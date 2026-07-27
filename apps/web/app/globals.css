@@ -1,0 +1,260 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Global Base ─────────────────────────────────────────── */
+@layer base {
+  :root {
+    --font-inter: 'Inter', sans-serif;
+  }
+
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    min-height: 100dvh;
+  }
+}
+
+/* ─── Component Layer ─────────────────────────────────────── */
+@layer components {
+  /* Bento card shape (2rem border-radius from original) */
+  .bento-shape {
+    border-radius: 2rem;
+  }
+
+  /* Gauge: Half-circle for health score */
+  .gauge-container {
+    position: relative;
+    width: 200px;
+    height: 100px;
+    overflow: hidden;
+  }
+
+  .gauge-bg {
+    width: 200px;
+    height: 200px;
+    border-radius: 50%;
+    border: 20px solid #e2e2e2;
+    position: absolute;
+  }
+
+  .gauge-fill {
+    width: 200px;
+    height: 200px;
+    border-radius: 50%;
+    border: 20px solid transparent;
+    border-top-color: #0d631b;
+    border-right-color: #0d631b;
+    position: absolute;
+    transform: rotate(225deg);
+    transition: transform 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* EC Gauge: 270-degree arc */
+  .ec-gauge-track {
+    width: 180px;
+    height: 180px;
+    border-radius: 50%;
+    border: 20px solid #e2e2e2;
+    border-bottom-color: transparent;
+    border-left-color: transparent;
+    transform: rotate(-135deg);
+  }
+
+  .ec-gauge-fill {
+    width: 180px;
+    height: 180px;
+    border-radius: 50%;
+    border: 20px solid #0d631b;
+    border-bottom-color: transparent;
+    border-left-color: transparent;
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform: rotate(-45deg);
+    transition: transform 1s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* pH Gradient Bar */
+  .ph-gradient {
+    background: linear-gradient(
+      to right,
+      #ef4444 0%,
+      #fbbf24 35%,
+      #22c55e 50%,
+      #3b82f6 65%,
+      #6366f1 100%
+    );
+  }
+
+  /* NPK gauge gradient */
+  .gauge-bar-gradient {
+    background: linear-gradient(90deg, #ba1a1a 0%, #0d631b 45%, #0d631b 55%, #ad5600 100%);
+  }
+
+  /* Glassmorphism header */
+  .glass-header {
+    backdrop-filter: blur(8px);
+    background: rgba(249, 249, 249, 0.85);
+  }
+
+  /* Glass card */
+  .glass-card {
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(8px);
+  }
+
+  /* Soft elevation shadow (matching original) */
+  .soft-elevation {
+    box-shadow: 0 4px 20px rgba(121, 86, 75, 0.08);
+  }
+
+  .soft-elevation-lg {
+    box-shadow: 0 4px 20px rgba(121, 86, 75, 0.12);
+  }
+
+  /* Touch targets */
+  .touch-target {
+    min-height: 56px;
+    display: flex;
+    align-items: center;
+  }
+
+  /* Custom Toggle Switch */
+  .switch {
+    position: relative;
+    display: inline-block;
+    width: 48px;
+    height: 24px;
+  }
+
+  .switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+
+  .slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: 0.4s;
+    border-radius: 24px;
+  }
+
+  .slider:before {
+    position: absolute;
+    content: '';
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: 0.4s;
+    border-radius: 50%;
+  }
+
+  input:checked + .slider {
+    background-color: #0d631b;
+  }
+
+  input:checked + .slider:before {
+    transform: translateX(24px);
+  }
+
+  /* Strength meter bars */
+  .strength-meter {
+    height: 4px;
+    transition: background-color 0.3s ease;
+  }
+
+  /* Step line for notifications */
+  .step-line {
+    position: relative;
+  }
+
+  .step-line::before {
+    content: '';
+    position: absolute;
+    left: 19px;
+    top: 40px;
+    bottom: 0;
+    width: 2px;
+    background: #bfcaba;
+  }
+
+  .step-line:last-child::before {
+    display: none;
+  }
+
+  /* Scrollbar hide */
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  /* Chart path animation */
+  .chart-path {
+    stroke-dasharray: 1000;
+    stroke-dashoffset: 1000;
+    animation: chart-draw 3s linear forwards;
+  }
+
+  @keyframes chart-draw {
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+}
+
+/* ─── Utilities ───────────────────────────────────────────── */
+@layer utilities {
+  .animate-fade-in {
+    animation: fade-in 0.4s ease-out;
+  }
+
+  .animate-slide-up {
+    animation: slide-up 0.4s ease-out;
+  }
+
+  @keyframes fade-in {
+    0% {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes slide-up {
+    0% {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}

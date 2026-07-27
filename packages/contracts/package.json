@@ -1,0 +1,11 @@
+{
+  "name": "@kebun-melon/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "build": "echo contracts placeholder build",
+    "typecheck": "tsc --noEmit"
+  }
+}

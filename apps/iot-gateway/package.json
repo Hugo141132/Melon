@@ -1,0 +1,10 @@
+{
+  "name": "@kebun-melon/iot-gateway",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "echo iot-gateway placeholder service",
+    "build": "echo iot-gateway placeholder build",
+    "typecheck": "tsc --noEmit"
+  }
+}
