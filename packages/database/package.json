@@ -21,11 +21,13 @@
     "db:test:schema": "vitest run test/schema.test.ts",
     "db:test:integration": "vitest run test/integration.test.ts",
     "db:test:seed": "vitest run test/seed.test.ts",
-    "db:test:seed-owner": "vitest run test/seed-owner.test.ts"
+    "db:test:seed-owner": "vitest run test/seed-owner.test.ts",
+    "db:test:user-repository": "vitest run test/user-repository.test.ts"
   },
   "dependencies": {
     "@node-rs/argon2": "^2.0.0",
-    "@prisma/client": "^5.22.0"
+    "@prisma/client": "^5.22.0",
+    "@kebun-melon/contracts": "*"
   },
   "devDependencies": {
     "dotenv-cli": "^7.4.4",

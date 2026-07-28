@@ -57,7 +57,7 @@
 | `PRD-DATA-005` | Reservoir water telemetry metrics data schema | `docs/PRD.md` | `DEC-MON-036` | `TASK-0408` | `TEST-MQTT-001` | `DECISION_REQUIRED` |
 | `PRD-DATA-006` | Shared sensor/tool battery telemetry metrics data schema | `docs/PRD.md` | `DEC-MON-036` | `TASK-0409` | `TEST-MQTT-001` | `DECISION_REQUIRED` |
 | `PRD-DATA-003` | Faucet preset target volume mappings | `docs/PRD.md` | `DEC-CTRL-051` | `TASK-0802` | `TEST-CTRL-001` | `READY_FOR_IMPLEMENTATION` |
-| `PRD-DATA-004` | User account profile data schema | `docs/PRD.md` | - | `TASK-0201` | `TEST-DB-001` | `READY_FOR_IMPLEMENTATION` |
+| `PRD-DATA-004` | User account profile data schema | `docs/PRD.md` | - | `TASK-0201` | `TEST-DB-001` | `IMPLEMENTED` |
 | `RBAC-ROLE-001` | OWNER role permissions and scope | `docs/RBAC.md` | `DEC-RBAC-013` | `TASK-0209` | `TEST-SEC-002` | `READY_FOR_IMPLEMENTATION` |
 | `RBAC-ROLE-002` | ADMIN role permissions and scope | `docs/RBAC.md` | `DEC-RBAC-015` | `TASK-0209` | `TEST-SEC-002` | `READY_FOR_IMPLEMENTATION` |
 | `RBAC-PERM-001` | Authentication required prior to authorisation | `docs/RBAC.md` | `DEC-AUTH-001` | `TASK-0209` | `TEST-SEC-001` | `READY_FOR_IMPLEMENTATION` |
@@ -138,7 +138,7 @@
 | `ARCH-DEP-001` | npm monorepo workspace repository structure | `docs/ARCHITECTURE.md` | `DEC-INF-075` | `TASK-0101` | `TEST-UNIT-001` | `IMPLEMENTED` |
 | `ARCH-DEP-002` | Multi-service container topology | `docs/ARCHITECTURE.md` | `DEC-INF-075` | `TASK-0101` | `TEST-E2E-001` | `READY_FOR_IMPLEMENTATION` |
 | `ARCH-DEP-003` | Environment variable validation on application startup | `docs/ARCHITECTURE.md` | - | `TASK-0103` | `TEST-UNIT-001` | `READY_FOR_IMPLEMENTATION` |
-| `DB-USER-001` | users table schema definition | `docs/DATABASE.md` | - | `TASK-0201` | `TEST-DB-001` | `READY_FOR_IMPLEMENTATION` |
+| `DB-USER-001` | users table schema definition | `docs/DATABASE.md` | - | `TASK-0201` | `TEST-DB-001` | `IMPLEMENTED` |
 | `DB-USER-002` | sessions table schema definition | `docs/DATABASE.md` | `DEC-AUTH-001` | `TASK-0201` | `TEST-DB-001` | `READY_FOR_IMPLEMENTATION` |
 | `DB-USER-003` | approval_history table schema definition | `docs/DATABASE.md` | `DEC-AUTH-006` | `TASK-0207` | `TEST-DB-001` | `READY_FOR_IMPLEMENTATION` |
 | `DB-USER-004` | roles and permissions tables schema definition | `docs/DATABASE.md` | - | `TASK-0105` | `TEST-DB-001` | `READY_FOR_IMPLEMENTATION` |

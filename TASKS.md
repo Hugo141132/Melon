@@ -473,34 +473,36 @@ Add checks for:
 ## TASK-0201 — Implement User Account Model
 
 **Priority:** `P0`  
-**Status:** `BACKLOG`  
+**Status:** `DONE`
 **Dependencies:** `TASK-0104`
+**Completed:** 2026-07-28 — Implemented shared TypeScript domain contracts in `packages/contracts` and repository abstraction in `packages/database`.
 
 ### Work
 
-Implement:
+Implemented:
 
-- User entity.
-- Account statuses.
-- Password hash.
-- Role assignment.
-- User preferences.
-- Approval records.
-- Timestamps.
+- User entity domain models and contracts.
+- Canonical account statuses (`PENDING_APPROVAL`, `APPROVED`, `ACTIVE`, `REJECTED`, `SUSPENDED`, `DEACTIVATED`).
+- Password hash exclusion in runtime public DTO (`PublicSafeUserDto`).
+- Independent role assignment representation (`UserRoleAssignmentDto`).
+- User preference contracts.
+- User repository abstraction (`UserRepository`).
+- Email normalisation (`trim().toLowerCase()`).
 
 ### Acceptance Criteria
 
 - Account statuses use canonical values.
-- Password hash is never returned.
+- Password hash is never returned in public-safe DTOs.
 - User role is stored independently.
-- Public registration path cannot directly set role or status.
+- Public registration path / public input cannot directly set role or status.
+
 
 ---
 
 ## TASK-0202 — Implement Password Hashing
 
 **Priority:** `P0`  
-**Status:** `BACKLOG`  
+**Status:** `IN_REVIEW`
 **Dependencies:** `TASK-0201`
 
 ### Work
