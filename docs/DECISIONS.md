@@ -32,7 +32,7 @@
 | **Authentication** | `DEC-AUTH-001` to `DEC-AUTH-012` | **APPROVED** | HTTP-only secure cookies, PostgreSQL session table, 30m idle / 12h max timeouts, CLI Owner seed, no public Owner creation. `SameSite` cookie value: **TBD** — pending explicit user approval. |
 | **RBAC** | `DEC-RBAC-013` to `DEC-RBAC-019` | **APPROVED** | Owner has global device visibility. Admins have mandatory per-device assignments; device assignment automatically grants both monitoring and faucet control. Owners manage assignments. No separate per-user-device `canControl` permission in v1. |
 | **Devices** | `DEC-DEV-020` to `DEC-DEV-035` | **APPROVED** | MQTT 5.0 over TLS via Gateway, per-device credentials/ACLs, no anonymous access, no direct browser-to-MQTT. Offline threshold: **TBD**. Stale threshold: **TBD**. |
-| **Monitoring** | `DEC-MON-036` to `DEC-MON-050` | **APPROVED** | Soil NPK in `mg/kg`, Temp in `°C`, Moisture in `%`, EC in `mS/cm`, Water TDS in `ppm`, Tank Vol in `L`, Presets in `mL`, Flow in `L/min`. `Water BAT` meaning and unit: **TBD**. Sensor precision and valid ranges: **TBD**. |
+| **Monitoring** | `DEC-MON-036` to `DEC-MON-050` | **APPROVED** | Three distinct monitoring domains: 1) Soil monitoring (NPK, Temp, Moisture, pH, EC, status), 2) Water monitoring (pH, TDS, EC, status), 3) Reservoir-water monitoring (Tank Vol in `L`, Flow in `L/min`, status). `BAT` is clarified as the shared sensor/tool battery supply for soil and water monitoring equipment (modeled independently as `SensorBatteryReading`). Reservoir-water monitoring does not use `BAT`. Sensor precision and valid ranges: **TBD**. |
 | **Faucet Control** | `DEC-CTRL-051` to `DEC-CTRL-067` | **APPROVED** | Max 1 active command/device, no auto retries, `ENABLE_FAUCET_CONTROL=false` default, dual written sign-off (Owner + Hardware Lead) required before production activation. Duplicate command IDs never re-dispense. Timeout ≠ completion. ACK timeout, completion timeout, expiry duration: **TBD**. Cancellation/stop support: **TBD**. |
 | **I18N** | `DEC-I18N-068` to `DEC-I18N-074` | **APPROVED** | Default `id` (Bahasa Indonesia), `en` fallback, cookie-based locale routing (no URL path pollution), UTC storage with `Asia/Jakarta` (WIB) presentation. |
 | **Infrastructure** | `DEC-INF-075` to `DEC-INF-088` | **APPROVED (ORM DECISION REQUIRED)** | npm monorepo, PostgreSQL (ORM TBD — see §2.5). Backup schedule, retention period, RPO, and RTO: **TBD** — pending explicit user approval. |
@@ -201,7 +201,7 @@ The following decisions remain TBD and must be resolved before the listed tasks 
 
 | Decision | Required Before | Notes |
 |---|---|---|
-| ORM selection (Prisma vs Drizzle) | `TASK-0104` | Neither is installed. User must choose. |
+| ORM selection (Prisma vs Drizzle) | `TASK-0104` | Approved: Prisma (`DEC-INF-076`). |
 | `SameSite` cookie policy exact value | `TASK-0204` | `SameSite=Strict` not yet approved. |
 | Device offline threshold (minutes) | `TASK-0407` | No numeric value approved. |
 | Device stale threshold (minutes) | `TASK-0407` | No numeric value approved. |
@@ -209,7 +209,8 @@ The following decisions remain TBD and must be resolved before the listed tasks 
 | Command completion timeout (seconds) | `TASK-0809` | No numeric value approved. |
 | Command expiry duration (seconds) | `TASK-0809` | No numeric value approved. |
 | Cancellation and stop support (yes/no) | `TASK-0810` | Unresolved. Default: do not implement. |
-| `Water BAT` meaning and unit | `TASK-0406` | Still undefined. |
+| Shared Sensor Battery (`BAT`) unit and precision | `TASK-0406` | BAT is clarified as shared soil/water tool/sensor battery. Unit & precision TBD. |
+| Reservoir-Water Volume and Flow Rate units | `TASK-0408` | Reservoir-water monitoring is a distinct domain from general water quality. Units TBD. |
 | Accessibility standard level | `TASK-1006` | WCAG level not yet approved. |
 | API performance targets (p95) | `TASK-1007` | No numeric values approved. |
 | Physical test run count per faucet phase | `TASK-0811` | No numeric value approved. |

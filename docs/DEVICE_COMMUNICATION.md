@@ -597,7 +597,7 @@ Topic:
 agriculture/{environment}/{siteId}/{deviceId}/telemetry/water
 ```
 
-Recommended payload:
+Recommended payload (Water-Quality monitoring domain):
 
 ```json
 {
@@ -611,12 +611,60 @@ Recommended payload:
     "ph": 7.1,
     "tds": 420,
     "ec": 0.84,
-    "battery": 82,
     "latitude": -6.2001,
     "longitude": 106.8168,
-    "status": "NORMAL",
+    "status": "NORMAL"
+  }
+}
+```
+
+### 14.1 Reservoir-Water Telemetry Payload (Proposed Domain)
+
+Topic:
+
+```text
+agriculture/{environment}/{siteId}/{deviceId}/telemetry/reservoir
+```
+
+Recommended payload:
+
+```json
+{
+  "schemaVersion": "1.0",
+  "messageId": "msg-reservoir-000001",
+  "deviceId": "water-node-001",
+  "siteId": "site-01",
+  "sequence": 903,
+  "recordedAt": "2026-07-27T13:45:00+07:00",
+  "data": {
     "tankVolume": 75.0,
-    "flowRate": 2.3
+    "flowRate": 2.3,
+    "status": "NORMAL"
+  }
+}
+```
+
+### 14.2 Shared Sensor/Tool Battery Telemetry Payload (Proposed Domain)
+
+Topic:
+
+```text
+agriculture/{environment}/{siteId}/{deviceId}/telemetry/battery
+```
+
+Recommended payload:
+
+```json
+{
+  "schemaVersion": "1.0",
+  "messageId": "msg-bat-000001",
+  "deviceId": "esp32-001",
+  "siteId": "site-01",
+  "sequence": 904,
+  "recordedAt": "2026-07-27T13:45:00+07:00",
+  "data": {
+    "battery": 82,
+    "status": "NORMAL"
   }
 }
 ```

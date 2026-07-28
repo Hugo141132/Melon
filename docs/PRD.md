@@ -345,31 +345,33 @@ The website shall not invent sensor units or valid ranges. Units and ranges shal
 
 ### 9.2 Water Monitoring (PRD-FR-024 / PRD-DATA-002)
 
-For the selected device, the application shall support display of:
+For the selected device, the application shall support display of water quality parameters:
 
 - Water pH.
 - Water TDS.
 - Water EC.
-- Water BAT.
-- Water latitude.
-- Water longitude.
 - Water status.
-- Water volume in the tank.
-- Water flow rate in the tank.
 
-For each available metric, the interface shall support:
+### 9.3 Reservoir-Water Monitoring (PRD-FR-038 / PRD-DATA-005)
 
-- Current value.
-- Unit supplied by the agreed data contract.
-- Measurement timestamp.
-- Latest update time.
-- Normal, warning, critical, unavailable, or invalid display state where applicable.
-- Historical view where data is stored.
-- Loading, empty, offline, stale, and error states.
+For the selected device, reservoir-water monitoring is a distinct domain supporting:
 
-The meaning and unit of `Water BAT` shall be defined in the integration specification. It shall remain `TBD` in implementation until confirmed.
+- Reservoir water volume.
+- Reservoir water flow rate.
+- Reservoir water status.
 
-### 9.3 Status Values (PRD-FR-025)
+Reservoir-water monitoring is separate from general water-quality monitoring.
+
+### 9.4 Shared Sensor/Tool Battery Monitoring (PRD-FR-039 / PRD-DATA-006)
+
+The application supports monitoring the shared sensor/tool battery (`BAT`), representing the power supply for the soil and water monitoring equipment:
+
+- Battery level / status.
+- Timestamp of battery reading.
+
+`BAT` is a shared equipment supply for soil and water monitoring. Reservoir-water monitoring does not use the `BAT` parameter.
+
+### 9.5 Status Values (PRD-FR-025)
 
 Internal status values shall remain language-neutral.
 

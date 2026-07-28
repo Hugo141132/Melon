@@ -672,6 +672,8 @@ ON soil_readings (device_id, status, recorded_at DESC)
 
 ## 8.3 `water_readings` (DB-TEL-002)
 
+Stores general water-quality telemetry.
+
 | Column | Type | Nullable | Notes |
 |---|---|---:|---|
 | `id` | UUID | No | Primary key |
@@ -684,12 +686,50 @@ ON soil_readings (device_id, status, recorded_at DESC)
 | `ph` | NUMERIC | Yes | |
 | `tds` | NUMERIC | Yes | Unit `TBD` |
 | `ec` | NUMERIC | Yes | Unit `TBD` |
-| `battery` | NUMERIC | Yes | Meaning/unit `TBD` |
 | `latitude` | NUMERIC(9,6) | Yes | |
 | `longitude` | NUMERIC(9,6) | Yes | |
 | `status` | VARCHAR(30) | Yes | Canonical status |
+| `validation_status` | VARCHAR(30) | No | |
+| `created_at` | TIMESTAMPTZ | No | |
+
+---
+
+## 8.4 `reservoir_water_readings` (DB-TEL-003)
+
+Stores reservoir-water volume and flow rate telemetry independently from general water-quality.
+
+| Column | Type | Nullable | Notes |
+|---|---|---:|---|
+| `id` | UUID | No | Primary key |
+| `device_id` | UUID | No | FK to `devices` |
+| `message_id` | VARCHAR(150) | No | Device message ID |
+| `sequence_number` | BIGINT | Yes | |
+| `schema_version` | VARCHAR(30) | No | |
+| `recorded_at` | TIMESTAMPTZ | Yes | |
+| `received_at` | TIMESTAMPTZ | No | |
 | `tank_volume` | NUMERIC | Yes | Unit `TBD` |
 | `flow_rate` | NUMERIC | Yes | Unit `TBD` |
+| `status` | VARCHAR(30) | Yes | Canonical status |
+| `validation_status` | VARCHAR(30) | No | |
+| `created_at` | TIMESTAMPTZ | No | |
+
+---
+
+## 8.5 `sensor_battery_readings` (DB-TEL-004)
+
+Stores time-series battery / power-supply measurements for the shared soil and water monitoring equipment.
+
+| Column | Type | Nullable | Notes |
+|---|---|---:|---|
+| `id` | UUID | No | Primary key |
+| `device_id` | UUID | No | FK to `devices` |
+| `message_id` | VARCHAR(150) | No | Device message ID |
+| `sequence_number` | BIGINT | Yes | |
+| `schema_version` | VARCHAR(30) | No | |
+| `recorded_at` | TIMESTAMPTZ | Yes | |
+| `received_at` | TIMESTAMPTZ | No | |
+| `battery_level` | NUMERIC | No | Unit/meaning `TBD` |
+| `status` | VARCHAR(30) | Yes | Canonical status |
 | `validation_status` | VARCHAR(30) | No | |
 | `created_at` | TIMESTAMPTZ | No | |
 
