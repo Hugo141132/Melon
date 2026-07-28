@@ -1114,9 +1114,22 @@ The following RBAC decisions remain unresolved:
 2. Multi-device support is confirmed, but the exact device-assignment model is not yet final.
 3. Owner management of other users is confirmed, but the permitted editable profile fields are not yet defined.
 4. Owner approval is confirmed, but the distinction between `APPROVED` and `ACTIVE` is unresolved.
-5. The first Owner provisioning process is not yet defined.
+5. The first Owner provisioning process is implemented via secure one-time CLI (`DEC-AUTH-006`, `TASK-0106`).
 6. It is not yet confirmed whether multiple Owners are allowed.
 7. Admin monitoring access is confirmed, but export permissions are unresolved.
 8. Alert acknowledgement permissions for Admins are unresolved.
 9. Existing-session invalidation behaviour after account suspension or device reassignment is not yet defined.
 10. The existing frontend must be checked to confirm that Owner-only and Admin-only states are visually represented without relying on frontend hiding as the sole security mechanism.
+
+---
+
+## 27. First Owner Provisioning Workflow (`TASK-0106`)
+
+Initial system bootstrap creates the primary `OWNER` account via a secure, explicit, one-time CLI script (`npm run seed:owner`).
+
+Key RBAC & Security Rules for Provisioning:
+1. **Public Registration Safety:** Public registration endpoints must NEVER create an `OWNER` role account. Registration creates only `ADMIN` in `PENDING_APPROVAL` status.
+2. **One-Time Bootstrap:** Provisioning checks for any existing non-revoked `OWNER` role assignment across all account statuses (`ACTIVE`, `APPROVED`, `PENDING_APPROVAL`, `SUSPENDED`, `DEACTIVATED`). Rejects if an Owner exists.
+3. **PostgreSQL Advisory Lock:** Uses a stable 64-bit BigInt transaction-scoped advisory lock (`84736291106`) to guarantee serialised single execution across concurrent processes.
+4. **Canonical Role Prerequisite:** Pre-checks canonical `OWNER` role existence in DB (`npm run db:seed` required prior to provisioning).
+5. **Initial State:** The provisioned Owner is created in `ACTIVE` account status with exactly 1 `OWNER` assignment, 0 `ADMIN` assignments, 0 `AccountApproval` records, and 1 system `AuditLog` record (`ACCOUNT_PROVISION_OWNER`).

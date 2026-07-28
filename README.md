@@ -14,7 +14,7 @@ The system is designed to:
 - Support English and Bahasa Indonesia.
 - Communicate with hardware through a backend-managed MQTT gateway.
 
-> **Current project status:** `TASK-0101` through `TASK-0105` (Database Foundation, Schema & Migrations, Communication Architecture Reconciliation, and Idempotent RBAC Roles/Permissions Seeding) are complete (`TASK-0105` status: `DONE`). Baseline Prisma schema, 4 telemetry models, canonical RBAC seed (`OWNER` & `ADMIN`, 38 permissions), PostgreSQL migration, static schema tests, and live database integration/seed tests are verified.
+> **Current project status:** `TASK-0101` through `TASK-0106` (Database Foundation, Schema & Migrations, Communication Architecture Reconciliation, Idempotent RBAC Roles/Permissions Seeding, and Secure First Owner Provisioning) are complete (`TASK-0106` status: `DONE`). Baseline Prisma schema, 4 telemetry models, canonical RBAC seed (`OWNER` & `ADMIN`, 38 permissions), PostgreSQL migration, one-time secure CLI first-Owner provisioning (`seed:owner`), static schema tests, and live database integration/seed/owner tests are verified.
 
 ---
 

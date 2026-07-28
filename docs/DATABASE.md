@@ -1666,3 +1666,17 @@ The database design is accepted when:
 8. Alert thresholds remain outside the current software specification.
 9. The authentication library will influence the final session schema.
 10. The hosting decision will influence backup, partitioning, and operational configuration.
+
+---
+
+# 32. Advisory Lock Strategy for First Owner Provisioning (`TASK-0106`)
+
+To prevent race conditions during initial system bootstrap across concurrent CLI instances or processes, initial Owner creation uses PostgreSQL transaction-scoped advisory locking (`pg_advisory_xact_lock`):
+
+- **Lock Identifier:** `84736291106` (`BigInt`).
+- **Scope:** Transaction-scoped (`pg_advisory_xact_lock`). The lock is automatically acquired inside the `Serializable` transaction critical section and released upon transaction commit or rollback.
+- **Execution:**
+  ```sql
+  SELECT pg_advisory_xact_lock(84736291106);
+  ```
+- **Behavior:** Concurrent attempts wait for the first process to finish, then observe the newly created `OWNER` assignment and safely terminate with a non-zero exit code (`PROVISIONING FAILED: First Owner account already exists`).

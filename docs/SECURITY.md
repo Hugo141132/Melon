@@ -1450,7 +1450,7 @@ The security implementation is accepted when:
 ## 33. Conflicts and Gaps Found
 
 1. The authentication and session mechanism is not final.
-2. The Owner account provisioning process remains undefined.
+2. The Owner account provisioning process is implemented via secure one-time CLI (`DEC-AUTH-006`, `TASK-0106`).
 3. Faucet-control permissions for Owner and Admin are unresolved.
 4. Concurrent command, cancellation, stop, and timeout policies remain unresolved.
 5. Device authentication may use passwords or certificates; the final production approach is not selected.
@@ -1459,3 +1459,15 @@ The security implementation is accepted when:
 8. The production hosting environment is still under discussion.
 9. MFA is recommended for Owner accounts but not yet approved.
 10. Security testing must be completed before production physical control is enabled.
+
+---
+
+## 34. First Owner Provisioning Security Controls (`TASK-0106`)
+
+Security controls enforced during initial system bootstrap:
+1. **Command-Line Input Safety:** Passwords must NOT be passed as visible command-line arguments. Passwords are accepts interactively via masked terminal input, stdin stream, or environment variable (`OWNER_PASSWORD`). Passwords are never logged or leaked.
+2. **Password Policy Enforcement:** Validated directly against §8.2 (12+ characters, uppercase, lowercase, digit, special character).
+3. **Argon2id Hashing:** Password hashes use `@node-rs/argon2` with algorithm Argon2id. Plaintext passwords are scrubbed from memory immediately after hashing.
+4. **PostgreSQL Advisory Locking:** Acquires `pg_advisory_xact_lock(84736291106)` inside a `Serializable` transaction to eliminate race conditions between concurrent provisioning processes.
+5. **Auditing without Leakage:** Logs a system `AuditLog` record (`eventKey = ACCOUNT_PROVISION_OWNER`, `actorUserId = null`, `result = SUCCESS`) containing target ID and role without any passwords, hashes, tokens, or database URLs.
+6. **No Pre-created Approval Records:** Omits `AccountApproval` rows to maintain foreign key integrity when no approving Owner user exists.

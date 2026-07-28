@@ -380,20 +380,23 @@ Seed canonical permissions from `RBAC.md`.
 
 ## TASK-0106 — Implement Secure First Owner Provisioning
 
-**Priority:** `P0`  
-**Status:** `BLOCKED`  
-**Dependencies:** `TASK-0104`, `TASK-0002`
+**Priority:** `P0`
+**Status:** `DONE`
+**Dependencies:** `TASK-0104`, `TASK-0002`, `TASK-0105`
 
 ### Work
 
-Implement the approved first Owner provisioning method.
+Implemented secure, explicit, one-time CLI first Owner provisioning workflow per `DEC-AUTH-006` (`npm run seed:owner` / `npm run db:test:seed-owner`).
 
-Possible approved methods:
-
-- One-time CLI.
-- Secure migration seed using secret input.
-- Restricted administrative script.
-- Deployment-time provisioning.
+Key Implementation Details:
+- Enforces approved password policy directly from `docs/SECURITY.md` §8.2 (12+ chars, upper, lower, digit, special character).
+- Uses PostgreSQL transaction-scoped advisory locking (`pg_advisory_xact_lock` with stable 64-bit BigInt `84736291106`) across `Serializable` transaction isolation for race-safe critical section execution.
+- Checks existing `OWNER` assignments across ALL user account statuses (`ACTIVE`, `APPROVED`, `PENDING_APPROVAL`, `SUSPENDED`, `DEACTIVATED`) and rejects if any non-revoked `OWNER` role exists.
+- Pre-checks canonical `OWNER` role existence in DB; fails non-zero with operator guidance if missing.
+- Normalises email (`trim().toLowerCase()`) and checks email uniqueness against pre-existing users (handling mixed-case duplicate email attempts).
+- Uses `@node-rs/argon2` for N-API compiled Argon2id password hashing and verification.
+- Atomically creates 1 `User` (`ACTIVE`), 1 `UserRoleAssignment` (`OWNER`), 0 `ADMIN` assignments, 0 `AccountApproval` rows, and 1 system `AuditLog` entry (null actor, no secrets or DB URLs).
+- Tested separate OS process concurrency race conditions with 2 simultaneous processes.
 
 ### Acceptance Criteria
 

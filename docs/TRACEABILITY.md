@@ -27,7 +27,7 @@
 | `PRD-FR-015` | Access restriction to authenticated users | `docs/PRD.md` | `DEC-AUTH-001` | `TASK-0210` | `TEST-API-001` | `READY_FOR_IMPLEMENTATION` |
 | `PRD-FR-016` | Admin account self-registration submission | `docs/PRD.md` | `DEC-AUTH-006` | `TASK-0203` | `TEST-API-002` | `READY_FOR_IMPLEMENTATION` |
 | `PRD-FR-017` | Admin approval workflow and account status transitions | `docs/PRD.md` | `DEC-AUTH-006` | `TASK-0207` | `TEST-API-002` | `READY_FOR_IMPLEMENTATION` |
-| `PRD-FR-018` | First Owner account seed provisioning | `docs/PRD.md` | `DEC-AUTH-006` | `TASK-0106` | `TEST-API-002` | `READY_FOR_IMPLEMENTATION` |
+| `PRD-FR-018` | First Owner account seed provisioning | `docs/PRD.md` | `DEC-AUTH-006` | `TASK-0106` | `TEST-API-002` | `IMPLEMENTED` |
 | `PRD-FR-019` | Login behavior and account-status validation | `docs/PRD.md` | `DEC-AUTH-001` | `TASK-0204` | `TEST-API-001` | `READY_FOR_IMPLEMENTATION` |
 | `PRD-FR-020` | Multi-device support and metadata tracking | `docs/PRD.md` | `DEC-DEV-020` | `TASK-0302` | `TEST-DB-001` | `READY_FOR_IMPLEMENTATION` |
 | `PRD-FR-021` | Device selector interface and context persistence | `docs/PRD.md` | - | `TASK-0306` | `TEST-E2E-003` | `READY_FOR_IMPLEMENTATION` |
@@ -179,7 +179,7 @@
 | `SEC-AUTH-001` | HTTP-only secure cookie session storage | `docs/SECURITY.md` | `DEC-AUTH-001` | `TASK-0204` | `TEST-SEC-001` | `READY_FOR_IMPLEMENTATION` |
 | `SEC-AUTH-002` | Password hashing using Argon2id algorithm | `docs/SECURITY.md` | - | `TASK-0202` | `TEST-SEC-001` | `READY_FOR_IMPLEMENTATION` |
 | `SEC-AUTH-003` | Public registration forbidden from creating Owner | `docs/SECURITY.md` | `DEC-AUTH-006` | `TASK-0203` | `TEST-SEC-001` | `READY_FOR_IMPLEMENTATION` |
-| `SEC-AUTH-004` | CLI seed method for first Owner account creation | `docs/SECURITY.md` | `DEC-AUTH-006` | `TASK-0106` | `TEST-SEC-001` | `READY_FOR_IMPLEMENTATION` |
+| `SEC-AUTH-004` | CLI seed method for first Owner account creation | `docs/SECURITY.md` | `DEC-AUTH-006` | `TASK-0106` | `TEST-SEC-001` | `IMPLEMENTED` |
 | `SEC-AUTH-005` | Session lifetime and idle timeout enforcement | `docs/SECURITY.md` | `DEC-AUTH-001` | `TASK-0204` | `TEST-SEC-001` | `READY_FOR_IMPLEMENTATION` |
 | `SEC-RBAC-001` | Server-side authorization for all protected routes | `docs/SECURITY.md` | - | `TASK-0210` | `TEST-SEC-002` | `READY_FOR_IMPLEMENTATION` |
 | `SEC-RBAC-002` | Device-level isolation and access boundary | `docs/SECURITY.md` | `DEC-RBAC-016` | `TASK-0304` | `TEST-SEC-003` | `READY_FOR_IMPLEMENTATION` |

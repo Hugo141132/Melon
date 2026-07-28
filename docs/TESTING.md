@@ -1795,3 +1795,20 @@ The testing strategy is satisfied when:
 8. Browser and mobile support requirements are not defined.
 9. Performance service-level targets remain provisional.
 10. UAT ownership and release approval authority are not yet documented.
+
+---
+
+# 42. First Owner Provisioning Test Suite (`TASK-0106`)
+
+Automated tests for first Owner provisioning are maintained in `packages/database/test/seed-owner.test.ts` (`npm run db:test:seed-owner`).
+
+Test Coverage Enforced:
+1. **Password Policy & Email Normalisation:** Verifies minimum 12 characters, uppercase, lowercase, digit, and special character requirements from `docs/SECURITY.md` §8.2. Verifies `trim().toLowerCase()` email normalisation.
+2. **Database URL Safety:** Rejects test runs if `TEST_DATABASE_URL` database name does not contain `test` or `disposable`.
+3. **Precondition & Missing Role Check:** Verifies error handling when canonical `OWNER` role is missing from DB.
+4. **Duplicate Email Rejection:** Verifies rejection of mixed-case duplicate email attempts when a non-Owner user exists.
+5. **Successful Creation Lifecycle:** Verifies atomic creation of 1 `ACTIVE` User, 1 non-revoked `OWNER` assignment, 0 `ADMIN` assignments, 0 `AccountApproval` rows, and 1 system `AuditLog` entry (null actor, non-sensitive metadata, no secrets/DB URLs). Verifies Argon2id password hash verification via library `verify()`.
+6. **Second-Attempt Rejection:** Verifies second provisioning attempt is rejected safely even if the existing Owner user account is `SUSPENDED` or `DEACTIVATED`.
+7. **Transaction Rollback:** Verifies complete rollback on simulated failure (`simulateFailure`), leaving 0 users, 0 assignments, 0 audit records.
+8. **Ordinary RBAC Seed Separation:** Verifies ordinary `npm run db:seed` creates 0 users, 0 sessions, 0 device assignments.
+9. **Separate OS Process Concurrency Test:** Spawns two separate OS processes simultaneously running `seed-owner.ts` against the same database, verifying exactly 1 process exits 0 and 1 process exits 1 (non-zero).
