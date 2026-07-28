@@ -355,7 +355,7 @@ REALTIME_TRANSPORT
 ## TASK-0105 — Seed Roles and Permissions
 
 **Priority:** `P0`  
-**Status:** `BACKLOG`  
+**Status:** `DONE`
 **Dependencies:** `TASK-0104`
 
 ### Work

@@ -366,12 +366,16 @@ describe('Live PostgreSQL Database Integration & Constraint Verification', () =>
       },
     });
 
-    const adminRole = await prisma.role.create({
-      data: {
-        code: 'ADMIN',
-        name: 'Administrator',
-      },
-    });
+    const adminRole =
+      (await prisma.role.findUnique({
+        where: { code: 'ADMIN' },
+      })) ||
+      (await prisma.role.create({
+        data: {
+          code: 'ADMIN',
+          name: 'Administrator',
+        },
+      }));
 
     await prisma.userRoleAssignment.create({
       data: {

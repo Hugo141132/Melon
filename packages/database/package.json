@@ -4,6 +4,9 @@
   "private": true,
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
@@ -12,9 +15,11 @@
     "db:generate": "dotenv -e ../../apps/web/.env.example -- prisma generate",
     "db:migrate:dev": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
+    "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
     "db:test:schema": "vitest run test/schema.test.ts",
-    "db:test:integration": "vitest run test/integration.test.ts"
+    "db:test:integration": "vitest run test/integration.test.ts",
+    "db:test:seed": "vitest run test/seed.test.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0"
@@ -22,6 +27,7 @@
   "devDependencies": {
     "dotenv-cli": "^7.4.4",
     "prisma": "^5.22.0",
+    "tsx": "^4.19.2",
     "vitest": "^1.6.0"
   }
 }
