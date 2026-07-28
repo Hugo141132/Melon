@@ -17,10 +17,15 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "typecheck:web": "npm run typecheck --workspace=apps/web",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "env:check": "tsx scripts/check-env.ts all",
+    "env:check:web": "tsx scripts/check-env.ts web",
+    "env:check:gateway": "tsx scripts/check-env.ts gateway",
+    "env:test": "tsx scripts/test-env.ts"
   },
   "devDependencies": {
     "prettier": "^3.3.3",
+    "tsx": "^4.23.1",
     "typescript": "^5"
   }
 }

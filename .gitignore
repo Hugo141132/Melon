@@ -34,3 +34,11 @@ coverage/
 # Temporary
 .tmp/
 .cache/
+.env.local
+.env.*.local
+apps/*/.env
+apps/*/.env.local
+apps/*/.env.*.local
+*.pem
+*.key
+*.tsbuildinfo

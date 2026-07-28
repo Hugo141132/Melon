@@ -6,5 +6,8 @@
     "dev": "echo iot-gateway placeholder service",
     "build": "echo iot-gateway placeholder build",
     "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^3.23.8"
   }
 }
