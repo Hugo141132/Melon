@@ -135,7 +135,7 @@
 | `ARCH-FLOW-002` | Telemetry ingestion architecture data flow | `docs/ARCHITECTURE.md` | `DEC-DEV-020` | `TASK-0405` | `TEST-MQTT-003` | `READY_FOR_IMPLEMENTATION` |
 | `ARCH-FLOW-003` | Realtime telemetry streaming architecture flow | `docs/ARCHITECTURE.md` | `DEC-INF-077` | `TASK-0505` | `TEST-E2E-003` | `DECISION_REQUIRED` |
 | `ARCH-FLOW-004` | Faucet command dispatch architecture flow | `docs/ARCHITECTURE.md` | `DEC-CTRL-051` | `TASK-0804` | `TEST-CTRL-002` | `READY_FOR_IMPLEMENTATION` |
-| `ARCH-DEP-001` | npm monorepo workspace repository structure | `docs/ARCHITECTURE.md` | `DEC-INF-075` | `TASK-0101` | `TEST-UNIT-001` | `READY_FOR_IMPLEMENTATION` |
+| `ARCH-DEP-001` | npm monorepo workspace repository structure | `docs/ARCHITECTURE.md` | `DEC-INF-075` | `TASK-0101` | `TEST-UNIT-001` | `IMPLEMENTED` |
 | `ARCH-DEP-002` | Multi-service container topology | `docs/ARCHITECTURE.md` | `DEC-INF-075` | `TASK-0101` | `TEST-E2E-001` | `READY_FOR_IMPLEMENTATION` |
 | `ARCH-DEP-003` | Environment variable validation on application startup | `docs/ARCHITECTURE.md` | - | `TASK-0103` | `TEST-UNIT-001` | `READY_FOR_IMPLEMENTATION` |
 | `DB-USER-001` | users table schema definition | `docs/DATABASE.md` | - | `TASK-0201` | `TEST-DB-001` | `READY_FOR_IMPLEMENTATION` |

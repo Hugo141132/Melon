@@ -246,7 +246,7 @@ TEST-RBAC-001
 ## TASK-0101 — Establish Repository Structure
 
 **Priority:** `P1`  
-**Status:** `BACKLOG`  
+**Status:** `DONE`
 **Dependencies:** `TASK-0001`
 
 ### Work
