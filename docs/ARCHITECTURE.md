@@ -110,37 +110,34 @@ Migration to a different frontend framework shall occur only when justified by t
 ```mermaid
 flowchart LR
     U[Owner / Admin Browser]
-    W[Web Application]
+    W[Web Application / Backend API]
     A[Authentication and RBAC Layer]
-    B[Application API]
     R[Realtime Delivery]
     G[IoT Gateway]
-    M[MQTT Broker]
-    D1[ESP32 Device 1]
-    D2[ESP32 Device 2]
-    DN[ESP32 Device N]
+    M[EMQX MQTT Broker]
+    D_Soil[Soil / Water Sensors REST]
+    D_Res[Reservoir Sensor MQTT]
     DB[(PostgreSQL)]
-    C[(Cache / Optional Redis)]
     O[Logs and Metrics]
 
     U -->|HTTPS| W
     W --> A
-    W --> B
-    B --> DB
-    B --> C
-    B --> G
-    R --> U
-    G --> R
+    D_Soil -->|REST API over Wi-Fi| W
+    W --> DB
     G --> DB
     G --> M
-    M <--> D1
-    M <--> D2
-    M <--> DN
+    M <--> D_Res
+    G --> R
+    R --> U
     W --> O
-    B --> O
     G --> O
     M --> O
 ```
+
+### 4.1 Ingress Paths by Domain
+
+1. **Soil & Water Quality Telemetry**: Equipment sends REST API calls over Wi-Fi directly to backend REST endpoints (`W`), which validate, persist (`DB`), and emit real-time updates (`R`).
+2. **Reservoir-Water Telemetry & Control**: Reservoir nodes connect via MQTT 5.0 over TLS to the EMQX broker (`M`). The IoT Gateway (`G`) ingests messages, validates payloads, persists to PostgreSQL (`DB`), and handles faucet commands.
 
 ---
 

@@ -2,8 +2,26 @@
   "name": "@kebun-melon/database",
   "version": "0.1.0",
   "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
-    "build": "echo database placeholder build",
-    "typecheck": "tsc --noEmit"
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "db:format": "prisma format",
+    "db:validate": "dotenv -e ../../apps/web/.env.example -- prisma validate",
+    "db:generate": "dotenv -e ../../apps/web/.env.example -- prisma generate",
+    "db:migrate:dev": "prisma migrate dev",
+    "db:migrate:deploy": "prisma migrate deploy",
+    "db:studio": "prisma studio",
+    "db:test:schema": "vitest run test/schema.test.ts",
+    "db:test:integration": "vitest run test/integration.test.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0"
+  },
+  "devDependencies": {
+    "dotenv-cli": "^7.4.4",
+    "prisma": "^5.22.0",
+    "vitest": "^1.6.0"
   }
 }

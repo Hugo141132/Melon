@@ -45,30 +45,48 @@ This specification does not define how a sensor produces a measurement. It defin
 
 ---
 
-## 3. Architectural Boundary
+### 3. Architectural Boundary
 
-The browser shall not communicate directly with an ESP32/NodeMCU device or publish directly to unrestricted MQTT topics.
+The browser shall not communicate directly with an ESP32/NodeMCU device or publish directly to MQTT topics.
 
-The required communication path is:
+The architecture provides two distinct ingress paths based on monitoring domain:
+
+### Path A — REST API over Wi-Fi (Soil & Water Quality Telemetry)
 
 ```text
-ESP32 / NodeMCU
+Soil and Water Monitoring Equipment
     │
-    │ MQTT over TLS
+    │ HTTPS / REST API over Wi-Fi
     ▼
-MQTT Broker
+Backend Ingestion Boundary (Web Backend)
+    │
+    ├── Validate payload schema & device authentication
+    ├── Persist telemetry to PostgreSQL database
+    └── Stream live updates to authenticated web frontend
+```
+
+### Path B — MQTT through EMQX Broker (Reservoir-Water Telemetry & Faucet Control)
+
+```text
+Reservoir-Water Monitoring & Control Equipment
+    │
+    │ MQTT 5.0 over TLS
+    ▼
+EMQX MQTT Broker
     │
     ▼
 IoT Gateway / Integration Service
     │
-    ├── Validate and store telemetry
-    ├── Maintain device state
-    ├── Publish device commands
-    ├── Process acknowledgements
+    ├── Validate message schema & topic permissions
+    ├── Persist reservoir telemetry to PostgreSQL database
+    ├── Publish faucet control commands & process acknowledgements
     └── Send live updates to the web backend
              │
              ▼
-Authenticated Web Application
+      Web Application
+             │
+             ▼
+   Authenticated Frontend
 ```
 
 For monitoring:
@@ -309,6 +327,23 @@ The frontend shall use the backend device record to determine which components a
 Missing capabilities shall not be treated as sensor failure.
 
 Whether capabilities are provisioned by the backend, published by the device, or both is `TBD`.
+
+### 7.1 Protocol Routing & Device Capability Mapping
+
+Communication protocol routing (`REST API over Wi-Fi` vs `MQTT over TLS through EMQX`) is deterministically resolved using a combination of `DeviceType` (`Device.deviceType`) and registered `DeviceCapability` entries (`DeviceCapability.capability`):
+
+| DeviceType | Required / Registered Capability | Protocol / Transport | Destination / Ingress Boundary |
+|---|---|---|---|
+| `SOIL_NODE` | `SOIL_TELEMETRY` | REST API over Wi-Fi (HTTPS) | Web Backend REST Ingestion Endpoint |
+| `WATER_NODE` | `WATER_TELEMETRY` | REST API over Wi-Fi (HTTPS) | Web Backend REST Ingestion Endpoint |
+| `COMBINED_NODE` | `SOIL_TELEMETRY` + `WATER_TELEMETRY` + `BATTERY_MONITORING` | REST API over Wi-Fi (HTTPS) | Web Backend REST Ingestion Endpoint |
+| `WATER_NODE` or `COMBINED_NODE` | `TANK_MONITORING` / `FLOW_MONITORING` | MQTT 5.0 over TLS | EMQX Broker → IoT Gateway Service |
+| `WATER_NODE` or `COMBINED_NODE` | `FAUCET_CONTROL` | MQTT 5.0 over TLS | EMQX Broker ← IoT Gateway Service |
+
+Rules:
+- Devices sending general soil and water quality telemetry use **REST API over Wi-Fi**.
+- Devices with `TANK_MONITORING`, `FLOW_MONITORING`, or `FAUCET_CONTROL` capabilities connect via **MQTT 5.0 over TLS** to the **EMQX Broker**.
+- The existing `DeviceType` enum values (`SOIL_NODE`, `WATER_NODE`, `COMBINED_NODE`) are sufficient and unambiguous when evaluated together with registered device capabilities. No schema enum modification is required.
 
 ---
 

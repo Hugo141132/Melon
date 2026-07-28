@@ -151,10 +151,8 @@ Physical faucet-control testing shall begin with:
 - RBAC.
 - Profile management.
 - Device assignment.
-- Monitoring.
-- Historical data.
-- Alerts.
-- Faucet control.
+- Telemetry ingestion via **REST API over Wi-Fi** (soil payload validation, water quality payload validation, invalid payload rejection, unauthorized device rejection, shared BAT placement verification).
+- Telemetry ingestion via **MQTT/EMQX** (reservoir volume telemetry, reservoir flow rate telemetry, invalid topic/payload rejection, per-device ACL enforcement, broker reconnects, duplicate handling, gateway validation).
 - Internationalisation.
 - API.
 - Database.

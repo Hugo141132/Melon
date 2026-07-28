@@ -145,10 +145,10 @@
 | `DB-DEV-001` | devices table schema definition | `docs/DATABASE.md` | `DEC-DEV-020` | `TASK-0302` | `TEST-DB-001` | `READY_FOR_IMPLEMENTATION` |
 | `DB-DEV-002` | user_devices assignment table schema definition | `docs/DATABASE.md` | `DEC-RBAC-016` | `TASK-0304` | `TEST-DB-001` | `READY_FOR_IMPLEMENTATION` |
 | `DB-DEV-003` | sites table schema definition | `docs/DATABASE.md` | `DEC-DEV-026` | `TASK-0301` | `TEST-DB-001` | `DEFERRED` |
-| `DB-TEL-001` | soil_telemetry table schema definition | `docs/DATABASE.md` | `DEC-MON-036` | `TASK-0405` | `TEST-DB-001` | `READY_FOR_IMPLEMENTATION` |
-| `DB-TEL-002` | water_telemetry table schema definition | `docs/DATABASE.md` | `DEC-MON-036` | `TASK-0406` | `TEST-DB-001` | `DECISION_REQUIRED` |
-| `DB-TEL-003` | reservoir_water_telemetry table schema definition | `docs/DATABASE.md` | `DEC-MON-036` | `TASK-0408` | `TEST-DB-001` | `DECISION_REQUIRED` |
-| `DB-TEL-004` | sensor_battery_telemetry table schema definition | `docs/DATABASE.md` | `DEC-MON-036` | `TASK-0409` | `TEST-DB-001` | `DECISION_REQUIRED` |
+| `DB-TEL-001` | soil_telemetry table schema definition | `docs/DATABASE.md` | `DEC-MON-036` | `TASK-0405` | `TEST-DB-001` | `VERIFIED` |
+| `DB-TEL-002` | water_telemetry table schema definition | `docs/DATABASE.md` | `DEC-MON-036` | `TASK-0406` | `TEST-DB-001` | `VERIFIED` |
+| `DB-TEL-003` | reservoir_water_telemetry table schema definition | `docs/DATABASE.md` | `DEC-MON-036` | `TASK-0408` | `TEST-DB-001` | `VERIFIED` |
+| `DB-TEL-004` | sensor_battery_telemetry table schema definition | `docs/DATABASE.md` | `DEC-MON-036` | `TASK-0409` | `TEST-DB-001` | `VERIFIED` |
 | `DB-CMD-001` | faucet_commands table schema definition | `docs/DATABASE.md` | `DEC-CTRL-051` | `TASK-0802` | `TEST-DB-002` | `READY_FOR_IMPLEMENTATION` |
 | `DB-CMD-002` | faucet_command_events table schema definition | `docs/DATABASE.md` | `DEC-CTRL-051` | `TASK-0802` | `TEST-DB-002` | `READY_FOR_IMPLEMENTATION` |
 | `DB-AUDIT-001` | audit_logs table schema definition | `docs/DATABASE.md` | - | `TASK-0903` | `TEST-DB-002` | `READY_FOR_IMPLEMENTATION` |

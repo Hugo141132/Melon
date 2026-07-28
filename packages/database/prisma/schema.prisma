@@ -1,0 +1,564 @@
+// Prisma Schema for Kebun Melon System
+// Supported ORM: Prisma (DEC-INF-076)
+// Database: PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// -----------------------------------------------------------------------------
+// Canonical Enums
+// -----------------------------------------------------------------------------
+
+enum UserRole {
+  OWNER
+  ADMIN
+}
+
+enum AccountStatus {
+  PENDING_APPROVAL
+  APPROVED
+  ACTIVE
+  REJECTED
+  SUSPENDED
+  DEACTIVATED
+}
+
+enum DeviceType {
+  SOIL_NODE
+  WATER_NODE
+  COMBINED_NODE
+}
+
+enum DeviceAccountStatus {
+  ACTIVE
+  INACTIVE
+  DEACTIVATED
+}
+
+enum DeviceConnectionStatus {
+  ONLINE
+  OFFLINE
+  STALE
+  UNKNOWN
+  INACTIVE
+}
+
+enum FaucetCommandStatus {
+  QUEUED
+  SENT
+  ACKNOWLEDGED
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  CANCELLED
+  TIMEOUT
+  EXPIRED
+}
+
+enum AlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum AlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+// -----------------------------------------------------------------------------
+// 1. Identity and Access
+// -----------------------------------------------------------------------------
+
+model User {
+  id              String        @id @default(uuid()) @db.Uuid
+  fullName        String        @map("full_name") @db.VarChar(150)
+  email           String        @unique @db.VarChar(320)
+  username        String?       @unique @db.VarChar(100)
+  passwordHash    String        @map("password_hash")
+  accountStatus   AccountStatus @default(PENDING_APPROVAL) @map("account_status")
+  emailVerifiedAt DateTime?     @map("email_verified_at") @db.Timestamptz
+  lastLoginAt     DateTime?     @map("last_login_at") @db.Timestamptz
+  suspendedAt     DateTime?     @map("suspended_at") @db.Timestamptz
+  deactivatedAt   DateTime?     @map("deactivated_at") @db.Timestamptz
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  userRoles            UserRoleAssignment[]
+  approvalApplicant    AccountApproval[]      @relation("ApprovalApplicant")
+  approvalDecidedBy    AccountApproval[]      @relation("ApprovalDecidedBy")
+  assignedDeviceAccess UserDeviceAccess[]     @relation("UserDeviceAccessUser")
+  assignedDevicesBy    UserDeviceAccess[]     @relation("UserDeviceAccessAssignedBy")
+  initiatedCommands    FaucetCommand[]        @relation("FaucetCommandInitiatedBy")
+  acknowledgedAlerts   AlertAcknowledgement[]
+  userPreference       UserPreference?
+  sessions             Session[]
+  actedAuditLogs       AuditLog[]             @relation("AuditLogActor")
+
+  @@index([accountStatus], map: "users_account_status_idx")
+  @@index([createdAt(sort: Desc)], map: "users_created_at_idx")
+  @@map("users")
+}
+
+model Role {
+  id           String   @id @default(uuid()) @db.Uuid
+  code         UserRole @unique
+  name         String   @db.VarChar(100)
+  description  String?
+  isSystemRole Boolean  @default(true) @map("is_system_role")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  userRoles       UserRoleAssignment[]
+  rolePermissions RolePermission[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String   @id @default(uuid()) @db.Uuid
+  code        String   @unique @db.VarChar(100)
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  rolePermissions RolePermission[]
+
+  @@map("permissions")
+}
+
+model UserRoleAssignment {
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  roleId           String    @map("role_id") @db.Uuid
+  assignedByUserId String?   @map("assigned_by_user_id") @db.Uuid
+  assignedAt       DateTime  @default(now()) @map("assigned_at") @db.Timestamptz
+  revokedAt        DateTime? @map("revoked_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  @@map("user_roles")
+}
+
+model RolePermission {
+  id           String   @id @default(uuid()) @db.Uuid
+  roleId       String   @map("role_id") @db.Uuid
+  permissionId String   @map("permission_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model AccountApproval {
+  id              String   @id @default(uuid()) @db.Uuid
+  applicantUserId String   @map("applicant_user_id") @db.Uuid
+  decision        String   @db.VarChar(30)
+  previousStatus  String   @map("previous_status") @db.VarChar(40)
+  newStatus       String   @map("new_status") @db.VarChar(40)
+  decidedByUserId String   @map("decided_by_user_id") @db.Uuid
+  decisionNote    String?  @map("decision_note")
+  decidedAt       DateTime @default(now()) @map("decided_at") @db.Timestamptz
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  applicant User @relation("ApprovalApplicant", fields: [applicantUserId], references: [id], onDelete: Restrict)
+  decidedBy User @relation("ApprovalDecidedBy", fields: [decidedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([applicantUserId, decidedAt(sort: Desc)], map: "account_approvals_applicant_idx")
+  @@map("account_approvals")
+}
+
+// -----------------------------------------------------------------------------
+// 2. Sites and Device Registry
+// -----------------------------------------------------------------------------
+
+model Site {
+  id          String   @id @default(uuid()) @db.Uuid
+  siteCode    String   @unique @map("site_code") @db.VarChar(100)
+  name        String   @db.VarChar(200)
+  description String?
+  latitude    Decimal? @db.Decimal(9, 6)
+  longitude   Decimal? @db.Decimal(9, 6)
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  devices Device[]
+
+  @@map("sites")
+}
+
+model Device {
+  id               String                 @id @default(uuid()) @db.Uuid
+  deviceId         String                 @unique @map("device_id") @db.VarChar(150)
+  siteId           String?                @map("site_id") @db.Uuid
+  name             String                 @db.VarChar(200)
+  deviceType       DeviceType             @map("device_type")
+  accountStatus    DeviceAccountStatus    @default(ACTIVE) @map("account_status")
+  connectionStatus DeviceConnectionStatus @default(UNKNOWN) @map("connection_status")
+  firmwareVersion  String?                @map("firmware_version") @db.VarChar(100)
+  hardwareRevision String?                @map("hardware_revision") @db.VarChar(100)
+  schemaVersion    String?                @map("schema_version") @db.VarChar(30)
+  lastSeenAt       DateTime?              @map("last_seen_at") @db.Timestamptz
+  lastMessageAt    DateTime?              @map("last_message_at") @db.Timestamptz
+  latitude         Decimal?               @db.Decimal(9, 6)
+  longitude        Decimal?               @db.Decimal(9, 6)
+  createdAt        DateTime               @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime               @updatedAt @map("updated_at") @db.Timestamptz
+  deactivatedAt    DateTime?              @map("deactivated_at") @db.Timestamptz
+
+  site                   Site?                   @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  capabilities           DeviceCapability[]
+  userAssignments        UserDeviceAccess[]
+  deviceStatusEvents     DeviceStatusEvent[]
+  soilReadings           SoilReading[]
+  waterReadings          WaterReading[]
+  reservoirWaterReadings ReservoirWaterReading[]
+  sensorBatteryReadings  SensorBatteryReading[]
+  faucetCommands         FaucetCommand[]
+  alerts                 Alert[]
+  userPreferences        UserPreference[]
+
+  @@index([siteId], map: "devices_site_idx")
+  @@index([connectionStatus], map: "devices_connection_status_idx")
+  @@index([lastSeenAt(sort: Desc)], map: "devices_last_seen_idx")
+  @@map("devices")
+}
+
+model DeviceCapability {
+  id         String   @id @default(uuid()) @db.Uuid
+  deviceId   String   @map("device_id") @db.Uuid
+  capability String   @db.VarChar(80)
+  enabled    Boolean  @default(true)
+  source     String?  @db.VarChar(30)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@unique([deviceId, capability])
+  @@map("device_capabilities")
+}
+
+model UserDeviceAccess {
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  deviceId         String    @map("device_id") @db.Uuid
+  assignedByUserId String    @map("assigned_by_user_id") @db.Uuid
+  assignedAt       DateTime  @default(now()) @map("assigned_at") @db.Timestamptz
+  revokedAt        DateTime? @map("revoked_at") @db.Timestamptz
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  user       User   @relation("UserDeviceAccessUser", fields: [userId], references: [id], onDelete: Restrict)
+  device     Device @relation(fields: [deviceId], references: [id], onDelete: Restrict)
+  assignedBy User   @relation("UserDeviceAccessAssignedBy", fields: [assignedByUserId], references: [id], onDelete: Restrict)
+
+  @@map("user_device_access")
+}
+
+model DeviceStatusEvent {
+  id         String    @id @default(uuid()) @db.Uuid
+  deviceId   String    @map("device_id") @db.Uuid
+  status     String    @db.VarChar(30)
+  reasonCode String?   @map("reason_code") @db.VarChar(80)
+  recordedAt DateTime? @map("recorded_at") @db.Timestamptz
+  receivedAt DateTime  @default(now()) @map("received_at") @db.Timestamptz
+  messageId  String?   @map("message_id") @db.VarChar(150)
+  metadata   Json?
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Restrict)
+
+  @@index([deviceId, receivedAt(sort: Desc)], map: "device_status_events_device_time_idx")
+  @@map("device_status_events")
+}
+
+// -----------------------------------------------------------------------------
+// 3. Telemetry Tables (Reconciled 3 Domains + Shared Battery)
+// -----------------------------------------------------------------------------
+
+model SoilReading {
+  id               String    @id @default(uuid()) @db.Uuid
+  deviceId         String    @map("device_id") @db.Uuid
+  messageId        String    @map("message_id") @db.VarChar(150)
+  sequenceNumber   BigInt?   @map("sequence_number")
+  schemaVersion    String    @map("schema_version") @db.VarChar(30)
+  recordedAt       DateTime? @map("recorded_at") @db.Timestamptz
+  receivedAt       DateTime  @default(now()) @map("received_at") @db.Timestamptz
+  nitrogen         Decimal?  @db.Decimal
+  phosphorus       Decimal?  @db.Decimal
+  potassium        Decimal?  @db.Decimal
+  temperature      Decimal?  @db.Decimal
+  moisture         Decimal?  @db.Decimal
+  ph               Decimal?  @db.Decimal
+  ec               Decimal?  @db.Decimal
+  status           String?   @db.VarChar(30)
+  validationStatus String    @default("VALID") @map("validation_status") @db.VarChar(30)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Restrict)
+
+  @@unique([deviceId, messageId], map: "soil_readings_message_unique")
+  @@index([deviceId, recordedAt(sort: Desc)], map: "soil_readings_device_recorded_idx")
+  @@index([deviceId, receivedAt(sort: Desc)], map: "soil_readings_device_received_idx")
+  @@index([deviceId, status, recordedAt(sort: Desc)], map: "soil_readings_status_idx")
+  @@map("soil_readings")
+}
+
+model WaterReading {
+  id               String    @id @default(uuid()) @db.Uuid
+  deviceId         String    @map("device_id") @db.Uuid
+  messageId        String    @map("message_id") @db.VarChar(150)
+  sequenceNumber   BigInt?   @map("sequence_number")
+  schemaVersion    String    @map("schema_version") @db.VarChar(30)
+  recordedAt       DateTime? @map("recorded_at") @db.Timestamptz
+  receivedAt       DateTime  @default(now()) @map("received_at") @db.Timestamptz
+  ph               Decimal?  @db.Decimal
+  tds              Decimal?  @db.Decimal
+  ec               Decimal?  @db.Decimal
+  latitude         Decimal?  @db.Decimal(9, 6)
+  longitude        Decimal?  @db.Decimal(9, 6)
+  status           String?   @db.VarChar(30)
+  validationStatus String    @default("VALID") @map("validation_status") @db.VarChar(30)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Restrict)
+
+  @@unique([deviceId, messageId], map: "water_readings_message_unique")
+  @@index([deviceId, recordedAt(sort: Desc)], map: "water_readings_device_recorded_idx")
+  @@index([deviceId, receivedAt(sort: Desc)], map: "water_readings_device_received_idx")
+  @@index([deviceId, status, recordedAt(sort: Desc)], map: "water_readings_status_idx")
+  @@map("water_readings")
+}
+
+model ReservoirWaterReading {
+  id               String    @id @default(uuid()) @db.Uuid
+  deviceId         String    @map("device_id") @db.Uuid
+  messageId        String    @map("message_id") @db.VarChar(150)
+  sequenceNumber   BigInt?   @map("sequence_number")
+  schemaVersion    String    @map("schema_version") @db.VarChar(30)
+  recordedAt       DateTime? @map("recorded_at") @db.Timestamptz
+  receivedAt       DateTime  @default(now()) @map("received_at") @db.Timestamptz
+  tankVolume       Decimal?  @map("tank_volume") @db.Decimal
+  flowRate         Decimal?  @map("flow_rate") @db.Decimal
+  status           String?   @db.VarChar(30)
+  validationStatus String    @default("VALID") @map("validation_status") @db.VarChar(30)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Restrict)
+
+  @@unique([deviceId, messageId], map: "reservoir_water_readings_message_unique")
+  @@index([deviceId, recordedAt(sort: Desc)], map: "reservoir_water_readings_device_recorded_idx")
+  @@index([deviceId, receivedAt(sort: Desc)], map: "reservoir_water_readings_device_received_idx")
+  @@index([deviceId, status, recordedAt(sort: Desc)], map: "reservoir_water_readings_status_idx")
+  @@map("reservoir_water_readings")
+}
+
+model SensorBatteryReading {
+  id               String    @id @default(uuid()) @db.Uuid
+  deviceId         String    @map("device_id") @db.Uuid
+  messageId        String    @map("message_id") @db.VarChar(150)
+  sequenceNumber   BigInt?   @map("sequence_number")
+  schemaVersion    String    @map("schema_version") @db.VarChar(30)
+  recordedAt       DateTime? @map("recorded_at") @db.Timestamptz
+  receivedAt       DateTime  @default(now()) @map("received_at") @db.Timestamptz
+  batteryLevel     Decimal?  @map("battery_level") @db.Decimal
+  status           String?   @db.VarChar(30)
+  validationStatus String    @default("VALID") @map("validation_status") @db.VarChar(30)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Restrict)
+
+  @@unique([deviceId, messageId], map: "sensor_battery_readings_message_unique")
+  @@index([deviceId, recordedAt(sort: Desc)], map: "sensor_battery_readings_device_recorded_idx")
+  @@index([deviceId, receivedAt(sort: Desc)], map: "sensor_battery_readings_device_received_idx")
+  @@index([deviceId, status, recordedAt(sort: Desc)], map: "sensor_battery_readings_status_idx")
+  @@map("sensor_battery_readings")
+}
+
+// -----------------------------------------------------------------------------
+// 4. Faucet Control Tables
+// -----------------------------------------------------------------------------
+
+model FaucetCommand {
+  id                String              @id @default(uuid()) @db.Uuid
+  commandId         String              @unique @map("command_id") @db.VarChar(150)
+  deviceId          String              @map("device_id") @db.Uuid
+  initiatedByUserId String              @map("initiated_by_user_id") @db.Uuid
+  initiatedByRole   UserRole            @map("initiated_by_role")
+  phase             Int                 @db.SmallInt
+  targetVolumeMl    Int                 @map("target_volume_ml")
+  actualVolumeMl    Decimal?            @map("actual_volume_ml") @db.Decimal
+  status            FaucetCommandStatus @default(QUEUED)
+  requestedAt       DateTime            @default(now()) @map("requested_at") @db.Timestamptz
+  queuedAt          DateTime?           @map("queued_at") @db.Timestamptz
+  sentAt            DateTime?           @map("sent_at") @db.Timestamptz
+  acknowledgedAt    DateTime?           @map("acknowledged_at") @db.Timestamptz
+  startedAt         DateTime?           @map("started_at") @db.Timestamptz
+  completedAt       DateTime?           @map("completed_at") @db.Timestamptz
+  failedAt          DateTime?           @map("failed_at") @db.Timestamptz
+  cancelledAt       DateTime?           @map("cancelled_at") @db.Timestamptz
+  expiresAt         DateTime            @map("expires_at") @db.Timestamptz
+  failureReasonCode String?             @map("failure_reason_code") @db.VarChar(100)
+  idempotencyKey    String              @unique @map("idempotency_key") @db.VarChar(150)
+  createdAt         DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime            @updatedAt @map("updated_at") @db.Timestamptz
+
+  device      Device               @relation(fields: [deviceId], references: [id], onDelete: Restrict)
+  initiatedBy User                 @relation("FaucetCommandInitiatedBy", fields: [initiatedByUserId], references: [id], onDelete: Restrict)
+  events      FaucetCommandEvent[]
+
+  @@index([deviceId, requestedAt(sort: Desc)], map: "faucet_commands_device_time_idx")
+  @@index([initiatedByUserId, requestedAt(sort: Desc)], map: "faucet_commands_user_time_idx")
+  @@index([status, requestedAt(sort: Desc)], map: "faucet_commands_status_idx")
+  @@map("faucet_commands")
+}
+
+model FaucetCommandEvent {
+  id              String    @id @default(uuid()) @db.Uuid
+  faucetCommandId String    @map("faucet_command_id") @db.Uuid
+  eventStatus     String    @map("event_status") @db.VarChar(40)
+  messageId       String?   @map("message_id") @db.VarChar(150)
+  reasonCode      String?   @map("reason_code") @db.VarChar(100)
+  actualVolumeMl  Decimal?  @map("actual_volume_ml") @db.Decimal
+  recordedAt      DateTime? @map("recorded_at") @db.Timestamptz
+  receivedAt      DateTime  @default(now()) @map("received_at") @db.Timestamptz
+  metadata        Json?
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  faucetCommand FaucetCommand @relation(fields: [faucetCommandId], references: [id], onDelete: Cascade)
+
+  @@index([faucetCommandId, receivedAt(sort: Asc)], map: "faucet_command_events_command_time_idx")
+  @@map("faucet_command_events")
+}
+
+// -----------------------------------------------------------------------------
+// 5. Alert Tables
+// -----------------------------------------------------------------------------
+
+model Alert {
+  id            String        @id @default(uuid()) @db.Uuid
+  deviceId      String?       @map("device_id") @db.Uuid
+  userId        String?       @map("user_id") @db.Uuid
+  alertType     String        @map("alert_type") @db.VarChar(80)
+  severity      AlertSeverity
+  status        AlertStatus   @default(OPEN)
+  sourceType    String        @map("source_type") @db.VarChar(50)
+  sourceId      String?       @map("source_id") @db.Uuid
+  titleKey      String?       @map("title_key") @db.VarChar(150)
+  messageKey    String?       @map("message_key") @db.VarChar(150)
+  messageParams Json?         @map("message_params")
+  openedAt      DateTime      @default(now()) @map("opened_at") @db.Timestamptz
+  resolvedAt    DateTime?     @map("resolved_at") @db.Timestamptz
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+
+  device           Device?                @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  acknowledgements AlertAcknowledgement[]
+
+  @@map("alerts")
+}
+
+model AlertAcknowledgement {
+  id                   String   @id @default(uuid()) @db.Uuid
+  alertId              String   @map("alert_id") @db.Uuid
+  acknowledgedByUserId String   @map("acknowledged_by_user_id") @db.Uuid
+  note                 String?
+  acknowledgedAt       DateTime @default(now()) @map("acknowledged_at") @db.Timestamptz
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  alert          Alert @relation(fields: [alertId], references: [id], onDelete: Cascade)
+  acknowledgedBy User  @relation(fields: [acknowledgedByUserId], references: [id], onDelete: Restrict)
+
+  @@map("alert_acknowledgements")
+}
+
+// -----------------------------------------------------------------------------
+// 6. Sessions and Preferences
+// -----------------------------------------------------------------------------
+
+model UserPreference {
+  id              String   @id @default(uuid()) @db.Uuid
+  userId          String   @unique @map("user_id") @db.Uuid
+  preferredLocale String   @default("en") @map("preferred_locale") @db.VarChar(10)
+  timezone        String?  @default("Asia/Jakarta") @db.VarChar(100)
+  defaultDeviceId String?  @map("default_device_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  defaultDevice Device? @relation(fields: [defaultDeviceId], references: [id], onDelete: SetNull)
+
+  @@map("user_preferences")
+}
+
+model Session {
+  id               String    @id @default(uuid()) @db.Uuid
+  sessionTokenHash String    @unique @map("session_token_hash")
+  userId           String    @map("user_id") @db.Uuid
+  expiresAt        DateTime  @map("expires_at") @db.Timestamptz
+  revokedAt        DateTime? @map("revoked_at") @db.Timestamptz
+  lastSeenAt       DateTime? @map("last_seen_at") @db.Timestamptz
+  ipAddress        String?   @map("ip_address") @db.VarChar(45)
+  userAgent        String?   @map("user_agent")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+// -----------------------------------------------------------------------------
+// 7. Audit & Integration Errors
+// -----------------------------------------------------------------------------
+
+model AuditLog {
+  id             String    @id @default(uuid()) @db.Uuid
+  eventKey       String    @map("event_key") @db.VarChar(150)
+  actorUserId    String?   @map("actor_user_id") @db.Uuid
+  actorRole      UserRole? @map("actor_role")
+  targetType     String?   @map("target_type") @db.VarChar(80)
+  targetId       String?   @map("target_id") @db.Uuid
+  result         String    @db.VarChar(30)
+  previousValues Json?     @map("previous_values")
+  newValues      Json?     @map("new_values")
+  metadata       Json?
+  requestId      String?   @map("request_id") @db.VarChar(150)
+  ipAddress      String?   @map("ip_address") @db.VarChar(45)
+  userAgent      String?   @map("user_agent")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  actor User? @relation("AuditLogActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([actorUserId, createdAt(sort: Desc)], map: "audit_logs_actor_time_idx")
+  @@index([targetType, targetId, createdAt(sort: Desc)], map: "audit_logs_target_time_idx")
+  @@index([eventKey, createdAt(sort: Desc)], map: "audit_logs_event_time_idx")
+  @@map("audit_logs")
+}
+
+model IntegrationError {
+  id           String   @id @default(uuid()) @db.Uuid
+  deviceId     String?  @map("device_id") @db.Uuid
+  messageId    String?  @map("message_id") @db.VarChar(150)
+  topic        String?
+  errorCode    String   @map("error_code") @db.VarChar(100)
+  errorDetails Json?    @map("error_details")
+  receivedAt   DateTime @default(now()) @map("received_at") @db.Timestamptz
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("integration_errors")
+}

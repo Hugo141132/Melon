@@ -31,7 +31,7 @@
 |---|---|---|---|
 | **Authentication** | `DEC-AUTH-001` to `DEC-AUTH-012` | **APPROVED** | HTTP-only secure cookies, PostgreSQL session table, 30m idle / 12h max timeouts, CLI Owner seed, no public Owner creation. `SameSite` cookie value: **TBD** — pending explicit user approval. |
 | **RBAC** | `DEC-RBAC-013` to `DEC-RBAC-019` | **APPROVED** | Owner has global device visibility. Admins have mandatory per-device assignments; device assignment automatically grants both monitoring and faucet control. Owners manage assignments. No separate per-user-device `canControl` permission in v1. |
-| **Devices** | `DEC-DEV-020` to `DEC-DEV-035` | **APPROVED** | MQTT 5.0 over TLS via Gateway, per-device credentials/ACLs, no anonymous access, no direct browser-to-MQTT. Offline threshold: **TBD**. Stale threshold: **TBD**. |
+| **Devices** | `DEC-DEV-020` to `DEC-DEV-035` | **APPROVED** | Multi-protocol architecture: Soil & Water monitoring telemetry via REST API over Wi-Fi (no MQTT broker). Reservoir-water monitoring (tank volume & flow rate) via MQTT through an EMQX broker (MQTT 5.0 over TLS via IoT Gateway). Shared sensor/tool battery monitoring via REST/Wi-Fi (placement TBD). Per-device credentials/ACLs, no anonymous access, no direct browser-to-MQTT. Offline threshold: **TBD**. Stale threshold: **TBD**. |
 | **Monitoring** | `DEC-MON-036` to `DEC-MON-050` | **APPROVED** | Three distinct monitoring domains: 1) Soil monitoring (NPK, Temp, Moisture, pH, EC, status), 2) Water monitoring (pH, TDS, EC, status), 3) Reservoir-water monitoring (Tank Vol in `L`, Flow in `L/min`, status). `BAT` is clarified as the shared sensor/tool battery supply for soil and water monitoring equipment (modeled independently as `SensorBatteryReading`). Reservoir-water monitoring does not use `BAT`. Sensor precision and valid ranges: **TBD**. |
 | **Faucet Control** | `DEC-CTRL-051` to `DEC-CTRL-067` | **APPROVED** | Max 1 active command/device, no auto retries, `ENABLE_FAUCET_CONTROL=false` default, dual written sign-off (Owner + Hardware Lead) required before production activation. Duplicate command IDs never re-dispense. Timeout ≠ completion. ACK timeout, completion timeout, expiry duration: **TBD**. Cancellation/stop support: **TBD**. |
 | **I18N** | `DEC-I18N-068` to `DEC-I18N-074` | **APPROVED** | Default `id` (Bahasa Indonesia), `en` fallback, cookie-based locale routing (no URL path pollution), UTC storage with `Asia/Jakarta` (WIB) presentation. |
@@ -146,11 +146,17 @@
 
 ### 2.3 Devices and Communication
 
-#### DEC-DEV-020: Primary Device Communication Protocol
+#### DEC-DEV-020: Primary Device Communication Protocols, EMQX Broker Selection & Device Routing
 * **Related Task IDs**: `TASK-0401`
-* **Related Documentation**: `DEVICE_COMMUNICATION.md` §3.1, `ARCHITECTURE.md` §5.1
-* **Status**: **APPROVED BY USER**
-* **Approved Decision**: MQTT 5.0 over TLS via long-running backend IoT Gateway service. Per-device unique username and password with per-device topic ACLs (`kebun-melon/v1/devices/{deviceId}/*`). No anonymous production access. No direct browser-to-MQTT connections. No retained faucet commands.
+* **Related Documentation**: `DEVICE_COMMUNICATION.md` §3.1, §7.1, `ARCHITECTURE.md` §5.1
+* **Status**: **APPROVED BY USER (2026-07-28)**
+* **Approved Decision**: Communication protocol is defined per domain:
+  1. **Soil Monitoring**: REST API over Wi-Fi submitted directly to backend ingestion endpoint (No MQTT broker).
+  2. **Water Monitoring**: REST API over Wi-Fi submitted directly to backend ingestion endpoint (No MQTT broker).
+  3. **Reservoir-Water Monitoring**: MQTT 5.0 over TLS via EMQX broker ingested through long-running backend IoT Gateway service.
+  4. **Shared Sensor Battery (`BAT`)**: Equipment power supply telemetry via REST API over Wi-Fi (exact REST payload field placement `TBD`).
+  5. **Protocol Routing Determinism**: Protocol selection is deterministically resolved using `DeviceType` (`SOIL_NODE`, `WATER_NODE`, `COMBINED_NODE`) combined with registered `DeviceCapability` entries (`SOIL_TELEMETRY`, `WATER_TELEMETRY`, `TANK_MONITORING`, `FLOW_MONITORING`, `FAUCET_CONTROL`). The existing `DeviceType` enum values are sufficient without schema modification.
+  Per-device unique username/password with per-device topic ACLs for reservoir MQTT. No anonymous production access. No direct browser-to-MQTT or browser-to-EMQX connections. No retained faucet commands.
 
 ---
 

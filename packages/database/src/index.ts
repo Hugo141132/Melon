@@ -1,2 +1,1 @@
-// Database package entry point placeholder
-export {};
+export * from './client';

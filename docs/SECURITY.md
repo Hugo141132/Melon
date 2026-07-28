@@ -196,21 +196,6 @@ The security design shall address:
 
 ---
 
-## 6. Trust Boundaries
-
-The system shall recognise these trust boundaries:
-
-```text
-Browser
-→ Public Internet
-→ Web Application
-→ Application API
-→ Database
-
-Web Application
-→ Internal Network
-→ IoT Gateway
-→ MQTT Broker
 → ESP32 / NodeMCU
 ```
 

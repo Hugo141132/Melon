@@ -17,7 +17,7 @@
 
 ## 2. Purpose
 
-This document defines the application API used by the web frontend and internal services.
+This document defines the application API used by the web frontend, internal services, and monitoring hardware.
 
 The API shall support:
 
@@ -26,7 +26,8 @@ The API shall support:
 - Owner approval and rejection.
 - Owner and Admin profile management.
 - Device listing and device access.
-- Current soil and water monitoring.
+- **Device Telemetry Ingestion (Soil and Water Quality via REST API over Wi-Fi)**.
+- Current soil and water monitoring query endpoints.
 - Historical telemetry.
 - Device status.
 - Faucet-control commands.
@@ -35,6 +36,8 @@ The API shall support:
 - User preferences and language.
 - Real-time update endpoints.
 - Health and readiness checks.
+
+Note: Reservoir-water telemetry (volume & flow rate) is ingested separately via MQTT/EMQX through the IoT Gateway service, not through the REST API. Shared sensor battery (`BAT`) is sent via REST over Wi-Fi (exact REST payload field placement `TBD`).
 
 The API shall not expose:
 

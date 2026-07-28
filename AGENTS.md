@@ -27,28 +27,21 @@ The project is a web-based multi-device monitoring and control system for ESP32/
 
 The system monitors:
 
-### Soil
+### Soil Monitoring (REST API over Wi-Fi)
 
-- Nitrogen.
-- Phosphorus.
-- Potassium.
-- Temperature.
-- Moisture.
-- pH.
-- EC.
-- Soil status.
+- Nitrogen, Phosphorus, Potassium, Temperature, Moisture, pH, EC, Soil status.
 
-### Water
+### Water Quality Monitoring (REST API over Wi-Fi)
 
-- pH.
-- TDS.
-- EC.
-- BAT or battery-related value, final meaning `TBD`.
-- Latitude.
-- Longitude.
-- Water status.
-- Tank water volume.
-- Tank water flow rate.
+- pH, TDS, EC, Latitude, Longitude, Water status.
+
+### Reservoir-Water Monitoring (MQTT 5.0 over TLS via EMQX Broker)
+
+- Reservoir water volume, Reservoir water flow rate, Reservoir status.
+
+### Shared Sensor/Tool Battery (`BAT`)
+
+- Equipment power supply battery monitoring via REST API over Wi-Fi (exact REST JSON payload placement `TBD`). Not a water-quality or reservoir parameter.
 
 ### Faucet Control Presets
 

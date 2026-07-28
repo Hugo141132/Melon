@@ -332,7 +332,7 @@ REALTIME_TRANSPORT
 ## TASK-0104 — Configure PostgreSQL and ORM
 
 **Priority:** `P0`  
-**Status:** `BACKLOG`  
+**Status:** `DONE`  
 **Dependencies:** `TASK-0101`, `TASK-0002`
 
 ### Work

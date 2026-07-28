@@ -14,40 +14,35 @@ The system is designed to:
 - Support English and Bahasa Indonesia.
 - Communicate with hardware through a backend-managed MQTT gateway.
 
-> **Current project status:** `TASK-0001` (Frontend Audit) and `TASK-0002` (Release-Blocking Product Decisions) are complete. Architectural decisions, RBAC rules, physical safety policies, and monorepo stack are fully approved in `docs/DECISIONS.md`. Foundation implementation is ready to begin with `TASK-0003` and `TASK-0101`.
+> **Current project status:** `TASK-0101` through `TASK-0104` (Database Foundation, Schema & Migrations, and Communication Architecture Reconciliation) are complete (`TASK-0104` status: `DONE`). Baseline Prisma schema, 4 telemetry models (`SoilReading`, `WaterReading`, `ReservoirWaterReading`, `SensorBatteryReading`), PostgreSQL migration, static schema tests, and live database integration tests are verified.
 
 ---
 
 ## 1. Core Features
 
-### Soil Monitoring
+### 1.1 Soil Monitoring
 
-The application supports the following soil fields:
+Transmitted via **REST API over Wi-Fi** directly to the web backend:
 
-- Nitrogen.
-- Phosphorus.
-- Potassium.
-- Temperature.
-- Moisture.
-- pH.
-- EC.
-- Soil status.
+- Nitrogen, Phosphorus, Potassium, Temperature, Moisture, pH, EC, Soil status.
 
-### Water Monitoring
+### 1.2 Water Monitoring (General Water Quality)
 
-The application supports the following water fields:
+Transmitted via **REST API over Wi-Fi** directly to the web backend:
 
-- pH.
-- TDS.
-- EC.
-- BAT or battery-related value.
-- Latitude.
-- Longitude.
-- Water status.
-- Tank water volume.
-- Tank water flow rate.
+- pH, TDS, EC, Latitude, Longitude, Water status.
 
-The final meaning and unit of `Water BAT` remain `TBD`.
+### 1.3 Reservoir-Water Monitoring
+
+Transmitted via **MQTT 5.0 over TLS through EMQX broker** to backend IoT Gateway:
+
+- Tank water volume, Tank water flow rate, Reservoir status.
+
+### 1.4 Shared Sensor/Tool Battery Monitoring (`BAT`)
+
+Transmitted via **REST API over Wi-Fi** along with soil & water equipment power supply:
+
+- Battery level / power supply status (exact REST JSON payload placement `TBD`). Not a water-quality or reservoir parameter.
 
 ### Faucet Control
 
