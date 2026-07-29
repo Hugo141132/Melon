@@ -616,7 +616,7 @@ Implement pages for:
 ## TASK-0206 — Implement Owner Pending Approval List
 
 **Priority:** `P0`  
-**Status:** `BACKLOG`  
+**Status:** `DONE`
 **Dependencies:** `TASK-0204`
 
 ### Work

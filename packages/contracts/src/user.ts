@@ -165,3 +165,29 @@ export const LoginInputSchema = z
   .strict();
 
 export type LoginInput = z.infer<typeof LoginInputSchema>;
+
+/**
+ * Schema for pending admin registration items exposed to Owner in approval list/detail endpoints.
+ * EXCLUDES: passwordHash, sessionTokenHash, internal notes, raw audit metadata, DB credentials, secrets.
+ */
+export const PendingApprovalItemDtoSchema = z.object({
+  userId: z.string().uuid(),
+  fullName: z.string().min(1),
+  email: z.string().email(),
+  accountStatus: AccountStatusSchema,
+  createdAt: z.date(),
+});
+
+export type PendingApprovalItemDto = z.infer<typeof PendingApprovalItemDtoSchema>;
+
+/**
+ * Schema for querying pending approval list.
+ */
+export const PendingApprovalsQueryInputSchema = z.object({
+  page: z.number().int().min(1).default(1),
+  pageSize: z.number().int().min(1).max(100).default(20),
+  search: z.string().optional(),
+  sort: z.enum(['createdAt:asc', 'createdAt:desc']).default('createdAt:desc'),
+});
+
+export type PendingApprovalsQueryInput = z.infer<typeof PendingApprovalsQueryInputSchema>;

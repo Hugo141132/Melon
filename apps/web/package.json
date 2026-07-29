@@ -12,6 +12,8 @@
     "test:login-route": "vitest run app/api/v1/auth/login/test/route.test.ts",
     "test:logout-route": "vitest run app/api/v1/auth/logout/test/route.test.ts",
     "test:session-route": "vitest run app/api/v1/auth/session/test/route.test.ts",
+    "test:approvals-route": "vitest run app/api/v1/approvals/test/route.test.ts",
+    "test:approvals-page": "vitest run app/approvals/test/page.test.ts",
     "test:status-page": "vitest run app/(auth)/status/test/page.test.ts"
   },
   "dependencies": {

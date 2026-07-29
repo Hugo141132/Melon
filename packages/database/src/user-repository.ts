@@ -148,6 +148,127 @@ export class UserRepository {
   }
 
   /**
+   * Retrieves a paginated list of pending admin registrations for Owner approval interface.
+   * Filters strictly by accountStatus = PENDING_APPROVAL.
+   * Selects ONLY public-safe allow-listed fields (id, fullName, email, accountStatus, createdAt).
+   * Password hashes, tokens, and sensitive metadata are NEVER fetched from DB.
+   */
+  async getPendingApprovals(options?: {
+    page?: number;
+    pageSize?: number;
+    search?: string;
+    sort?: 'createdAt:asc' | 'createdAt:desc';
+  }): Promise<{
+    items: Array<{
+      userId: string;
+      fullName: string;
+      email: string;
+      accountStatus: AccountStatus;
+      createdAt: Date;
+    }>;
+    pagination: {
+      page: number;
+      pageSize: number;
+      totalItems: number;
+      totalPages: number;
+    };
+  }> {
+    const page = Math.max(1, options?.page ?? 1);
+    const pageSize = Math.min(100, Math.max(1, options?.pageSize ?? 20));
+    const skip = (page - 1) * pageSize;
+    const search = options?.search?.trim();
+    const sort = options?.sort ?? 'createdAt:desc';
+
+    const where: any = {
+      accountStatus: AccountStatus.PENDING_APPROVAL,
+    };
+
+    if (search) {
+      where.OR = [
+        { fullName: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    const orderBy =
+      sort === 'createdAt:asc' ? { createdAt: 'asc' as const } : { createdAt: 'desc' as const };
+
+    const [users, totalItems] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        select: {
+          id: true,
+          fullName: true,
+          email: true,
+          accountStatus: true,
+          createdAt: true,
+        },
+        orderBy,
+        skip,
+        take: pageSize,
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+
+    const items = users.map((u) => ({
+      userId: u.id,
+      fullName: u.fullName,
+      email: u.email,
+      accountStatus: u.accountStatus as AccountStatus,
+      createdAt: u.createdAt,
+    }));
+
+    const totalPages = Math.ceil(totalItems / pageSize) || 1;
+
+    return {
+      items,
+      pagination: {
+        page,
+        pageSize,
+        totalItems,
+        totalPages,
+      },
+    };
+  }
+
+  /**
+   * Retrieves a single pending admin registration detail by userId.
+   * Asserts that target user exists AND has accountStatus = PENDING_APPROVAL.
+   * Selects ONLY public-safe allow-listed fields.
+   * Returns null if user is missing or not in PENDING_APPROVAL state.
+   */
+  async getPendingApprovalById(userId: string): Promise<{
+    userId: string;
+    fullName: string;
+    email: string;
+    accountStatus: AccountStatus;
+    createdAt: Date;
+  } | null> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        accountStatus: true,
+        createdAt: true,
+      },
+    });
+
+    if (!user || user.accountStatus !== AccountStatus.PENDING_APPROVAL) {
+      return null;
+    }
+
+    return {
+      userId: user.id,
+      fullName: user.fullName,
+      email: user.email,
+      accountStatus: user.accountStatus as AccountStatus,
+      createdAt: user.createdAt,
+    };
+  }
+
+  /**
    * Private helper to convert Prisma allow-listed selection into contract interface.
    * Sets dummy empty passwordHash internally for toPublicSafeUserDto mapper compliance.
    */
