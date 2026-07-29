@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "echo iot-gateway placeholder service",
     "build": "echo iot-gateway placeholder build",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint --ext .ts src"
   },
   "dependencies": {
     "zod": "^3.23.8"

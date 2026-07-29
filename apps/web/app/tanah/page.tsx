@@ -3,9 +3,8 @@
 import TopAppBar from '@/components/navigation/TopAppBar';
 import BottomNav from '@/components/navigation/BottomNav';
 import NPKChart from '@/components/charts/NPKChart';
-import { NPK_DATA, NPK_RANGES } from '@/lib/constants';
+import { NPK_DATA } from '@/lib/constants';
 import { CheckCircle, TrendingUp } from 'lucide-react';
-import { cn } from '@/lib/utils';
 
 interface NPKMeterProps {
   label: string;

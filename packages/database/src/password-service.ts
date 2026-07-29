@@ -43,7 +43,7 @@ export function validatePasswordPolicy(password: string): PasswordPolicyResult {
   if (!/[0-9]/.test(password)) {
     return { valid: false, reason: 'Password must contain at least one digit.' };
   }
-  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/.test(password)) {
+  if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?~`]/.test(password)) {
     return { valid: false, reason: 'Password must contain at least one special character.' };
   }
   return { valid: true };

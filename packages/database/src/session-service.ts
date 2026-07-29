@@ -96,9 +96,12 @@ export async function loginUser(
 
   const primaryRole = activeRoles[0] ?? UserRole.ADMIN;
 
-  const [session] = await prisma.$transaction([
+  const sessionId = crypto.randomUUID();
+
+  await prisma.$transaction([
     prisma.session.create({
       data: {
+        id: sessionId,
         sessionTokenHash,
         userId: user.id,
         expiresAt,
@@ -120,7 +123,7 @@ export async function loginUser(
         targetId: user.id,
         result: 'SUCCESS',
         metadata: {
-          sessionId: user.id,
+          sessionId,
         },
         requestId: metadata?.requestId ?? null,
         ipAddress: metadata?.ipAddress ?? null,

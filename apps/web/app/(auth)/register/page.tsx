@@ -3,16 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useState } from 'react';
-import {
-  ArrowLeft,
-  Mail,
-  Phone,
-  Eye,
-  EyeOff,
-  ArrowRight,
-  CheckCircle,
-  Loader2,
-} from 'lucide-react';
+import { ArrowLeft, Mail, Eye, EyeOff, ArrowRight, CheckCircle, Loader2 } from 'lucide-react';
 
 type Step = 1 | 2;
 

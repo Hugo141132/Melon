@@ -274,9 +274,10 @@ TEST-RBAC-001
 
 ## TASK-0102 — Configure TypeScript and Code Quality
 
-**Priority:** `P1`  
-**Status:** `BACKLOG`  
+**Priority:** `P1`
+**Status:** `DONE`
 **Dependencies:** `TASK-0101`
+**Completed:** 2026-07-29 — Configured strict TypeScript compiler flags (`noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`, `forceConsistentCasingInFileNames`), package ESLint configs (`packages/contracts`, `packages/database`, `apps/iot-gateway`), fixed React Hook `useEffect` dependencies and unused imports/variables, added unified `check:quality` script in root `package.json`, and verified type checking, linting (0 errors/warnings), Prettier formatting, unit tests, and production build cleanly.
 
 ### Work
 

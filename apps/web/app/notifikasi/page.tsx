@@ -161,7 +161,7 @@ export default function NotifikasiPage() {
         {/* Critical alerts first, then warnings */}
         <div className="space-y-3">
           {[...ALERTS]
-            .sort((a, b) => (a.severity === 'error' ? -1 : 1))
+            .sort((a, _b) => (a.severity === 'error' ? -1 : 1))
             .map((alert) => (
               <AlertCard key={alert.id} alert={alert} />
             ))}

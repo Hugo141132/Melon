@@ -1,10 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
+import { useState, useEffect, useCallback } from 'react';
 import TopAppBar from '@/components/navigation/TopAppBar';
 import BottomNav from '@/components/navigation/BottomNav';
-import { User, ShieldAlert, CheckCircle, XCircle, RefreshCw, Search, Lock } from 'lucide-react';
+import { User, ShieldAlert, CheckCircle, XCircle, RefreshCw, Search } from 'lucide-react';
 
 interface PendingApprovalItem {
   userId: string;
@@ -99,42 +98,45 @@ export default function PendingApprovalsPage() {
     }
   };
 
-  const fetchApprovals = async (pageToFetch = 1) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const query = new URLSearchParams({
-        page: pageToFetch.toString(),
-        pageSize: '20',
-        sort: 'createdAt:desc',
-      });
-      if (search.trim()) {
-        query.set('search', search.trim());
-      }
-
-      const res = await fetch(`/api/v1/approvals/pending?${query.toString()}`);
-      const json = await res.json();
-
-      if (!res.ok || !json.success) {
-        setError({
-          code: json.error?.code || 'UNKNOWN_ERROR',
-          message: json.error?.message || 'Gagal memuat daftar persetujuan pendaftaran.',
+  const fetchApprovals = useCallback(
+    async (pageToFetch = 1) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const query = new URLSearchParams({
+          page: pageToFetch.toString(),
+          pageSize: '20',
+          sort: 'createdAt:desc',
         });
-        setItems([]);
-        setPagination(null);
-      } else {
-        setItems(json.data || []);
-        setPagination(json.meta?.pagination || null);
+        if (search.trim()) {
+          query.set('search', search.trim());
+        }
+
+        const res = await fetch(`/api/v1/approvals/pending?${query.toString()}`);
+        const json = await res.json();
+
+        if (!res.ok || !json.success) {
+          setError({
+            code: json.error?.code || 'UNKNOWN_ERROR',
+            message: json.error?.message || 'Gagal memuat daftar persetujuan pendaftaran.',
+          });
+          setItems([]);
+          setPagination(null);
+        } else {
+          setItems(json.data || []);
+          setPagination(json.meta?.pagination || null);
+        }
+      } catch (err: unknown) {
+        setError({
+          code: 'NETWORK_ERROR',
+          message: 'Gagal terhubung ke server. Periksa koneksi jaringan Anda.',
+        });
+      } finally {
+        setLoading(false);
       }
-    } catch (err: any) {
-      setError({
-        code: 'NETWORK_ERROR',
-        message: 'Gagal terhubung ke server. Periksa koneksi jaringan Anda.',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    [search]
+  );
 
   const fetchDetail = async (userId: string) => {
     setSelectedUserId(userId);
@@ -155,7 +157,7 @@ export default function PendingApprovalsPage() {
 
   useEffect(() => {
     fetchApprovals(1);
-  }, []);
+  }, [fetchApprovals]);
 
   return (
     <div className="bg-app-surface text-app-on-surface min-h-dvh pb-24">

@@ -34,9 +34,12 @@
     "env:check": "tsx scripts/check-env.ts all",
     "env:check:web": "tsx scripts/check-env.ts web",
     "env:check:gateway": "tsx scripts/check-env.ts gateway",
-    "env:test": "tsx scripts/test-env.ts"
+    "env:test": "tsx scripts/test-env.ts",
+    "check:quality": "npm run typecheck && npm run lint && npm run format:check && npm run build"
   },
   "devDependencies": {
+    "@typescript-eslint/parser": "^7.2.0",
+    "eslint": "^8.57.0",
     "prettier": "^3.3.3",
     "tsx": "^4.23.1",
     "typescript": "^5"

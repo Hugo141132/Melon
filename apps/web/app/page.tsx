@@ -2,15 +2,7 @@ import type { Metadata } from 'next';
 import TopAppBar from '@/components/navigation/TopAppBar';
 import BottomNav from '@/components/navigation/BottomNav';
 import { DASHBOARD_DATA, ALERTS } from '@/lib/constants';
-import {
-  Sun,
-  Droplets,
-  Sprout,
-  TrendingUp,
-  CheckCircle,
-  AlertTriangle,
-  Thermometer,
-} from 'lucide-react';
+import { Sun, Droplets, Sprout, CheckCircle, AlertTriangle, Thermometer } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export const metadata: Metadata = {
