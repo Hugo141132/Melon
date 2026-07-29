@@ -88,7 +88,7 @@
 | `FLOW-AUTH-007` | Suspended user login restriction flow | `docs/USER_FLOWS.md` | - | `TASK-0204` | `TEST-SEC-001` | `READY_FOR_IMPLEMENTATION` |
 | `FLOW-USER-001` | Owner views pending registration list flow | `docs/USER_FLOWS.md` | `DEC-AUTH-006` | `TASK-0206` | `TEST-E2E-002` | `IMPLEMENTED` |
 | `FLOW-USER-002` | Owner approves Admin registration flow | `docs/USER_FLOWS.md` | `DEC-AUTH-006` | `TASK-0207` | `TEST-E2E-002` | `READY_FOR_IMPLEMENTATION` |
-| `FLOW-USER-003` | Owner rejects Admin registration flow | `docs/USER_FLOWS.md` | - | `TASK-0208` | `TEST-E2E-002` | `READY_FOR_IMPLEMENTATION` |
+| `FLOW-USER-003` | Owner rejects Admin registration flow | `docs/USER_FLOWS.md` | - | `TASK-0208` | `TEST-E2E-002` | `IMPLEMENTED` |
 | `FLOW-USER-004` | Owner user management navigation flow | `docs/USER_FLOWS.md` | - | `TASK-0212` | `TEST-E2E-002` | `READY_FOR_IMPLEMENTATION` |
 | `FLOW-USER-005` | Owner suspends active Admin flow | `docs/USER_FLOWS.md` | - | `TASK-0212` | `TEST-API-002` | `READY_FOR_IMPLEMENTATION` |
 | `FLOW-USER-006` | User updates own profile information flow | `docs/USER_FLOWS.md` | - | `TASK-0211` | `TEST-E2E-001` | `READY_FOR_IMPLEMENTATION` |

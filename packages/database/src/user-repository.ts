@@ -32,6 +32,30 @@ export type ApproveAdminResult =
       currentStatus?: AccountStatus;
     };
 
+export interface RejectAdminInput {
+  targetUserId: string;
+  decidedByUserId: string;
+  decisionNote?: string;
+  requestId?: string;
+  ipAddress?: string;
+  userAgent?: string;
+  notifyFn?: (applicant: { id: string; email: string; fullName: string }) => Promise<void>;
+}
+
+export type RejectAdminResult =
+  | {
+      success: true;
+      user: PublicSafeUserDto;
+      approvalRecordId: string;
+      auditLogId: string;
+    }
+  | {
+      success: false;
+      error: 'USER_NOT_FOUND' | 'INVALID_STATUS' | 'CONCURRENCY_CONFLICT' | 'INTERNAL_ERROR';
+      message: string;
+      currentStatus?: AccountStatus;
+    };
+
 export class UserRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
@@ -442,6 +466,160 @@ export class UserRepository {
         success: false,
         error: 'INTERNAL_ERROR',
         message: 'A database transaction error occurred during account approval.',
+      };
+    }
+  }
+
+  /**
+   * Transactionally rejects a pending admin registration (TASK-0208).
+   * Verifies current account status is PENDING_APPROVAL.
+   * Updates accountStatus to REJECTED.
+   * Creates an AccountApproval history record with decision='REJECT'.
+   * Inserts an AuditLog entry with eventKey='ACCOUNT_APPROVAL_REJECT' (without secrets).
+   * Executes notification callback post-commit (notification error does not rollback decision).
+   */
+  async rejectPendingAdmin(input: RejectAdminInput): Promise<RejectAdminResult> {
+    try {
+      const txResult = await this.prisma.$transaction(
+        async (tx) => {
+          // 1. Fetch user to verify current state
+          const targetUser = await tx.user.findUnique({
+            where: { id: input.targetUserId },
+            select: {
+              id: true,
+              fullName: true,
+              email: true,
+              username: true,
+              accountStatus: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+          });
+
+          if (!targetUser) {
+            return {
+              success: false as const,
+              error: 'USER_NOT_FOUND' as const,
+              message: `Target user with ID '${input.targetUserId}' does not exist.`,
+            };
+          }
+
+          if (targetUser.accountStatus !== AccountStatus.PENDING_APPROVAL) {
+            return {
+              success: false as const,
+              error: 'INVALID_STATUS' as const,
+              message: `Target user is in status '${targetUser.accountStatus}', not PENDING_APPROVAL. Rejection cannot be processed.`,
+              currentStatus: targetUser.accountStatus as AccountStatus,
+            };
+          }
+
+          // 2. Update account status to REJECTED
+          const updatedUser = await tx.user.update({
+            where: { id: input.targetUserId },
+            data: { accountStatus: AccountStatus.REJECTED },
+            select: {
+              id: true,
+              fullName: true,
+              email: true,
+              username: true,
+              accountStatus: true,
+              emailVerifiedAt: true,
+              lastLoginAt: true,
+              suspendedAt: true,
+              deactivatedAt: true,
+              createdAt: true,
+              updatedAt: true,
+              userRoles: {
+                where: { revokedAt: null },
+                select: {
+                  id: true,
+                  userId: true,
+                  roleId: true,
+                  assignedByUserId: true,
+                  assignedAt: true,
+                  revokedAt: true,
+                  role: { select: { code: true } },
+                },
+              },
+            },
+          });
+
+          // 3. Create AccountApproval history entry
+          const approvalRecord = await tx.accountApproval.create({
+            data: {
+              applicantUserId: targetUser.id,
+              decision: 'REJECT',
+              previousStatus: AccountStatus.PENDING_APPROVAL,
+              newStatus: AccountStatus.REJECTED,
+              decidedByUserId: input.decidedByUserId,
+              decisionNote: input.decisionNote?.trim() || null,
+            },
+          });
+
+          // 4. Log AuditLog event (strictly no secrets/passwords/tokens)
+          const auditLog = await tx.auditLog.create({
+            data: {
+              eventKey: 'ACCOUNT_APPROVAL_REJECT',
+              actorUserId: input.decidedByUserId,
+              actorRole: ContractUserRole.OWNER,
+              targetType: 'USER',
+              targetId: targetUser.id,
+              result: 'SUCCESS',
+              previousValues: { accountStatus: AccountStatus.PENDING_APPROVAL },
+              newValues: { accountStatus: AccountStatus.REJECTED },
+              metadata: {
+                decision: 'REJECT',
+                decisionNote: input.decisionNote?.trim() || null,
+                applicantEmail: targetUser.email,
+                applicantFullName: targetUser.fullName,
+              },
+              requestId: input.requestId || null,
+              ipAddress: input.ipAddress || null,
+              userAgent: input.userAgent || null,
+            },
+          });
+
+          return {
+            success: true as const,
+            user: toPublicSafeUserDto(this.mapPrismaUserToRawDbUser(updatedUser)),
+            approvalRecordId: approvalRecord.id,
+            auditLogId: auditLog.id,
+            applicantInfo: {
+              id: targetUser.id,
+              email: targetUser.email,
+              fullName: targetUser.fullName,
+            },
+          };
+        },
+        {
+          isolationLevel: 'RepeatableRead',
+        }
+      );
+
+      if (!txResult.success) {
+        return txResult;
+      }
+
+      // 5. Fire optional notification callback AFTER successful transaction commit
+      if (input.notifyFn && txResult.applicantInfo) {
+        try {
+          await input.notifyFn(txResult.applicantInfo);
+        } catch {
+          // Notification failure is non-blocking and must not fail or roll back decision
+        }
+      }
+
+      return {
+        success: true,
+        user: txResult.user,
+        approvalRecordId: txResult.approvalRecordId,
+        auditLogId: txResult.auditLogId,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: 'INTERNAL_ERROR',
+        message: 'A database transaction error occurred during account rejection.',
       };
     }
   }

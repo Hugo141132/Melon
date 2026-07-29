@@ -344,4 +344,159 @@ describe('TASK-0206 Approvals Database Integration & Security Test Suite', () =>
       expect(auditLogs.length).toBe(0);
     });
   });
+
+  describe('TASK-0208 rejectPendingAdmin Integration Tests', () => {
+    it('transactionally rejects pending admin, inserts AccountApproval history with decision REJECT, and records AuditLog without secrets', async () => {
+      const ownerUser = await prisma.user.create({
+        data: {
+          fullName: 'Owner User',
+          email: 'owner.reject@example.com',
+          passwordHash: '$argon2id$v=19$m=65536,t=3,p=4$dummyhashowner',
+          accountStatus: AccountStatus.ACTIVE,
+        },
+      });
+
+      const pendingUser = await prisma.user.create({
+        data: {
+          fullName: 'Pending Admin To Reject',
+          email: 'admin.pending.reject@example.com',
+          passwordHash: '$argon2id$v=19$m=65536,t=3,p=4$dummyhashpending',
+          accountStatus: AccountStatus.PENDING_APPROVAL,
+        },
+      });
+
+      let notifyCalled = false;
+      const notifyFn = async (applicant: { id: string; email: string; fullName: string }) => {
+        notifyCalled = true;
+        expect(applicant.id).toBe(pendingUser.id);
+      };
+
+      const result = await userRepo.rejectPendingAdmin({
+        targetUserId: pendingUser.id,
+        decidedByUserId: ownerUser.id,
+        decisionNote: 'Unverified credentials and identity mismatch',
+        requestId: 'req-reject-test-1',
+        notifyFn,
+      });
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+
+      expect(result.user.id).toBe(pendingUser.id);
+      expect(result.user.accountStatus).toBe(AccountStatus.REJECTED);
+      expect(notifyCalled).toBe(true);
+
+      // Verify DB User account status update
+      const dbUser = await prisma.user.findUnique({ where: { id: pendingUser.id } });
+      expect(dbUser?.accountStatus).toBe(AccountStatus.REJECTED);
+
+      // Verify AccountApproval history record
+      const approvalHistory = await prisma.accountApproval.findUnique({
+        where: { id: result.approvalRecordId },
+      });
+      expect(approvalHistory).not.toBeNull();
+      expect(approvalHistory?.applicantUserId).toBe(pendingUser.id);
+      expect(approvalHistory?.decidedByUserId).toBe(ownerUser.id);
+      expect(approvalHistory?.decision).toBe('REJECT');
+      expect(approvalHistory?.previousStatus).toBe(AccountStatus.PENDING_APPROVAL);
+      expect(approvalHistory?.newStatus).toBe(AccountStatus.REJECTED);
+      expect(approvalHistory?.decisionNote).toBe('Unverified credentials and identity mismatch');
+
+      // Verify AuditLog record and audit secrecy (no password hashes or secrets in values/metadata)
+      const auditLog = await prisma.auditLog.findUnique({
+        where: { id: result.auditLogId },
+      });
+      expect(auditLog).not.toBeNull();
+      expect(auditLog?.eventKey).toBe('ACCOUNT_APPROVAL_REJECT');
+      expect(auditLog?.actorUserId).toBe(ownerUser.id);
+      expect(auditLog?.targetId).toBe(pendingUser.id);
+      expect(auditLog?.targetType).toBe('USER');
+      expect(auditLog?.result).toBe('SUCCESS');
+
+      const auditString = JSON.stringify(auditLog);
+      expect(auditString).not.toContain('passwordHash');
+      expect(auditString).not.toContain('dummyhash');
+    });
+
+    it('rejects rejection request with CONFLICT / INVALID_STATUS if target is not PENDING_APPROVAL', async () => {
+      const ownerUser = await prisma.user.create({
+        data: {
+          fullName: 'Owner User',
+          email: 'owner.reject2@example.com',
+          passwordHash: '$argon2id$v=19$m=65536,t=3,p=4$dummyhashowner2',
+          accountStatus: AccountStatus.ACTIVE,
+        },
+      });
+
+      const alreadyRejectedUser = await prisma.user.create({
+        data: {
+          fullName: 'Already Rejected Admin',
+          email: 'admin.rejected@example.com',
+          passwordHash: '$argon2id$v=19$m=65536,t=3,p=4$dummyhashapp',
+          accountStatus: AccountStatus.REJECTED,
+        },
+      });
+
+      const result = await userRepo.rejectPendingAdmin({
+        targetUserId: alreadyRejectedUser.id,
+        decidedByUserId: ownerUser.id,
+      });
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error).toBe('INVALID_STATUS');
+      expect(result.currentStatus).toBe(AccountStatus.REJECTED);
+
+      // Verify no new AccountApproval record created
+      const approvals = await prisma.accountApproval.findMany({
+        where: { applicantUserId: alreadyRejectedUser.id },
+      });
+      expect(approvals.length).toBe(0);
+    });
+
+    it('handles two concurrent rejection/approval requests producing exactly 1 success and 1 conflict', async () => {
+      const ownerUser = await prisma.user.create({
+        data: {
+          fullName: 'Owner User',
+          email: 'owner.concurrent.reject@example.com',
+          passwordHash: '$argon2id$v=19$m=65536,t=3,p=4$dummyhashowner4',
+          accountStatus: AccountStatus.ACTIVE,
+        },
+      });
+
+      const pendingUser = await prisma.user.create({
+        data: {
+          fullName: 'Pending Admin Concurrent Reject',
+          email: 'admin.concurrent.reject@example.com',
+          passwordHash: '$argon2id$v=19$m=65536,t=3,p=4$dummyhashconcurrent',
+          accountStatus: AccountStatus.PENDING_APPROVAL,
+        },
+      });
+
+      const [res1, res2] = await Promise.all([
+        userRepo.rejectPendingAdmin({
+          targetUserId: pendingUser.id,
+          decidedByUserId: ownerUser.id,
+          decisionNote: 'Concurrent reject attempt 1',
+        }),
+        userRepo.approvePendingAdmin({
+          targetUserId: pendingUser.id,
+          decidedByUserId: ownerUser.id,
+          decisionNote: 'Concurrent approve attempt 2',
+        }),
+      ]);
+
+      const successes = [res1, res2].filter((r) => r.success);
+      const failures = [res1, res2].filter((r) => !r.success);
+
+      expect(successes.length).toBe(1);
+      expect(failures.length).toBe(1);
+
+      // Verify exactly 1 AccountApproval record
+      const approvalRecords = await prisma.accountApproval.findMany({
+        where: { applicantUserId: pendingUser.id },
+      });
+      expect(approvalRecords.length).toBe(1);
+    });
+  });
 });

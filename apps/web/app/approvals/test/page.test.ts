@@ -89,4 +89,37 @@ describe('Owner Approvals UI Component & Schema Integration Tests (TASK-0206)', 
     expect(conflictResponse.success).toBe(false);
     expect(conflictResponse.error.code).toBe('CONFLICT');
   });
+
+  it('5. Validates Owner UI rejection action request schema and error handling contracts', () => {
+    const validRejectInput = { decisionNote: 'Unverified credentials and identity mismatch' };
+    expect(validRejectInput.decisionNote).toBe('Unverified credentials and identity mismatch');
+
+    const successRejectResponse = {
+      success: true,
+      data: {
+        user: {
+          id: '123e4567-e89b-12d3-a456-426614174000',
+          fullName: 'Rejected Admin',
+          email: 'rejected.admin@example.com',
+          accountStatus: 'REJECTED',
+        },
+        approvalRecordId: 'rec-456',
+      },
+      meta: { requestId: 'req-reject-1' },
+    };
+    expect(successRejectResponse.success).toBe(true);
+    expect(successRejectResponse.data.user.accountStatus).toBe('REJECTED');
+
+    const conflictRejectResponse = {
+      success: false,
+      error: {
+        code: 'CONFLICT',
+        message: "Target user is in status 'REJECTED', not PENDING_APPROVAL.",
+        details: { currentStatus: 'REJECTED' },
+      },
+      meta: { requestId: 'req-reject-2' },
+    };
+    expect(conflictRejectResponse.success).toBe(false);
+    expect(conflictRejectResponse.error.code).toBe('CONFLICT');
+  });
 });

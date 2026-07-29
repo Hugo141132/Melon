@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import TopAppBar from '@/components/navigation/TopAppBar';
 import BottomNav from '@/components/navigation/BottomNav';
-import { User, ShieldAlert, CheckCircle, RefreshCw, Search, Lock } from 'lucide-react';
+import { User, ShieldAlert, CheckCircle, XCircle, RefreshCw, Search, Lock } from 'lucide-react';
 
 interface PendingApprovalItem {
   userId: string;
@@ -35,6 +35,10 @@ export default function PendingApprovalsPage() {
   const [approveError, setApproveError] = useState<string | null>(null);
   const [approveSuccess, setApproveSuccess] = useState<boolean>(false);
 
+  const [submittingReject, setSubmittingReject] = useState<boolean>(false);
+  const [rejectError, setRejectError] = useState<string | null>(null);
+  const [rejectSuccess, setRejectSuccess] = useState<boolean>(false);
+
   const handleApprove = async (userId: string) => {
     setSubmittingApprove(true);
     setApproveError(null);
@@ -62,6 +66,36 @@ export default function PendingApprovalsPage() {
       setApproveError('Gagal terhubung ke server saat memproses persetujuan.');
     } finally {
       setSubmittingApprove(false);
+    }
+  };
+
+  const handleReject = async (userId: string) => {
+    setSubmittingReject(true);
+    setRejectError(null);
+    setRejectSuccess(false);
+    try {
+      const res = await fetch(`/api/v1/approvals/${userId}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decisionNote }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        setRejectError(json.error?.message || 'Gagal menolak pendaftaran. Silakan coba lagi.');
+      } else {
+        setRejectSuccess(true);
+        setDecisionNote('');
+        setTimeout(() => {
+          setSelectedUserId(null);
+          setDetailItem(null);
+          setRejectSuccess(false);
+          fetchApprovals(pagination?.page || 1);
+        }, 1200);
+      }
+    } catch {
+      setRejectError('Gagal terhubung ke server saat memproses penolakan.');
+    } finally {
+      setSubmittingReject(false);
     }
   };
 
@@ -323,18 +357,43 @@ export default function PendingApprovalsPage() {
                       </div>
                     )}
 
-                    <button
-                      onClick={() => handleApprove(detailItem.userId)}
-                      disabled={submittingApprove}
-                      className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
-                    >
-                      {submittingApprove ? (
-                        <RefreshCw size={14} className="animate-spin" />
-                      ) : (
-                        <CheckCircle size={14} />
-                      )}
-                      Setujui Pendaftaran Admin
-                    </button>
+                    {rejectError && (
+                      <div className="p-2 bg-app-error-container/20 border border-app-error/30 text-app-error rounded text-xs">
+                        {rejectError}
+                      </div>
+                    )}
+                    {rejectSuccess && (
+                      <div className="p-2 bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 rounded text-xs flex items-center gap-1.5 font-medium">
+                        <XCircle size={14} /> Permohonan berhasil ditolak!
+                      </div>
+                    )}
+
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleApprove(detailItem.userId)}
+                        disabled={submittingApprove || submittingReject}
+                        className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
+                      >
+                        {submittingApprove ? (
+                          <RefreshCw size={14} className="animate-spin" />
+                        ) : (
+                          <CheckCircle size={14} />
+                        )}
+                        Setujui
+                      </button>
+                      <button
+                        onClick={() => handleReject(detailItem.userId)}
+                        disabled={submittingApprove || submittingReject}
+                        className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
+                      >
+                        {submittingReject ? (
+                          <RefreshCw size={14} className="animate-spin" />
+                        ) : (
+                          <XCircle size={14} />
+                        )}
+                        Tolak
+                      </button>
+                    </div>
                   </div>
                 </div>
               ) : (

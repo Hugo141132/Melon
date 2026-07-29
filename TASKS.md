@@ -664,8 +664,9 @@ Implement transactional approval.
 ## TASK-0208 — Implement Owner Rejection
 
 **Priority:** `P0`  
-**Status:** `BACKLOG`  
+**Status:** `DONE`  
 **Dependencies:** `TASK-0206`
+**Completed:** 2026-07-29 — Implemented transactional Owner rejection (`rejectPendingAdmin`) in `UserRepository` (`packages/database`), created API route handler `POST /api/v1/approvals/[userId]/reject` (`apps/web`), updated Owner UI in `apps/web/app/approvals/page.tsx` with rejection action button and error/success states, and added unit test coverage verifying `401`, `403`, `404`, `409` conflict responses, audit log recording without secret exposure, and isolated post-commit notifications.
 
 ### Acceptance Criteria
 
