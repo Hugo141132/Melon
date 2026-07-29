@@ -4,3 +4,4 @@ export * from './user-repository';
 export * from './password-service';
 export * from './admin-registration';
 export * from './session-service';
+export { CANONICAL_PERMISSIONS } from '../prisma/seed';

@@ -683,8 +683,9 @@ Implement transactional approval.
 ## TASK-0209 — Implement Authorisation Library
 
 **Priority:** `P0`  
-**Status:** `BACKLOG`  
-**Dependencies:** `TASK-0105`, `TASK-0204`
+**Status:** `DONE`  
+**Dependencies:** `TASK-0105`, `TASK-0204`  
+**Completed:** 2026-07-29 — Implemented server authorization library helpers (`apps/web/lib/auth/rbac.ts`) providing `requireSession()`, `requireActiveAccount()`, `requireRole()`, `requirePermission()`, `requireSelfOrPermission()`, `requireDeviceViewAccess()`, and `requireDeviceControlAccess()`. Enforced deny-by-default, server-side RBAC validation against canonical permissions, and active device-controllability checks. Added comprehensive unit test coverage (`apps/web/lib/auth/__tests__/rbac.test.ts`) with 100% pass rate across 17 tests.
 
 ### Work
 
