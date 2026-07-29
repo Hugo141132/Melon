@@ -589,8 +589,9 @@ accountStatus = PENDING_APPROVAL
 ## TASK-0205 — Implement Account-Status Pages
 
 **Priority:** `P1`  
-**Status:** `BACKLOG`  
+**Status:** `DONE`  
 **Dependencies:** `TASK-0203`, `TASK-0204`
+**Completed:** 2026-07-29 — Implemented status view page (`apps/web/app/(auth)/status/page.tsx`) rendering status-specific UI for `PENDING_APPROVAL`, `APPROVED`, `REJECTED`, `SUSPENDED`, `DEACTIVATED`, and `EXPIRED`. Configured server session account-status revalidation (`GET /api/v1/auth/session`), safe logout/support actions, and unit tests.
 
 ### Work
 
