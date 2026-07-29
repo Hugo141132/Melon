@@ -8,6 +8,30 @@ import {
   RawDbUserWithRoles,
 } from '@kebun-melon/contracts';
 
+export interface ApproveAdminInput {
+  targetUserId: string;
+  decidedByUserId: string;
+  decisionNote?: string;
+  requestId?: string;
+  ipAddress?: string;
+  userAgent?: string;
+  notifyFn?: (applicant: { id: string; email: string; fullName: string }) => Promise<void>;
+}
+
+export type ApproveAdminResult =
+  | {
+      success: true;
+      user: PublicSafeUserDto;
+      approvalRecordId: string;
+      auditLogId: string;
+    }
+  | {
+      success: false;
+      error: 'USER_NOT_FOUND' | 'INVALID_STATUS' | 'CONCURRENCY_CONFLICT' | 'INTERNAL_ERROR';
+      message: string;
+      currentStatus?: AccountStatus;
+    };
+
 export class UserRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
@@ -266,6 +290,160 @@ export class UserRepository {
       accountStatus: user.accountStatus as AccountStatus,
       createdAt: user.createdAt,
     };
+  }
+
+  /**
+   * Transactionally approves a pending admin registration (TASK-0207).
+   * Verifies current account status is PENDING_APPROVAL.
+   * Updates accountStatus to APPROVED (or ACTIVE per system policy).
+   * Creates an AccountApproval audit history record.
+   * Inserts an AuditLog entry (without secrets).
+   * Executes notification callback post-commit (notification error does not rollback decision).
+   */
+  async approvePendingAdmin(input: ApproveAdminInput): Promise<ApproveAdminResult> {
+    try {
+      const txResult = await this.prisma.$transaction(
+        async (tx) => {
+          // 1. Fetch user to verify current state
+          const targetUser = await tx.user.findUnique({
+            where: { id: input.targetUserId },
+            select: {
+              id: true,
+              fullName: true,
+              email: true,
+              username: true,
+              accountStatus: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+          });
+
+          if (!targetUser) {
+            return {
+              success: false as const,
+              error: 'USER_NOT_FOUND' as const,
+              message: `Target user with ID '${input.targetUserId}' does not exist.`,
+            };
+          }
+
+          if (targetUser.accountStatus !== AccountStatus.PENDING_APPROVAL) {
+            return {
+              success: false as const,
+              error: 'INVALID_STATUS' as const,
+              message: `Target user is in status '${targetUser.accountStatus}', not PENDING_APPROVAL. Approval cannot be processed.`,
+              currentStatus: targetUser.accountStatus as AccountStatus,
+            };
+          }
+
+          // 2. Update account status to APPROVED
+          const updatedUser = await tx.user.update({
+            where: { id: input.targetUserId },
+            data: { accountStatus: AccountStatus.APPROVED },
+            select: {
+              id: true,
+              fullName: true,
+              email: true,
+              username: true,
+              accountStatus: true,
+              emailVerifiedAt: true,
+              lastLoginAt: true,
+              suspendedAt: true,
+              deactivatedAt: true,
+              createdAt: true,
+              updatedAt: true,
+              userRoles: {
+                where: { revokedAt: null },
+                select: {
+                  id: true,
+                  userId: true,
+                  roleId: true,
+                  assignedByUserId: true,
+                  assignedAt: true,
+                  revokedAt: true,
+                  role: { select: { code: true } },
+                },
+              },
+            },
+          });
+
+          // 3. Create AccountApproval history entry
+          const approvalRecord = await tx.accountApproval.create({
+            data: {
+              applicantUserId: targetUser.id,
+              decision: 'APPROVE',
+              previousStatus: AccountStatus.PENDING_APPROVAL,
+              newStatus: AccountStatus.APPROVED,
+              decidedByUserId: input.decidedByUserId,
+              decisionNote: input.decisionNote?.trim() || null,
+            },
+          });
+
+          // 4. Log AuditLog event (strictly no secrets/passwords/tokens)
+          const auditLog = await tx.auditLog.create({
+            data: {
+              eventKey: 'ACCOUNT_APPROVAL_APPROVE',
+              actorUserId: input.decidedByUserId,
+              actorRole: ContractUserRole.OWNER,
+              targetType: 'USER',
+              targetId: targetUser.id,
+              result: 'SUCCESS',
+              previousValues: { accountStatus: AccountStatus.PENDING_APPROVAL },
+              newValues: { accountStatus: AccountStatus.APPROVED },
+              metadata: {
+                decision: 'APPROVE',
+                decisionNote: input.decisionNote?.trim() || null,
+                applicantEmail: targetUser.email,
+                applicantFullName: targetUser.fullName,
+              },
+              requestId: input.requestId || null,
+              ipAddress: input.ipAddress || null,
+              userAgent: input.userAgent || null,
+            },
+          });
+
+          return {
+            success: true as const,
+            user: toPublicSafeUserDto(this.mapPrismaUserToRawDbUser(updatedUser)),
+            approvalRecordId: approvalRecord.id,
+            auditLogId: auditLog.id,
+            applicantInfo: {
+              id: targetUser.id,
+              email: targetUser.email,
+              fullName: targetUser.fullName,
+            },
+          };
+        },
+        {
+          isolationLevel: 'RepeatableRead',
+        }
+      );
+
+      if (!txResult.success) {
+        return txResult;
+      }
+
+      // 5. Fire optional notification callback AFTER successful transaction commit
+      if (input.notifyFn && txResult.applicantInfo) {
+        try {
+          await input.notifyFn(txResult.applicantInfo);
+        } catch {
+          // Notification failure is non-blocking and must not fail or roll back decision
+        }
+      }
+
+      return {
+        success: true,
+        user: txResult.user,
+        approvalRecordId: txResult.approvalRecordId,
+        auditLogId: txResult.auditLogId,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: 'INTERNAL_ERROR',
+        message: 'A database transaction error occurred during account approval.',
+      };
+    }
   }
 
   /**

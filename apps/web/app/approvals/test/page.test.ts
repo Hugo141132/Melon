@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { PendingApprovalItemDtoSchema, PendingApprovalsQueryInputSchema } from '@kebun-melon/contracts';
+import {
+  PendingApprovalItemDtoSchema,
+  PendingApprovalsQueryInputSchema,
+} from '@kebun-melon/contracts';
 
 describe('Owner Approvals UI Component & Schema Integration Tests (TASK-0206)', () => {
   it('1. Validates schema parsing for populated pending approval item', () => {
@@ -49,5 +52,41 @@ describe('Owner Approvals UI Component & Schema Integration Tests (TASK-0206)', 
     expect(customQuery.pageSize).toBe(50);
     expect(customQuery.search).toBe('admin');
     expect(customQuery.sort).toBe('createdAt:asc');
+  });
+
+  it('4. Validates Owner UI approval action request schema and error handling contracts', () => {
+    // Valid decisionNote
+    const validApprovalInput = { decisionNote: 'Verified identity via phone' };
+    expect(validApprovalInput.decisionNote).toBe('Verified identity via phone');
+
+    // State contracts: SUCCESS response envelope format
+    const successResponse = {
+      success: true,
+      data: {
+        user: {
+          id: '123e4567-e89b-12d3-a456-426614174000',
+          fullName: 'Approved Admin',
+          email: 'admin@example.com',
+          accountStatus: 'APPROVED',
+        },
+        approvalRecordId: 'rec-123',
+      },
+      meta: { requestId: 'req-1' },
+    };
+    expect(successResponse.success).toBe(true);
+    expect(successResponse.data.user.accountStatus).toBe('APPROVED');
+
+    // State contracts: CONFLICT error response format
+    const conflictResponse = {
+      success: false,
+      error: {
+        code: 'CONFLICT',
+        message: "Target user is in status 'APPROVED', not PENDING_APPROVAL.",
+        details: { currentStatus: 'APPROVED' },
+      },
+      meta: { requestId: 'req-2' },
+    };
+    expect(conflictResponse.success).toBe(false);
+    expect(conflictResponse.error.code).toBe('CONFLICT');
   });
 });

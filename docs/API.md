@@ -995,10 +995,19 @@ Response:
 {
   "success": true,
   "data": {
-    "userId": "user-pending-001",
-    "previousStatus": "PENDING_APPROVAL",
-    "accountStatus": "ACTIVE",
-    "decidedAt": "2026-07-27T14:10:00+07:00"
+    "user": {
+      "id": "user-pending-001",
+      "fullName": "Pending Admin",
+      "email": "pending@example.com",
+      "accountStatus": "APPROVED",
+      "roles": ["ADMIN"],
+      "createdAt": "2026-07-27T10:00:00.000Z",
+      "updatedAt": "2026-07-29T14:10:00.000Z"
+    },
+    "approvalRecordId": "approval-uuid-001"
+  },
+  "meta": {
+    "requestId": "req-001"
   }
 }
 ```
@@ -1006,9 +1015,12 @@ Response:
 Possible errors:
 
 ```text
-ACCOUNT_STATE_CONFLICT
-USER_NOT_FOUND
+UNAUTHENTICATED
 FORBIDDEN
+USER_NOT_FOUND
+CONFLICT
+VALIDATION_ERROR
+INTERNAL_ERROR
 ```
 
 ---

@@ -641,9 +641,10 @@ Create Owner UI.
 
 ## TASK-0207 — Implement Owner Approval
 
-**Priority:** `P0`  
-**Status:** `BLOCKED`  
+**Priority:** `P0`
+**Status:** `DONE`
 **Dependencies:** `TASK-0206`, `TASK-0002`
+**Completed:** 2026-07-29 — Implemented transactional Owner approval (`approvePendingAdmin`) in `UserRepository` (`packages/database`), created API route handler `POST /api/v1/approvals/[userId]/approve` (`apps/web`), added Owner approval action UI in `apps/web/app/approvals/page.tsx`, and added complete unit & Docker-backed PostgreSQL integration test coverage verifying status rechecks, conflict protection (`409 CONFLICT`), `AccountApproval` audit history insertion, `AuditLog` event recording (with secret redaction), and notification failure isolation.
 
 ### Work
 

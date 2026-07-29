@@ -30,6 +30,40 @@ export default function PendingApprovalsPage() {
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [detailItem, setDetailItem] = useState<PendingApprovalItem | null>(null);
   const [loadingDetail, setLoadingDetail] = useState<boolean>(false);
+  const [decisionNote, setDecisionNote] = useState<string>('');
+  const [submittingApprove, setSubmittingApprove] = useState<boolean>(false);
+  const [approveError, setApproveError] = useState<string | null>(null);
+  const [approveSuccess, setApproveSuccess] = useState<boolean>(false);
+
+  const handleApprove = async (userId: string) => {
+    setSubmittingApprove(true);
+    setApproveError(null);
+    setApproveSuccess(false);
+    try {
+      const res = await fetch(`/api/v1/approvals/${userId}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decisionNote }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        setApproveError(json.error?.message || 'Gagal menyetujui pendaftaran. Silakan coba lagi.');
+      } else {
+        setApproveSuccess(true);
+        setDecisionNote('');
+        setTimeout(() => {
+          setSelectedUserId(null);
+          setDetailItem(null);
+          setApproveSuccess(false);
+          fetchApprovals(pagination?.page || 1);
+        }, 1200);
+      }
+    } catch {
+      setApproveError('Gagal terhubung ke server saat memproses persetujuan.');
+    } finally {
+      setSubmittingApprove(false);
+    }
+  };
 
   const fetchApprovals = async (pageToFetch = 1) => {
     setLoading(true);
@@ -264,14 +298,43 @@ export default function PendingApprovalsPage() {
                       {new Date(detailItem.createdAt).toLocaleString('id-ID')}
                     </p>
                   </div>
-                  <div className="p-3 bg-app-surface-container/50 rounded-lg border border-app-outline-variant/20 text-xs text-app-on-surface-variant space-y-1">
-                    <p className="font-medium text-app-on-surface flex items-center gap-1">
-                      <Lock size={12} /> Catatan Akses Tambahan
-                    </p>
-                    <p>
-                      Keputusan persetujuan/penolakan diproses oleh Owner melalui mekanisme
-                      transaksi (TASK-0207).
-                    </p>
+                  <div className="pt-3 border-t border-app-outline-variant/30 space-y-3">
+                    <div>
+                      <label className="text-xs text-app-outline font-medium">
+                        Catatan Persetujuan (Opsional)
+                      </label>
+                      <textarea
+                        rows={2}
+                        placeholder="Contoh: Identitas terverifikasi via telepon..."
+                        value={decisionNote}
+                        onChange={(e) => setDecisionNote(e.target.value)}
+                        className="w-full mt-1 p-2 bg-app-surface-container border border-app-outline-variant/30 rounded-lg text-xs text-app-on-surface focus:outline-none focus:border-app-primary resize-none"
+                      />
+                    </div>
+
+                    {approveError && (
+                      <div className="p-2 bg-app-error-container/20 border border-app-error/30 text-app-error rounded text-xs">
+                        {approveError}
+                      </div>
+                    )}
+                    {approveSuccess && (
+                      <div className="p-2 bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 rounded text-xs flex items-center gap-1.5 font-medium">
+                        <CheckCircle size={14} /> Permohonan berhasil disetujui!
+                      </div>
+                    )}
+
+                    <button
+                      onClick={() => handleApprove(detailItem.userId)}
+                      disabled={submittingApprove}
+                      className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+                    >
+                      {submittingApprove ? (
+                        <RefreshCw size={14} className="animate-spin" />
+                      ) : (
+                        <CheckCircle size={14} />
+                      )}
+                      Setujui Pendaftaran Admin
+                    </button>
                   </div>
                 </div>
               ) : (

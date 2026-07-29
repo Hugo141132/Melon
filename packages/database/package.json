@@ -33,6 +33,7 @@
     "db:test:session-integration:docker": "tsx scripts/run-session-docker-integration-test.ts",
     "db:test:approvals-integration": "vitest run test/approvals.service.integration.test.ts",
     "db:test:approvals-integration:docker": "tsx scripts/run-approvals-docker-integration-test.ts",
+    "db:test:smoke-task0207": "tsx scripts/smoke-test-task0207.ts",
     "db:test:smoke-task0206": "tsx scripts/smoke-test-task0206.ts",
     "db:test:smoke-task0204": "tsx scripts/smoke-test-task0204.ts"
   },
