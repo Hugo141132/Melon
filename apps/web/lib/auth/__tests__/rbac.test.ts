@@ -154,7 +154,18 @@ describe('TASK-0209 — Authorisation Library (apps/web/lib/auth/rbac.ts)', () =
       );
     });
 
-    it('16. Admin allowed device control when assigned and device is active/controllable', async () => {
+    it('16. Device control denied when ENABLE_FAUCET_CONTROL is disabled', async () => {
+      delete process.env.ENABLE_FAUCET_CONTROL;
+      const options = {
+        isDeviceActiveAndControllable: vi.fn().mockResolvedValue(true),
+      };
+      await expect(requireDeviceControlAccess(activeAdmin, 'device-101', options)).rejects.toThrow(
+        AuthorizationError
+      );
+    });
+
+    it('17. Admin allowed device control when ENABLE_FAUCET_CONTROL=true, assigned, and device is active/controllable', async () => {
+      process.env.ENABLE_FAUCET_CONTROL = 'true';
       const options = {
         isDeviceActiveAndControllable: vi.fn().mockResolvedValue(true),
       };
@@ -162,15 +173,18 @@ describe('TASK-0209 — Authorisation Library (apps/web/lib/auth/rbac.ts)', () =
         requireDeviceControlAccess(activeAdmin, 'device-101', options)
       ).resolves.not.toThrow();
       expect(options.isDeviceActiveAndControllable).toHaveBeenCalledWith('device-101');
+      delete process.env.ENABLE_FAUCET_CONTROL;
     });
 
-    it('17. Device control denied when device is inactive/uncontrollable', async () => {
+    it('18. Device control denied when device is inactive/uncontrollable even if flag is true', async () => {
+      process.env.ENABLE_FAUCET_CONTROL = 'true';
       const options = {
         isDeviceActiveAndControllable: vi.fn().mockResolvedValue(false),
       };
       await expect(requireDeviceControlAccess(activeAdmin, 'device-101', options)).rejects.toThrow(
         AuthorizationError
       );
+      delete process.env.ENABLE_FAUCET_CONTROL;
     });
   });
 });

@@ -198,6 +198,16 @@ export async function requireDeviceControlAccess(
 ): Promise<AuthenticatedUserSession> {
   requireActiveAccount(session);
 
+  const isFaucetEnabled =
+    process.env.ENABLE_FAUCET_CONTROL === 'true' || process.env.ENABLE_FAUCET_CONTROL === '1';
+  if (!isFaucetEnabled) {
+    throw new AuthorizationError(
+      403,
+      'FAUCET_CONTROL_DISABLED',
+      'Access denied: Faucet control feature flag ENABLE_FAUCET_CONTROL is currently disabled.'
+    );
+  }
+
   await requireDeviceViewAccess(session, targetDeviceId, options);
 
   if (options?.isDeviceActiveAndControllable) {
