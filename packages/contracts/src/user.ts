@@ -152,3 +152,16 @@ export const AdminRegistrationInputSchema = z
   .strict();
 
 export type AdminRegistrationInput = z.infer<typeof AdminRegistrationInputSchema>;
+
+/**
+ * Input schema for User Login.
+ * Uses z.object().strict() to reject extraneous injected fields.
+ */
+export const LoginInputSchema = z
+  .object({
+    email: z.string().trim().email('Invalid email address format.'),
+    password: z.string().min(1, 'Password is required.'),
+  })
+  .strict();
+
+export type LoginInput = z.infer<typeof LoginInputSchema>;
