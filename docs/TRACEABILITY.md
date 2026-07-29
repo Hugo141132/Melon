@@ -177,7 +177,7 @@
 | `API-ERR-001` | Standard JSON API error envelope format | `docs/API.md` | - | `TASK-0102` | `TEST-API-001` | `READY_FOR_IMPLEMENTATION` |
 | `API-ERR-002` | Canonical error code mapping and HTTP status rules | `docs/API.md` | - | `TASK-0102` | `TEST-API-001` | `READY_FOR_IMPLEMENTATION` |
 | `SEC-AUTH-001` | HTTP-only secure cookie session storage | `docs/SECURITY.md` | `DEC-AUTH-001` | `TASK-0204` | `TEST-SEC-001` | `READY_FOR_IMPLEMENTATION` |
-| `SEC-AUTH-002` | Password hashing using Argon2id algorithm | `docs/SECURITY.md` | - | `TASK-0202` | `TEST-SEC-001` | `READY_FOR_IMPLEMENTATION` |
+| `SEC-AUTH-002` | Password hashing using Argon2id algorithm | `docs/SECURITY.md` | - | `TASK-0202` | `TEST-SEC-001` | `IMPLEMENTED` |
 | `SEC-AUTH-003` | Public registration forbidden from creating Owner | `docs/SECURITY.md` | `DEC-AUTH-006` | `TASK-0203` | `TEST-SEC-001` | `READY_FOR_IMPLEMENTATION` |
 | `SEC-AUTH-004` | CLI seed method for first Owner account creation | `docs/SECURITY.md` | `DEC-AUTH-006` | `TASK-0106` | `TEST-SEC-001` | `IMPLEMENTED` |
 | `SEC-AUTH-005` | Session lifetime and idle timeout enforcement | `docs/SECURITY.md` | `DEC-AUTH-001` | `TASK-0204` | `TEST-SEC-001` | `READY_FOR_IMPLEMENTATION` |

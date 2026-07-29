@@ -22,6 +22,7 @@
     "db:test:integration": "vitest run test/integration.test.ts",
     "db:test:seed": "vitest run test/seed.test.ts",
     "db:test:seed-owner": "vitest run test/seed-owner.test.ts",
+    "db:test:password-service": "vitest run test/password-service.test.ts",
     "db:test:user-repository": "vitest run test/user-repository.test.ts"
   },
   "dependencies": {

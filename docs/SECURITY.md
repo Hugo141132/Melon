@@ -294,11 +294,18 @@ If introduced, it should be mandatory for:
 
 Passwords shall be hashed using a modern password-hashing function.
 
-Recommended:
+Approved algorithm and implementation:
 
 ```text
-Argon2id
+Argon2id (via @node-rs/argon2 N-API compiled binary)
+Algorithm variant: Argon2id (algorithm = 2)
+Default parameters: OWASP recommended baseline (memoryCost = 65536 KiB / 64 MiB, timeCost = 3 iterations, parallelism = 4 threads)
 ```
+
+The reusable password service is encapsulated in `@kebun-melon/database` (`packages/database/src/password-service.ts`) exposing:
+- `validatePasswordPolicy(password)`
+- `hashPassword(password, options?)`
+- `verifyPassword(storedHash, candidatePassword)`
 
 Acceptable fallback:
 

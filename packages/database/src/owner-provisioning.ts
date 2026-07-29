@@ -1,5 +1,7 @@
 import { PrismaClient, AccountStatus, UserRole } from '@prisma/client';
-import { hash, verify, Algorithm } from '@node-rs/argon2';
+import { validatePasswordPolicy, hashPassword, verifyPassword } from './password-service';
+
+export { validatePasswordPolicy };
 
 /**
  * Stable, application-specific 64-bit integer advisory lock key for first-Owner provisioning.
@@ -41,33 +43,6 @@ export function normaliseEmail(email: string): string {
 export function validateEmail(email: string): boolean {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
-}
-
-/**
- * Validates a password directly against the approved policy in docs/SECURITY.md §8.2:
- * - Minimum 12 characters.
- * - At least one uppercase letter.
- * - At least one lowercase letter.
- * - At least one digit.
- * - At least one special character.
- */
-export function validatePasswordPolicy(password: string): { valid: boolean; reason?: string } {
-  if (password.length < 12) {
-    return { valid: false, reason: 'Password must be at least 12 characters long.' };
-  }
-  if (!/[A-Z]/.test(password)) {
-    return { valid: false, reason: 'Password must contain at least one uppercase letter.' };
-  }
-  if (!/[a-z]/.test(password)) {
-    return { valid: false, reason: 'Password must contain at least one lowercase letter.' };
-  }
-  if (!/[0-9]/.test(password)) {
-    return { valid: false, reason: 'Password must contain at least one digit.' };
-  }
-  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/.test(password)) {
-    return { valid: false, reason: 'Password must contain at least one special character.' };
-  }
-  return { valid: true };
 }
 
 /**
@@ -127,7 +102,7 @@ export async function provisionFirstOwner(
   }
 
   // Pre-hash password before entering transaction to keep transaction window small
-  const passwordHash = await hash(input.password, { algorithm: 2 });
+  const passwordHash = await hashPassword(input.password);
 
   return await prisma.$transaction(
     async (tx) => {
@@ -236,11 +211,11 @@ export async function provisionFirstOwner(
 }
 
 /**
- * Verifies a stored Argon2id password hash using the argon2 library.
+ * Verifies a stored Argon2id password hash using the reusable password service.
  */
 export async function verifyOwnerPassword(
   storedHash: string,
   plainPassword: string
 ): Promise<boolean> {
-  return await verify(storedHash, plainPassword);
+  return await verifyPassword(storedHash, plainPassword);
 }

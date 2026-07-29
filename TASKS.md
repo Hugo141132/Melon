@@ -501,16 +501,18 @@ Implemented:
 
 ## TASK-0202 — Implement Password Hashing
 
-**Priority:** `P0`  
-**Status:** `IN_REVIEW`
+**Priority:** `P0`
+**Status:** `DONE`
 **Dependencies:** `TASK-0201`
+**Completed:** 2026-07-29 — Extracted reusable pure password service (`packages/database/src/password-service.ts`) using `@node-rs/argon2` (Argon2id), implemented password policy validation per `docs/SECURITY.md` §8.2, refactored first-Owner provisioning, and added unit & integration tests.
 
 ### Work
 
-- Use Argon2id or approved fallback.
+- Use Argon2id via `@node-rs/argon2`.
 - Configure secure parameters.
-- Add password verification.
-- Add password-policy validation.
+- Add password verification (`verifyPassword`).
+- Add password-policy validation (`validatePasswordPolicy`).
+- Refactor first-Owner provisioning (`provisionFirstOwner`) to consume reusable password service.
 
 ### Acceptance Criteria
 

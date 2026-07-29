@@ -450,7 +450,15 @@ EXPIRED
 
 Test:
 
-- Password verification.
+- Pure password service unit test suite (`npm run db:test:password-service` / `packages/database/test/password-service.test.ts`):
+  - Password policy compliance (12+ length, uppercase, lowercase, digit, special character).
+  - Argon2id hashing parameters and output structure (`$argon2id$`).
+  - Salt randomness (unique salts for identical passwords).
+  - Password verification logic (`verifyPassword`).
+  - Non-throwing safe error handling for malformed or corrupt hashes.
+  - Secret leak prevention (no plain passwords in error objects or strings).
+  - Immutability of input strings.
+- Password verification integration.
 - Account-status access decision.
 - Session-expiry calculation.
 - Session-revocation check.
