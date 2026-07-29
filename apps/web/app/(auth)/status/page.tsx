@@ -155,9 +155,7 @@ function StatusContent() {
       <main className="w-full max-w-md bg-surface-container-lowest bento-shape p-[32px] shadow-sm border border-outline-variant text-center">
         {/* Status Badge */}
         <div className="inline-flex items-center justify-center mb-6">
-          <span
-            className={`px-3 py-1 text-xs font-semibold rounded-full border ${config.badgeBg}`}
-          >
+          <span className={`px-3 py-1 text-xs font-semibold rounded-full border ${config.badgeBg}`}>
             {config.badgeText}
           </span>
         </div>
@@ -185,7 +183,9 @@ function StatusContent() {
           </div>
         ) : currentStatus && currentStatus !== normalizedReason ? (
           <div className="mb-6 p-3 bg-surface rounded-xl border border-outline-variant text-sm text-on-surface-variant flex items-center justify-between">
-            <span>Status akun di server: <strong>{currentStatus}</strong></span>
+            <span>
+              Status akun di server: <strong>{currentStatus}</strong>
+            </span>
             <button
               onClick={fetchSessionStatus}
               className="p-1 text-secondary hover:text-primary transition-colors cursor-pointer"

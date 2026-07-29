@@ -144,7 +144,12 @@ async function main() {
     });
 
     await prisma.$disconnect();
-    console.log('[4/7] Seeding complete:', { ownerId: owner.id, adminId: admin.id, pendingId: pending.id, suspendedOwnerId: suspendedOwner.id });
+    console.log('[4/7] Seeding complete:', {
+      ownerId: owner.id,
+      adminId: admin.id,
+      pendingId: pending.id,
+      suspendedOwnerId: suspendedOwner.id,
+    });
 
     // 5. Start web server in background pointing to testDbUrl
     console.log('[5/7] Starting local Next.js web server...');
@@ -180,7 +185,11 @@ async function main() {
 
     // Test A: Unauthenticated request -> 401
     const resUnauth = await makeRequest(`${baseUrl}/api/v1/approvals/pending`);
-    console.log('--> Check A (Unauthenticated list):', resUnauth.status, resUnauth.body.error?.code);
+    console.log(
+      '--> Check A (Unauthenticated list):',
+      resUnauth.status,
+      resUnauth.body.error?.code
+    );
     if (resUnauth.status !== 401 || resUnauth.body.error?.code !== 'UNAUTHENTICATED') {
       throw new Error(`Check A failed: expected 401 UNAUTHENTICATED, got ${resUnauth.status}`);
     }
@@ -198,7 +207,11 @@ async function main() {
     const resAdminList = await makeRequest(`${baseUrl}/api/v1/approvals/pending`, {
       headers: { Cookie: adminCookie },
     });
-    console.log('--> Check B (Active ADMIN list):', resAdminList.status, resAdminList.body.error?.code);
+    console.log(
+      '--> Check B (Active ADMIN list):',
+      resAdminList.status,
+      resAdminList.body.error?.code
+    );
     if (resAdminList.status !== 403 || resAdminList.body.error?.code !== 'FORBIDDEN') {
       throw new Error(`Check B failed: expected 403 FORBIDDEN, got ${resAdminList.status}`);
     }
@@ -213,11 +226,23 @@ async function main() {
     if (!ownerCookie) throw new Error('Failed to obtain OWNER session cookie');
 
     // Test C: Active OWNER list -> 200 with bounded pagination & no sensitive fields
-    const resOwnerList = await makeRequest(`${baseUrl}/api/v1/approvals/pending?page=1&pageSize=10`, {
-      headers: { Cookie: ownerCookie },
-    });
-    console.log('--> Check C (Active OWNER list):', resOwnerList.status, 'Items:', resOwnerList.body.data?.length);
-    if (resOwnerList.status !== 200 || !resOwnerList.body.success || resOwnerList.body.data.length < 1) {
+    const resOwnerList = await makeRequest(
+      `${baseUrl}/api/v1/approvals/pending?page=1&pageSize=10`,
+      {
+        headers: { Cookie: ownerCookie },
+      }
+    );
+    console.log(
+      '--> Check C (Active OWNER list):',
+      resOwnerList.status,
+      'Items:',
+      resOwnerList.body.data?.length
+    );
+    if (
+      resOwnerList.status !== 200 ||
+      !resOwnerList.body.success ||
+      resOwnerList.body.data.length < 1
+    ) {
       throw new Error(`Check C failed: expected 200 OK with items, got ${resOwnerList.status}`);
     }
     const sampleItem = resOwnerList.body.data[0];
@@ -230,16 +255,27 @@ async function main() {
     const resOwnerDetail = await makeRequest(`${baseUrl}/api/v1/approvals/${pendingUserId}`, {
       headers: { Cookie: ownerCookie },
     });
-    console.log('--> Check D (Active OWNER detail):', resOwnerDetail.status, resOwnerDetail.body.data?.fullName);
+    console.log(
+      '--> Check D (Active OWNER detail):',
+      resOwnerDetail.status,
+      resOwnerDetail.body.data?.fullName
+    );
     if (resOwnerDetail.status !== 200 || resOwnerDetail.body.data?.userId !== pendingUserId) {
       throw new Error(`Check D failed: expected 200 OK with detail data`);
     }
 
     // Test E: Missing or Non-Pending User -> 404
-    const resMissing = await makeRequest(`${baseUrl}/api/v1/approvals/00000000-0000-0000-0000-000000000000`, {
-      headers: { Cookie: ownerCookie },
-    });
-    console.log('--> Check E (Missing user detail):', resMissing.status, resMissing.body.error?.code);
+    const resMissing = await makeRequest(
+      `${baseUrl}/api/v1/approvals/00000000-0000-0000-0000-000000000000`,
+      {
+        headers: { Cookie: ownerCookie },
+      }
+    );
+    console.log(
+      '--> Check E (Missing user detail):',
+      resMissing.status,
+      resMissing.body.error?.code
+    );
     if (resMissing.status !== 404 || resMissing.body.error?.code !== 'USER_NOT_FOUND') {
       throw new Error(`Check E failed: expected 404 USER_NOT_FOUND, got ${resMissing.status}`);
     }
