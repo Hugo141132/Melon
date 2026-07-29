@@ -685,7 +685,7 @@ Implement transactional approval.
 **Priority:** `P0`  
 **Status:** `DONE`  
 **Dependencies:** `TASK-0105`, `TASK-0204`  
-**Completed:** 2026-07-29 — Implemented server authorization library helpers (`apps/web/lib/auth/rbac.ts`) providing `requireSession()`, `requireActiveAccount()`, `requireRole()`, `requirePermission()`, `requireSelfOrPermission()`, `requireDeviceViewAccess()`, and `requireDeviceControlAccess()`. Enforced deny-by-default, server-side RBAC validation against canonical permissions, and active device-controllability checks. Added comprehensive unit test coverage (`apps/web/lib/auth/__tests__/rbac.test.ts`) with 100% pass rate across 17 tests.
+**Completed:** 2026-07-29 — Implemented server authorisation library (`apps/web/lib/auth/rbac.ts`) with session lookup (`requireSession`), active status revalidation (`requireActiveAccount`), role guards (`requireRole`), permission checks (`requirePermission`), profile self/permission checks (`requireSelfOrPermission`), assigned device view access (`requireDeviceViewAccess`), and controllable device access (`requireDeviceControlAccess`) with strict `ENABLE_FAUCET_CONTROL` feature flag enforcement. Verified with 18 unit tests in `apps/web/lib/auth/__tests__/rbac.test.ts`.
 
 ### Work
 
