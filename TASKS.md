@@ -301,8 +301,9 @@ TEST-RBAC-001
 ## TASK-0103 — Configure Environment Validation
 
 **Priority:** `P0`  
-**Status:** `BACKLOG`  
-**Dependencies:** `TASK-0101`
+**Status:** `DONE`  
+**Dependencies:** `TASK-0101`  
+**Completed:** 2026-07-29 — Implemented Zod runtime environment variable schemas for web server (`apps/web/lib/env/server.ts`), web client (`apps/web/lib/env/client.ts`), and IoT gateway (`apps/iot-gateway/src/config/env.ts`). Configured startup validation CLI (`scripts/check-env.ts`), environment unit testing suite (`scripts/test-env.ts`), placeholder `.env.example` templates, secret redacting error handlers, and strict production checks (rejecting insecure `mqtt://` brokers and unapproved `ENABLE_FAUCET_CONTROL=true`). Verified 100% test pass rate via `npm run env:test` and `npm run env:check`.
 
 ### Work
 
