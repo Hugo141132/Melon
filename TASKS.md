@@ -525,9 +525,10 @@ Implemented:
 
 ## TASK-0203 — Implement Public Admin Registration
 
-**Priority:** `P0`  
-**Status:** `BACKLOG`  
+**Priority:** `P0`
+**Status:** `DONE`
 **Dependencies:** `TASK-0201`, `TASK-0202`
+**Completed:** 2026-07-29 — Implemented public Admin registration via `registerAdminUser` and `POST /api/v1/auth/register` API endpoint. Forced `role = ADMIN` and `accountStatus = PENDING_APPROVAL`, added strict input validation rejecting privilege injection, email normalisation, Argon2id password hashing, structured audit logging (`ACCOUNT_REGISTER_ADMIN`), and complete unit test coverage.
 
 ### Work
 

@@ -137,3 +137,18 @@ export const UserProfileUpdateInputSchema = z
   .strict();
 
 export type UserProfileUpdateInput = z.infer<typeof UserProfileUpdateInputSchema>;
+
+/**
+ * Public input schema for Admin Registration.
+ * Uses z.object().strict() to immediately fail or reject role, accountStatus, permissions,
+ * or any other privilege injection attempt.
+ */
+export const AdminRegistrationInputSchema = z
+  .object({
+    fullName: z.string().min(1, 'Full name is required.').max(150),
+    email: z.string().trim().email('Invalid email address format.'),
+    password: z.string().min(1, 'Password is required.'),
+  })
+  .strict();
+
+export type AdminRegistrationInput = z.infer<typeof AdminRegistrationInputSchema>;
