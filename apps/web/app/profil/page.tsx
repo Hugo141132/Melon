@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   ArrowLeft,
   MoreVertical,
@@ -11,19 +11,119 @@ import {
   Smartphone,
   LogOut,
   CheckCircle,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react';
 import { USER_PROFILE } from '@/lib/constants';
 
-export default function ProfilPage() {
-  const [name, setName] = useState(USER_PROFILE.name);
-  const [phone, setPhone] = useState(USER_PROFILE.phone);
-  const [saved, setSaved] = useState(false);
+interface UserProfileState {
+  id: string;
+  fullName: string;
+  email: string;
+  username: string | null;
+  accountStatus: string;
+  activeRoles: string[];
+}
 
+export default function ProfilPage() {
+  const [profile, setProfile] = useState<UserProfileState | null>(null);
+  const [fullName, setFullName] = useState('');
+  const [username, setUsername] = useState('');
+
+  // UI states
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [unauthenticated, setUnauthenticated] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
-  const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
+  // Fetch real profile from backend GET /api/v1/me
+  useEffect(() => {
+    let isMounted = true;
+    async function loadProfile() {
+      try {
+        setLoading(true);
+        setErrorMsg(null);
+        const res = await fetch('/api/v1/me');
+
+        if (res.status === 401 || res.status === 403) {
+          if (isMounted) {
+            setUnauthenticated(true);
+            setLoading(false);
+          }
+          return;
+        }
+
+        const json = await res.json();
+        if (json.success && json.data) {
+          if (isMounted) {
+            setProfile(json.data);
+            setFullName(json.data.fullName || '');
+            setUsername(json.data.username || '');
+          }
+        } else {
+          if (isMounted) {
+            setErrorMsg(json.error?.message || 'Gagal memuat profil pengguna.');
+          }
+        }
+      } catch {
+        if (isMounted) {
+          setErrorMsg('Terjadi kesalahan koneksi saat memuat profil.');
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadProfile();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setErrorMsg(null);
+    try {
+      const payload: { fullName?: string; username?: string | null } = {};
+      if (fullName.trim()) payload.fullName = fullName.trim();
+      payload.username = username.trim() ? username.trim() : null;
+
+      const res = await fetch('/api/v1/me', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.status === 401 || res.status === 403) {
+        setUnauthenticated(true);
+        setSaving(false);
+        return;
+      }
+
+      const json = await res.json();
+
+      if (res.ok && json.success && json.data) {
+        setProfile(json.data);
+        setFullName(json.data.fullName || '');
+        setUsername(json.data.username || '');
+        setSaved(true);
+        setTimeout(() => setSaved(false), 3000);
+      } else {
+        if (res.status === 422) {
+          setErrorMsg(json.error?.message || 'Data yang dimasukkan tidak valid.');
+        } else {
+          setErrorMsg(json.error?.message || 'Gagal menyimpan perubahan profil.');
+        }
+      }
+    } catch {
+      setErrorMsg('Terjadi kesalahan koneksi saat menyimpan profil.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleLogout = async () => {
@@ -36,6 +136,45 @@ export default function ProfilPage() {
       window.location.href = '/login';
     }
   };
+
+  // 1. Unauthenticated state
+  if (unauthenticated) {
+    return (
+      <div className="bg-app-surface text-app-on-surface min-h-dvh flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl p-6 max-w-sm w-full text-center space-y-4 soft-elevation">
+          <AlertCircle className="w-12 h-12 text-app-error mx-auto" />
+          <h2 className="text-xl font-bold">Sesi Berakhir</h2>
+          <p className="text-sm text-app-on-surface-variant">
+            Sesi Anda telah berakhir atau akun tidak aktif. Silakan masuk kembali.
+          </p>
+          <Link
+            href="/login"
+            className="block w-full py-3 bg-app-primary text-white rounded-xl font-semibold active:scale-95 transition-transform"
+          >
+            Kembali ke Login
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. Loading state
+  if (loading) {
+    return (
+      <div className="bg-app-surface text-app-on-surface min-h-dvh flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="w-8 h-8 text-app-primary animate-spin" />
+          <span className="text-sm font-medium text-app-on-surface-variant">
+            Memuat data profil...
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  const roleDisplay = profile?.activeRoles?.includes('OWNER')
+    ? 'Pemilik Lahan (OWNER)'
+    : 'Pengelola (ADMIN)';
 
   return (
     <div className="bg-app-surface text-app-on-surface min-h-dvh pb-32 font-sans">
@@ -58,6 +197,14 @@ export default function ProfilPage() {
       </header>
 
       <main className="max-w-md mx-auto px-[1rem] pt-[1rem] space-y-[1.5rem]">
+        {/* Error banner if any */}
+        {errorMsg && (
+          <div className="bg-app-error-container/20 border border-app-error text-app-error p-4 rounded-xl flex items-center gap-3 text-sm font-medium">
+            <AlertCircle size={18} className="shrink-0" />
+            <span>{errorMsg}</span>
+          </div>
+        )}
+
         {/* Section 1: Personal Info */}
         <section className="space-y-[1rem]">
           {/* Avatar */}
@@ -66,7 +213,7 @@ export default function ProfilPage() {
               <div className="w-28 h-28 rounded-full border-4 border-white soft-elevation overflow-hidden bg-app-surface-container">
                 <Image
                   src={USER_PROFILE.avatar}
-                  alt={USER_PROFILE.name}
+                  alt={fullName || USER_PROFILE.name}
                   width={112}
                   height={112}
                   className="w-full h-full object-cover"
@@ -79,56 +226,52 @@ export default function ProfilPage() {
             <div className="flex items-center gap-2 px-4 py-1.5 bg-app-on-primary-container text-app-primary rounded-full">
               <CheckCircle size={16} fill="currentColor" />
               <span className="text-[14px] font-semibold">
-                {USER_PROFILE.role} - Akun Terverifikasi
+                {roleDisplay} - {profile?.accountStatus || 'ACTIVE'}
               </span>
             </div>
           </div>
 
           <div className="space-y-4">
-            {/* Nama Lengkap */}
+            {/* Nama Lengkap (Editable) */}
             <div className="space-y-2">
               <label className="text-[14px] font-semibold text-app-on-surface-variant px-1 block">
                 Nama Lengkap
               </label>
               <input
                 className="w-full h-[56px] px-4 bg-white border-[1.5px] border-app-outline-variant rounded-xl focus:border-app-primary focus:ring-1 focus:ring-app-primary outline-none transition-all text-[16px]"
-                placeholder="Wahyu"
+                placeholder="Nama Lengkap"
                 type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                disabled={saving}
               />
             </div>
 
-            {/* WhatsApp */}
+            {/* Email (Read-Only) */}
             <div className="space-y-2">
               <label className="text-[14px] font-semibold text-app-on-surface-variant px-1 block">
-                Nomor WhatsApp
+                Email (Terdaftar)
               </label>
-              <div className="relative">
-                <input
-                  className="w-full h-[56px] px-4 pr-12 bg-white border-[1.5px] border-app-outline-variant rounded-xl focus:border-app-primary focus:ring-1 focus:ring-app-primary outline-none transition-all text-[16px]"
-                  placeholder="0812-xxxx-xxxx"
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                />
-                <CheckCircle
-                  size={20}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-app-primary"
-                  fill="currentColor"
-                />
-              </div>
+              <input
+                className="w-full h-[56px] px-4 bg-app-surface-container-low border-[1.5px] border-app-outline-variant rounded-xl text-app-on-surface-variant outline-none cursor-not-allowed text-[16px]"
+                type="email"
+                value={profile?.email || ''}
+                disabled
+              />
             </div>
 
-            {/* Nama Lahan */}
+            {/* Username / Alias (Editable) */}
             <div className="space-y-2">
               <label className="text-[14px] font-semibold text-app-on-surface-variant px-1 block">
-                Nama Lahan
+                Username / Alias (Opsional)
               </label>
               <input
                 className="w-full h-[56px] px-4 bg-white border-[1.5px] border-app-outline-variant rounded-xl focus:border-app-primary focus:ring-1 focus:ring-app-primary outline-none transition-all text-[16px]"
-                placeholder="Kebun Melon Pak Wahyu"
+                placeholder="username"
                 type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                disabled={saving}
               />
             </div>
           </div>
@@ -196,9 +339,15 @@ export default function ProfilPage() {
         <div className="max-w-md mx-auto">
           <button
             onClick={handleSave}
-            className="w-full h-[56px] bg-app-primary text-white rounded-xl text-[20px] font-semibold flex items-center justify-center gap-2 active:scale-95 transition-all shadow-lg shadow-app-primary/20 cursor-pointer"
+            disabled={saving}
+            className="w-full h-[56px] bg-app-primary text-white rounded-xl text-[20px] font-semibold flex items-center justify-center gap-2 active:scale-95 transition-all shadow-lg shadow-app-primary/20 cursor-pointer disabled:opacity-60"
           >
-            {saved ? (
+            {saving ? (
+              <>
+                <Loader2 size={20} className="animate-spin" />
+                Menyimpan...
+              </>
+            ) : saved ? (
               <>
                 <CheckCircle size={20} fill="white" />
                 Tersimpan!

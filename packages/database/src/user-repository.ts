@@ -625,6 +625,161 @@ export class UserRepository {
   }
 
   /**
+   * Updates user profile fields (fullName, username) transactionally.
+   * Rejects unallowlisted fields.
+   * Inserts an AuditLog entry with eventKey='profile.self.updated' (without secrets).
+   */
+  async updateUserProfile(input: {
+    userId: string;
+    data: { fullName?: string; username?: string | null };
+    requestId?: string;
+    ipAddress?: string;
+    userAgent?: string;
+  }): Promise<{
+    success: boolean;
+    user?: PublicSafeUserDto;
+    error?: 'USER_NOT_FOUND' | 'INTERNAL_ERROR';
+    message?: string;
+  }> {
+    try {
+      const result = await this.prisma.$transaction(
+        async (tx) => {
+          const existingUser = await tx.user.findUnique({
+            where: { id: input.userId },
+            select: {
+              id: true,
+              fullName: true,
+              username: true,
+              email: true,
+              accountStatus: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+          });
+
+          if (!existingUser) {
+            return {
+              success: false as const,
+              error: 'USER_NOT_FOUND' as const,
+              message: `User with ID '${input.userId}' not found.`,
+            };
+          }
+
+          const previousValues: Record<string, any> = {};
+          const newValues: Record<string, any> = {};
+          const updateData: Record<string, any> = {};
+
+          if (input.data.fullName !== undefined && input.data.fullName !== existingUser.fullName) {
+            previousValues.fullName = existingUser.fullName;
+            newValues.fullName = input.data.fullName;
+            updateData.fullName = input.data.fullName;
+          }
+
+          if (input.data.username !== undefined && input.data.username !== existingUser.username) {
+            previousValues.username = existingUser.username;
+            newValues.username = input.data.username;
+            updateData.username = input.data.username;
+          }
+
+          let updatedUser;
+          if (Object.keys(updateData).length > 0) {
+            updatedUser = await tx.user.update({
+              where: { id: input.userId },
+              data: updateData,
+              select: {
+                id: true,
+                fullName: true,
+                email: true,
+                username: true,
+                accountStatus: true,
+                emailVerifiedAt: true,
+                lastLoginAt: true,
+                suspendedAt: true,
+                deactivatedAt: true,
+                createdAt: true,
+                updatedAt: true,
+                userRoles: {
+                  where: { revokedAt: null },
+                  select: {
+                    id: true,
+                    userId: true,
+                    roleId: true,
+                    assignedByUserId: true,
+                    assignedAt: true,
+                    revokedAt: true,
+                    role: { select: { code: true } },
+                  },
+                },
+              },
+            });
+
+            // Create AuditLog record (SEC-LOG-001)
+            await tx.auditLog.create({
+              data: {
+                eventKey: 'profile.self.updated',
+                actorUserId: input.userId,
+                targetType: 'USER',
+                targetId: input.userId,
+                result: 'SUCCESS',
+                previousValues,
+                newValues,
+                requestId: input.requestId || null,
+                ipAddress: input.ipAddress || null,
+                userAgent: input.userAgent || null,
+              },
+            });
+          } else {
+            updatedUser = await tx.user.findUnique({
+              where: { id: input.userId },
+              select: {
+                id: true,
+                fullName: true,
+                email: true,
+                username: true,
+                accountStatus: true,
+                emailVerifiedAt: true,
+                lastLoginAt: true,
+                suspendedAt: true,
+                deactivatedAt: true,
+                createdAt: true,
+                updatedAt: true,
+                userRoles: {
+                  where: { revokedAt: null },
+                  select: {
+                    id: true,
+                    userId: true,
+                    roleId: true,
+                    assignedByUserId: true,
+                    assignedAt: true,
+                    revokedAt: true,
+                    role: { select: { code: true } },
+                  },
+                },
+              },
+            });
+          }
+
+          return {
+            success: true as const,
+            user: toPublicSafeUserDto(this.mapPrismaUserToRawDbUser(updatedUser)),
+          };
+        },
+        {
+          isolationLevel: 'RepeatableRead',
+        }
+      );
+
+      return result;
+    } catch (error) {
+      return {
+        success: false,
+        error: 'INTERNAL_ERROR',
+        message: 'A database transaction error occurred during profile update.',
+      };
+    }
+  }
+
+  /**
    * Private helper to convert Prisma allow-listed selection into contract interface.
    * Sets dummy empty passwordHash internally for toPublicSafeUserDto mapper compliance.
    */
