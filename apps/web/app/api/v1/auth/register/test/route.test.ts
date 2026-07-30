@@ -26,7 +26,7 @@ describe('POST /api/v1/auth/register Route Handler Unit Tests', () => {
       activeRoles: [UserRole.ADMIN],
     };
 
-    vi.spyOn(dbModule, 'registerAdminUser').mockResolvedValueOnce({
+    vi.spyOn(dbModule, 'registerUser').mockResolvedValueOnce({
       user: mockSafeUser as any,
     });
 
@@ -51,12 +51,12 @@ describe('POST /api/v1/auth/register Route Handler Unit Tests', () => {
     expect(responseString).not.toContain('$argon2id$');
   });
 
-  it('2. Returns 400 Bad Request on invalid payload or extraneous injected fields', async () => {
+  it('2. Returns 400 Bad Request on invalid payload or invalid role injection', async () => {
     const injectedBody = {
       fullName: 'Attacker',
       email: 'attacker@example.com',
       password: 'StrongPassword123!',
-      role: 'OWNER',
+      role: 'SUPERADMIN',
     };
 
     const req = new Request('http://localhost:3000/api/v1/auth/register', {
@@ -73,8 +73,32 @@ describe('POST /api/v1/auth/register Route Handler Unit Tests', () => {
     expect(json.error.code).toBe('VALIDATION_ERROR');
   });
 
+  it('2b. Returns 409 Conflict when attempting OWNER registration when an Owner already exists', async () => {
+    vi.spyOn(dbModule, 'registerUser').mockRejectedValueOnce(
+      new dbModule.OwnerAlreadyExistsError()
+    );
+
+    const req = new Request('http://localhost:3000/api/v1/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fullName: 'Second Owner',
+        email: 'secondowner@example.com',
+        password: 'StrongPassword123!',
+        role: 'OWNER',
+      }),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(409);
+
+    const json = await res.json();
+    expect(json.success).toBe(false);
+    expect(json.error.code).toBe('OWNER_ALREADY_EXISTS');
+  });
+
   it('3. Returns 409 Conflict on duplicate email', async () => {
-    vi.spyOn(dbModule, 'registerAdminUser').mockRejectedValueOnce(
+    vi.spyOn(dbModule, 'registerUser').mockRejectedValueOnce(
       new dbModule.DuplicateEmailError('duplicate@example.com')
     );
 
@@ -97,7 +121,7 @@ describe('POST /api/v1/auth/register Route Handler Unit Tests', () => {
   });
 
   it('4. Returns 422 Unprocessable Entity on password policy failure', async () => {
-    vi.spyOn(dbModule, 'registerAdminUser').mockRejectedValueOnce(
+    vi.spyOn(dbModule, 'registerUser').mockRejectedValueOnce(
       new dbModule.PasswordPolicyError('Password must be at least 12 characters long.')
     );
 
@@ -120,7 +144,7 @@ describe('POST /api/v1/auth/register Route Handler Unit Tests', () => {
   });
 
   it('5. Returns 503 Service Unavailable on missing ADMIN role', async () => {
-    vi.spyOn(dbModule, 'registerAdminUser').mockRejectedValueOnce(
+    vi.spyOn(dbModule, 'registerUser').mockRejectedValueOnce(
       new dbModule.MissingRoleError('ADMIN')
     );
 

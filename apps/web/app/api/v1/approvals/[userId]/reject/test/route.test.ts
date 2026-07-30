@@ -50,7 +50,13 @@ describe('TASK-0208 Owner Reject API Route Unit Tests', () => {
 
     mockValidateSession.mockResolvedValueOnce({
       session: { id: 's1', userId: 'admin-id-1' },
-      user: { id: 'admin-id-1', accountStatus: AccountStatus.ACTIVE },
+      user: {
+        id: 'admin-id-1',
+        fullName: 'Admin User',
+        email: 'admin@test.com',
+        accountStatus: AccountStatus.ACTIVE,
+        activeRoles: [UserRole.ADMIN],
+      },
     });
 
     mockReadActiveRoleAssignments.mockResolvedValueOnce([UserRole.ADMIN]);
@@ -63,7 +69,7 @@ describe('TASK-0208 Owner Reject API Route Unit Tests', () => {
     expect(res.status).toBe(403);
     const json = await res.json();
     expect(json.success).toBe(false);
-    expect(json.error.code).toBe('FORBIDDEN');
+    expect(json.error.code).toBe('FORBIDDEN_ROLE');
   });
 
   it('returns 404 USER_NOT_FOUND if target applicant does not exist', async () => {
@@ -71,7 +77,13 @@ describe('TASK-0208 Owner Reject API Route Unit Tests', () => {
 
     mockValidateSession.mockResolvedValueOnce({
       session: { id: 's2', userId: 'owner-id-1' },
-      user: { id: 'owner-id-1', accountStatus: AccountStatus.ACTIVE },
+      user: {
+        id: 'owner-id-1',
+        fullName: 'Owner User',
+        email: 'owner@test.com',
+        accountStatus: AccountStatus.ACTIVE,
+        activeRoles: [UserRole.OWNER],
+      },
     });
 
     mockReadActiveRoleAssignments.mockResolvedValueOnce([UserRole.OWNER]);
@@ -98,7 +110,13 @@ describe('TASK-0208 Owner Reject API Route Unit Tests', () => {
 
     mockValidateSession.mockResolvedValueOnce({
       session: { id: 's2', userId: 'owner-id-1' },
-      user: { id: 'owner-id-1', accountStatus: AccountStatus.ACTIVE },
+      user: {
+        id: 'owner-id-1',
+        fullName: 'Owner User',
+        email: 'owner@test.com',
+        accountStatus: AccountStatus.ACTIVE,
+        activeRoles: [UserRole.OWNER],
+      },
     });
 
     mockReadActiveRoleAssignments.mockResolvedValueOnce([UserRole.OWNER]);
@@ -127,7 +145,13 @@ describe('TASK-0208 Owner Reject API Route Unit Tests', () => {
 
     mockValidateSession.mockResolvedValueOnce({
       session: { id: 's2', userId: 'owner-id-1' },
-      user: { id: 'owner-id-1', accountStatus: AccountStatus.ACTIVE },
+      user: {
+        id: 'owner-id-1',
+        fullName: 'Owner User',
+        email: 'owner@test.com',
+        accountStatus: AccountStatus.ACTIVE,
+        activeRoles: [UserRole.OWNER],
+      },
     });
 
     mockReadActiveRoleAssignments.mockResolvedValueOnce([UserRole.OWNER]);

@@ -6,6 +6,7 @@ import {
   SESSION_COOKIE_NAME,
   SESSION_IDLE_TIMEOUT_MS,
   SESSION_ABSOLUTE_LIFETIME_MS,
+  SESSION_ABSOLUTE_LIFETIME_SECONDS,
 } from '../src/session-service';
 import { AccountStatus } from '@kebun-melon/contracts';
 
@@ -23,7 +24,8 @@ describe('Session Service Unit Tests', () => {
   it('2. Constants match security specifications', () => {
     expect(SESSION_COOKIE_NAME).toBe('session_token');
     expect(SESSION_IDLE_TIMEOUT_MS).toBe(30 * 60 * 1000); // 30 mins
-    expect(SESSION_ABSOLUTE_LIFETIME_MS).toBe(12 * 60 * 60 * 1000); // 12 hours
+    expect(SESSION_ABSOLUTE_LIFETIME_MS).toBe(8 * 60 * 60 * 1000); // 8 hours
+    expect(SESSION_ABSOLUTE_LIFETIME_SECONDS).toBe(8 * 60 * 60); // 8 hours (28800s)
   });
 
   it('3. Error classes instantiate with expected messages and codes', () => {

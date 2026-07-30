@@ -1,12 +1,16 @@
 'use client';
 
 import { useState } from 'react';
+import dynamic from 'next/dynamic';
 import TopAppBar from '@/components/navigation/TopAppBar';
 import BottomNav from '@/components/navigation/BottomNav';
-import WaterNutrientChart from '@/components/charts/WaterNutrientChart';
 import { WATER_DATA, IRRIGATION_PHASES } from '@/lib/constants';
 import { CheckCircle, TrendingUp, Waves, Droplets } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+const WaterNutrientChart = dynamic(() => import('@/components/charts/WaterNutrientChart'), {
+  ssr: false,
+});
 
 // EC Half-gauge
 function ECGauge({ value }: { value: number }) {

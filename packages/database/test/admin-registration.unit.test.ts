@@ -17,12 +17,31 @@ describe('Admin Registration Input & Security Unit Tests', () => {
     expect(parsed.password).toBe('StrongPassword123!');
   });
 
-  it('strictly rejects role injection in registration payload', () => {
+  it('accepts valid requested role (OWNER or ADMIN) and defaults to ADMIN when omitted', () => {
+    const ownerPayload = {
+      fullName: 'Test Owner',
+      email: 'owner@example.com',
+      password: 'StrongPassword123!',
+      role: 'OWNER',
+    };
+    const parsedOwner = AdminRegistrationInputSchema.parse(ownerPayload);
+    expect(parsedOwner.role).toBe(UserRole.OWNER);
+
+    const omittedPayload = {
+      fullName: 'Test Admin',
+      email: 'admin@example.com',
+      password: 'StrongPassword123!',
+    };
+    const parsedDefault = AdminRegistrationInputSchema.parse(omittedPayload);
+    expect(parsedDefault.role).toBe(UserRole.ADMIN);
+  });
+
+  it('strictly rejects unapproved role injection (e.g. SUPERADMIN)', () => {
     const injectedPayload = {
       fullName: 'Attacker Admin',
       email: 'attacker@example.com',
       password: 'StrongPassword123!',
-      role: 'OWNER',
+      role: 'SUPERADMIN',
     };
 
     expect(() => AdminRegistrationInputSchema.parse(injectedPayload)).toThrow();

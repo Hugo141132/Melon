@@ -8,12 +8,16 @@ import { USER_PROFILE } from '@/lib/constants';
 interface TopAppBarProps {
   showNotification?: boolean;
   notificationCount?: number;
+  user?: { fullName: string; email: string; role: string } | null;
 }
 
 export default function TopAppBar({
   showNotification = false,
   notificationCount = 0,
+  user,
 }: TopAppBarProps) {
+  const initial = user?.fullName ? user.fullName.charAt(0).toUpperCase() : null;
+
   return (
     <header className="fixed top-0 w-full z-50 bg-app-surface shadow-[0_4px_20px_rgba(121,86,75,0.12)] flex justify-between items-center px-[1rem] h-14">
       {/* Brand */}
@@ -37,14 +41,18 @@ export default function TopAppBar({
           </Link>
         )}
         <Link href="/profil" className="cursor-pointer">
-          <div className="w-8 h-8 rounded-full overflow-hidden border border-app-primary/20 ring-2 ring-app-primary/10">
-            <Image
-              src={USER_PROFILE.avatar}
-              alt="Profile"
-              width={32}
-              height={32}
-              className="w-full h-full object-cover"
-            />
+          <div className="w-8 h-8 rounded-full overflow-hidden border border-app-primary/20 ring-2 ring-app-primary/10 flex items-center justify-center bg-app-primary text-on-primary font-bold text-xs">
+            {initial ? (
+              initial
+            ) : (
+              <Image
+                src={USER_PROFILE.avatar}
+                alt="Profile"
+                width={32}
+                height={32}
+                className="w-full h-full object-cover"
+              />
+            )}
           </div>
         </Link>
       </div>

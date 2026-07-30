@@ -256,7 +256,7 @@ Public registration shall:
 
 The first Owner account shall be provisioned through a secure administrative process.
 
-The first Owner shall not be created through the public registration form.
+The first Owner may be created via public registration when no Owner exists in the system (transitioning directly to `ACTIVE`). Once created, public Owner registration is disabled server-side and greyed out in the UI.
 
 The provisioning process is the CLI interactive seed script (`npm run seed:owner`). Public registration MUST NEVER create an Owner account.
 
@@ -374,7 +374,7 @@ SameSite=Strict
 The approved session expiration limits are:
 
 - **Idle timeout**: 30 minutes of inactivity.
-- **Absolute expiry**: 12 hours maximum session lifetime.
+- **Absolute expiry**: 8 hours maximum session lifetime.
 - Revocation on logout, password change, suspension, or deactivation.
 
 ### 9.3 Session Revocation

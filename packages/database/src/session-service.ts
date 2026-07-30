@@ -13,7 +13,8 @@ import { verifyPassword } from './password-service';
 
 export const SESSION_COOKIE_NAME = 'session_token';
 export const SESSION_IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
-export const SESSION_ABSOLUTE_LIFETIME_MS = 12 * 60 * 60 * 1000; // 12 hours
+export const SESSION_ABSOLUTE_LIFETIME_MS = 8 * 60 * 60 * 1000; // 8 hours
+export const SESSION_ABSOLUTE_LIFETIME_SECONDS = 8 * 60 * 60; // 28800 seconds (8 hours)
 
 export class InvalidCredentialsError extends Error {
   constructor() {

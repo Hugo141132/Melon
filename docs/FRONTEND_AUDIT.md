@@ -318,3 +318,21 @@ None. No `Dockerfile`, `docker-compose.yml`, or CI/CD deployment files exist.
 | Tests | No unit, integration, or E2E tests installed | **Confirmed** |
 | `Water BAT` Meaning | Field definition and units unresolved | **TBD** |
 | Release Decisions | Product decisions in `TASK-0002` unresolved | **BLOCKED / TBD** |
+
+---
+
+## 8. Current Frontend/Backend Reconciliation Status (TASK-0210 Sync)
+
+The following reconciliation reflects the state of frontend integration against backend capabilities implemented up through **TASK-0210**:
+
+| Frontend Surface | Backend Capability Status | Categorization | Integration & User-Facing Behaviour |
+|---|---|---|---|
+| `/login` | `POST /api/v1/auth/login` implemented | **Category A: Integrated** | Submits credentials, sets HTTP-only cookie, handles validation errors, pending approval redirect to `/status`, and respects `redirect` query parameter. Wrapped in `<Suspense>`. |
+| `/register` | `GET /api/v1/auth/register/capabilities` & `POST /api/v1/auth/register` | **Category A: Integrated** | 2-Step Registration Flow: Step 1 checks `/capabilities` and renders role selection (OWNER enabled if 0 owners, greyed out if Owner exists; ADMIN always enabled). Step 2 collects user details. Submits `role`, `fullName`, `email`, `password`. Creates `OWNER` directly as `ACTIVE` (redirects to `/login?registered=owner`) or `ADMIN` as `PENDING_APPROVAL` (redirects to `/status?reason=PENDING_APPROVAL`). Server enforces atomic concurrency lock. |
+| `/status` | `GET /api/v1/auth/session` & account status guards | **Category A: Integrated** | Revalidates account status via `/api/v1/auth/session`, renders pending/rejected/suspended/deactivated states, provides Logout/Refresh actions. |
+| App Shell Middleware & Guarding | `middleware.ts` Edge Guard | **Category A: Integrated** | Guards protected pages & `/api/v1/approvals/*`. Redirects unauthenticated page requests to `/login?redirect=<path>` and returns `401 UNAUTHENTICATED` for API requests. |
+| Logout Action (`/profil` & `/status`) | `POST /api/v1/auth/logout` implemented | **Category A: Integrated** | Connected to real `POST /api/v1/auth/logout` endpoint in both `/profil` and `/status` pages, revoking database session and clearing HTTP-only cookie. |
+| `/approvals` | `/api/v1/approvals/*` endpoints implemented | **Category A: Integrated** | Fetches real pending Admin list with search and pagination, fetches user details, executes real `approve` and `reject` actions with decision notes. |
+| `/pengaturan` Role Awareness | `GET /api/v1/auth/session` & RBAC | **Category A: Integrated** | Fetches authenticated session. Conditionally displays the **Persetujuan Admin** (`/approvals`) card link ONLY when `role === 'OWNER'`. Hidden for `ADMIN`. |
+| Dashboard (`/`) Telemetry | IoT/Telemetry API not implemented yet | **Category C: Deferred** | Telemetry endpoints are deferred to subsequent IoT tasks (TASK-0400+). Dashboard telemetry UI remains static until backend endpoints exist. |
+| `/tanah` & `/air` Detail Pages | Telemetry & Faucet Control APIs not implemented | **Category C: Deferred** | Physical faucet control and sensor telemetry APIs are deferred per TASK backlog sequencing. Physical control remains safely disabled. |

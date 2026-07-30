@@ -325,7 +325,7 @@ Associates users with roles.
 
 - One active role per user is recommended for version 1.
 - Public registration shall assign only the `ADMIN` role.
-- No public registration request may create an `OWNER`.
+- Public registration creates an `OWNER` (with `accountStatus = ACTIVE`) ONLY IF no non-revoked `OWNER` assignment exists in the system. Otherwise, public registration creates an `ADMIN` (with `accountStatus = PENDING_APPROVAL`).
 
 Recommended uniqueness:
 

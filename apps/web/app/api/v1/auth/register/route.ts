@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@kebun-melon/database';
 import {
-  registerAdminUser,
+  registerUser,
   DuplicateEmailError,
   PasswordPolicyError,
   MissingRoleError,
+  OwnerAlreadyExistsError,
 } from '@kebun-melon/database';
 import { ZodError } from 'zod';
 
@@ -13,7 +14,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const result = await registerAdminUser(prisma, body);
+    const result = await registerUser(prisma, body);
 
     return NextResponse.json(
       {
@@ -40,6 +41,20 @@ export async function POST(request: Request) {
           meta: { requestId },
         },
         { status: 400 }
+      );
+    }
+
+    if (error instanceof OwnerAlreadyExistsError) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'OWNER_ALREADY_EXISTS',
+            message: 'Akun Owner sudah terdaftar di sistem. Pendaftaran Owner tidak tersedia.',
+          },
+          meta: { requestId },
+        },
+        { status: 409 }
       );
     }
 

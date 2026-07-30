@@ -754,7 +754,10 @@ The system shall:
 - Record security-relevant events.
 - Rate-limit authentication and sensitive control endpoints.
 - Prevent duplicate faucet-command execution where possible.
-- Prevent direct role assignment from public registration.
+- Support role selection on public registration (`/register`):
+  - Allow selecting `OWNER` if no Owner account currently exists in the system (created directly as `ACTIVE`).
+  - Once an Owner exists, grey out/disable `OWNER` selection and require all subsequent public registrations to be `ADMIN` (created as `PENDING_APPROVAL`).
+- Server-side concurrency protection guarantees `number of valid first Owner registrations <= 1`.
 - Prevent inactive or unapproved accounts from accessing protected pages.
 
 ### 18.2 Performance (PRD-NFR-002)

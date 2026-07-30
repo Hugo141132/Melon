@@ -1,13 +1,14 @@
 import { PrismaClient, AccountStatus, UserRole } from '@prisma/client';
 import {
-  AdminRegistrationInputSchema,
-  AdminRegistrationInput,
+  UserRegistrationInputSchema,
   PublicSafeUserDto,
   toPublicSafeUserDto,
   normaliseEmail,
   AccountStatus as ContractAccountStatus,
+  UserRole as ContractUserRole,
 } from '@kebun-melon/contracts';
 import { validatePasswordPolicy, hashPassword } from './password-service';
+import { provisionFirstOwner } from './owner-provisioning';
 
 export interface RegisterAdminResult {
   user: PublicSafeUserDto;
@@ -34,27 +35,47 @@ export class PasswordPolicyError extends Error {
   }
 }
 
+export class OwnerAlreadyExistsError extends Error {
+  constructor() {
+    super('First Owner account already exists. System already has an assigned Owner account.');
+    this.name = 'OwnerAlreadyExistsError';
+  }
+}
+
 /**
- * Executes public Admin registration.
+ * Checks if a non-revoked Owner account currently exists in the database.
+ */
+export async function isOwnerRegistrationAvailable(prisma: PrismaClient): Promise<boolean> {
+  const existingOwner = await prisma.userRoleAssignment.findFirst({
+    where: {
+      role: { code: UserRole.OWNER },
+      revokedAt: null,
+    },
+    select: { id: true },
+  });
+  return !existingOwner;
+}
+
+/**
+ * Executes public User registration (supporting requested role: OWNER or ADMIN).
  *
  * Requirements & Security Invariants:
- * 1. Strict schema parse ensures privilege fields (role, accountStatus, permissions, approvedBy, etc.) cannot be injected.
+ * 1. Strict schema parse ensures privilege fields (role, accountStatus, permissions, etc.) cannot be injected.
  * 2. Normalises email address (trim + lowercase).
  * 3. Validates password against approved security policy.
  * 4. Checks email uniqueness; throws DuplicateEmailError on collision.
- * 5. Guarantees role = ADMIN and accountStatus = PENDING_APPROVAL on server-side.
- * 6. Never creates OWNER accounts.
- * 7. Hashes password using Argon2id reusable password service.
- * 8. Records system audit log entry for ACCOUNT_REGISTER_ADMIN.
- * 9. Returns a PublicSafeUserDto omitting any password hashes, session tokens, or secrets.
+ * 5. Role = OWNER: If no Owner exists, creates OWNER in ACTIVE status using transaction-scoped PostgreSQL advisory lock.
+ *    If an Owner already exists, throws OwnerAlreadyExistsError.
+ * 6. Role = ADMIN: Creates ADMIN in PENDING_APPROVAL status requiring Owner approval.
+ * 7. Records system audit log entry.
+ * 8. Returns a PublicSafeUserDto omitting any password hashes, session tokens, or secrets.
  */
-export async function registerAdminUser(
+export async function registerUser(
   prisma: PrismaClient,
   rawInput: unknown
 ): Promise<RegisterAdminResult> {
-  // 1. Strict input validation - rejects any extraneous fields including role/status injection
-  const input: AdminRegistrationInput = AdminRegistrationInputSchema.parse(rawInput);
-
+  // 1. Strict input validation
+  const input = UserRegistrationInputSchema.parse(rawInput);
   const normalised = normaliseEmail(input.email);
   const fullNameTrimmed = input.fullName.trim();
 
@@ -68,7 +89,70 @@ export async function registerAdminUser(
     throw new PasswordPolicyError(pwdCheck.reason || 'Password policy violation.');
   }
 
-  // 3. Pre-hash password before transaction
+  // Handle OWNER registration path
+  if (input.role === ContractUserRole.OWNER) {
+    try {
+      const provisionRes = await provisionFirstOwner(prisma, {
+        email: normalised,
+        fullName: fullNameTrimmed,
+        password: input.password,
+      });
+
+      const fullOwner = await prisma.user.findUniqueOrThrow({
+        where: { id: provisionRes.user.id },
+        select: {
+          id: true,
+          fullName: true,
+          email: true,
+          username: true,
+          accountStatus: true,
+          emailVerifiedAt: true,
+          lastLoginAt: true,
+          suspendedAt: true,
+          deactivatedAt: true,
+          createdAt: true,
+          updatedAt: true,
+          userRoles: {
+            where: { revokedAt: null },
+            select: {
+              id: true,
+              userId: true,
+              roleId: true,
+              assignedByUserId: true,
+              assignedAt: true,
+              revokedAt: true,
+              role: { select: { code: true } },
+            },
+          },
+        },
+      });
+
+      const safeUser = toPublicSafeUserDto({
+        ...fullOwner,
+        passwordHash: '',
+        accountStatus: fullOwner.accountStatus as ContractAccountStatus,
+        userRoles: fullOwner.userRoles.map((ur) => ({
+          ...ur,
+          role: ur.role ? { code: ur.role.code as any } : undefined,
+        })),
+      });
+
+      return { user: safeUser };
+    } catch (err: any) {
+      if (
+        err.message?.includes('First Owner account already exists') ||
+        err.message?.includes('already has an assigned Owner account')
+      ) {
+        throw new OwnerAlreadyExistsError();
+      }
+      if (err.message?.includes('already exists')) {
+        throw new DuplicateEmailError(normalised);
+      }
+      throw err;
+    }
+  }
+
+  // Handle ADMIN registration path
   const passwordHash = await hashPassword(input.password);
 
   return await prisma.$transaction(async (tx) => {
@@ -182,3 +266,6 @@ export async function registerAdminUser(
     return { user: safeUser };
   });
 }
+
+// Export alias for backwards compatibility
+export const registerAdminUser = registerUser;

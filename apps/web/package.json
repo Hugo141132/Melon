@@ -15,7 +15,8 @@
     "test:approvals-route": "vitest run app/api/v1/approvals/test/route.test.ts",
     "test:approve-route": "vitest run app/api/v1/approvals/[userId]/approve/test/route.test.ts",
     "test:approvals-page": "vitest run app/approvals/test/page.test.ts",
-    "test:status-page": "vitest run app/(auth)/status/test/page.test.ts"
+    "test:status-page": "vitest run app/(auth)/status/test/page.test.ts",
+    "test:route-protection": "vitest run test/route_protection.test.ts"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.1",

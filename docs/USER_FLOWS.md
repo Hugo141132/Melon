@@ -40,8 +40,8 @@ The following rules apply to all flows:
 3. Hidden or disabled frontend controls do not replace server-side permission checks.
 4. Device-specific actions require device-level access checks.
 5. Monitoring permission does not automatically grant faucet-control permission.
-6. Public registration always creates an `ADMIN` with `PENDING_APPROVAL`.
-7. Public registration must never create an `OWNER`.
+6. Public registration creates an `OWNER` (with `accountStatus = ACTIVE`) ONLY IF no non-revoked Owner account exists in the system.
+7. Once an Owner account exists, public Owner selection is disabled and public registration creates an `ADMIN` with `PENDING_APPROVAL`.
 8. Admins may manage only their own profile.
 9. Owners may manage other users within the authorised scope.
 10. Language selection must never alter permissions or account status.

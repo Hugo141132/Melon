@@ -1,19 +1,29 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
-import { useState } from 'react';
-import { ArrowLeft, Mail, Eye, EyeOff, ArrowRight, CheckCircle, Loader2 } from 'lucide-react';
-
-type Step = 1 | 2;
+import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import {
+  ArrowLeft,
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+  User,
+  Loader2,
+  AlertCircle,
+  Crown,
+  ShieldCheck,
+  CheckCircle2,
+} from 'lucide-react';
 
 function PasswordStrengthMeter({ password }: { password: string }) {
   const getStrength = (val: string): number => {
     let strength = 0;
-    if (val.length >= 4) strength++;
-    if (val.length >= 8) strength++;
+    if (val.length >= 12) strength++;
     if (/[A-Z]/.test(val)) strength++;
-    if (/[0-9]/.test(val) || /[^A-Za-z0-9]/.test(val)) strength++;
+    if (/[a-z]/.test(val)) strength++;
+    if (/[0-9]/.test(val) && /[^A-Za-z0-9]/.test(val)) strength++;
     return strength;
   };
 
@@ -33,252 +43,380 @@ function PasswordStrengthMeter({ password }: { password: string }) {
 }
 
 export default function RegisterPage() {
-  const [step, setStep] = useState<Step>(1);
+  const router = useRouter();
+
+  const [step, setStep] = useState<1 | 2>(1);
+  const [selectedRole, setSelectedRole] = useState<'OWNER' | 'ADMIN'>('ADMIN');
+
+  const [ownerAvailable, setOwnerAvailable] = useState<boolean>(false);
+  const [loadingCapabilities, setLoadingCapabilities] = useState<boolean>(true);
+
   const [showPassword, setShowPassword] = useState(false);
-  const [agreed, setAgreed] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loadingSubmit, setLoadingSubmit] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const [formData, setFormData] = useState({
+    fullName: '',
     email: '',
-    whatsapp: '',
     password: '',
   });
 
-  const handleStep1Submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setStep(2);
-  };
+  useEffect(() => {
+    let isMounted = true;
+    const checkCapabilities = async () => {
+      setLoadingCapabilities(true);
+      try {
+        const res = await fetch('/api/v1/auth/register/capabilities');
+        const json = await res.json();
+        if (isMounted && res.ok && json.success) {
+          setOwnerAvailable(json.data.ownerRegistrationAvailable);
+        }
+      } catch {
+        if (isMounted) {
+          setOwnerAvailable(false);
+        }
+      } finally {
+        if (isMounted) {
+          setLoadingCapabilities(false);
+        }
+      }
+    };
 
-  const handleFinish = () => {
-    if (!agreed) {
-      alert('Silakan setujui Syarat & Ketentuan untuk melanjutkan.');
+    checkCapabilities();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage('');
+
+    if (!formData.fullName.trim() || !formData.email.trim() || !formData.password) {
+      setErrorMessage('Semua bidang harus diisi.');
       return;
     }
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      // In production: redirect to dashboard
-    }, 1500);
+
+    try {
+      setLoadingSubmit(true);
+      const res = await fetch('/api/v1/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName: formData.fullName.trim(),
+          email: formData.email.trim(),
+          password: formData.password,
+          role: selectedRole,
+        }),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok || !json.success) {
+        if (json.error?.code === 'OWNER_ALREADY_EXISTS') {
+          setErrorMessage(
+            'Akun Pemilik (Owner) sudah terdaftar di sistem. Pendaftaran Pemilik tidak tersedia.'
+          );
+          setOwnerAvailable(false);
+          setSelectedRole('ADMIN');
+          setStep(1); // Return to step 1 so user sees disabled card
+        } else {
+          setErrorMessage(
+            json.error?.message || 'Gagal mendaftarkan akun. Silakan periksa kembali data Anda.'
+          );
+        }
+        setLoadingSubmit(false);
+        return;
+      }
+
+      if (json.data?.user?.accountStatus === 'ACTIVE') {
+        // First Owner registered - redirect to login
+        router.push('/login?registered=owner');
+      } else {
+        // Admin registered - redirect to pending approval status
+        router.push('/status?reason=PENDING_APPROVAL');
+      }
+    } catch {
+      setErrorMessage('Terjadi kesalahan koneksi. Silakan coba lagi.');
+      setLoadingSubmit(false);
+    }
   };
 
-  if (step === 1) {
-    return (
-      <div className="bg-background text-on-background min-h-dvh flex flex-col">
-        {/* TopAppBar */}
-        <header className="w-full top-0 sticky bg-background flex items-center justify-between px-[24px] h-[56px] z-50">
-          <div className="flex items-center gap-4">
+  return (
+    <div className="bg-background text-on-background min-h-dvh flex flex-col justify-center items-center p-[24px]">
+      {/* TopAppBar */}
+      <header className="w-full max-w-md top-0 sticky bg-background flex items-center justify-between h-[56px] mb-4">
+        <div className="flex items-center gap-4">
+          {step === 2 ? (
+            <button
+              onClick={() => {
+                setErrorMessage('');
+                setStep(1);
+              }}
+              type="button"
+              className="text-primary hover:bg-surface-container-low transition-colors active:scale-95 duration-150 p-2 rounded-full cursor-pointer"
+              aria-label="Kembali ke pilih peran"
+            >
+              <ArrowLeft size={22} />
+            </button>
+          ) : (
             <Link
               href="/login"
               className="text-primary hover:bg-surface-container-low transition-colors active:scale-95 duration-150 p-2 rounded-full cursor-pointer"
             >
               <ArrowLeft size={22} />
             </Link>
-            <h1 className="text-[24px] leading-[32px] font-semibold text-primary">
-              Create Account
-            </h1>
-          </div>
-          <span className="hidden md:block text-[14px] leading-[20px] font-semibold tracking-[0.05em] text-on-surface-variant">
-            STEP 1 OF 2
-          </span>
-        </header>
+          )}
+          <h1 className="text-[24px] leading-[32px] font-semibold text-primary">
+            Daftar Akun Baru
+          </h1>
+        </div>
+      </header>
 
-        <main className="w-full max-w-lg px-[24px] py-[32px] flex-grow flex flex-col">
-          <section className="mb-[32px]">
-            <h2 className="text-[24px] leading-[32px] font-bold text-primary mb-2">
-              Mulai Langkah Pertamamu
-            </h2>
-            <p className="text-[16px] leading-[24px] text-on-surface-variant">
-              Lengkapi detail akun untuk akses penuh ke manajemen melon Anda.
-            </p>
-          </section>
-
-          <form className="flex flex-col gap-[16px]" onSubmit={handleStep1Submit}>
-            {/* Email */}
-            <div className="flex flex-col gap-2">
-              <label
-                htmlFor="reg-email"
-                className="text-[14px] leading-[20px] font-semibold tracking-[0.05em] text-on-surface-variant uppercase"
-              >
-                Email
-              </label>
-              <div className="relative">
-                <input
-                  type="email"
-                  id="reg-email"
-                  placeholder="Wahyu123@gmail.com"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full h-[56px] px-4 pr-12 border border-outline rounded-xl bg-white focus:ring-2 focus:ring-secondary focus:border-secondary text-[18px] leading-[28px] outline-none transition-all"
-                />
-                <Mail
-                  size={18}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-outline"
-                />
-              </div>
-            </div>
-
-            {/* WhatsApp */}
-            <div className="flex flex-col gap-2">
-              <label
-                htmlFor="whatsapp"
-                className="text-[14px] leading-[20px] font-semibold tracking-[0.05em] text-on-surface-variant uppercase"
-              >
-                Nomor WhatsApp
-              </label>
-              <div className="relative flex items-center">
-                <div className="absolute left-4 text-[18px] leading-[28px] text-on-surface-variant border-r border-outline pr-3">
-                  +62
-                </div>
-                <input
-                  type="tel"
-                  id="whatsapp"
-                  placeholder="812 xxxx xxxx"
-                  value={formData.whatsapp}
-                  onChange={(e) => setFormData({ ...formData, whatsapp: e.target.value })}
-                  className="w-full h-[56px] pl-[72px] pr-4 border border-outline rounded-xl bg-white focus:ring-2 focus:ring-secondary focus:border-secondary text-[18px] leading-[28px] outline-none transition-all"
-                />
-              </div>
-            </div>
-
-            {/* Password */}
-            <div className="flex flex-col gap-2">
-              <label
-                htmlFor="reg-password"
-                className="text-[14px] leading-[20px] font-semibold tracking-[0.05em] text-on-surface-variant uppercase"
-              >
-                Password
-              </label>
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  id="reg-password"
-                  placeholder="Minimal 8 karakter"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="w-full h-[56px] px-4 pr-14 border border-outline rounded-xl bg-white focus:ring-2 focus:ring-secondary focus:border-secondary text-[18px] leading-[28px] outline-none transition-all"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-outline hover:text-primary transition-colors flex items-center justify-center w-10 h-10 cursor-pointer"
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
-                >
-                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                </button>
-              </div>
-              <PasswordStrengthMeter password={formData.password} />
-              <p className="text-[14px] leading-[20px] font-semibold tracking-[0.05em] text-on-surface-variant italic">
-                Password minimal 8 karakter agar akunmu tetap aman.
+      <main className="w-full max-w-md bg-surface-container-lowest bento-shape p-[32px] shadow-sm border border-outline-variant">
+        {step === 1 ? (
+          /* Step 1: Choose Account Role */
+          <section className="space-y-6">
+            <div>
+              <span className="text-[12px] leading-[16px] font-bold text-secondary tracking-widest uppercase block mb-1">
+                Langkah 1 dari 2
+              </span>
+              <h2 className="text-[24px] leading-[32px] font-bold text-primary mb-2">
+                Pilih Tipe Peran Akun
+              </h2>
+              <p className="text-[16px] leading-[24px] text-on-surface-variant">
+                Tentukan jenis akun yang ingin Anda daftarkan di Kebun Melon.
               </p>
             </div>
 
-            {/* Submit */}
-            <button
-              className="mt-[16px] h-[56px] bg-primary text-on-primary text-[20px] leading-[24px] font-semibold rounded-xl hover:opacity-90 active:scale-95 transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
-              type="submit"
-            >
-              Lanjut
-              <ArrowRight size={20} />
-            </button>
-          </form>
-
-          <div className="mt-auto py-[32px] flex flex-col items-center gap-[16px]">
-            <p className="text-[16px] leading-[24px] text-on-surface-variant">
-              Sudah punya akun?{' '}
-              <Link href="/login" className="text-secondary font-bold hover:underline">
-                Masuk
-              </Link>
-            </p>
-          </div>
-        </main>
-      </div>
-    );
-  }
-
-  // Step 2 - Verification
-  return (
-    <div className="bg-background text-on-background min-h-dvh flex flex-col">
-      {/* TopAppBar */}
-      <header className="w-full top-0 sticky bg-background z-50 flex items-center justify-between px-[24px] h-[56px]">
-        <button
-          onClick={() => setStep(1)}
-          className="active:scale-95 duration-150 p-2 hover:bg-surface-container-low transition-colors rounded-full flex items-center cursor-pointer"
-        >
-          <ArrowLeft size={22} className="text-primary" />
-        </button>
-        <h1 className="text-[24px] leading-[32px] font-semibold text-primary text-center flex-grow">
-          Create Account
-        </h1>
-        <div className="w-10" />
-      </header>
-
-      <main className="flex-grow flex flex-col items-center px-[24px] py-[32px] max-w-md mx-auto w-full">
-        {/* Illustration */}
-        <div className="relative w-48 h-48 mb-4">
-          <Image
-            src="https://lh3.googleusercontent.com/aida-public/AB6AXuA2wBAfbTx9st1m8lh0Cd9vwdhY68vVd4GNCWe-OPHu43YQT9uads7lkXe-UjPi9GnP99awY77FnbijWaQaLLV3dXQVU142QDbsx_P_uEBIiyfdhJ0uy9sqMSY-TKsEisRcfpd-8qBXF10WqWtppmFPVUyhXxxlTGrXUhmsj50zNsVjxAJqIdchyWbjkWZCvHWU2ry1-C7S4lNLcWwKNbzrRYYy66-GEKbJ8skU4g7OPiAcc-EJnab0XA"
-            alt="Email verification illustration"
-            width={192}
-            height={192}
-            className="w-full h-full object-contain"
-          />
-        </div>
-        <h2 className="text-[24px] leading-[32px] font-bold text-primary mb-2">Cek Email Anda</h2>
-        <p className="text-[18px] leading-[28px] text-on-surface-variant max-w-xs text-center mb-[32px]">
-          Kami telah mengirimkan link verifikasi ke{' '}
-          <span className="font-semibold text-primary">
-            {formData.email || 'Wahyu123@gmail.com'}
-          </span>
-        </p>
-
-        {/* Action card */}
-        <div className="w-full space-y-[16px] bg-white p-6 rounded-xl border border-outline-variant shadow-sm">
-          {/* T&C Checkbox */}
-          <label className="flex items-start gap-4 cursor-pointer group">
-            <input
-              type="checkbox"
-              checked={agreed}
-              onChange={(e) => setAgreed(e.target.checked)}
-              className="mt-1 w-5 h-5 accent-secondary rounded cursor-pointer"
-            />
-            <span className="text-[16px] leading-[24px] text-on-surface leading-tight pt-1">
-              Saya menyetujui{' '}
-              <span className="text-secondary font-semibold hover:underline cursor-pointer">
-                Syarat &amp; Ketentuan
-              </span>{' '}
-              serta{' '}
-              <span className="text-secondary font-semibold hover:underline cursor-pointer">
-                Kebijakan Privasi
-              </span>{' '}
-              manajemen perkebunan.
-            </span>
-          </label>
-
-          {/* Main CTA */}
-          <button
-            className="w-full h-[56px] bg-primary text-on-primary rounded-xl text-[20px] leading-[24px] font-semibold active:scale-95 transition-all shadow-lg hover:bg-primary-container hover:text-on-primary-container flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70"
-            onClick={handleFinish}
-            disabled={loading}
-          >
-            {loading ? (
-              <>
-                <Loader2 size={20} className="animate-spin" />
-                Memproses...
-              </>
+            {loadingCapabilities ? (
+              <div className="py-12 flex flex-col items-center justify-center gap-3 text-on-surface-variant">
+                <Loader2 size={24} className="animate-spin text-primary" />
+                <span className="text-[14px]">Memeriksa ketersediaan peran...</span>
+              </div>
             ) : (
-              <>
-                Selesaikan Pendaftaran
-                <CheckCircle size={20} />
-              </>
-            )}
-          </button>
-        </div>
+              <div className="space-y-4">
+                {/* Option 1: OWNER */}
+                <button
+                  type="button"
+                  disabled={!ownerAvailable}
+                  onClick={() => {
+                    if (ownerAvailable) {
+                      setSelectedRole('OWNER');
+                    }
+                  }}
+                  className={`w-full text-left p-5 rounded-2xl border-2 transition-all flex items-start gap-4 ${
+                    !ownerAvailable
+                      ? 'bg-surface-container/50 border-outline-variant/40 opacity-60 cursor-not-allowed'
+                      : selectedRole === 'OWNER'
+                        ? 'bg-primary/5 border-primary shadow-sm'
+                        : 'bg-surface border-outline/40 hover:border-outline cursor-pointer'
+                  }`}
+                  aria-disabled={!ownerAvailable}
+                >
+                  <div
+                    className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
+                      !ownerAvailable
+                        ? 'bg-outline-variant/30 text-on-surface-variant'
+                        : 'bg-amber-100 text-amber-800'
+                    }`}
+                  >
+                    <Crown size={24} />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-[18px] font-bold text-on-surface">Pemilik (Owner)</h3>
+                      {selectedRole === 'OWNER' && ownerAvailable && (
+                        <CheckCircle2 size={20} className="text-primary" />
+                      )}
+                    </div>
+                    <p className="text-[14px] leading-[20px] text-on-surface-variant mt-1">
+                      Akses penuh kontrol sistem dan manajemen pengguna.
+                    </p>
+                    {!ownerAvailable && (
+                      <p className="text-[12px] leading-[16px] font-semibold text-error mt-2.5 bg-error-container/20 p-2 rounded-lg border border-error/20">
+                        Akun Pemilik sudah terdaftar di sistem.
+                      </p>
+                    )}
+                  </div>
+                </button>
 
-        <p className="mt-[32px] text-[16px] leading-[24px] text-on-surface-variant">
-          Tidak menerima email?{' '}
-          <button className="text-secondary font-semibold hover:underline cursor-pointer">
-            Kirim ulang
-          </button>
-        </p>
+                {/* Option 2: ADMIN */}
+                <button
+                  type="button"
+                  onClick={() => setSelectedRole('ADMIN')}
+                  className={`w-full text-left p-5 rounded-2xl border-2 transition-all flex items-start gap-4 cursor-pointer ${
+                    selectedRole === 'ADMIN'
+                      ? 'bg-primary/5 border-primary shadow-sm'
+                      : 'bg-surface border-outline/40 hover:border-outline'
+                  }`}
+                >
+                  <div className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0">
+                    <ShieldCheck size={24} />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-[18px] font-bold text-on-surface">Administrator</h3>
+                      {selectedRole === 'ADMIN' && (
+                        <CheckCircle2 size={20} className="text-primary" />
+                      )}
+                    </div>
+                    <p className="text-[14px] leading-[20px] text-on-surface-variant mt-1">
+                      Akses pemantauan sensor dan kontrol alat (memerlukan persetujuan Pemilik).
+                    </p>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setStep(2)}
+                  className="w-full mt-4 h-[56px] bg-primary text-on-primary text-[18px] leading-[24px] font-semibold rounded-xl hover:bg-primary-container hover:text-on-primary-container active:scale-[0.98] transition-all shadow-md flex items-center justify-center cursor-pointer"
+                >
+                  Lanjut ke Isian Data
+                </button>
+              </div>
+            )}
+          </section>
+        ) : (
+          /* Step 2: Form Details */
+          <section>
+            <div className="mb-[24px]">
+              <span className="text-[12px] leading-[16px] font-bold text-secondary tracking-widest uppercase block mb-1">
+                Langkah 2 dari 2 — Peran:{' '}
+                <span className="text-primary">
+                  {selectedRole === 'OWNER' ? 'PEMILIK (OWNER)' : 'ADMINISTRATOR'}
+                </span>
+              </span>
+              <h2 className="text-[24px] leading-[32px] font-bold text-primary mb-2">
+                Isi Data Pendaftaran
+              </h2>
+              <p className="text-[16px] leading-[24px] text-on-surface-variant">
+                {selectedRole === 'OWNER'
+                  ? 'Daftarkan akun Pemilik pertama untuk mengaktifkan sistem Kebun Melon.'
+                  : 'Daftarkan diri Anda untuk mengajukan akses Admin Kebun Melon.'}
+              </p>
+            </div>
+
+            {errorMessage && (
+              <div className="mb-6 p-3.5 bg-error-container/20 border border-error/30 rounded-xl text-error text-[14px] leading-[20px] flex items-start gap-2.5">
+                <AlertCircle size={18} className="mt-0.5 shrink-0" />
+                <span>{errorMessage}</span>
+              </div>
+            )}
+
+            <form className="flex flex-col gap-[16px]" onSubmit={handleSubmit}>
+              {/* Full Name */}
+              <div className="flex flex-col gap-2">
+                <label
+                  htmlFor="reg-fullname"
+                  className="text-[14px] leading-[20px] font-semibold tracking-[0.05em] text-on-surface-variant uppercase"
+                >
+                  Nama Lengkap
+                </label>
+                <div className="relative group">
+                  <User
+                    size={20}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 text-outline group-focus-within:text-secondary transition-colors"
+                  />
+                  <input
+                    type="text"
+                    id="reg-fullname"
+                    placeholder="Wahyu Pratama"
+                    value={formData.fullName}
+                    onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                    className="w-full h-[56px] pl-12 pr-4 border border-outline rounded-xl bg-surface focus:ring-2 focus:ring-secondary/10 focus:border-secondary text-[18px] leading-[28px] outline-none transition-all text-on-surface"
+                  />
+                </div>
+              </div>
+
+              {/* Email */}
+              <div className="flex flex-col gap-2">
+                <label
+                  htmlFor="reg-email"
+                  className="text-[14px] leading-[20px] font-semibold tracking-[0.05em] text-on-surface-variant uppercase"
+                >
+                  Alamat Email
+                </label>
+                <div className="relative group">
+                  <Mail
+                    size={20}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 text-outline group-focus-within:text-secondary transition-colors"
+                  />
+                  <input
+                    type="email"
+                    id="reg-email"
+                    placeholder="Wahyu123@gmail.com"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    className="w-full h-[56px] pl-12 pr-4 border border-outline rounded-xl bg-surface focus:ring-2 focus:ring-secondary/10 focus:border-secondary text-[18px] leading-[28px] outline-none transition-all text-on-surface"
+                  />
+                </div>
+              </div>
+
+              {/* Password */}
+              <div className="flex flex-col gap-2">
+                <label
+                  htmlFor="reg-password"
+                  className="text-[14px] leading-[20px] font-semibold tracking-[0.05em] text-on-surface-variant uppercase"
+                >
+                  Kata Sandi
+                </label>
+                <div className="relative group">
+                  <Lock
+                    size={20}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 text-outline group-focus-within:text-secondary transition-colors"
+                  />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    id="reg-password"
+                    placeholder="Minimal 12 karakter"
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    className="w-full h-[56px] pl-12 pr-12 border border-outline rounded-xl bg-surface focus:ring-2 focus:ring-secondary/10 focus:border-secondary text-[18px] leading-[28px] outline-none transition-all text-on-surface"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-outline hover:text-secondary transition-colors flex items-center justify-center w-10 h-10 cursor-pointer"
+                    aria-label={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
+                  >
+                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
+                <PasswordStrengthMeter password={formData.password} />
+                <p className="text-[12px] leading-[16px] font-medium text-on-surface-variant italic">
+                  Minimal 12 karakter (huruf besar, kecil, angka, dan simbol).
+                </p>
+              </div>
+
+              {/* Submit */}
+              <button
+                className="mt-[16px] h-[56px] bg-primary text-on-primary text-[18px] leading-[24px] font-semibold rounded-xl hover:bg-primary-container hover:text-on-primary-container active:scale-[0.98] transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                type="submit"
+                disabled={loadingSubmit}
+              >
+                {loadingSubmit ? (
+                  <>
+                    <Loader2 size={20} className="animate-spin" />
+                    <span>Memproses...</span>
+                  </>
+                ) : selectedRole === 'OWNER' ? (
+                  'Daftar Sebagai Pemilik (Owner)'
+                ) : (
+                  'Daftar Sebagai Admin'
+                )}
+              </button>
+            </form>
+          </section>
+        )}
+
+        <div className="mt-6 pt-4 border-t border-outline-variant/40 flex flex-col items-center gap-[16px]">
+          <p className="text-[16px] leading-[24px] text-on-surface-variant">
+            Sudah punya akun?{' '}
+            <Link href="/login" className="text-secondary font-bold hover:underline">
+              Masuk
+            </Link>
+          </p>
+        </div>
       </main>
     </div>
   );

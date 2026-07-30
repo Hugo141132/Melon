@@ -712,16 +712,17 @@ requireDeviceControlAccess()
 
 ## TASK-0210 — Protect Routes and APIs
 
-**Priority:** `P0`  
-**Status:** `BACKLOG`  
+**Priority:** `P0`
+**Status:** `DONE`
+**Completed:** `2026-07-30`
 **Dependencies:** `TASK-0209`
 
 ### Work
 
-- Protect all required pages.
-- Protect all API routes.
-- Add Owner-only guards.
-- Add session-expiry handling.
+- Protect all required pages via Next.js Edge Middleware and server-side authorization guards.
+- Protect all API routes using TASK-0209 `requireSession` and `requireRole` authorization helpers.
+- Add Owner-only guards (`requireRole(session, UserRole.OWNER)`).
+- Add session-expiry and revocation handling (`401 INVALID_SESSION` / automatic cookie clearance).
 
 ### Acceptance Criteria
 

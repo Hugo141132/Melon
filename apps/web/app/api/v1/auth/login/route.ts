@@ -5,6 +5,7 @@ import {
   InvalidCredentialsError,
   AccountStatusForbiddenError,
   SESSION_COOKIE_NAME,
+  SESSION_ABSOLUTE_LIFETIME_SECONDS,
 } from '@kebun-melon/database';
 import { AccountStatus } from '@kebun-melon/contracts';
 import { ZodError } from 'zod';
@@ -45,7 +46,7 @@ export async function POST(request: Request) {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
       path: '/',
-      maxAge: 43200, // 12 hours
+      maxAge: SESSION_ABSOLUTE_LIFETIME_SECONDS, // 8 hours
     });
 
     return response;
@@ -65,7 +66,7 @@ export async function POST(request: Request) {
       );
     }
 
-    if (error instanceof InvalidCredentialsError) {
+    if (error instanceof InvalidCredentialsError || error?.name === 'InvalidCredentialsError') {
       return NextResponse.json(
         {
           success: false,
@@ -79,7 +80,10 @@ export async function POST(request: Request) {
       );
     }
 
-    if (error instanceof AccountStatusForbiddenError) {
+    if (
+      error instanceof AccountStatusForbiddenError ||
+      error?.name === 'AccountStatusForbiddenError'
+    ) {
       let code = 'ACCOUNT_FORBIDDEN';
       if (error.status === AccountStatus.PENDING_APPROVAL) {
         code = 'ACCOUNT_PENDING_APPROVAL';

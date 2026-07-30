@@ -50,7 +50,13 @@ describe('TASK-0207 Owner Approve API Route Unit Tests', () => {
 
     mockValidateSession.mockResolvedValueOnce({
       session: { id: 's1', userId: 'admin-id-1' },
-      user: { id: 'admin-id-1', accountStatus: AccountStatus.ACTIVE },
+      user: {
+        id: 'admin-id-1',
+        fullName: 'Admin User',
+        email: 'admin@test.com',
+        accountStatus: AccountStatus.ACTIVE,
+        activeRoles: [UserRole.ADMIN],
+      },
     });
 
     mockReadActiveRoleAssignments.mockResolvedValueOnce([UserRole.ADMIN]);
@@ -63,7 +69,7 @@ describe('TASK-0207 Owner Approve API Route Unit Tests', () => {
     expect(res.status).toBe(403);
     const json = await res.json();
     expect(json.success).toBe(false);
-    expect(json.error.code).toBe('FORBIDDEN');
+    expect(json.error.code).toBe('FORBIDDEN_ROLE');
   });
 
   it('returns 404 USER_NOT_FOUND if target applicant does not exist', async () => {
@@ -71,7 +77,13 @@ describe('TASK-0207 Owner Approve API Route Unit Tests', () => {
 
     mockValidateSession.mockResolvedValueOnce({
       session: { id: 's2', userId: 'owner-id-1' },
-      user: { id: 'owner-id-1', accountStatus: AccountStatus.ACTIVE },
+      user: {
+        id: 'owner-id-1',
+        fullName: 'Owner User',
+        email: 'owner@test.com',
+        accountStatus: AccountStatus.ACTIVE,
+        activeRoles: [UserRole.OWNER],
+      },
     });
 
     mockReadActiveRoleAssignments.mockResolvedValueOnce([UserRole.OWNER]);
@@ -98,7 +110,13 @@ describe('TASK-0207 Owner Approve API Route Unit Tests', () => {
 
     mockValidateSession.mockResolvedValueOnce({
       session: { id: 's2', userId: 'owner-id-1' },
-      user: { id: 'owner-id-1', accountStatus: AccountStatus.ACTIVE },
+      user: {
+        id: 'owner-id-1',
+        fullName: 'Owner User',
+        email: 'owner@test.com',
+        accountStatus: AccountStatus.ACTIVE,
+        activeRoles: [UserRole.OWNER],
+      },
     });
 
     mockReadActiveRoleAssignments.mockResolvedValueOnce([UserRole.OWNER]);
@@ -127,7 +145,13 @@ describe('TASK-0207 Owner Approve API Route Unit Tests', () => {
 
     mockValidateSession.mockResolvedValueOnce({
       session: { id: 's2', userId: 'owner-id-1' },
-      user: { id: 'owner-id-1', accountStatus: AccountStatus.ACTIVE },
+      user: {
+        id: 'owner-id-1',
+        fullName: 'Owner User',
+        email: 'owner@test.com',
+        accountStatus: AccountStatus.ACTIVE,
+        activeRoles: [UserRole.OWNER],
+      },
     });
 
     mockReadActiveRoleAssignments.mockResolvedValueOnce([UserRole.OWNER]);
@@ -137,7 +161,7 @@ describe('TASK-0207 Owner Approve API Route Unit Tests', () => {
       fullName: 'Approved Admin',
       email: 'approved@example.com',
       username: null,
-      accountStatus: AccountStatus.APPROVED,
+      accountStatus: AccountStatus.ACTIVE,
       roles: [UserRole.ADMIN],
       createdAt: '2026-07-28T10:00:00.000Z',
       updatedAt: '2026-07-29T12:00:00.000Z',
@@ -160,7 +184,7 @@ describe('TASK-0207 Owner Approve API Route Unit Tests', () => {
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.success).toBe(true);
-    expect(json.data.user.accountStatus).toBe(AccountStatus.APPROVED);
+    expect(json.data.user.accountStatus).toBe(AccountStatus.ACTIVE);
     expect(json.data.approvalRecordId).toBe('approval-rec-123');
     expect(json.data.user).not.toHaveProperty('passwordHash');
     expect(json.data.user).not.toHaveProperty('sessionTokenHash');

@@ -1,15 +1,20 @@
-import type { Metadata } from 'next';
+'use client';
+
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import TopAppBar from '@/components/navigation/TopAppBar';
 import BottomNav from '@/components/navigation/BottomNav';
 import { USER_PROFILE } from '@/lib/constants';
-import { User, ChevronRight, Bell, Settings2, HelpCircle } from 'lucide-react';
-
-export const metadata: Metadata = {
-  title: 'Pengaturan - Kebun Melon',
-  description: 'Kelola akun, notifikasi, dan konfigurasi sensor lahan Anda.',
-};
+import {
+  User as UserIcon,
+  ChevronRight,
+  Bell,
+  Settings2,
+  HelpCircle,
+  ShieldCheck,
+  Loader2,
+} from 'lucide-react';
 
 interface SettingItemProps {
   icon: React.ReactNode;
@@ -41,6 +46,31 @@ function SettingItem({ icon, iconBg, title, subtitle, href }: SettingItemProps) 
 }
 
 export default function PengaturanPage() {
+  const [user, setUser] = useState<{
+    fullName: string;
+    email: string;
+    role: string;
+    accountStatus: string;
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchSession = async () => {
+      try {
+        const res = await fetch('/api/v1/auth/session');
+        const json = await res.json();
+        if (json.success && json.data.authenticated && json.data.user) {
+          setUser(json.data.user);
+        }
+      } catch {
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchSession();
+  }, []);
+
   return (
     <div className="bg-app-surface text-app-on-surface min-h-dvh pb-24">
       <TopAppBar />
@@ -51,31 +81,56 @@ export default function PengaturanPage() {
           <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-app-primary-fixed flex-shrink-0">
             <Image
               src={USER_PROFILE.avatar}
-              alt={USER_PROFILE.name}
+              alt={user?.fullName || USER_PROFILE.name}
               width={64}
               height={64}
               className="w-full h-full object-cover"
             />
           </div>
           <div>
-            <h2 className="text-[24px] leading-8 font-bold text-app-primary">
-              {USER_PROFILE.name}
-            </h2>
-            <p className="text-[14px] font-semibold text-app-on-surface-variant">
-              {USER_PROFILE.role}
-            </p>
+            {loading ? (
+              <div className="flex items-center gap-2 text-app-on-surface-variant">
+                <Loader2 size={18} className="animate-spin" />
+                <span className="text-[14px]">Memuat profil...</span>
+              </div>
+            ) : (
+              <>
+                <h2 className="text-[24px] leading-8 font-bold text-app-primary">
+                  {user?.fullName || USER_PROFILE.name}
+                </h2>
+                <p className="text-[14px] font-semibold text-app-on-surface-variant">
+                  {user?.role === 'OWNER'
+                    ? 'PEMILIK LAHAN (OWNER)'
+                    : user?.role === 'ADMIN'
+                      ? 'ADMINISTRATOR'
+                      : USER_PROFILE.role}
+                </p>
+              </>
+            )}
           </div>
         </section>
 
         {/* Settings List */}
         <div className="space-y-3 animate-fade-in">
           <SettingItem
-            icon={<User size={22} className="text-app-secondary" />}
+            icon={<UserIcon size={22} className="text-app-secondary" />}
             iconBg="bg-app-secondary-fixed"
             title="Profil & Akun"
             subtitle="Informasi pribadi dan keamanan"
             href="/profil"
           />
+
+          {/* Persetujuan Admin navigation item - visible ONLY to OWNER */}
+          {user?.role === 'OWNER' && (
+            <SettingItem
+              icon={<ShieldCheck size={22} className="text-emerald-700" />}
+              iconBg="bg-emerald-100"
+              title="Persetujuan Admin"
+              subtitle="Kelola persetujuan registrasi Admin"
+              href="/approvals"
+            />
+          )}
+
           <SettingItem
             icon={<Bell size={22} className="text-app-primary" />}
             iconBg="bg-app-primary/10"

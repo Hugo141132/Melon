@@ -54,7 +54,13 @@ describe('TASK-0206 Owner Pending Approval API Routes Unit Tests', () => {
 
       mockValidateSession.mockResolvedValueOnce({
         session: { id: 's1', userId: 'admin-id-1' },
-        user: { id: 'admin-id-1', accountStatus: AccountStatus.ACTIVE },
+        user: {
+          id: 'admin-id-1',
+          fullName: 'Admin User',
+          email: 'admin@test.com',
+          accountStatus: AccountStatus.ACTIVE,
+          activeRoles: [UserRole.ADMIN],
+        },
       });
 
       mockReadActiveRoleAssignments.mockResolvedValueOnce([UserRole.ADMIN]);
@@ -65,7 +71,7 @@ describe('TASK-0206 Owner Pending Approval API Routes Unit Tests', () => {
       expect(res.status).toBe(403);
       const json = await res.json();
       expect(json.success).toBe(false);
-      expect(json.error.code).toBe('FORBIDDEN');
+      expect(json.error.code).toBe('FORBIDDEN_ROLE');
     });
 
     it('returns 401 UNAUTHENTICATED when session revalidation fails due to inactive account status', async () => {
@@ -80,7 +86,7 @@ describe('TASK-0206 Owner Pending Approval API Routes Unit Tests', () => {
       expect(res.status).toBe(401);
       const json = await res.json();
       expect(json.success).toBe(false);
-      expect(json.error.code).toBe('UNAUTHENTICATED');
+      expect(json.error.code).toBe('INVALID_SESSION');
     });
 
     it('returns 200 OK with safe allowlisted data envelope for active OWNER', async () => {
@@ -88,7 +94,13 @@ describe('TASK-0206 Owner Pending Approval API Routes Unit Tests', () => {
 
       mockValidateSession.mockResolvedValueOnce({
         session: { id: 's2', userId: 'owner-id-1' },
-        user: { id: 'owner-id-1', accountStatus: AccountStatus.ACTIVE },
+        user: {
+          id: 'owner-id-1',
+          fullName: 'Owner User',
+          email: 'owner@test.com',
+          accountStatus: AccountStatus.ACTIVE,
+          activeRoles: [UserRole.OWNER],
+        },
       });
 
       mockReadActiveRoleAssignments.mockResolvedValueOnce([UserRole.OWNER]);
@@ -128,7 +140,13 @@ describe('TASK-0206 Owner Pending Approval API Routes Unit Tests', () => {
 
       mockValidateSession.mockResolvedValueOnce({
         session: { id: 's2', userId: 'owner-id-1' },
-        user: { id: 'owner-id-1', accountStatus: AccountStatus.ACTIVE },
+        user: {
+          id: 'owner-id-1',
+          fullName: 'Owner User',
+          email: 'owner@test.com',
+          accountStatus: AccountStatus.ACTIVE,
+          activeRoles: [UserRole.OWNER],
+        },
       });
 
       mockReadActiveRoleAssignments.mockResolvedValueOnce([UserRole.OWNER]);
@@ -148,7 +166,13 @@ describe('TASK-0206 Owner Pending Approval API Routes Unit Tests', () => {
 
       mockValidateSession.mockResolvedValueOnce({
         session: { id: 's2', userId: 'owner-id-1' },
-        user: { id: 'owner-id-1', accountStatus: AccountStatus.ACTIVE },
+        user: {
+          id: 'owner-id-1',
+          fullName: 'Owner User',
+          email: 'owner@test.com',
+          accountStatus: AccountStatus.ACTIVE,
+          activeRoles: [UserRole.OWNER],
+        },
       });
 
       mockReadActiveRoleAssignments.mockResolvedValueOnce([UserRole.OWNER]);

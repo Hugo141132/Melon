@@ -1,10 +1,12 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import TopAppBar from '@/components/navigation/TopAppBar';
 import BottomNav from '@/components/navigation/BottomNav';
-import NPKChart from '@/components/charts/NPKChart';
 import { NPK_DATA } from '@/lib/constants';
 import { CheckCircle, TrendingUp } from 'lucide-react';
+
+const NPKChart = dynamic(() => import('@/components/charts/NPKChart'), { ssr: false });
 
 interface NPKMeterProps {
   label: string;

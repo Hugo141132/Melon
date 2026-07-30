@@ -359,10 +359,10 @@ export class UserRepository {
             };
           }
 
-          // 2. Update account status to APPROVED
+          // 2. Update account status to ACTIVE (Owner approval directly activates Admin)
           const updatedUser = await tx.user.update({
             where: { id: input.targetUserId },
-            data: { accountStatus: AccountStatus.APPROVED },
+            data: { accountStatus: AccountStatus.ACTIVE },
             select: {
               id: true,
               fullName: true,
@@ -396,7 +396,7 @@ export class UserRepository {
               applicantUserId: targetUser.id,
               decision: 'APPROVE',
               previousStatus: AccountStatus.PENDING_APPROVAL,
-              newStatus: AccountStatus.APPROVED,
+              newStatus: AccountStatus.ACTIVE,
               decidedByUserId: input.decidedByUserId,
               decisionNote: input.decisionNote?.trim() || null,
             },
@@ -412,7 +412,7 @@ export class UserRepository {
               targetId: targetUser.id,
               result: 'SUCCESS',
               previousValues: { accountStatus: AccountStatus.PENDING_APPROVAL },
-              newValues: { accountStatus: AccountStatus.APPROVED },
+              newValues: { accountStatus: AccountStatus.ACTIVE },
               metadata: {
                 decision: 'APPROVE',
                 decisionNote: input.decisionNote?.trim() || null,

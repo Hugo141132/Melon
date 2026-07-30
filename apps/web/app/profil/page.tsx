@@ -19,9 +19,22 @@ export default function ProfilPage() {
   const [phone, setPhone] = useState(USER_PROFILE.phone);
   const [saved, setSaved] = useState(false);
 
+  const [loggingOut, setLoggingOut] = useState(false);
+
   const handleSave = () => {
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
+  };
+
+  const handleLogout = async () => {
+    setLoggingOut(true);
+    try {
+      await fetch('/api/v1/auth/logout', { method: 'POST' });
+    } catch {
+      // Ignore network error during logout cleanup
+    } finally {
+      window.location.href = '/login';
+    }
   };
 
   return (
@@ -167,9 +180,13 @@ export default function ProfilPage() {
 
         {/* Danger Zone */}
         <section className="pt-4">
-          <button className="w-full flex items-center gap-3 p-4 text-app-error font-semibold active:bg-app-error-container/10 transition-colors rounded-xl cursor-pointer">
+          <button
+            onClick={handleLogout}
+            disabled={loggingOut}
+            className="w-full flex items-center gap-3 p-4 text-app-error font-semibold active:bg-app-error-container/10 transition-colors rounded-xl cursor-pointer disabled:opacity-60"
+          >
             <LogOut size={20} />
-            <span>Keluar dari Akun</span>
+            <span>{loggingOut ? 'Keluar...' : 'Keluar dari Akun'}</span>
           </button>
         </section>
       </main>
