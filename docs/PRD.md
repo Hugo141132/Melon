@@ -352,24 +352,25 @@ For the selected device, the application shall support display of water quality 
 - Water EC.
 - Water status.
 
-### 9.3 Reservoir-Water Monitoring (PRD-FR-038 / PRD-DATA-005)
+### 9.3 Water Tank Monitoring (PRD-FR-038 / PRD-DATA-005)
 
-For the selected device, reservoir-water monitoring is a distinct domain supporting:
+For the selected device, water tank monitoring is a distinct domain supporting:
 
-- Reservoir water volume.
-- Reservoir water flow rate.
-- Reservoir water status.
+- Water tank volume (canonical unit: L).
+- Water flow rate (canonical unit: m³/h).
+- Water tank status.
+- Control capabilities: Solenoid Valve (irrigation control actuator) and Relay (ON/OFF switch).
 
-Reservoir-water monitoring is separate from general water-quality monitoring.
+Water tank monitoring is separate from general water-quality monitoring.
 
-### 9.4 Shared Sensor/Tool Battery Monitoring (PRD-FR-039 / PRD-DATA-006)
+### 9.4 Device Electrical / INA219 Power Monitoring (PRD-FR-039 / PRD-DATA-006)
 
-The application supports monitoring the shared sensor/tool battery (`BAT`), representing the power supply for the soil and water monitoring equipment:
+The application supports electrical monitoring via INA219 sensors (monitoring voltage, current, and power consumption):
 
-- Battery level / status.
-- Timestamp of battery reading.
+- System electrical consumption / power status.
+- Timestamp of electrical reading.
 
-`BAT` is a shared equipment supply for soil and water monitoring. Reservoir-water monitoring does not use the `BAT` parameter.
+INA219 electrical monitoring tracks system electrical consumption as device health/power telemetry. It is not classified as a battery percentage or primary agronomic monitoring parameter. Water tank monitoring does not use the `BAT` parameter.
 
 ### 9.5 Status Values (PRD-FR-025)
 

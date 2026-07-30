@@ -31,6 +31,8 @@ enum AccountStatus {
 
 enum DeviceType {
   SOIL_NODE
+  WATER_QUALITY_NODE
+  WATER_TANK_NODE
   WATER_NODE
   COMBINED_NODE
 }

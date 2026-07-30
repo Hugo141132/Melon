@@ -117,6 +117,12 @@ export const CANONICAL_PERMISSIONS: SeedPermissionDef[] = [
     adminAccess: false,
   },
   {
+    code: 'device.delete',
+    description: 'Permanently delete device',
+    ownerAccess: true,
+    adminAccess: false,
+  },
+  {
     code: 'device.assign',
     description: 'Assign device to user',
     ownerAccess: true,

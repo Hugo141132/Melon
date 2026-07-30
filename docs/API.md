@@ -37,7 +37,7 @@ The API shall support:
 - Real-time update endpoints.
 - Health and readiness checks.
 
-Note: Reservoir-water telemetry (volume & flow rate) is ingested separately via MQTT/EMQX through the IoT Gateway service, not through the REST API. Shared sensor battery (`BAT`) is sent via REST over Wi-Fi (exact REST payload field placement `TBD`).
+Note: Water tank telemetry (volume & flow rate) is ingested separately via MQTT/EMQX through the IoT Gateway service, not through the REST API. Electrical monitoring (voltage, current, power) via INA219 is sent via REST over Wi-Fi.
 
 The API shall not expose:
 

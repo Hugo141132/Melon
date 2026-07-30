@@ -706,8 +706,8 @@ Stores reservoir-water volume and flow rate telemetry independently from general
 | `schema_version` | VARCHAR(30) | No | |
 | `recorded_at` | TIMESTAMPTZ | Yes | |
 | `received_at` | TIMESTAMPTZ | No | |
-| `tank_volume` | NUMERIC | Yes | Unit `TBD` |
-| `flow_rate` | NUMERIC | Yes | Unit `TBD` |
+| `tank_volume` | NUMERIC | Yes | Unit `L` (Liters) |
+| `flow_rate` | NUMERIC | Yes | Unit `m³/h` (Cubic meters per hour) |
 | `status` | VARCHAR(30) | Yes | Canonical status |
 | `validation_status` | VARCHAR(30) | No | |
 | `created_at` | TIMESTAMPTZ | No | |

@@ -151,9 +151,9 @@ export default function PengaturanPage() {
           <SettingItem
             icon={<Settings2 size={22} className="text-app-tertiary" />}
             iconBg="bg-app-tertiary-fixed/30"
-            title="Konfigurasi Alat & Sensor"
-            subtitle="Sambungkan dan atur sensor IoT"
-            href="#"
+            title="Registri Perangkat IoT"
+            subtitle="Daftar dan kelola sensor & controller"
+            href="/devices"
           />
           <SettingItem
             icon={<HelpCircle size={22} className="text-app-on-surface-variant" />}

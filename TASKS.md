@@ -812,8 +812,9 @@ Implement sites if required for version 1.
 ## TASK-0302 — Implement Device Registry
 
 **Priority:** `P0`  
-**Status:** `BACKLOG`  
+**Status:** `DONE`
 **Dependencies:** `TASK-0104`
+**Completed:** 2026-07-30 — Implemented Device Registry with Zod DTO contracts (`packages/contracts/src/device.ts`), database repository abstraction (`packages/database/src/device-repository.ts`), REST API route handlers (`/api/v1/devices`, `/[deviceId]`, `/[deviceId]/deactivate`), and IoT Device Management UI (`apps/web/app/devices/page.tsx`). Strictly protected device secrets and credentials, prevented client overrides of server-controlled status/telemetry fields via `.strict()` schema stripping, enforced canonical untranslated device lifecycle (`ACTIVE`, `INACTIVE`, `DEACTIVATED`) and connection status values (`ONLINE`, `OFFLINE`, `STALE`, `UNKNOWN`, `INACTIVE`), and added comprehensive unit test suites covering contracts, database repository, RBAC API authorization, and frontend pages.
 
 ### Work
 

@@ -65,10 +65,10 @@ Backend Ingestion Boundary (Web Backend)
     └── Stream live updates to authenticated web frontend
 ```
 
-### Path B — MQTT through EMQX Broker (Reservoir-Water Telemetry & Faucet Control)
+### Path B — MQTT through EMQX Broker (Water Tank Monitoring & Faucet Control)
 
 ```text
-Reservoir-Water Monitoring & Control Equipment
+Water Tank Monitoring & Control Equipment
     │
     │ MQTT 5.0 over TLS
     ▼
@@ -78,7 +78,7 @@ EMQX MQTT Broker
 IoT Gateway / Integration Service
     │
     ├── Validate message schema & topic permissions
-    ├── Persist reservoir telemetry to PostgreSQL database
+    ├── Persist water tank telemetry to PostgreSQL database
     ├── Publish faucet control commands & process acknowledgements
     └── Send live updates to the web backend
              │
