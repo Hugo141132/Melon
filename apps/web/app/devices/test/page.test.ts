@@ -118,4 +118,34 @@ describe('Device Registry UI Component & Schema Contract Tests (TASK-0302)', () 
       } as any)
     ).toThrow();
   });
+
+  it('6. Validates WATER_TANK_NODE capability display contains FAUCET_CONTROL and excludes RELAY_CONTROL / SOLENOID_VALVE_CONTROL', () => {
+    const tankDevice = {
+      id: '123e4567-e89b-12d3-a456-426614174001',
+      deviceId: 'water-tank-node-001',
+      siteId: null,
+      name: 'Water Tank Node 1',
+      deviceType: DeviceType.WATER_TANK_NODE,
+      accountStatus: DeviceAccountStatus.ACTIVE,
+      connectionStatus: DeviceConnectionStatus.ONLINE,
+      firmwareVersion: '1.0.0',
+      hardwareRevision: null,
+      schemaVersion: '1.0',
+      lastSeenAt: null,
+      lastMessageAt: null,
+      latitude: null,
+      longitude: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      deactivatedAt: null,
+      capabilities: ['WATER_TANK_VOLUME', 'WATER_FLOW_RATE', 'FAUCET_CONTROL'],
+    };
+
+    const parsed = PublicSafeDeviceDtoSchema.parse(tankDevice);
+    expect(parsed.capabilities).toContain('WATER_TANK_VOLUME');
+    expect(parsed.capabilities).toContain('WATER_FLOW_RATE');
+    expect(parsed.capabilities).toContain('FAUCET_CONTROL');
+    expect(parsed.capabilities).not.toContain('RELAY_CONTROL');
+    expect(parsed.capabilities).not.toContain('SOLENOID_VALVE_CONTROL');
+  });
 });

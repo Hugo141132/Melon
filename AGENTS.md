@@ -136,6 +136,96 @@ Before changing frontend structure:
 
 A technically cleaner redesign is not automatically an approved change.
 
+### 4.1 Mandatory Frontend Design Governance
+
+Whenever a task intentionally modifies the visual frontend UI, agents must strictly follow the repository governance rules specified here and detailed in [docs/UI_UX.md](file:///c:/Users/hugop/Documents/Web%20Monitoring/Kebun-Melon/docs/UI_UX.md).
+
+#### Task-Level Frontend Declaration
+
+For every future task involving visual frontend changes, the agent MUST explicitly declare before or during implementation:
+
+```text
+Frontend impact:
+[NONE | MINOR | MATERIAL REDESIGN]
+
+Selected UI direction:
+<exactly one approved design direction>
+
+Existing color template:
+UNCHANGED
+
+Selected motion effects:
+<relevant subset of the 12 approved motion effects>
+
+21st.dev MCP:
+[REQUIRED | NOT REQUIRED]
+
+Reason:
+<short justification>
+```
+
+If `Frontend impact = NONE`, selecting a UI direction or motion set is not required.
+
+#### Controlled List of 6 Approved UI Directions
+
+When modifying UI, select exactly ONE primary direction from this controlled list:
+
+1. `Premium Minimal Ops`
+2. `Soft Bento Dashboard`
+3. `Swiss Data Minimalism`
+4. `Soft Glass Layers`
+5. `Neo-Industrial Monitoring`
+6. `Editorial Analytics`
+
+Rules:
+- Select the ONE primary direction that best suits the page/task.
+- Do not arbitrarily combine multiple visual paradigms.
+- Existing implemented pages do not need to be retroactively redesigned solely to satisfy this rule.
+
+#### Color Governance (MANDATORY)
+
+The existing Kebun Melon color template and design tokens are authoritative. Frontend work MUST NOT:
+- replace the current palette;
+- rebrand the application;
+- introduce a competing primary color system;
+- change the established color template merely because another design style was selected.
+
+Selecting a UI direction changes visual/layout treatment, NOT the established brand color palette. Existing project color tokens must be reused wherever practical.
+
+#### Controlled List of 12 Approved Motion Effects
+
+When visual frontend work is performed, select only the relevant motion effects from this controlled list:
+
+1. Page enter
+2. Card hover
+3. Button hover
+4. Sidebar selection
+5. Dropdown
+6. Modal
+7. KPI refresh
+8. Chart loading
+9. New event
+10. Healthy status
+11. Critical alert
+12. Skeleton loading
+
+All motion must be lightweight, subtle, performant, appropriate for an operations dashboard, non-distracting, accessible, and respect `prefers-reduced-motion`. Continuous expensive animations, excessive blur, or purely decorative movement are strictly forbidden.
+
+#### 21st.dev MCP Governance
+
+21st.dev MCP is **REQUIRED** before implementation when frontend work requires a `MATERIAL REDESIGN` (substantial page composition change, major dashboard layout, new component system, major visual UX restructuring).
+
+21st.dev MCP is **NOT REQUIRED** for minor API wiring, data binding, text changes, small state indicators, small additions using existing components, or bug fixes that preserve the established layout.
+
+#### TASK-0303 Governance Record
+
+`TASK-0303` frontend implementation record:
+- Frontend impact: `MINOR`
+- Selected UI direction: `Premium Minimal Ops`
+- Existing color template: `UNCHANGED`
+- Selected motion effects: `Card hover`, `Skeleton loading`
+- 21st.dev MCP: `NOT REQUIRED`
+
 ---
 
 ## 5. Task Selection Rules

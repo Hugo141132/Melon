@@ -1052,7 +1052,132 @@ Control history shall clearly distinguish:
 
 ---
 
-## 25. Audit-Specific Items to Verify
+## 25. Frontend Visual Design Governance and Motion System
+
+This section defines the canonical UI design directions, color governance rules, motion/micro-interaction library, motion semantics, task-level declaration requirements, and 21st.dev MCP usage rules for all frontend implementation work.
+
+### 25.1 Mandatory Primary UI Design Directions
+
+Whenever a task intentionally modifies the visual frontend UI, the implementation must select exactly ONE primary approved UI design direction from this controlled list:
+
+1. `Premium Minimal Ops`: High-contrast operational hierarchy, clean typography, precise grid alignment, restrained micro-interactions, dark-mode prioritized.
+2. `Soft Bento Dashboard`: Structured grid container cards, soft subtle borders, high scannability, clear visual separation between telemetry domains.
+3. `Swiss Data Minimalism`: Strict typographic scale, grid alignment, heavy contrast emphasis on telemetry metrics, minimal decorative accents.
+4. `Soft Glass Layers`: Modern subtle backdrop blurs, layered depth card surfaces, sleek operational badges, dark theme visual polish.
+5. `Neo-Industrial Monitoring`: High-density data grid layout, operational status emphasis, vivid status indicators, industrial utility aesthetics.
+6. `Editorial Analytics`: Elegant metric callouts, spacious layout rhythm, structured report typography, clean analytical visual emphasis.
+
+**Rules:**
+- A task does NOT need to use all six directions.
+- Select the ONE primary direction that best suits the page/task.
+- Do not arbitrarily combine multiple visual paradigms.
+- Small supporting characteristics from the existing application may remain, but the selected direction should guide any new visual work.
+- Existing implemented pages do not need to be retroactively redesigned solely to satisfy this rule.
+
+### 25.2 Mandatory Color Governance
+
+The existing Kebun Melon color template and design tokens are authoritative (`FRONTEND_AUDIT.md` & `globals.css`).
+
+Frontend work MUST NOT:
+- replace the current palette;
+- rebrand the application;
+- introduce a competing primary color system;
+- change the established color template merely because another design style was selected.
+
+Selecting a UI direction changes visual/layout treatment, NOT the established brand color palette. Existing project color tokens must be reused wherever practical.
+
+### 25.3 Approved Motion & Micro-Interaction Library
+
+When visual frontend work is performed, select only the motion effects genuinely relevant to the task from this controlled list of twelve approved motion effects:
+
+1. `Page enter`: Subtle initial content entrance.
+2. `Card hover`: Small elevation/translation emphasis, not dramatic movement.
+3. `Button hover`: Clear interactive affordance and scale/brightness feedback.
+4. `Sidebar selection`: Subtle active-state movement or indicator transition.
+5. `Dropdown`: Short open/close fade/slide transition.
+6. `Modal`: Controlled fade/scale entrance and exit.
+7. `KPI refresh`: Subtle value/state update indication only when KPI data actually refreshes.
+8. `Chart loading`: Loading transition/skeleton while chart data is unresolved.
+9. `New event`: Temporary emphasis for genuinely newly arrived monitoring events.
+10. `Healthy status`: Restrained status feedback; avoid constant distracting pulsing.
+11. `Critical alert`: Attention-prioritized animation only for genuinely critical conditions.
+12. `Skeleton loading`: Temporary content placeholder while data is loading.
+
+**Rules:**
+- A task does NOT need to use all motion effects.
+- Do not add animation merely to satisfy the list.
+- The selected effects must correspond to actual UI behavior on that page.
+- Do not use critical, healthy, or new-event animations for static decorative purposes.
+
+### 25.4 Motion Quality and Performance Standards
+
+All selected motion effects must satisfy the following operational standards:
+- **Lightweight & Subtle**: Short duration (150ms-300ms), smooth easing curves (`cubic-bezier(0.4, 0, 0.2, 1)`).
+- **Performant**: Animate GPU-accelerated properties (`opacity`, `transform`, `scale`). Avoid continuous repaints, heavy blur animation, or broad layout shifts.
+- **Accessible**: Respect `prefers-reduced-motion` media query by disabling non-essential transitions for users with motion sensitivity.
+- **Functionally Meaningful**: Provide immediate visual feedback for user interactions or telemetry state changes without causing operational distraction.
+
+### 25.5 Task-Level Frontend Declaration Standard
+
+For every future task involving visual frontend changes, the agent must explicitly declare before or during implementation:
+
+```text
+Frontend impact:
+- NONE
+- MINOR
+- MATERIAL REDESIGN
+
+Selected UI direction:
+<exactly one approved design direction>
+
+Existing color template:
+UNCHANGED
+
+Selected motion effects:
+<relevant subset of the 12 approved motion effects>
+
+21st.dev MCP:
+REQUIRED / NOT REQUIRED
+
+Reason:
+<short justification>
+```
+
+If `Frontend impact = NONE`, selecting a UI direction or motion set is not required.
+
+### 25.6 21st.dev MCP Governance
+
+Use 21st.dev MCP BEFORE implementation when frontend work requires a `MATERIAL REDESIGN`, including:
+- substantial page composition change;
+- major dashboard layout;
+- new significant component system;
+- major cards/tables redesign;
+- substantial modal/form redesign;
+- major visual UX restructuring.
+
+21st.dev MCP is **NOT REQUIRED** for:
+- minor API wiring;
+- data binding;
+- text changes;
+- small state indicators;
+- small additions using existing components;
+- bug fixes that preserve the established layout.
+
+Do not redesign a page merely to justify using 21st.dev MCP.
+
+### 25.7 TASK-0303 Governance Record
+
+`TASK-0303` frontend implementation record:
+- **Frontend impact:** `MINOR`
+- **Selected UI direction:** `Premium Minimal Ops`
+- **Existing color template:** `UNCHANGED`
+- **Selected motion effects:** `Card hover`, `Skeleton loading`
+- **21st.dev MCP:** `NOT REQUIRED`
+- **Reason:** Read-only device capability display added to `/devices` page reusing existing card layouts and skeleton loading states without altering overall page composition.
+
+---
+
+## 26. Audit-Specific Items to Verify
 
 The following items shall be copied from or checked against `FRONTEND_AUDIT.md` before implementation begins:
 
@@ -1080,7 +1205,7 @@ Do not guess these values. Use the audit and source code.
 
 ---
 
-## 26. Out of Scope
+## 27. Out of Scope
 
 This document does not define:
 
@@ -1101,7 +1226,7 @@ These belong in the corresponding product, communication, API, database, and arc
 
 ---
 
-## 27. Related Documents
+## 28. Related Documents
 
 This specification should be used with:
 
@@ -1121,7 +1246,7 @@ This specification should be used with:
 
 ---
 
-## 28. Implementation Principle
+## 29. Implementation Principle
 
 The existing frontend is not merely a visual reference to imitate. It is an implementation asset to preserve and extend.
 

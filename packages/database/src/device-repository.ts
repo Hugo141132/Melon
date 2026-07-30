@@ -295,6 +295,10 @@ export class DeviceRepository {
         include: { capabilities: true },
       });
 
+      if (input.deviceType !== undefined) {
+        await this.reconcileDeviceCapabilities(dev.id, tx);
+      }
+
       const isUuidActor =
         actorUserId && typeof actorUserId === 'string' && actorUserId.trim().length > 0;
       await tx.auditLog.create({
@@ -320,7 +324,68 @@ export class DeviceRepository {
       return dev;
     });
 
-    return this.formatPublicSafeDto(updated);
+    return (await this.getDeviceByCanonicalId(updated.id))!;
+  }
+
+  /**
+   * Idempotent capability reconciliation helper for a single device.
+   * Ensures the device's persisted capability rows strictly match its canonical deviceType profile.
+   * Removes obsolete or cross-profile capabilities and creates missing canonical capabilities.
+   * Can be executed within an existing Prisma transaction client (tx).
+   */
+  async reconcileDeviceCapabilities(
+    deviceDbId: string,
+    tx?: Prisma.TransactionClient
+  ): Promise<void> {
+    const prismaClient = tx || this.prisma;
+
+    const device = await prismaClient.device.findUnique({
+      where: { id: deviceDbId },
+      include: { capabilities: true },
+    });
+
+    if (!device) return;
+
+    const canonicalCaps = getCanonicalCapabilitiesForDeviceType(device.deviceType as DeviceType);
+    const existingCapMap = new Map(device.capabilities.map((c) => [c.capability, c]));
+
+    // 1. Remove obsolete or cross-profile capability rows
+    const obsoleteIds = device.capabilities
+      .filter((c) => !canonicalCaps.includes(c.capability))
+      .map((c) => c.id);
+
+    if (obsoleteIds.length > 0) {
+      await prismaClient.deviceCapability.deleteMany({
+        where: { id: { in: obsoleteIds } },
+      });
+    }
+
+    // 2. Add missing canonical capability rows
+    const missingCaps = canonicalCaps.filter((cap) => !existingCapMap.has(cap));
+
+    if (missingCaps.length > 0) {
+      await prismaClient.deviceCapability.createMany({
+        data: missingCaps.map((cap) => ({
+          deviceId: deviceDbId,
+          capability: cap,
+          enabled: true,
+          source: 'PROVISIONED',
+        })),
+        skipDuplicates: true,
+      });
+    }
+  }
+
+  /**
+   * One-time maintenance method to reconcile existing database records.
+   * Scans existing devices in the database and cleans up obsolete rows (e.g. RELAY_CONTROL, SOLENOID_VALVE_CONTROL).
+   */
+  async reconcileExistingDeviceCapabilitiesOnce(): Promise<{ reconciledDeviceCount: number }> {
+    const devices = await this.prisma.device.findMany({ select: { id: true } });
+    for (const dev of devices) {
+      await this.reconcileDeviceCapabilities(dev.id);
+    }
+    return { reconciledDeviceCount: devices.length };
   }
 
   /**

@@ -37,6 +37,7 @@
 | **I18N** | `DEC-I18N-068` to `DEC-I18N-074` | **APPROVED** | Default `id` (Bahasa Indonesia), `en` fallback, cookie-based locale routing (no URL path pollution), UTC storage with `Asia/Jakarta` (WIB) presentation. |
 | **Infrastructure** | `DEC-INF-075` to `DEC-INF-088` | **APPROVED (ORM DECISION REQUIRED)** | npm monorepo, PostgreSQL (ORM TBD — see §2.5). Backup schedule, retention period, RPO, and RTO: **TBD** — pending explicit user approval. |
 | **Testing** | `DEC-TST-089` to `DEC-TST-100` | **APPROVED** | Modern Evergreen browsers. Mobile viewport primary (360-430px). Accessibility standard: **TBD**. API performance targets (p95): **TBD**. Physical test run count per faucet phase: **TBD**. |
+| **UI/UX & Frontend** | `DEC-UIUX-101` | **APPROVED** | 6 primary UI directions (1 per task), authoritative Kebun Melon color palette (UNCHANGED), controlled 12-motion library, performant motion quality, mandatory task-level frontend declaration, 21st.dev MCP required ONLY for material redesigns. |
 
 ---
 
@@ -198,6 +199,21 @@
 * **Context**: PostgreSQL is the confirmed database. The current `package.json` contains neither Prisma nor Drizzle. Exactly one ORM must be selected before `TASK-0104` begins. Do not install either until this decision is recorded.
 * **Recommendation**: Prisma — mature migration system, type-safe client, broad Next.js ecosystem support.
 * **Required Action**: Record the selected ORM here once the user decides.
+
+---
+
+### 2.9 UI/UX and Frontend Governance
+
+#### DEC-UIUX-101: Mandatory Frontend Design Governance, Motion Library, and 21st.dev MCP Rules
+* **Related Task IDs**: All frontend tasks (`TASK-0303`, `TASK-0501`–`TASK-0704`, etc.)
+* **Related Documentation**: `AGENTS.md` §4.1, `docs/UI_UX.md` §25, `FRONTEND_AUDIT.md`
+* **Status**: **APPROVED BY USER**
+* **Approved Decision**:
+  1. **Primary UI Direction**: Every task altering visual UI must select exactly ONE primary UI direction from the 6 approved options (`Premium Minimal Ops`, `Soft Bento Dashboard`, `Swiss Data Minimalism`, `Soft Glass Layers`, `Neo-Industrial Monitoring`, `Editorial Analytics`).
+  2. **Color Governance**: Existing Kebun Melon color tokens (`globals.css`) are authoritative and MUST NOT be changed or replaced.
+  3. **Motion Library**: Controlled list of 12 approved motion effects (`Page enter`, `Card hover`, `Button hover`, `Sidebar selection`, `Dropdown`, `Modal`, `KPI refresh`, `Chart loading`, `New event`, `Healthy status`, `Critical alert`, `Skeleton loading`). All motion must be subtle, lightweight, performant, non-distracting, and respect `prefers-reduced-motion`.
+  4. **Task-Level Declaration**: Agents MUST declare Frontend Impact (`NONE`, `MINOR`, `MATERIAL REDESIGN`), UI direction, Color status (`UNCHANGED`), Motion effects, and 21st.dev MCP requirement before/during implementation.
+  5. **21st.dev MCP Governance**: Required BEFORE implementation ONLY for `MATERIAL REDESIGN` (substantial composition changes, new component systems, major dashboard layout redesigns). Not required for minor wiring, text changes, small state indicators, or existing component additions.
 
 ---
 

@@ -407,9 +407,27 @@ export default function DeviceRegistryPage() {
 
         {/* Device Cards Grid */}
         {loading ? (
-          <div className="p-12 text-center text-app-on-surface-variant flex flex-col items-center gap-3">
-            <Loader2 size={32} className="animate-spin text-app-primary" />
-            <p className="text-[14px]">Memuat registri perangkat...</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {[1, 2, 3, 4].map((i) => (
+              <div
+                key={i}
+                className="bg-app-surface-container-lowest p-5 rounded-xl border border-app-outline-variant/20 space-y-4 animate-pulse"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="h-4 bg-app-surface-container rounded w-28" />
+                  <div className="h-5 bg-app-surface-container rounded-full w-16" />
+                </div>
+                <div className="h-6 bg-app-surface-container rounded w-3/4" />
+                <div className="space-y-2 pt-2 border-t border-app-outline-variant/10">
+                  <div className="h-3 bg-app-surface-container rounded w-1/2" />
+                  <div className="h-3 bg-app-surface-container rounded w-2/3" />
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <div className="h-5 bg-app-surface-container rounded w-20" />
+                  <div className="h-5 bg-app-surface-container rounded w-24" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : devices.length === 0 ? (
           <div className="p-12 bg-app-surface-container-lowest rounded-xl border border-app-outline-variant/20 text-center space-y-3">
@@ -429,33 +447,38 @@ export default function DeviceRegistryPage() {
               return (
                 <div
                   key={device.id}
-                  className={`bg-app-surface-container-lowest p-5 rounded-xl soft-elevation border transition-all ${
+                  className={`bg-app-surface-container-lowest p-5 rounded-xl soft-elevation border transition-all duration-200 ${
                     isDeactivated
-                      ? 'border-gray-300 opacity-60 bg-gray-50'
-                      : 'border-app-outline-variant/30 hover:border-app-primary/40'
+                      ? 'border-gray-200 opacity-60 bg-gray-50/80'
+                      : 'border-app-outline-variant/30 hover:border-app-primary/40 hover:-translate-y-0.5 hover:shadow-md'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3 mb-3">
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="text-[12px] font-mono px-2 py-0.5 rounded bg-app-surface-container font-semibold text-app-on-surface-variant">
+                        <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-app-surface-container font-semibold text-app-on-surface-variant border border-app-outline-variant/10">
                           {device.deviceId}
                         </span>
                         <span
-                          className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                          className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1.5 ${
                             device.connectionStatus === 'ONLINE'
-                              ? 'bg-emerald-100 text-emerald-800'
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
                               : device.connectionStatus === 'OFFLINE'
-                                ? 'bg-rose-100 text-rose-800'
+                                ? 'bg-rose-50 text-rose-700 border border-rose-200/60'
                                 : device.connectionStatus === 'STALE'
-                                  ? 'bg-amber-100 text-amber-800'
-                                  : 'bg-gray-200 text-gray-700'
+                                  ? 'bg-amber-50 text-amber-700 border border-amber-200/60'
+                                  : 'bg-gray-100 text-gray-700 border border-gray-200/60'
                           }`}
                         >
+                          {device.connectionStatus === 'ONLINE' && (
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          )}
                           {device.connectionStatus}
                         </span>
                       </div>
-                      <h3 className="text-[18px] font-bold text-app-primary mt-1">{device.name}</h3>
+                      <h3 className="text-[18px] font-bold text-app-primary mt-1.5 tracking-tight">
+                        {device.name}
+                      </h3>
                     </div>
 
                     {isOwner && (
@@ -467,7 +490,7 @@ export default function DeviceRegistryPage() {
                               setEditName(device.name);
                               setEditModalOpen(true);
                             }}
-                            className="p-1.5 rounded-lg hover:bg-app-surface-container text-app-on-surface-variant"
+                            className="p-1.5 rounded-lg hover:bg-app-surface-container text-app-on-surface-variant transition-colors active:scale-95"
                             title="Edit Perangkat"
                           >
                             <Edit2 size={16} />
@@ -479,7 +502,7 @@ export default function DeviceRegistryPage() {
                               setDeactivateDevice(device);
                               setDeactivateModalOpen(true);
                             }}
-                            className="p-1.5 rounded-lg hover:bg-amber-50 text-amber-700"
+                            className="p-1.5 rounded-lg hover:bg-amber-50 text-amber-700 transition-colors active:scale-95"
                             title="Nonaktifkan Perangkat"
                           >
                             <PowerOff size={16} />
@@ -491,7 +514,7 @@ export default function DeviceRegistryPage() {
                             setDeleteConfirmedChecked(false);
                             setDeleteModalOpen(true);
                           }}
-                          className="p-1.5 rounded-lg hover:bg-rose-50 text-rose-600"
+                          className="p-1.5 rounded-lg hover:bg-rose-50 text-rose-600 transition-colors active:scale-95"
                           title="Hapus Perangkat Permanen"
                         >
                           <X size={16} />
@@ -503,7 +526,7 @@ export default function DeviceRegistryPage() {
                   <div className="space-y-2 text-[13px] text-app-on-surface-variant border-t border-app-outline-variant/20 pt-3">
                     <div className="flex items-center justify-between">
                       <span className="flex items-center gap-1.5">
-                        <Sliders size={14} />
+                        <Sliders size={14} className="text-app-outline" />
                         Tipe:
                       </span>
                       <span className="font-semibold text-app-on-surface">{device.deviceType}</span>
@@ -511,7 +534,7 @@ export default function DeviceRegistryPage() {
 
                     <div className="flex items-center justify-between">
                       <span className="flex items-center gap-1.5">
-                        <Clock size={14} />
+                        <Clock size={14} className="text-app-outline" />
                         Terakhir Terlihat:
                       </span>
                       <span>
@@ -521,23 +544,71 @@ export default function DeviceRegistryPage() {
                       </span>
                     </div>
 
-                    {device.capabilities.length > 0 && (
-                      <div className="pt-2">
-                        <span className="text-[11px] font-semibold text-app-outline block mb-1">
-                          Kapabilitas:
-                        </span>
-                        <div className="flex flex-wrap gap-1">
-                          {device.capabilities.map((cap) => (
-                            <span
-                              key={cap}
-                              className="text-[10px] bg-app-surface-container px-2 py-0.5 rounded font-mono text-app-on-surface"
-                            >
-                              {cap}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                    {device.capabilities.length > 0 &&
+                      (() => {
+                        const monitoringCaps = device.capabilities.filter(
+                          (c) => c !== 'FAUCET_CONTROL'
+                        );
+                        const controlCaps = device.capabilities.filter(
+                          (c) => c === 'FAUCET_CONTROL'
+                        );
+
+                        const formatCap = (cap: string) => {
+                          switch (cap) {
+                            case 'FAUCET_CONTROL':
+                              return 'Irrigation Valve Control';
+                            case 'WATER_TANK_VOLUME':
+                              return 'Water Tank Volume (L)';
+                            case 'WATER_FLOW_RATE':
+                              return 'Water Flow Rate (m³/h)';
+                            case 'WATER_TDS':
+                              return 'Water TDS (ppm)';
+                            default:
+                              return cap;
+                          }
+                        };
+
+                        return (
+                          <div className="pt-2 space-y-2.5">
+                            {monitoringCaps.length > 0 && (
+                              <div>
+                                <span className="text-[11px] font-bold text-app-outline uppercase tracking-wider block mb-1">
+                                  Pemantauan (Monitoring):
+                                </span>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {monitoringCaps.map((cap) => (
+                                    <span
+                                      key={cap}
+                                      className="text-[10px] bg-app-surface-container px-2 py-0.5 rounded-md font-mono text-app-on-surface border border-app-outline-variant/10 shadow-2xs"
+                                    >
+                                      {formatCap(cap)}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {controlCaps.length > 0 && (
+                              <div>
+                                <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block mb-1">
+                                  Kontrol (Control):
+                                </span>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {controlCaps.map((cap) => (
+                                    <span
+                                      key={cap}
+                                      className="text-[10px] bg-emerald-50 text-emerald-800 border border-emerald-200/80 px-2.5 py-0.5 rounded-md font-mono font-bold flex items-center gap-1 shadow-2xs"
+                                    >
+                                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                      {formatCap(cap)}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                   </div>
                 </div>
               );
@@ -556,14 +627,14 @@ export default function DeviceRegistryPage() {
               <button
                 disabled={pagination.page <= 1}
                 onClick={() => fetchDevices(pagination.page - 1)}
-                className="p-2 rounded-lg border border-app-outline-variant/40 hover:bg-app-surface-container disabled:opacity-40"
+                className="p-2 rounded-lg border border-app-outline-variant/40 hover:bg-app-surface-container disabled:opacity-40 transition-colors"
               >
                 <ChevronLeft size={18} />
               </button>
               <button
                 disabled={pagination.page >= pagination.totalPages}
                 onClick={() => fetchDevices(pagination.page + 1)}
-                className="p-2 rounded-lg border border-app-outline-variant/40 hover:bg-app-surface-container disabled:opacity-40"
+                className="p-2 rounded-lg border border-app-outline-variant/40 hover:bg-app-surface-container disabled:opacity-40 transition-colors"
               >
                 <ChevronRight size={18} />
               </button>
@@ -651,11 +722,10 @@ export default function DeviceRegistryPage() {
                     </ul>
                     <div className="pt-1.5 border-t border-app-outline-variant/20">
                       <span className="font-bold text-app-primary block mb-0.5">
-                        Kontrol Perangkat keras:
+                        Kapabilitas Kontrol:
                       </span>
                       <ul className="space-y-0.5 text-app-on-surface-variant font-mono">
-                        <li>• Solenoid Valve</li>
-                        <li>• Relay</li>
+                        <li>• Irrigation Valve Control (FAUCET_CONTROL)</li>
                       </ul>
                     </div>
                   </div>

@@ -48,10 +48,54 @@ export const WATER_TANK_NODE_MONITORING_PARAMETERS = [
   'WATER_FLOW_RATE',
 ] as const;
 
-export const WATER_TANK_NODE_CONTROL_CAPABILITIES = [
-  'SOLENOID_VALVE_CONTROL',
-  'RELAY_CONTROL',
-] as const;
+export const WATER_TANK_NODE_CONTROL_CAPABILITIES = ['FAUCET_CONTROL'] as const;
+
+export enum CapabilityCategory {
+  MONITORING = 'MONITORING',
+  CONTROL = 'CONTROL',
+}
+
+/**
+ * Classifies a capability into MONITORING or CONTROL.
+ */
+export function getCapabilityCategory(capability: string): CapabilityCategory {
+  if (capability === 'FAUCET_CONTROL') {
+    return CapabilityCategory.CONTROL;
+  }
+  return CapabilityCategory.MONITORING;
+}
+
+/**
+ * Feature detection helper to check if a device supports an active, enabled capability.
+ * Returns false if capability is missing or if enabled === false.
+ */
+export function supportsCapability(
+  device:
+    | {
+        capabilities?: string[] | { capability: string; enabled?: boolean }[];
+      }
+    | null
+    | undefined,
+  capability: string
+): boolean {
+  if (!device || !device.capabilities || !Array.isArray(device.capabilities)) {
+    return false;
+  }
+
+  for (const item of device.capabilities) {
+    if (typeof item === 'string') {
+      if (item === capability) {
+        return true;
+      }
+    } else if (item && typeof item === 'object' && 'capability' in item) {
+      if (item.capability === capability) {
+        return item.enabled !== false;
+      }
+    }
+  }
+
+  return false;
+}
 
 /**
  * Derives the canonical capability list for a given device type.

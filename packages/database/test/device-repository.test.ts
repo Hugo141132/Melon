@@ -260,4 +260,89 @@ describe('DeviceRepository Unit Tests (TASK-0302)', () => {
       );
     });
   });
+
+  describe('reconcileDeviceCapabilities & updateDevice', () => {
+    it('reconciles WATER_TANK_NODE to exactly WATER_TANK_VOLUME, WATER_FLOW_RATE, and FAUCET_CONTROL', async () => {
+      const mockDevice = {
+        id: 'tank-device-id',
+        deviceId: 'water-tank-001',
+        deviceType: 'WATER_TANK_NODE',
+        capabilities: [
+          { id: 'c1', capability: 'RELAY_CONTROL', enabled: true },
+          { id: 'c2', capability: 'SOLENOID_VALVE_CONTROL', enabled: true },
+          { id: 'c3', capability: 'WATER_TANK_VOLUME', enabled: true },
+        ],
+      };
+
+      mockPrisma.device.findUnique.mockResolvedValue(mockDevice);
+      mockPrisma.deviceCapability = {
+        deleteMany: vi.fn().mockResolvedValue({ count: 2 }),
+        createMany: vi.fn().mockResolvedValue({ count: 2 }),
+      };
+
+      await repo.reconcileDeviceCapabilities('tank-device-id');
+
+      // Obsolete RELAY_CONTROL and SOLENOID_VALVE_CONTROL should be deleted
+      expect(mockPrisma.deviceCapability.deleteMany).toHaveBeenCalledWith({
+        where: { id: { in: ['c1', 'c2'] } },
+      });
+
+      // Missing WATER_FLOW_RATE and FAUCET_CONTROL should be created
+      expect(mockPrisma.deviceCapability.createMany).toHaveBeenCalledWith({
+        data: expect.arrayContaining([
+          {
+            deviceId: 'tank-device-id',
+            capability: 'WATER_FLOW_RATE',
+            enabled: true,
+            source: 'PROVISIONED',
+          },
+          {
+            deviceId: 'tank-device-id',
+            capability: 'FAUCET_CONTROL',
+            enabled: true,
+            source: 'PROVISIONED',
+          },
+        ]),
+        skipDuplicates: true,
+      });
+    });
+
+    it('atomically reconciles capabilities when deviceType is updated', async () => {
+      const existingDevice = {
+        id: 'device-id-123',
+        deviceId: 'node-123',
+        name: 'Node 123',
+        deviceType: 'SOIL_NODE',
+        accountStatus: 'ACTIVE',
+        capabilities: [{ id: 'c1', capability: 'SOIL_NITROGEN', enabled: true }],
+      };
+
+      mockPrisma.device.findFirst.mockResolvedValue(existingDevice);
+      mockPrisma.device.findUnique.mockResolvedValue(existingDevice);
+
+      const updatedDevice = {
+        ...existingDevice,
+        deviceType: 'WATER_QUALITY_NODE',
+      };
+
+      mockPrisma.device.update.mockResolvedValue(updatedDevice);
+      mockPrisma.deviceCapability = {
+        deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
+        createMany: vi.fn().mockResolvedValue({ count: 3 }),
+      };
+
+      vi.spyOn(repo, 'reconcileDeviceCapabilities').mockImplementation(async () => {});
+
+      await repo.updateDevice(
+        'node-123',
+        { deviceType: DeviceType.WATER_QUALITY_NODE },
+        'owner-id'
+      );
+
+      expect(repo.reconcileDeviceCapabilities).toHaveBeenCalledWith(
+        'device-id-123',
+        expect.anything()
+      );
+    });
+  });
 });

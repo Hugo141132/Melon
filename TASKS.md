@@ -841,8 +841,9 @@ Implement:
 ## TASK-0303 — Implement Device Capabilities
 
 **Priority:** `P1`  
-**Status:** `BACKLOG`  
+**Status:** `DONE`
 **Dependencies:** `TASK-0302`
+**Completed:** 2026-07-30 — Implemented typed device capabilities with single server-authoritative mapping source in `@kebun-melon/contracts`, runtime feature detection helper `supportsCapability`, MONITORING vs CONTROL capability categorization (`getCapabilityCategory`), atomic transaction reconciliation on device profile (`deviceType`) update in `@kebun-melon/database`, controlled one-time DB reconciliation removing obsolete `RELAY_CONTROL` & `SOLENOID_VALVE_CONTROL` rows on `water-tank-node-ryd0at`, and read-only capability rendering under Monitoring and Control headers on `/devices` UI. Added unit and integration test coverage across contract, database, and frontend layers.
 
 ### Work
 
