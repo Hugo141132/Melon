@@ -332,3 +332,29 @@ export async function revokeSession(
 
   return true;
 }
+
+/**
+ * Revokes all non-revoked sessions for a specific target user.
+ * Accepts either a PrismaClient or a Prisma Transaction client.
+ */
+export async function revokeAllUserSessions(
+  db: PrismaClient | any,
+  userId: string
+): Promise<number> {
+  if (!userId || typeof userId !== 'string') {
+    return 0;
+  }
+
+  const now = new Date();
+  const updateResult = await db.session.updateMany({
+    where: {
+      userId,
+      revokedAt: null,
+    },
+    data: {
+      revokedAt: now,
+    },
+  });
+
+  return updateResult.count;
+}

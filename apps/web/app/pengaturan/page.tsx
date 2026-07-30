@@ -8,6 +8,7 @@ import BottomNav from '@/components/navigation/BottomNav';
 import { USER_PROFILE } from '@/lib/constants';
 import {
   User as UserIcon,
+  Users as UsersIcon,
   ChevronRight,
   Bell,
   Settings2,
@@ -120,15 +121,24 @@ export default function PengaturanPage() {
             href="/profil"
           />
 
-          {/* Persetujuan Admin navigation item - visible ONLY to OWNER */}
+          {/* Owner-only navigation items */}
           {user?.role === 'OWNER' && (
-            <SettingItem
-              icon={<ShieldCheck size={22} className="text-emerald-700" />}
-              iconBg="bg-emerald-100"
-              title="Persetujuan Admin"
-              subtitle="Kelola persetujuan registrasi Admin"
-              href="/approvals"
-            />
+            <>
+              <SettingItem
+                icon={<UsersIcon size={22} className="text-blue-700" />}
+                iconBg="bg-blue-100"
+                title="Manajemen Pengguna"
+                subtitle="Kelola status dan profil pengguna"
+                href="/users"
+              />
+              <SettingItem
+                icon={<ShieldCheck size={22} className="text-emerald-700" />}
+                iconBg="bg-emerald-100"
+                title="Persetujuan Admin"
+                subtitle="Kelola persetujuan registrasi Admin"
+                href="/approvals"
+              />
+            </>
           )}
 
           <SettingItem

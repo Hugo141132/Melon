@@ -120,15 +120,14 @@ TIMESTAMPTZ
 
 The application shall display timestamps according to the active locale and timezone.
 
-### 3.5 Soft Deletion
+### 3.5 Deletion and Soft Deactivation Policies
 
-Security-sensitive and historical records shall not be hard-deleted through normal application functions.
+Security-sensitive and historical records (audit logs, telemetry history) shall not be arbitrarily deleted.
 
-Soft deletion or deactivation shall be used for:
+Deletion policies:
 
-- Users.
-- Devices.
-- Device assignments, where historical reconstruction matters.
+- Owner-initiated Admin Account Deletion (`DELETE /api/v1/users/{userId}`): Permanently hard-deletes the target Admin user row and account-owned dependent records (`sessions`, `user_roles`, `user_preferences`, `user_device_access`, `account_approvals`, `faucet_commands`) inside a single database transaction, while anonymizing `actorUserId` in existing audit logs and recording an `account.deleted` audit event.
+- Devices and Device assignments: Soft deletion or deactivation is used where historical telemetry reconstruction matters.
 
 Telemetry and audit records shall follow retention policies rather than user-triggered deletion.
 

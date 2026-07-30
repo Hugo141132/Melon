@@ -196,3 +196,44 @@ export const PendingApprovalsQueryInputSchema = z.object({
 });
 
 export type PendingApprovalsQueryInput = z.infer<typeof PendingApprovalsQueryInputSchema>;
+
+/**
+ * Schema for updating profile data of another user by Owner.
+ * EXCLUDES email (strictly READ-ONLY), role, accountStatus, passwordHash, sessionTokenHash, etc.
+ * Uses z.object().strict() to reject unknown or forbidden properties.
+ */
+export const OwnerUserProfileUpdateInputSchema = z
+  .object({
+    fullName: z.string().min(1, 'Full name cannot be empty.').max(150).optional(),
+    username: z.string().min(1).max(100).nullable().optional(),
+  })
+  .strict();
+
+export type OwnerUserProfileUpdateInput = z.infer<typeof OwnerUserProfileUpdateInputSchema>;
+
+/**
+ * Schema for querying user management list by Owner.
+ */
+export const UserQueryInputSchema = z.object({
+  page: z.number().int().min(1).default(1),
+  pageSize: z.number().int().min(1).max(100).default(20),
+  role: UserRoleSchema.optional(),
+  accountStatus: AccountStatusSchema.optional(),
+  search: z.string().optional(),
+  sort: z
+    .enum(['createdAt:asc', 'createdAt:desc', 'fullName:asc', 'fullName:desc'])
+    .default('createdAt:desc'),
+});
+
+export type UserQueryInput = z.infer<typeof UserQueryInputSchema>;
+
+/**
+ * Schema for user lifecycle actions (suspend, deactivate, activate) with an optional reason.
+ */
+export const UserLifecycleActionInputSchema = z
+  .object({
+    reason: z.string().max(500).optional(),
+  })
+  .strict();
+
+export type UserLifecycleActionInput = z.infer<typeof UserLifecycleActionInputSchema>;

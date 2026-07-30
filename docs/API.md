@@ -859,20 +859,41 @@ Status: `TBD`, depending on the final `APPROVED` and `ACTIVE` workflow.
 
 ---
 
-## 12.6 Deactivate User
+## 12.6 Permanent Delete User Account
 
 ```http
-POST /api/v1/users/{userId}/deactivate
+DELETE /api/v1/users/{userId}
 ```
 
 **Authentication:** Required  
-**Permission:** `account.deactivate`
+**Permission:** `account.deactivate` (or `account.delete`)
+
+**Rules:**
+- Owner-only endpoint.
+- Target must be an `ADMIN` account in `ACTIVE`, `SUSPENDED`, `REJECTED`, `DEACTIVATED`, or legacy `APPROVED` status.
+- Deletion of `PENDING_APPROVAL` accounts is rejected with `409 CANNOT_DELETE_PENDING_APPROVAL`. (Pending accounts must be processed via the approval workflow).
+- Deletion of `OWNER` accounts or self-deletion is strictly forbidden (`403 FORBIDDEN_TARGET`).
+- Transactionally deletes all dependent records (`sessions`, `user_roles`, `user_preferences`, `user_device_access`, `account_approvals`, `faucet_commands`), anonymizes `actorUserId` in `audit_logs`, logs an `account.deleted` audit event, and hard-deletes the `users` database row.
 
 Request:
 
 ```json
 {
   "reason": "Account no longer required"
+}
+```
+
+Response:
+
+```json
+{
+  "success": true,
+  "data": {
+    "deletedUserId": "user-002"
+  },
+  "meta": {
+    "requestId": "req-01JXYZ001"
+  }
 }
 ```
 

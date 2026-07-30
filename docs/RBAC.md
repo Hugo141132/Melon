@@ -320,8 +320,8 @@ A deactivated account shall:
 
 - Be denied protected access.
 - Lose access through existing sessions.
-- Remain in historical records for audit purposes.
-- Not be physically deleted when deletion would break audit integrity.
+- Remain in historical records for audit purposes where soft-deactivated.
+- When an Owner explicitly executes the 'Delete Account' action on an eligible Admin, permanent hard deletion (`DELETE /api/v1/users/{userId}`) removes the user row and account-owned records from the database in a transaction, leaving an `account.deleted` audit event with anonymized actor references.
 
 ---
 

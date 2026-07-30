@@ -139,12 +139,12 @@ describe('TASK-0206 Approvals Database Integration & Security Test Suite', () =>
       if (!result.success) return;
 
       expect(result.user.id).toBe(pendingUser.id);
-      expect(result.user.accountStatus).toBe(AccountStatus.APPROVED);
+      expect(result.user.accountStatus).toBe(AccountStatus.ACTIVE);
       expect(notifyCalled).toBe(true);
 
       // Verify DB User account status update
       const dbUser = await prisma.user.findUnique({ where: { id: pendingUser.id } });
-      expect(dbUser?.accountStatus).toBe(AccountStatus.APPROVED);
+      expect(dbUser?.accountStatus).toBe(AccountStatus.ACTIVE);
 
       // Verify AccountApproval history record
       const approvalHistory = await prisma.accountApproval.findUnique({
@@ -155,7 +155,7 @@ describe('TASK-0206 Approvals Database Integration & Security Test Suite', () =>
       expect(approvalHistory?.decidedByUserId).toBe(ownerUser.id);
       expect(approvalHistory?.decision).toBe('APPROVE');
       expect(approvalHistory?.previousStatus).toBe(AccountStatus.PENDING_APPROVAL);
-      expect(approvalHistory?.newStatus).toBe(AccountStatus.APPROVED);
+      expect(approvalHistory?.newStatus).toBe(AccountStatus.ACTIVE);
       expect(approvalHistory?.decisionNote).toBe('Verified identity and credentials');
 
       // Verify AuditLog record and audit secrecy (no password hashes or secrets in values/metadata)
@@ -174,7 +174,7 @@ describe('TASK-0206 Approvals Database Integration & Security Test Suite', () =>
       expect(auditString).not.toContain('dummyhash');
     });
 
-    it('rejects approval with CONFLICT / INVALID_STATUS if target is already APPROVED or REJECTED', async () => {
+    it('rejects approval with CONFLICT / INVALID_STATUS if target is already ACTIVE or REJECTED', async () => {
       const ownerUser = await prisma.user.create({
         data: {
           fullName: 'Owner User',
@@ -186,10 +186,10 @@ describe('TASK-0206 Approvals Database Integration & Security Test Suite', () =>
 
       const approvedUser = await prisma.user.create({
         data: {
-          fullName: 'Already Approved Admin',
+          fullName: 'Already Active Admin',
           email: 'admin.approved@example.com',
           passwordHash: '$argon2id$v=19$m=65536,t=3,p=4$dummyhashapp',
-          accountStatus: AccountStatus.APPROVED,
+          accountStatus: AccountStatus.ACTIVE,
         },
       });
 
@@ -201,7 +201,7 @@ describe('TASK-0206 Approvals Database Integration & Security Test Suite', () =>
       expect(result.success).toBe(false);
       if (result.success) return;
       expect(result.error).toBe('INVALID_STATUS');
-      expect(result.currentStatus).toBe(AccountStatus.APPROVED);
+      expect(result.currentStatus).toBe(AccountStatus.ACTIVE);
 
       // Verify no new AccountApproval record created
       const approvals = await prisma.accountApproval.findMany({
@@ -243,7 +243,7 @@ describe('TASK-0206 Approvals Database Integration & Security Test Suite', () =>
       if (!result.success) return;
 
       const dbUser = await prisma.user.findUnique({ where: { id: pendingUser.id } });
-      expect(dbUser?.accountStatus).toBe(AccountStatus.APPROVED);
+      expect(dbUser?.accountStatus).toBe(AccountStatus.ACTIVE);
     });
 
     it('handles two concurrent approval requests producing exactly 1 success, 1 conflict, 1 AccountApproval record, and 1 AuditLog', async () => {
@@ -284,9 +284,9 @@ describe('TASK-0206 Approvals Database Integration & Security Test Suite', () =>
       expect(successes.length).toBe(1);
       expect(failures.length).toBe(1);
 
-      // Verify DB User is APPROVED
+      // Verify DB User is ACTIVE
       const dbUser = await prisma.user.findUnique({ where: { id: pendingUser.id } });
-      expect(dbUser?.accountStatus).toBe(AccountStatus.APPROVED);
+      expect(dbUser?.accountStatus).toBe(AccountStatus.ACTIVE);
 
       // Verify exactly 1 AccountApproval record
       const approvalRecords = await prisma.accountApproval.findMany({

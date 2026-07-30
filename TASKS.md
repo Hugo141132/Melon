@@ -760,25 +760,31 @@ PATCH /api/v1/me
 ## TASK-0212 — Implement Owner User Management
 
 **Priority:** `P1`  
-**Status:** `BACKLOG`  
+**Status:** `DONE`
 **Dependencies:** `TASK-0209`
 
 ### Work
 
-Implement:
-
-- User list.
-- User detail.
-- Permitted profile edit.
-- Suspension.
-- Deactivation.
-- Activation, if approved.
+Implemented complete Owner User Management:
+- Paginated user list & user details with strict Owner RBAC authorization (`account.read`, `account.update`, `account.suspend`, `account.activate`, `account.deactivate`).
+- Admin listing excluding soft-deleted accounts by default.
+- Permitted profile editing strictly allowlisting `fullName` and `username` (`email` read-only).
+- Account suspension (`POST /api/v1/users/{userId}/suspend`) and reactivation (`POST /api/v1/users/{userId}/activate`).
+- Permanent account hard deletion (`DELETE /api/v1/users/{userId}`) for eligible ADMIN accounts (`ACTIVE`, `SUSPENDED`, `REJECTED`, `DEACTIVATED`, `APPROVED`), excluding `PENDING_APPROVAL` accounts (`409 CANNOT_DELETE_PENDING_APPROVAL`).
+- OWNER account deletion protection (`403 FORBIDDEN_TARGET`).
+- Transactional deletion of `users` row and all dependent records (`sessions`, `user_roles`, `user_preferences`, `user_device_access`, `account_approvals`, `faucet_commands`, `alert_acknowledgements`).
+- Anonymization of historical audit log `actorUserId` to NULL and non-PII `account.deleted` audit log event creation.
+- Checkbox + modal UX for account deletion on `/users` with double-submission protection and immediate local state removal.
+- Filter cleanup on `/users` omitting `APPROVED` and `DEACTIVATED`.
 
 ### Acceptance Criteria
 
-- Admin cannot call endpoints.
-- Immutable and secret fields cannot be edited.
-- Status changes revoke sessions.
+- Admin cannot call user management endpoints (`403 INSUFFICIENT_PERMISSION`).
+- Immutable and secret fields cannot be edited (`email`, `role`, `accountStatus`, `passwordHash` strictly protected).
+- Status changes and permanent deletion revoke all target active sessions.
+- Account deletion executes transactional hard-delete of `users` row and account-owned dependent records, and logs non-PII `account.deleted` audit event.
+- `PENDING_APPROVAL` accounts cannot be deleted directly (rejected with `409 CANNOT_DELETE_PENDING_APPROVAL`).
+- `OWNER` accounts cannot be deleted or suspended (`403 FORBIDDEN_TARGET`).
 - Actions are audited.
 
 ---

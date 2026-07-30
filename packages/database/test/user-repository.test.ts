@@ -124,4 +124,82 @@ describe('UserRepository Unit Tests', () => {
       },
     });
   });
+
+  it('deleteUserPermanently creates account.deleted audit log containing strictly NO PII', async () => {
+    const targetId = '10000000-0000-0000-0000-000000000002';
+    const actorId = '10000000-0000-0000-0000-000000000001';
+    const mockAuditLogCreate = vi.fn().mockResolvedValue({ id: 'audit-1' });
+
+    const mockTx = {
+      session: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
+      userPreference: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
+      userRoleAssignment: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
+      accountApproval: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      userDeviceAccess: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      faucetCommand: { findMany: vi.fn().mockResolvedValue([]), deleteMany: vi.fn() },
+      faucetCommandEvent: { deleteMany: vi.fn() },
+      alertAcknowledgement: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      auditLog: { updateMany: vi.fn().mockResolvedValue({ count: 0 }), create: mockAuditLogCreate },
+      user: { delete: vi.fn().mockResolvedValue({ id: targetId }) },
+    };
+
+    const mockPrismaClient: any = {
+      user: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: targetId,
+          fullName: 'Sensitive Target Admin',
+          email: 'sensitive.admin@test.com',
+          username: 'sensitiveadmin',
+          accountStatus: 'ACTIVE',
+          emailVerifiedAt: null,
+          lastLoginAt: null,
+          suspendedAt: null,
+          deactivatedAt: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          userRoles: [
+            {
+              id: 'ur1',
+              userId: targetId,
+              roleId: 'r1',
+              assignedByUserId: actorId,
+              assignedAt: new Date(),
+              revokedAt: null,
+              role: { code: 'ADMIN' },
+            },
+          ],
+        }),
+      },
+      userRoleAssignment: {
+        findMany: vi.fn().mockResolvedValue([{ role: { code: 'ADMIN' } }]),
+      },
+      $transaction: vi.fn().mockImplementation((cb: any) => cb(mockTx)),
+    };
+
+    const repo = new UserRepository(mockPrismaClient);
+    const result = await repo.deleteUserPermanently({
+      targetUserId: targetId,
+      actorUserId: actorId,
+      reason: 'Privacy verification test',
+    });
+
+    expect(result.success).toBe(true);
+
+    // Verify audit log creation call arguments contain NO PII
+    expect(mockAuditLogCreate).toHaveBeenCalledTimes(1);
+    const auditArg = mockAuditLogCreate.mock.calls[0][0].data;
+
+    expect(auditArg.eventKey).toBe('account.deleted');
+    expect(auditArg.actorUserId).toBe(actorId);
+    expect(auditArg.targetId).toBe(targetId);
+
+    // Assert strictly NO PII in previousValues or metadata
+    const prevValues = auditArg.previousValues;
+    expect(prevValues).not.toHaveProperty('email');
+    expect(prevValues).not.toHaveProperty('fullName');
+    expect(prevValues).not.toHaveProperty('username');
+    expect(prevValues).not.toHaveProperty('passwordHash');
+    expect(prevValues).not.toHaveProperty('sessionToken');
+    expect(prevValues).not.toHaveProperty('secret');
+  });
 });

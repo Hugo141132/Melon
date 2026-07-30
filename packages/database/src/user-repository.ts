@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 import {
   AccountStatus,
   UserRole as ContractUserRole,
@@ -6,7 +6,49 @@ import {
   toPublicSafeUserDto,
   normaliseEmail,
   RawDbUserWithRoles,
+  OwnerUserProfileUpdateInput,
 } from '@kebun-melon/contracts';
+import { revokeAllUserSessions } from './session-service';
+
+export interface UpdateOtherUserProfileInput {
+  targetUserId: string;
+  actorUserId: string;
+  data: OwnerUserProfileUpdateInput;
+  requestId?: string;
+  ipAddress?: string;
+  userAgent?: string;
+}
+
+export type UpdateOtherUserProfileResult =
+  | { success: true; user: PublicSafeUserDto }
+  | {
+      success: false;
+      error: 'USER_NOT_FOUND' | 'FORBIDDEN_TARGET' | 'CONCURRENCY_CONFLICT' | 'INTERNAL_ERROR';
+      message: string;
+    };
+
+export interface UserLifecycleInput {
+  targetUserId: string;
+  actorUserId: string;
+  reason?: string;
+  requestId?: string;
+  ipAddress?: string;
+  userAgent?: string;
+}
+
+export type UserLifecycleResult =
+  | { success: true; user: PublicSafeUserDto }
+  | {
+      success: false;
+      error:
+        | 'USER_NOT_FOUND'
+        | 'FORBIDDEN_TARGET'
+        | 'INVALID_STATUS_TRANSITION'
+        | 'LAST_OWNER_PROTECTION'
+        | 'INTERNAL_ERROR';
+      message: string;
+      currentStatus?: AccountStatus;
+    };
 
 export interface ApproveAdminInput {
   targetUserId: string;
@@ -775,6 +817,651 @@ export class UserRepository {
         success: false,
         error: 'INTERNAL_ERROR',
         message: 'A database transaction error occurred during profile update.',
+      };
+    }
+  }
+
+  /**
+   * Retrieves a paginated list of users for Owner user-management.
+   * EXCLUDES passwordHash, sessionTokenHash, and secrets.
+   */
+  async getUsers(options?: {
+    page?: number;
+    pageSize?: number;
+    role?: ContractUserRole;
+    accountStatus?: AccountStatus;
+    search?: string;
+    sort?: 'createdAt:asc' | 'createdAt:desc' | 'fullName:asc' | 'fullName:desc';
+  }): Promise<{
+    items: PublicSafeUserDto[];
+    pagination: {
+      page: number;
+      pageSize: number;
+      totalItems: number;
+      totalPages: number;
+    };
+  }> {
+    const page = Math.max(1, options?.page ?? 1);
+    const pageSize = Math.min(100, Math.max(1, options?.pageSize ?? 20));
+    const skip = (page - 1) * pageSize;
+    const search = options?.search?.trim();
+    const sort = options?.sort ?? 'createdAt:desc';
+
+    const where: any = {};
+
+    if (options?.accountStatus) {
+      where.accountStatus = options.accountStatus;
+    } else {
+      where.accountStatus = { not: AccountStatus.DEACTIVATED };
+    }
+
+    if (options?.role) {
+      where.userRoles = {
+        some: {
+          revokedAt: null,
+          role: { code: options.role },
+        },
+      };
+    }
+
+    if (search) {
+      where.OR = [
+        { fullName: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
+        { username: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    let orderBy: any = { createdAt: 'desc' };
+    if (sort === 'createdAt:asc') orderBy = { createdAt: 'asc' };
+    else if (sort === 'fullName:asc') orderBy = { fullName: 'asc' };
+    else if (sort === 'fullName:desc') orderBy = { fullName: 'desc' };
+
+    const selectFields = {
+      id: true,
+      fullName: true,
+      email: true,
+      username: true,
+      accountStatus: true,
+      emailVerifiedAt: true,
+      lastLoginAt: true,
+      suspendedAt: true,
+      deactivatedAt: true,
+      createdAt: true,
+      updatedAt: true,
+      userRoles: {
+        where: { revokedAt: null },
+        select: {
+          id: true,
+          userId: true,
+          roleId: true,
+          assignedByUserId: true,
+          assignedAt: true,
+          revokedAt: true,
+          role: { select: { code: true } },
+        },
+      },
+    };
+
+    const [users, totalItems] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        select: selectFields,
+        orderBy,
+        skip,
+        take: pageSize,
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+
+    const items = users.map((u) => toPublicSafeUserDto(this.mapPrismaUserToRawDbUser(u)));
+    const totalPages = Math.ceil(totalItems / pageSize) || 1;
+
+    return {
+      items,
+      pagination: {
+        page,
+        pageSize,
+        totalItems,
+        totalPages,
+      },
+    };
+  }
+
+  /**
+   * Retrieves a single user for Owner management view.
+   * EXCLUDES passwordHash, sessionTokenHash, and secrets.
+   */
+  async getUserManagementById(userId: string): Promise<PublicSafeUserDto | null> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        username: true,
+        accountStatus: true,
+        emailVerifiedAt: true,
+        lastLoginAt: true,
+        suspendedAt: true,
+        deactivatedAt: true,
+        createdAt: true,
+        updatedAt: true,
+        userRoles: {
+          where: { revokedAt: null },
+          select: {
+            id: true,
+            userId: true,
+            roleId: true,
+            assignedByUserId: true,
+            assignedAt: true,
+            revokedAt: true,
+            role: { select: { code: true } },
+          },
+        },
+      },
+    });
+
+    if (!user) return null;
+
+    return toPublicSafeUserDto(this.mapPrismaUserToRawDbUser(user));
+  }
+
+  /**
+   * Updates another user's profile (fullName and/or username).
+   * Email is strictly READ-ONLY.
+   * Owner profiles cannot be edited through this endpoint.
+   */
+  async updateOtherUserProfile(
+    input: UpdateOtherUserProfileInput
+  ): Promise<UpdateOtherUserProfileResult> {
+    try {
+      const targetUser = await this.findUserById(input.targetUserId);
+      if (!targetUser) {
+        return {
+          success: false,
+          error: 'USER_NOT_FOUND',
+          message: `Target user with ID '${input.targetUserId}' does not exist.`,
+        };
+      }
+
+      if (targetUser.activeRoles.includes(ContractUserRole.OWNER)) {
+        return {
+          success: false,
+          error: 'FORBIDDEN_TARGET',
+          message: 'Owner profiles cannot be edited through this endpoint.',
+        };
+      }
+
+      const updateData: { fullName?: string; username?: string | null } = {};
+      if (input.data.fullName !== undefined) updateData.fullName = input.data.fullName.trim();
+      if (input.data.username !== undefined)
+        updateData.username = input.data.username ? input.data.username.trim() : null;
+
+      const previousValues = {
+        fullName: targetUser.fullName,
+        username: targetUser.username,
+      };
+
+      const result = await this.prisma.$transaction(
+        async (tx) => {
+          const updated = await tx.user.update({
+            where: { id: input.targetUserId },
+            data: updateData,
+            select: {
+              id: true,
+              fullName: true,
+              email: true,
+              username: true,
+              accountStatus: true,
+              emailVerifiedAt: true,
+              lastLoginAt: true,
+              suspendedAt: true,
+              deactivatedAt: true,
+              createdAt: true,
+              updatedAt: true,
+              userRoles: {
+                where: { revokedAt: null },
+                select: {
+                  id: true,
+                  userId: true,
+                  roleId: true,
+                  assignedByUserId: true,
+                  assignedAt: true,
+                  revokedAt: true,
+                  role: { select: { code: true } },
+                },
+              },
+            },
+          });
+
+          await tx.auditLog.create({
+            data: {
+              eventKey: 'profile.other.updated',
+              actorUserId: input.actorUserId,
+              targetType: 'USER',
+              targetId: input.targetUserId,
+              result: 'SUCCESS',
+              previousValues,
+              newValues: updateData,
+              requestId: input.requestId || null,
+              ipAddress: input.ipAddress || null,
+              userAgent: input.userAgent || null,
+            },
+          });
+
+          return toPublicSafeUserDto(this.mapPrismaUserToRawDbUser(updated));
+        },
+        { isolationLevel: 'RepeatableRead' }
+      );
+
+      return { success: true, user: result };
+    } catch (error) {
+      return {
+        success: false,
+        error: 'INTERNAL_ERROR',
+        message: 'A database error occurred while updating the target user profile.',
+      };
+    }
+  }
+
+  /**
+   * Transactionally suspends an ACTIVE user account.
+   * Atomically sets accountStatus = SUSPENDED, revokes all sessions, and logs audit event.
+   * Target must be ADMIN (Owner accounts cannot be suspended).
+   */
+  async suspendUser(input: UserLifecycleInput): Promise<UserLifecycleResult> {
+    try {
+      const targetUser = await this.findUserById(input.targetUserId);
+      if (!targetUser) {
+        return {
+          success: false,
+          error: 'USER_NOT_FOUND',
+          message: `Target user with ID '${input.targetUserId}' does not exist.`,
+        };
+      }
+
+      if (
+        targetUser.activeRoles.includes(ContractUserRole.OWNER) ||
+        input.targetUserId === input.actorUserId
+      ) {
+        return {
+          success: false,
+          error: 'FORBIDDEN_TARGET',
+          message: 'Owner accounts cannot be suspended.',
+        };
+      }
+
+      if (targetUser.accountStatus !== AccountStatus.ACTIVE) {
+        return {
+          success: false,
+          error: 'INVALID_STATUS_TRANSITION',
+          message: `Only ACTIVE accounts can be suspended. Current status is ${targetUser.accountStatus}.`,
+          currentStatus: targetUser.accountStatus,
+        };
+      }
+
+      const now = new Date();
+
+      const result = await this.prisma.$transaction(
+        async (tx) => {
+          const updated = await tx.user.update({
+            where: { id: input.targetUserId },
+            data: {
+              accountStatus: AccountStatus.SUSPENDED,
+              suspendedAt: now,
+            },
+            select: {
+              id: true,
+              fullName: true,
+              email: true,
+              username: true,
+              accountStatus: true,
+              emailVerifiedAt: true,
+              lastLoginAt: true,
+              suspendedAt: true,
+              deactivatedAt: true,
+              createdAt: true,
+              updatedAt: true,
+              userRoles: {
+                where: { revokedAt: null },
+                select: {
+                  id: true,
+                  userId: true,
+                  roleId: true,
+                  assignedByUserId: true,
+                  assignedAt: true,
+                  revokedAt: true,
+                  role: { select: { code: true } },
+                },
+              },
+            },
+          });
+
+          // Soft-revoke all sessions for target user atomically inside transaction
+          await revokeAllUserSessions(tx, input.targetUserId);
+
+          // Audit log (strictly without secrets)
+          await tx.auditLog.create({
+            data: {
+              eventKey: 'account.suspended',
+              actorUserId: input.actorUserId,
+              targetType: 'USER',
+              targetId: input.targetUserId,
+              result: 'SUCCESS',
+              previousValues: { accountStatus: targetUser.accountStatus },
+              newValues: { accountStatus: AccountStatus.SUSPENDED, suspendedAt: now },
+              metadata: { reason: input.reason?.trim() || null },
+              requestId: input.requestId || null,
+              ipAddress: input.ipAddress || null,
+              userAgent: input.userAgent || null,
+            },
+          });
+
+          return toPublicSafeUserDto(this.mapPrismaUserToRawDbUser(updated));
+        },
+        { isolationLevel: 'RepeatableRead' }
+      );
+
+      return { success: true, user: result };
+    } catch (error) {
+      return {
+        success: false,
+        error: 'INTERNAL_ERROR',
+        message: 'A database error occurred while suspending the target user.',
+      };
+    }
+  }
+
+  /**
+   * Transactionally deactivates an ACTIVE or SUSPENDED user account.
+   * Atomically sets accountStatus = DEACTIVATED, revokes all sessions, and logs audit event.
+   * Target must be ADMIN (Owner accounts cannot be deactivated).
+   */
+  /**
+   * Deactivates/Deletes an Admin user permanently.
+   */
+  async deactivateUser(input: UserLifecycleInput): Promise<UserLifecycleResult> {
+    const res = await this.deleteUserPermanently(input);
+    if (!res.success) {
+      return {
+        success: false,
+        error: (res.error as any) || 'INTERNAL_ERROR',
+        message: res.message || 'Failed to deactivate user.',
+        currentStatus: res.currentStatus,
+      };
+    }
+    return {
+      success: true,
+      user: {
+        id: input.targetUserId,
+        fullName: '',
+        email: '',
+        username: null,
+        accountStatus: AccountStatus.DEACTIVATED,
+        emailVerifiedAt: null,
+        lastLoginAt: null,
+        suspendedAt: null,
+        deactivatedAt: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        activeRoles: [],
+      },
+    };
+  }
+
+  /**
+   * Permanently deletes an ADMIN user account and all dependent records in a single database transaction.
+   * Target MUST be ADMIN and MUST NOT be PENDING_APPROVAL or OWNER.
+   */
+  async deleteUserPermanently(input: UserLifecycleInput): Promise<{
+    success: boolean;
+    error?: string;
+    message?: string;
+    currentStatus?: AccountStatus;
+  }> {
+    try {
+      const targetUser = await this.getUserManagementById(input.targetUserId);
+      if (!targetUser) {
+        return {
+          success: false,
+          error: 'NOT_FOUND',
+          message: 'Target user account not found.',
+        };
+      }
+
+      if (
+        targetUser.activeRoles.includes(ContractUserRole.OWNER) ||
+        input.targetUserId === input.actorUserId
+      ) {
+        return {
+          success: false,
+          error: 'FORBIDDEN_TARGET',
+          message: 'Owner accounts cannot be deleted.',
+        };
+      }
+
+      if (targetUser.accountStatus === AccountStatus.PENDING_APPROVAL) {
+        return {
+          success: false,
+          error: 'CANNOT_DELETE_PENDING_APPROVAL',
+          message: 'Pending approval accounts must be processed through the approval workflow.',
+          currentStatus: targetUser.accountStatus,
+        };
+      }
+
+      await this.prisma.$transaction(
+        async (tx) => {
+          const targetId = input.targetUserId;
+
+          // 1. Delete all sessions
+          await tx.session.deleteMany({
+            where: { userId: targetId },
+          });
+
+          // 2. Delete user preferences
+          await tx.userPreference.deleteMany({
+            where: { userId: targetId },
+          });
+
+          // 3. Delete user role assignments
+          await tx.userRoleAssignment.deleteMany({
+            where: { userId: targetId },
+          });
+
+          // 4. Delete account approvals (where applicant or decidedBy)
+          await tx.accountApproval.deleteMany({
+            where: {
+              OR: [{ applicantUserId: targetId }, { decidedByUserId: targetId }],
+            },
+          });
+
+          // 5. Delete user device access assignments
+          await tx.userDeviceAccess.deleteMany({
+            where: {
+              OR: [{ userId: targetId }, { assignedByUserId: targetId }],
+            },
+          });
+
+          // 6. Delete faucet commands & command events initiated by target user
+          const userCommands = await tx.faucetCommand.findMany({
+            where: { initiatedByUserId: targetId },
+            select: { id: true },
+          });
+          if (userCommands.length > 0) {
+            const commandIds = userCommands.map((c) => c.id);
+            await tx.faucetCommandEvent.deleteMany({
+              where: { faucetCommandId: { in: commandIds } },
+            });
+            await tx.faucetCommand.deleteMany({
+              where: { initiatedByUserId: targetId },
+            });
+          }
+
+          // 7. Delete alert acknowledgements by target user
+          await tx.alertAcknowledgement.deleteMany({
+            where: { acknowledgedByUserId: targetId },
+          });
+
+          // 8. Anonymize/nullify audit log actorUserId where target was actor
+          await tx.auditLog.updateMany({
+            where: { actorUserId: targetId },
+            data: { actorUserId: null },
+          });
+
+          // 9. Audit log event for permanent deletion (strictly non-PII)
+          await tx.auditLog.create({
+            data: {
+              eventKey: 'account.deleted',
+              actorUserId: input.actorUserId,
+              targetType: 'USER',
+              targetId: targetId,
+              result: 'SUCCESS',
+              previousValues: {
+                accountStatus: targetUser.accountStatus,
+                targetRole: 'ADMIN',
+              },
+              newValues: Prisma.JsonNull,
+              metadata: { reason: input.reason?.trim() || null },
+              requestId: input.requestId || null,
+              ipAddress: input.ipAddress || null,
+              userAgent: input.userAgent || null,
+            },
+          });
+
+          // 10. Delete the User row itself
+          await tx.user.delete({
+            where: { id: targetId },
+          });
+        },
+        { isolationLevel: 'RepeatableRead' }
+      );
+
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: 'INTERNAL_ERROR',
+        message: 'A database error occurred while deleting the target user.',
+      };
+    }
+  }
+
+  /**
+   * Transactionally activates/reactivates a SUSPENDED, DEACTIVATED, or APPROVED user account.
+   * PENDING_APPROVAL users must go through approval workflow.
+   * REJECTED users cannot be directly activated.
+   */
+  async activateUser(input: UserLifecycleInput): Promise<UserLifecycleResult> {
+    try {
+      const targetUser = await this.findUserById(input.targetUserId);
+      if (!targetUser) {
+        return {
+          success: false,
+          error: 'USER_NOT_FOUND',
+          message: `Target user with ID '${input.targetUserId}' does not exist.`,
+        };
+      }
+
+      if (targetUser.activeRoles.includes(ContractUserRole.OWNER)) {
+        return {
+          success: false,
+          error: 'FORBIDDEN_TARGET',
+          message: 'Owner accounts do not require reactivation.',
+        };
+      }
+
+      if (targetUser.accountStatus === AccountStatus.PENDING_APPROVAL) {
+        return {
+          success: false,
+          error: 'INVALID_STATUS_TRANSITION',
+          message: 'Pending approval accounts must be processed through the approval workflow.',
+          currentStatus: targetUser.accountStatus,
+        };
+      }
+
+      if (targetUser.accountStatus === AccountStatus.REJECTED) {
+        return {
+          success: false,
+          error: 'INVALID_STATUS_TRANSITION',
+          message: 'Rejected accounts cannot be directly activated.',
+          currentStatus: targetUser.accountStatus,
+        };
+      }
+
+      if (targetUser.accountStatus === AccountStatus.ACTIVE) {
+        return {
+          success: false,
+          error: 'INVALID_STATUS_TRANSITION',
+          message: 'Account is already ACTIVE.',
+          currentStatus: targetUser.accountStatus,
+        };
+      }
+
+      const result = await this.prisma.$transaction(
+        async (tx) => {
+          const updated = await tx.user.update({
+            where: { id: input.targetUserId },
+            data: {
+              accountStatus: AccountStatus.ACTIVE,
+              suspendedAt: null,
+              deactivatedAt: null,
+            },
+            select: {
+              id: true,
+              fullName: true,
+              email: true,
+              username: true,
+              accountStatus: true,
+              emailVerifiedAt: true,
+              lastLoginAt: true,
+              suspendedAt: true,
+              deactivatedAt: true,
+              createdAt: true,
+              updatedAt: true,
+              userRoles: {
+                where: { revokedAt: null },
+                select: {
+                  id: true,
+                  userId: true,
+                  roleId: true,
+                  assignedByUserId: true,
+                  assignedAt: true,
+                  revokedAt: true,
+                  role: { select: { code: true } },
+                },
+              },
+            },
+          });
+
+          // Audit log (strictly without secrets)
+          await tx.auditLog.create({
+            data: {
+              eventKey: 'account.activated',
+              actorUserId: input.actorUserId,
+              targetType: 'USER',
+              targetId: input.targetUserId,
+              result: 'SUCCESS',
+              previousValues: { accountStatus: targetUser.accountStatus },
+              newValues: { accountStatus: AccountStatus.ACTIVE },
+              metadata: { reason: input.reason?.trim() || null },
+              requestId: input.requestId || null,
+              ipAddress: input.ipAddress || null,
+              userAgent: input.userAgent || null,
+            },
+          });
+
+          return toPublicSafeUserDto(this.mapPrismaUserToRawDbUser(updated));
+        },
+        { isolationLevel: 'RepeatableRead' }
+      );
+
+      return { success: true, user: result };
+    } catch (error) {
+      return {
+        success: false,
+        error: 'INTERNAL_ERROR',
+        message: 'A database error occurred while activating the target user.',
       };
     }
   }
