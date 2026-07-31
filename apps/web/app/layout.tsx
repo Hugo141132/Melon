@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
+import { DeviceProvider } from '@/context/DeviceContext';
 
 export const metadata: Metadata = {
   title: {
@@ -20,7 +21,9 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="id">
-      <body className="min-h-dvh font-sans antialiased">{children}</body>
+      <body className="min-h-dvh font-sans antialiased">
+        <DeviceProvider>{children}</DeviceProvider>
+      </body>
     </html>
   );
 }
