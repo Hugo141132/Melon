@@ -335,15 +335,14 @@ Communication protocol routing (`REST API over Wi-Fi` vs `MQTT over TLS through 
 | DeviceType | Required / Registered Capability | Protocol / Transport | Destination / Ingress Boundary |
 |---|---|---|---|
 | `SOIL_NODE` | `SOIL_TELEMETRY` | REST API over Wi-Fi (HTTPS) | Web Backend REST Ingestion Endpoint |
-| `WATER_NODE` | `WATER_TELEMETRY` | REST API over Wi-Fi (HTTPS) | Web Backend REST Ingestion Endpoint |
-| `COMBINED_NODE` | `SOIL_TELEMETRY` + `WATER_TELEMETRY` + `BATTERY_MONITORING` | REST API over Wi-Fi (HTTPS) | Web Backend REST Ingestion Endpoint |
-| `WATER_NODE` or `COMBINED_NODE` | `TANK_MONITORING` / `FLOW_MONITORING` | MQTT 5.0 over TLS | EMQX Broker → IoT Gateway Service |
-| `WATER_NODE` or `COMBINED_NODE` | `FAUCET_CONTROL` | MQTT 5.0 over TLS | EMQX Broker ← IoT Gateway Service |
+| `WATER_QUALITY_NODE` | `WATER_TELEMETRY` | REST API over Wi-Fi (HTTPS) | Web Backend REST Ingestion Endpoint |
+| `WATER_TANK_NODE` | `TANK_MONITORING` / `FLOW_MONITORING` | MQTT 5.0 over TLS | EMQX Broker → IoT Gateway Service |
+| `WATER_TANK_NODE` | `FAUCET_CONTROL` | MQTT 5.0 over TLS | EMQX Broker ← IoT Gateway Service |
 
 Rules:
 - Devices sending general soil and water quality telemetry use **REST API over Wi-Fi**.
 - Devices with `TANK_MONITORING`, `FLOW_MONITORING`, or `FAUCET_CONTROL` capabilities connect via **MQTT 5.0 over TLS** to the **EMQX Broker**.
-- The existing `DeviceType` enum values (`SOIL_NODE`, `WATER_NODE`, `COMBINED_NODE`) are sufficient and unambiguous when evaluated together with registered device capabilities. No schema enum modification is required.
+- The existing `DeviceType` enum values (`SOIL_NODE`, `WATER_QUALITY_NODE`, `WATER_TANK_NODE`) are sufficient and unambiguous when evaluated together with registered device capabilities. No schema enum modification is required.
 
 ---
 

@@ -156,7 +156,7 @@
   2. **Water Monitoring**: REST API over Wi-Fi submitted directly to backend ingestion endpoint (No MQTT broker).
   3. **Reservoir-Water Monitoring**: MQTT 5.0 over TLS via EMQX broker ingested through long-running backend IoT Gateway service.
   4. **Shared Sensor Battery (`BAT`)**: Equipment power supply telemetry via REST API over Wi-Fi (exact REST payload field placement `TBD`).
-  5. **Protocol Routing Determinism**: Protocol selection is deterministically resolved using `DeviceType` (`SOIL_NODE`, `WATER_NODE`, `COMBINED_NODE`) combined with registered `DeviceCapability` entries (`SOIL_TELEMETRY`, `WATER_TELEMETRY`, `TANK_MONITORING`, `FLOW_MONITORING`, `FAUCET_CONTROL`). The existing `DeviceType` enum values are sufficient without schema modification.
+  5. **Protocol Routing Determinism**: Protocol selection is deterministically resolved using `DeviceType` (`SOIL_NODE`, `WATER_QUALITY_NODE`, `WATER_TANK_NODE`) combined with registered `DeviceCapability` entries (`SOIL_TELEMETRY`, `WATER_TELEMETRY`, `TANK_MONITORING`, `FLOW_MONITORING`, `FAUCET_CONTROL`). The existing `DeviceType` enum values are sufficient without schema modification.
   Per-device unique username/password with per-device topic ACLs for reservoir MQTT. No anonymous production access. No direct browser-to-MQTT or browser-to-EMQX connections. No retained faucet commands.
 
 ---

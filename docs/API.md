@@ -1103,7 +1103,7 @@ Response item:
   "deviceId": "water-node-001",
   "name": "Water Node 1",
   "siteId": "site-01",
-  "deviceType": "WATER_NODE",
+  "deviceType": "WATER_TANK_NODE",
   "connectionStatus": "ONLINE",
   "accountStatus": "ACTIVE",
   "lastSeenAt": "2026-07-27T14:15:00+07:00",
@@ -1153,7 +1153,7 @@ Request:
   "deviceId": "water-node-002",
   "name": "Water Node 2",
   "siteId": "site-01",
-  "deviceType": "WATER_NODE",
+  "deviceType": "WATER_TANK_NODE",
   "capabilities": [
     "WATER_TELEMETRY",
     "FAUCET_CONTROL"

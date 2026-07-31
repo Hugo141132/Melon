@@ -101,7 +101,7 @@ describe('Live PostgreSQL Database Integration & Constraint Verification', () =>
         data: {
           deviceId: uniqueDeviceId,
           name: 'Test Node 2',
-          deviceType: 'WATER_NODE',
+          deviceType: 'WATER_TANK_NODE',
           connectionStatus: 'OFFLINE',
         },
       })
@@ -122,7 +122,7 @@ describe('Live PostgreSQL Database Integration & Constraint Verification', () =>
       data: {
         deviceId: `faucet-node-${Date.now()}`,
         name: 'Faucet Node 1',
-        deviceType: 'WATER_NODE',
+        deviceType: 'WATER_TANK_NODE',
         connectionStatus: 'ONLINE',
       },
     });
@@ -176,7 +176,7 @@ describe('Live PostgreSQL Database Integration & Constraint Verification', () =>
       data: {
         deviceId: `active-cmd-node-${Date.now()}`,
         name: 'Active Command Node',
-        deviceType: 'WATER_NODE',
+        deviceType: 'WATER_TANK_NODE',
         connectionStatus: 'ONLINE',
       },
     });
@@ -228,7 +228,7 @@ describe('Live PostgreSQL Database Integration & Constraint Verification', () =>
       data: {
         deviceId: `term-cmd-node-${Date.now()}`,
         name: 'Terminal State Node',
-        deviceType: 'WATER_NODE',
+        deviceType: 'WATER_TANK_NODE',
         connectionStatus: 'ONLINE',
       },
     });
@@ -285,7 +285,7 @@ describe('Live PostgreSQL Database Integration & Constraint Verification', () =>
       data: {
         deviceId: `phase-cmd-node-${Date.now()}`,
         name: 'Phase Check Node',
-        deviceType: 'WATER_NODE',
+        deviceType: 'WATER_TANK_NODE',
         connectionStatus: 'ONLINE',
       },
     });

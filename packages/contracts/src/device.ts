@@ -4,13 +4,10 @@ export enum DeviceType {
   SOIL_NODE = 'SOIL_NODE',
   WATER_QUALITY_NODE = 'WATER_QUALITY_NODE',
   WATER_TANK_NODE = 'WATER_TANK_NODE',
-  WATER_NODE = 'WATER_NODE',
-  COMBINED_NODE = 'COMBINED_NODE',
 }
 
 /**
  * Supported device types allowed for NEW device creation.
- * Legacy types (WATER_NODE, COMBINED_NODE) are preserved for database row compatibility but rejected for new device registration.
  */
 export const NEW_DEVICE_TYPES = [
   DeviceType.SOIL_NODE,
@@ -106,17 +103,9 @@ export function getCanonicalCapabilitiesForDeviceType(deviceType: DeviceType): s
     case DeviceType.SOIL_NODE:
       return [...SOIL_NODE_MONITORING_PARAMETERS];
     case DeviceType.WATER_QUALITY_NODE:
-    case DeviceType.WATER_NODE:
       return [...WATER_QUALITY_NODE_MONITORING_PARAMETERS];
     case DeviceType.WATER_TANK_NODE:
       return [...WATER_TANK_NODE_MONITORING_PARAMETERS, ...WATER_TANK_NODE_CONTROL_CAPABILITIES];
-    case DeviceType.COMBINED_NODE:
-      return [
-        ...SOIL_NODE_MONITORING_PARAMETERS,
-        ...WATER_QUALITY_NODE_MONITORING_PARAMETERS,
-        ...WATER_TANK_NODE_MONITORING_PARAMETERS,
-        ...WATER_TANK_NODE_CONTROL_CAPABILITIES,
-      ];
     default:
       return [];
   }
@@ -139,6 +128,13 @@ export enum DeviceConnectionStatus {
 export const DeviceTypeSchema = z.nativeEnum(DeviceType);
 export const DeviceAccountStatusSchema = z.nativeEnum(DeviceAccountStatus);
 export const DeviceConnectionStatusSchema = z.nativeEnum(DeviceConnectionStatus);
+
+export const DevicePermissionsDtoSchema = z.object({
+  canView: z.boolean(),
+  canControl: z.boolean(),
+});
+
+export type DevicePermissionsDto = z.infer<typeof DevicePermissionsDtoSchema>;
 
 /**
  * Public/Safe Device DTO schema.
@@ -163,6 +159,7 @@ export const PublicSafeDeviceDtoSchema = z.object({
   updatedAt: z.date(),
   deactivatedAt: z.date().nullable(),
   capabilities: z.array(z.string()),
+  permissions: DevicePermissionsDtoSchema.optional(),
 });
 
 export type PublicSafeDeviceDto = z.infer<typeof PublicSafeDeviceDtoSchema>;

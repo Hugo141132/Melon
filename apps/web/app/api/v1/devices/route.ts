@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server';
 import { prisma, DeviceRepository, DeviceConflictError } from '@kebun-melon/database';
 import { DeviceQueryInputSchema, CreateDeviceInputSchema } from '@kebun-melon/contracts';
-import { requireSession, requirePermission, AuthorizationError } from '../../../../lib/auth/rbac';
+import {
+  requireSession,
+  requirePermission,
+  computeDevicePermissions,
+  AuthorizationError,
+} from '../../../../lib/auth/rbac';
 
 export async function GET(request: Request) {
   const requestId = `req-${Date.now()}`;
@@ -56,10 +61,15 @@ export async function GET(request: Request) {
 
     const result = await deviceRepo.getDevices(parseResult.data, authorizedDeviceIds);
 
+    const itemsWithPermissions = result.items.map((device) => ({
+      ...device,
+      permissions: computeDevicePermissions(session, device, true),
+    }));
+
     return NextResponse.json(
       {
         success: true,
-        data: result.items,
+        data: itemsWithPermissions,
         meta: {
           requestId,
           pagination: result.pagination,

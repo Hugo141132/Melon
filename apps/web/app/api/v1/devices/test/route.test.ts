@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { GET, POST } from '../route';
-import { PATCH, DELETE } from '../[deviceId]/route';
+import { GET as GET_DETAIL, PATCH, DELETE } from '../[deviceId]/route';
 import { POST as DEACTIVATE } from '../[deviceId]/deactivate/route';
 import { AccountStatus, UserRole, DeviceType } from '@kebun-melon/contracts';
 import * as dbModule from '@kebun-melon/database';
@@ -20,6 +20,8 @@ const mockCreateDevice = vi.fn();
 const mockUpdateDevice = vi.fn();
 const mockDeactivateDevice = vi.fn();
 const mockDeleteDevicePermanently = vi.fn();
+const mockFindManyUserDeviceAccess = vi.fn().mockResolvedValue([]);
+const mockFindFirstUserDeviceAccess = vi.fn().mockResolvedValue(null);
 
 vi.mock('@kebun-melon/database', async (importOriginal) => {
   const actual = await importOriginal<typeof dbModule>();
@@ -27,8 +29,8 @@ vi.mock('@kebun-melon/database', async (importOriginal) => {
     ...actual,
     prisma: {
       userDeviceAccess: {
-        findMany: vi.fn().mockResolvedValue([]),
-        findFirst: vi.fn().mockResolvedValue(null),
+        findMany: (...args: any[]) => mockFindManyUserDeviceAccess(...args),
+        findFirst: (...args: any[]) => mockFindFirstUserDeviceAccess(...args),
       },
     },
     DeviceRepository: class {
@@ -54,11 +56,14 @@ vi.mock('@kebun-melon/database', async (importOriginal) => {
   };
 });
 
-describe('Device Registry API Endpoints (TASK-0302)', () => {
+describe('Device Registry API Endpoints (TASK-0302 & TASK-0305)', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     vi.clearAllMocks();
     mockCookieToken = 'valid-token';
+    mockFindManyUserDeviceAccess.mockResolvedValue([]);
+    mockFindFirstUserDeviceAccess.mockResolvedValue(null);
+    delete process.env.ENABLE_FAUCET_CONTROL;
   });
 
   const mockOwnerSession = () => {
@@ -74,20 +79,20 @@ describe('Device Registry API Endpoints (TASK-0302)', () => {
     } as any);
   };
 
-  const mockAdminSession = () => {
+  const mockAdminSession = (accountStatus = AccountStatus.ACTIVE) => {
     vi.spyOn(dbModule, 'validateSession').mockResolvedValueOnce({
       session: { id: 's-admin', userId: 'admin-id-1', expiresAt: new Date() },
       user: {
         id: 'admin-id-1',
         fullName: 'Admin User',
         email: 'admin@test.com',
-        accountStatus: AccountStatus.ACTIVE,
+        accountStatus,
         activeRoles: [UserRole.ADMIN],
       },
     } as any);
   };
 
-  describe('GET /api/v1/devices', () => {
+  describe('GET /api/v1/devices (TASK-0305 Authorised Device List)', () => {
     it('returns 401 when request is unauthenticated', async () => {
       mockCookieToken = undefined;
 
@@ -99,7 +104,18 @@ describe('Device Registry API Endpoints (TASK-0302)', () => {
       expect(json.error.code).toBe('UNAUTHENTICATED');
     });
 
-    it('returns authorized devices for OWNER globally without secret exposure', async () => {
+    it('returns 403 ACCOUNT_NOT_ACTIVE when user account is PENDING_APPROVAL', async () => {
+      mockAdminSession(AccountStatus.PENDING_APPROVAL);
+
+      const res = await GET(new Request('http://localhost/api/v1/devices'));
+      const json = await res.json();
+
+      expect(res.status).toBe(403);
+      expect(json.success).toBe(false);
+      expect(json.error.code).toBe('ACCOUNT_NOT_ACTIVE');
+    });
+
+    it('returns authorized devices for OWNER globally with permissions DTO', async () => {
       mockOwnerSession();
 
       mockGetDevices.mockResolvedValueOnce({
@@ -108,7 +124,7 @@ describe('Device Registry API Endpoints (TASK-0302)', () => {
             id: 'dev-1',
             deviceId: 'water-node-001',
             name: 'Water Node 1',
-            deviceType: DeviceType.WATER_NODE,
+            deviceType: DeviceType.WATER_QUALITY_NODE,
             accountStatus: 'ACTIVE',
             connectionStatus: 'ONLINE',
             capabilities: ['WATER_TELEMETRY'],
@@ -125,6 +141,205 @@ describe('Device Registry API Endpoints (TASK-0302)', () => {
       expect(json.data.length).toBe(1);
       expect(json.data[0].deviceId).toBe('water-node-001');
       expect(json.data[0].deviceSecret).toBeUndefined();
+      expect(json.data[0].permissions).toEqual({
+        canView: true,
+        canControl: false,
+      });
+      // Verifies Owner query does not filter by user assignments
+      expect(mockGetDevices).toHaveBeenCalledWith(expect.anything(), undefined);
+    });
+
+    it('filters devices strictly to active assignments (revokedAt === null) for ADMIN', async () => {
+      mockAdminSession();
+
+      mockFindManyUserDeviceAccess.mockResolvedValueOnce([{ deviceId: 'dev-assigned-uuid' }]);
+
+      mockGetDevices.mockResolvedValueOnce({
+        items: [
+          {
+            id: 'dev-assigned-uuid',
+            deviceId: 'water-tank-node-001',
+            name: 'Tank Node 1',
+            deviceType: DeviceType.WATER_TANK_NODE,
+            accountStatus: 'ACTIVE',
+            connectionStatus: 'ONLINE',
+            capabilities: ['WATER_TANK_VOLUME', 'FLOW_MONITORING', 'FAUCET_CONTROL'],
+          },
+        ],
+        pagination: { page: 1, pageSize: 20, totalItems: 1, totalPages: 1 },
+      });
+
+      const res = await GET(new Request('http://localhost/api/v1/devices'));
+      const json = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(json.success).toBe(true);
+      expect(mockGetDevices).toHaveBeenCalledWith(expect.anything(), ['dev-assigned-uuid']);
+      expect(json.data[0].permissions).toBeDefined();
+      expect(json.data[0].permissions.canView).toBe(true);
+    });
+
+    it('returns empty list for ADMIN with no active assignments', async () => {
+      mockAdminSession();
+      mockFindManyUserDeviceAccess.mockResolvedValueOnce([]);
+
+      mockGetDevices.mockResolvedValueOnce({
+        items: [],
+        pagination: { page: 1, pageSize: 20, totalItems: 0, totalPages: 1 },
+      });
+
+      const res = await GET(new Request('http://localhost/api/v1/devices'));
+      const json = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(json.success).toBe(true);
+      expect(json.data).toEqual([]);
+      expect(mockGetDevices).toHaveBeenCalledWith(expect.anything(), []);
+    });
+  });
+
+  describe('GET /api/v1/devices/[deviceId] (TASK-0305 Device Detail)', () => {
+    it('returns 404 DEVICE_NOT_FOUND when device does not exist', async () => {
+      mockOwnerSession();
+      mockGetDeviceByCanonicalId.mockResolvedValueOnce(null);
+
+      const res = await GET_DETAIL(new Request('http://localhost/api/v1/devices/non-existent'), {
+        params: { deviceId: 'non-existent' },
+      });
+      const json = await res.json();
+
+      expect(res.status).toBe(404);
+      expect(json.success).toBe(false);
+      expect(json.error.code).toBe('DEVICE_NOT_FOUND');
+    });
+
+    it('returns 200 OK with permissions for OWNER for any existing device', async () => {
+      mockOwnerSession();
+      const mockDev = {
+        id: 'dev-1',
+        deviceId: 'water-node-001',
+        name: 'Water Node 1',
+        deviceType: DeviceType.WATER_QUALITY_NODE,
+        accountStatus: 'ACTIVE',
+        connectionStatus: 'ONLINE',
+        capabilities: ['WATER_PH'],
+      };
+      mockGetDeviceByCanonicalId.mockResolvedValueOnce(mockDev);
+
+      const res = await GET_DETAIL(new Request('http://localhost/api/v1/devices/water-node-001'), {
+        params: { deviceId: 'water-node-001' },
+      });
+      const json = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(json.success).toBe(true);
+      expect(json.data.deviceId).toBe('water-node-001');
+      expect(json.data.permissions).toEqual({ canView: true, canControl: false });
+    });
+
+    it('returns 200 OK for ADMIN when device is actively assigned', async () => {
+      mockAdminSession();
+      const mockDev = {
+        id: 'dev-1',
+        deviceId: 'water-node-001',
+        name: 'Water Node 1',
+        deviceType: DeviceType.WATER_QUALITY_NODE,
+        accountStatus: 'ACTIVE',
+        connectionStatus: 'ONLINE',
+        capabilities: ['WATER_PH'],
+      };
+      mockGetDeviceByCanonicalId.mockResolvedValueOnce(mockDev);
+      mockFindFirstUserDeviceAccess.mockResolvedValueOnce({
+        id: 'assignment-1',
+        userId: 'admin-id-1',
+        deviceId: 'dev-1',
+        revokedAt: null,
+      });
+
+      const res = await GET_DETAIL(new Request('http://localhost/api/v1/devices/water-node-001'), {
+        params: { deviceId: 'water-node-001' },
+      });
+      const json = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(json.success).toBe(true);
+      expect(json.data.permissions).toEqual({ canView: true, canControl: false });
+    });
+
+    it('returns 403 DEVICE_NOT_ASSIGNED for ADMIN when device is unassigned or assignment is revoked', async () => {
+      mockAdminSession();
+      const mockDev = {
+        id: 'dev-2',
+        deviceId: 'unassigned-node-002',
+        name: 'Unassigned Node',
+        deviceType: DeviceType.SOIL_NODE,
+        accountStatus: 'ACTIVE',
+        connectionStatus: 'ONLINE',
+        capabilities: ['SOIL_NITROGEN'],
+      };
+      mockGetDeviceByCanonicalId.mockResolvedValueOnce(mockDev);
+      // findFirst returns null because revokedAt !== null or no assignment row exists
+      mockFindFirstUserDeviceAccess.mockResolvedValueOnce(null);
+
+      const res = await GET_DETAIL(
+        new Request('http://localhost/api/v1/devices/unassigned-node-002'),
+        { params: { deviceId: 'unassigned-node-002' } }
+      );
+      const json = await res.json();
+
+      expect(res.status).toBe(403);
+      expect(json.success).toBe(false);
+      expect(json.error.code).toBe('DEVICE_NOT_ASSIGNED');
+    });
+
+    it('evaluates permissions.canControl = true when ENABLE_FAUCET_CONTROL=true and device has FAUCET_CONTROL capability', async () => {
+      process.env.ENABLE_FAUCET_CONTROL = 'true';
+      mockOwnerSession();
+
+      const tankDevice = {
+        id: 'dev-tank',
+        deviceId: 'water-tank-node-001',
+        name: 'Tank Node',
+        deviceType: DeviceType.WATER_TANK_NODE,
+        accountStatus: 'ACTIVE',
+        connectionStatus: 'ONLINE',
+        capabilities: ['WATER_TANK_VOLUME', 'FAUCET_CONTROL'],
+      };
+      mockGetDeviceByCanonicalId.mockResolvedValueOnce(tankDevice);
+
+      const res = await GET_DETAIL(
+        new Request('http://localhost/api/v1/devices/water-tank-node-001'),
+        { params: { deviceId: 'water-tank-node-001' } }
+      );
+      const json = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(json.data.permissions).toEqual({ canView: true, canControl: true });
+    });
+
+    it('evaluates permissions.canControl = false when device is DEACTIVATED', async () => {
+      process.env.ENABLE_FAUCET_CONTROL = 'true';
+      mockOwnerSession();
+
+      const deactivatedTankDevice = {
+        id: 'dev-tank',
+        deviceId: 'water-tank-node-001',
+        name: 'Tank Node',
+        deviceType: DeviceType.WATER_TANK_NODE,
+        accountStatus: 'DEACTIVATED',
+        connectionStatus: 'INACTIVE',
+        capabilities: ['WATER_TANK_VOLUME', 'FAUCET_CONTROL'],
+      };
+      mockGetDeviceByCanonicalId.mockResolvedValueOnce(deactivatedTankDevice);
+
+      const res = await GET_DETAIL(
+        new Request('http://localhost/api/v1/devices/water-tank-node-001'),
+        { params: { deviceId: 'water-tank-node-001' } }
+      );
+      const json = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(json.data.permissions).toEqual({ canView: true, canControl: false });
     });
   });
 
@@ -138,7 +353,7 @@ describe('Device Registry API Endpoints (TASK-0302)', () => {
         body: JSON.stringify({
           deviceId: 'water-node-002',
           name: 'Water Node 2',
-          deviceType: DeviceType.WATER_NODE,
+          deviceType: DeviceType.WATER_QUALITY_NODE,
         }),
       });
 

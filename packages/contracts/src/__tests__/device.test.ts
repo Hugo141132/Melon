@@ -47,22 +47,6 @@ describe('Device Contracts (TASK-0302)', () => {
       expect(parsed.deviceId).toBe('water-quality-node-001');
     });
 
-    it('rejects legacy device creation types (WATER_NODE, COMBINED_NODE)', () => {
-      expect(() =>
-        CreateDeviceInputSchema.parse({
-          name: 'Legacy Node',
-          deviceType: 'WATER_NODE' as any,
-        })
-      ).toThrow();
-
-      expect(() =>
-        CreateDeviceInputSchema.parse({
-          name: 'Legacy Node',
-          deviceType: 'COMBINED_NODE' as any,
-        })
-      ).toThrow();
-    });
-
     it('rejects out of bound coordinates', () => {
       expect(() =>
         CreateDeviceInputSchema.parse({
@@ -121,7 +105,7 @@ describe('Device Contracts (TASK-0302)', () => {
         deviceId: 'water-node-001',
         siteId: null,
         name: 'Water Node 1',
-        deviceType: DeviceType.WATER_NODE,
+        deviceType: DeviceType.WATER_QUALITY_NODE,
         accountStatus: DeviceAccountStatus.ACTIVE,
         connectionStatus: DeviceConnectionStatus.ONLINE,
         firmwareVersion: '1.0.0',

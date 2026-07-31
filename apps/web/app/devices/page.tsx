@@ -26,8 +26,7 @@ interface PublicSafeDeviceDto {
   deviceId: string;
   siteId: string | null;
   name: string;
-  deviceType:
-    'SOIL_NODE' | 'WATER_QUALITY_NODE' | 'WATER_TANK_NODE' | 'WATER_NODE' | 'COMBINED_NODE';
+  deviceType: 'SOIL_NODE' | 'WATER_QUALITY_NODE' | 'WATER_TANK_NODE';
   accountStatus: 'ACTIVE' | 'INACTIVE' | 'DEACTIVATED';
   connectionStatus: 'ONLINE' | 'OFFLINE' | 'STALE' | 'UNKNOWN' | 'INACTIVE';
   firmwareVersion: string | null;
@@ -386,8 +385,6 @@ export default function DeviceRegistryPage() {
               <option value="SOIL_NODE">Soil Monitoring</option>
               <option value="WATER_QUALITY_NODE">Water Quality Monitoring</option>
               <option value="WATER_TANK_NODE">Water Tank Monitoring</option>
-              <option value="WATER_NODE">Water Node (Legacy)</option>
-              <option value="COMBINED_NODE">Combined Node (Legacy)</option>
             </select>
 
             <select

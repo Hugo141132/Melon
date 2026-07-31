@@ -1,6 +1,12 @@
 import { cookies } from 'next/headers';
 import { prisma, validateSession, SESSION_COOKIE_NAME } from '@kebun-melon/database';
-import { UserRole, AccountStatus } from '@kebun-melon/contracts';
+import {
+  UserRole,
+  AccountStatus,
+  DeviceAccountStatus,
+  supportsCapability,
+  DevicePermissionsDto,
+} from '@kebun-melon/contracts';
 import { CANONICAL_PERMISSIONS } from '@kebun-melon/database';
 
 export class AuthorizationError extends Error {
@@ -222,4 +228,43 @@ export async function requireDeviceControlAccess(
   }
 
   return session;
+}
+
+/**
+ * Computes dynamic device permissions DTO (canView, canControl) per user session and device state.
+ * Preserves RBAC, active account status, device capabilities, and ENABLE_FAUCET_CONTROL feature flag.
+ */
+export function computeDevicePermissions(
+  session: AuthenticatedUserSession,
+  device: {
+    accountStatus: string;
+    capabilities?: string[] | { capability: string; enabled?: boolean }[];
+  },
+  isAssigned: boolean = true
+): DevicePermissionsDto {
+  if (session.accountStatus !== AccountStatus.ACTIVE) {
+    return { canView: false, canControl: false };
+  }
+
+  const isOwner = session.activeRoles.includes(UserRole.OWNER);
+  const isAdmin = session.activeRoles.includes(UserRole.ADMIN);
+
+  const canView = isOwner || (isAdmin && isAssigned);
+  if (!canView) {
+    return { canView: false, canControl: false };
+  }
+
+  const isFaucetEnabled =
+    process.env.ENABLE_FAUCET_CONTROL === 'true' || process.env.ENABLE_FAUCET_CONTROL === '1';
+
+  const isDeviceActive = device.accountStatus === DeviceAccountStatus.ACTIVE;
+  const hasControlCap = supportsCapability(device, 'FAUCET_CONTROL');
+
+  const canControl =
+    isFaucetEnabled && isDeviceActive && hasControlCap && (isOwner || (isAdmin && isAssigned));
+
+  return {
+    canView,
+    canControl,
+  };
 }

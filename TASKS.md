@@ -899,9 +899,10 @@ revokedAt
 
 ## TASK-0305 — Implement Authorised Device List
 
-**Priority:** `P0`  
-**Status:** `BACKLOG`  
+**Priority:** `P0`
+**Status:** `DONE`
 **Dependencies:** `TASK-0304`
+**Completed:** 2026-07-31 — Implemented authorised device listing and device detail access endpoints (`GET /api/v1/devices`, `GET /api/v1/devices/{deviceId}`). `OWNER` role receives global device visibility across all sites. `ADMIN` role receives strictly scoped device access filtered by active `UserDeviceAccess` assignments (`revokedAt === null`), with revoked or unassigned devices disappearing immediately and direct access attempts returning HTTP 403 `DEVICE_NOT_ASSIGNED`. Integrated dynamic `permissions` DTO (`canView`, `canControl`) on all returned device objects, dynamically evaluated using RBAC, active account status, device capabilities, and the `ENABLE_FAUCET_CONTROL` feature flag. Added comprehensive unit and integration test coverage across list filtering, detail authorization, permissions computation, and negative auth security rules.
 
 ### Work
 

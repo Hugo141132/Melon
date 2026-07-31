@@ -5,6 +5,7 @@ import {
   requireSession,
   requirePermission,
   requireDeviceViewAccess,
+  computeDevicePermissions,
   AuthorizationError,
 } from '../../../../../lib/auth/rbac';
 
@@ -14,20 +15,6 @@ export async function GET(request: Request, { params }: { params: { deviceId: st
 
   try {
     const session = await requireSession(request);
-    await requireDeviceViewAccess(session, targetDeviceId, {
-      isDeviceAssignedToUser: async (userId, devId) => {
-        const assignment = await prisma.userDeviceAccess.findFirst({
-          where: {
-            userId,
-            revokedAt: null,
-            device: {
-              OR: [{ id: devId }, { deviceId: devId }],
-            },
-          },
-        });
-        return !!assignment;
-      },
-    });
 
     const deviceRepo = new DeviceRepository(prisma);
     const device = await deviceRepo.getDeviceByCanonicalId(targetDeviceId);
@@ -46,10 +33,30 @@ export async function GET(request: Request, { params }: { params: { deviceId: st
       );
     }
 
+    await requireDeviceViewAccess(session, targetDeviceId, {
+      isDeviceAssignedToUser: async (userId, devId) => {
+        const assignment = await prisma.userDeviceAccess.findFirst({
+          where: {
+            userId,
+            revokedAt: null,
+            device: {
+              OR: [{ id: devId }, { deviceId: devId }],
+            },
+          },
+        });
+        return !!assignment;
+      },
+    });
+
+    const permissions = computeDevicePermissions(session, device, true);
+
     return NextResponse.json(
       {
         success: true,
-        data: device,
+        data: {
+          ...device,
+          permissions,
+        },
         meta: { requestId },
       },
       { status: 200 }

@@ -447,8 +447,8 @@ Recommended `device_type` values:
 
 ```text
 SOIL_NODE
-WATER_NODE
-COMBINED_NODE
+WATER_QUALITY_NODE
+WATER_TANK_NODE
 ```
 
 Recommended device lifecycle values:
