@@ -11,6 +11,13 @@ export const gatewayEnvSchema = z.object({
   MQTT_CA_CERT_PATH: z.string().optional(),
   MQTT_CLIENT_CERT_PATH: z.string().optional(),
   MQTT_CLIENT_KEY_PATH: z.string().optional(),
+  HOST: z.string().default('0.0.0.0'),
+  PORT: z
+    .preprocess(
+      (val) => (val ? parseInt(String(val), 10) : 3001),
+      z.number().int().min(1).max(65535)
+    )
+    .default(3001),
   ENABLE_FAUCET_CONTROL: z
     .preprocess(
       (val) => {
@@ -67,4 +74,42 @@ export function validateGatewayEnv(
     throw new Error('Gateway environment validation failed: ' + issueMsgs);
   }
   return result.data;
+}
+
+export function redactString(val: string): string {
+  let result = val;
+  // Mask DB connection string passwords: postgresql://user:pass@host -> postgresql://user:***@host
+  result = result.replace(/(:\/\/[^:@]+:)(?:[^:@/]+)(@)/g, '$1***$2');
+  // Mask inline password/secret values: password secretpass -> password=[REDACTED]
+  result = result.replace(/(password|pass|secret|token|key)[:=\s]+([^\s;,]+)/gi, '$1=[REDACTED]');
+  return result;
+}
+
+export function redactSecrets<T extends Record<string, any>>(obj: T): T {
+  const sensitiveKeys = [
+    'password',
+    'pass',
+    'secret',
+    'token',
+    'key',
+    'mqtt_gateway_password',
+    'database_url',
+  ];
+
+  const redacted = { ...obj };
+  for (const [k, v] of Object.entries(redacted)) {
+    if (typeof v === 'string') {
+      const lowerKey = k.toLowerCase();
+      if (sensitiveKeys.some((s) => lowerKey.includes(s))) {
+        if (lowerKey.includes('database_url') || lowerKey.includes('url')) {
+          redacted[k as keyof T] = redactString(v) as unknown as T[keyof T];
+        } else {
+          redacted[k as keyof T] = '[REDACTED]' as unknown as T[keyof T];
+        }
+      } else {
+        redacted[k as keyof T] = redactString(v) as unknown as T[keyof T];
+      }
+    }
+  }
+  return redacted;
 }

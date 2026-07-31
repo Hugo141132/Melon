@@ -954,8 +954,9 @@ Frontend states:
 ## TASK-0401 — Create IoT Gateway Service
 
 **Priority:** `P0`  
-**Status:** `BACKLOG`  
+**Status:** `DONE`
 **Dependencies:** `TASK-0101`, `TASK-0002`
+**Completed:** 2026-07-31 — Implemented long-running IoT Gateway Fastify/TypeScript service in `apps/iot-gateway`. Integrated `GatewayMqttClient` supporting MQTT 5.0/3.1.1 fallback with TLS configuration, state tracking (`DISCONNECTED`, `CONNECTING`, `CONNECTED`, `RECONNECTING`, `ERROR`), and automatic exponential reconnect logic. Configured Zod environment validation (`apps/iot-gateway/src/config/env.ts`) and secret redaction (`redactSecrets`, `redactString`). Exposed `GET /health` (pass, uptime, timestamp) and `GET /ready` (real DB `prisma.$queryRaw` check + MQTT connection status). Created subsystem module scaffolds for topic router, message validator, telemetry processor, status processor, command publisher (`retain = false`), acknowledgement processor, and structured observability logger. Added unit test suites (`apps/iot-gateway/src/__tests__/`) verifying config validation, health/readiness, MQTT lifecycle, graceful shutdown, and secret redaction. Verified clean manual runtime testing.
 
 ### Work
 

@@ -14,7 +14,7 @@ The system is designed to:
 - Support English and Bahasa Indonesia.
 - Communicate with hardware through a backend-managed MQTT gateway.
 
-> **Current project status:** `TASK-0101` through `TASK-0201` (Database Foundation, Schema & Migrations, Communication Architecture Reconciliation, Idempotent RBAC Roles/Permissions Seeding, Secure First Owner Provisioning, and User Account Model & Contracts) are complete (`TASK-0201` status: `DONE`). Baseline Prisma schema, 4 telemetry models, canonical RBAC seed (`OWNER` & `ADMIN`, 38 permissions), PostgreSQL migration, one-time secure CLI first-Owner provisioning (`seed:owner`), shared domain contracts in `@kebun-melon/contracts`, `PublicSafeUserDto` runtime sanitisation, and `UserRepository` abstraction are verified.
+> **Current project status:** `TASK-0101` through `TASK-0401` (Repository Foundation, Auth & RBAC, Device Registry & Access Assignments, and IoT Gateway Service) are complete (`TASK-0401` status: `DONE`). Fastify + TypeScript gateway service (`apps/iot-gateway`), MQTT client with TLS/reconnect handling, secret redaction, real DB + MQTT `/ready` endpoint, subsystem scaffolds, and test suites are verified.
 
 ---
 
