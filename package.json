@@ -35,6 +35,8 @@
     "env:check:web": "tsx scripts/check-env.ts web",
     "env:check:gateway": "tsx scripts/check-env.ts gateway",
     "env:test": "tsx scripts/test-env.ts",
+    "mqtt:pwfile": "tsx scripts/generate-mqtt-pwfile.ts",
+    "mqtt:test": "tsx scripts/test-mqtt-broker.ts",
     "check:quality": "npm run typecheck && npm run lint && npm run format:check && npm run build"
   },
   "devDependencies": {

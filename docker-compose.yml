@@ -1,0 +1,28 @@
+services:
+  mqtt-broker:
+    image: eclipse-mosquitto:2
+    container_name: kebun-melon-mosquitto
+    restart: unless-stopped
+    ports:
+      - '1883:1883'
+      - '9001:9001'
+    volumes:
+      - ./docker/mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./docker/mosquitto/config/acl.conf:/mosquitto/config/acl.conf:ro
+      - ./docker/mosquitto/config/pwfile:/mosquitto/config/pwfile:ro
+      - mosquitto-data:/mosquitto/data
+      - mosquitto-log:/mosquitto/log
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          "mosquitto_sub -t '$$SYS/#' -C 1 -i healthcheck -u gateway_user -P gateway_dev_password_123 || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+volumes:
+  mosquitto-data:
+  mosquitto-log:

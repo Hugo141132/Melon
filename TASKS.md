@@ -983,9 +983,10 @@ Create long-running service with:
 
 ## TASK-0402 — Configure Development MQTT Broker
 
-**Priority:** `P1`  
-**Status:** `BACKLOG`  
+**Priority:** `P1`
+**Status:** `DONE`
 **Dependencies:** `TASK-0401`
+**Completed:** 2026-07-31 — Configured local Eclipse Mosquitto MQTT broker via Docker Compose (`docker-compose.yml`), `docker/mosquitto/config/mosquitto.conf` (disabling anonymous access `allow_anonymous false`, configuring password & ACL files), `docker/mosquitto/config/acl.conf` (defining gateway `gateway_user` full access `readwrite agriculture/#`, per-device topic isolation for `device_esp32_001`, `device_node_002`, `unauthorized_device`, and dynamic patterns `%u`), and `scripts/generate-mqtt-pwfile.ts` (generating PBKDF2-SHA512 hashed credentials in `docker/mosquitto/config/pwfile`). Created verification script `scripts/test-mqtt-broker.ts` (`npm run mqtt:test`) and Vitest test suite (`apps/iot-gateway/src/__tests__/broker-config.test.ts`) covering anonymous rejection, valid login, cross-device ACL denial, gateway permissions, and non-retained faucet command policies. Verified 100% test pass rate.
 
 ### Work
 

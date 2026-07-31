@@ -1,0 +1,25 @@
+# Eclipse Mosquitto Password File — TEMPLATE ONLY
+# DO NOT COMMIT REAL HASHES OR CREDENTIALS TO SOURCE CONTROL
+#
+# This file documents the expected username structure for the development broker.
+# The real password hash file (`pwfile`) is NOT tracked in git (.gitignored).
+#
+# To generate the real `pwfile` for local development:
+#   1. Copy .env.example to .env and set MQTT_* credentials.
+#   2. Run: npm run mqtt:pwfile
+#   3. Restart the broker: docker compose restart mqtt-broker
+#
+# Expected users:
+#   gateway_user          — IoT Gateway Service (read/write agriculture/#)
+#   device_esp32_001      — Development Device 1 (isolated to own topic namespace)
+#   device_node_002       — Development Device 2 (isolated to own topic namespace)
+#   unauthorized_device   — Test-only device for ACL denial verification
+#
+# Credentials are derived from environment variables:
+#   MQTT_GATEWAY_USERNAME / MQTT_GATEWAY_PASSWORD
+#   MQTT_DEV1_USERNAME    / MQTT_DEV1_PASSWORD
+#   MQTT_DEV2_USERNAME    / MQTT_DEV2_PASSWORD
+#   MQTT_UNAUTH_USERNAME  / MQTT_UNAUTH_PASSWORD
+#
+# See: .env.example and scripts/mqtt-config.ts for variable names.
+# See: scripts/generate-mqtt-pwfile.ts for the generation logic.

@@ -14,7 +14,7 @@ The system is designed to:
 - Support English and Bahasa Indonesia.
 - Communicate with hardware through a backend-managed MQTT gateway.
 
-> **Current project status:** `TASK-0101` through `TASK-0401` (Repository Foundation, Auth & RBAC, Device Registry & Access Assignments, and IoT Gateway Service) are complete (`TASK-0401` status: `DONE`). Fastify + TypeScript gateway service (`apps/iot-gateway`), MQTT client with TLS/reconnect handling, secret redaction, real DB + MQTT `/ready` endpoint, subsystem scaffolds, and test suites are verified.
+> **Current project status:** `TASK-0101` through `TASK-0402` (Repository Foundation, Auth & RBAC, Device Registry & Access Assignments, IoT Gateway Service, and Development MQTT Broker Configuration) are complete (`TASK-0402` status: `DONE`). Eclipse Mosquitto dockerized MQTT broker configuration (`docker-compose.yml`, `mosquitto.conf`, `acl.conf`, `pwfile`), PBKDF2-SHA512 password hashing generator, anonymous access rejection, per-device topic isolation, gateway permissions, non-retained command policy enforcement, and verification scripts are verified.
 
 ---
 

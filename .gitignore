@@ -42,3 +42,10 @@ apps/*/.env.*.local
 *.pem
 *.key
 *.tsbuildinfo
+
+# MQTT Broker — generated runtime files (do NOT track)
+# The real password hash file must not be committed.
+# Run `npm run mqtt:pwfile` to generate it locally from environment credentials.
+docker/mosquitto/config/pwfile
+docker/mosquitto/data/
+docker/mosquitto/log/
