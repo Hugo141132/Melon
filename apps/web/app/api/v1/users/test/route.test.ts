@@ -4,6 +4,8 @@ import { GET as GET_DETAIL, PATCH as PATCH_USER, DELETE as DELETE_USER } from '.
 import { POST as SUSPEND_USER } from '../[userId]/suspend/route';
 import { POST as DEACTIVATE_USER } from '../[userId]/deactivate/route';
 import { POST as ACTIVATE_USER } from '../[userId]/activate/route';
+import { GET as GET_DEVICES, POST as ASSIGN_DEVICE } from '../[userId]/devices/route';
+import { DELETE as REVOKE_DEVICE } from '../[userId]/devices/[deviceId]/route';
 import { AccountStatus, UserRole } from '@kebun-melon/contracts';
 import * as dbModule from '@kebun-melon/database';
 import {
@@ -28,6 +30,9 @@ const mockSuspendUser = vi.fn();
 const mockDeactivateUser = vi.fn();
 const mockActivateUser = vi.fn();
 const mockDeleteUserPermanently = vi.fn();
+const mockListUserDeviceAssignments = vi.fn();
+const mockAssignDeviceToUser = vi.fn();
+const mockRevokeDeviceAssignment = vi.fn();
 
 vi.mock('@kebun-melon/database', async (importOriginal) => {
   const actual = await importOriginal<typeof dbModule>();
@@ -54,6 +59,17 @@ vi.mock('@kebun-melon/database', async (importOriginal) => {
       }
       deleteUserPermanently(...args: any[]) {
         return mockDeleteUserPermanently(...args);
+      }
+    },
+    DeviceAssignmentRepository: class {
+      listUserDeviceAssignments(...args: any[]) {
+        return mockListUserDeviceAssignments(...args);
+      }
+      assignDeviceToUser(...args: any[]) {
+        return mockAssignDeviceToUser(...args);
+      }
+      revokeDeviceAssignment(...args: any[]) {
+        return mockRevokeDeviceAssignment(...args);
       }
     },
   };
@@ -582,5 +598,204 @@ describe('TASK-0212 Owner User Management API & Safety Tests', () => {
     });
     const res = await DELETE_USER(req, { params: { userId: 'admin-id-2' } });
     expect(res.status).toBe(403);
+  });
+});
+
+describe('TASK-0304 User Device Assignments API Routes', () => {
+  const mockOwnerSession = () => {
+    mockCookieToken = 'owner-token';
+    vi.spyOn(dbModule, 'validateSession').mockResolvedValueOnce({
+      session: {
+        id: 's-owner',
+        userId: 'owner-id-1',
+        expiresAt: new Date(),
+        lastSeenAt: new Date(),
+      },
+      user: {
+        id: 'owner-id-1',
+        fullName: 'Owner User',
+        email: 'owner@test.com',
+        username: 'owner1',
+        accountStatus: AccountStatus.ACTIVE,
+        emailVerifiedAt: null,
+        lastLoginAt: null,
+        suspendedAt: null,
+        deactivatedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        activeRoles: [UserRole.OWNER],
+      },
+    });
+  };
+
+  const mockAdminSession = () => {
+    mockCookieToken = 'admin-token';
+    vi.spyOn(dbModule, 'validateSession').mockResolvedValueOnce({
+      session: {
+        id: 's-admin',
+        userId: 'admin-id-1',
+        expiresAt: new Date(),
+        lastSeenAt: new Date(),
+      },
+      user: {
+        id: 'admin-id-1',
+        fullName: 'Admin User',
+        email: 'admin@test.com',
+        username: 'admin1',
+        accountStatus: AccountStatus.ACTIVE,
+        emailVerifiedAt: null,
+        lastLoginAt: null,
+        suspendedAt: null,
+        deactivatedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        activeRoles: [UserRole.ADMIN],
+      },
+    });
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe('GET /api/v1/users/[userId]/devices', () => {
+    it('returns 200 with assignments list for Owner request', async () => {
+      mockOwnerSession();
+      const mockAssignments = [
+        {
+          id: 'assign-1',
+          userId: 'admin-id-2',
+          deviceId: 'dev-1',
+          canonicalDeviceId: 'water-node-001',
+          deviceName: 'Water Node 1',
+          assignedByUserId: 'owner-id-1',
+          assignedAt: new Date(),
+          revokedAt: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ];
+      mockListUserDeviceAssignments.mockResolvedValue(mockAssignments);
+
+      const request = new Request('http://localhost/api/v1/users/admin-id-2/devices');
+      const response = await GET_DEVICES(request, { params: { userId: 'admin-id-2' } });
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body.success).toBe(true);
+      expect(body.data.assignments).toHaveLength(1);
+    });
+
+    it('returns 403 Forbidden for Admin request', async () => {
+      mockAdminSession();
+      const request = new Request('http://localhost/api/v1/users/admin-id-2/devices');
+      const response = await GET_DEVICES(request, { params: { userId: 'admin-id-2' } });
+      const body = await response.json();
+
+      expect(response.status).toBe(403);
+      expect(body.success).toBe(false);
+      expect(body.error.code).toBe('INSUFFICIENT_PERMISSION');
+    });
+  });
+
+  describe('POST /api/v1/users/[userId]/devices', () => {
+    it('returns 201 Created when Owner assigns a device', async () => {
+      mockOwnerSession();
+      const mockAssignment = {
+        id: 'assign-1',
+        userId: 'admin-id-2',
+        deviceId: 'dev-1',
+        canonicalDeviceId: 'water-node-001',
+        deviceName: 'Water Node 1',
+        assignedByUserId: 'owner-id-1',
+        assignedAt: new Date(),
+        revokedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      mockAssignDeviceToUser.mockResolvedValue(mockAssignment);
+
+      const request = new Request('http://localhost/api/v1/users/admin-id-2/devices', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ deviceId: 'water-node-001' }),
+      });
+
+      const response = await ASSIGN_DEVICE(request, { params: { userId: 'admin-id-2' } });
+      const body = await response.json();
+
+      expect(response.status).toBe(201);
+      expect(body.success).toBe(true);
+      expect(body.data.canonicalDeviceId).toBe('water-node-001');
+    });
+
+    it('returns 403 Forbidden for Admin attempt to assign', async () => {
+      mockAdminSession();
+      const request = new Request('http://localhost/api/v1/users/admin-id-2/devices', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ deviceId: 'water-node-001' }),
+      });
+
+      const response = await ASSIGN_DEVICE(request, { params: { userId: 'admin-id-2' } });
+      const body = await response.json();
+
+      expect(response.status).toBe(403);
+      expect(body.success).toBe(false);
+    });
+
+    it('returns 409 Conflict when active assignment already exists', async () => {
+      mockOwnerSession();
+      mockAssignDeviceToUser.mockRejectedValue(
+        new dbModule.DeviceAssignmentError('Active assignment exists', 'ACTIVE_ASSIGNMENT_EXISTS')
+      );
+
+      const request = new Request('http://localhost/api/v1/users/admin-id-2/devices', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ deviceId: 'water-node-001' }),
+      });
+
+      const response = await ASSIGN_DEVICE(request, { params: { userId: 'admin-id-2' } });
+      const body = await response.json();
+
+      expect(response.status).toBe(409);
+      expect(body.error.code).toBe('ACTIVE_ASSIGNMENT_EXISTS');
+    });
+  });
+
+  describe('DELETE /api/v1/users/[userId]/devices/[deviceId]', () => {
+    it('returns 204 No Content when Owner revokes assignment', async () => {
+      mockOwnerSession();
+      mockRevokeDeviceAssignment.mockResolvedValue({
+        id: 'assign-1',
+        revokedAt: new Date(),
+      });
+
+      const request = new Request(
+        'http://localhost/api/v1/users/admin-id-2/devices/water-node-001',
+        { method: 'DELETE' }
+      );
+
+      const response = await REVOKE_DEVICE(request, {
+        params: { userId: 'admin-id-2', deviceId: 'water-node-001' },
+      });
+
+      expect(response.status).toBe(204);
+    });
+
+    it('returns 403 Forbidden for Admin attempt to revoke', async () => {
+      mockAdminSession();
+      const request = new Request(
+        'http://localhost/api/v1/users/admin-id-2/devices/water-node-001',
+        { method: 'DELETE' }
+      );
+
+      const response = await REVOKE_DEVICE(request, {
+        params: { userId: 'admin-id-2', deviceId: 'water-node-001' },
+      });
+
+      expect(response.status).toBe(403);
+    });
   });
 });

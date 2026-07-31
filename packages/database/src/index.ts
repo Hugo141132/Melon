@@ -5,4 +5,5 @@ export * from './password-service';
 export * from './admin-registration';
 export * from './session-service';
 export * from './device-repository';
+export * from './device-assignment-repository';
 export { CANONICAL_PERMISSIONS } from '../prisma/seed';

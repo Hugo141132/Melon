@@ -869,11 +869,13 @@ BATTERY_MONITORING
 
 ## TASK-0304 — Implement User-Device Assignments
 
-**Priority:** `P0`  
-**Status:** `BACKLOG`  
+**Priority:** `P0`
+**Status:** `DONE`
 **Dependencies:** `TASK-0302`, `TASK-0209`
+**Completed:** 2026-07-31 — Implemented management of User ↔ Device assignment relationships. Owner can assign devices to Admin users and revoke assignments (`assignedBy`, `assignedAt`, `revokedAt`). Historical revoked rows are retained in PostgreSQL (`revokedAt IS NOT NULL`), and single active assignment per (user_id, device_id) is enforced by partial unique index `user_device_access_active_user_device_unique`. Active assigned devices display cleanly in the Owner management UI, with instant UI updates on revocation, and revoked devices immediately becoming available for reassignment. Added comprehensive unit and integration test coverage across contract, API, database repository, and frontend layers.
 
 ### Work
+
 
 Implement:
 

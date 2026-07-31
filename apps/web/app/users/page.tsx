@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+
 import Link from 'next/link';
 import TopAppBar from '@/components/navigation/TopAppBar';
 import BottomNav from '@/components/navigation/BottomNav';
@@ -20,6 +21,7 @@ import {
   X,
   CheckCircle2,
   AlertTriangle,
+  Cpu,
 } from 'lucide-react';
 
 interface UserDto {
@@ -82,6 +84,109 @@ export default function UserManagementPage() {
   );
   const [actionReason, setActionReason] = useState('');
   const [actionSubmitting, setActionSubmitting] = useState(false);
+
+  // Device Access Modal State
+  const [deviceModalOpen, setDeviceModalOpen] = useState(false);
+  const [userAssignments, setUserAssignments] = useState<any[]>([]);
+  const [availableDevices, setAvailableDevices] = useState<any[]>([]);
+  const [deviceModalLoading, setDeviceModalLoading] = useState(false);
+  const [selectedAssignDeviceId, setSelectedAssignDeviceId] = useState('');
+  const [assigningDevice, setAssigningDevice] = useState(false);
+  const [revokingDeviceId, setRevokingDeviceId] = useState<string | null>(null);
+
+  const fetchUserDeviceAssignments = useCallback(async (userId: string) => {
+    setDeviceModalLoading(true);
+    try {
+      const [assignRes, devRes] = await Promise.all([
+        fetch(`/api/v1/users/${userId}/devices`),
+        fetch(`/api/v1/devices`),
+      ]);
+      const assignJson = await assignRes.json();
+      const devJson = await devRes.json();
+
+      if (assignJson.success) {
+        const activeOnly = (assignJson.data.assignments || []).filter(
+          (a: any) => a.revokedAt === null
+        );
+        setUserAssignments(activeOnly);
+      }
+      if (devJson.success) {
+        const rawDevices = Array.isArray(devJson.data) ? devJson.data : devJson.data?.devices || [];
+        setAvailableDevices(rawDevices);
+      }
+    } catch {
+      setErrorMsg('Gagal memuat daftar hak akses perangkat.');
+    } finally {
+      setDeviceModalLoading(false);
+    }
+  }, []);
+
+  const handleAssignDevice = async () => {
+    if (!selectedUser || !selectedAssignDeviceId) return;
+    setAssigningDevice(true);
+    setErrorMsg(null);
+    try {
+      const res = await fetch(`/api/v1/users/${selectedUser.id}/devices`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deviceId: selectedAssignDeviceId }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error?.message || 'Gagal menetapkan perangkat.');
+      }
+      setSuccessMsg('Perangkat berhasil ditetapkan.');
+      setSelectedAssignDeviceId('');
+      await fetchUserDeviceAssignments(selectedUser.id);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Gagal menetapkan perangkat.');
+    } finally {
+      setAssigningDevice(false);
+    }
+  };
+
+  const handleRevokeDevice = async (canonicalDeviceId: string) => {
+    if (!selectedUser) return;
+    setRevokingDeviceId(canonicalDeviceId);
+    setErrorMsg(null);
+    try {
+      const res = await fetch(`/api/v1/users/${selectedUser.id}/devices/${canonicalDeviceId}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json.error?.message || 'Gagal mencabut akses perangkat.');
+      }
+      setSuccessMsg('Akses perangkat berhasil dicabut.');
+      setUserAssignments((prev) =>
+        prev.filter(
+          (a) => a.canonicalDeviceId !== canonicalDeviceId && a.deviceId !== canonicalDeviceId
+        )
+      );
+      await fetchUserDeviceAssignments(selectedUser.id);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Gagal mencabut akses perangkat.');
+    } finally {
+      setRevokingDeviceId(null);
+    }
+  };
+
+  const unassignedAvailableDevices = useMemo(() => {
+    const activeAssignedIds = new Set(
+      userAssignments
+        .filter((a) => !a.revokedAt)
+        .flatMap((a) => [a.deviceId, a.canonicalDeviceId].filter(Boolean))
+    );
+
+    return availableDevices.filter((dev) => {
+      if (dev.accountStatus && dev.accountStatus !== 'ACTIVE') {
+        return false;
+      }
+      const canonicalId = dev.deviceId || dev.canonicalDeviceId;
+      const isAssigned = activeAssignedIds.has(dev.id) || activeAssignedIds.has(canonicalId);
+      return !isAssigned;
+    });
+  }, [availableDevices, userAssignments]);
 
   // Load session to check Owner role
   useEffect(() => {
@@ -467,6 +572,19 @@ export default function UserManagementPage() {
 
                       {!isOwner && (
                         <>
+                          {currentUserRole === 'OWNER' && (
+                            <button
+                              onClick={() => {
+                                setSelectedUser(u);
+                                setDeviceModalOpen(true);
+                                fetchUserDeviceAssignments(u.id);
+                              }}
+                              className="px-3 py-1.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-[12px] font-medium rounded-lg hover:bg-emerald-100 transition-colors flex items-center gap-1.5"
+                            >
+                              <Cpu size={14} /> Perangkat
+                            </button>
+                          )}
+
                           <button
                             onClick={() => {
                               setSelectedUser(u);
@@ -817,6 +935,147 @@ export default function UserManagementPage() {
                   : confirmAction === 'suspend'
                     ? 'Ya, Tangguhkan'
                     : 'Ya, Aktifkan'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Device Access Management Modal */}
+      {deviceModalOpen && selectedUser && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-app-surface-container-lowest border border-app-outline-variant/30 rounded-2xl p-6 max-w-lg w-full soft-elevation space-y-5">
+            <div className="flex items-center justify-between border-b border-app-outline-variant/20 pb-4">
+              <div>
+                <h2 className="text-[18px] font-bold text-app-on-surface flex items-center gap-2">
+                  <Cpu size={20} className="text-app-primary" /> Kelola Perangkat Admin
+                </h2>
+                <p className="text-[13px] text-app-on-surface-variant font-medium">
+                  {selectedUser.fullName} ({selectedUser.email})
+                </p>
+              </div>
+              <button
+                onClick={() => setDeviceModalOpen(false)}
+                className="text-app-outline hover:text-app-on-surface"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {selectedUser.accountStatus !== 'ACTIVE' && (
+              <div className="p-3 bg-amber-50 border border-amber-200 text-amber-800 text-[13px] rounded-xl flex items-center gap-2">
+                <AlertTriangle size={16} className="flex-shrink-0" />
+                <span>
+                  Perhatian: Hanya pengguna dengan status <strong>ACTIVE</strong> yang dapat
+                  diberikan akses perangkat baru.
+                </span>
+              </div>
+            )}
+
+            {/* Assign Device Form */}
+            {selectedUser.accountStatus === 'ACTIVE' && (
+              <div className="space-y-2 bg-app-surface-container-low p-4 rounded-xl border border-app-outline-variant/30">
+                <label className="text-[13px] font-bold text-app-on-surface block">
+                  Tetapkan Perangkat Baru
+                </label>
+                <div className="flex gap-2">
+                  <select
+                    value={selectedAssignDeviceId}
+                    onChange={(e) => setSelectedAssignDeviceId(e.target.value)}
+                    className="flex-1 px-3 py-2 bg-app-surface-container border border-app-outline-variant/40 rounded-xl text-[13px] focus:outline-none"
+                  >
+                    <option value="">-- Pilih Perangkat --</option>
+                    {unassignedAvailableDevices.map((dev: any) => {
+                      const canonicalId = dev.deviceId || dev.canonicalDeviceId;
+                      const name = dev.name || dev.deviceName;
+                      return (
+                        <option key={dev.id || canonicalId} value={canonicalId}>
+                          {name} ({canonicalId})
+                        </option>
+                      );
+                    })}
+                  </select>
+
+                  <button
+                    type="button"
+                    disabled={!selectedAssignDeviceId || assigningDevice}
+                    onClick={handleAssignDevice}
+                    className="px-4 py-2 bg-app-primary text-app-on-primary text-[13px] font-bold rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center gap-1.5"
+                  >
+                    {assigningDevice && <Loader2 size={14} className="animate-spin" />} Tetapkan
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Active Assigned Devices List */}
+            <div className="space-y-3">
+              <h3 className="text-[14px] font-bold text-app-on-surface">
+                Perangkat Aktif Pengguna ({userAssignments.length})
+              </h3>
+              {deviceModalLoading ? (
+                <div className="p-6 text-center text-app-on-surface-variant flex items-center justify-center gap-2">
+                  <Loader2 size={18} className="animate-spin text-app-primary" />
+                  <span className="text-[13px]">Memuat akses perangkat...</span>
+                </div>
+              ) : userAssignments.length === 0 ? (
+                <p className="text-[13px] text-app-outline italic text-center p-4">
+                  Belum ada perangkat yang ditetapkan untuk akun admin ini.
+                </p>
+              ) : (
+                <div className="divide-y divide-app-outline-variant/20 max-h-60 overflow-y-auto pr-1">
+                  {userAssignments.map((assignment) => (
+                    <div
+                      key={assignment.id}
+                      className="py-3 flex items-center justify-between gap-3 text-[13px]"
+                    >
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-app-on-surface">
+                            {assignment.deviceName || assignment.canonicalDeviceId}
+                          </span>
+                          <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-emerald-50 text-emerald-800 border border-emerald-200">
+                            AKTIF
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-app-outline font-mono">
+                          ID: {assignment.canonicalDeviceId}
+                        </p>
+                        <p className="text-[11px] text-app-outline">
+                          Ditetapkan:{' '}
+                          {new Date(assignment.assignedAt).toLocaleDateString('id-ID', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                          })}
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={revokingDeviceId === assignment.canonicalDeviceId}
+                        onClick={() => handleRevokeDevice(assignment.canonicalDeviceId)}
+                        className="px-3 py-1 bg-red-50 text-red-700 border border-red-200 text-[12px] font-medium rounded-lg hover:bg-red-100 transition-colors flex items-center gap-1 disabled:opacity-50"
+                      >
+                        {revokingDeviceId === assignment.canonicalDeviceId ? (
+                          <Loader2 size={12} className="animate-spin" />
+                        ) : (
+                          'Cabut Akses'
+                        )}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-app-outline-variant/20">
+              <button
+                type="button"
+                onClick={() => setDeviceModalOpen(false)}
+                className="px-4 py-2 bg-app-surface-container text-app-on-surface text-[13px] font-medium rounded-xl border border-app-outline-variant/30 hover:bg-app-surface-container-high transition-colors"
+              >
+                Tutup
               </button>
             </div>
           </div>
