@@ -924,9 +924,10 @@ GET /api/v1/devices/{deviceId}
 
 ## TASK-0306 — Implement Device Selector
 
-**Priority:** `P1`  
-**Status:** `BACKLOG`  
+**Priority:** `P1`
+**Status:** `DONE`
 **Dependencies:** `TASK-0305`
+**Completed:** 2026-07-31 — Implemented DeviceContext provider and DeviceSelector component in apps/web. Sourced authorised devices exclusively from GET /api/v1/devices, adhering strictly to OWNER global scope and ADMIN assigned device scope. Handled 6 core UI states: Loading (skeleton), 0 devices (empty state, metrics/controls disabled), 1 device (active badge), multiple devices (>1 dropdown with search and status filters), revoked access (notice banner and safe fallback), and API error. Implemented URL (?deviceId=...) and localStorage candidate validation against the server-authorised list to prevent client-side tampering. Integrated selector into TopAppBar and RootLayout. Added comprehensive unit and integration test coverage (apps/web/app/devices/test/selector.test.ts).
 
 ### Work
 
