@@ -736,7 +736,8 @@ requireDeviceControlAccess()
 ## TASK-0211 — Implement Self Profile
 
 **Priority:** `P1`  
-**Status:** `BACKLOG`  
+**Status:** `DONE`  
+**Completed:** `2026-07-30`  
 **Dependencies:** `TASK-0204`, `TASK-0209`
 
 ### Work
@@ -1151,8 +1152,9 @@ Implement:
 ## TASK-0408 — Implement Device Simulator
 
 **Priority:** `P1`  
-**Status:** `BACKLOG`  
-**Dependencies:** `TASK-0402`, `TASK-0404`
+**Status:** `BLOCKED`  
+**Dependencies:** `TASK-0402`, `TASK-0404`  
+**Blocked Reason:** Blocked by `docs/DECISIONS.md` §3 (Reservoir-Water Volume and Flow Rate units TBD) and downstream blocked dependencies (`TASK-0406` Water Quality REST ingestion blocked, `TASK-0407` Heartbeat/Status thresholds blocked, `TASK-0803` Faucet Command API blocked). Soil/Water Quality over MQTT prohibited per `DEC-DEV-020`.
 
 ### Work
 
