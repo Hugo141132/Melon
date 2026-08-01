@@ -1006,9 +1006,10 @@ Create long-running service with:
 
 ## TASK-0403 — Implement MQTT Topic Router
 
-**Priority:** `P0`  
-**Status:** `BACKLOG`  
+**Priority:** `P0`
+**Status:** `DONE`
 **Dependencies:** `TASK-0401`
+**Completed:** 2026-07-31 — Implemented full MQTT topic parsing, structural validation, environment isolation, device-payload matching (`isTopicPayloadMatch`), wildcard rejection, and subscription topic pattern helpers (`getSubscriptionPattern`, `getCategorySubscriptionPattern`, `buildTopic`) per `docs/DEVICE_COMMUNICATION.md` §8. Added comprehensive unit test suite in `apps/iot-gateway/src/__tests__/topic-router.test.ts`.
 
 ### Work
 
