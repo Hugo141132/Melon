@@ -1063,7 +1063,7 @@ Validate:
 ## TASK-0405 — Implement Soil Telemetry Ingestion
 
 **Priority:** `P0`  
-**Status:** `BACKLOG`  
+**Status:** `DONE`
 **Dependencies:** `TASK-0404`, `TASK-0104`
 
 ### Work

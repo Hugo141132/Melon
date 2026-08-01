@@ -16,3 +16,19 @@ export enum AccountStatus {
   SUSPENDED = 'SUSPENDED',
   DEACTIVATED = 'DEACTIVATED',
 }
+
+export enum MonitoringStatus {
+  NORMAL = 'NORMAL',
+  WARNING = 'WARNING',
+  CRITICAL = 'CRITICAL',
+  UNKNOWN = 'UNKNOWN',
+  UNAVAILABLE = 'UNAVAILABLE',
+  INVALID = 'INVALID',
+}
+
+export enum TelemetryValidationStatus {
+  VALID = 'VALID',
+  PARTIAL = 'PARTIAL',
+  INVALID = 'INVALID',
+  QUARANTINED = 'QUARANTINED',
+}

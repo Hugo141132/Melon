@@ -57,6 +57,17 @@ describe('TASK-0210 — Route and API Protection Integration Tests', () => {
       const res = middleware(req);
       expect(res.status).toBe(200); // NextResponse.next()
     });
+
+    it('5. Allows device telemetry ingestion API endpoints without user session cookie', () => {
+      const telemetryEndpoint = 'http://localhost:3000/api/v1/devices/soil-node-001/telemetry/soil';
+      const req = new NextRequest(telemetryEndpoint, {
+        method: 'POST',
+        headers: { 'x-device-id': 'soil-node-001' },
+      });
+      const res = middleware(req);
+      expect(res.status).toBe(200); // NextResponse.next() -> allows request to proceed to route handler
+      expect(res.headers.get('location')).toBeNull();
+    });
   });
 
   describe('Server-Side Session & RBAC Enforcement Helpers', () => {

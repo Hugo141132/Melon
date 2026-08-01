@@ -24,6 +24,13 @@ export class DeviceNotFoundError extends Error {
   }
 }
 
+export class DeviceInactiveError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'DeviceInactiveError';
+  }
+}
+
 export interface PaginatedDevicesResult {
   items: PublicSafeDeviceDto[];
   pagination: {
