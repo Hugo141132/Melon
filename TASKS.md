@@ -1034,8 +1034,9 @@ message subtype
 ## TASK-0404 — Implement Shared Message Validation
 
 **Priority:** `P0`  
-**Status:** `BACKLOG`  
+**Status:** `DONE`  
 **Dependencies:** `TASK-0403`
+**Completed:** 2026-08-01 — Extended MessageValidator scaffold (`apps/iot-gateway/src/validation/validator.ts`) to validate payload byte size limits (default 64 KB, returning `MESSAGE_TOO_LARGE`), JSON parsing (`INVALID_JSON`), non-null object payload (`INVALID_SCHEMA`), schemaVersion 1.0 (`UNSUPPORTED_SCHEMA_VERSION`), envelope fields (UUID messageId, deviceId, ISO timestamp, sequence), topic/payload device ID mismatch (`TOPIC_DEVICE_MISMATCH`), and recursive non-finite numeric checks (`INVALID_VALUE`). Added comprehensive unit test suite in `apps/iot-gateway/src/__tests__/message-validator.test.ts`.
 
 ### Work
 

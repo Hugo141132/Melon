@@ -60,7 +60,7 @@ describe('IoT Gateway Subsystem Modules', () => {
     it('validates a valid base payload JSON', () => {
       const raw = Buffer.from(
         JSON.stringify({
-          version: '1.0',
+          schemaVersion: '1.0',
           messageId: '550e8400-e29b-41d4-a716-446655440000',
           deviceId: 'device-01',
           timestamp: new Date().toISOString(),
