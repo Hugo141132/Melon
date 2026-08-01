@@ -3,8 +3,12 @@ import { redactSecrets } from '../config/env';
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 export interface LogMeta {
-  requestId?: string;
+  correlationId?: string;
+  messageId?: string;
+  commandId?: string;
   deviceId?: string;
+  ingestionId?: string;
+  requestId?: string;
   topic?: string;
   [key: string]: unknown;
 }

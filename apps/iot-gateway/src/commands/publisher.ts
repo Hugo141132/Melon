@@ -1,5 +1,6 @@
 import { GatewayMqttClient } from '../mqtt/client';
 import { logger } from '../observability/logger';
+import { metricsCollector } from '../observability/metrics';
 
 export class CommandPublisher {
   /**
@@ -17,6 +18,7 @@ export class CommandPublisher {
         deviceId,
         commandId,
       });
+      metricsCollector.incrementCommandFailures();
       return { published: false };
     }
 
@@ -31,6 +33,7 @@ export class CommandPublisher {
 
     // Faucet commands must never be retained (retain = false)
     await mqttClient.publish(topic, payloadBuffer, 1, false);
+    metricsCollector.incrementCommandsPublished();
 
     logger.info('Scaffold: Faucet command published', {
       deviceId,

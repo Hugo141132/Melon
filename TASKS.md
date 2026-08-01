@@ -1182,8 +1182,9 @@ Simulate:
 ## TASK-0409 — Implement Gateway Observability
 
 **Priority:** `P1`  
-**Status:** `BACKLOG`  
+**Status:** `DONE`
 **Dependencies:** `TASK-0401`
+**Completed:** 2026-08-01 — Implemented broker-agnostic `GatewayMetricsCollector` in `apps/iot-gateway/src/observability/metrics.ts` tracking broker connection states, message counters (valid, invalid, duplicate, unknown device attempts), telemetry ingestion latency statistics, active device counts, and command status. Enhanced `logger.ts` LogMeta for correlation IDs (`correlationId`, `messageId`, `commandId`, `deviceId`, `ingestionId`, `requestId`) and automated secret redaction. Integrated metric recording into `GatewayMqttClient` and `CommandPublisher`. Preserved existing `/health` and `/ready` routes without changes or unspec'd public endpoints. Added unit test suite `apps/iot-gateway/src/__tests__/metrics.test.ts`. Verified 88/88 test pass rate, lint, diff-check, and status.
 
 ### Work
 

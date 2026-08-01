@@ -2,6 +2,7 @@ import mqtt, { MqttClient, IClientOptions } from 'mqtt';
 import fs from 'fs';
 import { GatewayEnv, redactString } from '../config/env';
 import { logger } from '../observability/logger';
+import { metricsCollector } from '../observability/metrics';
 
 export type MqttConnectionStatus =
   'DISCONNECTED' | 'CONNECTING' | 'CONNECTED' | 'RECONNECTING' | 'ERROR';
@@ -39,6 +40,7 @@ export class GatewayMqttClient {
     }
 
     this.status = 'CONNECTING';
+    metricsCollector.recordBrokerState('CONNECTING');
     const brokerUrl = this.env.MQTT_BROKER_URL || 'mqtt://localhost:1883';
 
     const options: IClientOptions = {
@@ -79,6 +81,7 @@ export class GatewayMqttClient {
     } catch (err: any) {
       this.status = 'ERROR';
       this.lastError = err?.message || 'Failed to initialize MQTT connection';
+      metricsCollector.incrementErrors();
       logger.error('MQTT connection initialization failed', err);
       throw err;
     }
@@ -90,23 +93,27 @@ export class GatewayMqttClient {
     this.client.on('connect', () => {
       this.status = 'CONNECTED';
       this.lastError = null;
+      metricsCollector.incrementConnects();
       logger.info('MQTT client successfully connected to broker');
     });
 
     this.client.on('reconnect', () => {
       this.status = 'RECONNECTING';
+      metricsCollector.incrementReconnects();
       logger.warn('MQTT client reconnecting to broker...');
     });
 
     this.client.on('close', () => {
       if (this.status !== 'DISCONNECTED') {
         this.status = 'DISCONNECTED';
+        metricsCollector.recordBrokerState('DISCONNECTED');
         logger.warn('MQTT client connection closed');
       }
     });
 
     this.client.on('offline', () => {
       this.status = 'DISCONNECTED';
+      metricsCollector.recordBrokerState('DISCONNECTED');
       logger.warn('MQTT client went offline');
     });
 
@@ -114,10 +121,12 @@ export class GatewayMqttClient {
       this.status = 'ERROR';
       const sanitizedMsg = redactString(err.message);
       this.lastError = sanitizedMsg;
+      metricsCollector.incrementErrors();
       logger.error('MQTT client error occurred', new Error(sanitizedMsg));
     });
 
     this.client.on('message', (topic: string, payload: Buffer) => {
+      metricsCollector.incrementMessagesReceived();
       for (const handler of this.messageHandlers) {
         try {
           handler(topic, payload);
