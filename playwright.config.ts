@@ -12,15 +12,24 @@ export default defineConfig({
     headless: true,
     trace: 'on-first-retry',
   },
-  projects: [
-    {
-      name: 'msedge',
-      use: {
-        ...devices['Desktop Chrome'],
-        channel: 'msedge',
-      },
-    },
-  ],
+  projects: process.env.CI
+    ? [
+        {
+          name: 'chromium',
+          use: {
+            ...devices['Desktop Chrome'],
+          },
+        },
+      ]
+    : [
+        {
+          name: 'msedge',
+          use: {
+            ...devices['Desktop Chrome'],
+            channel: 'msedge',
+          },
+        },
+      ],
   webServer: {
     command: 'npm run dev',
     url: 'http://localhost:3000',

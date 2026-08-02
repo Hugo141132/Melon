@@ -442,8 +442,9 @@ Configure:
 ## TASK-0108 — Configure CI Pipeline
 
 **Priority:** `P1`  
-**Status:** `BACKLOG`  
-**Dependencies:** `TASK-0102`, `TASK-0107`
+**Status:** `DONE`  
+**Dependencies:** `TASK-0102`, `TASK-0107`  
+**Completed:** 2026-08-02 — Configured GitHub Actions CI pipeline (`.github/workflows/ci.yml`) triggering on pull requests and pushes to `main`. Configured Node.js 20 with `npm` dependency caching, code formatting check (`npm run format:check`), ESLint linting (`npm run lint`), TypeScript type checking (`npm run typecheck`), environment schema validation (`npm run env:check`), environment unit tests (`npm run env:test`), requirement traceability verification (`python scripts/validate-requirements.py`), Prisma client generation & schema validation (`npm run db:generate`, `npm run db:validate`), ephemeral PostgreSQL migration deployment (`npm run db:migrate:deploy`), high-severity dependency security scanning (`npm audit --audit-level=high`), hardcoded credential secret pattern scanning, Vitest unit & integration test coverage (`npm run test:coverage`), Next.js & Fastify production build verification (`npm run build`), bundled Chromium installation (`npx playwright install chromium --with-deps`), and headless Playwright E2E smoke tests (`npm run test:e2e`). Updated `playwright.config.ts` to dynamically use bundled `chromium` when `process.env.CI` is true while preserving `msedge` for local testing. Verified all 44 test suites (349 tests), ESLint, TypeScript, formatting, environment schema, and traceability scripts passed 100% locally.
 
 ### Work
 
