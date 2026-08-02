@@ -1,11 +1,7 @@
 import { redactSecrets } from '../config/env';
 
 export type BrokerConnectionState =
-  | 'DISCONNECTED'
-  | 'CONNECTING'
-  | 'CONNECTED'
-  | 'RECONNECTING'
-  | 'ERROR';
+  'DISCONNECTED' | 'CONNECTING' | 'CONNECTED' | 'RECONNECTING' | 'ERROR';
 
 export interface LatencyStats {
   count: number;
