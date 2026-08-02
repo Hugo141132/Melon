@@ -1159,7 +1159,7 @@ Implement:
 **Priority:** `P1`  
 **Status:** `BACKLOG`  
 **Dependencies:** `TASK-0402`, `TASK-0404`, `TASK-0405`  
-**Notes:** Adapted to simulate available Soil Telemetry (REST per `TASK-0405`), Reservoir Tank Telemetry (MQTT per `DEC-DEV-020`), and Faucet Command Acknowledgements, while ignoring blocked water quality & heartbeat payloads until unblocked.
+**Notes:** Adapted to simulate available Soil Telemetry (REST per `TASK-0405`), Water Tank (`WATER_TANK_NODE`) Telemetry (MQTT per `DEC-DEV-020`), and Faucet Command Acknowledgements, while ignoring blocked water quality & heartbeat payloads until unblocked.
 
 ### Work
 
@@ -1222,7 +1222,7 @@ Metrics:
 **Priority:** `P0`  
 **Status:** `BACKLOG`  
 **Dependencies:** `TASK-0405`, `TASK-0305`  
-**Notes:** Adapted to serve Soil Telemetry (`TASK-0405`) and Reservoir Tank Telemetry (`TASK-0401`), returning null for uningested water quality metrics per `AGENTS.md` §16.
+**Notes:** Adapted to serve Soil Telemetry (`TASK-0405`) and Water Tank (`WATER_TANK_NODE`) Telemetry (`TASK-0401`), returning null for uningested water quality metrics per `AGENTS.md` §16.
 
 ### Work
 
