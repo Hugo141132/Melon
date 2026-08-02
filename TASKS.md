@@ -1563,9 +1563,9 @@ Document:
 ## TASK-0803 — Implement Faucet Command API
 
 **Priority:** `P0`  
-**Status:** `BACKLOG`  
+**Status:** `DONE`  
 **Dependencies:** `TASK-0802`, `TASK-0304`  
-**Notes:** Permission matrix finalized in `TASK-0801` (`DEC-RBAC-015`); unblocked pending database model (`TASK-0802`).
+**Completed:** 2026-08-02 — Implemented POST /api/v1/devices/{deviceId}/faucet-commands, GET /api/v1/devices/{deviceId}/faucet-commands, and GET /api/v1/devices/{deviceId}/faucet-commands/{commandId} REST API endpoints with active session authentication (`requireSession`), active account revalidation (`requireActiveAccount`), RBAC permissions (`device.control.dispense`, `device.control.history.read`), ENABLE_FAUCET_CONTROL feature flag guard, device assignment scoping, FAUCET_CONTROL capability validation, device active & ONLINE state checks, server-side phase-to-volume mapping (Phase 1: 300mL, Phase 2: 1000mL, Phase 3: 1500mL), idempotency key handling, max 1 active command per device conflict enforcement (QUEUED, SENT, ACKNOWLEDGED, IN_PROGRESS), durable QUEUED persistence with initial FaucetCommandEvent creation, atomic AuditLog recording (faucet.command.created), paginated history filtering, and 100% test coverage.
 
 ### Work
 

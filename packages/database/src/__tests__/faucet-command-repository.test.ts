@@ -25,6 +25,9 @@ describe('FaucetCommandRepository Unit & Integration Tests', () => {
         findFirst: vi.fn(),
         create: vi.fn(),
       },
+      auditLog: {
+        create: vi.fn(),
+      },
       $transaction: vi.fn(async (cb) => cb(mockPrisma)),
     };
 

@@ -214,6 +214,8 @@ export async function requireDeviceControlAccess(
     );
   }
 
+  requirePermission(session, 'device.control.dispense');
+
   await requireDeviceViewAccess(session, targetDeviceId, options);
 
   if (options?.isDeviceActiveAndControllable) {

@@ -217,6 +217,25 @@ export class FaucetCommandRepository {
           },
         });
 
+        await tx.auditLog.create({
+          data: {
+            eventKey: 'faucet.command.created',
+            actorUserId,
+            actorRole,
+            targetType: 'faucet_command',
+            targetId: cmd.id,
+            result: 'SUCCESS',
+            newValues: {
+              commandId: cmd.commandId,
+              deviceId: cmd.deviceId,
+              phase: cmd.phase,
+              targetVolumeMl: cmd.targetVolumeMl,
+              idempotencyKey: cmd.idempotencyKey,
+              status: cmd.status,
+            },
+          },
+        });
+
         return { ...cmd, events: [evt] };
       });
 
