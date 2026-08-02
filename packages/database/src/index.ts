@@ -8,4 +8,5 @@ export * from './device-repository';
 export * from './device-assignment-repository';
 export * from './telemetry-repository';
 export * from './alert-repository';
+export * from './faucet-command-repository';
 export { CANONICAL_PERMISSIONS } from '../prisma/seed';

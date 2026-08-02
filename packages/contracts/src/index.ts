@@ -4,3 +4,4 @@ export * from './device';
 export * from './device-assignment';
 export * from './telemetry';
 export * from './alert';
+export * from './faucet';

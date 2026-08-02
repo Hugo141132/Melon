@@ -1545,8 +1545,10 @@ Document:
 ## TASK-0802 — Implement Faucet Command Database Model
 
 **Priority:** `P0`  
-**Status:** `BACKLOG`  
-**Dependencies:** `TASK-0104`
+**Status:** `DONE`  
+**Dependencies:** `TASK-0104`  
+**Completed:** 2026-08-02 — Implemented FaucetCommand & FaucetCommandEvent contracts, server-side phase-volume mapping (Phase 1: 300mL, Phase 2: 1000mL, Phase 3: 1500mL), raw SQL migration for partial unique message_id index on faucet_command_events, FaucetCommandRepository with state transition safeguards, idempotency checks, active command concurrency checks, and complete test suite.
+
 
 ### Acceptance Criteria
 
