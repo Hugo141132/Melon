@@ -7,4 +7,5 @@ export * from './session-service';
 export * from './device-repository';
 export * from './device-assignment-repository';
 export * from './telemetry-repository';
+export * from './alert-repository';
 export { CANONICAL_PERMISSIONS } from '../prisma/seed';

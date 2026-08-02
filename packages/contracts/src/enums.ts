@@ -32,3 +32,15 @@ export enum TelemetryValidationStatus {
   INVALID = 'INVALID',
   QUARANTINED = 'QUARANTINED',
 }
+
+export enum AlertSeverity {
+  INFO = 'INFO',
+  WARNING = 'WARNING',
+  CRITICAL = 'CRITICAL',
+}
+
+export enum AlertStatus {
+  OPEN = 'OPEN',
+  ACKNOWLEDGED = 'ACKNOWLEDGED',
+  RESOLVED = 'RESOLVED',
+}

@@ -1444,8 +1444,10 @@ CI detects:
 ## TASK-0701 — Implement Alert Model and API
 
 **Priority:** `P1`  
-**Status:** `BACKLOG`  
-**Dependencies:** `TASK-0104`, `TASK-0304`
+**Status:** `DONE`  
+**Dependencies:** `TASK-0104`, `TASK-0304`  
+**Completed:** 2026-08-02 — Implemented Alert DTO contracts, Zod schemas, AlertRepository with OWNER global scope and ADMIN device assignment scoping, and REST API endpoints (GET /api/v1/alerts and GET /api/v1/alerts/[alertId]) with full RBAC, filtering, pagination, standard error envelopes, and test coverage across contract, repository, and API routes.
+
 
 ### Work
 
