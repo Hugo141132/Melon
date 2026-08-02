@@ -797,8 +797,9 @@ Implemented complete Owner User Management:
 ## TASK-0301 — Implement Site Model
 
 **Priority:** `P2`  
-**Status:** `BLOCKED`  
-**Dependencies:** `TASK-0104`, `TASK-0002`
+**Status:** `SUPERSEDED`  
+**Dependencies:** `TASK-0302`  
+**Completed:** 2026-08-02 — Superseded by single default site in device schema in `TASK-0302` (`DONE`); multi-site UI selector explicitly deferred to Phase 11 (`TASK-1105`) per `DEC-DEV-026`.
 
 ### Work
 
@@ -1098,7 +1099,8 @@ status
 
 **Priority:** `P0`  
 **Status:** `BLOCKED`  
-**Dependencies:** `TASK-0404`, `TASK-0104`, `TASK-0002`
+**Dependencies:** `TASK-0404`, `TASK-0104`  
+**Blocked Reason:** Blocked by `docs/DECISIONS.md` §3 (`Water BAT` telemetry unit/precision and telemetry publish interval TBD).
 
 ### Work
 
@@ -1129,7 +1131,8 @@ flowRate
 
 **Priority:** `P0`  
 **Status:** `BLOCKED`  
-**Dependencies:** `TASK-0404`, `TASK-0002`
+**Dependencies:** `TASK-0404`  
+**Blocked Reason:** Blocked by `docs/DECISIONS.md` §3 (Device offline threshold minutes and stale threshold minutes TBD).
 
 ### Work
 
@@ -1154,9 +1157,9 @@ Implement:
 ## TASK-0408 — Implement Device Simulator
 
 **Priority:** `P1`  
-**Status:** `BLOCKED`  
-**Dependencies:** `TASK-0402`, `TASK-0404`  
-**Blocked Reason:** Blocked by `docs/DECISIONS.md` §3 (Reservoir-Water Volume and Flow Rate units TBD) and downstream blocked dependencies (`TASK-0406` Water Quality REST ingestion blocked, `TASK-0407` Heartbeat/Status thresholds blocked, `TASK-0803` Faucet Command API blocked). Soil/Water Quality over MQTT prohibited per `DEC-DEV-020`.
+**Status:** `BACKLOG`  
+**Dependencies:** `TASK-0402`, `TASK-0404`, `TASK-0405`  
+**Notes:** Adapted to simulate available Soil Telemetry (REST per `TASK-0405`), Reservoir Tank Telemetry (MQTT per `DEC-DEV-020`), and Faucet Command Acknowledgements, while ignoring blocked water quality & heartbeat payloads until unblocked.
 
 ### Work
 
@@ -1218,7 +1221,8 @@ Metrics:
 
 **Priority:** `P0`  
 **Status:** `BACKLOG`  
-**Dependencies:** `TASK-0405`, `TASK-0406`, `TASK-0305`
+**Dependencies:** `TASK-0405`, `TASK-0305`  
+**Notes:** Adapted to serve Soil Telemetry (`TASK-0405`) and Reservoir Tank Telemetry (`TASK-0401`), returning null for uningested water quality metrics per `AGENTS.md` §16.
 
 ### Work
 
@@ -1271,7 +1275,8 @@ Display:
 
 **Priority:** `P1`  
 **Status:** `BACKLOG`  
-**Dependencies:** `TASK-0405`, `TASK-0406`
+**Dependencies:** `TASK-0405`  
+**Notes:** Adapted to query historical Soil Telemetry (`TASK-0405`).
 
 ### Work
 
@@ -1306,8 +1311,9 @@ Implement bounded history for soil and water.
 ## TASK-0505 — Implement Realtime Monitoring Stream
 
 **Priority:** `P1`  
-**Status:** `BLOCKED`  
-**Dependencies:** `TASK-0401`, `TASK-0501`, `TASK-0002`
+**Status:** `BACKLOG`  
+**Dependencies:** `TASK-0401`, `TASK-0501`  
+**Notes:** Approved in-memory Server-Sent Events (SSE) over HTTP for v1 per `DEC-INF-077` and `DEC-DEV-020`.
 
 ### Work
 
@@ -1335,8 +1341,9 @@ Server-Sent Events
 ## TASK-0601 — Select and Configure I18N Library
 
 **Priority:** `P1`  
-**Status:** `BLOCKED`  
-**Dependencies:** `TASK-0001`, `TASK-0002`
+**Status:** `BACKLOG`  
+**Dependencies:** `TASK-0001`  
+**Notes:** `next-intl` approved for Next.js 14 App Router per `DEC-I18N-068`.
 
 ### Work
 
@@ -1458,13 +1465,7 @@ Implement:
 - Alert detail.
 - Scope filtering.
 - Canonical type and severity.
-- Translation keys and parameters.
-
-### Acceptance Criteria
-
-- Users see only authorised alerts.
-- Alerts store canonical values.
-- System text is translated in frontend.
+- Translation key
 
 ---
 
@@ -1472,7 +1473,8 @@ Implement:
 
 **Priority:** `P1`  
 **Status:** `BLOCKED`  
-**Dependencies:** `TASK-0407`, `TASK-0002`
+**Dependencies:** `TASK-0407`  
+**Blocked Reason:** Blocked by `TASK-0407` (Device offline and stale threshold minutes TBD).
 
 ### Acceptance Criteria
 
@@ -1499,8 +1501,9 @@ Implement:
 ## TASK-0704 — Implement Alert Acknowledgement
 
 **Priority:** `P2`  
-**Status:** `BLOCKED`  
-**Dependencies:** `TASK-0701`, `TASK-0002`
+**Status:** `BACKLOG`  
+**Dependencies:** `TASK-0701`  
+**Notes:** `TASK-0701` (`DONE`) established alert schema and API; RBAC permissions finalized in `DEC-RBAC-015`.
 
 ### Acceptance Criteria
 
@@ -1511,13 +1514,14 @@ Implement:
 
 ---
 
-# 16. Phase 8 — Faucet Control
+## 16. Phase 8 — Faucet Control
 
 ## TASK-0801 — Finalise Faucet Permission Matrix
 
 **Priority:** `P0`  
-**Status:** `BLOCKED`  
-**Dependencies:** `TASK-0002`
+**Status:** `DONE`  
+**Dependencies:** `TASK-0002`  
+**Completed:** 2026-08-02 — Faucet permission matrix finalized and documented in `RBAC.md` §4.4 and `SECURITY.md` §5 per `DEC-RBAC-015` (`Active ADMIN + assigned device access = faucet-control permission`) and `DEC-CTRL-051` (`Faucet Safety Rules & Idempotency`).
 
 ### Work
 
@@ -1557,8 +1561,9 @@ Document:
 ## TASK-0803 — Implement Faucet Command API
 
 **Priority:** `P0`  
-**Status:** `BLOCKED`  
-**Dependencies:** `TASK-0801`, `TASK-0802`, `TASK-0304`
+**Status:** `BACKLOG`  
+**Dependencies:** `TASK-0802`, `TASK-0304`  
+**Notes:** Permission matrix finalized in `TASK-0801` (`DEC-RBAC-015`); unblocked pending database model (`TASK-0802`).
 
 ### Work
 
@@ -1687,7 +1692,8 @@ EXPIRED
 
 **Priority:** `P0`  
 **Status:** `BLOCKED`  
-**Dependencies:** `TASK-0806`, `TASK-0002`
+**Dependencies:** `TASK-0806`  
+**Blocked Reason:** Blocked by `docs/DECISIONS.md` §3 (Command ACK timeout seconds, completion timeout seconds, and expiry duration seconds TBD).
 
 ### Acceptance Criteria
 
@@ -1702,10 +1708,9 @@ EXPIRED
 ## TASK-0810 — Implement Cancel and Stop
 
 **Priority:** `P2`  
-**Status:** `BLOCKED`  
-**Dependencies:** `TASK-0801`, `TASK-0806`
-
-Only implement if approved.
+**Status:** `NOT_APPLICABLE`  
+**Dependencies:** None  
+**Notes:** Explicitly excluded for initial v1 release per `docs/DECISIONS.md` §3 (Default: do not implement cancellation/stop commands in v1).
 
 ### Acceptance Criteria
 
@@ -1767,8 +1772,11 @@ Implement:
 ## TASK-0902 — Implement Rate Limiting
 
 **Priority:** `P0`  
-**Status:** `BLOCKED`  
-**Dependencies:** `TASK-0204`, `TASK-0002`
+**Status:** `BACKLOG`  
+**Dependencies:** `TASK-0204`, `TASK-0002`  
+**Notes:** Sliding window rate limiting designed in `SECURITY.md` §4 with environment-configurable limits.
+
+### Work
 
 Apply to:
 
@@ -1870,8 +1878,9 @@ Apply to:
 ## TASK-0908 — Implement Session Revocation
 
 **Priority:** `P0`  
-**Status:** `BLOCKED`  
-**Dependencies:** `TASK-0204`
+**Status:** `BACKLOG`  
+**Dependencies:** `TASK-0204`  
+**Notes:** Extends real-time session revocation across active SSE streams and middleware guards.
 
 ### Acceptance Criteria
 
