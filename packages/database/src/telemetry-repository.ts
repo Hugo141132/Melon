@@ -128,4 +128,49 @@ export class TelemetryRepository {
       throw err;
     }
   }
+
+  /**
+   * Fetches the latest SoilReading for a given device internal UUID or canonical deviceId.
+   */
+  async getLatestSoilReading(deviceIdentifier: string) {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      deviceIdentifier
+    );
+    return this.prisma.soilReading.findFirst({
+      where: isUuid
+        ? { OR: [{ deviceId: deviceIdentifier }, { device: { deviceId: deviceIdentifier } }] }
+        : { device: { deviceId: deviceIdentifier } },
+      orderBy: { receivedAt: 'desc' },
+    });
+  }
+
+  /**
+   * Fetches the latest WaterReading for a given device internal UUID or canonical deviceId.
+   */
+  async getLatestWaterReading(deviceIdentifier: string) {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      deviceIdentifier
+    );
+    return this.prisma.waterReading.findFirst({
+      where: isUuid
+        ? { OR: [{ deviceId: deviceIdentifier }, { device: { deviceId: deviceIdentifier } }] }
+        : { device: { deviceId: deviceIdentifier } },
+      orderBy: { receivedAt: 'desc' },
+    });
+  }
+
+  /**
+   * Fetches the latest ReservoirWaterReading (water tank) for a given device internal UUID or canonical deviceId.
+   */
+  async getLatestWaterTankReading(deviceIdentifier: string) {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      deviceIdentifier
+    );
+    return this.prisma.reservoirWaterReading.findFirst({
+      where: isUuid
+        ? { OR: [{ deviceId: deviceIdentifier }, { device: { deviceId: deviceIdentifier } }] }
+        : { device: { deviceId: deviceIdentifier } },
+      orderBy: { receivedAt: 'desc' },
+    });
+  }
 }

@@ -17,6 +17,13 @@ describe('TelemetryRepository Unit Tests (TASK-0405)', () => {
       soilReading: {
         create: vi.fn(),
         findUnique: vi.fn(),
+        findFirst: vi.fn(),
+      },
+      waterReading: {
+        findFirst: vi.fn(),
+      },
+      reservoirWaterReading: {
+        findFirst: vi.fn(),
       },
       $transaction: vi.fn(async (cb: any) => cb(mockPrisma)),
     };
@@ -178,6 +185,26 @@ describe('TelemetryRepository Unit Tests (TASK-0405)', () => {
       };
 
       await expect(repo.ingestSoilReading(input)).rejects.toThrow(DeviceNotFoundError);
+    });
+  });
+
+  describe('getLatestWaterTankReading', () => {
+    it('queries using relation filter when non-UUID canonical deviceId is passed', async () => {
+      mockPrisma.reservoirWaterReading.findFirst.mockResolvedValue({
+        id: 'reading-tank-1',
+        deviceId: '33333333-3333-3333-3333-333333333333',
+        tankVolume: new Prisma.Decimal(1500),
+        flowRate: new Prisma.Decimal(25.5),
+        status: 'NORMAL',
+      });
+
+      const res = await repo.getLatestWaterTankReading('water-tank-node-3uufzi');
+
+      expect(mockPrisma.reservoirWaterReading.findFirst).toHaveBeenCalledWith({
+        where: { device: { deviceId: 'water-tank-node-3uufzi' } },
+        orderBy: { receivedAt: 'desc' },
+      });
+      expect(res?.id).toBe('reading-tank-1');
     });
   });
 });

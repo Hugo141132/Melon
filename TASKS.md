@@ -1220,7 +1220,7 @@ Metrics:
 ## TASK-0501 — Implement Latest Monitoring API
 
 **Priority:** `P0`  
-**Status:** `BACKLOG`  
+**Status:** `DONE`  
 **Dependencies:** `TASK-0405`, `TASK-0305`  
 **Notes:** Adapted to serve Soil Telemetry (`TASK-0405`) and Water Tank (`WATER_TANK_NODE`) Telemetry (`TASK-0401`), returning null for uningested water quality metrics per `AGENTS.md` §16.
 
