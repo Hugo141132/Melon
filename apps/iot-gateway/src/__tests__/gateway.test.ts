@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { EventEmitter } from 'events';
-import { validateGatewayEnv, redactSecrets } from '../config/env';
+import { validateGatewayEnv, redactSecrets, loadGatewayDotenv } from '../config/env';
 import { buildApp } from '../app';
 import { GatewayMqttClient } from '../mqtt/client';
 
@@ -89,6 +89,10 @@ describe('TASK-0401 — IoT Gateway Service', () => {
       expect(redacted.MQTT_GATEWAY_PASSWORD).toBe('[REDACTED]');
       expect(redacted.DATABASE_URL).toBe('postgresql://postgres:***@localhost:5432/kebun_melon');
       expect(redacted.normalField).toBe('public_value');
+    });
+
+    it('executes loadGatewayDotenv without throwing errors', () => {
+      expect(() => loadGatewayDotenv()).not.toThrow();
     });
   });
 

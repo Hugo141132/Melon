@@ -254,10 +254,14 @@ export class FaucetCommandRepository {
    * Fetches single command by DB UUID or commandId.
    */
   async getCommandById(idOrCommandId: string): Promise<FaucetCommandDto | null> {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      idOrCommandId
+    );
+
     const command = await this.prisma.faucetCommand.findFirst({
-      where: {
-        OR: [{ id: idOrCommandId }, { commandId: idOrCommandId }],
-      },
+      where: isUuid
+        ? { OR: [{ id: idOrCommandId }, { commandId: idOrCommandId }] }
+        : { commandId: idOrCommandId },
       include: { events: { orderBy: { receivedAt: 'asc' } } },
     });
 
@@ -361,8 +365,13 @@ export class FaucetCommandRepository {
       metadata?: Record<string, unknown>;
     }
   ): Promise<FaucetCommandDto> {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      idOrCommandId
+    );
     const existing = await this.prisma.faucetCommand.findFirst({
-      where: { OR: [{ id: idOrCommandId }, { commandId: idOrCommandId }] },
+      where: isUuid
+        ? { OR: [{ id: idOrCommandId }, { commandId: idOrCommandId }] }
+        : { commandId: idOrCommandId },
     });
 
     if (!existing) {
@@ -454,8 +463,13 @@ export class FaucetCommandRepository {
       metadata?: Record<string, unknown>;
     }
   ): Promise<FaucetCommandEventDto> {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      idOrCommandId
+    );
     const existingCmd = await this.prisma.faucetCommand.findFirst({
-      where: { OR: [{ id: idOrCommandId }, { commandId: idOrCommandId }] },
+      where: isUuid
+        ? { OR: [{ id: idOrCommandId }, { commandId: idOrCommandId }] }
+        : { commandId: idOrCommandId },
     });
 
     if (!existingCmd) {

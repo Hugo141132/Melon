@@ -1,6 +1,10 @@
 import Fastify, { FastifyInstance } from 'fastify';
 import { GatewayEnv } from './config/env';
 import { GatewayMqttClient } from './mqtt/client';
+import {
+  CommandPublisher,
+  commandPublisher as defaultCommandPublisher,
+} from './commands/publisher';
 import { registerHealthRoutes, DbChecker } from './routes/health';
 import { logger } from './observability/logger';
 
@@ -8,17 +12,21 @@ export interface AppOptions {
   env: GatewayEnv;
   mqttClient?: GatewayMqttClient;
   dbChecker?: DbChecker;
+  commandPublisher?: CommandPublisher;
 }
 
 export function buildApp(options: AppOptions): {
   app: FastifyInstance;
   mqttClient: GatewayMqttClient;
+  commandPublisher: CommandPublisher;
 } {
   const app = Fastify({
     logger: false, // We use our structured logger module with secret redaction
   });
 
   const mqttClient = options.mqttClient ?? new GatewayMqttClient(options.env);
+  const commandPublisher = options.commandPublisher ?? defaultCommandPublisher;
+  commandPublisher.bind(options.env, mqttClient);
 
   // Register routes
   registerHealthRoutes(app, mqttClient, options.dbChecker);
@@ -35,5 +43,5 @@ export function buildApp(options: AppOptions): {
     });
   });
 
-  return { app, mqttClient };
+  return { app, mqttClient, commandPublisher };
 }

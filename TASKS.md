@@ -1593,8 +1593,9 @@ POST /devices/{deviceId}/faucet-commands
 ## TASK-0804 — Implement Gateway Command Publisher
 
 **Priority:** `P0`  
-**Status:** `BACKLOG`  
+**Status:** `DONE`
 **Dependencies:** `TASK-0401`, `TASK-0803`
+**Completed:** 2026-08-03 — Implemented `CommandPublisher` in `@kebun-melon/iot-gateway` to publish eligible, unexpired `QUEUED` faucet commands for `WATER_TANK_NODE` devices over MQTT (QoS 1, retain = false). Enforced target device type validation, phase/volume mapping, dynamic canonical topic routing (`agriculture/{environment}/{siteId}/{deviceId}/command/faucet`), payload formatting, and atomic DB state transition to `SENT` with `FaucetCommandEvent` creation. Fixed `.env` loading and non-UUID `commandId` detail API query handling. Verified manually with active Mosquitto broker and 100% unit/quality test coverage.
 
 ### Acceptance Criteria
 

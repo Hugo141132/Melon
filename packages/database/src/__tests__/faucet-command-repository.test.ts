@@ -240,4 +240,31 @@ describe('FaucetCommandRepository Unit & Integration Tests', () => {
       expect(mockPrisma.faucetCommandEvent.create).not.toHaveBeenCalled();
     });
   });
+
+  describe('getCommandById', () => {
+    it('queries only commandId when input is a non-UUID string (e.g. cmd-test-001)', async () => {
+      mockPrisma.faucetCommand.findFirst.mockResolvedValue(mockCommandRecord);
+
+      const result = await repository.getCommandById('cmd-test-001');
+
+      expect(mockPrisma.faucetCommand.findFirst).toHaveBeenCalledWith({
+        where: { commandId: 'cmd-test-001' },
+        include: { events: { orderBy: { receivedAt: 'asc' } } },
+      });
+      expect(result?.commandId).toBe('cmd-test-001');
+    });
+
+    it('queries both id and commandId via OR when input is a valid UUID', async () => {
+      const validUuid = '33333333-3333-3333-3333-333333333333';
+      mockPrisma.faucetCommand.findFirst.mockResolvedValue(mockCommandRecord);
+
+      const result = await repository.getCommandById(validUuid);
+
+      expect(mockPrisma.faucetCommand.findFirst).toHaveBeenCalledWith({
+        where: { OR: [{ id: validUuid }, { commandId: validUuid }] },
+        include: { events: { orderBy: { receivedAt: 'asc' } } },
+      });
+      expect(result?.id).toBe(validUuid);
+    });
+  });
 });

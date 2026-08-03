@@ -112,7 +112,7 @@ describe('IoT Gateway Subsystem Modules', () => {
 
       expect(res.published).toBe(true);
       expect(mockEmitter.publishedTopics).toContain(
-        'agriculture/production/site-01/water-node-01/command/faucet'
+        'agriculture/development/site-01/water-node-01/command/faucet'
       );
     });
 

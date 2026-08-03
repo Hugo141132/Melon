@@ -19,7 +19,7 @@ async function startServer() {
       }),
     });
 
-    const { app, mqttClient } = buildApp({ env });
+    const { app, mqttClient, commandPublisher } = buildApp({ env });
 
     // Connect to MQTT Broker asynchronously (non-blocking server start)
     if (env.MQTT_BROKER_URL) {
@@ -32,6 +32,11 @@ async function startServer() {
       logger.warn('MQTT_BROKER_URL not configured. Running gateway in HTTP-only standby mode.');
     }
 
+    // Start command publisher polling worker if DB and MQTT are configured
+    if (env.DATABASE_URL && env.MQTT_BROKER_URL) {
+      commandPublisher.startPolling(2000);
+    }
+
     // Start Fastify HTTP server
     const address = await app.listen({ port: env.PORT, host: env.HOST });
     logger.info(`IoT Gateway HTTP server listening at ${address}`);
@@ -40,6 +45,7 @@ async function startServer() {
     const shutdown = async (signal: string) => {
       logger.info(`Received ${signal}. Shutting down IoT Gateway Service gracefully...`);
       try {
+        commandPublisher.stopPolling();
         await app.close();
         await mqttClient.disconnect();
         logger.info('IoT Gateway Service shutdown complete.');

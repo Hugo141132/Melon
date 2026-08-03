@@ -1,4 +1,21 @@
+import fs from 'fs';
+import path from 'path';
+import dotenv from 'dotenv';
 import { z } from 'zod';
+
+export function loadGatewayDotenv(): void {
+  const localEnv = path.resolve(__dirname, '../../.env');
+  if (fs.existsSync(localEnv)) {
+    dotenv.config({ path: localEnv });
+  }
+  const rootEnv = path.resolve(__dirname, '../../../../.env');
+  if (fs.existsSync(rootEnv)) {
+    dotenv.config({ path: rootEnv });
+  }
+  dotenv.config();
+}
+
+loadGatewayDotenv();
 
 export const gatewayEnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
