@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import TopAppBar from '@/components/navigation/TopAppBar';
 import BottomNav from '@/components/navigation/BottomNav';
@@ -60,7 +61,6 @@ function PHBar({ value }: { value: number }) {
 
 export default function AirPage() {
   const [activePhase, setActivePhase] = useState(1);
-  const [valveOpen, setValveOpen] = useState(false);
 
   return (
     <div className="bg-app-surface text-app-on-surface min-h-dvh pb-24">
@@ -208,41 +208,25 @@ export default function AirPage() {
           </div>
         </section>
 
-        {/* Valve Control */}
+        {/* Valve Control Quick Navigation */}
         <section className="bg-app-surface-container-lowest rounded-xl p-4 soft-elevation border border-app-outline-variant/30 flex items-center justify-between animate-fade-in">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-app-primary/10 flex items-center justify-center text-app-primary">
               <Droplets size={20} />
             </div>
             <div>
-              <p className="text-[14px] font-bold text-app-on-surface">Kontrol Kran Air</p>
+              <p className="text-[14px] font-bold text-app-on-surface">Kontrol Kran Air Otomatis</p>
               <p className="text-[12px] text-app-on-surface-variant">
-                Status: {valveOpen ? 'Terbuka' : 'Tertutup'}
+                Preset dosis (300 / 1000 / 1500 mL) & riwayat eksekusi
               </p>
             </div>
           </div>
-          <div className="flex bg-app-surface-container rounded-full p-1">
-            <button
-              onClick={() => setValveOpen(false)}
-              className={cn(
-                'px-4 py-1.5 rounded-full text-[12px] font-bold transition-all cursor-pointer',
-                !valveOpen
-                  ? 'bg-white shadow-sm text-app-on-surface'
-                  : 'text-app-on-surface-variant'
-              )}
-            >
-              Tutup
-            </button>
-            <button
-              onClick={() => setValveOpen(true)}
-              className={cn(
-                'px-4 py-1.5 rounded-full text-[12px] font-bold transition-all cursor-pointer',
-                valveOpen ? 'bg-white shadow-sm text-app-on-surface' : 'text-app-on-surface-variant'
-              )}
-            >
-              Buka
-            </button>
-          </div>
+          <Link
+            href="/controls"
+            className="px-4 py-2 bg-app-primary text-white text-[12px] font-bold rounded-xl hover:bg-app-primary-container transition-all cursor-pointer shadow-xs"
+          >
+            Buka Panel Kontrol
+          </Link>
         </section>
       </main>
 

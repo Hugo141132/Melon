@@ -1661,7 +1661,8 @@ EXPIRED
 ## TASK-0807 — Implement Faucet Control UI
 
 **Priority:** `P0`  
-**Status:** `BACKLOG`  
+**Status:** `DONE`  
+**Completed:** 2026-08-03 — Built Faucet Control UI (/controls page, FaucetPresetSelector, FaucetConfirmationModal, FaucetStatusCard, FaucetHistoryTable) with Phase 1/2/3 preset volumes (300/1000/1500 mL), explicit confirmation modal, permission/feature flag/offline/active-command disabled state handling, active-only status polling, timeline display, and execution history. Added 13 unit & component regression tests covering UI states, modal submit, and polling loop lifecycle.
 **Dependencies:** `TASK-0803`, `TASK-0806`
 
 ### Acceptance Criteria
