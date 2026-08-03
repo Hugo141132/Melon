@@ -110,3 +110,41 @@ export const PaginatedFaucetCommandsDtoSchema = z.object({
 });
 
 export type PaginatedFaucetCommandsDto = z.infer<typeof PaginatedFaucetCommandsDtoSchema>;
+
+/**
+ * Canonical Faucet Acknowledgement Rejection Reason Codes
+ */
+export const FAUCET_ACK_REASON_CODES = [
+  'INVALID_COMMAND',
+  'INVALID_PHASE',
+  'EXPIRED_COMMAND',
+  'DUPLICATE_COMMAND',
+  'DEVICE_BUSY',
+  'DEVICE_NOT_READY',
+  'INSUFFICIENT_WATER',
+  'CONTROL_DISABLED',
+  'UNSUPPORTED_ACTION',
+  'INTERNAL_ERROR',
+  'REJECTED_BY_DEVICE',
+] as const;
+
+export type FaucetAckReasonCode = (typeof FAUCET_ACK_REASON_CODES)[number];
+
+/**
+ * Faucet Acknowledgement MQTT Payload Schema
+ * Topic: agriculture/{environment}/{siteId}/{deviceId}/ack/faucet
+ */
+export const FaucetAcknowledgementPayloadSchema = z.object({
+  schemaVersion: z.string().default('1.0'),
+  messageId: z.string().trim().min(1),
+  commandId: z.string().trim().min(1),
+  deviceId: z.string().trim().min(1),
+  recordedAt: z.string().optional(),
+  data: z.object({
+    status: z.enum(['ACKNOWLEDGED', 'REJECTED']),
+    accepted: z.boolean(),
+    reasonCode: z.string().trim().optional(),
+  }),
+});
+
+export type FaucetAcknowledgementPayload = z.infer<typeof FaucetAcknowledgementPayloadSchema>;

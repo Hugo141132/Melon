@@ -19,15 +19,22 @@ async function startServer() {
       }),
     });
 
-    const { app, mqttClient, commandPublisher } = buildApp({ env });
+    const { app, mqttClient, commandPublisher, acknowledgementProcessor } = buildApp({ env });
 
     // Connect to MQTT Broker asynchronously (non-blocking server start)
     if (env.MQTT_BROKER_URL) {
-      mqttClient.connect().catch((err) => {
-        logger.warn('Initial MQTT connection attempt failed, will auto-retry', {
-          error: err.message,
+      mqttClient
+        .connect()
+        .then(() => {
+          acknowledgementProcessor.subscribeToAcknowledgements().catch((err) => {
+            logger.error('Failed to subscribe to ACKs after MQTT connection', err);
+          });
+        })
+        .catch((err) => {
+          logger.warn('Initial MQTT connection attempt failed, will auto-retry', {
+            error: err.message,
+          });
         });
-      });
     } else {
       logger.warn('MQTT_BROKER_URL not configured. Running gateway in HTTP-only standby mode.');
     }
@@ -46,6 +53,7 @@ async function startServer() {
       logger.info(`Received ${signal}. Shutting down IoT Gateway Service gracefully...`);
       try {
         commandPublisher.stopPolling();
+        acknowledgementProcessor.stop();
         await app.close();
         await mqttClient.disconnect();
         logger.info('IoT Gateway Service shutdown complete.');

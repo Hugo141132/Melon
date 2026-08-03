@@ -1611,8 +1611,9 @@ POST /devices/{deviceId}/faucet-commands
 ## TASK-0805 — Implement Device Acknowledgement Processing
 
 **Priority:** `P0`  
-**Status:** `BACKLOG`  
-**Dependencies:** `TASK-0804`
+**Status:** `DONE`  
+**Dependencies:** `TASK-0804`  
+**Completed:** 2026-08-03 — Implemented `AcknowledgementProcessor` in `@kebun-melon/iot-gateway` to subscribe to canonical faucet ACK topics (`agriculture/{environment}/{siteId}/{deviceId}/ack/faucet`, QoS 1). Validated topic/payload deviceId matching, resolved external device ID to internal device UUID, and enforced `WATER_TANK_NODE` device type scope. Executed strict `SENT` → `ACKNOWLEDGED` (for accepted ACKs) and `SENT` → `FAILED` (for rejected ACKs with canonical reasonCode) state transitions with `FaucetCommandEvent` audit creation. Preserved duplicate `messageId` idempotency, isolated non-`SENT` command states against out-of-order state regression, and enforced that ACK processing never auto-completes commands to `COMPLETED`. Verified with 100% unit and integration test coverage (11 tests in `acknowledgement-processor.test.ts`) and verified manually via MQTT broker testing.
 
 ### Acceptance Criteria
 
