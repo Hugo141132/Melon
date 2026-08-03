@@ -19,7 +19,8 @@ async function startServer() {
       }),
     });
 
-    const { app, mqttClient, commandPublisher, acknowledgementProcessor } = buildApp({ env });
+    const { app, mqttClient, commandPublisher, acknowledgementProcessor, faucetEventProcessor } =
+      buildApp({ env });
 
     // Connect to MQTT Broker asynchronously (non-blocking server start)
     if (env.MQTT_BROKER_URL) {
@@ -28,6 +29,9 @@ async function startServer() {
         .then(() => {
           acknowledgementProcessor.subscribeToAcknowledgements().catch((err) => {
             logger.error('Failed to subscribe to ACKs after MQTT connection', err);
+          });
+          faucetEventProcessor.subscribeToEvents().catch((err) => {
+            logger.error('Failed to subscribe to events after MQTT connection', err);
           });
         })
         .catch((err) => {
@@ -54,6 +58,7 @@ async function startServer() {
       try {
         commandPublisher.stopPolling();
         acknowledgementProcessor.stop();
+        faucetEventProcessor.stop();
         await app.close();
         await mqttClient.disconnect();
         logger.info('IoT Gateway Service shutdown complete.');

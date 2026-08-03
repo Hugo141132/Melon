@@ -1628,8 +1628,9 @@ POST /devices/{deviceId}/faucet-commands
 ## TASK-0806 — Implement Command Event State Machine
 
 **Priority:** `P0`  
-**Status:** `BACKLOG`  
-**Dependencies:** `TASK-0805`
+**Status:** `DONE`  
+**Dependencies:** `TASK-0805`  
+**Completed:** 2026-08-03 — Implemented `FaucetEventProcessor` in `@kebun-melon/iot-gateway` (`apps/iot-gateway/src/events/processor.ts`) to subscribe to canonical faucet execution event topics (`agriculture/{environment}/{siteId}/{deviceId}/event/faucet`, QoS 1). Validated topic/payload deviceId matching, resolved external device ID to internal device UUID, and enforced `WATER_TANK_NODE` device type scope. Executed strict `ACKNOWLEDGED` → `IN_PROGRESS` → `COMPLETED` and `ACKNOWLEDGED`/`IN_PROGRESS` → `FAILED` state transitions with `FaucetCommandEvent` audit creation and `actualVolumeMl` / `reasonCode` tracking. Rejects state regressions and terminal state mutations (`COMPLETED`, `FAILED`, `CANCELLED`, `TIMEOUT`, `EXPIRED`), preserves duplicate `messageId` idempotency, and wires into existing `app.ts` / `index.ts` lifecycle. Verified with 100% test coverage (11 unit/integration tests in `faucet-event-processor.test.ts` and 444 total project tests passing).
 
 ### Work
 

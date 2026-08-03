@@ -9,6 +9,10 @@ import {
   AcknowledgementProcessor,
   acknowledgementProcessor as defaultAcknowledgementProcessor,
 } from './acknowledgements/processor';
+import {
+  FaucetEventProcessor,
+  faucetEventProcessor as defaultFaucetEventProcessor,
+} from './events/processor';
 import { registerHealthRoutes, DbChecker } from './routes/health';
 import { logger } from './observability/logger';
 
@@ -18,6 +22,7 @@ export interface AppOptions {
   dbChecker?: DbChecker;
   commandPublisher?: CommandPublisher;
   acknowledgementProcessor?: AcknowledgementProcessor;
+  faucetEventProcessor?: FaucetEventProcessor;
 }
 
 export function buildApp(options: AppOptions): {
@@ -25,6 +30,7 @@ export function buildApp(options: AppOptions): {
   mqttClient: GatewayMqttClient;
   commandPublisher: CommandPublisher;
   acknowledgementProcessor: AcknowledgementProcessor;
+  faucetEventProcessor: FaucetEventProcessor;
 } {
   const app = Fastify({
     logger: false, // We use our structured logger module with secret redaction
@@ -34,9 +40,11 @@ export function buildApp(options: AppOptions): {
   const commandPublisher = options.commandPublisher ?? defaultCommandPublisher;
   const acknowledgementProcessor =
     options.acknowledgementProcessor ?? defaultAcknowledgementProcessor;
+  const faucetEventProcessor = options.faucetEventProcessor ?? defaultFaucetEventProcessor;
 
   commandPublisher.bind(options.env, mqttClient);
   acknowledgementProcessor.bind(options.env, mqttClient);
+  faucetEventProcessor.bind(options.env, mqttClient);
 
   // Register routes
   registerHealthRoutes(app, mqttClient, options.dbChecker);
@@ -53,5 +61,5 @@ export function buildApp(options: AppOptions): {
     });
   });
 
-  return { app, mqttClient, commandPublisher, acknowledgementProcessor };
+  return { app, mqttClient, commandPublisher, acknowledgementProcessor, faucetEventProcessor };
 }

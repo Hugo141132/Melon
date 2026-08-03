@@ -148,3 +148,23 @@ export const FaucetAcknowledgementPayloadSchema = z.object({
 });
 
 export type FaucetAcknowledgementPayload = z.infer<typeof FaucetAcknowledgementPayloadSchema>;
+
+/**
+ * Faucet Progress/Execution Event MQTT Payload Schema
+ * Topic: agriculture/{environment}/{siteId}/{deviceId}/event/faucet
+ */
+export const FaucetEventPayloadSchema = z.object({
+  schemaVersion: z.string().default('1.0'),
+  messageId: z.string().trim().min(1),
+  commandId: z.string().trim().min(1),
+  deviceId: z.string().trim().min(1),
+  recordedAt: z.string().optional(),
+  data: z.object({
+    status: z.enum(['IN_PROGRESS', 'COMPLETED', 'FAILED']),
+    targetVolumeMl: z.number().int().positive().optional(),
+    actualVolumeMl: z.number().min(0).optional(),
+    reasonCode: z.string().trim().optional(),
+  }),
+});
+
+export type FaucetEventPayload = z.infer<typeof FaucetEventPayloadSchema>;
