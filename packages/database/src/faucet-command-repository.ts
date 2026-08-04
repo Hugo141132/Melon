@@ -153,36 +153,6 @@ export class FaucetCommandRepository {
     actorUserId: string,
     actorRole: UserRole
   ): Promise<FaucetCommandDto> {
-    // 1. Idempotency check: key already used
-    const existingKey = await this.prisma.faucetCommand.findUnique({
-      where: { idempotencyKey: input.idempotencyKey },
-      include: { events: { orderBy: { receivedAt: 'asc' } } },
-    });
-
-    if (existingKey) {
-      if (existingKey.deviceId === input.deviceId && existingKey.phase === input.phase) {
-        return this.formatCommandDto(existingKey);
-      }
-      throw new FaucetCommandConflictError(
-        `Idempotency key '${input.idempotencyKey}' has already been used for a different command.`
-      );
-    }
-
-    // 2. Active command concurrency check (max 1 active per device)
-    const activeCommand = await this.prisma.faucetCommand.findFirst({
-      where: {
-        deviceId: input.deviceId,
-        status: { in: ACTIVE_STATUSES },
-      },
-    });
-
-    if (activeCommand) {
-      throw new FaucetCommandConflictError(
-        `Device '${input.deviceId}' already has an active faucet command in progress (commandId: ${activeCommand.commandId}, status: ${activeCommand.status}).`
-      );
-    }
-
-    // 3. Map phase to target volume server-side
     const targetVolumeMl = mapPhaseToVolume(input.phase);
 
     const now = input.requestedAt ? new Date(input.requestedAt) : new Date();
@@ -193,6 +163,35 @@ export class FaucetCommandRepository {
 
     try {
       const created = await this.prisma.$transaction(async (tx) => {
+        // 1. Idempotency check inside transaction
+        const existingKey = await tx.faucetCommand.findUnique({
+          where: { idempotencyKey: input.idempotencyKey },
+          include: { events: { orderBy: { receivedAt: 'asc' } } },
+        });
+
+        if (existingKey) {
+          if (existingKey.deviceId === input.deviceId && existingKey.phase === input.phase) {
+            return existingKey;
+          }
+          throw new FaucetCommandConflictError(
+            `Idempotency key '${input.idempotencyKey}' has already been used for a different command.`
+          );
+        }
+
+        // 2. Active command concurrency check (max 1 active per device)
+        const activeCommand = await tx.faucetCommand.findFirst({
+          where: {
+            deviceId: input.deviceId,
+            status: { in: ACTIVE_STATUSES },
+          },
+        });
+
+        if (activeCommand) {
+          throw new FaucetCommandConflictError(
+            `Device '${input.deviceId}' already has an active faucet command in progress (commandId: ${activeCommand.commandId}, status: ${activeCommand.status}).`
+          );
+        }
+
         const cmd = await tx.faucetCommand.create({
           data: {
             commandId,
@@ -241,7 +240,28 @@ export class FaucetCommandRepository {
 
       return this.formatCommandDto(created);
     } catch (error: any) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      if (error instanceof FaucetCommandConflictError) {
+        throw error;
+      }
+
+      if (
+        (error instanceof Prisma.PrismaClientKnownRequestError || error?.code === 'P2002') &&
+        error.code === 'P2002'
+      ) {
+        const existingKey = await this.prisma.faucetCommand.findUnique({
+          where: { idempotencyKey: input.idempotencyKey },
+          include: { events: { orderBy: { receivedAt: 'asc' } } },
+        });
+
+        if (existingKey) {
+          if (existingKey.deviceId === input.deviceId && existingKey.phase === input.phase) {
+            return this.formatCommandDto(existingKey);
+          }
+          throw new FaucetCommandConflictError(
+            `Idempotency key '${input.idempotencyKey}' has already been used for a different command.`
+          );
+        }
+
         throw new FaucetCommandConflictError(
           `Faucet command creation failed due to unique constraint conflict.`
         );

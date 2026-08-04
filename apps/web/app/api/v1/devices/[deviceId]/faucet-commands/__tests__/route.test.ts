@@ -438,6 +438,37 @@ describe('Faucet Command API Endpoints (TASK-0803)', () => {
       expect(json.error.code).toBe('ACTIVE_COMMAND_EXISTS');
     });
 
+    it('returns existing command when identical idempotencyKey and request payload are re-submitted', async () => {
+      mockCreateCommand.mockResolvedValue(mockCommandRecord);
+
+      const req1 = new Request(
+        `http://localhost/api/v1/devices/${mockCanonicalDeviceId}/faucet-commands`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'idempotency-key': 'idem-001' },
+          body: JSON.stringify({ phase: 1 }),
+        }
+      );
+      const res1 = await POST(req1, { params: { deviceId: mockCanonicalDeviceId } });
+      const json1 = await res1.json();
+
+      const req2 = new Request(
+        `http://localhost/api/v1/devices/${mockCanonicalDeviceId}/faucet-commands`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'idempotency-key': 'idem-001' },
+          body: JSON.stringify({ phase: 1 }),
+        }
+      );
+      const res2 = await POST(req2, { params: { deviceId: mockCanonicalDeviceId } });
+      const json2 = await res2.json();
+
+      expect(res1.status).toBe(201);
+      expect(res2.status).toBe(201);
+      expect(json1.data.id).toBe(mockCommandRecord.id);
+      expect(json2.data.id).toBe(mockCommandRecord.id);
+    });
+
     it('returns 409 DUPLICATE_COMMAND_CONFLICT when idempotencyKey is reused for a different command', async () => {
       mockCreateCommand.mockRejectedValue(
         new FaucetCommandConflictError(

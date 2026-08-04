@@ -1681,7 +1681,8 @@ EXPIRED
 ## TASK-0808 — Implement Duplicate Command Protection
 
 **Priority:** `P0`  
-**Status:** `BACKLOG`  
+**Status:** `DONE`  
+**Completed:** 2026-08-04 — Enhanced `createCommand` in `FaucetCommandRepository` (`@kebun-melon/database`) to perform idempotency checks and max-1 active command checks transactionally, re-querying by `idempotencyKey` on Prisma `P2002` unique constraint error to gracefully return the existing command for identical concurrent/replay requests, or raise `FaucetCommandConflictError` (`409 DUPLICATE_COMMAND_CONFLICT`) for conflicting parameter reuses. Preserved single `QUEUED` event and single command creation during race conditions with zero duplicate MQTT publications. Confirmed existing ACK and execution event `messageId` deduplication in `@kebun-melon/iot-gateway`. Added comprehensive unit and integration test coverage (`faucet-command-repository.test.ts`, `route.test.ts`) and verified manually against active PostgreSQL dev DB.
 **Dependencies:** `TASK-0803`, `TASK-0804`, `TASK-0805`
 
 ### Acceptance Criteria

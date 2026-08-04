@@ -120,6 +120,48 @@ describe('FaucetCommandRepository Unit & Integration Tests', () => {
       expect(mockPrisma.faucetCommand.create).not.toHaveBeenCalled();
     });
 
+    it('returns existing command when a concurrent request throws P2002 but key matches identical parameters', async () => {
+      mockPrisma.faucetCommand.findUnique.mockResolvedValue(mockCommandRecord);
+      mockPrisma.faucetCommand.findFirst.mockResolvedValue(null);
+      const p2002Error = new (class extends Error {
+        code = 'P2002';
+      })('Unique constraint failed');
+      mockPrisma.$transaction.mockRejectedValueOnce(p2002Error);
+
+      const result = await repository.createCommand(
+        {
+          deviceId: mockDeviceId,
+          phase: 1,
+          idempotencyKey: 'idem-001',
+        },
+        mockUserId,
+        UserRole.ADMIN
+      );
+
+      expect(result.commandId).toBe(mockCommandRecord.commandId);
+    });
+
+    it('throws FaucetCommandConflictError when a concurrent request throws P2002 and key matches a conflicting phase', async () => {
+      mockPrisma.faucetCommand.findUnique.mockResolvedValue(mockCommandRecord);
+      mockPrisma.faucetCommand.findFirst.mockResolvedValue(null);
+      const p2002Error = new (class extends Error {
+        code = 'P2002';
+      })('Unique constraint failed');
+      mockPrisma.$transaction.mockRejectedValueOnce(p2002Error);
+
+      await expect(
+        repository.createCommand(
+          {
+            deviceId: mockDeviceId,
+            phase: 2, // Conflicting phase
+            idempotencyKey: 'idem-001',
+          },
+          mockUserId,
+          UserRole.ADMIN
+        )
+      ).rejects.toThrow(FaucetCommandConflictError);
+    });
+
     it('throws FaucetCommandConflictError when idempotencyKey is reused for a different device or phase', async () => {
       mockPrisma.faucetCommand.findUnique.mockResolvedValue(mockCommandRecord);
 
