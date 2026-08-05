@@ -1781,7 +1781,7 @@ Implement:
 ## TASK-0902 — Implement Rate Limiting
 
 **Priority:** `P0`  
-**Status:** `BACKLOG`  
+**Status:** `DONE`  
 **Dependencies:** `TASK-0204`, `TASK-0002`  
 **Notes:** Sliding window rate limiting designed in `SECURITY.md` §4 with environment-configurable limits.
 

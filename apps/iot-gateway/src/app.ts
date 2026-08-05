@@ -25,6 +25,49 @@ export interface AppOptions {
   faucetEventProcessor?: FaucetEventProcessor;
 }
 
+// In-memory rate limit store for gateway HTTP endpoints
+const gatewayRateLimitStore = new Map<string, { count: number; resetTime: number }>();
+
+export function clearGatewayRateLimitStore(): void {
+  gatewayRateLimitStore.clear();
+}
+
+function checkGatewayRateLimit(
+  ip: string,
+  limit: number,
+  windowMs: number
+): {
+  allowed: boolean;
+  limit: number;
+  remaining: number;
+  resetTime: number;
+  retryAfterSeconds: number;
+} {
+  const now = Date.now();
+  const key = `gateway:${ip}`;
+  let entry = gatewayRateLimitStore.get(key);
+
+  if (!entry || now >= entry.resetTime) {
+    entry = { count: 1, resetTime: now + windowMs };
+    gatewayRateLimitStore.set(key, entry);
+  } else {
+    entry.count += 1;
+  }
+
+  const allowed = entry.count <= limit;
+  const remaining = Math.max(0, limit - entry.count);
+  const retryAfterMs = Math.max(0, entry.resetTime - now);
+  const retryAfterSeconds = Math.ceil(retryAfterMs / 1000);
+
+  return {
+    allowed,
+    limit,
+    remaining,
+    resetTime: entry.resetTime,
+    retryAfterSeconds,
+  };
+}
+
 export function buildApp(options: AppOptions): {
   app: FastifyInstance;
   mqttClient: GatewayMqttClient;
@@ -46,8 +89,8 @@ export function buildApp(options: AppOptions): {
   acknowledgementProcessor.bind(options.env, mqttClient);
   faucetEventProcessor.bind(options.env, mqttClient);
 
-  // Security headers hook per SECURITY.md §16.8 and TASK-0901
-  app.addHook('onRequest', async (_request, reply) => {
+  // Security headers and rate limiting hook per SECURITY.md §16.4, §16.8 and TASK-0902
+  app.addHook('onRequest', async (request, reply) => {
     reply.header('X-Content-Type-Options', 'nosniff');
     reply.header('X-Frame-Options', 'DENY');
     reply.header('Referrer-Policy', 'strict-origin-when-cross-origin');
@@ -60,6 +103,28 @@ export function buildApp(options: AppOptions): {
     const isProd = options.env.APP_ENV === 'production' || process.env.NODE_ENV === 'production';
     if (isProd) {
       reply.header('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
+    }
+
+    const clientIp = request.ip || '127.0.0.1';
+    const rateLimit = checkGatewayRateLimit(
+      clientIp,
+      options.env.RATE_LIMIT_GATEWAY_MAX ?? 60,
+      options.env.RATE_LIMIT_WINDOW_MS ?? 60000
+    );
+
+    reply.header('X-RateLimit-Limit', String(rateLimit.limit));
+    reply.header('X-RateLimit-Remaining', String(Math.max(0, rateLimit.remaining)));
+    reply.header('X-RateLimit-Reset', String(Math.ceil(rateLimit.resetTime / 1000)));
+
+    if (!rateLimit.allowed) {
+      reply.header('Retry-After', String(Math.max(1, rateLimit.retryAfterSeconds)));
+      return reply.status(429).send({
+        success: false,
+        error: {
+          code: 'TOO_MANY_REQUESTS',
+          message: 'Too many requests to gateway service. Please try again later.',
+        },
+      });
     }
   });
 

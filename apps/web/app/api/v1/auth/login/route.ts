@@ -9,14 +9,33 @@ import {
 } from '@kebun-melon/database';
 import { AccountStatus } from '@kebun-melon/contracts';
 import { ZodError } from 'zod';
+import {
+  checkRateLimit,
+  getClientIp,
+  createRateLimitResponse,
+  applyRateLimitToResponse,
+} from '@/lib/rate-limit';
+import { validateServerEnv } from '@/lib/env/server';
 
 export async function POST(request: Request) {
   const requestId = `req-${Date.now()}`;
   const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || undefined;
   const userAgent = request.headers.get('user-agent') || undefined;
 
+  const env = validateServerEnv();
+  const clientIp = getClientIp(request);
+  const rateLimitInfo = checkRateLimit(clientIp, {
+    keyPrefix: 'login',
+    limit: env.RATE_LIMIT_LOGIN_MAX,
+    windowMs: env.RATE_LIMIT_WINDOW_MS,
+  });
+
+  if (!rateLimitInfo.allowed) {
+    return createRateLimitResponse(rateLimitInfo, requestId);
+  }
+
   try {
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
     const result = await loginUser(prisma, body, { ipAddress, userAgent, requestId });
 
     const primaryRole = result.user.activeRoles[0] ?? 'ADMIN';
@@ -49,25 +68,28 @@ export async function POST(request: Request) {
       maxAge: SESSION_ABSOLUTE_LIFETIME_SECONDS, // 8 hours
     });
 
+    applyRateLimitToResponse(response, rateLimitInfo);
     return response;
   } catch (error: any) {
-    if (error instanceof ZodError) {
-      return NextResponse.json(
+    let errResponse: NextResponse;
+    if (error instanceof ZodError || error?.name === 'ZodError') {
+      errResponse = NextResponse.json(
         {
           success: false,
           error: {
             code: 'VALIDATION_ERROR',
             message: 'Invalid request payload format or extraneous fields present.',
-            details: error.flatten(),
+            details: typeof error.flatten === 'function' ? error.flatten() : undefined,
           },
           meta: { requestId },
         },
         { status: 400 }
       );
-    }
-
-    if (error instanceof InvalidCredentialsError || error?.name === 'InvalidCredentialsError') {
-      return NextResponse.json(
+    } else if (
+      error instanceof InvalidCredentialsError ||
+      error?.name === 'InvalidCredentialsError'
+    ) {
+      errResponse = NextResponse.json(
         {
           success: false,
           error: {
@@ -78,9 +100,7 @@ export async function POST(request: Request) {
         },
         { status: 401 }
       );
-    }
-
-    if (
+    } else if (
       error instanceof AccountStatusForbiddenError ||
       error?.name === 'AccountStatusForbiddenError'
     ) {
@@ -97,7 +117,7 @@ export async function POST(request: Request) {
         code = 'ACCOUNT_DEACTIVATED';
       }
 
-      return NextResponse.json(
+      errResponse = NextResponse.json(
         {
           success: false,
           error: {
@@ -108,18 +128,20 @@ export async function POST(request: Request) {
         },
         { status: 403 }
       );
-    }
-
-    return NextResponse.json(
-      {
-        success: false,
-        error: {
-          code: 'INTERNAL_ERROR',
-          message: 'An unexpected internal error occurred during login.',
+    } else {
+      errResponse = NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'INTERNAL_ERROR',
+            message: 'An unexpected internal error occurred during login.',
+          },
+          meta: { requestId },
         },
-        meta: { requestId },
-      },
-      { status: 500 }
-    );
+        { status: 500 }
+      );
+    }
+    applyRateLimitToResponse(errResponse, rateLimitInfo);
+    return errResponse;
   }
 }

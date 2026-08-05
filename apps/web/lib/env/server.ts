@@ -19,6 +19,24 @@ export const serverEnvSchema = z.object({
       z.boolean({ invalid_type_error: 'ENABLE_FAUCET_CONTROL must be boolean (true/false)' })
     )
     .default(false),
+  RATE_LIMIT_LOGIN_MAX: z
+    .preprocess((val) => (val ? parseInt(String(val), 10) : 5), z.number().int().min(1))
+    .default(5),
+  RATE_LIMIT_REGISTER_MAX: z
+    .preprocess((val) => (val ? parseInt(String(val), 10) : 3), z.number().int().min(1))
+    .default(3),
+  RATE_LIMIT_APPROVAL_MAX: z
+    .preprocess((val) => (val ? parseInt(String(val), 10) : 10), z.number().int().min(1))
+    .default(10),
+  RATE_LIMIT_FAUCET_MAX: z
+    .preprocess((val) => (val ? parseInt(String(val), 10) : 5), z.number().int().min(1))
+    .default(5),
+  RATE_LIMIT_HISTORY_MAX: z
+    .preprocess((val) => (val ? parseInt(String(val), 10) : 30), z.number().int().min(1))
+    .default(30),
+  RATE_LIMIT_WINDOW_MS: z
+    .preprocess((val) => (val ? parseInt(String(val), 10) : 60000), z.number().int().min(1000))
+    .default(60000),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
@@ -27,6 +45,8 @@ export function validateServerEnv(
   env: Record<string, string | undefined> = process.env
 ): ServerEnv {
   const isProd = env.NODE_ENV === 'production' || env.APP_ENV === 'production';
+  const isTest =
+    env.NODE_ENV === 'test' || env.APP_ENV === 'test' || process.env.NODE_ENV === 'test';
   const isFaucetTrue = env.ENABLE_FAUCET_CONTROL === 'true' || env.ENABLE_FAUCET_CONTROL === '1';
 
   if (isProd && isFaucetTrue) {
@@ -35,7 +55,40 @@ export function validateServerEnv(
     );
   }
 
-  const result = serverEnvSchema.safeParse(env);
+  const dynamicSchema = serverEnvSchema.extend({
+    RATE_LIMIT_LOGIN_MAX: z
+      .preprocess(
+        (val) => (val ? parseInt(String(val), 10) : isTest ? 1000 : 5),
+        z.number().int().min(1)
+      )
+      .default(isTest ? 1000 : 5),
+    RATE_LIMIT_REGISTER_MAX: z
+      .preprocess(
+        (val) => (val ? parseInt(String(val), 10) : isTest ? 1000 : 3),
+        z.number().int().min(1)
+      )
+      .default(isTest ? 1000 : 3),
+    RATE_LIMIT_APPROVAL_MAX: z
+      .preprocess(
+        (val) => (val ? parseInt(String(val), 10) : isTest ? 1000 : 10),
+        z.number().int().min(1)
+      )
+      .default(isTest ? 1000 : 10),
+    RATE_LIMIT_FAUCET_MAX: z
+      .preprocess(
+        (val) => (val ? parseInt(String(val), 10) : isTest ? 1000 : 5),
+        z.number().int().min(1)
+      )
+      .default(isTest ? 1000 : 5),
+    RATE_LIMIT_HISTORY_MAX: z
+      .preprocess(
+        (val) => (val ? parseInt(String(val), 10) : isTest ? 1000 : 30),
+        z.number().int().min(1)
+      )
+      .default(isTest ? 1000 : 30),
+  });
+
+  const result = dynamicSchema.safeParse(env);
   if (!result.success) {
     const issueMsgs = result.error.issues
       .map((i) => i.path.join('.') + ': ' + i.message)

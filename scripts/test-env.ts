@@ -156,5 +156,41 @@ try {
   );
 }
 
+// 13. Rate limit environment variables default properly
+try {
+  const sEnv = validateServerEnv({});
+  const gEnv = validateGatewayEnv({});
+  assert(
+    sEnv.RATE_LIMIT_LOGIN_MAX === 5 &&
+      sEnv.RATE_LIMIT_REGISTER_MAX === 3 &&
+      sEnv.RATE_LIMIT_APPROVAL_MAX === 10 &&
+      sEnv.RATE_LIMIT_FAUCET_MAX === 5 &&
+      sEnv.RATE_LIMIT_HISTORY_MAX === 30 &&
+      sEnv.RATE_LIMIT_WINDOW_MS === 60000 &&
+      gEnv.RATE_LIMIT_GATEWAY_MAX === 60 &&
+      gEnv.RATE_LIMIT_WINDOW_MS === 60000,
+    'Rate limit environment variables default properly'
+  );
+} catch (e: any) {
+  assert(false, 'Rate limit env defaults test failed: ' + e.message);
+}
+
+// 14. Custom rate limit environment values parse correctly
+try {
+  const sEnv = validateServerEnv({
+    RATE_LIMIT_LOGIN_MAX: '10',
+    RATE_LIMIT_FAUCET_MAX: '2',
+    RATE_LIMIT_WINDOW_MS: '30000',
+  });
+  assert(
+    sEnv.RATE_LIMIT_LOGIN_MAX === 10 &&
+      sEnv.RATE_LIMIT_FAUCET_MAX === 2 &&
+      sEnv.RATE_LIMIT_WINDOW_MS === 30000,
+    'Custom rate limit environment values parse correctly'
+  );
+} catch (e: any) {
+  assert(false, 'Custom rate limit env test failed: ' + e.message);
+}
+
 console.log('\nSummary: ' + passed + ' passed, ' + failed + ' failed.');
 if (failed > 0) process.exit(1);

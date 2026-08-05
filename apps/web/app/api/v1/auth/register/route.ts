@@ -8,15 +8,34 @@ import {
   OwnerAlreadyExistsError,
 } from '@kebun-melon/database';
 import { ZodError } from 'zod';
+import {
+  checkRateLimit,
+  getClientIp,
+  createRateLimitResponse,
+  applyRateLimitToResponse,
+} from '@/lib/rate-limit';
+import { validateServerEnv } from '@/lib/env/server';
 
 export async function POST(request: Request) {
   const requestId = `req-${Date.now()}`;
 
+  const env = validateServerEnv();
+  const clientIp = getClientIp(request);
+  const rateLimitInfo = checkRateLimit(clientIp, {
+    keyPrefix: 'register',
+    limit: env.RATE_LIMIT_REGISTER_MAX,
+    windowMs: env.RATE_LIMIT_WINDOW_MS,
+  });
+
+  if (!rateLimitInfo.allowed) {
+    return createRateLimitResponse(rateLimitInfo, requestId);
+  }
+
   try {
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
     const result = await registerUser(prisma, body);
 
-    return NextResponse.json(
+    const response = NextResponse.json(
       {
         success: true,
         data: {
@@ -28,24 +47,25 @@ export async function POST(request: Request) {
       },
       { status: 201 }
     );
+    applyRateLimitToResponse(response, rateLimitInfo);
+    return response;
   } catch (error: any) {
-    if (error instanceof ZodError) {
-      return NextResponse.json(
+    let errResponse: NextResponse;
+    if (error instanceof ZodError || error?.name === 'ZodError') {
+      errResponse = NextResponse.json(
         {
           success: false,
           error: {
             code: 'VALIDATION_ERROR',
             message: 'Invalid request payload format or extraneous fields present.',
-            details: error.flatten(),
+            details: typeof error.flatten === 'function' ? error.flatten() : undefined,
           },
           meta: { requestId },
         },
         { status: 400 }
       );
-    }
-
-    if (error instanceof OwnerAlreadyExistsError) {
-      return NextResponse.json(
+    } else if (error instanceof OwnerAlreadyExistsError) {
+      errResponse = NextResponse.json(
         {
           success: false,
           error: {
@@ -56,10 +76,8 @@ export async function POST(request: Request) {
         },
         { status: 409 }
       );
-    }
-
-    if (error instanceof DuplicateEmailError) {
-      return NextResponse.json(
+    } else if (error instanceof DuplicateEmailError) {
+      errResponse = NextResponse.json(
         {
           success: false,
           error: {
@@ -70,10 +88,8 @@ export async function POST(request: Request) {
         },
         { status: 409 }
       );
-    }
-
-    if (error instanceof PasswordPolicyError) {
-      return NextResponse.json(
+    } else if (error instanceof PasswordPolicyError) {
+      errResponse = NextResponse.json(
         {
           success: false,
           error: {
@@ -84,10 +100,8 @@ export async function POST(request: Request) {
         },
         { status: 422 }
       );
-    }
-
-    if (error instanceof MissingRoleError) {
-      return NextResponse.json(
+    } else if (error instanceof MissingRoleError) {
+      errResponse = NextResponse.json(
         {
           success: false,
           error: {
@@ -98,18 +112,20 @@ export async function POST(request: Request) {
         },
         { status: 503 }
       );
-    }
-
-    return NextResponse.json(
-      {
-        success: false,
-        error: {
-          code: 'INTERNAL_ERROR',
-          message: 'An unexpected internal error occurred during registration.',
+    } else {
+      errResponse = NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'INTERNAL_ERROR',
+            message: 'An unexpected internal error occurred during registration.',
+          },
+          meta: { requestId },
         },
-        meta: { requestId },
-      },
-      { status: 500 }
-    );
+        { status: 500 }
+      );
+    }
+    applyRateLimitToResponse(errResponse, rateLimitInfo);
+    return errResponse;
   }
 }

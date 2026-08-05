@@ -46,6 +46,12 @@ export const gatewayEnvSchema = z.object({
       z.boolean({ invalid_type_error: 'ENABLE_FAUCET_CONTROL must be boolean (true/false)' })
     )
     .default(false),
+  RATE_LIMIT_GATEWAY_MAX: z
+    .preprocess((val) => (val ? parseInt(String(val), 10) : 60), z.number().int().min(1))
+    .default(60),
+  RATE_LIMIT_WINDOW_MS: z
+    .preprocess((val) => (val ? parseInt(String(val), 10) : 60000), z.number().int().min(1000))
+    .default(60000),
 });
 
 export type GatewayEnv = z.infer<typeof gatewayEnvSchema>;
@@ -83,7 +89,19 @@ export function validateGatewayEnv(
     }
   }
 
-  const result = gatewayEnvSchema.safeParse(env);
+  const isTest =
+    env.NODE_ENV === 'test' || env.APP_ENV === 'test' || process.env.NODE_ENV === 'test';
+
+  const dynamicSchema = gatewayEnvSchema.extend({
+    RATE_LIMIT_GATEWAY_MAX: z
+      .preprocess(
+        (val) => (val ? parseInt(String(val), 10) : isTest ? 1000 : 60),
+        z.number().int().min(1)
+      )
+      .default(isTest ? 1000 : 60),
+  });
+
+  const result = dynamicSchema.safeParse(env);
   if (!result.success) {
     const issueMsgs = result.error.issues
       .map((i) => i.path.join('.') + ': ' + i.message)

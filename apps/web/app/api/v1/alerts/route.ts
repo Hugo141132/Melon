@@ -2,6 +2,13 @@ import { NextResponse } from 'next/server';
 import { prisma, AlertRepository } from '@kebun-melon/database';
 import { AlertQueryInputSchema, UserRole } from '@kebun-melon/contracts';
 import { requireSession, requirePermission, AuthorizationError } from '../../../../lib/auth/rbac';
+import {
+  checkRateLimit,
+  getClientIp,
+  createRateLimitResponse,
+  applyRateLimitToResponse,
+} from '../../../../lib/rate-limit';
+import { validateServerEnv } from '../../../../lib/env/server';
 
 export async function GET(request: Request) {
   const requestId = `req-${Date.now()}`;
@@ -9,6 +16,18 @@ export async function GET(request: Request) {
   try {
     const session = await requireSession(request);
     requirePermission(session, 'alert.read');
+
+    const env = validateServerEnv();
+    const rateLimitIdentifier = session.id || getClientIp(request);
+    const rateLimitInfo = checkRateLimit(rateLimitIdentifier, {
+      keyPrefix: 'history',
+      limit: env.RATE_LIMIT_HISTORY_MAX,
+      windowMs: env.RATE_LIMIT_WINDOW_MS,
+    });
+
+    if (!rateLimitInfo.allowed) {
+      return createRateLimitResponse(rateLimitInfo, requestId);
+    }
 
     const { searchParams } = new URL(request.url);
     const rawQuery = {
@@ -55,7 +74,7 @@ export async function GET(request: Request) {
     const alertRepo = new AlertRepository(prisma);
     const result = await alertRepo.getAlerts(parseResult.data, authorizedDeviceIds, session.id);
 
-    return NextResponse.json(
+    const response = NextResponse.json(
       {
         success: true,
         data: result.items,
@@ -66,6 +85,8 @@ export async function GET(request: Request) {
       },
       { status: 200 }
     );
+    applyRateLimitToResponse(response, rateLimitInfo);
+    return response;
   } catch (error: any) {
     if (error instanceof AuthorizationError || error?.name === 'AuthorizationError') {
       return NextResponse.json(

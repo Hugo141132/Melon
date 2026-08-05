@@ -21,6 +21,13 @@ import {
   requireDeviceControlAccess,
   AuthorizationError,
 } from '@/lib/auth/rbac';
+import {
+  checkRateLimit,
+  getClientIp,
+  createRateLimitResponse,
+  applyRateLimitToResponse,
+} from '@/lib/rate-limit';
+import { validateServerEnv } from '@/lib/env/server';
 
 export async function POST(request: Request, { params }: { params: { deviceId: string } }) {
   const requestId = `req-${Date.now()}`;
@@ -28,6 +35,18 @@ export async function POST(request: Request, { params }: { params: { deviceId: s
 
   try {
     const session = await requireSession(request);
+
+    const env = validateServerEnv();
+    const rateLimitIdentifier = session.id || getClientIp(request);
+    const rateLimitInfo = checkRateLimit(rateLimitIdentifier, {
+      keyPrefix: 'faucet_cmd',
+      limit: env.RATE_LIMIT_FAUCET_MAX,
+      windowMs: env.RATE_LIMIT_WINDOW_MS,
+    });
+
+    if (!rateLimitInfo.allowed) {
+      return createRateLimitResponse(rateLimitInfo, requestId);
+    }
 
     const body = await request.json().catch(() => ({}));
     const headerIdempotencyKey =
@@ -137,7 +156,7 @@ export async function POST(request: Request, { params }: { params: { deviceId: s
     const faucetRepo = new FaucetCommandRepository(prisma);
     const command = await faucetRepo.createCommand(parseResult.data, session.id, actorRole);
 
-    return NextResponse.json(
+    const response = NextResponse.json(
       {
         success: true,
         data: command,
@@ -145,6 +164,8 @@ export async function POST(request: Request, { params }: { params: { deviceId: s
       },
       { status: 201 }
     );
+    applyRateLimitToResponse(response, rateLimitInfo);
+    return response;
   } catch (error: any) {
     if (error instanceof AuthorizationError || error?.name === 'AuthorizationError') {
       return NextResponse.json(
@@ -220,6 +241,18 @@ export async function GET(request: Request, { params }: { params: { deviceId: st
     const session = await requireSession(request);
     requirePermission(session, 'device.control.history.read');
 
+    const env = validateServerEnv();
+    const rateLimitIdentifier = session.id || getClientIp(request);
+    const rateLimitInfo = checkRateLimit(rateLimitIdentifier, {
+      keyPrefix: 'history',
+      limit: env.RATE_LIMIT_HISTORY_MAX,
+      windowMs: env.RATE_LIMIT_WINDOW_MS,
+    });
+
+    if (!rateLimitInfo.allowed) {
+      return createRateLimitResponse(rateLimitInfo, requestId);
+    }
+
     const deviceRepo = new DeviceRepository(prisma);
     const device = await deviceRepo.getDeviceByCanonicalId(targetDeviceId);
 
@@ -284,7 +317,7 @@ export async function GET(request: Request, { params }: { params: { deviceId: st
     const faucetRepo = new FaucetCommandRepository(prisma);
     const result = await faucetRepo.getCommands(parseResult.data, [device.id]);
 
-    return NextResponse.json(
+    const response = NextResponse.json(
       {
         success: true,
         data: result,
@@ -292,6 +325,8 @@ export async function GET(request: Request, { params }: { params: { deviceId: st
       },
       { status: 200 }
     );
+    applyRateLimitToResponse(response, rateLimitInfo);
+    return response;
   } catch (error: any) {
     if (error instanceof AuthorizationError || error?.name === 'AuthorizationError') {
       return NextResponse.json(

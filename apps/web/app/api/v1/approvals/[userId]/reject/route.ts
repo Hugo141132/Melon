@@ -2,6 +2,13 @@ import { NextResponse } from 'next/server';
 import { prisma, UserRepository } from '@kebun-melon/database';
 import { UserRole } from '@kebun-melon/contracts';
 import { requireSession, requireRole, AuthorizationError } from '../../../../../../lib/auth/rbac';
+import {
+  checkRateLimit,
+  getClientIp,
+  createRateLimitResponse,
+  applyRateLimitToResponse,
+} from '../../../../../../lib/rate-limit';
+import { validateServerEnv } from '../../../../../../lib/env/server';
 
 export async function POST(request: Request, { params }: { params: { userId: string } }) {
   const requestId = `req-${Date.now()}`;
@@ -27,6 +34,18 @@ export async function POST(request: Request, { params }: { params: { userId: str
         );
       }
       throw err;
+    }
+
+    const env = validateServerEnv();
+    const rateLimitIdentifier = session.id || getClientIp(request);
+    const rateLimitInfo = checkRateLimit(rateLimitIdentifier, {
+      keyPrefix: 'approval',
+      limit: env.RATE_LIMIT_APPROVAL_MAX,
+      windowMs: env.RATE_LIMIT_WINDOW_MS,
+    });
+
+    if (!rateLimitInfo.allowed) {
+      return createRateLimitResponse(rateLimitInfo, requestId);
     }
 
     // Parse and validate optional decisionNote from body
@@ -113,7 +132,7 @@ export async function POST(request: Request, { params }: { params: { userId: str
       );
     }
 
-    return NextResponse.json(
+    const response = NextResponse.json(
       {
         success: true,
         data: {
@@ -126,6 +145,8 @@ export async function POST(request: Request, { params }: { params: { userId: str
       },
       { status: 200 }
     );
+    applyRateLimitToResponse(response, rateLimitInfo);
+    return response;
   } catch (error) {
     return NextResponse.json(
       {
