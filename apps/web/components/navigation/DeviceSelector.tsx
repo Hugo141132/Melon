@@ -2,14 +2,16 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useDeviceContext, AuthorisedDevice } from '@/context/DeviceContext';
+import { useRouter } from 'next/navigation';
 import { ChevronDown, Search, Check, AlertTriangle, Cpu, RefreshCw, X } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, formatDeviceDisplayName } from '@/lib/utils';
 
 export interface DeviceSelectorProps {
   className?: string;
 }
 
 export default function DeviceSelector({ className }: DeviceSelectorProps) {
+  const router = useRouter();
   const {
     devices,
     selectedDevice,
@@ -27,6 +29,13 @@ export default function DeviceSelector({ className }: DeviceSelectorProps) {
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ONLINE' | 'OFFLINE'>('ALL');
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Prefetch target routes for instant seamless client navigation
+  useEffect(() => {
+    router.prefetch('/soil');
+    router.prefetch('/water');
+    router.prefetch('/controls');
+  }, [router]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -73,6 +82,13 @@ export default function DeviceSelector({ className }: DeviceSelectorProps) {
     selectDevice(device.deviceId);
     setIsOpen(false);
     setSearchQuery('');
+    if (device.deviceType === 'SOIL_NODE') {
+      router.push('/soil');
+    } else if (device.deviceType === 'WATER_QUALITY_NODE') {
+      router.push('/water');
+    } else if (device.deviceType === 'WATER_TANK_NODE') {
+      router.push('/controls');
+    }
   };
 
   // Keyboard navigation inside dropdown
@@ -164,8 +180,8 @@ export default function DeviceSelector({ className }: DeviceSelectorProps) {
               getStatusColor(selectedDevice.connectionStatus)
             )}
           />
-          <span className="truncate max-w-[130px]" title={selectedDevice.deviceName}>
-            {selectedDevice.deviceName}
+          <span className="truncate max-w-[130px]" title={formatDeviceDisplayName(selectedDevice)}>
+            {formatDeviceDisplayName(selectedDevice)}
           </span>
           <span className="text-[10px] text-app-on-surface-variant bg-app-surface-container px-1.5 py-0.5 rounded font-mono">
             {selectedDevice.deviceType.replace('_NODE', '')}
@@ -203,9 +219,9 @@ export default function DeviceSelector({ className }: DeviceSelectorProps) {
         />
         <span
           className="truncate max-w-[120px] sm:max-w-[160px]"
-          title={selectedDevice?.deviceName}
+          title={formatDeviceDisplayName(selectedDevice)}
         >
-          {selectedDevice?.deviceName || 'Pilih Perangkat'}
+          {formatDeviceDisplayName(selectedDevice) || 'Pilih Perangkat'}
         </span>
         <ChevronDown
           size={14}
@@ -259,7 +275,7 @@ export default function DeviceSelector({ className }: DeviceSelectorProps) {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Cari nama, ID, atau lokasi..."
+                placeholder="Cari nama atau lokasi..."
                 className="w-full bg-app-surface-container-lowest border border-app-outline-variant/30 rounded-lg pl-8 pr-3 py-1.5 text-xs text-app-on-surface placeholder:text-app-on-surface-variant/50 focus:outline-none focus:ring-1 focus:ring-app-primary"
                 data-testid="device-search-input"
               />
@@ -330,14 +346,18 @@ export default function DeviceSelector({ className }: DeviceSelectorProps) {
                       />
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5">
-                          <p className="text-xs font-bold truncate">{device.deviceName}</p>
+                          <p className="text-xs font-bold truncate">
+                            {formatDeviceDisplayName(device)}
+                          </p>
                           <span className="text-[10px] text-app-on-surface-variant/80 font-mono bg-app-surface-container/60 px-1 py-0.2 rounded">
                             {device.deviceType.replace('_NODE', '')}
                           </span>
                         </div>
-                        <p className="text-[11px] text-app-on-surface-variant truncate font-mono">
-                          {device.deviceId} {device.siteName ? `• ${device.siteName}` : ''}
-                        </p>
+                        {device.siteName && (
+                          <p className="text-[11px] text-app-on-surface-variant truncate">
+                            {device.siteName}
+                          </p>
+                        )}
                       </div>
                     </div>
 

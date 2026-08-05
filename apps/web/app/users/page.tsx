@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 
 import Link from 'next/link';
 import TopAppBar from '@/components/navigation/TopAppBar';
-import BottomNav from '@/components/navigation/BottomNav';
 import {
   Users as UsersIcon,
   ShieldAlert,
@@ -403,7 +402,6 @@ export default function UserManagementPage() {
             </Link>
           </div>
         </main>
-        <BottomNav />
       </div>
     );
   }
@@ -1081,8 +1079,6 @@ export default function UserManagementPage() {
           </div>
         </div>
       )}
-
-      <BottomNav />
     </div>
   );
 }

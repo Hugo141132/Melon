@@ -255,9 +255,6 @@ export default function FaucetStatusCard({
           <StatusIcon size={22} className={badge.animate ? 'animate-spin' : ''} />
           <div>
             <p className="text-[14px] font-bold leading-tight">{badge.label}</p>
-            <p className="text-[11px] opacity-90 mt-0.5 font-mono">
-              ID: {currentCommand.commandId || currentCommand.id}
-            </p>
           </div>
         </div>
 

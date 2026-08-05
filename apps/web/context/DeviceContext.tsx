@@ -57,7 +57,7 @@ export function DeviceProvider({
   const [isRevoked, setIsRevoked] = useState<boolean>(false);
   const [revokedDeviceId, setRevokedDeviceId] = useState<string | null>(null);
 
-  // Helper to read candidate device ID from URL search params or localStorage
+  // Helper to read candidate device ID from URL search params, sessionStorage, or localStorage
   const getCandidateDeviceId = useCallback((): string | null => {
     if (typeof window === 'undefined') return null;
 
@@ -72,11 +72,21 @@ export function DeviceProvider({
       // Ignore URL parsing errors
     }
 
-    // 2. Priority: localStorage
+    // 2. Priority: sessionStorage
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored && stored.trim().length > 0) {
-        return stored.trim();
+      const sessionStored = sessionStorage.getItem(STORAGE_KEY);
+      if (sessionStored && sessionStored.trim().length > 0) {
+        return sessionStored.trim();
+      }
+    } catch {
+      // Ignore sessionStorage errors
+    }
+
+    // 3. Priority: localStorage
+    try {
+      const localStored = localStorage.getItem(STORAGE_KEY);
+      if (localStored && localStored.trim().length > 0) {
+        return localStored.trim();
       }
     } catch {
       // Ignore localStorage errors
@@ -85,15 +95,26 @@ export function DeviceProvider({
     return null;
   }, []);
 
-  // Sync selection with localStorage and URL without triggering page reload
+  // Helper to determine preferred deviceType based on current route path
+  const getRoutePreferredDeviceType = useCallback((): string | null => {
+    if (typeof window === 'undefined') return null;
+    const path = window.location.pathname;
+    if (path === '/soil' || path === '/tanah') return 'SOIL_NODE';
+    if (path === '/water' || path === '/air') return 'WATER_QUALITY_NODE';
+    if (path === '/controls') return 'WATER_TANK_NODE';
+    return null;
+  }, []);
+
+  // Sync selection with sessionStorage, localStorage and URL without triggering page reload
   const syncSelection = useCallback((device: AuthorisedDevice | null) => {
     if (typeof window === 'undefined') return;
 
     if (device) {
       try {
         localStorage.setItem(STORAGE_KEY, device.deviceId);
+        sessionStorage.setItem(STORAGE_KEY, device.deviceId);
       } catch {
-        // Ignore localStorage write failure
+        // Ignore storage write failure
       }
 
       try {
@@ -108,8 +129,9 @@ export function DeviceProvider({
     } else {
       try {
         localStorage.removeItem(STORAGE_KEY);
+        sessionStorage.removeItem(STORAGE_KEY);
       } catch {
-        // Ignore localStorage remove failure
+        // Ignore storage remove failure
       }
 
       try {
@@ -147,24 +169,31 @@ export function DeviceProvider({
           setRevokedDeviceId(null);
           return;
         } else {
-          // Candidate ID was supplied (URL or localStorage) but is NOT in server-authorised list!
-          // Tampered URL or revoked access detected!
+          // Candidate ID was supplied (URL, session, or localStorage) but is NOT in server-authorised list!
           setIsRevoked(true);
           setRevokedDeviceId(candidateId);
-          // Fallback to first authorised device
-          const fallback = fetchedDevices[0];
+          // Fallback to route-matching or first device
+          const routePreferredType = getRoutePreferredDeviceType();
+          const routeMatch = routePreferredType
+            ? fetchedDevices.find((d) => d.deviceType === routePreferredType)
+            : null;
+          const fallback = routeMatch || fetchedDevices[0];
           setSelectedDevice(fallback);
           syncSelection(fallback);
           return;
         }
       }
 
-      // Default selection: first authorised device
-      const defaultDevice = fetchedDevices[0];
+      // Default selection: route-matching device or first authorised device
+      const routePreferredType = getRoutePreferredDeviceType();
+      const routeMatch = routePreferredType
+        ? fetchedDevices.find((d) => d.deviceType === routePreferredType)
+        : null;
+      const defaultDevice = routeMatch || fetchedDevices[0];
       setSelectedDevice(defaultDevice);
       syncSelection(defaultDevice);
     },
-    [getCandidateDeviceId, syncSelection]
+    [getCandidateDeviceId, getRoutePreferredDeviceType, syncSelection]
   );
 
   const refetchDevices = useCallback(async () => {
@@ -209,12 +238,10 @@ export function DeviceProvider({
     (deviceId: string): boolean => {
       const target = devices.find((d) => d.deviceId === deviceId);
       if (!target) {
-        // Attempted selection of non-authorised device (tampering or invalid ID)
         setError('Perangkat tidak diizinkan atau tidak ditemukan.');
         return false;
       }
 
-      // Clear stale state and select target device
       setSelectedDevice(target);
       syncSelection(target);
       setIsRevoked(false);

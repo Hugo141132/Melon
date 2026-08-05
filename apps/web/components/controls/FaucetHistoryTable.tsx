@@ -162,7 +162,6 @@ export default function FaucetHistoryTable({ deviceId, className }: FaucetHistor
         <table className="w-full text-left border-collapse text-xs">
           <thead>
             <tr className="bg-app-surface-container-low/60 border-b border-app-outline-variant/20 text-app-on-surface-variant">
-              <th className="p-3 font-semibold">ID Perintah</th>
               <th className="p-3 font-semibold">Fase / Target</th>
               <th className="p-3 font-semibold">Volume Aktual</th>
               <th className="p-3 font-semibold">Status</th>
@@ -174,9 +173,6 @@ export default function FaucetHistoryTable({ deviceId, className }: FaucetHistor
             {loading ? (
               [1, 2, 3].map((i) => (
                 <tr key={i} className="animate-pulse">
-                  <td className="p-3">
-                    <div className="h-3 bg-app-surface-container rounded w-20" />
-                  </td>
                   <td className="p-3">
                     <div className="h-3 bg-app-surface-container rounded w-24" />
                   </td>
@@ -196,7 +192,7 @@ export default function FaucetHistoryTable({ deviceId, className }: FaucetHistor
               ))
             ) : history.length === 0 ? (
               <tr>
-                <td colSpan={6} className="p-8 text-center text-app-on-surface-variant">
+                <td colSpan={5} className="p-8 text-center text-app-on-surface-variant">
                   <Droplets size={28} className="mx-auto mb-2 opacity-30 text-app-primary" />
                   <p className="font-semibold text-[13px]">Belum ada riwayat perintah faucet</p>
                   <p className="text-[11px] opacity-80">
@@ -210,10 +206,6 @@ export default function FaucetHistoryTable({ deviceId, className }: FaucetHistor
                   key={item.id}
                   className="hover:bg-app-surface-container-low/30 transition-colors"
                 >
-                  <td className="p-3 font-mono font-semibold text-app-primary">
-                    {item.commandId || item.id}
-                  </td>
-
                   <td className="p-3">
                     <span className="font-bold text-app-on-surface">
                       {item.targetVolumeMl.toLocaleString('id-ID')} mL

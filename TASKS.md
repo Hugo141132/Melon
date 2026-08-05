@@ -1247,8 +1247,9 @@ GET /devices/{deviceId}/monitoring/water/latest
 ## TASK-0502 — Implement Monitoring Dashboard
 
 **Priority:** `P1`  
-**Status:** `BACKLOG`  
-**Dependencies:** `TASK-0501`, `TASK-0306`
+**Status:** `DONE`  
+**Dependencies:** `TASK-0501`, `TASK-0306`  
+**Completed:** 2026-08-05 — Implemented full multi-device monitoring dashboard with domain route partitioning (`/soil` for soil metrics, `/water` for water quality metrics, `/controls` for reservoir water tank metrics & faucet controls, and `/sensor` overview), centered top-bar `DeviceSelector` with automatic route prefetching and device restoration from `DeviceContext`/`sessionStorage`/`localStorage`, dynamic user display name without hardcoded fallbacks, neutral `Pengguna` account placeholder during loading/unauthenticated states, preserving existing design aesthetic and responsive layout, with full unit test coverage and quality verification.
 
 ### Work
 

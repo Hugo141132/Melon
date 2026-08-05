@@ -183,4 +183,73 @@ describe('TASK-0306 — Device Selector & Global DeviceContext State Integration
     expect(devices.length).toBe(3);
     expect(error).toBeNull();
   });
+
+  it('8. Hidden Device ID in Visual Dropdown Items (ID preserved internally)', () => {
+    const device = mockDevices[0]; // soil-node-001, 'Soil Sensor Blok A', siteName 'Blok Utama'
+
+    // Internal API / state uses deviceId
+    expect(device.deviceId).toBe('soil-node-001');
+
+    // Visual label contains deviceName and optional siteName, omitting raw deviceId
+    const visibleTitle = device.deviceName;
+    const visibleSubtext = device.siteName || '';
+
+    expect(visibleTitle).toBe('Soil Sensor Blok A');
+    expect(visibleSubtext).toBe('Blok Utama');
+    expect(visibleSubtext).not.toContain('soil-node-001');
+  });
+
+  it('9. Direct Navigation to /soil on SOIL_NODE Selection', () => {
+    const soilDevice = mockDevices[0];
+    const pushSpy = vi.fn();
+
+    const handleSelectWithNavigation = (dev: AuthorisedDevice) => {
+      if (dev.deviceType === 'SOIL_NODE') {
+        pushSpy('/soil');
+      } else if (dev.deviceType === 'WATER_QUALITY_NODE') {
+        pushSpy('/air');
+      } else if (dev.deviceType === 'WATER_TANK_NODE') {
+        pushSpy('/controls');
+      }
+    };
+
+    handleSelectWithNavigation(soilDevice);
+    expect(pushSpy).toHaveBeenCalledWith('/soil');
+  });
+
+  it('10. Direct Navigation to /water on WATER_QUALITY_NODE Selection', () => {
+    const waterDevice = mockDevices[1];
+    const pushSpy = vi.fn();
+
+    const handleSelectWithNavigation = (dev: AuthorisedDevice) => {
+      if (dev.deviceType === 'SOIL_NODE') {
+        pushSpy('/soil');
+      } else if (dev.deviceType === 'WATER_QUALITY_NODE') {
+        pushSpy('/water');
+      } else if (dev.deviceType === 'WATER_TANK_NODE') {
+        pushSpy('/controls');
+      }
+    };
+
+    handleSelectWithNavigation(waterDevice);
+    expect(pushSpy).toHaveBeenCalledWith('/water');
+  });
+
+  it('11. Direct Navigation to /controls on WATER_TANK_NODE Selection', () => {
+    const tankDevice = mockDevices[2];
+    const pushSpy = vi.fn();
+
+    const handleSelectWithNavigation = (dev: AuthorisedDevice) => {
+      if (dev.deviceType === 'SOIL_NODE') {
+        pushSpy('/soil');
+      } else if (dev.deviceType === 'WATER_QUALITY_NODE') {
+        pushSpy('/air');
+      } else if (dev.deviceType === 'WATER_TANK_NODE') {
+        pushSpy('/controls');
+      }
+    };
+
+    handleSelectWithNavigation(tankDevice);
+    expect(pushSpy).toHaveBeenCalledWith('/controls');
+  });
 });

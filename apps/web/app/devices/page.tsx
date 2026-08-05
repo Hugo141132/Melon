@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import TopAppBar from '@/components/navigation/TopAppBar';
-import BottomNav from '@/components/navigation/BottomNav';
 import {
   Cpu,
   Search,
@@ -901,8 +900,6 @@ export default function DeviceRegistryPage() {
           </div>
         </div>
       )}
-
-      <BottomNav />
     </div>
   );
 }

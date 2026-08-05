@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import TopAppBar from '@/components/navigation/TopAppBar';
-import BottomNav from '@/components/navigation/BottomNav';
 import { USER_PROFILE } from '@/lib/constants';
 import {
   User as UserIcon,
@@ -169,8 +168,6 @@ export default function PengaturanPage() {
           <p className="text-[12px] text-app-on-surface-variant">Kebun Melon v1.0.0</p>
         </div>
       </main>
-
-      <BottomNav />
     </div>
   );
 }

@@ -25,7 +25,7 @@ export const IRRIGATION_PHASES = [
 export const DASHBOARD_DATA = {
   healthScore: 92,
   healthLabel: 'Sangat Baik',
-  userName: 'Pak Wahyu',
+  userName: '',
   subtitle: 'Tanaman tumbuh optimal hari ini.',
   soil: { percent: 78, label: 'Stabil & Subur' },
   water: { percent: 65, label: 'Irigasi Aktif' },

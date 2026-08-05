@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import TopAppBar from '@/components/navigation/TopAppBar';
-import BottomNav from '@/components/navigation/BottomNav';
 import { ALERTS, type Alert, type AlertSeverity } from '@/lib/constants';
 import {
   LucideIcon,
@@ -182,8 +181,6 @@ export default function NotifikasiPage() {
           </div>
         </section>
       </main>
-
-      <BottomNav />
     </div>
   );
 }

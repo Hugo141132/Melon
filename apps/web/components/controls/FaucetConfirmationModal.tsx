@@ -101,9 +101,6 @@ export default function FaucetConfirmationModal({
               <span className="font-semibold text-app-on-surface truncate block">
                 {selectedDevice.deviceName}
               </span>
-              <span className="font-mono text-[10px] text-app-on-surface-variant">
-                {selectedDevice.deviceId}
-              </span>
             </div>
 
             <div>

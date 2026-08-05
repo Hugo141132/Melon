@@ -1,0 +1,167 @@
+'use client';
+
+import dynamic from 'next/dynamic';
+import TopAppBar from '@/components/navigation/TopAppBar';
+import { useDeviceContext } from '@/context/DeviceContext';
+import { useLatestMonitoring } from '@/hooks/useLatestMonitoring';
+import { WATER_DATA } from '@/lib/constants';
+import { CheckCircle, TrendingUp, Cpu } from 'lucide-react';
+
+const WaterNutrientChart = dynamic(() => import('@/components/charts/WaterNutrientChart'), {
+  ssr: false,
+});
+
+// EC Half-gauge for Water Quality Node
+function ECGauge({ value }: { value: number }) {
+  const maxEC = 4;
+  const angle = -135 + (Math.min(value, maxEC) / maxEC) * 270;
+  return (
+    <div className="flex flex-col items-center mb-2">
+      <div className="relative" style={{ width: 180, height: 90, overflow: 'hidden' }}>
+        {/* Track */}
+        <div className="ec-gauge-track absolute top-0 left-0" />
+        {/* Fill */}
+        <div className="ec-gauge-fill" style={{ transform: `rotate(${angle - 90}deg)` }} />
+        {/* Value overlay */}
+        <div className="absolute inset-0 flex flex-col items-center justify-end pb-1">
+          <span className="text-[28px] leading-9 font-bold text-app-primary">{value}</span>
+          <span className="text-[12px] leading-4 text-app-on-surface-variant">mS/cm</span>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 bg-app-primary/10 px-4 py-1.5 rounded-full mt-2">
+        <CheckCircle size={16} className="text-app-primary" />
+        <span className="text-[14px] font-semibold text-app-primary">Status: Stabil</span>
+      </div>
+    </div>
+  );
+}
+
+// pH bar for Water Quality Node
+function PHBar({ value }: { value: number }) {
+  const pct = Math.max(0, Math.min(100, ((value - 1) / 13) * 100));
+  return (
+    <div className="mt-4">
+      <div className="h-2 w-full rounded-full ph-gradient relative overflow-hidden">
+        <div
+          className="absolute top-0 bottom-0 w-1.5 bg-white shadow-sm rounded-full border border-app-outline/20"
+          style={{ left: `${pct}%` }}
+        />
+      </div>
+      <div className="flex justify-between mt-1 px-0.5">
+        <span className="text-[10px] font-bold">1</span>
+        <span className="text-[10px] font-bold text-app-primary">7</span>
+        <span className="text-[10px] font-bold">14</span>
+      </div>
+    </div>
+  );
+}
+
+export default function WaterPage() {
+  const { selectedDevice } = useDeviceContext();
+  const { snapshot } = useLatestMonitoring();
+
+  const deviceType = selectedDevice?.deviceType;
+
+  const isTankNode = deviceType === 'WATER_TANK_NODE';
+  const isSoilNode = deviceType === 'SOIL_NODE';
+  const isQualityNode = !isTankNode && !isSoilNode;
+
+  const waterData = snapshot?.water?.data;
+  const phVal = waterData?.ph ?? WATER_DATA.ph.value;
+  const tdsVal = waterData?.tds ?? WATER_DATA.tds.value;
+  const ecVal = waterData?.ec ?? WATER_DATA.ec.value;
+  const statusLabel = waterData?.status || 'Optimal';
+
+  return (
+    <div className="bg-app-surface text-app-on-surface min-h-dvh pb-10">
+      <TopAppBar />
+
+      <main className="pt-20 px-[1rem] space-y-5">
+        {(isSoilNode || isTankNode) && (
+          <section className="bg-app-surface-container-lowest rounded-xl p-5 soft-elevation-lg border border-app-outline-variant/30 flex flex-col items-center text-center animate-fade-in space-y-3">
+            <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-600">
+              <Cpu size={24} />
+            </div>
+            <div>
+              <h3 className="text-[16px] font-bold text-app-on-surface">
+                {isSoilNode ? 'Perangkat Sensor Tanah Aktif' : 'Perangkat Tangki Air Aktif'}
+              </h3>
+              <p className="text-[12px] text-app-on-surface-variant mt-1 max-w-sm">
+                Perangkat{' '}
+                <code className="bg-app-surface-container px-1 py-0.5 rounded font-mono">
+                  {selectedDevice?.deviceName}
+                </code>{' '}
+                {isSoilNode
+                  ? 'adalah node pemantauan tanah. Pilih Water Quality Node di selector untuk melihat kualitas air.'
+                  : 'adalah node tangki air (pemantauan berada di halaman Kontrol). Pilih Water Quality Node di selector untuk melihat kualitas air.'}
+              </p>
+            </div>
+          </section>
+        )}
+
+        {isQualityNode && (
+          <>
+            <section className="bg-app-surface-container-lowest rounded-xl p-5 soft-elevation-lg border border-app-outline-variant/30 animate-fade-in">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-app-primary animate-pulse" />
+                  <span className="text-[14px] font-semibold text-app-primary">
+                    Status Kualitas Air: {statusLabel}
+                  </span>
+                </div>
+                <span className="text-[12px] text-app-on-surface-variant">Update: Real-Time</span>
+              </div>
+              <p className="text-[18px] leading-7 font-semibold text-app-on-surface">
+                "Kualitas air &amp; nutrisi terukur stabil."
+              </p>
+            </section>
+
+            <section className="bg-app-surface-container-lowest rounded-xl p-5 soft-elevation-lg border border-app-outline-variant/30 flex flex-col items-center animate-fade-in">
+              <h3 className="text-[14px] font-semibold text-app-on-surface-variant self-start mb-4">
+                Electrical Conductivity (EC)
+              </h3>
+              <ECGauge value={ecVal} />
+            </section>
+
+            <div className="grid grid-cols-2 gap-4 animate-fade-in">
+              <div className="bg-app-surface-container-lowest rounded-xl p-5 soft-elevation-lg border border-app-outline-variant/30 flex flex-col justify-between">
+                <div>
+                  <h3 className="text-[14px] font-semibold text-app-on-surface-variant mb-2">
+                    pH Level
+                  </h3>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-[28px] font-bold text-app-on-surface">{phVal}</span>
+                    <span className="text-[12px] text-app-on-surface-variant">
+                      {WATER_DATA.ph.status}
+                    </span>
+                  </div>
+                </div>
+                <PHBar value={phVal} />
+              </div>
+
+              <div className="bg-app-surface-container-lowest rounded-xl p-5 soft-elevation-lg border border-app-outline-variant/30 flex flex-col justify-between">
+                <div>
+                  <h3 className="text-[14px] font-semibold text-app-on-surface-variant mb-2">
+                    Total Dissolved Solids
+                  </h3>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-[28px] font-bold text-app-on-surface">{tdsVal}</span>
+                    <span className="text-[12px] text-app-on-surface-variant">ppm</span>
+                  </div>
+                </div>
+                <div className="mt-4 flex items-center gap-1 text-app-primary">
+                  <TrendingUp size={14} />
+                  <span className="text-[12px] font-semibold">{WATER_DATA.tds.status}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="animate-fade-in">
+              <WaterNutrientChart />
+            </div>
+          </>
+        )}
+      </main>
+    </div>
+  );
+}

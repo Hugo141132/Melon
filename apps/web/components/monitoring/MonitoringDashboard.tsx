@@ -1,0 +1,502 @@
+'use client';
+
+import React from 'react';
+import { useDeviceContext } from '@/context/DeviceContext';
+import { useLatestMonitoring } from '@/hooks/useLatestMonitoring';
+import {
+  Sprout,
+  Droplets,
+  Gauge,
+  Thermometer,
+  Activity,
+  AlertTriangle,
+  RefreshCw,
+  Clock,
+  WifiOff,
+  Database,
+  CheckCircle2,
+  Sliders,
+} from 'lucide-react';
+import { cn, formatDeviceDisplayName } from '@/lib/utils';
+
+// Helper to format numeric values nicely or return placeholder
+function formatMetricValue(val: number | null | undefined, decimals = 1, fallback = '-'): string {
+  if (val === null || val === undefined || isNaN(val)) return fallback;
+  return Number.isInteger(val) ? val.toString() : val.toFixed(decimals);
+}
+
+// Format timestamp cleanly into Indonesian format
+function formatTimestamp(isoString: string | null | undefined): string {
+  if (!isoString) return 'Belum ada data';
+  try {
+    const date = new Date(isoString);
+    if (isNaN(date.getTime())) return 'Belum ada data';
+    return date.toLocaleTimeString('id-ID', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+  } catch {
+    return 'Belum ada data';
+  }
+}
+
+// ─── Single Metric Item Display ───────────────────────────
+interface MetricItemProps {
+  label: string;
+  value: string;
+  unit?: string;
+  sublabel?: string;
+  icon?: React.ReactNode;
+  highlightColor?: string;
+}
+
+function MetricItem({ label, value, unit, sublabel, icon, highlightColor }: MetricItemProps) {
+  return (
+    <div className="bg-app-surface-container-lowest rounded-xl p-4 border border-app-outline-variant/30 soft-elevation transition-all hover:border-app-primary/30">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[12px] leading-4 font-medium text-app-on-surface-variant">
+          {label}
+        </span>
+        {icon && (
+          <div
+            className={cn(
+              'w-7 h-7 rounded-lg flex items-center justify-center text-app-primary bg-app-primary/10',
+              highlightColor
+            )}
+          >
+            {icon}
+          </div>
+        )}
+      </div>
+      <div className="flex items-baseline gap-1">
+        <span className="text-[24px] leading-8 font-bold text-app-on-surface">{value}</span>
+        {unit && (
+          <span className="text-[12px] leading-4 font-medium text-app-on-surface-variant">
+            {unit}
+          </span>
+        )}
+      </div>
+      {sublabel && (
+        <p className="text-[11px] leading-4 text-app-on-surface-variant mt-1">{sublabel}</p>
+      )}
+    </div>
+  );
+}
+
+// ─── Skeleton Loading Cards ───────────────────────────────
+function MonitoringSkeleton() {
+  return (
+    <div className="space-y-5 animate-pulse" data-testid="monitoring-skeleton">
+      {/* Device Header Skeleton */}
+      <div className="bg-app-surface-container-lowest rounded-2xl p-5 border border-app-outline-variant/20 h-24" />
+      {/* Cards Skeleton Grid */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="bg-app-surface-container-lowest rounded-xl p-5 border border-app-outline-variant/20 h-32" />
+        <div className="bg-app-surface-container-lowest rounded-xl p-5 border border-app-outline-variant/20 h-32" />
+        <div className="bg-app-surface-container-lowest rounded-xl p-5 border border-app-outline-variant/20 h-32" />
+        <div className="bg-app-surface-container-lowest rounded-xl p-5 border border-app-outline-variant/20 h-32" />
+      </div>
+    </div>
+  );
+}
+
+// ─── Soil Monitoring Section ──────────────────────────────
+interface SoilSectionProps {
+  data: {
+    nitrogen: number | null;
+    phosphorus: number | null;
+    potassium: number | null;
+    temperature: number | null;
+    moisture: number | null;
+    ph: number | null;
+    ec: number | null;
+    status: string | null;
+  };
+  recordedAt: string | null;
+  isStale: boolean;
+}
+
+function SoilMonitoringSection({ data, recordedAt }: SoilSectionProps) {
+  return (
+    <section className="bg-app-surface-container-lowest rounded-2xl p-5 border border-app-outline-variant/30 soft-elevation-lg space-y-4">
+      <div className="flex items-center justify-between pb-3 border-b border-app-outline-variant/20">
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-xl bg-app-primary/10 flex items-center justify-center text-app-primary">
+            <Sprout size={20} />
+          </div>
+          <div>
+            <h3 className="text-[16px] leading-6 font-bold text-app-on-surface">
+              Pemantauan Tanah (SOIL)
+            </h3>
+            <p className="text-[12px] leading-4 text-app-on-surface-variant">
+              Tercatat: {formatTimestamp(recordedAt)}
+            </p>
+          </div>
+        </div>
+        {data.status && (
+          <span className="text-[12px] leading-4 font-semibold px-2.5 py-1 rounded-full bg-app-primary/10 text-app-primary">
+            {data.status}
+          </span>
+        )}
+      </div>
+
+      {/* NPK Summary */}
+      <div className="bg-app-surface-container-low/50 rounded-xl p-4 border border-app-outline-variant/20">
+        <p className="text-[12px] font-semibold text-app-on-surface-variant mb-2">
+          HARA UTAMA (NPK)
+        </p>
+        <div className="grid grid-cols-3 gap-3">
+          <div className="text-center p-2 rounded-lg bg-emerald-500/10">
+            <span className="text-[11px] font-bold text-emerald-700 block">Nitrogen (N)</span>
+            <span className="text-[18px] font-bold text-app-on-surface">
+              {formatMetricValue(data.nitrogen, 0)}
+            </span>
+            <span className="text-[10px] text-app-on-surface-variant block">mg/kg</span>
+          </div>
+          <div className="text-center p-2 rounded-lg bg-amber-500/10">
+            <span className="text-[11px] font-bold text-amber-700 block">Fosfor (P)</span>
+            <span className="text-[18px] font-bold text-app-on-surface">
+              {formatMetricValue(data.phosphorus, 0)}
+            </span>
+            <span className="text-[10px] text-app-on-surface-variant block">mg/kg</span>
+          </div>
+          <div className="text-center p-2 rounded-lg bg-lime-500/10">
+            <span className="text-[11px] font-bold text-lime-700 block">Kalium (K)</span>
+            <span className="text-[18px] font-bold text-app-on-surface">
+              {formatMetricValue(data.potassium, 0)}
+            </span>
+            <span className="text-[10px] text-app-on-surface-variant block">mg/kg</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Environmental & Chemical Soil Parameters */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <MetricItem
+          label="Suhu Tanah"
+          value={formatMetricValue(data.temperature, 1)}
+          unit="°C"
+          icon={<Thermometer size={16} />}
+        />
+        <MetricItem
+          label="Kelembapan"
+          value={formatMetricValue(data.moisture, 1)}
+          unit="%"
+          icon={<Droplets size={16} />}
+        />
+        <MetricItem
+          label="pH Tanah"
+          value={formatMetricValue(data.ph, 2)}
+          icon={<Activity size={16} />}
+        />
+        <MetricItem
+          label="Konduktivitas (EC)"
+          value={formatMetricValue(data.ec, 2)}
+          unit="mS/cm"
+          icon={<Gauge size={16} />}
+        />
+      </div>
+    </section>
+  );
+}
+
+// ─── Water Quality Section ────────────────────────────────
+interface WaterQualitySectionProps {
+  data: {
+    ph: number | null;
+    tds: number | null;
+    ec: number | null;
+    status: string | null;
+  };
+  recordedAt: string | null;
+}
+
+function WaterQualitySection({ data, recordedAt }: WaterQualitySectionProps) {
+  return (
+    <section className="bg-app-surface-container-lowest rounded-2xl p-5 border border-app-outline-variant/30 soft-elevation-lg space-y-4">
+      <div className="flex items-center justify-between pb-3 border-b border-app-outline-variant/20">
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-xl bg-cyan-500/10 flex items-center justify-center text-cyan-600">
+            <Droplets size={20} />
+          </div>
+          <div>
+            <h3 className="text-[16px] leading-6 font-bold text-app-on-surface">
+              Kualitas Air Irigasi
+            </h3>
+            <p className="text-[12px] leading-4 text-app-on-surface-variant">
+              Tercatat: {formatTimestamp(recordedAt)}
+            </p>
+          </div>
+        </div>
+        {data.status && (
+          <span className="text-[12px] leading-4 font-semibold px-2.5 py-1 rounded-full bg-cyan-500/10 text-cyan-700">
+            {data.status}
+          </span>
+        )}
+      </div>
+
+      <div className="grid grid-cols-3 gap-3">
+        <MetricItem
+          label="pH Air"
+          value={formatMetricValue(data.ph, 2)}
+          icon={<Activity size={16} />}
+        />
+        <MetricItem
+          label="TDS Air"
+          value={formatMetricValue(data.tds, 0)}
+          unit="ppm"
+          icon={<Sliders size={16} />}
+        />
+        <MetricItem
+          label="Konduktivitas (EC)"
+          value={formatMetricValue(data.ec, 2)}
+          unit="mS/cm"
+          icon={<Gauge size={16} />}
+        />
+      </div>
+    </section>
+  );
+}
+
+// ─── Water Tank Section (No Reservoir Terminology) ────────
+interface WaterTankSectionProps {
+  data: {
+    tankVolume: number | null;
+    flowRate: number | null;
+    status: string | null;
+  };
+  recordedAt: string | null;
+}
+
+function WaterTankSection({ data, recordedAt }: WaterTankSectionProps) {
+  return (
+    <section className="bg-app-surface-container-lowest rounded-2xl p-5 border border-app-outline-variant/30 soft-elevation-lg space-y-4">
+      <div className="flex items-center justify-between pb-3 border-b border-app-outline-variant/20">
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-600">
+            <Database size={20} />
+          </div>
+          <div>
+            <h3 className="text-[16px] leading-6 font-bold text-app-on-surface">
+              Pemantauan Tangki Air
+            </h3>
+            <p className="text-[12px] leading-4 text-app-on-surface-variant">
+              Tercatat: {formatTimestamp(recordedAt)}
+            </p>
+          </div>
+        </div>
+        {data.status && (
+          <span className="text-[12px] leading-4 font-semibold px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-700">
+            {data.status}
+          </span>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <MetricItem
+          label="Volume Air Tangki"
+          value={formatMetricValue(data.tankVolume, 1)}
+          unit="L"
+          icon={<Database size={16} />}
+        />
+        <MetricItem
+          label="Laju Aliran Air"
+          value={formatMetricValue(data.flowRate, 1)}
+          unit="m³/h"
+          icon={<Activity size={16} />}
+        />
+      </div>
+    </section>
+  );
+}
+
+// ─── Main Monitoring Dashboard Component ──────────────────
+export default function MonitoringDashboard() {
+  const { selectedDevice, isLoading: isDeviceLoading } = useDeviceContext();
+  const {
+    snapshot,
+    isLoading: isMonitoringLoading,
+    isRevalidating,
+    isStale,
+    connectionStatus,
+    error,
+    refetch,
+  } = useLatestMonitoring();
+
+  const isLoading = isDeviceLoading || isMonitoringLoading;
+
+  // 1. No device selected
+  if (!selectedDevice && !isLoading) {
+    return (
+      <div className="bg-app-surface-container-lowest rounded-2xl p-8 text-center border border-app-outline-variant/30 soft-elevation-lg my-4">
+        <div className="w-12 h-12 rounded-full bg-app-primary/10 flex items-center justify-center text-app-primary mx-auto mb-3">
+          <Sprout size={24} />
+        </div>
+        <h3 className="text-[18px] font-bold text-app-on-surface mb-1">
+          Tidak Ada Perangkat Dipilih
+        </h3>
+        <p className="text-[14px] text-app-on-surface-variant max-w-sm mx-auto">
+          Silakan pilih perangkat pada bagian pemilih perangkat di atas untuk melihat data
+          pemantauan real-time.
+        </p>
+      </div>
+    );
+  }
+
+  // 2. Loading State
+  if (isLoading) {
+    return <MonitoringSkeleton />;
+  }
+
+  // 3. Error State
+  if (error) {
+    return (
+      <div className="bg-app-error/5 border border-app-error/30 rounded-2xl p-6 text-center soft-elevation my-4 space-y-3">
+        <div className="w-12 h-12 rounded-full bg-app-error/10 flex items-center justify-center text-app-error mx-auto">
+          <AlertTriangle size={24} />
+        </div>
+        <h3 className="text-[16px] font-bold text-app-error">Gagal Memuat Data Pemantauan</h3>
+        <p className="text-[13px] text-app-on-surface-variant max-w-md mx-auto">{error}</p>
+        <button
+          onClick={() => refetch()}
+          className="inline-flex items-center gap-2 bg-app-primary text-white text-[13px] font-semibold px-4 py-2 rounded-xl hover:bg-app-primary/90 transition-colors shadow-sm cursor-pointer"
+        >
+          <RefreshCw size={14} className={isRevalidating ? 'animate-spin' : ''} />
+          Coba Lagi
+        </button>
+      </div>
+    );
+  }
+
+  // Determine sub-data availability
+  const hasSoilData = snapshot?.soil && snapshot.soil.data;
+  const hasWaterQualityData =
+    snapshot?.water &&
+    snapshot.water.data &&
+    (snapshot.water.data.ph !== null ||
+      snapshot.water.data.tds !== null ||
+      snapshot.water.data.ec !== null);
+  const hasWaterTankData =
+    snapshot?.water &&
+    snapshot.water.data &&
+    (snapshot.water.data.tankVolume !== null || snapshot.water.data.flowRate !== null);
+
+  const hasAnyData = hasSoilData || hasWaterQualityData || hasWaterTankData;
+
+  // Status Badge Colors & Labels
+  const isOnline = connectionStatus === 'ONLINE';
+  const isOffline = connectionStatus === 'OFFLINE';
+  const isStaleStatus = connectionStatus === 'STALE' || isStale;
+
+  return (
+    <div className="space-y-5 animate-fade-in" data-testid="monitoring-dashboard">
+      {/* ── Device Status & Freshness Banner ── */}
+      <div className="bg-app-surface-container-lowest rounded-2xl p-5 border border-app-outline-variant/30 soft-elevation-lg flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div
+            className={cn(
+              'w-3 h-3 rounded-full flex-shrink-0',
+              isOnline && 'bg-emerald-500 animate-pulse',
+              isOffline && 'bg-rose-500',
+              isStaleStatus && 'bg-amber-500'
+            )}
+          />
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-[16px] font-bold text-app-on-surface">
+                {formatDeviceDisplayName(selectedDevice)}
+              </h2>
+              <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded bg-app-surface-container text-app-on-surface-variant">
+                {selectedDevice?.deviceType}
+              </span>
+            </div>
+            <p className="text-[12px] text-app-on-surface-variant flex items-center gap-1 mt-0.5">
+              <Clock size={13} />
+              Terakhir Terlihat:{' '}
+              {formatTimestamp(snapshot?.lastSeenAt || selectedDevice?.lastSeenAt)}
+            </p>
+          </div>
+        </div>
+
+        {/* Refresh & Connection Badges */}
+        <div className="flex items-center gap-2">
+          {isOffline && (
+            <span className="inline-flex items-center gap-1 text-[12px] font-semibold px-3 py-1 rounded-full bg-rose-500/10 text-rose-700">
+              <WifiOff size={14} /> Terputus (Offline)
+            </span>
+          )}
+          {isStaleStatus && !isOffline && (
+            <span className="inline-flex items-center gap-1 text-[12px] font-semibold px-3 py-1 rounded-full bg-amber-500/10 text-amber-700">
+              <AlertTriangle size={14} /> Data Usang (Stale)
+            </span>
+          )}
+          {isOnline && !isStaleStatus && (
+            <span className="inline-flex items-center gap-1 text-[12px] font-semibold px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-700">
+              <CheckCircle2 size={14} /> Terhubung (Online)
+            </span>
+          )}
+
+          <button
+            onClick={() => refetch()}
+            disabled={isRevalidating}
+            title="Perbarui Data"
+            className="p-2 rounded-xl border border-app-outline-variant/30 text-app-on-surface-variant hover:bg-app-surface-container-low transition-colors cursor-pointer"
+          >
+            <RefreshCw size={16} className={isRevalidating ? 'animate-spin' : ''} />
+          </button>
+        </div>
+      </div>
+
+      {/* ── Stale Warning Alert ── */}
+      {isStaleStatus && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-center gap-3">
+          <AlertTriangle size={20} className="text-amber-600 flex-shrink-0" />
+          <p className="text-[13px] leading-5 text-amber-800 font-medium">
+            Perhatian: Data pemantauan saat ini tidak diperbarui secara real-time. Perangkat sedang
+            stale atau terputus.
+          </p>
+        </div>
+      )}
+
+      {/* ── Empty State (No Telemetry Data) ── */}
+      {!hasAnyData && (
+        <div className="bg-app-surface-container-lowest rounded-2xl p-8 text-center border border-app-outline-variant/30 soft-elevation my-4">
+          <div className="w-12 h-12 rounded-full bg-app-surface-container flex items-center justify-center text-app-on-surface-variant mx-auto mb-3">
+            <Database size={24} />
+          </div>
+          <h3 className="text-[16px] font-bold text-app-on-surface mb-1">
+            Belum Ada Data Pemantauan
+          </h3>
+          <p className="text-[13px] text-app-on-surface-variant max-w-sm mx-auto">
+            Perangkat {selectedDevice?.deviceName} belum pernah mengirimkan data pemantauan.
+          </p>
+        </div>
+      )}
+
+      {/* ── Render Sections Based on Capability / Returned Data ── */}
+
+      {/* 1. SOIL TELEMETRY */}
+      {hasSoilData && (
+        <SoilMonitoringSection
+          data={snapshot!.soil!.data}
+          recordedAt={snapshot!.soil!.recordedAt}
+          isStale={snapshot!.soil!.isStale}
+        />
+      )}
+
+      {/* 2. WATER QUALITY */}
+      {hasWaterQualityData && (
+        <WaterQualitySection
+          data={snapshot!.water!.data}
+          recordedAt={snapshot!.water!.recordedAt}
+        />
+      )}
+
+      {/* 3. WATER TANK */}
+      {hasWaterTankData && (
+        <WaterTankSection data={snapshot!.water!.data} recordedAt={snapshot!.water!.recordedAt} />
+      )}
+    </div>
+  );
+}

@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import TopAppBar from '@/components/navigation/TopAppBar';
-import BottomNav from '@/components/navigation/BottomNav';
 import { User, ShieldAlert, CheckCircle, XCircle, RefreshCw, Search } from 'lucide-react';
 
 interface PendingApprovalItem {
@@ -407,8 +406,6 @@ export default function PendingApprovalsPage() {
           </div>
         )}
       </main>
-
-      <BottomNav />
     </div>
   );
 }
