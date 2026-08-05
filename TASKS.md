@@ -1757,8 +1757,9 @@ Test each phase repeatedly with measured output.
 ## TASK-0901 — Implement Security Headers
 
 **Priority:** `P0`  
-**Status:** `BACKLOG`  
-**Dependencies:** `TASK-0204`
+**Status:** `DONE`  
+**Dependencies:** `TASK-0204`  
+**Completed:** 2026-08-05 — Configured security HTTP response headers across Next.js web application (`apps/web/next.config.mjs`) and Fastify IoT Gateway (`apps/iot-gateway/src/app.ts`), enforcing Content-Security-Policy (CSP), X-Content-Type-Options (nosniff), Referrer-Policy, Permissions-Policy, X-Frame-Options (DENY) / frame-ancestors ('none'), and conditional Strict-Transport-Security (HSTS, max-age 2 years with preload) strictly for production environments (omitted on localhost/dev). Added comprehensive unit and integration test suites in `apps/web/test/unit/security-headers.test.ts` and `apps/iot-gateway/src/__tests__/security-headers.test.ts`. Updated requirement `SEC-DATA-003` in `docs/TRACEABILITY.md`.
 
 Implement:
 

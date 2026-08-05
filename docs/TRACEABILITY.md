@@ -198,7 +198,7 @@
 | `SEC-CTRL-006` | Command timeout distinct from physical completion state | `docs/SECURITY.md` | `DEC-CTRL-051` | `TASK-0809` | `TEST-CTRL-004` | `READY_FOR_IMPLEMENTATION` |
 | `SEC-DATA-001` | Passwords, hashes, and secrets redacted from logs | `docs/SECURITY.md` | - | `TASK-0903` | `TEST-SEC-005` | `READY_FOR_IMPLEMENTATION` |
 | `SEC-DATA-002` | CSRF token protection and CORS allowlist enforcement | `docs/SECURITY.md` | - | `TASK-0901` | `TEST-SEC-005` | `READY_FOR_IMPLEMENTATION` |
-| `SEC-DATA-003` | Content Security Policy (CSP) and security headers | `docs/SECURITY.md` | - | `TASK-0901` | `TEST-SEC-005` | `READY_FOR_IMPLEMENTATION` |
+| `SEC-DATA-003` | Content Security Policy (CSP) and security headers | `docs/SECURITY.md` | - | `TASK-0901` | `TEST-SEC-005` | `IMPLEMENTED` |
 | `SEC-DATA-004` | Immutable append-only audit log storage | `docs/SECURITY.md` | - | `TASK-0903` | `TEST-DB-002` | `READY_FOR_IMPLEMENTATION` |
 | `SEC-OPS-001` | Automated secret scanning in CI pipeline | `docs/SECURITY.md` | - | `TASK-0906` | `TEST-SEC-005` | `READY_FOR_IMPLEMENTATION` |
 | `SEC-OPS-002` | API rate limiting on authentication and control endpoints | `docs/SECURITY.md` | - | `TASK-0902` | `TEST-SEC-005` | `DECISION_REQUIRED` |

@@ -107,6 +107,7 @@ describe('DeviceSelector Auto-Restoration & Display Name Regression Tests', () =
   beforeEach(() => {
     sessionStorage.clear();
     localStorage.clear();
+    window.history.replaceState({}, '', 'http://localhost:3000/');
   });
 
   it('automatically displays currently selected device name from sessionStorage / DeviceContext on page load/refresh', () => {
@@ -128,6 +129,7 @@ describe('DeviceSelector Auto-Restoration & Display Name Regression Tests', () =
 
   it('automatically displays route-preferred device type if no previous selection is saved', () => {
     mockPathname = '/water';
+    window.history.replaceState({}, '', 'http://localhost:3000/water');
 
     render(
       <DeviceProvider initialDevices={mockDevices}>
