@@ -15,7 +15,7 @@ export async function GET(request: Request) {
 
   try {
     const session = await requireSession(request);
-    requirePermission(session, 'alert.read');
+    requirePermission(session, 'alert.read', 'ALERT', undefined, request);
 
     const env = validateServerEnv();
     const rateLimitIdentifier = session.id || getClientIp(request);

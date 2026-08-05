@@ -13,7 +13,7 @@ export async function GET(request: Request, { params }: { params: { userId: stri
   try {
     const session = await requireSession(request);
     // Listing assignments for a user requires device.assign or profile.other.read (Owner-only)
-    requirePermission(session, 'device.assign');
+    requirePermission(session, 'device.assign', 'USER_DEVICE', params.userId, request);
 
     const { searchParams } = new URL(request.url);
     const rawIncludeRevoked = searchParams.get('includeRevoked');
@@ -69,7 +69,7 @@ export async function POST(request: Request, { params }: { params: { userId: str
 
   try {
     const session = await requireSession(request);
-    requirePermission(session, 'device.assign');
+    requirePermission(session, 'device.assign', 'USER_DEVICE', params.userId, request);
 
     const body = await request.json();
     const parseResult = AssignDeviceInputSchema.safeParse(body);

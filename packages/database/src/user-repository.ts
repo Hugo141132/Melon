@@ -7,6 +7,7 @@ import {
   normaliseEmail,
   RawDbUserWithRoles,
   OwnerUserProfileUpdateInput,
+  AuditEventKey,
 } from '@kebun-melon/contracts';
 import { revokeAllUserSessions } from './session-service';
 
@@ -447,7 +448,7 @@ export class UserRepository {
           // 4. Log AuditLog event (strictly no secrets/passwords/tokens)
           const auditLog = await tx.auditLog.create({
             data: {
-              eventKey: 'ACCOUNT_APPROVAL_APPROVE',
+              eventKey: AuditEventKey.ACCOUNT_APPROVED,
               actorUserId: input.decidedByUserId,
               actorRole: ContractUserRole.OWNER,
               targetType: 'USER',
@@ -601,7 +602,7 @@ export class UserRepository {
           // 4. Log AuditLog event (strictly no secrets/passwords/tokens)
           const auditLog = await tx.auditLog.create({
             data: {
-              eventKey: 'ACCOUNT_APPROVAL_REJECT',
+              eventKey: AuditEventKey.ACCOUNT_REJECTED,
               actorUserId: input.decidedByUserId,
               actorRole: ContractUserRole.OWNER,
               targetType: 'USER',

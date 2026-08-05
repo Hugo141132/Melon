@@ -96,7 +96,7 @@ export async function PATCH(request: Request, { params }: { params: { deviceId: 
 
   try {
     const session = await requireSession(request);
-    requirePermission(session, 'device.update');
+    requirePermission(session, 'device.update', 'DEVICE', targetDeviceId, request);
 
     const body = await request.json().catch(() => ({}));
     const parseResult = UpdateDeviceInputSchema.safeParse(body);
@@ -180,7 +180,7 @@ export async function DELETE(request: Request, { params }: { params: { deviceId:
 
   try {
     const session = await requireSession(request);
-    requirePermission(session, 'device.delete');
+    requirePermission(session, 'device.delete', 'DEVICE', targetDeviceId, request);
 
     const deviceRepo = new DeviceRepository(prisma);
     const deletedDevice = await deviceRepo.deleteDevicePermanently(targetDeviceId, session.id);

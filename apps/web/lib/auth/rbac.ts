@@ -8,6 +8,7 @@ import {
   DevicePermissionsDto,
 } from '@kebun-melon/contracts';
 import { CANONICAL_PERMISSIONS } from '@kebun-melon/database';
+import { logAuthorizationDenial } from '@/lib/audit/audit-service';
 
 export class AuthorizationError extends Error {
   constructor(
@@ -112,7 +113,10 @@ export function requireRole(
 
 export function requirePermission(
   session: AuthenticatedUserSession,
-  permissionCode: string
+  permissionCode: string,
+  targetType?: string,
+  targetId?: string,
+  request?: Request
 ): AuthenticatedUserSession {
   requireActiveAccount(session);
 
@@ -131,6 +135,13 @@ export function requirePermission(
   const hasAccess = (isOwner && permDef.ownerAccess) || (isAdmin && permDef.adminAccess);
 
   if (!hasAccess) {
+    logAuthorizationDenial(
+      session,
+      permissionCode,
+      targetType || 'PERMISSION',
+      targetId,
+      request
+    ).catch(() => {});
     throw new AuthorizationError(
       403,
       'INSUFFICIENT_PERMISSION',
@@ -144,7 +155,8 @@ export function requirePermission(
 export function requireSelfOrPermission(
   session: AuthenticatedUserSession,
   targetUserId: string,
-  permissionCode: string
+  permissionCode: string,
+  request?: Request
 ): AuthenticatedUserSession {
   requireActiveAccount(session);
 
@@ -152,7 +164,7 @@ export function requireSelfOrPermission(
     return session;
   }
 
-  return requirePermission(session, permissionCode);
+  return requirePermission(session, permissionCode, 'USER', targetUserId, request);
 }
 
 export interface DeviceAuthorizationOptions {

@@ -14,7 +14,7 @@ export async function DELETE(
 
   try {
     const session = await requireSession(request);
-    requirePermission(session, 'device.unassign');
+    requirePermission(session, 'device.unassign', 'USER_DEVICE', params.deviceId, request);
 
     const clientIp =
       request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || undefined;

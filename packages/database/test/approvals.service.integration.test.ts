@@ -163,7 +163,7 @@ describe('TASK-0206 Approvals Database Integration & Security Test Suite', () =>
         where: { id: result.auditLogId },
       });
       expect(auditLog).not.toBeNull();
-      expect(auditLog?.eventKey).toBe('ACCOUNT_APPROVAL_APPROVE');
+      expect(auditLog?.eventKey).toBe('account.approved');
       expect(auditLog?.actorUserId).toBe(ownerUser.id);
       expect(auditLog?.targetId).toBe(pendingUser.id);
       expect(auditLog?.targetType).toBe('USER');
@@ -296,7 +296,7 @@ describe('TASK-0206 Approvals Database Integration & Security Test Suite', () =>
 
       // Verify exactly 1 AuditLog record
       const auditLogs = await prisma.auditLog.findMany({
-        where: { targetId: pendingUser.id, eventKey: 'ACCOUNT_APPROVAL_APPROVE' },
+        where: { targetId: pendingUser.id, eventKey: 'account.approved' },
       });
       expect(auditLogs.length).toBe(1);
     });
@@ -407,7 +407,7 @@ describe('TASK-0206 Approvals Database Integration & Security Test Suite', () =>
         where: { id: result.auditLogId },
       });
       expect(auditLog).not.toBeNull();
-      expect(auditLog?.eventKey).toBe('ACCOUNT_APPROVAL_REJECT');
+      expect(auditLog?.eventKey).toBe('account.rejected');
       expect(auditLog?.actorUserId).toBe(ownerUser.id);
       expect(auditLog?.targetId).toBe(pendingUser.id);
       expect(auditLog?.targetType).toBe('USER');

@@ -5,3 +5,4 @@ export * from './device-assignment';
 export * from './telemetry';
 export * from './alert';
 export * from './faucet';
+export * from './audit';

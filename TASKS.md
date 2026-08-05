@@ -1809,8 +1809,9 @@ Apply to:
 ## TASK-0903 — Implement Audit Logging
 
 **Priority:** `P0`  
-**Status:** `BACKLOG`  
-**Dependencies:** `TASK-0104`
+**Status:** `DONE`  
+**Dependencies:** `TASK-0104`  
+**Completed:** 2026-08-05 — Implemented append-only Audit Logging per `DB-AUDIT-001`, `SEC-LOG-001`, and `API-AUDIT-001`. Created `AuditEventKey` enums, `AuditLogDto` schemas, and `redactSecrets` recursive sanitization helper in `@kebun-melon/contracts`. Created `AuditRepository` in `@kebun-melon/database` supporting atomic `createAuditLog`, paginated `findAuditLogs`, and `findAuditLogById` with strictly zero edit/delete capabilities exposed. Added `recordAuditEvent` and `logAuthorizationDenial` server helpers in `apps/web/lib/audit/audit-service.ts`. Created `GET /api/v1/audit-logs` and `GET /api/v1/audit-logs/{auditId}` API endpoints guarded by active session authentication and `audit.read` permission (`OWNER` role). Added unit and integration test coverage across contracts, database repository, and Web API routes.
 
 ### Acceptance Criteria
 
@@ -1820,6 +1821,7 @@ Apply to:
 - Actor, target, result, and request ID are stored.
 
 ---
+
 
 ## TASK-0904 — Implement Structured Application Logging
 

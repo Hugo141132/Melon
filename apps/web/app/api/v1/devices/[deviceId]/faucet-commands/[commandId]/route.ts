@@ -17,7 +17,13 @@ export async function GET(
 
   try {
     const session = await requireSession(request);
-    requirePermission(session, 'device.control.history.read');
+    requirePermission(
+      session,
+      'device.control.history.read',
+      'FAUCET_COMMAND',
+      targetCommandId,
+      request
+    );
 
     const deviceRepo = new DeviceRepository(prisma);
     const device = await deviceRepo.getDeviceByCanonicalId(targetDeviceId);

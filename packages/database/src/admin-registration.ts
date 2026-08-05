@@ -6,6 +6,7 @@ import {
   normaliseEmail,
   AccountStatus as ContractAccountStatus,
   UserRole as ContractUserRole,
+  AuditEventKey,
 } from '@kebun-melon/contracts';
 import { validatePasswordPolicy, hashPassword } from './password-service';
 import { provisionFirstOwner } from './owner-provisioning';
@@ -197,10 +198,10 @@ export async function registerUser(
       },
     });
 
-    // 8. Log system audit log record (ACCOUNT_REGISTER_ADMIN)
+    // 8. Log system audit log record (account.registration.created)
     await tx.auditLog.create({
       data: {
-        eventKey: 'ACCOUNT_REGISTER_ADMIN',
+        eventKey: AuditEventKey.ACCOUNT_REGISTRATION_CREATED,
         actorUserId: null,
         actorRole: null,
         targetType: 'USER',

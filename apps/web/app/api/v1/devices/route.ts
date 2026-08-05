@@ -13,7 +13,7 @@ export async function GET(request: Request) {
 
   try {
     const session = await requireSession(request);
-    requirePermission(session, 'device.read');
+    requirePermission(session, 'device.read', 'DEVICE', undefined, request);
 
     const { searchParams } = new URL(request.url);
     const rawQuery = {
@@ -111,7 +111,7 @@ export async function POST(request: Request) {
 
   try {
     const session = await requireSession(request);
-    requirePermission(session, 'device.create');
+    requirePermission(session, 'device.create', 'DEVICE', undefined, request);
 
     const body = await request.json().catch(() => ({}));
     const parseResult = CreateDeviceInputSchema.safeParse(body);

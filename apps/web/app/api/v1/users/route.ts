@@ -8,7 +8,7 @@ export async function GET(request: Request) {
 
   try {
     const session = await requireSession(request);
-    requirePermission(session, 'profile.other.read');
+    requirePermission(session, 'profile.other.read', 'USER', undefined, request);
 
     const { searchParams } = new URL(request.url);
     const rawQuery = {

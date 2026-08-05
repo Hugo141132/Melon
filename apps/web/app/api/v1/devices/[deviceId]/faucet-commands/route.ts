@@ -239,7 +239,7 @@ export async function GET(request: Request, { params }: { params: { deviceId: st
 
   try {
     const session = await requireSession(request);
-    requirePermission(session, 'device.control.history.read');
+    requirePermission(session, 'device.control.history.read', 'DEVICE', targetDeviceId, request);
 
     const env = validateServerEnv();
     const rateLimitIdentifier = session.id || getClientIp(request);

@@ -12,7 +12,7 @@ export async function GET(request: Request, { params }: { params: { userId: stri
 
   try {
     const session = await requireSession(request);
-    requirePermission(session, 'profile.other.read');
+    requirePermission(session, 'profile.other.read', 'USER', params.userId, request);
 
     const userRepo = new UserRepository(prisma);
     const user = await userRepo.getUserManagementById(params.userId);
@@ -73,7 +73,7 @@ export async function PATCH(request: Request, { params }: { params: { userId: st
 
   try {
     const session = await requireSession(request);
-    requirePermission(session, 'profile.other.update');
+    requirePermission(session, 'profile.other.update', 'USER', params.userId, request);
 
     let body: unknown;
     try {
@@ -210,7 +210,7 @@ export async function DELETE(request: Request, { params }: { params: { userId: s
 
   try {
     const session = await requireSession(request);
-    requirePermission(session, 'account.deactivate');
+    requirePermission(session, 'account.deactivate', 'USER', params.userId, request);
 
     let body: any = {};
     try {

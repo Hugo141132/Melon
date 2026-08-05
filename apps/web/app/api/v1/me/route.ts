@@ -14,7 +14,7 @@ export async function GET(request: Request) {
   try {
     const session = await requireSession(request);
     requireActiveAccount(session);
-    requirePermission(session, 'profile.self.read');
+    requirePermission(session, 'profile.self.read', 'USER', session.id, request);
 
     const userRepo = new UserRepository(prisma);
     const user = await userRepo.findUserById(session.id);
@@ -76,7 +76,7 @@ export async function PATCH(request: Request) {
   try {
     const session = await requireSession(request);
     requireActiveAccount(session);
-    requirePermission(session, 'profile.self.update');
+    requirePermission(session, 'profile.self.update', 'USER', session.id, request);
 
     let body: unknown;
     try {

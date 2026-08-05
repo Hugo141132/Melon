@@ -150,7 +150,7 @@ describe('TASK-0204 Login and Session Management Integration Test Suite', () => 
 
     // Verify AuditLog secrecy
     const auditLog = await prisma.auditLog.findFirst({
-      where: { eventKey: 'ACCOUNT_LOGIN_SUCCESS', actorUserId: user.id },
+      where: { eventKey: 'auth.login.success', actorUserId: user.id },
     });
     expect(auditLog).not.toBeNull();
     const auditString = JSON.stringify(auditLog);
@@ -295,7 +295,7 @@ describe('TASK-0204 Login and Session Management Integration Test Suite', () => 
 
     // Verify AuditLog
     const audit = await prisma.auditLog.findFirst({
-      where: { eventKey: 'ACCOUNT_LOGOUT_SUCCESS', actorUserId: user.id },
+      where: { eventKey: 'auth.logout', actorUserId: user.id },
     });
     expect(audit).not.toBeNull();
 

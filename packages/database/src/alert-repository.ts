@@ -203,4 +203,69 @@ export class AlertRepository {
 
     return this.formatAlertDto(created);
   }
+
+  /**
+   * Acknowledges an Alert and records an alert.acknowledged AuditLog entry inside a database transaction.
+   */
+  async acknowledgeAlert(
+    alertId: string,
+    userId: string,
+    note?: string,
+    authorizedDeviceIds?: string[]
+  ): Promise<{ alertId: string; status: AlertStatus; acknowledgedAt: Date }> {
+    const alert = await this.prisma.alert.findUnique({
+      where: { id: alertId },
+    });
+
+    if (!alert) {
+      throw new AlertNotFoundError(`Alert '${alertId}' not found.`);
+    }
+
+    if (authorizedDeviceIds !== undefined && alert.deviceId) {
+      if (!authorizedDeviceIds.includes(alert.deviceId)) {
+        throw new AlertNotFoundError(`Alert '${alertId}' not found or device access revoked.`);
+      }
+    }
+
+    const now = new Date();
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.alert.update({
+        where: { id: alertId },
+        data: {
+          status: AlertStatus.ACKNOWLEDGED,
+        },
+      });
+
+      await tx.alertAcknowledgement.create({
+        data: {
+          alertId,
+          acknowledgedByUserId: userId,
+          note: note ? note.trim() : null,
+          acknowledgedAt: now,
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          eventKey: 'alert.acknowledged',
+          actorUserId: userId,
+          targetType: 'Alert',
+          targetId: alertId,
+          result: 'SUCCESS',
+          previousValues: { status: alert.status },
+          newValues: { status: AlertStatus.ACKNOWLEDGED },
+          metadata: {
+            note: note ? note.trim() : null,
+          },
+        },
+      });
+    });
+
+    return {
+      alertId,
+      status: AlertStatus.ACKNOWLEDGED,
+      acknowledgedAt: now,
+    };
+  }
 }

@@ -1,20 +1,21 @@
-import { NextResponse } from 'next/server';
-import { prisma, AlertRepository } from '@kebun-melon/database';
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma, AlertRepository, AlertNotFoundError } from '@kebun-melon/database';
 import { UserRole } from '@kebun-melon/contracts';
 import {
   requireSession,
   requirePermission,
   AuthorizationError,
-} from '../../../../../lib/auth/rbac';
+} from '../../../../../../lib/auth/rbac';
 
-export async function GET(request: Request, { params }: { params: { alertId: string } }) {
+export async function POST(request: NextRequest, { params }: { params: { alertId: string } }) {
   const requestId = `req-${Date.now()}`;
 
   try {
     const session = await requireSession(request);
-    requirePermission(session, 'alert.read', 'ALERT', params.alertId, request);
+    requirePermission(session, 'alert.acknowledge', 'ALERT', params.alertId, request);
 
     const alertId = params.alertId;
+    const body = await request.json().catch(() => ({}));
 
     let authorizedDeviceIds: string[] | undefined = undefined;
     const isOwner = session.activeRoles.includes(UserRole.OWNER);
@@ -30,15 +31,29 @@ export async function GET(request: Request, { params }: { params: { alertId: str
     }
 
     const alertRepo = new AlertRepository(prisma);
-    const alert = await alertRepo.getAlertById(alertId, authorizedDeviceIds, session.id);
+    const result = await alertRepo.acknowledgeAlert(
+      alertId,
+      session.id,
+      body.note,
+      authorizedDeviceIds
+    );
 
-    if (!alert) {
+    return NextResponse.json(
+      {
+        success: true,
+        data: result,
+        meta: { requestId },
+      },
+      { status: 200 }
+    );
+  } catch (error: any) {
+    if (error instanceof AlertNotFoundError || error?.name === 'AlertNotFoundError') {
       return NextResponse.json(
         {
           success: false,
           error: {
             code: 'ALERT_NOT_FOUND',
-            message: `Alert '${alertId}' not found or access denied.`,
+            message: error.message,
           },
           meta: { requestId },
         },
@@ -46,15 +61,6 @@ export async function GET(request: Request, { params }: { params: { alertId: str
       );
     }
 
-    return NextResponse.json(
-      {
-        success: true,
-        data: alert,
-        meta: { requestId },
-      },
-      { status: 200 }
-    );
-  } catch (error: any) {
     if (error instanceof AuthorizationError || error?.name === 'AuthorizationError') {
       return NextResponse.json(
         {
@@ -74,7 +80,7 @@ export async function GET(request: Request, { params }: { params: { alertId: str
         success: false,
         error: {
           code: 'INTERNAL_ERROR',
-          message: 'An unexpected error occurred while fetching alert details.',
+          message: 'An unexpected error occurred while acknowledging alert.',
         },
         meta: { requestId },
       },

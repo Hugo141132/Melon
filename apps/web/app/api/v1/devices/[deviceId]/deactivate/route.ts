@@ -12,7 +12,7 @@ export async function POST(request: Request, { params }: { params: { deviceId: s
 
   try {
     const session = await requireSession(request);
-    requirePermission(session, 'device.deactivate');
+    requirePermission(session, 'device.deactivate', 'DEVICE', targetDeviceId, request);
 
     const deviceRepo = new DeviceRepository(prisma);
     const deactivatedDevice = await deviceRepo.deactivateDevice(targetDeviceId, session.id);

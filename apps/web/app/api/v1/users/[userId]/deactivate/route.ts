@@ -12,7 +12,7 @@ export async function POST(request: Request, { params }: { params: { userId: str
 
   try {
     const session = await requireSession(request);
-    requirePermission(session, 'account.deactivate');
+    requirePermission(session, 'account.deactivate', 'USER', params.userId, request);
 
     let reason: string | undefined = undefined;
     try {

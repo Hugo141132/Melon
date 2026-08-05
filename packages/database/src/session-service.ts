@@ -8,6 +8,7 @@ import {
   normaliseEmail,
   LoginInputSchema,
   RawDbUserWithRoles,
+  AuditEventKey,
 } from '@kebun-melon/contracts';
 import { verifyPassword } from './password-service';
 
@@ -117,7 +118,7 @@ export async function loginUser(
     }),
     prisma.auditLog.create({
       data: {
-        eventKey: 'ACCOUNT_LOGIN_SUCCESS',
+        eventKey: AuditEventKey.AUTH_LOGIN_SUCCESS,
         actorUserId: user.id,
         actorRole: primaryRole,
         targetType: 'User',
@@ -317,7 +318,7 @@ export async function revokeSession(
     }),
     prisma.auditLog.create({
       data: {
-        eventKey: 'ACCOUNT_LOGOUT_SUCCESS',
+        eventKey: AuditEventKey.AUTH_LOGOUT,
         actorUserId: session.userId,
         targetType: 'User',
         targetId: session.userId,
