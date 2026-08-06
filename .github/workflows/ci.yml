@@ -73,6 +73,7 @@ jobs:
 
       - name: Execute Environment Tests
         env:
+          NODE_ENV: development
           MQTT_BROKER_URL: mqtts://localhost:8883
         run: npm run env:test
 
