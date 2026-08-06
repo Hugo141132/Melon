@@ -15,28 +15,6 @@
   ],
   "dependencyExceptions": [
     {
-      "id": "EXC-DEP-001",
-      "packageName": "fastify",
-      "advisoryId": "GHSA-jx2c-rxcm-jvmq",
-      "severity": "HIGH",
-      "reason": "Fastify Content-Type header tab character validation bypass.",
-      "mitigation": "Implemented explicit onRequest header validation hook in apps/iot-gateway rejecting tab characters (\t) with 400 Bad Request.",
-      "approvedBy": "PENDING_USER_APPROVAL",
-      "approvedDate": "2026-08-06",
-      "expiresDate": "2027-08-06"
-    },
-    {
-      "id": "EXC-DEP-002",
-      "packageName": "find-my-way",
-      "advisoryId": "GHSA-c96f-x56v-gq3h",
-      "severity": "HIGH",
-      "reason": "Fastify sub-dependency for HTTP2 routing.",
-      "mitigation": "HTTP2 protocol disabled in Fastify server configuration; only standard HTTP/1.1 REST endpoints exposed.",
-      "approvedBy": "PENDING_USER_APPROVAL",
-      "approvedDate": "2026-08-06",
-      "expiresDate": "2027-08-06"
-    },
-    {
       "id": "EXC-DEP-012",
       "packageName": "vite",
       "advisoryId": "GHSA-fx2h-pf6j-xcff",

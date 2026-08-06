@@ -1,4 +1,4 @@
-import Fastify, { FastifyInstance } from 'fastify';
+import Fastify, { FastifyInstance, FastifyError } from 'fastify';
 import { GatewayEnv } from './config/env';
 import { GatewayMqttClient } from './mqtt/client';
 import {
@@ -145,10 +145,11 @@ export function buildApp(options: AppOptions): {
   // Register routes
   registerHealthRoutes(app, mqttClient, options.dbChecker);
 
-  // Global error handler with secret redaction
-  app.setErrorHandler((error, _request, reply) => {
+  // Global error handler with secret redaction (typed for Fastify v5)
+  app.setErrorHandler((error: FastifyError | Error | unknown, _request, reply) => {
     logger.error('Unhandled Fastify request error', error);
-    reply.status(error.statusCode || 500).send({
+    const statusCode = (error as { statusCode?: number })?.statusCode || 500;
+    reply.status(statusCode).send({
       success: false,
       error: {
         code: 'INTERNAL_ERROR',

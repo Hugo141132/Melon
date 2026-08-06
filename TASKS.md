@@ -1924,8 +1924,9 @@ Apply to:
 ## TASK-0910 — Fastify Framework Major Version Upgrade (v5.x)
 
 **Priority:** `P0`
-**Status:** `BACKLOG`
+**Status:** `DONE`
 **Dependencies:** `TASK-0401`
+**Completed:** Upgraded Fastify in `apps/iot-gateway` from `^4.28.1` to `^5.11.2` (`5.11.2` resolved in lockfile). Updated `setErrorHandler` in `apps/iot-gateway/src/app.ts` for Fastify v5 `unknown` error type safety. Verified Fastify v5 native resolution of `GHSA-jx2c-rxcm-jvmq` (header tab character validation bypass) and `GHSA-c96f-x56v-gq3h` (`find-my-way` HTTP2 DDoS advisory), and removed resolved security exceptions `EXC-DEP-001` and `EXC-DEP-002` from `scripts/security-exceptions.json`. Verified all 12 test files (128/128 tests) pass in `apps/iot-gateway`, monorepo typecheck passes with 0 errors across all workspaces, build compiles cleanly, dependency scan confirms 0 Fastify advisories, Prettier formatting passes, and runtime `/health` (HTTP 200) and `/ready` (HTTP 503 DEGRADED) smoke tests succeed.
 
 ### Acceptance Criteria
 
