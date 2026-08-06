@@ -1956,15 +1956,17 @@ Apply to:
 ## TASK-0912 — Vitest and Vite Major Version Upgrade (v4.x / v6.x)
 
 **Priority:** `P0`
-**Status:** `BACKLOG`
+**Status:** `DONE`
 **Dependencies:** `TASK-0108`
 
 ### Acceptance Criteria
 
-- Upgrade Vitest and Vite dev test dependencies across monorepo (`vitest` v1.6.0 $\rightarrow$ v4.x, `vite` v5.4.1 $\rightarrow$ v6.x).
+- Upgrade Vitest and Vite dev test dependencies across monorepo (`vitest` v1.6.0 $\rightarrow$ v4.1.10, `vite` v5.4.1 $\rightarrow$ v6.4.3).
 - Resolve `GHSA-5xrq-8626-4rwp` and `GHSA-fx2h-pf6j-xcff` advisories.
 - Update test configuration and coverage reporter integration.
 - Verify all unit, component, and integration test suites execute cleanly.
+
+**Completed:** Upgraded `vitest` to `4.1.10`, `@vitest/coverage-v8` to `4.1.10`, `vite` override to `6.4.3`, and `@vitejs/plugin-react` to `4.4.0`. Migrated Vitest v4 configuration files to `.mts`, removed deprecated `poolOptions`, set top-level `pool: 'forks'`, `maxWorkers: 1`, `isolate: true`, and `environmentMatchGlobs`. Removed temporary security exceptions `EXC-DEP-012` and `EXC-DEP-013`. Verified 100% test suite pass (54/54 files, 461 tests), typecheck, linting, secret scanner (0 hardcoded secrets), dependency scanner (0 high/0 critical advisories, 0 exceptions), and production build.
 
 ---
 

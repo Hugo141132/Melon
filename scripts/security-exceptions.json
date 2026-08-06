@@ -13,28 +13,5 @@
       "expiresDate": "2027-08-06"
     }
   ],
-  "dependencyExceptions": [
-    {
-      "id": "EXC-DEP-012",
-      "packageName": "vite",
-      "advisoryId": "GHSA-fx2h-pf6j-xcff",
-      "severity": "HIGH",
-      "reason": "Vite server.fs.deny bypass on Windows alternate paths.",
-      "mitigation": "Vitest dev test runner only; omitted from production deployment.",
-      "approvedBy": "PENDING_USER_APPROVAL",
-      "approvedDate": "2026-08-06",
-      "expiresDate": "2027-08-06"
-    },
-    {
-      "id": "EXC-DEP-013",
-      "packageName": "vitest",
-      "advisoryId": "GHSA-5xrq-8626-4rwp",
-      "severity": "CRITICAL",
-      "reason": "Vitest UI server arbitrary file read and execution.",
-      "mitigation": "Vitest UI server not enabled or exposed; test runner executed only via headless CLI.",
-      "approvedBy": "PENDING_USER_APPROVAL",
-      "approvedDate": "2026-08-06",
-      "expiresDate": "2027-08-06"
-    }
-  ]
+  "dependencyExceptions": []
 }

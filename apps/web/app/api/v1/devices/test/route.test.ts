@@ -8,10 +8,11 @@ import * as dbModule from '@kebun-melon/database';
 let mockCookieToken: string | undefined = 'valid-token';
 
 vi.mock('next/headers', () => ({
-  cookies: () => ({
-    get: (name: string) =>
-      name === 'session_token' && mockCookieToken ? { value: mockCookieToken } : undefined,
-  }),
+  cookies: () =>
+    Promise.resolve({
+      get: (name: string) =>
+        name === 'session_token' && mockCookieToken ? { value: mockCookieToken } : undefined,
+    }),
 }));
 
 const mockGetDevices = vi.fn();
@@ -58,7 +59,6 @@ vi.mock('@kebun-melon/database', async (importOriginal) => {
 
 describe('Device Registry API Endpoints (TASK-0302 & TASK-0305)', () => {
   beforeEach(() => {
-    vi.restoreAllMocks();
     vi.clearAllMocks();
     mockCookieToken = 'valid-token';
     mockFindManyUserDeviceAccess.mockResolvedValue([]);

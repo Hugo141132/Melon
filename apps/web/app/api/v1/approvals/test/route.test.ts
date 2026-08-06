@@ -21,11 +21,13 @@ vi.mock('@kebun-melon/database', () => ({
   prisma: {},
   SESSION_COOKIE_NAME: 'session_token',
   validateSession: (...args: any[]) => mockValidateSession(...args),
-  UserRepository: vi.fn().mockImplementation(() => ({
-    readActiveRoleAssignments: (...args: any[]) => mockReadActiveRoleAssignments(...args),
-    getPendingApprovals: (...args: any[]) => mockGetPendingApprovals(...args),
-    getPendingApprovalById: (...args: any[]) => mockGetPendingApprovalById(...args),
-  })),
+  UserRepository: vi.fn().mockImplementation(function () {
+    return {
+      readActiveRoleAssignments: (...args: any[]) => mockReadActiveRoleAssignments(...args),
+      getPendingApprovals: (...args: any[]) => mockGetPendingApprovals(...args),
+      getPendingApprovalById: (...args: any[]) => mockGetPendingApprovalById(...args),
+    };
+  }),
 }));
 
 describe('TASK-0206 Owner Pending Approval API Routes Unit Tests', () => {
@@ -63,7 +65,7 @@ describe('TASK-0206 Owner Pending Approval API Routes Unit Tests', () => {
         },
       });
 
-      mockReadActiveRoleAssignments.mockResolvedValueOnce([UserRole.ADMIN]);
+      mockReadActiveRoleAssignments.mockResolvedValue([UserRole.ADMIN]);
 
       const req = new Request('http://localhost:3000/api/v1/approvals/pending');
       const res = await pendingGET(req);
@@ -102,6 +104,8 @@ describe('TASK-0206 Owner Pending Approval API Routes Unit Tests', () => {
           activeRoles: [UserRole.OWNER],
         },
       });
+
+      mockReadActiveRoleAssignments.mockResolvedValue([UserRole.OWNER]);
 
       mockReadActiveRoleAssignments.mockResolvedValueOnce([UserRole.OWNER]);
 

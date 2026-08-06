@@ -17,10 +17,11 @@ import {
 let mockCookieToken: string | undefined = 'valid-token';
 
 vi.mock('next/headers', () => ({
-  cookies: () => ({
-    get: (name: string) =>
-      name === 'session_token' && mockCookieToken ? { value: mockCookieToken } : undefined,
-  }),
+  cookies: () =>
+    Promise.resolve({
+      get: (name: string) =>
+        name === 'session_token' && mockCookieToken ? { value: mockCookieToken } : undefined,
+    }),
 }));
 
 const mockGetUsers = vi.fn();
@@ -77,7 +78,6 @@ vi.mock('@kebun-melon/database', async (importOriginal) => {
 
 describe('TASK-0212 Owner User Management API & Safety Tests', () => {
   beforeEach(() => {
-    vi.restoreAllMocks();
     vi.clearAllMocks();
     mockCookieToken = 'owner-token';
   });

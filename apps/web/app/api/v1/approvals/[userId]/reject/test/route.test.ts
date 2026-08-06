@@ -19,10 +19,12 @@ vi.mock('@kebun-melon/database', () => ({
   prisma: {},
   SESSION_COOKIE_NAME: 'session_token',
   validateSession: (...args: any[]) => mockValidateSession(...args),
-  UserRepository: vi.fn().mockImplementation(() => ({
-    readActiveRoleAssignments: (...args: any[]) => mockReadActiveRoleAssignments(...args),
-    rejectPendingAdmin: (...args: any[]) => mockRejectPendingAdmin(...args),
-  })),
+  UserRepository: vi.fn().mockImplementation(function () {
+    return {
+      readActiveRoleAssignments: (...args: any[]) => mockReadActiveRoleAssignments(...args),
+      rejectPendingAdmin: (...args: any[]) => mockRejectPendingAdmin(...args),
+    };
+  }),
 }));
 
 describe('TASK-0208 Owner Reject API Route Unit Tests', () => {

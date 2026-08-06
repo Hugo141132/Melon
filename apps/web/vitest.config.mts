@@ -4,20 +4,19 @@ import path from 'path';
 
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './'),
+    },
+  },
   test: {
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./test/setup.ts'],
     pool: 'forks',
-    poolOptions: {
-      forks: {
-        execArgv: ['--max-old-space-size=4096'],
-        singleFork: true,
-      },
-    },
-    alias: {
-      '@': path.resolve(__dirname, './'),
-    },
+    execArgv: ['--max-old-space-size=4096'],
+    maxWorkers: 1,
+    isolate: true,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

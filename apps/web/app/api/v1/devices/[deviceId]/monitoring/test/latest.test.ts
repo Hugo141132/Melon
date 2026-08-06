@@ -55,7 +55,6 @@ vi.mock('@kebun-melon/database', async (importOriginal) => {
 
 describe('Latest Monitoring API Endpoints (TASK-0501)', () => {
   beforeEach(() => {
-    vi.restoreAllMocks();
     vi.clearAllMocks();
     mockCookieToken = 'valid-token';
     mockFindFirstUserDeviceAccess.mockResolvedValue(null);

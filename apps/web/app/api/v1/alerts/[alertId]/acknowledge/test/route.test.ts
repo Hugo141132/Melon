@@ -18,9 +18,11 @@ vi.mock('@kebun-melon/database', async (importOriginal) => {
   const actual: any = await importOriginal();
   return {
     ...actual,
-    AlertRepository: vi.fn().mockImplementation(() => ({
-      acknowledgeAlert: vi.fn(),
-    })),
+    AlertRepository: vi.fn().mockImplementation(function () {
+      return {
+        acknowledgeAlert: vi.fn(),
+      };
+    }),
     AlertNotFoundError: actual.AlertNotFoundError,
   };
 });
@@ -89,12 +91,11 @@ describe('POST /api/v1/alerts/[alertId]/acknowledge', () => {
     const mockAck = vi
       .fn()
       .mockRejectedValue(new AlertNotFoundError("Alert 'alert-999' not found."));
-    vi.mocked(AlertRepository).mockImplementation(
-      () =>
-        ({
-          acknowledgeAlert: mockAck,
-        }) as any
-    );
+    vi.mocked(AlertRepository).mockImplementation(function () {
+      return {
+        acknowledgeAlert: mockAck,
+      } as any;
+    });
 
     const req = new NextRequest('http://localhost/api/v1/alerts/alert-999/acknowledge', {
       method: 'POST',
@@ -125,12 +126,11 @@ describe('POST /api/v1/alerts/[alertId]/acknowledge', () => {
     };
 
     const mockAck = vi.fn().mockResolvedValue(ackResult);
-    vi.mocked(AlertRepository).mockImplementation(
-      () =>
-        ({
-          acknowledgeAlert: mockAck,
-        }) as any
-    );
+    vi.mocked(AlertRepository).mockImplementation(function () {
+      return {
+        acknowledgeAlert: mockAck,
+      } as any;
+    });
 
     const req = new NextRequest('http://localhost/api/v1/alerts/alert-001/acknowledge', {
       method: 'POST',

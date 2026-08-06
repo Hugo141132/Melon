@@ -19,10 +19,12 @@ vi.mock('@kebun-melon/database', () => ({
   prisma: {},
   SESSION_COOKIE_NAME: 'session_token',
   validateSession: (...args: any[]) => mockValidateSession(...args),
-  UserRepository: vi.fn().mockImplementation(() => ({
-    readActiveRoleAssignments: (...args: any[]) => mockReadActiveRoleAssignments(...args),
-    approvePendingAdmin: (...args: any[]) => mockApprovePendingAdmin(...args),
-  })),
+  UserRepository: vi.fn().mockImplementation(function () {
+    return {
+      readActiveRoleAssignments: (...args: any[]) => mockReadActiveRoleAssignments(...args),
+      approvePendingAdmin: (...args: any[]) => mockApprovePendingAdmin(...args),
+    };
+  }),
 }));
 
 describe('TASK-0207 Owner Approve API Route Unit Tests', () => {

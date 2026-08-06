@@ -7,10 +7,11 @@ import * as dbModule from '@kebun-melon/database';
 let mockCookieToken: string | undefined = 'valid-token';
 
 vi.mock('next/headers', () => ({
-  cookies: () => ({
-    get: (name: string) =>
-      name === 'session_token' && mockCookieToken ? { value: mockCookieToken } : undefined,
-  }),
+  cookies: () =>
+    Promise.resolve({
+      get: (name: string) =>
+        name === 'session_token' && mockCookieToken ? { value: mockCookieToken } : undefined,
+    }),
 }));
 
 const mockGetAlerts = vi.fn();
@@ -39,7 +40,6 @@ vi.mock('@kebun-melon/database', async (importOriginal) => {
 
 describe('Alerts API Endpoints (TASK-0701)', () => {
   beforeEach(() => {
-    vi.restoreAllMocks();
     vi.clearAllMocks();
     mockCookieToken = 'valid-token';
     mockFindManyUserDeviceAccess.mockResolvedValue([]);

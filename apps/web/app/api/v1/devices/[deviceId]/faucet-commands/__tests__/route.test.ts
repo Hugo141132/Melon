@@ -15,10 +15,11 @@ import { FaucetCommandConflictError } from '@kebun-melon/database';
 let mockCookieToken: string | undefined = 'valid-token';
 
 vi.mock('next/headers', () => ({
-  cookies: () => ({
-    get: (name: string) =>
-      name === 'session_token' && mockCookieToken ? { value: mockCookieToken } : undefined,
-  }),
+  cookies: () =>
+    Promise.resolve({
+      get: (name: string) =>
+        name === 'session_token' && mockCookieToken ? { value: mockCookieToken } : undefined,
+    }),
 }));
 
 const mockValidateSession = vi.fn();
