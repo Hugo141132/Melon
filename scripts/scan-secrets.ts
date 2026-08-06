@@ -99,7 +99,10 @@ export function loadExceptions(configPath?: string): SecretException[] {
 export function isExceptionMatch(finding: SecretFinding, exceptions: SecretException[]): boolean {
   const normalizedPath = finding.filePath.replace(/\\/g, '/');
   return exceptions.some((ex) => {
-    const patternMatch = ex.pathPattern === '*' || normalizedPath.includes(ex.pathPattern);
+    const patternMatch =
+      ex.pathPattern === '*' ||
+      ex.pathPattern === 'git-history' ||
+      normalizedPath.includes(ex.pathPattern);
     const ruleMatch = ex.ruleId === '*' || ex.ruleId === finding.ruleId;
     return patternMatch && ruleMatch;
   });
@@ -180,12 +183,41 @@ export function scanGitHistory(
       maxBuffer: 10 * 1024 * 1024,
     });
 
-    const rawFindings = scanContent(gitDiff, 'git-history');
-    // Only return additions (+) in diffs
-    const addedFindings = rawFindings.filter(
-      (f) => f.matchedText.startsWith('+') && !f.matchedText.startsWith('+++')
-    );
-    return addedFindings.filter((finding) => !isExceptionMatch(finding, exceptions));
+    const findings: SecretFinding[] = [];
+    const lines = gitDiff.split(/\r?\n/);
+    let currentFile = 'git-history';
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+
+      if (line.startsWith('diff --git a/')) {
+        const parts = line.split(' b/');
+        if (parts.length > 1) {
+          currentFile = parts[1];
+        }
+      }
+
+      if (line.startsWith('+') && !line.startsWith('+++')) {
+        const lineContent = line.substring(1);
+        for (const rule of SECRET_RULES) {
+          if (rule.pattern.test(lineContent)) {
+            const finding: SecretFinding = {
+              filePath: currentFile,
+              lineNumber: i + 1,
+              ruleId: rule.id,
+              ruleName: rule.name,
+              matchedText: lineContent.trim(),
+            };
+
+            if (!isExceptionMatch(finding, exceptions)) {
+              findings.push(finding);
+            }
+          }
+        }
+      }
+    }
+
+    return findings;
   } catch {
     return [];
   }
