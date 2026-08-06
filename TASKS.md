@@ -1859,7 +1859,7 @@ Apply to:
 **Priority:** `P0`
 **Status:** `BLOCKED`
 **Dependencies:** `TASK-0108`
-**Notes:** Task is BLOCKED pending approval or major upgrade remediation of remaining 13 dependency advisories via TASK-0910 (Fastify v5), TASK-0911 (Next.js v15/v16), and TASK-0912 (Vitest/Vite).
+**Notes:** Task is BLOCKED pending approval or major upgrade remediation of remaining dependency advisories via TASK-0912 (Vitest/Vite). TASK-0910 (Fastify v5) and TASK-0911 (Next.js v16) are DONE.
 **Progress:** — Implemented automated secret scanning (`scripts/scan-secrets.ts`) and dependency vulnerability scanning (`scripts/check-dependencies.ts`) per `SEC-OPS-001` and `SEC-OPS-004`. Upgraded Next.js to safe 14.2.35 version and applied npm overrides for fast-uri (3.1.5) and postcss (^8.5.18). Implemented Fastify header tab character rejection workaround in apps/iot-gateway/src/app.ts. Configured GitHub Actions CI pipeline (`.github/workflows/ci.yml`) and governance process (`docs/SECURITY_EXCEPTIONS.md`). Exceptions set to PENDING_USER_APPROVAL.
 
 ### Acceptance Criteria
@@ -1926,7 +1926,7 @@ Apply to:
 **Priority:** `P0`
 **Status:** `DONE`
 **Dependencies:** `TASK-0401`
-**Completed:** Upgraded Fastify in `apps/iot-gateway` from `^4.28.1` to `^5.11.2` (`5.11.2` resolved in lockfile). Updated `setErrorHandler` in `apps/iot-gateway/src/app.ts` for Fastify v5 `unknown` error type safety. Verified Fastify v5 native resolution of `GHSA-jx2c-rxcm-jvmq` (header tab character validation bypass) and `GHSA-c96f-x56v-gq3h` (`find-my-way` HTTP2 DDoS advisory), and removed resolved security exceptions `EXC-DEP-001` and `EXC-DEP-002` from `scripts/security-exceptions.json`. Verified all 12 test files (128/128 tests) pass in `apps/iot-gateway`, monorepo typecheck passes with 0 errors across all workspaces, build compiles cleanly, dependency scan confirms 0 Fastify advisories, Prettier formatting passes, and runtime `/health` (HTTP 200) and `/ready` (HTTP 503 DEGRADED) smoke tests succeed.
+**Completed:** Upgraded Fastify in `apps/iot-gateway` from `^4.28.1` to `^5.11.2` (`5.11.2` resolved in lockfile). Updated `setErrorHandler` in `apps/iot-gateway/src/app.ts` for Fastify v5 `unknown` error type safety. Verified Fastify v5 native resolution of `GHSA-jx2c-rxcm-jvmq` (header tab character validation bypass) and `GHSA-c96f-x56v-gq3h` (`find-my-way` HTTP2 DDoS advisory), and removed resolved security exceptions `EXC-DEP-001` and `EXC-DEP-002` from `scripts/security-exceptions.json`. Verified all 12 test files (128/128 tests) pass in `apps/iot-gateway`, monorepo typecheck passes with 0 errors across all workspaces, build compiles cleanly, dependency scan confirms 0 Fastify advisories, Prettier formatting passes, and runtime `/health` (HTTP 200) and `/ready` (HTTP 503 DEGRADED) smoke tests succeed. Full `npm run check:quality` command exits with code 1 solely due to remaining TASK-0912 `vitest`/`vite` advisories.
 
 ### Acceptance Criteria
 
