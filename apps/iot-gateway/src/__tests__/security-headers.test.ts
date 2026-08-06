@@ -56,4 +56,21 @@ describe('TASK-0901 — IoT Gateway Security Headers Integration Tests', () => {
       'max-age=63072000; includeSubDomains; preload'
     );
   });
+
+  it('rejects request with 400 Bad Request when header contains tab character (GHSA-jx2c-rxcm-jvmq workaround)', async () => {
+    const { app } = buildApp({ env: envDev });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/health',
+      headers: {
+        'content-type': 'application/json;\tcharset=utf-8',
+      },
+    });
+
+    expect(response.statusCode).toBe(400);
+    const json = JSON.parse(response.payload);
+    expect(json.success).toBe(false);
+    expect(json.error.code).toBe('INVALID_HEADER');
+  });
 });

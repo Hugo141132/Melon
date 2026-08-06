@@ -1856,9 +1856,11 @@ Apply to:
 
 ## TASK-0906 — Implement Secret Scanning and Dependency Scanning
 
-**Priority:** `P0`  
-**Status:** `BACKLOG`  
+**Priority:** `P0`
+**Status:** `BLOCKED`
 **Dependencies:** `TASK-0108`
+**Notes:** Task is BLOCKED pending approval or major upgrade remediation of remaining 13 dependency advisories via TASK-0910 (Fastify v5), TASK-0911 (Next.js v15/v16), and TASK-0912 (Vitest/Vite).
+**Progress:** — Implemented automated secret scanning (`scripts/scan-secrets.ts`) and dependency vulnerability scanning (`scripts/check-dependencies.ts`) per `SEC-OPS-001` and `SEC-OPS-004`. Upgraded Next.js to safe 14.2.35 version and applied npm overrides for fast-uri (3.1.5) and postcss (^8.5.18). Implemented Fastify header tab character rejection workaround in apps/iot-gateway/src/app.ts. Configured GitHub Actions CI pipeline (`.github/workflows/ci.yml`) and governance process (`docs/SECURITY_EXCEPTIONS.md`). Exceptions set to PENDING_USER_APPROVAL.
 
 ### Acceptance Criteria
 

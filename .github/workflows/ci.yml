@@ -1,0 +1,99 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  quality-test-build:
+    name: Build, Test & Security Checks
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgrespassword
+          POSTGRES_DB: kebun_melon_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      NODE_ENV: test
+      CI: 'true'
+      DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/kebun_melon_test?schema=public
+      JWT_SECRET: ci-test-jwt-secret-key-at-least-32-chars-long
+      NEXTAUTH_SECRET: ci-test-nextauth-secret-at-least-32-chars-long
+      FIRST_OWNER_PROVISIONING_SECRET: ci-test-provisioning-secret-at-least-32-chars-long
+      ENABLE_FAUCET_CONTROL: 'false'
+      DEFAULT_LOCALE: en
+      MQTT_BROKER_URL: mqtt://localhost:1883
+      MQTT_USERNAME: gateway_user
+      MQTT_PASSWORD: testgatewaypassword123
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Verify Code Formatting
+        run: npm run format:check
+
+      - name: Execute ESLint
+        run: npm run lint
+
+      - name: Execute TypeScript Type Check
+        run: npm run typecheck
+
+      - name: Validate Environment Schema
+        run: npm run env:check
+
+      - name: Execute Environment Tests
+        run: npm run env:test
+
+      - name: Validate Requirement Traceability
+        run: python scripts/validate-requirements.py
+
+      - name: Generate Prisma Client & Validate Schema
+        run: |
+          npm run db:generate
+          npm run db:validate
+
+      - name: Deploy Database Migrations
+        run: npm run db:migrate:deploy
+
+      - name: Security Scan (Secret Pattern Scanning)
+        run: npm run scan:secrets
+
+      - name: Security Scan (Dependency Audit)
+        run: npm run scan:deps
+
+      - name: Execute Unit & Integration Tests (Coverage)
+        run: npm run test:coverage
+
+      - name: Verify Production Build
+        run: npm run build
+
+      - name: Install Playwright Browsers (Bundled Chromium)
+        run: npx playwright install chromium --with-deps
+
+      - name: Execute Playwright E2E Smoke Tests
+        run: npm run test:e2e

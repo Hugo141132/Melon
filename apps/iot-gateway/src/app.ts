@@ -91,6 +91,20 @@ export function buildApp(options: AppOptions): {
 
   // Security headers and rate limiting hook per SECURITY.md §16.4, §16.8 and TASK-0902
   app.addHook('onRequest', async (request, reply) => {
+    // GHSA-jx2c-rxcm-jvmq workaround: Reject headers containing tab characters (\t / 0x09)
+    for (const [headerName, headerValue] of Object.entries(request.headers)) {
+      const valStr = Array.isArray(headerValue) ? headerValue.join('') : headerValue || '';
+      if (valStr.includes('\t')) {
+        return reply.status(400).send({
+          success: false,
+          error: {
+            code: 'INVALID_HEADER',
+            message: `Header '${headerName}' contains invalid tab character.`,
+          },
+        });
+      }
+    }
+
     reply.header('X-Content-Type-Options', 'nosniff');
     reply.header('X-Frame-Options', 'DENY');
     reply.header('Referrer-Policy', 'strict-origin-when-cross-origin');
