@@ -54,6 +54,11 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
+      - name: Generate Prisma Client & Validate Schema
+        run: |
+          npm run db:generate
+          npm run db:validate
+
       - name: Verify Code Formatting
         run: npm run format:check
 
@@ -71,11 +76,6 @@ jobs:
 
       - name: Validate Requirement Traceability
         run: python scripts/validate-requirements.py
-
-      - name: Generate Prisma Client & Validate Schema
-        run: |
-          npm run db:generate
-          npm run db:validate
 
       - name: Deploy Database Migrations
         run: npm run db:migrate:deploy
