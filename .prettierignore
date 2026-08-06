@@ -8,3 +8,5 @@ package-lock.json
 docs/
 TASKS.md
 AGENTS.md
+next-env.d.ts
+apps/web/next-env.d.ts
