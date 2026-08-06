@@ -72,6 +72,8 @@ jobs:
         run: npm run env:check
 
       - name: Execute Environment Tests
+        env:
+          MQTT_BROKER_URL: mqtts://localhost:8883
         run: npm run env:test
 
       - name: Validate Requirement Traceability
