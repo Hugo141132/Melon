@@ -30,7 +30,9 @@ export interface AuthenticatedUserSession {
   assignedDeviceIds?: string[];
 }
 
-export function extractSessionTokenFromRequest(request?: Request): string | undefined {
+export async function extractSessionTokenFromRequest(
+  request?: Request
+): Promise<string | undefined> {
   if (request) {
     const cookieHeader = request.headers.get('cookie');
     if (cookieHeader) {
@@ -48,7 +50,7 @@ export function extractSessionTokenFromRequest(request?: Request): string | unde
   }
 
   try {
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     return cookieStore.get(SESSION_COOKIE_NAME)?.value;
   } catch {
     return undefined;
@@ -56,7 +58,7 @@ export function extractSessionTokenFromRequest(request?: Request): string | unde
 }
 
 export async function requireSession(request?: Request): Promise<AuthenticatedUserSession> {
-  const token = extractSessionTokenFromRequest(request);
+  const token = await extractSessionTokenFromRequest(request);
 
   if (!token) {
     throw new AuthorizationError(

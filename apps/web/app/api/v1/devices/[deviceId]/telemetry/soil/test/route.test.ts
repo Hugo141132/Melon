@@ -64,7 +64,7 @@ describe('HTTPS REST Soil Telemetry Ingestion Endpoint Auth & Logic (TASK-0405)'
       body: JSON.stringify(validPayload),
     });
 
-    const res = await POST(req, { params: { deviceId: 'soil-node-001' } });
+    const res = await POST(req, { params: Promise.resolve({ deviceId: 'soil-node-001' }) });
     const json = await res.json();
 
     expect(res.status).toBe(201);
@@ -96,7 +96,7 @@ describe('HTTPS REST Soil Telemetry Ingestion Endpoint Auth & Logic (TASK-0405)'
       body: JSON.stringify(validPayload),
     });
 
-    const res = await POST(req, { params: { deviceId: 'soil-node-001' } });
+    const res = await POST(req, { params: Promise.resolve({ deviceId: 'soil-node-001' }) });
     const json = await res.json();
 
     expect(res.status).toBe(401);
@@ -115,7 +115,7 @@ describe('HTTPS REST Soil Telemetry Ingestion Endpoint Auth & Logic (TASK-0405)'
       body: JSON.stringify(validPayload),
     });
 
-    const res = await POST(req, { params: { deviceId: 'soil-node-001' } });
+    const res = await POST(req, { params: Promise.resolve({ deviceId: 'soil-node-001' }) });
     const json = await res.json();
 
     expect(res.status).toBe(401);
@@ -145,7 +145,7 @@ describe('HTTPS REST Soil Telemetry Ingestion Endpoint Auth & Logic (TASK-0405)'
       body: JSON.stringify(validPayload),
     });
 
-    const res = await POST(req, { params: { deviceId: 'soil-node-001' } });
+    const res = await POST(req, { params: Promise.resolve({ deviceId: 'soil-node-001' }) });
     const json = await res.json();
 
     expect(res.status).toBe(200);
@@ -189,7 +189,7 @@ describe('HTTPS REST Soil Telemetry Ingestion Endpoint Auth & Logic (TASK-0405)'
       body: JSON.stringify(zeroPayload),
     });
 
-    const res = await POST(req, { params: { deviceId: 'soil-node-001' } });
+    const res = await POST(req, { params: Promise.resolve({ deviceId: 'soil-node-001' }) });
     expect(res.status).toBe(201);
 
     expect(mockIngestSoilReading).toHaveBeenCalledWith(
@@ -233,7 +233,7 @@ describe('HTTPS REST Soil Telemetry Ingestion Endpoint Auth & Logic (TASK-0405)'
       body: JSON.stringify(nullPayload),
     });
 
-    const res = await POST(req, { params: { deviceId: 'soil-node-001' } });
+    const res = await POST(req, { params: Promise.resolve({ deviceId: 'soil-node-001' }) });
     expect(res.status).toBe(201);
 
     expect(mockIngestSoilReading).toHaveBeenCalledWith(
@@ -260,7 +260,7 @@ describe('HTTPS REST Soil Telemetry Ingestion Endpoint Auth & Logic (TASK-0405)'
       body: JSON.stringify(mismatchPayload),
     });
 
-    const res = await POST(req, { params: { deviceId: 'soil-node-001' } });
+    const res = await POST(req, { params: Promise.resolve({ deviceId: 'soil-node-001' }) });
     const json = await res.json();
 
     expect(res.status).toBe(400);
@@ -288,7 +288,7 @@ describe('HTTPS REST Soil Telemetry Ingestion Endpoint Auth & Logic (TASK-0405)'
       body: JSON.stringify(invalidPayload),
     });
 
-    const res = await POST(req, { params: { deviceId: 'soil-node-001' } });
+    const res = await POST(req, { params: Promise.resolve({ deviceId: 'soil-node-001' }) });
     const json = await res.json();
 
     expect(res.status).toBe(422);
@@ -311,7 +311,7 @@ describe('HTTPS REST Soil Telemetry Ingestion Endpoint Auth & Logic (TASK-0405)'
       body: JSON.stringify({ ...validPayload, deviceId: 'soil-node-999' }),
     });
 
-    const res = await POST(req, { params: { deviceId: 'soil-node-999' } });
+    const res = await POST(req, { params: Promise.resolve({ deviceId: 'soil-node-999' }) });
     const json = await res.json();
 
     expect(res.status).toBe(404);
@@ -333,7 +333,7 @@ describe('HTTPS REST Soil Telemetry Ingestion Endpoint Auth & Logic (TASK-0405)'
       body: JSON.stringify(validPayload),
     });
 
-    const res = await POST(req, { params: { deviceId: 'soil-node-001' } });
+    const res = await POST(req, { params: Promise.resolve({ deviceId: 'soil-node-001' }) });
     const json = await res.json();
 
     expect(res.status).toBe(403);

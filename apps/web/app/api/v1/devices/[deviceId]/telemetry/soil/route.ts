@@ -15,7 +15,8 @@ import { SoilTelemetryPayloadSchema } from '@kebun-melon/contracts';
  *
  * Path: POST /api/v1/devices/[deviceId]/telemetry/soil
  */
-export async function POST(request: Request, { params }: { params: { deviceId: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ deviceId: string }> }) {
+  const params = await props.params;
   const requestId = `req-soil-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const pathDeviceId = params.deviceId;
 

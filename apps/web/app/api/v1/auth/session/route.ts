@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { prisma, validateSession, SESSION_COOKIE_NAME } from '@kebun-melon/database';
 
-function extractSessionToken(request: Request): string | undefined {
+async function extractSessionToken(request: Request): Promise<string | undefined> {
   const cookieHeader = request.headers.get('cookie');
   if (cookieHeader) {
     const match = cookieHeader.match(
@@ -13,7 +13,7 @@ function extractSessionToken(request: Request): string | undefined {
     }
   }
   try {
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     return cookieStore.get(SESSION_COOKIE_NAME)?.value;
   } catch {
     return undefined;
@@ -24,7 +24,7 @@ export async function GET(request: Request) {
   const requestId = `req-${Date.now()}`;
 
   try {
-    const token = extractSessionToken(request);
+    const token = await extractSessionToken(request);
 
     if (!token) {
       return NextResponse.json(

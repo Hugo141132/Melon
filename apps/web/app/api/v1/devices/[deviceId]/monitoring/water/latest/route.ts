@@ -13,7 +13,8 @@ const toNumberOrNull = (val: any): number | null => {
   return isNaN(num) ? null : num;
 };
 
-export async function GET(request: Request, { params }: { params: { deviceId: string } }) {
+export async function GET(request: Request, props: { params: Promise<{ deviceId: string }> }) {
+  const params = await props.params;
   const requestId = `req-water-latest-${Date.now()}`;
   const targetDeviceId = params.deviceId;
 

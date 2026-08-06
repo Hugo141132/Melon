@@ -3,7 +3,8 @@ import { prisma, UserRepository } from '@kebun-melon/database';
 import { UserRole } from '@kebun-melon/contracts';
 import { requireSession, requireRole, AuthorizationError } from '../../../../../lib/auth/rbac';
 
-export async function GET(request: Request, { params }: { params: { userId: string } }) {
+export async function GET(request: Request, props: { params: Promise<{ userId: string }> }) {
+  const params = await props.params;
   const requestId = `req-${Date.now()}`;
 
   try {

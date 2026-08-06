@@ -29,7 +29,8 @@ import {
 } from '@/lib/rate-limit';
 import { validateServerEnv } from '@/lib/env/server';
 
-export async function POST(request: Request, { params }: { params: { deviceId: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ deviceId: string }> }) {
+  const params = await props.params;
   const requestId = `req-${Date.now()}`;
   const targetDeviceId = params.deviceId;
 
@@ -233,7 +234,8 @@ export async function POST(request: Request, { params }: { params: { deviceId: s
   }
 }
 
-export async function GET(request: Request, { params }: { params: { deviceId: string } }) {
+export async function GET(request: Request, props: { params: Promise<{ deviceId: string }> }) {
+  const params = await props.params;
   const requestId = `req-${Date.now()}`;
   const targetDeviceId = params.deviceId;
 

@@ -10,7 +10,8 @@ import {
 } from '../../../../../../lib/rate-limit';
 import { validateServerEnv } from '../../../../../../lib/env/server';
 
-export async function POST(request: Request, { params }: { params: { userId: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ userId: string }> }) {
+  const params = await props.params;
   const requestId = `req-${Date.now()}`;
   const userId = params.userId;
 

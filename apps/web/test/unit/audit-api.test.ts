@@ -254,7 +254,9 @@ describe('Audit API Routes & Audit Service (TASK-0903)', () => {
       vi.mocked(AuditRepository.findAuditLogById).mockResolvedValue(null);
 
       const req = new NextRequest('http://localhost/api/v1/audit-logs/non-existent-id');
-      const res = await getAuditLogById(req, { params: { auditId: 'non-existent-id' } });
+      const res = await getAuditLogById(req, {
+        params: Promise.resolve({ auditId: 'non-existent-id' }),
+      });
 
       expect(res.status).toBe(404);
       const json = await res.json();
@@ -287,7 +289,7 @@ describe('Audit API Routes & Audit Service (TASK-0903)', () => {
         'http://localhost/api/v1/audit-logs/123e4567-e89b-12d3-a456-426614174000'
       );
       const res = await getAuditLogById(req, {
-        params: { auditId: '123e4567-e89b-12d3-a456-426614174000' },
+        params: Promise.resolve({ auditId: '123e4567-e89b-12d3-a456-426614174000' }),
       });
 
       expect(res.status).toBe(200);

@@ -2,18 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma, AuditRepository } from '@kebun-melon/database';
 import { requireSession, requirePermission, AuthorizationError } from '@/lib/auth/rbac';
 
-interface RouteParams {
-  params: {
-    auditId: string;
-  };
-}
-
 /**
  * GET /api/v1/audit-logs/[auditId]
  * Get single audit log record by ID.
  * Requires active session and 'audit.read' permission (OWNER only).
  */
-export async function GET(request: NextRequest, { params }: RouteParams) {
+export async function GET(request: NextRequest, props: { params: Promise<{ auditId: string }> }) {
+  const params = await props.params;
   try {
     const session = await requireSession(request);
     requirePermission(session, 'audit.read', 'AUDIT_LOG', params.auditId, request);

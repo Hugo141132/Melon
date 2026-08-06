@@ -8,8 +8,9 @@ import {
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { userId: string; deviceId: string } }
+  props: { params: Promise<{ userId: string; deviceId: string }> }
 ) {
+  const params = await props.params;
   const requestId = `req-${Date.now()}`;
 
   try {

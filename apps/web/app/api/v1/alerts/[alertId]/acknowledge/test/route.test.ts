@@ -40,7 +40,7 @@ describe('POST /api/v1/alerts/[alertId]/acknowledge', () => {
       body: JSON.stringify({ note: 'Field check' }),
     });
 
-    const res = await POST(req, { params: { alertId: 'alert-001' } });
+    const res = await POST(req, { params: Promise.resolve({ alertId: 'alert-001' }) });
     expect(res.status).toBe(401);
     const json = await res.json();
     expect(json.success).toBe(false);
@@ -69,7 +69,7 @@ describe('POST /api/v1/alerts/[alertId]/acknowledge', () => {
       body: JSON.stringify({ note: 'Field check' }),
     });
 
-    const res = await POST(req, { params: { alertId: 'alert-001' } });
+    const res = await POST(req, { params: Promise.resolve({ alertId: 'alert-001' }) });
     expect(res.status).toBe(403);
     const json = await res.json();
     expect(json.success).toBe(false);
@@ -101,7 +101,7 @@ describe('POST /api/v1/alerts/[alertId]/acknowledge', () => {
       body: JSON.stringify({ note: 'Field check' }),
     });
 
-    const res = await POST(req, { params: { alertId: 'alert-999' } });
+    const res = await POST(req, { params: Promise.resolve({ alertId: 'alert-999' }) });
     expect(res.status).toBe(404);
     const json = await res.json();
     expect(json.success).toBe(false);
@@ -137,7 +137,7 @@ describe('POST /api/v1/alerts/[alertId]/acknowledge', () => {
       body: JSON.stringify({ note: 'Field check completed' }),
     });
 
-    const res = await POST(req, { params: { alertId: 'alert-001' } });
+    const res = await POST(req, { params: Promise.resolve({ alertId: 'alert-001' }) });
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.success).toBe(true);

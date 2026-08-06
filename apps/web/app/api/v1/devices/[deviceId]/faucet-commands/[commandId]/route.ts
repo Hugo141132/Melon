@@ -9,8 +9,9 @@ import {
 
 export async function GET(
   request: Request,
-  { params }: { params: { deviceId: string; commandId: string } }
+  props: { params: Promise<{ deviceId: string; commandId: string }> }
 ) {
+  const params = await props.params;
   const requestId = `req-${Date.now()}`;
   const targetDeviceId = params.deviceId;
   const targetCommandId = params.commandId;

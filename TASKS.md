@@ -1921,6 +1921,52 @@ Apply to:
 
 ---
 
+## TASK-0910 — Fastify Framework Major Version Upgrade (v5.x)
+
+**Priority:** `P0`
+**Status:** `BACKLOG`
+**Dependencies:** `TASK-0401`
+
+### Acceptance Criteria
+
+- Upgrade Fastify in `apps/iot-gateway` from v4.28.1 to v5.x.
+- Resolve transitive `fastify`, `find-my-way`, `@fastify/ajv-compiler`, and `@fastify/fast-json-stringify-compiler` advisories (`GHSA-jx2c-rxcm-jvmq`, `GHSA-c96f-x56v-gq3h`).
+- Update route registrations, hooks, and error handlers for Fastify v5 API breaking changes.
+- Verify all gateway unit, integration, and security header tests pass.
+
+---
+
+## TASK-0911 — Next.js Framework Major Version Upgrade (v15.x / v16.x)
+
+**Priority:** `P0`
+**Status:** `DONE`
+**Dependencies:** `TASK-0104`
+**Completed:** Upgraded Next.js in `apps/web` from `14.2.35` to `16.3.0`, React to `19.0.0`, React DOM to `19.0.0`, `@testing-library/react` to `16.2.0`, `eslint-config-next` to `16.3.0`, and `eslint` to `9.20.0`. Added root package overrides for React 19 monorepo deduplication. Migrated `cookies()` and dynamic route params (`props: { params: Promise<{ ... }> }`) across all 22 route handlers and auth helpers. Migrated to ESLint 9 flat config (`apps/web/eslint.config.mjs`) using native TypeScript parser and `@next/eslint-plugin-next`. Updated `next.config.mjs` for Next 16 `serverExternalPackages`. Updated unit tests to pass `params` as `Promise.resolve(...)`. Resolved all 8 Next.js security advisories (`GHSA-h25m-26qc-wcjf`, `GHSA-q4gf-8mx6-v5v3`, `GHSA-8h8q-6873-q5fj`, `GHSA-c4j6-fc7j-m34r`, `GHSA-36qx-fr4f-26g5`, `GHSA-m99w-x7hq-7vfj`, `GHSA-89xv-2m56-2m9x`, `GHSA-p9j2-gv94-2wf4`) and `glob` advisory (`GHSA-5j98-mcp5-4vw2`), and removed resolved exceptions `EXC-DEP-003` through `EXC-DEP-011` from `scripts/security-exceptions.json`. Verified 36/36 test files (281/281 tests) pass, typecheck passes with 0 errors, ESLint 9 linting passes, secret scanning passes, and Next.js 16 production build compiles 30 static pages and 22 dynamic route handlers.
+
+### Acceptance Criteria
+
+- Upgrade Next.js in `apps/web` from v14.2.35 to v15.x/v16.x.
+- Resolve App Router framework advisories requiring major version bump (`GHSA-h25m-26qc-wcjf`, `GHSA-q4gf-8mx6-v5v3`, `GHSA-8h8q-6873-q5fj`, `GHSA-c4j6-fc7j-m34r`, `GHSA-36qx-fr4f-26g5`, `GHSA-m99w-x7hq-7vfj`, `GHSA-89xv-2m56-2m9x`, `GHSA-p9j2-gv94-2wf4`, `GHSA-5j98-mcp5-4vw2`).
+- Update React peer dependencies and ESLint 9 / Next 16 flat configuration.
+- Verify all web unit, component, integration, and Playwright E2E tests pass.
+
+---
+
+## TASK-0912 — Vitest and Vite Major Version Upgrade (v4.x / v6.x)
+
+**Priority:** `P0`
+**Status:** `BACKLOG`
+**Dependencies:** `TASK-0108`
+
+### Acceptance Criteria
+
+- Upgrade Vitest and Vite dev test dependencies across monorepo (`vitest` v1.6.0 $\rightarrow$ v4.x, `vite` v5.4.1 $\rightarrow$ v6.x).
+- Resolve `GHSA-5xrq-8626-4rwp` and `GHSA-fx2h-pf6j-xcff` advisories.
+- Update test configuration and coverage reporter integration.
+- Verify all unit, component, and integration test suites execute cleanly.
+
+---
+
 # 18. Phase 10 — Verification and Release
 
 ## TASK-1001 — Complete Unit Test Suite

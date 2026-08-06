@@ -115,7 +115,7 @@ describe('Latest Monitoring API Endpoints (TASK-0501)', () => {
       mockCookieToken = undefined;
       const res = await GET_SOIL_LATEST(
         new Request('http://localhost/api/v1/devices/DEV-SOIL-001/monitoring/soil/latest'),
-        { params: { deviceId: 'DEV-SOIL-001' } }
+        { params: Promise.resolve({ deviceId: 'DEV-SOIL-001' }) }
       );
       expect(res.status).toBe(401);
       const json = await res.json();
@@ -129,7 +129,7 @@ describe('Latest Monitoring API Endpoints (TASK-0501)', () => {
 
       const res = await GET_SOIL_LATEST(
         new Request('http://localhost/api/v1/devices/DEV-NONEXISTENT/monitoring/soil/latest'),
-        { params: { deviceId: 'DEV-NONEXISTENT' } }
+        { params: Promise.resolve({ deviceId: 'DEV-NONEXISTENT' }) }
       );
       expect(res.status).toBe(404);
       const json = await res.json();
@@ -143,7 +143,7 @@ describe('Latest Monitoring API Endpoints (TASK-0501)', () => {
 
       const res = await GET_SOIL_LATEST(
         new Request('http://localhost/api/v1/devices/DEV-SOIL-001/monitoring/soil/latest'),
-        { params: { deviceId: 'DEV-SOIL-001' } }
+        { params: Promise.resolve({ deviceId: 'DEV-SOIL-001' }) }
       );
       expect(res.status).toBe(403);
       const json = await res.json();
@@ -171,7 +171,7 @@ describe('Latest Monitoring API Endpoints (TASK-0501)', () => {
 
       const res = await GET_SOIL_LATEST(
         new Request('http://localhost/api/v1/devices/DEV-SOIL-001/monitoring/soil/latest'),
-        { params: { deviceId: 'DEV-SOIL-001' } }
+        { params: Promise.resolve({ deviceId: 'DEV-SOIL-001' }) }
       );
       expect(res.status).toBe(200);
       const json = await res.json();
@@ -204,7 +204,7 @@ describe('Latest Monitoring API Endpoints (TASK-0501)', () => {
         new Request(
           'http://localhost/api/v1/devices/water-tank-node-3uufzi/monitoring/water/latest'
         ),
-        { params: { deviceId: 'water-tank-node-3uufzi' } }
+        { params: Promise.resolve({ deviceId: 'water-tank-node-3uufzi' }) }
       );
       expect(res.status).toBe(200);
       const json = await res.json();
@@ -236,7 +236,7 @@ describe('Latest Monitoring API Endpoints (TASK-0501)', () => {
         new Request(
           'http://localhost/api/v1/devices/water-tank-node-3uufzi/monitoring/water/latest'
         ),
-        { params: { deviceId: 'water-tank-node-3uufzi' } }
+        { params: Promise.resolve({ deviceId: 'water-tank-node-3uufzi' }) }
       );
 
       expect(res.status).toBe(200);
@@ -274,7 +274,7 @@ describe('Latest Monitoring API Endpoints (TASK-0501)', () => {
 
       const res = await GET_LATEST(
         new Request('http://localhost/api/v1/devices/DEV-SOIL-001/monitoring/latest'),
-        { params: { deviceId: 'DEV-SOIL-001' } }
+        { params: Promise.resolve({ deviceId: 'DEV-SOIL-001' }) }
       );
       expect(res.status).toBe(200);
       const json = await res.json();

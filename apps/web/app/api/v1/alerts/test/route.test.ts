@@ -170,7 +170,7 @@ describe('Alerts API Endpoints (TASK-0701)', () => {
       mockGetAlertById.mockResolvedValueOnce(null);
 
       const res = await GET_DETAIL(new Request('http://localhost/api/v1/alerts/non-existent'), {
-        params: { alertId: 'non-existent' },
+        params: Promise.resolve({ alertId: 'non-existent' }),
       });
       const json = await res.json();
 
@@ -192,7 +192,7 @@ describe('Alerts API Endpoints (TASK-0701)', () => {
 
       const res = await GET_DETAIL(
         new Request('http://localhost/api/v1/alerts/11111111-1111-1111-1111-111111111111'),
-        { params: { alertId: '11111111-1111-1111-1111-111111111111' } }
+        { params: Promise.resolve({ alertId: '11111111-1111-1111-1111-111111111111' }) }
       );
       const json = await res.json();
 

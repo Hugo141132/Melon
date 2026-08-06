@@ -38,7 +38,7 @@ describe('TASK-0207 Owner Approve API Route Unit Tests', () => {
       method: 'POST',
     });
 
-    const res = await approvePOST(req, { params: { userId: 'target-id-1' } });
+    const res = await approvePOST(req, { params: Promise.resolve({ userId: 'target-id-1' }) });
     expect(res.status).toBe(401);
     const json = await res.json();
     expect(json.success).toBe(false);
@@ -64,7 +64,7 @@ describe('TASK-0207 Owner Approve API Route Unit Tests', () => {
     const req = new Request('http://localhost:3000/api/v1/approvals/target-id-1/approve', {
       method: 'POST',
     });
-    const res = await approvePOST(req, { params: { userId: 'target-id-1' } });
+    const res = await approvePOST(req, { params: Promise.resolve({ userId: 'target-id-1' }) });
 
     expect(res.status).toBe(403);
     const json = await res.json();
@@ -97,7 +97,7 @@ describe('TASK-0207 Owner Approve API Route Unit Tests', () => {
     const req = new Request('http://localhost:3000/api/v1/approvals/missing-id/approve', {
       method: 'POST',
     });
-    const res = await approvePOST(req, { params: { userId: 'missing-id' } });
+    const res = await approvePOST(req, { params: Promise.resolve({ userId: 'missing-id' }) });
 
     expect(res.status).toBe(404);
     const json = await res.json();
@@ -131,7 +131,9 @@ describe('TASK-0207 Owner Approve API Route Unit Tests', () => {
     const req = new Request('http://localhost:3000/api/v1/approvals/already-approved-id/approve', {
       method: 'POST',
     });
-    const res = await approvePOST(req, { params: { userId: 'already-approved-id' } });
+    const res = await approvePOST(req, {
+      params: Promise.resolve({ userId: 'already-approved-id' }),
+    });
 
     expect(res.status).toBe(409);
     const json = await res.json();
@@ -179,7 +181,7 @@ describe('TASK-0207 Owner Approve API Route Unit Tests', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ decisionNote: 'Verified identity via phone call' }),
     });
-    const res = await approvePOST(req, { params: { userId: 'target-id-1' } });
+    const res = await approvePOST(req, { params: Promise.resolve({ userId: 'target-id-1' }) });
 
     expect(res.status).toBe(200);
     const json = await res.json();

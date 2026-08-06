@@ -168,7 +168,7 @@ describe('Faucet Command API Endpoints (TASK-0803)', () => {
         }
       );
 
-      const res = await POST(req, { params: { deviceId: mockCanonicalDeviceId } });
+      const res = await POST(req, { params: Promise.resolve({ deviceId: mockCanonicalDeviceId }) });
       const json = await res.json();
 
       expect(res.status).toBe(401);
@@ -187,7 +187,7 @@ describe('Faucet Command API Endpoints (TASK-0803)', () => {
         }
       );
 
-      const res = await POST(req, { params: { deviceId: mockCanonicalDeviceId } });
+      const res = await POST(req, { params: Promise.resolve({ deviceId: mockCanonicalDeviceId }) });
       const json = await res.json();
 
       expect(res.status).toBe(403);
@@ -206,7 +206,7 @@ describe('Faucet Command API Endpoints (TASK-0803)', () => {
         }
       );
 
-      const res = await POST(req, { params: { deviceId: mockCanonicalDeviceId } });
+      const res = await POST(req, { params: Promise.resolve({ deviceId: mockCanonicalDeviceId }) });
       const json = await res.json();
 
       expect(res.status).toBe(403);
@@ -222,7 +222,7 @@ describe('Faucet Command API Endpoints (TASK-0803)', () => {
         body: JSON.stringify({ phase: 1 }),
       });
 
-      const res = await POST(req, { params: { deviceId: 'nonexistent-node' } });
+      const res = await POST(req, { params: Promise.resolve({ deviceId: 'nonexistent-node' }) });
       const json = await res.json();
 
       expect(res.status).toBe(404);
@@ -241,7 +241,7 @@ describe('Faucet Command API Endpoints (TASK-0803)', () => {
         }
       );
 
-      const res = await POST(req, { params: { deviceId: mockCanonicalDeviceId } });
+      const res = await POST(req, { params: Promise.resolve({ deviceId: mockCanonicalDeviceId }) });
       const json = await res.json();
 
       expect(res.status).toBe(403);
@@ -263,7 +263,7 @@ describe('Faucet Command API Endpoints (TASK-0803)', () => {
         }
       );
 
-      const res = await POST(req, { params: { deviceId: mockCanonicalDeviceId } });
+      const res = await POST(req, { params: Promise.resolve({ deviceId: mockCanonicalDeviceId }) });
       const json = await res.json();
 
       expect(res.status).toBe(403);
@@ -285,7 +285,7 @@ describe('Faucet Command API Endpoints (TASK-0803)', () => {
         }
       );
 
-      const res = await POST(req, { params: { deviceId: mockCanonicalDeviceId } });
+      const res = await POST(req, { params: Promise.resolve({ deviceId: mockCanonicalDeviceId }) });
       const json = await res.json();
 
       expect(res.status).toBe(422);
@@ -307,7 +307,7 @@ describe('Faucet Command API Endpoints (TASK-0803)', () => {
         }
       );
 
-      const res = await POST(req, { params: { deviceId: mockCanonicalDeviceId } });
+      const res = await POST(req, { params: Promise.resolve({ deviceId: mockCanonicalDeviceId }) });
       const json = await res.json();
 
       expect(res.status).toBe(403);
@@ -324,7 +324,7 @@ describe('Faucet Command API Endpoints (TASK-0803)', () => {
         }
       );
 
-      const res = await POST(req, { params: { deviceId: mockCanonicalDeviceId } });
+      const res = await POST(req, { params: Promise.resolve({ deviceId: mockCanonicalDeviceId }) });
       const json = await res.json();
 
       expect(res.status).toBe(422);
@@ -341,7 +341,7 @@ describe('Faucet Command API Endpoints (TASK-0803)', () => {
         }
       );
 
-      const res = await POST(req, { params: { deviceId: mockCanonicalDeviceId } });
+      const res = await POST(req, { params: Promise.resolve({ deviceId: mockCanonicalDeviceId }) });
       const json = await res.json();
 
       expect(res.status).toBe(422);
@@ -358,7 +358,7 @@ describe('Faucet Command API Endpoints (TASK-0803)', () => {
         }
       );
 
-      const res = await POST(req, { params: { deviceId: mockCanonicalDeviceId } });
+      const res = await POST(req, { params: Promise.resolve({ deviceId: mockCanonicalDeviceId }) });
       const json = await res.json();
 
       expect(res.status).toBe(201);
@@ -398,7 +398,7 @@ describe('Faucet Command API Endpoints (TASK-0803)', () => {
         }
       );
 
-      const res = await POST(req, { params: { deviceId: mockCanonicalDeviceId } });
+      const res = await POST(req, { params: Promise.resolve({ deviceId: mockCanonicalDeviceId }) });
       const json = await res.json();
 
       expect(res.status).toBe(201);
@@ -431,7 +431,7 @@ describe('Faucet Command API Endpoints (TASK-0803)', () => {
         }
       );
 
-      const res = await POST(req, { params: { deviceId: mockCanonicalDeviceId } });
+      const res = await POST(req, { params: Promise.resolve({ deviceId: mockCanonicalDeviceId }) });
       const json = await res.json();
 
       expect(res.status).toBe(409);
@@ -449,7 +449,9 @@ describe('Faucet Command API Endpoints (TASK-0803)', () => {
           body: JSON.stringify({ phase: 1 }),
         }
       );
-      const res1 = await POST(req1, { params: { deviceId: mockCanonicalDeviceId } });
+      const res1 = await POST(req1, {
+        params: Promise.resolve({ deviceId: mockCanonicalDeviceId }),
+      });
       const json1 = await res1.json();
 
       const req2 = new Request(
@@ -460,7 +462,9 @@ describe('Faucet Command API Endpoints (TASK-0803)', () => {
           body: JSON.stringify({ phase: 1 }),
         }
       );
-      const res2 = await POST(req2, { params: { deviceId: mockCanonicalDeviceId } });
+      const res2 = await POST(req2, {
+        params: Promise.resolve({ deviceId: mockCanonicalDeviceId }),
+      });
       const json2 = await res2.json();
 
       expect(res1.status).toBe(201);
@@ -485,7 +489,7 @@ describe('Faucet Command API Endpoints (TASK-0803)', () => {
         }
       );
 
-      const res = await POST(req, { params: { deviceId: mockCanonicalDeviceId } });
+      const res = await POST(req, { params: Promise.resolve({ deviceId: mockCanonicalDeviceId }) });
       const json = await res.json();
 
       expect(res.status).toBe(409);
@@ -500,7 +504,7 @@ describe('Faucet Command API Endpoints (TASK-0803)', () => {
       const req = new Request(
         `http://localhost/api/v1/devices/${mockCanonicalDeviceId}/faucet-commands`
       );
-      const res = await GET(req, { params: { deviceId: mockCanonicalDeviceId } });
+      const res = await GET(req, { params: Promise.resolve({ deviceId: mockCanonicalDeviceId }) });
       const json = await res.json();
 
       expect(res.status).toBe(401);
@@ -511,7 +515,7 @@ describe('Faucet Command API Endpoints (TASK-0803)', () => {
       mockGetDeviceByCanonicalId.mockResolvedValue(null);
 
       const req = new Request(`http://localhost/api/v1/devices/nonexistent-node/faucet-commands`);
-      const res = await GET(req, { params: { deviceId: 'nonexistent-node' } });
+      const res = await GET(req, { params: Promise.resolve({ deviceId: 'nonexistent-node' }) });
       const json = await res.json();
 
       expect(res.status).toBe(404);
@@ -524,7 +528,7 @@ describe('Faucet Command API Endpoints (TASK-0803)', () => {
       const req = new Request(
         `http://localhost/api/v1/devices/${mockCanonicalDeviceId}/faucet-commands`
       );
-      const res = await GET(req, { params: { deviceId: mockCanonicalDeviceId } });
+      const res = await GET(req, { params: Promise.resolve({ deviceId: mockCanonicalDeviceId }) });
       const json = await res.json();
 
       expect(res.status).toBe(403);
@@ -535,7 +539,7 @@ describe('Faucet Command API Endpoints (TASK-0803)', () => {
       const req = new Request(
         `http://localhost/api/v1/devices/${mockCanonicalDeviceId}/faucet-commands?page=1&pageSize=10`
       );
-      const res = await GET(req, { params: { deviceId: mockCanonicalDeviceId } });
+      const res = await GET(req, { params: Promise.resolve({ deviceId: mockCanonicalDeviceId }) });
       const json = await res.json();
 
       expect(res.status).toBe(200);
@@ -558,7 +562,10 @@ describe('Faucet Command API Endpoints (TASK-0803)', () => {
         `http://localhost/api/v1/devices/${mockCanonicalDeviceId}/faucet-commands/${mockCommandRecord.commandId}`
       );
       const res = await GET_COMMAND_DETAIL(req, {
-        params: { deviceId: mockCanonicalDeviceId, commandId: mockCommandRecord.commandId },
+        params: Promise.resolve({
+          deviceId: mockCanonicalDeviceId,
+          commandId: mockCommandRecord.commandId,
+        }),
       });
       const json = await res.json();
 
@@ -573,7 +580,7 @@ describe('Faucet Command API Endpoints (TASK-0803)', () => {
         `http://localhost/api/v1/devices/${mockCanonicalDeviceId}/faucet-commands/cmd-nonexistent`
       );
       const res = await GET_COMMAND_DETAIL(req, {
-        params: { deviceId: mockCanonicalDeviceId, commandId: 'cmd-nonexistent' },
+        params: Promise.resolve({ deviceId: mockCanonicalDeviceId, commandId: 'cmd-nonexistent' }),
       });
       const json = await res.json();
 
@@ -586,7 +593,10 @@ describe('Faucet Command API Endpoints (TASK-0803)', () => {
         `http://localhost/api/v1/devices/${mockCanonicalDeviceId}/faucet-commands/${mockCommandRecord.commandId}`
       );
       const res = await GET_COMMAND_DETAIL(req, {
-        params: { deviceId: mockCanonicalDeviceId, commandId: mockCommandRecord.commandId },
+        params: Promise.resolve({
+          deviceId: mockCanonicalDeviceId,
+          commandId: mockCommandRecord.commandId,
+        }),
       });
       const json = await res.json();
 

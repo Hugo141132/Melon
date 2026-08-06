@@ -6,7 +6,8 @@ import {
   AuthorizationError,
 } from '../../../../../../lib/auth/rbac';
 
-export async function POST(request: Request, { params }: { params: { deviceId: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ deviceId: string }> }) {
+  const params = await props.params;
   const requestId = `req-${Date.now()}`;
   const targetDeviceId = params.deviceId;
 

@@ -9,7 +9,8 @@ import {
   AuthorizationError,
 } from '../../../../../lib/auth/rbac';
 
-export async function GET(request: Request, { params }: { params: { deviceId: string } }) {
+export async function GET(request: Request, props: { params: Promise<{ deviceId: string }> }) {
+  const params = await props.params;
   const requestId = `req-${Date.now()}`;
   const targetDeviceId = params.deviceId;
 
@@ -90,7 +91,8 @@ export async function GET(request: Request, { params }: { params: { deviceId: st
   }
 }
 
-export async function PATCH(request: Request, { params }: { params: { deviceId: string } }) {
+export async function PATCH(request: Request, props: { params: Promise<{ deviceId: string }> }) {
+  const params = await props.params;
   const requestId = `req-${Date.now()}`;
   const targetDeviceId = params.deviceId;
 
@@ -174,7 +176,8 @@ export async function PATCH(request: Request, { params }: { params: { deviceId: 
   }
 }
 
-export async function DELETE(request: Request, { params }: { params: { deviceId: string } }) {
+export async function DELETE(request: Request, props: { params: Promise<{ deviceId: string }> }) {
+  const params = await props.params;
   const requestId = `req-${Date.now()}`;
   const targetDeviceId = params.deviceId;
 

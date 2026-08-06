@@ -153,7 +153,9 @@ describe('TASK-0206 Owner Pending Approval API Routes Unit Tests', () => {
       mockGetPendingApprovalById.mockResolvedValueOnce(null);
 
       const req = new Request('http://localhost:3000/api/v1/approvals/non-existent-user-id');
-      const res = await detailGET(req, { params: { userId: 'non-existent-user-id' } });
+      const res = await detailGET(req, {
+        params: Promise.resolve({ userId: 'non-existent-user-id' }),
+      });
 
       expect(res.status).toBe(404);
       const json = await res.json();
@@ -188,7 +190,9 @@ describe('TASK-0206 Owner Pending Approval API Routes Unit Tests', () => {
       mockGetPendingApprovalById.mockResolvedValueOnce(mockDetail);
 
       const req = new Request('http://localhost:3000/api/v1/approvals/applicant-uuid-99');
-      const res = await detailGET(req, { params: { userId: 'applicant-uuid-99' } });
+      const res = await detailGET(req, {
+        params: Promise.resolve({ userId: 'applicant-uuid-99' }),
+      });
 
       expect(res.status).toBe(200);
       const json = await res.json();

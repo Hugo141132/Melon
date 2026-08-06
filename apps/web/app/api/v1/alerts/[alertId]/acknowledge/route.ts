@@ -7,7 +7,8 @@ import {
   AuthorizationError,
 } from '../../../../../../lib/auth/rbac';
 
-export async function POST(request: NextRequest, { params }: { params: { alertId: string } }) {
+export async function POST(request: NextRequest, props: { params: Promise<{ alertId: string }> }) {
+  const params = await props.params;
   const requestId = `req-${Date.now()}`;
 
   try {

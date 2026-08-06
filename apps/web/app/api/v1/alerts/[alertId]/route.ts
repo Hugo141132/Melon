@@ -7,7 +7,8 @@ import {
   AuthorizationError,
 } from '../../../../../lib/auth/rbac';
 
-export async function GET(request: Request, { params }: { params: { alertId: string } }) {
+export async function GET(request: Request, props: { params: Promise<{ alertId: string }> }) {
+  const params = await props.params;
   const requestId = `req-${Date.now()}`;
 
   try {

@@ -7,7 +7,8 @@ import {
   AuthorizationError,
 } from '../../../../../lib/auth/rbac';
 
-export async function GET(request: Request, { params }: { params: { userId: string } }) {
+export async function GET(request: Request, props: { params: Promise<{ userId: string }> }) {
+  const params = await props.params;
   const requestId = `req-${Date.now()}`;
 
   try {
@@ -68,7 +69,8 @@ export async function GET(request: Request, { params }: { params: { userId: stri
   }
 }
 
-export async function PATCH(request: Request, { params }: { params: { userId: string } }) {
+export async function PATCH(request: Request, props: { params: Promise<{ userId: string }> }) {
+  const params = await props.params;
   const requestId = `req-${Date.now()}`;
 
   try {
@@ -205,7 +207,8 @@ export async function PATCH(request: Request, { params }: { params: { userId: st
   }
 }
 
-export async function DELETE(request: Request, { params }: { params: { userId: string } }) {
+export async function DELETE(request: Request, props: { params: Promise<{ userId: string }> }) {
+  const params = await props.params;
   const requestId = `req-${Date.now()}`;
 
   try {

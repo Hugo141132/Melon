@@ -204,7 +204,7 @@ describe('Device Registry API Endpoints (TASK-0302 & TASK-0305)', () => {
       mockGetDeviceByCanonicalId.mockResolvedValueOnce(null);
 
       const res = await GET_DETAIL(new Request('http://localhost/api/v1/devices/non-existent'), {
-        params: { deviceId: 'non-existent' },
+        params: Promise.resolve({ deviceId: 'non-existent' }),
       });
       const json = await res.json();
 
@@ -227,7 +227,7 @@ describe('Device Registry API Endpoints (TASK-0302 & TASK-0305)', () => {
       mockGetDeviceByCanonicalId.mockResolvedValueOnce(mockDev);
 
       const res = await GET_DETAIL(new Request('http://localhost/api/v1/devices/water-node-001'), {
-        params: { deviceId: 'water-node-001' },
+        params: Promise.resolve({ deviceId: 'water-node-001' }),
       });
       const json = await res.json();
 
@@ -257,7 +257,7 @@ describe('Device Registry API Endpoints (TASK-0302 & TASK-0305)', () => {
       });
 
       const res = await GET_DETAIL(new Request('http://localhost/api/v1/devices/water-node-001'), {
-        params: { deviceId: 'water-node-001' },
+        params: Promise.resolve({ deviceId: 'water-node-001' }),
       });
       const json = await res.json();
 
@@ -283,7 +283,7 @@ describe('Device Registry API Endpoints (TASK-0302 & TASK-0305)', () => {
 
       const res = await GET_DETAIL(
         new Request('http://localhost/api/v1/devices/unassigned-node-002'),
-        { params: { deviceId: 'unassigned-node-002' } }
+        { params: Promise.resolve({ deviceId: 'unassigned-node-002' }) }
       );
       const json = await res.json();
 
@@ -309,7 +309,7 @@ describe('Device Registry API Endpoints (TASK-0302 & TASK-0305)', () => {
 
       const res = await GET_DETAIL(
         new Request('http://localhost/api/v1/devices/water-tank-node-001'),
-        { params: { deviceId: 'water-tank-node-001' } }
+        { params: Promise.resolve({ deviceId: 'water-tank-node-001' }) }
       );
       const json = await res.json();
 
@@ -334,7 +334,7 @@ describe('Device Registry API Endpoints (TASK-0302 & TASK-0305)', () => {
 
       const res = await GET_DETAIL(
         new Request('http://localhost/api/v1/devices/water-tank-node-001'),
-        { params: { deviceId: 'water-tank-node-001' } }
+        { params: Promise.resolve({ deviceId: 'water-tank-node-001' }) }
       );
       const json = await res.json();
 
@@ -435,7 +435,7 @@ describe('Device Registry API Endpoints (TASK-0302 & TASK-0305)', () => {
         }),
       });
 
-      const res = await PATCH(req, { params: { deviceId: 'water-node-001' } });
+      const res = await PATCH(req, { params: Promise.resolve({ deviceId: 'water-node-001' }) });
       const json = await res.json();
 
       expect(res.status).toBe(422);
@@ -458,7 +458,9 @@ describe('Device Registry API Endpoints (TASK-0302 & TASK-0305)', () => {
         method: 'POST',
       });
 
-      const res = await DEACTIVATE(req, { params: { deviceId: 'water-node-001' } });
+      const res = await DEACTIVATE(req, {
+        params: Promise.resolve({ deviceId: 'water-node-001' }),
+      });
       const json = await res.json();
 
       expect(res.status).toBe(200);
@@ -481,7 +483,7 @@ describe('Device Registry API Endpoints (TASK-0302 & TASK-0305)', () => {
         method: 'DELETE',
       });
 
-      const res = await DELETE(req, { params: { deviceId: 'water-node-001' } });
+      const res = await DELETE(req, { params: Promise.resolve({ deviceId: 'water-node-001' }) });
       const json = await res.json();
 
       expect(res.status).toBe(200);
@@ -496,7 +498,7 @@ describe('Device Registry API Endpoints (TASK-0302 & TASK-0305)', () => {
         method: 'DELETE',
       });
 
-      const res = await DELETE(req, { params: { deviceId: 'water-node-001' } });
+      const res = await DELETE(req, { params: Promise.resolve({ deviceId: 'water-node-001' }) });
       const json = await res.json();
 
       expect(res.status).toBe(403);
@@ -514,7 +516,7 @@ describe('Device Registry API Endpoints (TASK-0302 & TASK-0305)', () => {
         method: 'DELETE',
       });
 
-      const res = await DELETE(req, { params: { deviceId: 'non-existent' } });
+      const res = await DELETE(req, { params: Promise.resolve({ deviceId: 'non-existent' }) });
       const json = await res.json();
 
       expect(res.status).toBe(404);

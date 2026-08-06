@@ -254,7 +254,7 @@ describe('TASK-0212 Owner User Management API & Safety Tests', () => {
     });
 
     const req = new Request('http://localhost:3000/api/v1/users/admin-id-2');
-    const res = await GET_DETAIL(req, { params: { userId: 'admin-id-2' } });
+    const res = await GET_DETAIL(req, { params: Promise.resolve({ userId: 'admin-id-2' }) });
 
     expect(res.status).toBe(200);
     const json = await res.json();
@@ -267,7 +267,7 @@ describe('TASK-0212 Owner User Management API & Safety Tests', () => {
   it('6. ADMIN user-management detail request returns 403', async () => {
     mockAdminSession();
     const req = new Request('http://localhost:3000/api/v1/users/admin-id-2');
-    const res = await GET_DETAIL(req, { params: { userId: 'admin-id-2' } });
+    const res = await GET_DETAIL(req, { params: Promise.resolve({ userId: 'admin-id-2' }) });
 
     expect(res.status).toBe(403);
   });
@@ -299,7 +299,7 @@ describe('TASK-0212 Owner User Management API & Safety Tests', () => {
       body: JSON.stringify({ fullName: 'Updated Admin Name', username: 'newusername' }),
     });
 
-    const res = await PATCH_USER(req, { params: { userId: 'admin-id-2' } });
+    const res = await PATCH_USER(req, { params: Promise.resolve({ userId: 'admin-id-2' }) });
 
     expect(res.status).toBe(200);
     const json = await res.json();
@@ -316,7 +316,7 @@ describe('TASK-0212 Owner User Management API & Safety Tests', () => {
       body: JSON.stringify({ role: 'OWNER', fullName: 'Hacker' }),
     });
 
-    const res = await PATCH_USER(req, { params: { userId: 'admin-id-2' } });
+    const res = await PATCH_USER(req, { params: Promise.resolve({ userId: 'admin-id-2' }) });
     expect(res.status).toBe(422);
     const json = await res.json();
     expect(json.error.code).toBe('VALIDATION_ERROR');
@@ -331,7 +331,7 @@ describe('TASK-0212 Owner User Management API & Safety Tests', () => {
       body: JSON.stringify({ accountStatus: 'ACTIVE' }),
     });
 
-    const res = await PATCH_USER(req, { params: { userId: 'admin-id-2' } });
+    const res = await PATCH_USER(req, { params: Promise.resolve({ userId: 'admin-id-2' }) });
     expect(res.status).toBe(422);
   });
 
@@ -344,7 +344,7 @@ describe('TASK-0212 Owner User Management API & Safety Tests', () => {
       body: JSON.stringify({ email: 'newemail@test.com', passwordHash: 'hacked' }),
     });
 
-    const res = await PATCH_USER(req, { params: { userId: 'admin-id-2' } });
+    const res = await PATCH_USER(req, { params: Promise.resolve({ userId: 'admin-id-2' }) });
     expect(res.status).toBe(422);
   });
 
@@ -375,7 +375,7 @@ describe('TASK-0212 Owner User Management API & Safety Tests', () => {
       body: JSON.stringify({ reason: 'Policy violation' }),
     });
 
-    const res = await SUSPEND_USER(req, { params: { userId: 'admin-id-2' } });
+    const res = await SUSPEND_USER(req, { params: Promise.resolve({ userId: 'admin-id-2' }) });
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.success).toBe(true);
@@ -407,7 +407,7 @@ describe('TASK-0212 Owner User Management API & Safety Tests', () => {
     const req = new Request('http://localhost:3000/api/v1/users/admin-id-2/suspend', {
       method: 'POST',
     });
-    await SUSPEND_USER(req, { params: { userId: 'admin-id-2' } });
+    await SUSPEND_USER(req, { params: Promise.resolve({ userId: 'admin-id-2' }) });
 
     // Now test that suspended user session is rejected by requireActiveAccount
     const suspendedSession: AuthenticatedUserSession = {
@@ -446,7 +446,7 @@ describe('TASK-0212 Owner User Management API & Safety Tests', () => {
       method: 'POST',
     });
 
-    const res = await DEACTIVATE_USER(req, { params: { userId: 'admin-id-2' } });
+    const res = await DEACTIVATE_USER(req, { params: Promise.resolve({ userId: 'admin-id-2' }) });
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.data.accountStatus).toBe('DEACTIVATED');
@@ -466,7 +466,9 @@ describe('TASK-0212 Owner User Management API & Safety Tests', () => {
       method: 'POST',
     });
 
-    const res = await ACTIVATE_USER(req, { params: { userId: 'pending-admin-id' } });
+    const res = await ACTIVATE_USER(req, {
+      params: Promise.resolve({ userId: 'pending-admin-id' }),
+    });
     expect(res.status).toBe(409);
     const json = await res.json();
     expect(json.error.code).toBe('INVALID_STATUS_TRANSITION');
@@ -497,7 +499,7 @@ describe('TASK-0212 Owner User Management API & Safety Tests', () => {
       method: 'POST',
     });
 
-    const res = await ACTIVATE_USER(req, { params: { userId: 'admin-id-2' } });
+    const res = await ACTIVATE_USER(req, { params: Promise.resolve({ userId: 'admin-id-2' }) });
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.data.accountStatus).toBe('ACTIVE');
@@ -509,7 +511,7 @@ describe('TASK-0212 Owner User Management API & Safety Tests', () => {
     const req = new Request('http://localhost:3000/api/v1/users/admin-id-2/suspend', {
       method: 'POST',
     });
-    const res = await SUSPEND_USER(req, { params: { userId: 'admin-id-2' } });
+    const res = await SUSPEND_USER(req, { params: Promise.resolve({ userId: 'admin-id-2' }) });
     expect(res.status).toBe(403);
   });
 
@@ -526,7 +528,7 @@ describe('TASK-0212 Owner User Management API & Safety Tests', () => {
       method: 'POST',
     });
 
-    const res = await SUSPEND_USER(req, { params: { userId: 'owner-id-1' } });
+    const res = await SUSPEND_USER(req, { params: Promise.resolve({ userId: 'owner-id-1' }) });
     expect(res.status).toBe(403);
     const json = await res.json();
     expect(json.error.code).toBe('FORBIDDEN_TARGET');
@@ -544,7 +546,7 @@ describe('TASK-0212 Owner User Management API & Safety Tests', () => {
       method: 'DELETE',
     });
 
-    const res = await DELETE_USER(req, { params: { userId: 'admin-id-2' } });
+    const res = await DELETE_USER(req, { params: Promise.resolve({ userId: 'admin-id-2' }) });
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.success).toBe(true);
@@ -565,7 +567,7 @@ describe('TASK-0212 Owner User Management API & Safety Tests', () => {
       method: 'DELETE',
     });
 
-    const res = await DELETE_USER(req, { params: { userId: 'pending-admin-id' } });
+    const res = await DELETE_USER(req, { params: Promise.resolve({ userId: 'pending-admin-id' }) });
     expect(res.status).toBe(409);
     const json = await res.json();
     expect(json.error.code).toBe('CANNOT_DELETE_PENDING_APPROVAL');
@@ -584,7 +586,7 @@ describe('TASK-0212 Owner User Management API & Safety Tests', () => {
       method: 'DELETE',
     });
 
-    const res = await DELETE_USER(req, { params: { userId: 'owner-id-1' } });
+    const res = await DELETE_USER(req, { params: Promise.resolve({ userId: 'owner-id-1' }) });
     expect(res.status).toBe(403);
     const json = await res.json();
     expect(json.error.code).toBe('FORBIDDEN_TARGET');
@@ -596,7 +598,7 @@ describe('TASK-0212 Owner User Management API & Safety Tests', () => {
     const req = new Request('http://localhost:3000/api/v1/users/admin-id-2', {
       method: 'DELETE',
     });
-    const res = await DELETE_USER(req, { params: { userId: 'admin-id-2' } });
+    const res = await DELETE_USER(req, { params: Promise.resolve({ userId: 'admin-id-2' }) });
     expect(res.status).toBe(403);
   });
 });
@@ -678,7 +680,9 @@ describe('TASK-0304 User Device Assignments API Routes', () => {
       mockListUserDeviceAssignments.mockResolvedValue(mockAssignments);
 
       const request = new Request('http://localhost/api/v1/users/admin-id-2/devices');
-      const response = await GET_DEVICES(request, { params: { userId: 'admin-id-2' } });
+      const response = await GET_DEVICES(request, {
+        params: Promise.resolve({ userId: 'admin-id-2' }),
+      });
       const body = await response.json();
 
       expect(response.status).toBe(200);
@@ -689,7 +693,9 @@ describe('TASK-0304 User Device Assignments API Routes', () => {
     it('returns 403 Forbidden for Admin request', async () => {
       mockAdminSession();
       const request = new Request('http://localhost/api/v1/users/admin-id-2/devices');
-      const response = await GET_DEVICES(request, { params: { userId: 'admin-id-2' } });
+      const response = await GET_DEVICES(request, {
+        params: Promise.resolve({ userId: 'admin-id-2' }),
+      });
       const body = await response.json();
 
       expect(response.status).toBe(403);
@@ -721,7 +727,9 @@ describe('TASK-0304 User Device Assignments API Routes', () => {
         body: JSON.stringify({ deviceId: 'water-node-001' }),
       });
 
-      const response = await ASSIGN_DEVICE(request, { params: { userId: 'admin-id-2' } });
+      const response = await ASSIGN_DEVICE(request, {
+        params: Promise.resolve({ userId: 'admin-id-2' }),
+      });
       const body = await response.json();
 
       expect(response.status).toBe(201);
@@ -737,7 +745,9 @@ describe('TASK-0304 User Device Assignments API Routes', () => {
         body: JSON.stringify({ deviceId: 'water-node-001' }),
       });
 
-      const response = await ASSIGN_DEVICE(request, { params: { userId: 'admin-id-2' } });
+      const response = await ASSIGN_DEVICE(request, {
+        params: Promise.resolve({ userId: 'admin-id-2' }),
+      });
       const body = await response.json();
 
       expect(response.status).toBe(403);
@@ -756,7 +766,9 @@ describe('TASK-0304 User Device Assignments API Routes', () => {
         body: JSON.stringify({ deviceId: 'water-node-001' }),
       });
 
-      const response = await ASSIGN_DEVICE(request, { params: { userId: 'admin-id-2' } });
+      const response = await ASSIGN_DEVICE(request, {
+        params: Promise.resolve({ userId: 'admin-id-2' }),
+      });
       const body = await response.json();
 
       expect(response.status).toBe(409);
@@ -778,7 +790,7 @@ describe('TASK-0304 User Device Assignments API Routes', () => {
       );
 
       const response = await REVOKE_DEVICE(request, {
-        params: { userId: 'admin-id-2', deviceId: 'water-node-001' },
+        params: Promise.resolve({ userId: 'admin-id-2', deviceId: 'water-node-001' }),
       });
 
       expect(response.status).toBe(204);
@@ -792,7 +804,7 @@ describe('TASK-0304 User Device Assignments API Routes', () => {
       );
 
       const response = await REVOKE_DEVICE(request, {
-        params: { userId: 'admin-id-2', deviceId: 'water-node-001' },
+        params: Promise.resolve({ userId: 'admin-id-2', deviceId: 'water-node-001' }),
       });
 
       expect(response.status).toBe(403);
