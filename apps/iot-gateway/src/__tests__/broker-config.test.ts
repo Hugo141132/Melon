@@ -1,9 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import { commandPublisher } from '../commands/publisher';
 import { GatewayMqttClient } from '../mqtt/client';
-import { generateMosquittoHash } from '../../../../scripts/generate-mqtt-pwfile';
+import { generateMosquittoHash, writePwfile } from '../../../../scripts/generate-mqtt-pwfile';
 
 /**
  * TASK-0402: MQTT Broker Configuration & Security Controls
@@ -35,6 +35,12 @@ describe('TASK-0402: MQTT Broker Configuration & Security Controls', () => {
   const dockerComposePath = path.join(rootDir, 'docker-compose.yml');
 
   const usernames = getExpectedUsernames();
+
+  beforeAll(() => {
+    if (!fs.existsSync(pwfilePath)) {
+      writePwfile();
+    }
+  });
 
   it('verifies mosquitto.conf strictly disables anonymous access and links security files', () => {
     expect(fs.existsSync(mosquittoConfPath)).toBe(true);
