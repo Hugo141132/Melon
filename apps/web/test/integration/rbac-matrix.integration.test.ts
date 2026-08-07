@@ -119,9 +119,12 @@ describe('API Integration Test Suite — RBAC Matrix & Role Boundaries (TASK-100
     });
 
     it('denies Admin access to POST /api/v1/approvals/[userId]/approve with 403 FORBIDDEN_ROLE', async () => {
-      const req = new Request(`http://localhost:3000/api/v1/approvals/${mockPendingUserId}/approve`, {
-        method: 'POST',
-      });
+      const req = new Request(
+        `http://localhost:3000/api/v1/approvals/${mockPendingUserId}/approve`,
+        {
+          method: 'POST',
+        }
+      );
       const res = await approveUserHandler(req, {
         params: Promise.resolve({ userId: mockPendingUserId }),
       });
@@ -133,11 +136,14 @@ describe('API Integration Test Suite — RBAC Matrix & Role Boundaries (TASK-100
     });
 
     it('denies Admin access to POST /api/v1/approvals/[userId]/reject with 403 FORBIDDEN_ROLE', async () => {
-      const req = new Request(`http://localhost:3000/api/v1/approvals/${mockPendingUserId}/reject`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason: 'Incomplete information' }),
-      });
+      const req = new Request(
+        `http://localhost:3000/api/v1/approvals/${mockPendingUserId}/reject`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason: 'Incomplete information' }),
+        }
+      );
       const res = await rejectUserHandler(req, {
         params: Promise.resolve({ userId: mockPendingUserId }),
       });
@@ -256,9 +262,12 @@ describe('API Integration Test Suite — RBAC Matrix & Role Boundaries (TASK-100
         },
       });
 
-      const req = new Request(`http://localhost:3000/api/v1/approvals/${mockPendingUserId}/approve`, {
-        method: 'POST',
-      });
+      const req = new Request(
+        `http://localhost:3000/api/v1/approvals/${mockPendingUserId}/approve`,
+        {
+          method: 'POST',
+        }
+      );
       const res = await approveUserHandler(req, {
         params: Promise.resolve({ userId: mockPendingUserId }),
       });
