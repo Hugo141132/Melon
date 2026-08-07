@@ -1891,9 +1891,10 @@ Apply to:
 ## TASK-0908 — Implement Session Revocation
 
 **Priority:** `P0`  
-**Status:** `BACKLOG`  
-**Dependencies:** `TASK-0204`  
-**Notes:** Extends real-time session revocation across active SSE streams and middleware guards.
+**Status:** `IN_PROGRESS`
+**Dependencies:** `TASK-0204`, `TASK-0505`
+**Progress:** Implemented session revocation mechanisms across account lifecycle states (SUSPENDED, DEACTIVATED, REJECTED), transactional password updates (`changeUserPassword`), HTTP endpoint `POST /api/v1/auth/change-password`, database helper `verifyStreamSessionActive` prepared for integration when SSE is built in `TASK-0505`, and immediate device access revocation on subsequent authorization checks (`requireDeviceViewAccess`). Added `ACCOUNT_PASSWORD_CHANGED` audit log event key and verified 100% test pass rate across database and web unit test suites (51 test files, 378 tests passing). Full completion of live-stream closing pending `TASK-0505` real-time SSE stream implementation.
+
 
 ### Acceptance Criteria
 

@@ -186,15 +186,20 @@ export async function requireDeviceViewAccess(
   }
 
   if (session.activeRoles.includes(UserRole.ADMIN)) {
-    if (session.assignedDeviceIds && session.assignedDeviceIds.includes(targetDeviceId)) {
-      return session;
-    }
-
     if (options?.isDeviceAssignedToUser) {
       const isAssigned = await options.isDeviceAssignedToUser(session.id, targetDeviceId);
       if (isAssigned) {
         return session;
       }
+      throw new AuthorizationError(
+        403,
+        'DEVICE_NOT_ASSIGNED',
+        `Access denied: Device '${targetDeviceId}' is not assigned to user or access has been revoked.`
+      );
+    }
+
+    if (session.assignedDeviceIds && session.assignedDeviceIds.includes(targetDeviceId)) {
+      return session;
     }
 
     throw new AuthorizationError(

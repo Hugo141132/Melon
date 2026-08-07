@@ -359,3 +359,16 @@ export async function revokeAllUserSessions(
 
   return updateResult.count;
 }
+
+/**
+ * Revalidates that a live stream session token remains active, non-expired, and non-revoked.
+ * Called by SSE or real-time event stream heartbeat/ticks.
+ * Returns true if active, or false if expired, revoked, or account is not ACTIVE (signalling stream termination).
+ */
+export async function verifyStreamSessionActive(
+  prisma: PrismaClient,
+  rawToken: string
+): Promise<boolean> {
+  const validated = await validateSession(prisma, rawToken);
+  return validated !== null;
+}

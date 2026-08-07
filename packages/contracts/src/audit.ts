@@ -13,6 +13,7 @@ export enum AuditEventKey {
   ACCOUNT_ACTIVATED = 'account.activated',
   ACCOUNT_DEACTIVATED = 'account.deactivated',
   ACCOUNT_DELETED = 'account.deleted',
+  ACCOUNT_PASSWORD_CHANGED = 'account.password.changed',
   PROFILE_SELF_UPDATED = 'profile.self.updated',
   PROFILE_OTHER_UPDATED = 'profile.other.updated',
   DEVICE_ACCESS_ASSIGNED = 'device.access.assigned',

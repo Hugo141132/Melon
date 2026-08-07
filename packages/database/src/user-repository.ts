@@ -10,6 +10,7 @@ import {
   AuditEventKey,
 } from '@kebun-melon/contracts';
 import { revokeAllUserSessions } from './session-service';
+import { validatePasswordPolicy, hashPassword, verifyPassword } from './password-service';
 
 export interface UpdateOtherUserProfileInput {
   targetUserId: string;
@@ -25,6 +26,29 @@ export type UpdateOtherUserProfileResult =
   | {
       success: false;
       error: 'USER_NOT_FOUND' | 'FORBIDDEN_TARGET' | 'CONCURRENCY_CONFLICT' | 'INTERNAL_ERROR';
+      message: string;
+    };
+
+export interface ChangeUserPasswordInput {
+  userId: string;
+  currentPassword?: string;
+  newPassword: string;
+  actorUserId: string;
+  requestId?: string;
+  ipAddress?: string;
+  userAgent?: string;
+}
+
+export type ChangeUserPasswordResult =
+  | { success: true; revokedSessionsCount: number; user: PublicSafeUserDto }
+  | {
+      success: false;
+      error:
+        | 'USER_NOT_FOUND'
+        | 'INVALID_CURRENT_PASSWORD'
+        | 'WEAK_PASSWORD'
+        | 'ACCOUNT_NOT_ACTIVE'
+        | 'INTERNAL_ERROR';
       message: string;
     };
 
@@ -818,6 +842,133 @@ export class UserRepository {
         success: false,
         error: 'INTERNAL_ERROR',
         message: 'A database transaction error occurred during profile update.',
+      };
+    }
+  }
+
+  /**
+   * Transactionally updates a user's password and revokes ALL active sessions (TASK-0908).
+   * Enforces password policy, Argon2id hashing, transactional session revocation, and secret-redacted audit logging.
+   */
+  async changeUserPassword(input: ChangeUserPasswordInput): Promise<ChangeUserPasswordResult> {
+    try {
+      const policyCheck = validatePasswordPolicy(input.newPassword);
+      if (!policyCheck.valid) {
+        return {
+          success: false,
+          error: 'WEAK_PASSWORD',
+          message: policyCheck.reason || 'Password does not meet required security policy.',
+        };
+      }
+
+      const user = await this.prisma.user.findUnique({
+        where: { id: input.userId },
+        select: {
+          id: true,
+          fullName: true,
+          email: true,
+          username: true,
+          passwordHash: true,
+          accountStatus: true,
+        },
+      });
+
+      if (!user) {
+        return {
+          success: false,
+          error: 'USER_NOT_FOUND',
+          message: `User with ID '${input.userId}' not found.`,
+        };
+      }
+
+      if (user.accountStatus !== AccountStatus.ACTIVE) {
+        return {
+          success: false,
+          error: 'ACCOUNT_NOT_ACTIVE',
+          message: `Account is ${user.accountStatus}. Only ACTIVE accounts can update password.`,
+        };
+      }
+
+      if (input.currentPassword) {
+        const isCurrentValid = await verifyPassword(user.passwordHash, input.currentPassword);
+        if (!isCurrentValid) {
+          return {
+            success: false,
+            error: 'INVALID_CURRENT_PASSWORD',
+            message: 'Current password provided is incorrect.',
+          };
+        }
+      }
+
+      const newHash = await hashPassword(input.newPassword);
+
+      const result = await this.prisma.$transaction(
+        async (tx) => {
+          const updatedUser = await tx.user.update({
+            where: { id: input.userId },
+            data: { passwordHash: newHash },
+            select: {
+              id: true,
+              fullName: true,
+              email: true,
+              username: true,
+              accountStatus: true,
+              emailVerifiedAt: true,
+              lastLoginAt: true,
+              suspendedAt: true,
+              deactivatedAt: true,
+              createdAt: true,
+              updatedAt: true,
+              userRoles: {
+                where: { revokedAt: null },
+                select: {
+                  id: true,
+                  userId: true,
+                  roleId: true,
+                  assignedByUserId: true,
+                  assignedAt: true,
+                  revokedAt: true,
+                  role: { select: { code: true } },
+                },
+              },
+            },
+          });
+
+          // Revoke ALL active sessions for the user transactionally
+          const revokedCount = await revokeAllUserSessions(tx, input.userId);
+
+          // Audit log for password change (strictly without secrets)
+          await tx.auditLog.create({
+            data: {
+              eventKey: AuditEventKey.ACCOUNT_PASSWORD_CHANGED,
+              actorUserId: input.actorUserId,
+              targetType: 'USER',
+              targetId: input.userId,
+              result: 'SUCCESS',
+              previousValues: Prisma.JsonNull,
+              newValues: Prisma.JsonNull,
+              metadata: { revokedSessionsCount: revokedCount },
+              requestId: input.requestId || null,
+              ipAddress: input.ipAddress || null,
+              userAgent: input.userAgent || null,
+            },
+          });
+
+          return {
+            success: true as const,
+            revokedSessionsCount: revokedCount,
+            user: toPublicSafeUserDto(this.mapPrismaUserToRawDbUser(updatedUser)),
+          };
+        },
+        { isolationLevel: 'RepeatableRead' }
+      );
+
+      return result;
+    } catch (error) {
+      return {
+        success: false,
+        error: 'INTERNAL_ERROR',
+        message: 'A database error occurred during password change.',
       };
     }
   }
