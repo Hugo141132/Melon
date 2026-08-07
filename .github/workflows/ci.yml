@@ -60,6 +60,15 @@ jobs:
           npm run db:validate
 
       - name: Generate MQTT Test Password File
+        env:
+          MQTT_GATEWAY_USERNAME: gateway_user
+          MQTT_GATEWAY_PASSWORD: ci_dummy_gateway_password_123!
+          MQTT_DEV1_USERNAME: device_esp32_001
+          MQTT_DEV1_PASSWORD: ci_dummy_dev1_password_123!
+          MQTT_DEV2_USERNAME: device_node_002
+          MQTT_DEV2_PASSWORD: ci_dummy_dev2_password_123!
+          MQTT_UNAUTH_USERNAME: unauthorized_device
+          MQTT_UNAUTH_PASSWORD: ci_dummy_unauth_password_123!
         run: npm run mqtt:pwfile
 
       - name: Verify Code Formatting
