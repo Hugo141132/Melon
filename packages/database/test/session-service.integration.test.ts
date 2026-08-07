@@ -15,11 +15,11 @@ import { seedRBAC } from '../prisma/seed';
 import { hashPassword } from '../src/password-service';
 
 describe('TASK-0204 Login and Session Management Integration Test Suite', () => {
-  const testDbUrl = process.env.TEST_DATABASE_URL;
+  const testDbUrl = process.env.TEST_DATABASE_URL || process.env.DATABASE_URL;
 
   if (!testDbUrl) {
     throw new Error(
-      'TEST_DATABASE_URL environment variable is required to run integration tests.\n' +
+      'TEST_DATABASE_URL or DATABASE_URL environment variable is required to run integration tests.\n' +
         'Example: TEST_DATABASE_URL="postgresql://postgres:postgres@localhost:55432/kebun_melon_disposable_test"\n' +
         'Or run: npm run db:test:session-integration:docker'
     );
