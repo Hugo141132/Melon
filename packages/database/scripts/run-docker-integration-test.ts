@@ -1,6 +1,7 @@
 import { execSync } from 'child_process';
 import crypto from 'crypto';
 import net from 'net';
+import path from 'path';
 
 /**
  * Finds an available random TCP port on localhost to avoid port collisions during concurrent test runs.
@@ -20,6 +21,7 @@ async function getAvailablePort(): Promise<number> {
 function run(cmd: string, env: Record<string, string> = {}) {
   execSync(cmd, {
     stdio: 'inherit',
+    cwd: path.resolve(__dirname, '..'),
     env: { ...process.env, ...env },
   });
 }
@@ -28,7 +30,12 @@ async function main() {
   const existingUrl = process.env.TEST_DATABASE_URL || process.env.DATABASE_URL;
   if (existingUrl) {
     console.log('[INIT] Using existing test database URL from environment.');
-    run(`npx vitest run --config vitest.integration.config.mts`);
+    console.log('[SEED] Running RBAC seed on existing test database...');
+    run(`npx tsx prisma/seed.ts`, { DATABASE_URL: existingUrl, TEST_DATABASE_URL: existingUrl });
+    run(`npx vitest run --config vitest.integration.config.mts`, {
+      TEST_DATABASE_URL: existingUrl,
+      DATABASE_URL: existingUrl,
+    });
     return;
   }
 
