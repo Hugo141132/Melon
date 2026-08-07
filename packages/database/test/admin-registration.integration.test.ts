@@ -10,6 +10,8 @@ import { validateTestDatabaseUrl } from '../src/owner-provisioning';
 import { seedRBAC } from '../prisma/seed';
 import { verifyPassword } from '../src/password-service';
 
+import { AuditEventKey } from '@kebun-melon/contracts';
+
 describe('TASK-0203 Public Admin Registration Integration Test Suite', () => {
   const testDbUrl = process.env.TEST_DATABASE_URL || process.env.DATABASE_URL;
 
@@ -170,7 +172,7 @@ describe('TASK-0203 Public Admin Registration Integration Test Suite', () => {
     const auditLog = await prisma.auditLog.findFirst({
       where: {
         targetId: res.user.id,
-        eventKey: 'ACCOUNT_REGISTER_ADMIN',
+        eventKey: AuditEventKey.ACCOUNT_REGISTRATION_CREATED,
       },
     });
 

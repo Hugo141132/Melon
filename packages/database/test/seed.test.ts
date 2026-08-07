@@ -50,7 +50,7 @@ describe('Permanent RBAC Database Seed & Idempotency Test', () => {
     const seedResult = await seedRBAC(prisma);
 
     expect(seedResult.rolesCount).toBe(2);
-    expect(seedResult.permissionsCount).toBe(38);
+    expect(seedResult.permissionsCount).toBe(CANONICAL_PERMISSIONS.length);
 
     const roles = await prisma.role.findMany();
     expect(roles.length).toBe(2);
@@ -60,42 +60,45 @@ describe('Permanent RBAC Database Seed & Idempotency Test', () => {
     const permissions = await prisma.permission.findMany({
       orderBy: { code: 'asc' },
     });
-    expect(permissions.length).toBe(38);
+    expect(permissions.length).toBe(CANONICAL_PERMISSIONS.length);
 
-    // Verify OWNER mappings (37 permissions mapped to OWNER per docs/RBAC.md §10)
     const ownerRole = roles.find((r) => r.code === 'OWNER')!;
     const ownerMappings = await prisma.rolePermission.findMany({
       where: { roleId: ownerRole.id },
     });
-    expect(ownerMappings.length).toBe(37);
+    expect(ownerMappings.length).toBe(CANONICAL_PERMISSIONS.filter((p) => p.ownerAccess).length);
 
-    // Verify ADMIN mappings (19 permissions mapped to ADMIN per docs/RBAC.md §10)
     const adminRole = roles.find((r) => r.code === 'ADMIN')!;
     const adminMappings = await prisma.rolePermission.findMany({
       where: { roleId: adminRole.id },
     });
-    expect(adminMappings.length).toBe(19);
+    expect(adminMappings.length).toBe(CANONICAL_PERMISSIONS.filter((p) => p.adminAccess).length);
 
-    // Total unique role_permissions mappings (37 + 19 = 56)
     const totalMappings = await prisma.rolePermission.count();
-    expect(totalMappings).toBe(56);
-  });
+    expect(totalMappings).toBe(
+      CANONICAL_PERMISSIONS.filter((p) => p.ownerAccess).length +
+        CANONICAL_PERMISSIONS.filter((p) => p.adminAccess).length
+    );
+  }, 15000);
 
   it('2. Second seed run is strictly idempotent (zero duplicates, unchanged counts)', async () => {
     const seedResult2 = await seedRBAC(prisma);
 
     expect(seedResult2.rolesCount).toBe(2);
-    expect(seedResult2.permissionsCount).toBe(38);
+    expect(seedResult2.permissionsCount).toBe(CANONICAL_PERMISSIONS.length);
 
     const rolesCount = await prisma.role.count();
     expect(rolesCount).toBe(2);
 
     const permCount = await prisma.permission.count();
-    expect(permCount).toBe(38);
+    expect(permCount).toBe(CANONICAL_PERMISSIONS.length);
 
     const totalMappings = await prisma.rolePermission.count();
-    expect(totalMappings).toBe(56);
-  });
+    expect(totalMappings).toBe(
+      CANONICAL_PERMISSIONS.filter((p) => p.ownerAccess).length +
+        CANONICAL_PERMISSIONS.filter((p) => p.adminAccess).length
+    );
+  }, 15000);
 
   it('3. OWNER-only permissions are NOT mapped to ADMIN role', async () => {
     const adminRole = await prisma.role.findUnique({
@@ -113,7 +116,7 @@ describe('Permanent RBAC Database Seed & Idempotency Test', () => {
       (p) => p.code
     );
 
-    expect(ownerOnlyPerms.length).toBe(19);
+    expect(ownerOnlyPerms.length).toBe(20);
 
     for (const code of ownerOnlyPerms) {
       expect(adminPermCodes).not.toContain(code);

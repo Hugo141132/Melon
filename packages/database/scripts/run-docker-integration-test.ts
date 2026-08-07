@@ -25,14 +25,21 @@ function run(cmd: string, env: Record<string, string> = {}) {
 }
 
 async function main() {
+  const existingUrl = process.env.TEST_DATABASE_URL || process.env.DATABASE_URL;
+  if (existingUrl) {
+    console.log('[INIT] Using existing test database URL from environment.');
+    run(`npx vitest run --config vitest.integration.config.mts`);
+    return;
+  }
+
   const nonce = crypto.randomBytes(6).toString('hex');
   const dbUser = 'test_user_' + nonce;
   const dbPass = 'test_pass_' + crypto.randomBytes(12).toString('hex');
-  const dbName = 'test_db_' + nonce;
+  const dbName = 'kebun_melon_disposable_test_' + nonce;
   const containerName = 'kebun_melon_test_pg_' + nonce;
 
   const port = await getAvailablePort();
-  const testDbUrl = `postgresql://${dbUser}:${dbPass}@127.0.0.1:${port}/${dbName}`;
+  const testDbUrl = `postgresql://${dbUser}:${dbPass}@127.0.0.1:${port}/${dbName}?schema=public`;
 
   console.log('--- STARTING REPRODUCIBLE DOCKER INTEGRATION TEST WORKFLOW ---');
   console.log(`[INIT] Nonce: ${nonce} | Port: ${port} | Container: ${containerName}`);
@@ -70,9 +77,10 @@ async function main() {
     run(`npx tsx prisma/seed.ts`, { DATABASE_URL: testDbUrl });
 
     // 5. Execute integration tests with process-isolated TEST_DATABASE_URL
-    console.log('[5/5] Executing admin registration integration test suite...');
-    run(`npx vitest run test/admin-registration.integration.test.ts`, {
+    console.log('[5/5] Executing database integration test suite (serial)...');
+    run(`npx vitest run --config vitest.integration.config.mts`, {
       TEST_DATABASE_URL: testDbUrl,
+      DATABASE_URL: testDbUrl,
     });
 
     console.log('--- REPRODUCIBLE DOCKER INTEGRATION TEST SUCCEEDED ---');

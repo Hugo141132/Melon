@@ -20,7 +20,7 @@
     "seed:owner": "tsx scripts/seed-owner.ts",
     "db:studio": "prisma studio",
     "db:test:schema": "vitest run test/schema.test.ts",
-    "db:test:integration": "vitest run --config vitest.integration.config.mts",
+    "db:test:integration": "tsx scripts/run-docker-integration-test.ts",
     "db:test:seed": "vitest run test/seed.test.ts",
     "db:test:seed-owner": "vitest run test/seed-owner.test.ts",
     "db:test:password-service": "vitest run test/password-service.test.ts",

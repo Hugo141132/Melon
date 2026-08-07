@@ -305,7 +305,10 @@ export async function seedRBAC(prisma: PrismaClient) {
             permissionId: permId,
           },
         },
-        update: {},
+        update: {
+          roleId: ownerRole.id,
+          permissionId: permId,
+        },
         create: {
           roleId: ownerRole.id,
           permissionId: permId,
@@ -321,7 +324,10 @@ export async function seedRBAC(prisma: PrismaClient) {
             permissionId: permId,
           },
         },
-        update: {},
+        update: {
+          roleId: adminRole.id,
+          permissionId: permId,
+        },
         create: {
           roleId: adminRole.id,
           permissionId: permId,
