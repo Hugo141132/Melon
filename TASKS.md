@@ -1312,9 +1312,9 @@ Implement bounded history for soil and water.
 ## TASK-0505 — Implement Realtime Monitoring Stream
 
 **Priority:** `P1`  
-**Status:** `BACKLOG`  
+**Status:** `DONE`
 **Dependencies:** `TASK-0401`, `TASK-0501`  
-**Notes:** Approved in-memory Server-Sent Events (SSE) over HTTP for v1 per `DEC-INF-077` and `DEC-DEV-020`.
+**Completed:** Implemented in-memory Server-Sent Events (SSE) streaming route `GET /api/v1/realtime/stream` and `RealtimeEventHub` (`apps/web/lib/realtime/event-hub.ts`) per `DEC-INF-077` and `DEC-DEV-020`. Enforced initial session authentication (`requireSession`), active account revalidation (`requireActiveAccount`), target device view access authorization (`requireDeviceViewAccess`), and event filtering by `deviceId` and `channels`. Integrated `verifyStreamSessionActive` in heartbeat loop to emit `session.expired` and terminate stream on session expiry/revocation (completing `TASK-0908`), and rechecked device access to emit `access.revoked` and terminate stream on device unassignment. Added `useRealtimeMonitoring` hook (`apps/web/hooks/use-realtime-monitoring.ts`) with automatic fallback to polling. Verified 100% test pass rate across unit test suite (`apps/web/test/unit/realtime-stream.test.ts`).
 
 ### Work
 
@@ -1891,9 +1891,9 @@ Apply to:
 ## TASK-0908 — Implement Session Revocation
 
 **Priority:** `P0`  
-**Status:** `IN_PROGRESS`
+**Status:** `DONE`
 **Dependencies:** `TASK-0204`, `TASK-0505`
-**Progress:** Implemented session revocation mechanisms across account lifecycle states (SUSPENDED, DEACTIVATED, REJECTED), transactional password updates (`changeUserPassword`), HTTP endpoint `POST /api/v1/auth/change-password`, database helper `verifyStreamSessionActive` prepared for integration when SSE is built in `TASK-0505`, and immediate device access revocation on subsequent authorization checks (`requireDeviceViewAccess`). Added `ACCOUNT_PASSWORD_CHANGED` audit log event key and verified 100% test pass rate across database and web unit test suites (51 test files, 378 tests passing). Full completion of live-stream closing pending `TASK-0505` real-time SSE stream implementation.
+**Completed:** Implemented session revocation mechanisms across account lifecycle states (SUSPENDED, DEACTIVATED, REJECTED), transactional password updates (`changeUserPassword`), HTTP endpoint `POST /api/v1/auth/change-password`, database helper `verifyStreamSessionActive`, immediate device access revocation on authorization checks (`requireDeviceViewAccess`), and live-stream closing on session expiry/revocation (`GET /api/v1/realtime/stream` SSE route in `TASK-0505`). Added `ACCOUNT_PASSWORD_CHANGED` audit log event key and verified 100% test pass rate across unit test suites (`packages/database/test/session-revocation.unit.test.ts`, `apps/web/test/unit/session-revocation.test.ts`, `apps/web/test/unit/realtime-stream.test.ts`).
 
 
 ### Acceptance Criteria

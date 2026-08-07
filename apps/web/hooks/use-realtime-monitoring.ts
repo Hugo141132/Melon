@@ -20,7 +20,9 @@ export function useRealtimeMonitoring({
   onEvent,
 }: UseRealtimeOptions = {}): UseRealtimeReturn {
   const [status, setStatus] = useState<'CONNECTING' | 'OPEN' | 'CLOSED' | 'POLLING'>('CLOSED');
-  const [lastEvent, setLastEvent] = useState<{ name: string; data: any; timestamp: string } | null>(null);
+  const [lastEvent, setLastEvent] = useState<{ name: string; data: any; timestamp: string } | null>(
+    null
+  );
   const [error, setError] = useState<string | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
 

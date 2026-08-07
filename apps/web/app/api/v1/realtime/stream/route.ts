@@ -142,8 +142,7 @@ export async function GET(request: Request) {
           });
 
           // System events are always permitted
-          const isSystemEvent =
-            eventName === 'access.revoked' || eventName === 'session.expired';
+          const isSystemEvent = eventName === 'access.revoked' || eventName === 'session.expired';
           if (!matchesChannel && !isSystemEvent) {
             return;
           }
@@ -231,7 +230,7 @@ export async function GET(request: Request) {
     headers: {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache, no-transform',
-      'Connection': 'keep-alive',
+      Connection: 'keep-alive',
       'X-Accel-Buffering': 'no',
     },
   });
