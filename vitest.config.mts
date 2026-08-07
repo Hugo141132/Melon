@@ -1,4 +1,5 @@
 import { defineConfig } from 'vitest/config';
+import react from '@vitejs/plugin-react';
 import path from 'path';
 
 const hasTestDb = Boolean(process.env.TEST_DATABASE_URL || process.env.DATABASE_URL);
@@ -14,15 +15,18 @@ const dbIntegrationPatterns = [
 ];
 
 export default defineConfig({
+  plugins: [react()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './apps/web'),
     },
   },
+  projects: ['apps/*', 'packages/*'],
   test: {
     globals: true,
     isolate: true,
-    environmentMatchGlobs: [['apps/web/**', 'jsdom']],
+    environment: 'jsdom',
+    setupFiles: ['./apps/web/test/setup.ts'],
     exclude: [
       '**/node_modules/**',
       '**/dist/**',

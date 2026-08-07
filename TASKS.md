@@ -1857,9 +1857,9 @@ Apply to:
 ## TASK-0906 — Implement Secret Scanning and Dependency Scanning
 
 **Priority:** `P0`
-**Status:** `BLOCKED`
-**Dependencies:** `TASK-0108`
-**Notes:** Task is BLOCKED pending approval or major upgrade remediation of remaining dependency advisories via TASK-0912 (Vitest/Vite). TASK-0910 (Fastify v5) and TASK-0911 (Next.js v16) are DONE.
+**Status:** `DONE`
+**Dependencies:** `TASK-0108`, `TASK-0912`
+**Completed:** 2026-08-06 — Reconciled workspace dependencies by upgrading stale `vitest` references in `apps/iot-gateway` and `packages/contracts` from `^1.6.0` to `^4.1.10`. Regenerated lockfile cleanly with 0 high/0 critical unapproved security advisories. Verified secret scan (`npm run scan:secrets`), dependency scan (`npm run scan:deps`), environment security unit tests (`npm run env:test`), TypeScript typecheck (`npm run typecheck`), ESLint (`npm run lint`), 69 test files (548/548 tests) via Vitest (`npm run test`), and Next.js production build (`npm run build`).
 **Progress:** — Implemented automated secret scanning (`scripts/scan-secrets.ts`) and dependency vulnerability scanning (`scripts/check-dependencies.ts`) per `SEC-OPS-001` and `SEC-OPS-004`. Upgraded Next.js to safe 14.2.35 version and applied npm overrides for fast-uri (3.1.5) and postcss (^8.5.18). Implemented Fastify header tab character rejection workaround in apps/iot-gateway/src/app.ts. Configured GitHub Actions CI pipeline (`.github/workflows/ci.yml`) and governance process (`docs/SECURITY_EXCEPTIONS.md`). Exceptions set to PENDING_USER_APPROVAL.
 
 ### Acceptance Criteria
