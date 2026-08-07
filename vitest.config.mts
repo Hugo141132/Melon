@@ -33,12 +33,18 @@ export default defineConfig({
       '**/.next/**',
       '**/coverage/**',
       '**/e2e/**',
-      ...(hasTestDb ? [] : dbIntegrationPatterns),
+      ...dbIntegrationPatterns,
     ],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
-      exclude: ['**/node_modules/**', '**/dist/**', '**/.next/**', '**/coverage/**'],
+      exclude: [
+        '**/node_modules/**',
+        '**/dist/**',
+        '**/.next/**',
+        '**/coverage/**',
+        ...dbIntegrationPatterns,
+      ],
     },
   },
 });

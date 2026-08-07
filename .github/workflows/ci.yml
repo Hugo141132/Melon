@@ -89,8 +89,11 @@ jobs:
       - name: Security Scan (Dependency Audit)
         run: npm run scan:deps
 
-      - name: Execute Unit & Integration Tests (Coverage)
+      - name: Execute Unit Tests (Coverage)
         run: npm run test:coverage
+
+      - name: Execute Database Integration Tests (Serial)
+        run: npm run test:integration
 
       - name: Verify Production Build
         run: npm run build

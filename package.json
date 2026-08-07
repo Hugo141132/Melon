@@ -52,6 +52,7 @@
     "test:workspace": "node --max-old-space-size=4096 node_modules/vitest/vitest.mjs run",
     "test:watch": "node --max-old-space-size=4096 node_modules/vitest/vitest.mjs",
     "test:coverage": "node --max-old-space-size=4096 node_modules/vitest/vitest.mjs run --coverage",
+    "test:integration": "npm run db:test:integration",
     "test:e2e": "playwright test",
     "check:quality": "npm run typecheck && npm run lint && npm run format:check && npm run scan:secrets && npm run scan:deps && npm run build"
   },

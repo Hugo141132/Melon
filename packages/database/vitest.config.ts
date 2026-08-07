@@ -13,6 +13,6 @@ export default defineConfig({
   test: {
     globals: true,
     isolate: true,
-    exclude: ['**/node_modules/**', '**/dist/**', ...(hasTestDb ? [] : dbIntegrationPatterns)],
+    exclude: ['**/node_modules/**', '**/dist/**', ...dbIntegrationPatterns],
   },
 });
