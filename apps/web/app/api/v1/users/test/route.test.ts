@@ -39,6 +39,9 @@ vi.mock('@kebun-melon/database', async (importOriginal) => {
   const actual = await importOriginal<typeof dbModule>();
   return {
     ...actual,
+    AuditRepository: {
+      createAuditLog: vi.fn().mockResolvedValue({}),
+    },
     UserRepository: class {
       getUsers(...args: any[]) {
         return mockGetUsers(...args);
