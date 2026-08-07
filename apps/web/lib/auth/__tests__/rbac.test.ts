@@ -51,15 +51,32 @@ describe('TASK-0209 — Authorisation Library (apps/web/lib/auth/rbac.ts)', () =
       expect(() => requireActiveAccount(activeAdmin)).not.toThrow();
     });
 
-    it('2. Throws 403 ACCOUNT_NOT_ACTIVE for non-ACTIVE statuses (deny by default)', () => {
-      expect(() => requireActiveAccount(pendingAdmin)).toThrow(AuthorizationError);
-      expect(() => requireActiveAccount(suspendedAdmin)).toThrow(AuthorizationError);
+    it('2. Throws 403 ACCOUNT_NOT_ACTIVE for all non-ACTIVE statuses (deny by default)', () => {
+      const nonActiveStatuses = [
+        AccountStatus.PENDING_APPROVAL,
+        AccountStatus.APPROVED,
+        AccountStatus.REJECTED,
+        AccountStatus.SUSPENDED,
+        AccountStatus.DEACTIVATED,
+      ];
 
-      try {
-        requireActiveAccount(pendingAdmin);
-      } catch (err: any) {
-        expect(err.statusCode).toBe(403);
-        expect(err.code).toBe('ACCOUNT_NOT_ACTIVE');
+      for (const status of nonActiveStatuses) {
+        const userSession: AuthenticatedUserSession = {
+          id: 'user-test-status',
+          fullName: 'Status User',
+          email: 'status@kebunmelon.id',
+          accountStatus: status,
+          activeRoles: [UserRole.ADMIN],
+        };
+
+        expect(() => requireActiveAccount(userSession)).toThrow(AuthorizationError);
+
+        try {
+          requireActiveAccount(userSession);
+        } catch (err: any) {
+          expect(err.statusCode).toBe(403);
+          expect(err.code).toBe('ACCOUNT_NOT_ACTIVE');
+        }
       }
     });
   });
@@ -81,6 +98,7 @@ describe('TASK-0209 — Authorisation Library (apps/web/lib/auth/rbac.ts)', () =
 
     it('5. Rejects non-ACTIVE account even if role matches', () => {
       expect(() => requireRole(pendingAdmin, UserRole.ADMIN)).toThrow(AuthorizationError);
+      expect(() => requireRole(suspendedAdmin, UserRole.ADMIN)).toThrow(AuthorizationError);
     });
   });
 

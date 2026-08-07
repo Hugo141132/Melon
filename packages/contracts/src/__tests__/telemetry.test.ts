@@ -1,7 +1,16 @@
 import { describe, it, expect } from 'vitest';
-import { SoilTelemetryDataSchema, SoilTelemetryPayloadSchema, MonitoringStatus } from '../index';
+import {
+  SoilTelemetryDataSchema,
+  SoilTelemetryPayloadSchema,
+  SoilMonitoringResponseDtoSchema,
+  WaterMonitoringResponseDtoSchema,
+  LatestMonitoringSnapshotDtoSchema,
+  MonitoringStatus,
+  DeviceType,
+  DeviceConnectionStatus,
+} from '../index';
 
-describe('Soil Telemetry Contract Schemas', () => {
+describe('Soil & Water Telemetry Contract Schemas', () => {
   describe('SoilTelemetryDataSchema', () => {
     it('parses valid full soil data', () => {
       const input = {
@@ -114,6 +123,115 @@ describe('Soil Telemetry Contract Schemas', () => {
       expect(result.data.ph).toBe(6.5);
       expect(result.data.status).toBe(MonitoringStatus.NORMAL);
       expect(result.data.potassium).toBeNull();
+    });
+  });
+
+  describe('SoilMonitoringResponseDtoSchema', () => {
+    it('parses valid soil monitoring response DTO', () => {
+      const dto = {
+        deviceId: 'soil-node-001',
+        recordedAt: '2026-08-01T10:00:00.000Z',
+        receivedAt: '2026-08-01T10:00:01.000Z',
+        isStale: false,
+        data: {
+          nitrogen: 45.2,
+          phosphorus: 21.8,
+          potassium: 73.1,
+          temperature: 28.4,
+          moisture: 67.3,
+          ph: 6.5,
+          ec: 1.42,
+          status: MonitoringStatus.NORMAL,
+        },
+      };
+
+      const result = SoilMonitoringResponseDtoSchema.parse(dto);
+      expect(result.deviceId).toBe('soil-node-001');
+      expect(result.data.nitrogen).toBe(45.2);
+      expect(result.isStale).toBe(false);
+    });
+  });
+
+  describe('WaterMonitoringResponseDtoSchema', () => {
+    it('parses valid water monitoring response DTO', () => {
+      const dto = {
+        deviceId: 'water-node-001',
+        recordedAt: '2026-08-01T10:00:00.000Z',
+        receivedAt: '2026-08-01T10:00:01.000Z',
+        isStale: false,
+        data: {
+          ph: 6.8,
+          tds: 420,
+          ec: 1.5,
+          tankVolume: 450,
+          flowRate: 12.5,
+          status: MonitoringStatus.NORMAL,
+        },
+      };
+
+      const result = WaterMonitoringResponseDtoSchema.parse(dto);
+      expect(result.deviceId).toBe('water-node-001');
+      expect(result.data.ph).toBe(6.8);
+      expect(result.data.tds).toBe(420);
+      expect(result.data.tankVolume).toBe(450);
+      expect(result.isStale).toBe(false);
+    });
+
+    it('preserves numeric 0 for water telemetry parameters', () => {
+      const dto = {
+        deviceId: 'water-node-001',
+        recordedAt: '2026-08-01T10:00:00.000Z',
+        receivedAt: '2026-08-01T10:00:01.000Z',
+        isStale: false,
+        data: {
+          ph: 0,
+          tds: 0,
+          ec: 0,
+          tankVolume: 0,
+          flowRate: 0,
+          status: 'NORMAL',
+        },
+      };
+
+      const result = WaterMonitoringResponseDtoSchema.parse(dto);
+      expect(result.data.ph).toBe(0);
+      expect(result.data.tds).toBe(0);
+      expect(result.data.ec).toBe(0);
+      expect(result.data.tankVolume).toBe(0);
+      expect(result.data.flowRate).toBe(0);
+    });
+  });
+
+  describe('LatestMonitoringSnapshotDtoSchema', () => {
+    it('parses combined monitoring snapshot DTO with soil and water telemetry', () => {
+      const snapshot = {
+        deviceId: 'device-101',
+        deviceType: DeviceType.WATER_TANK_NODE,
+        connectionStatus: DeviceConnectionStatus.ONLINE,
+        lastSeenAt: '2026-08-01T10:00:00.000Z',
+        soil: null,
+        water: {
+          deviceId: 'device-101',
+          recordedAt: '2026-08-01T10:00:00.000Z',
+          receivedAt: '2026-08-01T10:00:01.000Z',
+          isStale: false,
+          data: {
+            ph: 6.5,
+            tds: 350,
+            ec: 1.2,
+            tankVolume: 500,
+            flowRate: 10.0,
+            status: 'NORMAL',
+          },
+        },
+      };
+
+      const result = LatestMonitoringSnapshotDtoSchema.parse(snapshot);
+      expect(result.deviceId).toBe('device-101');
+      expect(result.deviceType).toBe(DeviceType.WATER_TANK_NODE);
+      expect(result.connectionStatus).toBe(DeviceConnectionStatus.ONLINE);
+      expect(result.soil).toBeNull();
+      expect(result.water?.data.tankVolume).toBe(500);
     });
   });
 });
