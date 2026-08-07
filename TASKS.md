@@ -1997,7 +1997,8 @@ Critical unit coverage includes:
 ## TASK-1002 — Complete API Integration Tests
 
 **Priority:** `P0`  
-**Status:** `BACKLOG`  
+**Status:** `DONE`
+**Completed:** `2026-08-07`
 **Dependencies:** API implementation
 
 ### Acceptance Criteria
