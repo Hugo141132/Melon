@@ -18,10 +18,17 @@ describe('TASK-0206 Approvals Database Integration & Security Test Suite', () =>
   });
 
   beforeEach(async () => {
-    // Clean up test users and roles
+    // Clean up dependent tables and test users
+    await prisma.faucetCommandEvent.deleteMany({});
+    await prisma.faucetCommand.deleteMany({});
+    await prisma.userDeviceAccess.deleteMany({});
+    await prisma.alertAcknowledgement.deleteMany({});
+    await prisma.alert.deleteMany({});
+    await prisma.auditLog.deleteMany({});
+    await prisma.accountApproval.deleteMany({});
     await prisma.userRoleAssignment.deleteMany({});
     await prisma.session.deleteMany({});
-    await prisma.accountApproval.deleteMany({});
+    await prisma.userPreference.deleteMany({});
     await prisma.user.deleteMany({});
   });
 

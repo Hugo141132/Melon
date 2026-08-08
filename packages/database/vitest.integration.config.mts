@@ -1,6 +1,13 @@
 import { defineConfig } from 'vitest/config';
+import path from 'path';
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      '@kebun-melon/contracts': path.resolve(__dirname, '../contracts/src/index.ts'),
+      '@kebun-melon/database': path.resolve(__dirname, './src/index.ts'),
+    },
+  },
   test: {
     globals: true,
     isolate: true,
