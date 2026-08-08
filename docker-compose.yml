@@ -12,11 +12,14 @@ services:
       - ./docker/mosquitto/config/pwfile:/mosquitto/config/pwfile:ro
       - mosquitto-data:/mosquitto/data
       - mosquitto-log:/mosquitto/log
+    environment:
+      MQTT_GATEWAY_USERNAME: ${MQTT_GATEWAY_USERNAME:-gateway_user}
+      MQTT_GATEWAY_PASSWORD: ${MQTT_GATEWAY_PASSWORD}
     healthcheck:
       test:
         [
           'CMD-SHELL',
-          "mosquitto_sub -t '$$SYS/#' -C 1 -i healthcheck -u gateway_user -P gateway_dev_password_123 || exit 1",
+          'mosquitto_pub -t ''agriculture/healthcheck'' -m ''ping'' -i healthcheck -u "$$MQTT_GATEWAY_USERNAME" -P "$$MQTT_GATEWAY_PASSWORD" || exit 1',
         ]
       interval: 10s
       timeout: 5s

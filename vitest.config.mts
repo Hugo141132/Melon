@@ -19,6 +19,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './apps/web'),
+      '@kebun-melon/database': path.resolve(__dirname, './packages/database/src/index.ts'),
+      '@kebun-melon/contracts': path.resolve(__dirname, './packages/contracts/src/index.ts'),
     },
   },
   projects: ['apps/*', 'packages/*'],

@@ -7,7 +7,7 @@ const prisma = new PrismaClient({
     db: {
       url:
         process.env.DATABASE_URL ||
-        'postgresql://postgres:Hpnh_5312132@db.xjsencdgfcbkzdzqcnqx.supabase.co:5432/postgres',
+        'postgresql://postgres:Hpnh_5312132@db.xjsencdgfcbkzdzqcnqx.supabase.co:6543/postgres',
     },
   },
 });

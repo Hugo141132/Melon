@@ -7,7 +7,7 @@ import {
   SESSION_COOKIE_NAME,
   SESSION_ABSOLUTE_LIFETIME_SECONDS,
 } from '@kebun-melon/database';
-import { AccountStatus } from '@kebun-melon/contracts';
+import { AccountStatus, LoginInputSchema } from '@kebun-melon/contracts';
 import { ZodError } from 'zod';
 import {
   checkRateLimit,
@@ -35,7 +35,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const body = await request.json().catch(() => ({}));
+    const body = LoginInputSchema.parse(await request.json().catch(() => ({})));
     const result = await loginUser(prisma, body, { ipAddress, userAgent, requestId });
 
     const primaryRole = result.user.activeRoles[0] ?? 'ADMIN';
