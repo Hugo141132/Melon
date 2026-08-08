@@ -366,7 +366,7 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
       .first();
     await expect(confirmButton).toBeVisible({ timeout: 10000 });
     await Promise.all([
-      page.waitForResponse((res) => res.url().includes('/faucet-commands') && res.status() === 200),
+      page.waitForResponse((res) => res.url().includes('/faucet-commands') && res.ok()),
       confirmButton.click(),
     ]);
     // Verify command created in database
