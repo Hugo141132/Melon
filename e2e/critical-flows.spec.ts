@@ -365,10 +365,15 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
       )
       .first();
     await expect(confirmButton).toBeVisible({ timeout: 10000 });
-    await Promise.all([
-      page.waitForResponse((res) => res.url().includes('/faucet-commands') && res.ok()),
+    const [response] = await Promise.all([
+      page.waitForResponse((res) => res.url().includes('/faucet-commands')),
       confirmButton.click(),
     ]);
+    const resJson = await response.json();
+    if (!response.ok()) {
+      console.error('Faucet Command API Error:', response.status(), resJson);
+    }
+    expect(response.status()).toBe(201);
     // Verify command created in database
     const command = await prisma.faucetCommand.findFirst({
       where: { initiatedByUserId: adminUserId, deviceId: targetDeviceId },
