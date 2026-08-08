@@ -355,32 +355,18 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
     const phase1Button = page
       .locator('button:has-text("Phase 1"), button:has-text("300 mL"), button:has-text("Tahap 1")')
       .first();
-    if (await phase1Button.isVisible()) {
-      await phase1Button.click();
+    await expect(phase1Button).toBeEnabled({ timeout: 10000 });
+    await phase1Button.click();
 
-      // Wait for confirm modal button and submit
-      const confirmButton = page
-        .locator('button:has-text("Konfirmasi"), button:has-text("Dispense")')
-        .first();
-      await expect(confirmButton).toBeVisible({ timeout: 10000 });
-      await Promise.all([
-        page.waitForResponse(
-          (res) => res.url().includes('/faucet-commands') && res.status() === 200
-        ),
-        confirmButton.click(),
-      ]);
-    } else {
-      // Directly submit command via API if UI button is disabled due to simulator offline state
-      const targetDev = await prisma.device.findUnique({ where: { id: targetDeviceId } });
-      const apiRes = await page.request.post(
-        `/api/v1/devices/${targetDev!.deviceId}/faucet-commands`,
-        {
-          data: { phase: 'PHASE_1' },
-        }
-      );
-      expect(apiRes.ok()).toBeTruthy();
-    }
-
+    // Wait for confirm modal button and submit
+    const confirmButton = page
+      .locator('button:has-text("Konfirmasi"), button:has-text("Dispense")')
+      .first();
+    await expect(confirmButton).toBeVisible({ timeout: 10000 });
+    await Promise.all([
+      page.waitForResponse((res) => res.url().includes('/faucet-commands') && res.status() === 200),
+      confirmButton.click(),
+    ]);
     // Verify command created in database
     const command = await prisma.faucetCommand.findFirst({
       where: { initiatedByUserId: adminUserId, deviceId: targetDeviceId },
