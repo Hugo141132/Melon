@@ -114,4 +114,7 @@ jobs:
         run: npx playwright install chromium --with-deps
 
       - name: Execute Playwright E2E Smoke Tests
+        env:
+          APP_ENV: staging
+          ENABLE_FAUCET_CONTROL: 'true'
         run: npm run test:e2e
