@@ -27,5 +27,9 @@ export default defineConfig({
     url: 'http://localhost:3000',
     reuseExistingServer: true,
     timeout: 30000,
+    env: {
+      ...process.env,
+      ENABLE_FAUCET_CONTROL: 'true',
+    },
   },
 });

@@ -64,7 +64,6 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
           data: {
             deviceId: targetDeviceId,
             capability: 'FAUCET_CONTROL',
-            category: 'CONTROL',
           },
         });
       }
@@ -77,10 +76,7 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
           accountStatus: 'ACTIVE',
           connectionStatus: 'ONLINE',
           capabilities: {
-            create: [
-              { capability: 'TANK_MONITORING', category: 'MONITORING' },
-              { capability: 'FAUCET_CONTROL', category: 'CONTROL' },
-            ],
+            create: [{ capability: 'TANK_MONITORING' }, { capability: 'FAUCET_CONTROL' }],
           },
         },
       });
@@ -173,7 +169,10 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
     // Click Approve button once details finish loading
     const approveButton = page.locator('button', { hasText: 'Setujui' });
     await approveButton.waitFor({ state: 'visible', timeout: 10000 });
-    await approveButton.click();
+    await Promise.all([
+      page.waitForResponse((res) => res.url().includes('/approve') && res.status() === 200),
+      approveButton.click(),
+    ]);
 
     // Wait for success indication or item removal
     await expect(page.locator('body')).toContainText(/berhasil disetujui|tidak ada permohonan/i, {
@@ -298,17 +297,25 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
     if (cookies.some((c: any) => c.name === 'session_token')) {
       return;
     }
-    await page.goto('/login');
-    if (page.url().includes('/login')) {
-      await page.fill('input#email', testAdminEmail);
-      await page.fill('input#password', testAdminPassword);
-      await Promise.all([
-        page.waitForResponse(
-          (res: any) => res.url().includes('/api/v1/auth/login') && res.status() === 200
-        ),
-        page.click('button[type="submit"]'),
-      ]);
-      await expect(page).not.toHaveURL(/\/login/, { timeout: 10000 });
+    const res = await page.request.post('/api/v1/auth/login', {
+      data: { email: testAdminEmail, password: testAdminPassword },
+    });
+    const headers = res.headers();
+    const setCookie = headers['set-cookie'];
+    if (setCookie) {
+      const match = setCookie.match(/session_token=([^;]+)/);
+      if (match) {
+        await page.context().addCookies([
+          {
+            name: 'session_token',
+            value: match[1],
+            domain: 'localhost',
+            path: '/',
+            httpOnly: true,
+            sameSite: 'Lax',
+          },
+        ]);
+      }
     }
   }
 
