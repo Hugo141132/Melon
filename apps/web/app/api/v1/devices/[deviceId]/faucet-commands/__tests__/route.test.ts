@@ -536,6 +536,18 @@ describe('Faucet Command API Endpoints (TASK-0803)', () => {
       expect(json.error.code).toBe('DEVICE_NOT_ASSIGNED');
     });
 
+    it('returns 200 OK with paginated commands list when authorized with relative URL', async () => {
+      const req = {
+        url: `/api/v1/devices/${mockCanonicalDeviceId}/faucet-commands?page=1&pageSize=10`,
+        headers: new Headers(),
+      } as unknown as Request;
+      const res = await GET(req, { params: Promise.resolve({ deviceId: mockCanonicalDeviceId }) });
+      const json = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(json.success).toBe(true);
+    });
+
     it('returns 200 OK with paginated commands list when authorized', async () => {
       const req = new Request(
         `http://localhost/api/v1/devices/${mockCanonicalDeviceId}/faucet-commands?page=1&pageSize=10`

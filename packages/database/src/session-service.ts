@@ -245,10 +245,17 @@ export async function validateSession(
   }
 
   // Session is valid: update lastSeenAt
-  await prisma.session.update({
-    where: { id: session.id },
-    data: { lastSeenAt: now },
-  });
+  try {
+    await prisma.session.update({
+      where: { id: session.id },
+      data: { lastSeenAt: now },
+    });
+  } catch (err: any) {
+    if (err?.code === 'P2025') {
+      return null;
+    }
+    throw err;
+  }
 
   const rawUserWithRoles: RawDbUserWithRoles = {
     id: session.user.id,

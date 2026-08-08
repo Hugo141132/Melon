@@ -87,13 +87,17 @@ export async function POST(request: Request, props: { params: Promise<{ deviceId
 
     await requireDeviceControlAccess(session, targetDeviceId, {
       isDeviceAssignedToUser: async (userId: string, devId: string) => {
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          devId
+        );
+        const deviceFilter = isUuid
+          ? { OR: [{ id: devId }, { deviceId: devId }] }
+          : { deviceId: devId };
         const assignment = await prisma.userDeviceAccess.findFirst({
           where: {
             userId,
             revokedAt: null,
-            device: {
-              OR: [{ id: devId }, { deviceId: devId }],
-            },
+            device: deviceFilter,
           },
         });
         return !!assignment;
@@ -236,9 +240,23 @@ export async function POST(request: Request, props: { params: Promise<{ deviceId
 }
 
 export async function GET(request: Request, props: { params: Promise<{ deviceId: string }> }) {
-  const params = await props.params;
+  const params = await Promise.resolve(props?.params);
   const requestId = `req-${Date.now()}`;
-  const targetDeviceId = params.deviceId;
+  const targetDeviceId = params?.deviceId;
+
+  if (!targetDeviceId) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: {
+          code: 'BAD_REQUEST',
+          message: 'Device ID parameter is required.',
+        },
+        meta: { requestId },
+      },
+      { status: 400 }
+    );
+  }
 
   try {
     const session = await requireSession(request);
@@ -275,20 +293,24 @@ export async function GET(request: Request, props: { params: Promise<{ deviceId:
 
     await requireDeviceViewAccess(session, targetDeviceId, {
       isDeviceAssignedToUser: async (userId: string, devId: string) => {
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          devId
+        );
+        const deviceFilter = isUuid
+          ? { OR: [{ id: devId }, { deviceId: devId }] }
+          : { deviceId: devId };
         const assignment = await prisma.userDeviceAccess.findFirst({
           where: {
             userId,
             revokedAt: null,
-            device: {
-              OR: [{ id: devId }, { deviceId: devId }],
-            },
+            device: deviceFilter,
           },
         });
         return !!assignment;
       },
     });
 
-    const url = new URL(request.url);
+    const url = new URL(request.url, 'http://localhost');
     const rawQuery = {
       page: url.searchParams.get('page') ? Number(url.searchParams.get('page')) : 1,
       pageSize: url.searchParams.get('pageSize') ? Number(url.searchParams.get('pageSize')) : 20,
@@ -331,26 +353,33 @@ export async function GET(request: Request, props: { params: Promise<{ deviceId:
     applyRateLimitToResponse(response, rateLimitInfo);
     return response;
   } catch (error: any) {
-    if (error instanceof AuthorizationError || error?.name === 'AuthorizationError') {
+    if (
+      error instanceof AuthorizationError ||
+      error?.name === 'AuthorizationError' ||
+      (error?.statusCode && error?.code)
+    ) {
       return NextResponse.json(
         {
           success: false,
           error: {
-            code: error.code,
-            message: error.message,
+            code: error.code || 'FORBIDDEN',
+            message: error.message || 'Access denied.',
           },
           meta: { requestId },
         },
-        { status: error.statusCode }
+        { status: error.statusCode || 403 }
       );
     }
 
+    console.error('[Faucet Commands GET Error]:', error);
     return NextResponse.json(
       {
         success: false,
         error: {
           code: 'INTERNAL_ERROR',
-          message: 'An unexpected error occurred while fetching faucet command history.',
+          message:
+            error?.message || 'An unexpected error occurred while fetching faucet command history.',
+          details: String(error),
         },
         meta: { requestId },
       },

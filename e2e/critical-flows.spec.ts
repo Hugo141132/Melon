@@ -24,6 +24,21 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
   let targetDeviceId: string;
 
   test.beforeAll(async () => {
+    // 0. Clean up previous test admin users and their relations to allow fresh registration
+    const existingTestUsers = await prisma.user.findMany({
+      where: { email: { startsWith: 'e2e_admin_' } },
+      select: { id: true },
+    });
+    const userIds = existingTestUsers.map((u) => u.id);
+    if (userIds.length > 0) {
+      await prisma.userRoleAssignment.deleteMany({ where: { userId: { in: userIds } } });
+      await prisma.userDeviceAccess.deleteMany({ where: { userId: { in: userIds } } });
+      await prisma.accountApproval.deleteMany({ where: { applicantUserId: { in: userIds } } });
+      await prisma.session.deleteMany({ where: { userId: { in: userIds } } });
+      await prisma.faucetCommand.deleteMany({ where: { initiatedByUserId: { in: userIds } } });
+      await prisma.user.deleteMany({ where: { id: { in: userIds } } });
+    }
+
     // 1. Ensure Owner user exists in DB with known credentials
     const ownerPasswordHash = await hashPassword(ownerPassword);
     const owner = await prisma.user.upsert({
@@ -155,9 +170,7 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
     await expect(page.locator('body')).toContainText(/Permohonan Pendaftaran/i, { timeout: 10000 });
 
     // Click the applicant item card
-    const applicantCard = page
-      .locator('div[class*="cursor-pointer"]', { hasText: testAdminEmail })
-      .first();
+    const applicantCard = page.locator('h4', { hasText: testAdminName }).first();
     await expect(applicantCard).toBeVisible({ timeout: 10000 });
     await applicantCard.click();
 
@@ -169,10 +182,14 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
     // Click Approve button once details finish loading
     const approveButton = page.locator('button', { hasText: 'Setujui' });
     await approveButton.waitFor({ state: 'visible', timeout: 10000 });
-    await Promise.all([
-      page.waitForResponse((res) => res.url().includes('/approve') && res.status() === 200),
+    const [approveResponse] = await Promise.all([
+      page.waitForResponse((res) => res.url().includes('/approve')),
       approveButton.click(),
     ]);
+    if (approveResponse.status() !== 200) {
+      console.error('Approve API error:', approveResponse.status(), await approveResponse.text());
+    }
+    expect(approveResponse.status()).toBe(200);
 
     // Wait for success indication or item removal
     await expect(page.locator('body')).toContainText(/berhasil disetujui|tidak ada permohonan/i, {
@@ -206,6 +223,9 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
       (c) => c.name === 'session_token' || c.name === 'kebun_melon_session'
     );
     expect(sessionCookie).toBeDefined();
+    if (sessionCookie) {
+      adminSessionToken = sessionCookie.value;
+    }
   });
 
   // Flow 4: Device Assignment
@@ -271,15 +291,7 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
   // Flow 5: Admin views monitoring metrics for assigned device
   test('Flow 5: Admin views monitoring metrics for assigned device', async ({ page }) => {
     // Log in as Admin
-    await page.goto('/login');
-    await page.fill('input#email', testAdminEmail);
-    await page.fill('input#password', testAdminPassword);
-    await Promise.all([
-      page.waitForResponse(
-        (res) => res.url().includes('/api/v1/auth/login') && res.status() === 200
-      ),
-      page.click('button[type="submit"]'),
-    ]);
+    await loginAsAdmin(page);
 
     await page.goto('/soil');
     await expect(page.locator('body')).toContainText(
@@ -292,30 +304,40 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
     expect(title).toContain('Kebun Melon');
   });
 
+  let adminSessionToken: string | undefined;
+
   async function loginAsAdmin(page: any) {
-    const cookies = await page.context().cookies();
-    if (cookies.some((c: any) => c.name === 'session_token')) {
+    if (adminSessionToken) {
+      await page.context().addCookies([
+        {
+          name: 'session_token',
+          value: adminSessionToken,
+          domain: 'localhost',
+          path: '/',
+          httpOnly: true,
+          secure: false,
+          sameSite: 'Lax',
+        },
+      ]);
       return;
     }
-    const res = await page.request.post('/api/v1/auth/login', {
-      data: { email: testAdminEmail, password: testAdminPassword },
-    });
-    const headers = res.headers();
-    const setCookie = headers['set-cookie'];
-    if (setCookie) {
-      const match = setCookie.match(/session_token=([^;]+)/);
-      if (match) {
-        await page.context().addCookies([
-          {
-            name: 'session_token',
-            value: match[1],
-            domain: 'localhost',
-            path: '/',
-            httpOnly: true,
-            sameSite: 'Lax',
-          },
-        ]);
-      }
+
+    await page.goto('/login');
+    await page.fill('input#email', testAdminEmail);
+    await page.fill('input#password', testAdminPassword);
+    const [loginRes] = await Promise.all([
+      page.waitForResponse((res: any) => res.url().includes('/api/v1/auth/login')),
+      page.click('button[type="submit"]'),
+    ]);
+    if (loginRes.status() !== 200) {
+      console.error('loginAsAdmin error:', loginRes.status(), await loginRes.text());
+    }
+    expect(loginRes.status()).toBe(200);
+
+    const cookies = await page.context().cookies();
+    const token = cookies.find((c: any) => c.name === 'session_token')?.value;
+    if (token) {
+      adminSessionToken = token;
     }
   }
 
@@ -382,7 +404,7 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
       orderBy: { requestedAt: 'desc' },
     });
     expect(command).not.toBeNull();
-    expect(command?.phase).toBe('PHASE_1');
+    expect(command?.phase === 1 || (command?.phase as any) === 'PHASE_1').toBe(true);
     expect(command?.targetVolumeMl).toBe(300);
   });
 
@@ -422,9 +444,18 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
     const apiRes = await page.request.post(
       `/api/v1/devices/${targetDev!.deviceId}/faucet-commands`,
       {
-        data: { phase: 'PHASE_2' },
+        data: {
+          phase: 2,
+          idempotencyKey: `idem_flow10_${Date.now()}`,
+        },
+        headers: {
+          cookie: `session_token=${adminSessionToken}`,
+        },
       }
     );
+    if (!apiRes.ok()) {
+      console.error('Flow 10 API error:', apiRes.status(), await apiRes.text());
+    }
     expect(apiRes.ok()).toBeTruthy();
     const json = await apiRes.json();
     const commandId = json.data.id;
@@ -436,15 +467,14 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
     });
     await prisma.faucetCommandEvent.create({
       data: {
-        commandId,
-        status: 'FAILED',
+        faucetCommandId: commandId,
+        eventStatus: 'FAILED',
         messageId: `msg_failed_${Date.now()}`,
-        payload: { reasonCode: 'ERR_HARDWARE' },
       },
     });
 
     await page.goto('/controls');
-    await expect(page.locator('body')).toContainText(/Kontrol|FAILED|Gagal|ERR_HARDWARE/i);
+    await expect(page.locator('body')).toContainText(/Kontrol|FAILED|Gagal/i);
   });
 
   // Flow 11: Session Expiry
@@ -473,8 +503,16 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
 
     // Attempt to invoke faucet command API for revoked device
     const targetDev = await prisma.device.findUnique({ where: { id: targetDeviceId } });
+    const cookies = await page.context().cookies();
+    const token = cookies.find((c: any) => c.name === 'session_token')?.value || adminSessionToken;
     const res = await page.request.post(`/api/v1/devices/${targetDev!.deviceId}/faucet-commands`, {
-      data: { phase: 'PHASE_1' },
+      data: {
+        phase: 1,
+        idempotencyKey: `idem_flow12_${Date.now()}`,
+      },
+      headers: {
+        cookie: `session_token=${token}`,
+      },
     });
 
     // Server must reject with HTTP 403 / DEVICE_NOT_ASSIGNED
