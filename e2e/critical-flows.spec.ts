@@ -360,7 +360,9 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
 
     // Wait for confirm modal button and submit
     const confirmButton = page
-      .locator('button:has-text("Konfirmasi"), button:has-text("Dispense")')
+      .locator(
+        'button:has-text("Kirimkan Perintah"), button:has-text("Konfirmasi"), button[data-testid="btn-confirm-dispense"]'
+      )
       .first();
     await expect(confirmButton).toBeVisible({ timeout: 10000 });
     await Promise.all([
