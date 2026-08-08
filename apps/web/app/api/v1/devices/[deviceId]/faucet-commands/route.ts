@@ -219,13 +219,14 @@ export async function POST(request: Request, props: { params: Promise<{ deviceId
         { status: 409 }
       );
     }
-
+    console.error('[Faucet Commands POST Error]:', error);
     return NextResponse.json(
       {
         success: false,
         error: {
           code: 'INTERNAL_ERROR',
-          message: 'An unexpected error occurred while creating faucet command.',
+          message: error?.message || 'An unexpected error occurred while creating faucet command.',
+          details: String(error),
         },
         meta: { requestId },
       },
