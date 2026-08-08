@@ -358,13 +358,17 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
     if (await phase1Button.isVisible()) {
       await phase1Button.click();
 
-      // Click Confirm modal button if visible
+      // Wait for confirm modal button and submit
       const confirmButton = page
         .locator('button:has-text("Konfirmasi"), button:has-text("Dispense")')
         .first();
-      if (await confirmButton.isVisible()) {
-        await confirmButton.click();
-      }
+      await expect(confirmButton).toBeVisible({ timeout: 10000 });
+      await Promise.all([
+        page.waitForResponse(
+          (res) => res.url().includes('/faucet-commands') && res.status() === 200
+        ),
+        confirmButton.click(),
+      ]);
     } else {
       // Directly submit command via API if UI button is disabled due to simulator offline state
       const targetDev = await prisma.device.findUnique({ where: { id: targetDeviceId } });
