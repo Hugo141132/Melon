@@ -10,14 +10,15 @@ export default defineConfig({
   use: {
     baseURL: process.env.PLAYWRIGHT_TEST_BASE_URL || 'http://localhost:3000',
     headless: true,
-    trace: 'on-first-retry',
+    trace: 'retain-on-failure',
+    screenshot: 'only-on-failure',
   },
   projects: [
     {
-      name: 'msedge',
+      name: process.env.CI ? 'chromium' : 'msedge',
       use: {
         ...devices['Desktop Chrome'],
-        channel: 'msedge',
+        ...(process.env.CI ? {} : { channel: 'msedge' }),
       },
     },
   ],

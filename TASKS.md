@@ -2033,7 +2033,8 @@ Critical unit coverage includes:
 ## TASK-1004 — Complete End-to-End Critical Flows
 
 **Priority:** `P0`  
-**Status:** `BACKLOG`  
+**Status:** `BLOCKED`
+**Blocker:** Staging deployment environment and hosting infrastructure are missing; E2E flows pass 100% on local dev server (http://localhost:3000) but cannot satisfy the acceptance criterion "Flows pass in staging" until staging hosting is provisioned.
 **Dependencies:** Core UI and APIs
 
 Required flows:

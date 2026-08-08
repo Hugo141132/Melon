@@ -75,6 +75,33 @@ describe('TASK-0401 — IoT Gateway Service', () => {
           ENABLE_FAUCET_CONTROL: 'true',
         })
       ).toThrowError(/ENABLE_FAUCET_CONTROL=true is rejected in production/);
+
+      expect(() =>
+        validateGatewayEnv({
+          NODE_ENV: 'production',
+          APP_ENV: 'production',
+          MQTT_BROKER_URL: 'mqtts://broker.example.com:8883',
+          MQTT_GATEWAY_CLIENT_ID: 'gateway-01',
+          MQTT_GATEWAY_USERNAME: 'gw-user',
+          MQTT_GATEWAY_PASSWORD: 'secretpassword',
+          ENABLE_FAUCET_CONTROL: 'true',
+        })
+      ).toThrowError(/ENABLE_FAUCET_CONTROL=true is rejected in production/);
+    });
+
+    it('allows ENABLE_FAUCET_CONTROL=true when NODE_ENV=production and APP_ENV=staging', () => {
+      const config = validateGatewayEnv({
+        NODE_ENV: 'production',
+        APP_ENV: 'staging',
+        MQTT_BROKER_URL: 'mqtts://broker.example.com:8883',
+        MQTT_GATEWAY_CLIENT_ID: 'gateway-01',
+        MQTT_GATEWAY_USERNAME: 'gw-user',
+        MQTT_GATEWAY_PASSWORD: 'secretpassword',
+        ENABLE_FAUCET_CONTROL: 'true',
+      });
+
+      expect(config.APP_ENV).toBe('staging');
+      expect(config.ENABLE_FAUCET_CONTROL).toBe(true);
     });
 
     it('redacts sensitive passwords, tokens, and DB connection strings', () => {

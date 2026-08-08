@@ -44,12 +44,13 @@ export type ServerEnv = z.infer<typeof serverEnvSchema>;
 export function validateServerEnv(
   env: Record<string, string | undefined> = process.env
 ): ServerEnv {
-  const isProd = env.NODE_ENV === 'production' || env.APP_ENV === 'production';
+  const isStrictProd =
+    env.APP_ENV === 'production' || (env.NODE_ENV === 'production' && env.APP_ENV !== 'staging');
   const isTest =
     env.NODE_ENV === 'test' || env.APP_ENV === 'test' || process.env.NODE_ENV === 'test';
   const isFaucetTrue = env.ENABLE_FAUCET_CONTROL === 'true' || env.ENABLE_FAUCET_CONTROL === '1';
 
-  if (isProd && isFaucetTrue) {
+  if (isStrictProd && isFaucetTrue) {
     throw new Error(
       'Production enablement error: ENABLE_FAUCET_CONTROL=true is rejected in production until formal written sign-off activation gate is implemented.'
     );

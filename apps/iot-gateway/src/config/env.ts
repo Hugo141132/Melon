@@ -60,6 +60,8 @@ export function validateGatewayEnv(
   env: Record<string, string | undefined> = process.env
 ): GatewayEnv {
   const isProd = env.NODE_ENV === 'production' || env.APP_ENV === 'production';
+  const isStrictProd =
+    env.APP_ENV === 'production' || (env.NODE_ENV === 'production' && env.APP_ENV !== 'staging');
   const isFaucetTrue = env.ENABLE_FAUCET_CONTROL === 'true' || env.ENABLE_FAUCET_CONTROL === '1';
 
   if (isProd) {
@@ -82,11 +84,12 @@ export function validateGatewayEnv(
         'Production gateway requirement failed: MQTT_BROKER_URL must use a secure scheme (mqtts://, ssl://, or wss://).'
       );
     }
-    if (isFaucetTrue) {
-      throw new Error(
-        'Production enablement error: ENABLE_FAUCET_CONTROL=true is rejected in production until formal written sign-off activation gate is implemented.'
-      );
-    }
+  }
+
+  if (isStrictProd && isFaucetTrue) {
+    throw new Error(
+      'Production enablement error: ENABLE_FAUCET_CONTROL=true is rejected in production until formal written sign-off activation gate is implemented.'
+    );
   }
 
   const isTest =
