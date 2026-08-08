@@ -366,7 +366,9 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
       .first();
     await expect(confirmButton).toBeVisible({ timeout: 10000 });
     const [response] = await Promise.all([
-      page.waitForResponse((res) => res.url().includes('/faucet-commands')),
+      page.waitForResponse(
+        (res) => res.request().method() === 'POST' && res.url().includes('/faucet-commands')
+      ),
       confirmButton.click(),
     ]);
     const resJson = await response.json();
