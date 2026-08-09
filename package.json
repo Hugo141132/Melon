@@ -49,6 +49,7 @@
     "env:check:gateway": "tsx scripts/check-env.ts gateway",
     "env:test": "tsx scripts/test-env.ts",
     "mqtt:pwfile": "tsx scripts/generate-mqtt-pwfile.ts",
+    "sim:esp32-001": "tsx scripts/esp32-simulator.ts",
     "scan:secrets": "tsx scripts/scan-secrets.ts",
     "scan:deps": "tsx scripts/check-dependencies.ts",
     "test": "node --max-old-space-size=4096 node_modules/vitest/vitest.mjs run",

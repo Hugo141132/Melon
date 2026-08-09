@@ -19,8 +19,14 @@ async function startServer() {
       }),
     });
 
-    const { app, mqttClient, commandPublisher, acknowledgementProcessor, faucetEventProcessor } =
-      buildApp({ env });
+    const {
+      app,
+      mqttClient,
+      commandPublisher,
+      acknowledgementProcessor,
+      faucetEventProcessor,
+      telemetryProcessor,
+    } = buildApp({ env });
 
     // Connect to MQTT Broker asynchronously (non-blocking server start)
     if (env.MQTT_BROKER_URL) {
@@ -32,6 +38,9 @@ async function startServer() {
           });
           faucetEventProcessor.subscribeToEvents().catch((err) => {
             logger.error('Failed to subscribe to events after MQTT connection', err);
+          });
+          telemetryProcessor.subscribeToTelemetry().catch((err) => {
+            logger.error('Failed to subscribe to telemetry after MQTT connection', err);
           });
         })
         .catch((err) => {
@@ -59,6 +68,7 @@ async function startServer() {
         commandPublisher.stopPolling();
         acknowledgementProcessor.stop();
         faucetEventProcessor.stop();
+        telemetryProcessor.stop();
         await app.close();
         await mqttClient.disconnect();
         logger.info('IoT Gateway Service shutdown complete.');

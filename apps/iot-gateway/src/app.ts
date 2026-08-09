@@ -13,6 +13,10 @@ import {
   FaucetEventProcessor,
   faucetEventProcessor as defaultFaucetEventProcessor,
 } from './events/processor';
+import {
+  TelemetryProcessor,
+  telemetryProcessor as defaultTelemetryProcessor,
+} from './telemetry/processor';
 import { registerHealthRoutes, DbChecker } from './routes/health';
 import { logger } from './observability/logger';
 
@@ -23,6 +27,7 @@ export interface AppOptions {
   commandPublisher?: CommandPublisher;
   acknowledgementProcessor?: AcknowledgementProcessor;
   faucetEventProcessor?: FaucetEventProcessor;
+  telemetryProcessor?: TelemetryProcessor;
 }
 
 // In-memory rate limit store for gateway HTTP endpoints
@@ -74,6 +79,7 @@ export function buildApp(options: AppOptions): {
   commandPublisher: CommandPublisher;
   acknowledgementProcessor: AcknowledgementProcessor;
   faucetEventProcessor: FaucetEventProcessor;
+  telemetryProcessor: TelemetryProcessor;
 } {
   const app = Fastify({
     logger: false, // We use our structured logger module with secret redaction
@@ -84,10 +90,12 @@ export function buildApp(options: AppOptions): {
   const acknowledgementProcessor =
     options.acknowledgementProcessor ?? defaultAcknowledgementProcessor;
   const faucetEventProcessor = options.faucetEventProcessor ?? defaultFaucetEventProcessor;
+  const telemetryProcessor = options.telemetryProcessor ?? defaultTelemetryProcessor;
 
   commandPublisher.bind(options.env, mqttClient);
   acknowledgementProcessor.bind(options.env, mqttClient);
   faucetEventProcessor.bind(options.env, mqttClient);
+  telemetryProcessor.bind(options.env, mqttClient);
 
   // Security headers and rate limiting hook per SECURITY.md §16.4, §16.8 and TASK-0902
   app.addHook('onRequest', async (request, reply) => {
@@ -158,5 +166,12 @@ export function buildApp(options: AppOptions): {
     });
   });
 
-  return { app, mqttClient, commandPublisher, acknowledgementProcessor, faucetEventProcessor };
+  return {
+    app,
+    mqttClient,
+    commandPublisher,
+    acknowledgementProcessor,
+    faucetEventProcessor,
+    telemetryProcessor,
+  };
 }

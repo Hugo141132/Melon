@@ -25,7 +25,7 @@ const VALID_SLUG_REGEX = /^[a-zA-Z0-9_-]+$/;
 // null indicates that NO subtype is allowed (topic length must be exactly 5)
 // Set of strings indicates required subtypes (topic length must be exactly 6)
 const CATEGORY_SUBTYPE_MAP: Record<TopicCategory, ReadonlySet<string> | null> = {
-  telemetry: new Set(['soil', 'water']),
+  telemetry: new Set(['soil', 'water', 'reservoir']),
   status: null,
   heartbeat: null,
   command: new Set(['faucet']),

@@ -170,12 +170,13 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
     await expect(page.locator('body')).toContainText(/Permohonan Pendaftaran/i, { timeout: 10000 });
 
     // Click the applicant item card
-    const applicantCard = page.locator('h4', { hasText: testAdminName }).first();
-    await expect(applicantCard).toBeVisible({ timeout: 10000 });
+    const applicantName = page.locator('h4', { hasText: testAdminName }).first();
+    await expect(applicantName).toBeVisible({ timeout: 10000 });
+    const applicantCard = applicantName.locator('xpath=..');
     await applicantCard.click();
 
-    // Wait for applicant detail panel to load
-    await expect(page.locator('body')).toContainText(/Detail Pendaftaran|Email Registrasi/i, {
+    // Wait for applicant detail panel to load with email text
+    await expect(page.locator('body')).toContainText(testAdminEmail, {
       timeout: 10000,
     });
 

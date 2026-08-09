@@ -113,3 +113,47 @@ export const LatestMonitoringSnapshotDtoSchema = z.object({
 });
 
 export type LatestMonitoringSnapshotDto = z.infer<typeof LatestMonitoringSnapshotDtoSchema>;
+
+/**
+ * Shared Reservoir-Water Telemetry Data Schema & Type (Water Tank Node)
+ * Source of truth: docs/DEVICE_COMMUNICATION.md §14.1
+ */
+export const ReservoirTelemetryDataSchema = z.object({
+  tankVolume: z.number().finite().nullable().optional().default(null),
+  flowRate: z.number().finite().nullable().optional().default(null),
+  status: z.nativeEnum(MonitoringStatus).nullable().optional().default(null),
+});
+
+export type ReservoirTelemetryData = z.infer<typeof ReservoirTelemetryDataSchema>;
+
+/**
+ * Reservoir Telemetry Payload Envelope Schema & Type
+ */
+export const ReservoirTelemetryPayloadSchema = z.object({
+  schemaVersion: z.string().min(1).default('1.0'),
+  messageId: z.string().min(1).max(150),
+  deviceId: z.string().min(1).max(150),
+  siteId: z.string().min(1).max(150).optional().nullable(),
+  sequence: z.number().int().nonnegative().optional().nullable(),
+  recordedAt: z.string().optional().nullable(),
+  sentAt: z.string().optional().nullable(),
+  firmwareVersion: z.string().optional().nullable(),
+  data: ReservoirTelemetryDataSchema,
+});
+
+export type ReservoirTelemetryPayload = z.infer<typeof ReservoirTelemetryPayloadSchema>;
+
+/**
+ * DTO for persisting Reservoir Water Telemetry reading
+ */
+export interface IngestReservoirTelemetryInput {
+  deviceId: string;
+  messageId: string;
+  schemaVersion: string;
+  sequenceNumber?: bigint | number | null;
+  recordedAt?: Date | string | null;
+  tankVolume?: number | null;
+  flowRate?: number | null;
+  status?: string | null;
+  validationStatus?: TelemetryValidationStatus | string;
+}
