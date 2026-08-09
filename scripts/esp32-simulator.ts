@@ -1,23 +1,23 @@
 import mqtt from 'mqtt';
-import { getMqttTestCredentials } from './mqtt-config';
+import { getMqttSimulatorCredentials } from './mqtt-config';
 
 /**
  * Minimal MQTT Telemetry Simulator for Staging / Development
  *
  * Enforces contract rules:
  * - Uses existing MQTT contracts from docs/DEVICE_COMMUNICATION.md.
+ * - Loads credentials via getMqttSimulatorCredentials() (MQTT_BROKER_URL, MQTT_DEV1_USERNAME, MQTT_DEV1_PASSWORD, MQTT_DEVICE_ID).
  * - Device ID configured via MQTT_DEVICE_ID (defaults to 'esp32-001').
- * - Environment and credentials loaded from local env via getMqttTestCredentials().
  * - Strictly publishes telemetry only (no status/ONLINE publishing, no faucet commands).
  * - Safe handling of connection errors and graceful disconnects.
  */
 
 async function runSimulator(): Promise<void> {
-  const creds = getMqttTestCredentials();
+  const creds = getMqttSimulatorCredentials();
 
   const environment = process.env.NODE_ENV === 'production' ? 'production' : 'staging';
   const siteId = process.env.MQTT_SITE_ID || 'site-01';
-  const deviceId = process.env.MQTT_DEVICE_ID || 'esp32-001';
+  const deviceId = creds.deviceId;
 
   // Topic pattern: agriculture/{environment}/{siteId}/{deviceId}/telemetry/reservoir
   const topic = `agriculture/${environment}/${siteId}/${deviceId}/telemetry/reservoir`;
@@ -27,8 +27,8 @@ async function runSimulator(): Promise<void> {
   console.log(`[${deviceId} Simulator] Target Topic: ${topic}`);
 
   const client = mqtt.connect(creds.brokerUrl, {
-    username: creds.device1Username,
-    password: creds.device1Password,
+    username: creds.username,
+    password: creds.password,
     clientId: `sim-${deviceId}-${Math.random().toString(16).substring(2, 8)}`,
     clean: true,
     path: '/mqtt',

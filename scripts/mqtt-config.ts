@@ -82,7 +82,6 @@ function requireConfigEnv(name: string): string {
   }
   return value;
 }
-
 export function getMqttTestCredentials(): MqttTestCredentials {
   loadLocalIgnoredEnv();
   return {
@@ -95,5 +94,22 @@ export function getMqttTestCredentials(): MqttTestCredentials {
     unauthUsername: requireConfigEnv('MQTT_UNAUTH_USERNAME'),
     unauthPassword: requireConfigEnv('MQTT_UNAUTH_PASSWORD'),
     brokerUrl: process.env.MQTT_BROKER_URL || 'mqtt://localhost:1883',
+  };
+}
+
+export interface MqttSimulatorCredentials {
+  brokerUrl: string;
+  username: string;
+  password: string;
+  deviceId: string;
+}
+
+export function getMqttSimulatorCredentials(): MqttSimulatorCredentials {
+  loadLocalIgnoredEnv();
+  return {
+    brokerUrl: process.env.MQTT_BROKER_URL || 'mqtt://localhost:1883',
+    username: process.env.MQTT_STAGING_USERNAME || requireConfigEnv('MQTT_DEV1_USERNAME'),
+    password: process.env.MQTT_STAGING_PASSWORD || requireConfigEnv('MQTT_DEV1_PASSWORD'),
+    deviceId: process.env.MQTT_DEVICE_ID || 'esp32-001',
   };
 }
