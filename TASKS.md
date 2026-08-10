@@ -1098,9 +1098,9 @@ status
 ## TASK-0406 — Implement Water Telemetry Ingestion
 
 **Priority:** `P0`  
-**Status:** `BLOCKED`  
+**Status:** `READY`  
 **Dependencies:** `TASK-0404`, `TASK-0104`  
-**Blocked Reason:** Blocked by `docs/DECISIONS.md` §3 (`Water BAT` telemetry unit/precision and telemetry publish interval TBD).
+**Notes:** Unblocked via `DEC-MON-085` (`BAT` = Battery, `latitude`/`longitude` deleted).
 
 ### Work
 
@@ -2445,7 +2445,7 @@ The first production release is blocked until:
 - [ ] Device-access rules are implemented.
 - [ ] MQTT security is configured.
 - [ ] Telemetry units are documented.
-- [ ] `Water BAT` is clarified.
+- [x] Battery (`BAT`) parameter identity & scope clarified (`DEC-MON-085`).
 - [ ] Stale and offline thresholds are approved.
 - [ ] Faucet permission matrix is approved.
 - [ ] Command concurrency is approved.
@@ -2507,7 +2507,7 @@ The first production release is blocked until:
 2. ~~The frontend technology must be confirmed before choosing implementation libraries.~~ **Resolved** — Next.js 14 App Router confirmed via `FRONTEND_AUDIT.md`.
 3. ~~The authentication and session approach is not final.~~ **Resolved** — PostgreSQL session table with HTTP-only cookies approved (`DEC-AUTH-001`). `SameSite` exact value still TBD.
 4. ~~Owner and Admin faucet permissions remain unresolved.~~ **Partially resolved** — Admin faucet permission rule approved (`DEC-RBAC-015`). Owner faucet permission and cancellation/stop support remain TBD.
-5. Several sensor units confirmed (`DEC-MON`). `Water BAT` meaning and unit remain undefined.
+5. ~~`Water BAT` meaning and unit.~~ **Resolved** — `BAT` stands for Battery, incorporated into soil and water quality sensors (`DEC-MON-085`).
 6. Device freshness thresholds (offline and stale) remain undefined — see `docs/DECISIONS.md` §3.
 7. ~~The production broker and device credential strategy remain unresolved.~~ **Resolved** — MQTT 5.0 over TLS, per-device credentials, per-device ACLs (`DEC-DEV-020`). Production broker vendor still TBD.
 8. Command concurrency approved. Cancellation, stop, timeout values, and late-event handling remain TBD.

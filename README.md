@@ -873,7 +873,7 @@ Production release remains blocked until:
 - [ ] MQTT broker and device authentication are selected.
 - [ ] Production MQTT TLS and ACLs are verified.
 - [ ] Telemetry units are confirmed.
-- [ ] `Water BAT` is clarified.
+- [x] Battery (`BAT`) parameter identity & scope clarified (`DEC-MON-085`).
 - [ ] Offline and stale thresholds are approved.
 - [ ] Faucet permission matrix is approved.
 - [ ] Command concurrency is approved.
@@ -911,7 +911,7 @@ The current documentation still contains unresolved decisions, including:
 18. Device password versus certificate authentication.
 19. Telemetry intervals.
 20. Measurement units.
-21. `Water BAT` meaning.
+21. ~~`Water BAT` meaning.~~ **RESOLVED** — `BAT` stands for Battery, incorporated into soil and water quality sensors (`DEC-MON-085`).
 22. Offline and stale thresholds.
 23. Default and fallback locale.
 24. Real-time transport.

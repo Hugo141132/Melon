@@ -1035,7 +1035,7 @@ Stop implementation and report a blocker when:
 - A required policy is `TBD`.
 - A change could enable unauthorised physical control.
 - Sensor units are required but unknown.
-- `Water BAT` meaning is required but unknown.
+- `BAT` (Battery) parameter meaning or units are required but unknown.
 - The Owner/Admin control matrix is unresolved.
 - Command concurrency is unresolved and implementation depends on it.
 - Timeout behaviour is unresolved and implementation depends on it.
@@ -1486,7 +1486,7 @@ The following remain unresolved unless newer project documentation says otherwis
 14. Final MQTT broker.
 15. Device authentication method.
 16. Telemetry units.
-17. `Water BAT` meaning.
+17. ~~`Water BAT` meaning.~~ **RESOLVED** — `BAT` stands for Battery, incorporated into soil and water quality sensors (`DEC-MON-085`).
 18. Telemetry interval.
 19. Offline threshold.
 20. Stale threshold.

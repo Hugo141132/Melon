@@ -958,7 +958,7 @@ The following decisions must be resolved before their related implementation is 
 5. Final device communication protocol.
 6. MQTT broker choice, if MQTT is approved.
 7. Exact sensor units.
-8. Meaning and unit of `Water BAT`.
+8. ~~Meaning and unit of `Water BAT`.~~ **RESOLVED** — `BAT` stands for Battery, incorporated into soil and water quality sensors (`DEC-MON-085`).
 9. Data update interval.
 10. Stale-data threshold.
 11. Historical-data retention period.
@@ -991,7 +991,7 @@ The following decisions must be resolved before their related implementation is 
 1. The communication medium is described as internet or Wi-Fi, but the application protocol has not yet been formally selected. Wi-Fi is connectivity, not a complete message contract.
 2. Monitoring access is confirmed for Owner and Admin, but faucet-control permissions for each role are not yet confirmed.
 3. Multi-device support is confirmed, but device ownership and assignment rules are not yet defined.
-4. `Water BAT` is listed as a monitored value, but its meaning and unit are not yet defined.
+4. ~~`Water BAT` is listed as a monitored value.~~ **RESOLVED** — `BAT` stands for Battery, incorporated into soil and water quality sensors (`DEC-MON-085`).
 5. Soil and water statuses are required, but thresholds and calculation ownership are not yet defined.
 6. Historical monitoring is expected, but retention and aggregation rules are not yet defined.
 7. Owner approval is required for Admin access, but the approval notification and activation process are not yet defined.

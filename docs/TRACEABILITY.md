@@ -53,7 +53,7 @@
 | `PRD-NFR-004` | Accessibility compliance standards | `docs/PRD.md` | `` | `TASK-1006` | `TEST-E2E-005` | `DECISION_REQUIRED` |
 | `PRD-NFR-005` | Maintainability and component structure reuse | `docs/PRD.md` | `DEC-INF-075` | `TASK-0102` | `TEST-UNIT-001` | `READY_FOR_IMPLEMENTATION` |
 | `PRD-DATA-001` | Soil telemetry metrics data schema | `docs/PRD.md` | `DEC-MON-036` | `TASK-0405` | `TEST-MQTT-001` | `READY_FOR_IMPLEMENTATION` |
-| `PRD-DATA-002` | Water telemetry metrics data schema | `docs/PRD.md` | `DEC-MON-036` | `TASK-0406` | `TEST-MQTT-001` | `DECISION_REQUIRED` |
+| `PRD-DATA-002` | Water telemetry metrics data schema | `docs/PRD.md` | `DEC-MON-085` | `TASK-0406` | `TEST-MQTT-001` | `READY_FOR_IMPLEMENTATION` |
 | `PRD-DATA-005` | Reservoir water telemetry metrics data schema | `docs/PRD.md` | `DEC-MON-036` | `TASK-0408` | `TEST-MQTT-001` | `DECISION_REQUIRED` |
 | `PRD-DATA-006` | Shared sensor/tool battery telemetry metrics data schema | `docs/PRD.md` | `DEC-MON-036` | `TASK-0409` | `TEST-MQTT-001` | `DECISION_REQUIRED` |
 | `PRD-DATA-003` | Faucet preset target volume mappings | `docs/PRD.md` | `DEC-CTRL-051` | `TASK-0802` | `TEST-CTRL-001` | `READY_FOR_IMPLEMENTATION` |
@@ -113,7 +113,7 @@
 | `DEV-TOPIC-002` | Standard MQTT topic structure rules | `docs/DEVICE_COMMUNICATION.md` | `DEC-DEV-020` | `TASK-0403` | `TEST-MQTT-001` | `READY_FOR_IMPLEMENTATION` |
 | `DEV-TOPIC-003` | Per-device topic access isolation rules | `docs/DEVICE_COMMUNICATION.md` | `DEC-DEV-020` | `TASK-0403` | `TEST-MQTT-002` | `READY_FOR_IMPLEMENTATION` |
 | `DEV-TEL-001` | Soil telemetry MQTT payload specification | `docs/DEVICE_COMMUNICATION.md` | `DEC-MON-036` | `TASK-0405` | `TEST-MQTT-001` | `READY_FOR_IMPLEMENTATION` |
-| `DEV-TEL-002` | Water telemetry MQTT payload specification | `docs/DEVICE_COMMUNICATION.md` | `DEC-MON-036` | `TASK-0406` | `TEST-MQTT-001` | `DECISION_REQUIRED` |
+| `DEV-TEL-002` | Water telemetry MQTT payload specification | `docs/DEVICE_COMMUNICATION.md` | `DEC-MON-085` | `TASK-0406` | `TEST-MQTT-001` | `READY_FOR_IMPLEMENTATION` |
 | `DEV-TEL-003` | Telemetry payload ingestion processing rules | `docs/DEVICE_COMMUNICATION.md` | - | `TASK-0405` | `TEST-MQTT-003` | `READY_FOR_IMPLEMENTATION` |
 | `DEV-STAT-001` | Device heartbeat MQTT payload specification | `docs/DEVICE_COMMUNICATION.md` | `` | `TASK-0407` | `TEST-MQTT-002` | `DECISION_REQUIRED` |
 | `DEV-STAT-002` | MQTT Last Will and Testament (LWT) disconnect handling | `docs/DEVICE_COMMUNICATION.md` | `DEC-DEV-020` | `TASK-0407` | `TEST-MQTT-002` | `READY_FOR_IMPLEMENTATION` |

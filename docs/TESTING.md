@@ -590,9 +590,7 @@ Test each metric:
 - Water pH.
 - TDS.
 - Water EC.
-- Water BAT.
-- Latitude.
-- Longitude.
+- Battery (`BAT`).
 - Tank volume.
 - Flow rate.
 

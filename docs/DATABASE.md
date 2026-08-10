@@ -1630,7 +1630,7 @@ The database design is accepted when:
 7. Owner scope model.
 8. Exact device lifecycle states.
 9. Exact units and precision for sensor fields.
-10. Final meaning of `Water BAT`.
+10. ~~Final meaning of `Water BAT`.~~ **RESOLVED** — `BAT` stands for Battery, incorporated into soil and water quality sensors (`DEC-MON-085`).
 11. Latest-reading denormalisation.
 12. Raw payload retention.
 13. Telemetry retention.
@@ -1655,7 +1655,7 @@ The database design is accepted when:
 # 31. Conflicts and Gaps Found
 
 1. Several telemetry units and precision requirements remain undefined.
-2. `Water BAT` remains ambiguous.
+2. ~~`Water BAT` remains ambiguous.~~ **RESOLVED** — `BAT` stands for Battery, incorporated into soil and water quality sensors (`DEC-MON-085`).
 3. The Owner device-access scope is not final.
 4. Faucet-control role permissions are not final.
 5. Command concurrency and cancellation rules are unresolved.

@@ -503,21 +503,20 @@ The water section shall display:
 - Water latitude
 - Water longitude
 - Water status
+- Battery (`BAT`)
 - Tank volume
 - Water flow rate
 
-### 11.1 Water Battery
+### 11.1 Equipment Battery (BAT)
 
-Until the data contract confirms whether `Water BAT` represents percentage, voltage, or another value:
+`BAT` stands for **Battery** (`DEC-MON-085`) incorporated directly into soil and water quality monitoring sensor nodes:
 
-- display the supplied unit;
-- avoid assuming a percentage;
-- avoid drawing a percentage battery icon for voltage-only values;
-- label unavailable semantics clearly in development documentation.
+- display the supplied unit (`%` or Volts);
+- label unavailable semantics clearly.
 
 ### 11.2 Water Location
 
-Latitude and longitude shall be available as text.
+Latitude and longitude parameters are **DELETED** from water monitoring and shall not be rendered.
 
 Where a map is included, it shall provide:
 

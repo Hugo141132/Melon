@@ -2524,4 +2524,4 @@ The API is accepted when:
 7. The real-time transport is not final.
 8. The gateway integration method is not final.
 9. Command cancellation and stop behaviour remain unresolved.
-10. Exact sensor units and `Water BAT` semantics remain outside this API contract until confirmed.
+10. ~~`Water BAT` semantics.~~ **RESOLVED** — `BAT` stands for Battery, incorporated into soil and water quality sensors (`DEC-MON-085`).
