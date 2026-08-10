@@ -155,8 +155,16 @@
   1. **Soil Monitoring**: REST API over Wi-Fi submitted directly to backend ingestion endpoint (No MQTT broker).
   2. **Water Monitoring**: REST API over Wi-Fi submitted directly to backend ingestion endpoint (No MQTT broker).
   3. **Reservoir-Water Monitoring**: MQTT 5.0 over TLS via EMQX broker ingested through long-running backend IoT Gateway service.
-  4. **Shared Sensor Battery (`BAT`)**: Equipment power supply telemetry via REST API over Wi-Fi (exact REST payload field placement `TBD`).
+  4. **Sensor Battery (`BAT`)**: `BAT` stands for **Battery** (not "Water BAT"). It is incorporated directly into soil and water quality sensor nodes to monitor equipment power supply (`DEC-MON-085`).
   5. **Protocol Routing Determinism**: Protocol selection is deterministically resolved using `DeviceType` (`SOIL_NODE`, `WATER_QUALITY_NODE`, `WATER_TANK_NODE`) combined with registered `DeviceCapability` entries (`SOIL_TELEMETRY`, `WATER_TELEMETRY`, `TANK_MONITORING`, `FLOW_MONITORING`, `FAUCET_CONTROL`). The existing `DeviceType` enum values are sufficient without schema modification.
+
+#### DEC-MON-085: Battery (BAT) Parameter Identity & Sensor Node Incorporation
+* **Related Task IDs**: `TASK-0405`, `TASK-0406`
+* **Related Documentation**: `DEVICE_COMMUNICATION.md` §14, `DATABASE.md` §8.5, `AGENTS.md` §2
+* **Status**: **APPROVED BY USER (2026-08-10)**
+* **Approved Decision**:
+  1. The `BAT` parameter stands for **Battery** (not "Water BAT").
+  2. The Battery (`BAT`) parameter is incorporated directly into both **soil monitoring sensors** (`SOIL_NODE`) and **water quality sensors** (`WATER_QUALITY_NODE`) to measure equipment power supply.
   Per-device unique username/password with per-device topic ACLs for reservoir MQTT. No anonymous production access. No direct browser-to-MQTT or browser-to-EMQX connections. No retained faucet commands.
 
 ---
@@ -231,7 +239,7 @@ The following decisions remain TBD and must be resolved before the listed tasks 
 | Command completion timeout (seconds) | `TASK-0809` | No numeric value approved. |
 | Command expiry duration (seconds) | `TASK-0809` | No numeric value approved. |
 | Cancellation and stop support (yes/no) | `TASK-0810` | Unresolved. Default: do not implement. |
-| Shared Sensor Battery (`BAT`) unit and precision | `TASK-0406` | BAT is clarified as shared soil/water tool/sensor battery. Unit & precision TBD. |
+| Sensor Battery (`BAT`) parameter identity & scope | `TASK-0405`, `TASK-0406` | Approved: `BAT` stands for Battery, incorporated into soil and water quality sensors (`DEC-MON-085`). |
 | Reservoir-Water Volume and Flow Rate units | `TASK-0408` | Reservoir-water monitoring is a distinct domain from general water quality. Units TBD. |
 | Accessibility standard level | `TASK-1006` | WCAG level not yet approved. |
 | API performance targets (p95) | `TASK-1007` | No numeric values approved. |

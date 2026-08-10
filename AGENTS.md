@@ -29,19 +29,19 @@ The system monitors:
 
 ### Soil Monitoring (REST API over Wi-Fi)
 
-- Nitrogen, Phosphorus, Potassium, Temperature, Moisture, pH, EC, Soil status.
+- Nitrogen, Phosphorus, Potassium, Temperature, Moisture, pH, EC, Battery (`BAT`), Soil status.
 
 ### Water Quality Monitoring (REST API over Wi-Fi)
 
-- pH, TDS, EC, Latitude, Longitude, Water status.
+- pH, TDS, EC, Battery (`BAT`), Water status (Latitude and Longitude deleted).
 
 ### Reservoir-Water Monitoring (MQTT 5.0 over TLS via EMQX Broker)
 
 - Reservoir water volume, Reservoir water flow rate, Reservoir status.
 
-### Shared Sensor/Tool Battery (`BAT`)
+### Sensor Battery (`BAT`)
 
-- Equipment power supply battery monitoring via REST API over Wi-Fi (exact REST JSON payload placement `TBD`). Not a water-quality or reservoir parameter.
+- Equipment power supply battery monitoring incorporated into soil and water quality sensor nodes via REST API over Wi-Fi. (`BAT` stands for Battery, not Water BAT).
 
 ### Faucet Control Presets
 

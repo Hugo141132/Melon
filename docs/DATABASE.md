@@ -685,8 +685,8 @@ Stores general water-quality telemetry.
 | `ph` | NUMERIC | Yes | |
 | `tds` | NUMERIC | Yes | Unit `TBD` |
 | `ec` | NUMERIC | Yes | Unit `TBD` |
-| `latitude` | NUMERIC(9,6) | Yes | |
-| `longitude` | NUMERIC(9,6) | Yes | |
+| `latitude` | NUMERIC(9,6) | Yes | DELETED parameter |
+| `longitude` | NUMERIC(9,6) | Yes | DELETED parameter |
 | `status` | VARCHAR(30) | Yes | Canonical status |
 | `validation_status` | VARCHAR(30) | No | |
 | `created_at` | TIMESTAMPTZ | No | |
@@ -715,8 +715,7 @@ Stores reservoir-water volume and flow rate telemetry independently from general
 ---
 
 ## 8.5 `sensor_battery_readings` (DB-TEL-004)
-
-Stores time-series battery / power-supply measurements for the shared soil and water monitoring equipment.
+Stores time-series battery / power-supply measurements incorporated into soil (`SOIL_NODE`) and water (`WATER_QUALITY_NODE`) monitoring equipment. (`BAT` stands for Battery, `DEC-MON-085`).
 
 | Column | Type | Nullable | Notes |
 |---|---|---:|---|
@@ -727,7 +726,7 @@ Stores time-series battery / power-supply measurements for the shared soil and w
 | `schema_version` | VARCHAR(30) | No | |
 | `recorded_at` | TIMESTAMPTZ | Yes | |
 | `received_at` | TIMESTAMPTZ | No | |
-| `battery_level` | NUMERIC | No | Unit/meaning `TBD` |
+| `battery_level` | NUMERIC | No | Battery power level (`BAT`) |
 | `status` | VARCHAR(30) | Yes | Canonical status |
 | `validation_status` | VARCHAR(30) | No | |
 | `created_at` | TIMESTAMPTZ | No | |

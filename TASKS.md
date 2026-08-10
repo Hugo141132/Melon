@@ -187,7 +187,7 @@ Code completion alone is not task completion.
 - Whether control is assigned per role, user, or device.
 - Concurrent faucet-command policy.
 - Cancellation and stop support.
-- Meaning and unit of `Water BAT`.
+- Meaning and unit of Battery (`BAT`). **RESOLVED** — `BAT` stands for Battery, incorporated into soil and water quality sensors (`DEC-MON-085`).
 - Measurement units.
 - Offline and stale thresholds.
 - Default and fallback locale.
@@ -1111,9 +1111,7 @@ ph
 tds
 ec
 battery
-latitude
-longitude
-status
+status (latitude and longitude deleted)
 tankVolume
 flowRate
 ```
@@ -2483,7 +2481,7 @@ The first production release is blocked until:
 18. Telemetry intervals. **TBD** — see `docs/DECISIONS.md` §3.
 19. Offline and stale thresholds. **TBD** — see `docs/DECISIONS.md` §3.
 20. ~~Measurement units.~~ **RESOLVED** — confirmed in `DEC-MON-036` through `DEC-MON-050`.
-21. `Water BAT` meaning and unit. **TBD** — see `docs/DECISIONS.md` §3.
+21. ~~`Water BAT` meaning and unit.~~ **RESOLVED** — `BAT` stands for Battery, incorporated into soil and water quality sensors (`DEC-MON-085`).
 22. ~~Default and fallback locale.~~ **RESOLVED** — `id` default, `en` fallback (`DEC-I18N-068`).
 23. Realtime transport. **DEFERRED** — SSE in-memory in v1 (`DEC-INF-077`).
 24. Redis requirement. **DEFERRED** — not required in v1 (`DEC-INF-077`).

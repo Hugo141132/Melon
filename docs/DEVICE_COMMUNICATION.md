@@ -606,6 +606,7 @@ Recommended payload:
 | `moisture` | Number or null | Yes when capability exists | `TBD` |
 | `ph` | Number or null | Yes when capability exists | Unitless |
 | `ec` | Number or null | Yes when capability exists | `TBD` |
+| `battery` | Number or null | Yes when capability exists | `%`, volts, or `TBD` |
 | `status` | Canonical enum | Recommended | Defined by external status rules |
 
 Allowed provisional soil status values:
@@ -645,8 +646,6 @@ Recommended payload (Water-Quality monitoring domain):
     "ph": 7.1,
     "tds": 420,
     "ec": 0.84,
-    "latitude": -6.2001,
-    "longitude": 106.8168,
     "status": "NORMAL"
   }
 }
@@ -711,8 +710,8 @@ Recommended payload:
 | `tds` | Number or null | Yes when capability exists | `TBD` |
 | `ec` | Number or null | Yes when capability exists | `TBD` |
 | `battery` | Number or null | Yes when capability exists | `%`, volts, or `TBD` |
-| `latitude` | Number or null | When location exists | Decimal degrees |
-| `longitude` | Number or null | When location exists | Decimal degrees |
+| `latitude` | Number or null | DELETED | Deleted parameter |
+| `longitude` | Number or null | DELETED | Deleted parameter |
 | `status` | Canonical enum | Recommended | Defined by external status rules |
 | `tankVolume` | Number or null | When tank capability exists | `TBD` |
 | `flowRate` | Number or null | When flow capability exists | `TBD` |
@@ -728,7 +727,7 @@ UNAVAILABLE
 INVALID
 ```
 
-The final meaning and unit of `battery` / `Water BAT` shall be confirmed by the hardware team.
+The `battery` (`BAT`) parameter stands for **Battery** (not "Water BAT") and measures equipment power supply incorporated directly into soil and water quality sensor nodes (`DEC-MON-085`).
 
 ---
 
