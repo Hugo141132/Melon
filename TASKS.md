@@ -1098,29 +1098,27 @@ status
 ## TASK-0406 — Implement Water Telemetry Ingestion
 
 **Priority:** `P0`  
-**Status:** `READY`  
+**Status:** `DONE`  
 **Dependencies:** `TASK-0404`, `TASK-0104`  
-**Notes:** Unblocked via `DEC-MON-085` (`BAT` = Battery, `latitude`/`longitude` deleted).
+**Completed:** 2026-08-10 — Implemented Water Quality Telemetry Ingestion contracts (`WaterTelemetryDataSchema`, `WaterTelemetryPayloadSchema`, `IngestWaterTelemetryInput`), database repository ingestion method (`ingestWaterReading`), and HTTPS REST API endpoint (`POST /api/v1/devices/[deviceId]/telemetry/water`). Strictly conformed to `DEC-DEV-020` and `DEC-MON-086`: `BAT` parameter is completely removed from soil and water-quality telemetry (`DEC-MON-086`, superseding `DEC-MON-085`); `latitude` and `longitude` are deleted parameters; Water Quality Telemetry uses REST API over Wi-Fi (`ph`, `tds`, `ec`, `status`), while reservoir `tankVolume` and `flowRate` remain on the MQTT/IoT Gateway path (`WATER_TANK_NODE`). Preserved explicit numeric zero (`0`) vs `null`, handled duplicate `messageId` idempotently (returning HTTP 200 with `isDuplicate: true`), and added unit test suites in `@kebun-melon/contracts`, `@kebun-melon/database`, and `web`.
 
 ### Work
 
-Process:
+Process (Water Quality Telemetry over REST API per `DEC-DEV-020`):
 
 ```text
 ph
 tds
 ec
-battery
-status (latitude and longitude deleted)
-tankVolume
-flowRate
+status
 ```
+
+*Note on Stale Backlog Text & BAT Removal Resolution:* In accordance with document precedence (`docs/DECISIONS.md` §2.3 `DEC-DEV-020` & `DEC-MON-086`), `battery` (`BAT`), `latitude`, and `longitude` are deleted parameters and are omitted from water quality telemetry. Reservoir `tankVolume` and `flowRate` belong exclusively to Reservoir Water Telemetry on the MQTT/IoT Gateway path (`WATER_TANK_NODE`, `TASK-0404`).
 
 ### Acceptance Criteria
 
-- Coordinate bounds are enforced.
+- Obsolete coordinate parameters (`latitude`/`longitude`) and `BAT` parameter are not reintroduced (`DEC-MON-086`).
 - Missing values are not converted to zero.
-- `Water BAT` meaning and unit are documented.
 - Duplicate message IDs are idempotent.
 
 ---

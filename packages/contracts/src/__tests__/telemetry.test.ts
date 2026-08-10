@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   SoilTelemetryDataSchema,
   SoilTelemetryPayloadSchema,
+  WaterTelemetryDataSchema,
+  WaterTelemetryPayloadSchema,
   SoilMonitoringResponseDtoSchema,
   WaterMonitoringResponseDtoSchema,
   LatestMonitoringSnapshotDtoSchema,
@@ -123,6 +125,107 @@ describe('Soil & Water Telemetry Contract Schemas', () => {
       expect(result.data.ph).toBe(6.5);
       expect(result.data.status).toBe(MonitoringStatus.NORMAL);
       expect(result.data.potassium).toBeNull();
+    });
+  });
+
+  describe('WaterTelemetryDataSchema & WaterTelemetryPayloadSchema (TASK-0406)', () => {
+    it('parses valid water quality data (DEC-DEV-020, DEC-MON-086)', () => {
+      const input = {
+        ph: 6.8,
+        tds: 420,
+        ec: 1.25,
+        status: 'NORMAL',
+      };
+
+      const result = WaterTelemetryDataSchema.parse(input);
+      expect(result.ph).toBe(6.8);
+      expect(result.tds).toBe(420);
+      expect(result.ec).toBe(1.25);
+      expect(result.status).toBe(MonitoringStatus.NORMAL);
+    });
+
+    it('does not include deleted battery, latitude/longitude, or reservoir tankVolume/flowRate parameters (DEC-DEV-020, DEC-MON-086)', () => {
+      const input = {
+        ph: 7.0,
+        tds: 400,
+        ec: 1.1,
+        battery: 90, // Removed BAT parameter
+        latitude: -6.2001, // Obsolete field
+        longitude: 106.8166, // Obsolete field
+        tankVolume: 500, // Reservoir field (stays on MQTT)
+        flowRate: 12.5, // Reservoir field (stays on MQTT)
+      };
+
+      const result = WaterTelemetryDataSchema.parse(input);
+      expect(result.ph).toBe(7.0);
+      expect((result as any).battery).toBeUndefined();
+      expect((result as any).latitude).toBeUndefined();
+      expect((result as any).longitude).toBeUndefined();
+      expect((result as any).tankVolume).toBeUndefined();
+      expect((result as any).flowRate).toBeUndefined();
+    });
+
+    it('PRESERVES NUMERIC 0 and does not convert to null', () => {
+      const input = {
+        ph: 0,
+        tds: 0,
+        ec: 0,
+      };
+
+      const result = WaterTelemetryDataSchema.parse(input);
+      expect(result.ph).toBe(0);
+      expect(result.tds).toBe(0);
+      expect(result.ec).toBe(0);
+    });
+
+    it('PRESERVES NULL and MISSING values as NULL', () => {
+      const input = {
+        ph: null,
+        // tds, ec missing
+      };
+
+      const result = WaterTelemetryDataSchema.parse(input);
+      expect(result.ph).toBeNull();
+      expect(result.tds).toBeNull();
+      expect(result.ec).toBeNull();
+    });
+
+    it('rejects non-finite numeric values (NaN, Infinity)', () => {
+      expect(() =>
+        WaterTelemetryDataSchema.parse({
+          ph: NaN,
+        })
+      ).toThrow();
+
+      expect(() =>
+        WaterTelemetryDataSchema.parse({
+          tds: Infinity,
+        })
+      ).toThrow();
+    });
+
+    it('parses valid water telemetry payload envelope', () => {
+      const payload = {
+        schemaVersion: '1.0',
+        messageId: 'water-msg-000001',
+        deviceId: 'water-node-001',
+        siteId: 'site-01',
+        sequence: 42,
+        recordedAt: '2026-08-10T10:00:00+07:00',
+        data: {
+          ph: 6.8,
+          tds: 410,
+          ec: 1.2,
+          status: 'NORMAL',
+        },
+      };
+
+      const result = WaterTelemetryPayloadSchema.parse(payload);
+      expect(result.schemaVersion).toBe('1.0');
+      expect(result.messageId).toBe('water-msg-000001');
+      expect(result.deviceId).toBe('water-node-001');
+      expect(result.data.ph).toBe(6.8);
+      expect(result.data.ec).toBe(1.2);
     });
   });
 

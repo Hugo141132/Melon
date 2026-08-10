@@ -55,7 +55,7 @@
 | `PRD-DATA-001` | Soil telemetry metrics data schema | `docs/PRD.md` | `DEC-MON-036` | `TASK-0405` | `TEST-MQTT-001` | `READY_FOR_IMPLEMENTATION` |
 | `PRD-DATA-002` | Water telemetry metrics data schema | `docs/PRD.md` | `DEC-MON-085` | `TASK-0406` | `TEST-MQTT-001` | `READY_FOR_IMPLEMENTATION` |
 | `PRD-DATA-005` | Reservoir water telemetry metrics data schema | `docs/PRD.md` | `DEC-MON-036` | `TASK-0408` | `TEST-MQTT-001` | `DECISION_REQUIRED` |
-| `PRD-DATA-006` | Shared sensor/tool battery telemetry metrics data schema | `docs/PRD.md` | `DEC-MON-036` | `TASK-0409` | `TEST-MQTT-001` | `DECISION_REQUIRED` |
+| `PRD-DATA-006` | Shared sensor/tool battery telemetry metrics data schema | `docs/PRD.md` | `DEC-MON-036` | `TBD (Proposed Domain)` | `TEST-MQTT-001` | `DECISION_REQUIRED` |
 | `PRD-DATA-003` | Faucet preset target volume mappings | `docs/PRD.md` | `DEC-CTRL-051` | `TASK-0802` | `TEST-CTRL-001` | `READY_FOR_IMPLEMENTATION` |
 | `PRD-DATA-004` | User account profile data schema | `docs/PRD.md` | - | `TASK-0201` | `TEST-DB-001` | `IMPLEMENTED` |
 | `RBAC-ROLE-001` | OWNER role permissions and scope | `docs/RBAC.md` | `DEC-RBAC-013` | `TASK-0209` | `TEST-SEC-002` | `READY_FOR_IMPLEMENTATION` |
@@ -148,7 +148,7 @@
 | `DB-TEL-001` | soil_telemetry table schema definition | `docs/DATABASE.md` | `DEC-MON-036` | `TASK-0405` | `TEST-DB-001` | `VERIFIED` |
 | `DB-TEL-002` | water_telemetry table schema definition | `docs/DATABASE.md` | `DEC-MON-036` | `TASK-0406` | `TEST-DB-001` | `VERIFIED` |
 | `DB-TEL-003` | reservoir_water_telemetry table schema definition | `docs/DATABASE.md` | `DEC-MON-036` | `TASK-0408` | `TEST-DB-001` | `VERIFIED` |
-| `DB-TEL-004` | sensor_battery_telemetry table schema definition | `docs/DATABASE.md` | `DEC-MON-036` | `TASK-0409` | `TEST-DB-001` | `VERIFIED` |
+| `DB-TEL-004` | sensor_battery_telemetry table schema definition | `docs/DATABASE.md` | `DEC-MON-036` | `TBD (Proposed Domain)` | `TEST-DB-001` | `VERIFIED` |
 | `DB-CMD-001` | faucet_commands table schema definition | `docs/DATABASE.md` | `DEC-CTRL-051` | `TASK-0802` | `TEST-DB-002` | `READY_FOR_IMPLEMENTATION` |
 | `DB-CMD-002` | faucet_command_events table schema definition | `docs/DATABASE.md` | `DEC-CTRL-051` | `TASK-0802` | `TEST-DB-002` | `READY_FOR_IMPLEMENTATION` |
 | `DB-AUDIT-001` | audit_logs table schema definition | `docs/DATABASE.md` | - | `TASK-0903` | `TEST-DB-002` | `READY_FOR_IMPLEMENTATION` |

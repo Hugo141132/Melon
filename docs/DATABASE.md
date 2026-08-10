@@ -715,7 +715,7 @@ Stores reservoir-water volume and flow rate telemetry independently from general
 ---
 
 ## 8.5 `sensor_battery_readings` (DB-TEL-004)
-Stores time-series battery / power-supply measurements incorporated into soil (`SOIL_NODE`) and water (`WATER_QUALITY_NODE`) monitoring equipment. (`BAT` stands for Battery, `DEC-MON-085`).
+Stores time-series battery / power-supply measurements. Note: `BAT` is completely removed from soil (`SOIL_NODE`) and water (`WATER_QUALITY_NODE`) monitoring telemetry per `DEC-MON-086` (superseding `DEC-MON-085`). Table schema is retained for standalone hardware power telemetry (`TASK-0409`).
 
 | Column | Type | Nullable | Notes |
 |---|---|---:|---|

@@ -1347,12 +1347,7 @@ Response:
       "ph": 7.1,
       "tds": 420,
       "ec": 0.84,
-      "battery": 82,
-      "latitude": -6.2001,
-      "longitude": 106.8168,
       "status": "NORMAL",
-      "tankVolume": 75.0,
-      "flowRate": 2.3,
       "freshness": "CURRENT"
     }
   }
@@ -1480,17 +1475,12 @@ GET /api/v1/devices/{deviceId}/monitoring/water/history
 
 Same requirements as soil history.
 
-Supported metrics may include:
+Supported metrics for water-quality:
 
 ```text
 ph
 tds
 ec
-battery
-latitude
-longitude
-tankVolume
-flowRate
 ```
 
 ---
@@ -2524,4 +2514,4 @@ The API is accepted when:
 7. The real-time transport is not final.
 8. The gateway integration method is not final.
 9. Command cancellation and stop behaviour remain unresolved.
-10. ~~`Water BAT` semantics.~~ **RESOLVED** — `BAT` stands for Battery, incorporated into soil and water quality sensors (`DEC-MON-085`).
+10. ~~`Water BAT` semantics.~~ **RESOLVED** — `BAT` parameter is removed completely from soil and water quality monitoring (`DEC-MON-086`, superseding `DEC-MON-085`).

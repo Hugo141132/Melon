@@ -20,9 +20,17 @@ describe('TelemetryRepository Unit Tests (TASK-0405)', () => {
         findFirst: vi.fn(),
       },
       waterReading: {
+        create: vi.fn(),
+        findUnique: vi.fn(),
         findFirst: vi.fn(),
       },
+      sensorBatteryReading: {
+        create: vi.fn(),
+        findUnique: vi.fn(),
+      },
       reservoirWaterReading: {
+        create: vi.fn(),
+        findUnique: vi.fn(),
         findFirst: vi.fn(),
       },
       $transaction: vi.fn(async (cb: any) => cb(mockPrisma)),
@@ -185,6 +193,151 @@ describe('TelemetryRepository Unit Tests (TASK-0405)', () => {
       };
 
       await expect(repo.ingestSoilReading(input)).rejects.toThrow(DeviceNotFoundError);
+    });
+  });
+
+  describe('ingestWaterReading (TASK-0406)', () => {
+    it('successfully ingests valid water quality reading and updates lastSeenAt atomically (DEC-DEV-020, DEC-MON-086)', async () => {
+      const mockDevice = {
+        id: 'water-dev-uuid-1',
+        deviceId: 'water-node-001',
+        accountStatus: 'ACTIVE',
+      };
+
+      const mockCreatedWaterReading = {
+        id: 'water-reading-uuid-1',
+        deviceId: mockDevice.id,
+        messageId: 'msg-water-001',
+        sequenceNumber: BigInt(5),
+        schemaVersion: '1.0',
+        recordedAt: new Date('2026-08-10T10:00:00Z'),
+        receivedAt: new Date('2026-08-10T10:00:01Z'),
+        ph: new Prisma.Decimal(6.8),
+        tds: new Prisma.Decimal(420),
+        ec: new Prisma.Decimal(1.2),
+        status: MonitoringStatus.NORMAL,
+        validationStatus: TelemetryValidationStatus.VALID,
+      };
+
+      mockPrisma.device.findFirst.mockResolvedValue(mockDevice);
+      mockPrisma.waterReading.create.mockResolvedValue(mockCreatedWaterReading);
+      mockPrisma.device.update.mockResolvedValue({ ...mockDevice, lastSeenAt: new Date() });
+
+      const input = {
+        deviceId: 'water-node-001',
+        messageId: 'msg-water-001',
+        schemaVersion: '1.0',
+        sequenceNumber: 5,
+        recordedAt: '2026-08-10T10:00:00Z',
+        ph: 6.8,
+        tds: 420,
+        ec: 1.2,
+        status: MonitoringStatus.NORMAL,
+      };
+
+      const result = await repo.ingestWaterReading(input);
+
+      expect(result.readingId).toBe(mockCreatedWaterReading.id);
+      expect(result.deviceId).toBe(mockDevice.id);
+      expect(result.canonicalDeviceId).toBe('water-node-001');
+      expect(result.messageId).toBe('msg-water-001');
+      expect(result.isDuplicate).toBe(false);
+
+      // Verify waterReading create payload
+      expect(mockPrisma.waterReading.create).toHaveBeenCalledTimes(1);
+      const waterArg = mockPrisma.waterReading.create.mock.calls[0][0].data;
+      expect(waterArg.deviceId).toBe(mockDevice.id);
+      expect(waterArg.ph).toEqual(new Prisma.Decimal(6.8));
+
+      // Verify atomic device update call
+      expect(mockPrisma.device.update).toHaveBeenCalledTimes(1);
+    });
+
+    it('PRESERVES NUMERIC 0 values and NULL for omitted parameters', async () => {
+      const mockDevice = {
+        id: 'water-dev-uuid-1',
+        deviceId: 'water-node-001',
+        accountStatus: 'ACTIVE',
+      };
+
+      mockPrisma.device.findFirst.mockResolvedValue(mockDevice);
+      mockPrisma.waterReading.create.mockResolvedValue({
+        id: 'water-reading-uuid-2',
+        deviceId: mockDevice.id,
+        messageId: 'msg-water-zero',
+        recordedAt: null,
+        receivedAt: new Date(),
+        ph: new Prisma.Decimal(0),
+        tds: null,
+        validationStatus: TelemetryValidationStatus.VALID,
+      });
+
+      const input = {
+        deviceId: 'water-node-001',
+        messageId: 'msg-water-zero',
+        schemaVersion: '1.0',
+        ph: 0, // Explicit zero
+        // tds omitted
+      };
+
+      await repo.ingestWaterReading(input);
+
+      const waterArg = mockPrisma.waterReading.create.mock.calls[0][0].data;
+      expect(waterArg.ph).toEqual(new Prisma.Decimal(0));
+      expect(waterArg.tds).toBeNull();
+      expect(waterArg.ec).toBeNull();
+    });
+
+    it('handles DUPLICATE water message IDs idempotently without throwing error', async () => {
+      const mockDevice = {
+        id: 'water-dev-uuid-1',
+        deviceId: 'water-node-001',
+        accountStatus: 'ACTIVE',
+      };
+
+      mockPrisma.device.findFirst.mockResolvedValue(mockDevice);
+
+      const p2002Error = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: '5.0.0',
+      });
+
+      mockPrisma.$transaction.mockRejectedValueOnce(p2002Error);
+
+      const mockExistingReading = {
+        id: 'existing-water-reading-id',
+        deviceId: mockDevice.id,
+        messageId: 'msg-water-dup',
+        recordedAt: new Date('2026-08-10T10:00:00Z'),
+        receivedAt: new Date('2026-08-10T10:00:01Z'),
+        validationStatus: TelemetryValidationStatus.VALID,
+      };
+
+      mockPrisma.waterReading.findUnique.mockResolvedValue(mockExistingReading);
+
+      const input = {
+        deviceId: 'water-node-001',
+        messageId: 'msg-water-dup',
+        schemaVersion: '1.0',
+      };
+
+      const result = await repo.ingestWaterReading(input);
+
+      expect(result.readingId).toBe('existing-water-reading-id');
+      expect(result.isDuplicate).toBe(true);
+      expect(result.messageId).toBe('msg-water-dup');
+    });
+
+    it('throws DeviceNotFoundError when target device does not exist', async () => {
+      mockPrisma.device.findFirst.mockResolvedValue(null);
+
+      const input = {
+        deviceId: 'unregistered-water-999',
+        messageId: 'msg-water-001',
+        schemaVersion: '1.0',
+      };
+
+      await expect(repo.ingestWaterReading(input)).rejects.toThrow(DeviceNotFoundError);
     });
   });
 

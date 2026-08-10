@@ -115,6 +115,66 @@ export const LatestMonitoringSnapshotDtoSchema = z.object({
 export type LatestMonitoringSnapshotDto = z.infer<typeof LatestMonitoringSnapshotDtoSchema>;
 
 /**
+ * Shared Water Quality Telemetry Data Schema & Type
+ * Source of truth: docs/DEVICE_COMMUNICATION.md §14, DEC-DEV-020, DEC-MON-086
+ * Water-Quality monitoring domain (REST API over Wi-Fi).
+ * BAT parameter is removed per DEC-MON-086 (superseding DEC-MON-085).
+ * Latitude and Longitude parameters are deleted and must not be reintroduced.
+ * Reservoir tankVolume and flowRate parameters remain on the MQTT/IoT Gateway path (WATER_TANK_NODE).
+ */
+export const WaterTelemetryDataSchema = z.object({
+  ph: z.number().finite().nullable().optional().default(null),
+  tds: z.number().finite().nullable().optional().default(null),
+  ec: z.number().finite().nullable().optional().default(null),
+  status: z.nativeEnum(MonitoringStatus).nullable().optional().default(null),
+});
+
+export type WaterTelemetryData = z.infer<typeof WaterTelemetryDataSchema>;
+
+/**
+ * Water Telemetry Payload Envelope Schema & Type
+ */
+export const WaterTelemetryPayloadSchema = z.object({
+  schemaVersion: z.string().min(1).default('1.0'),
+  messageId: z.string().min(1).max(150),
+  deviceId: z.string().min(1).max(150),
+  siteId: z.string().min(1).max(150).optional().nullable(),
+  sequence: z.number().int().nonnegative().optional().nullable(),
+  recordedAt: z.string().optional().nullable(),
+  timestamp: z.string().optional().nullable(),
+  data: WaterTelemetryDataSchema,
+});
+
+export type WaterTelemetryPayload = z.infer<typeof WaterTelemetryPayloadSchema>;
+
+/**
+ * DTO for persisting Water Quality Telemetry reading (REST API over Wi-Fi)
+ */
+export interface IngestWaterTelemetryInput {
+  deviceId: string;
+  messageId: string;
+  schemaVersion: string;
+  sequenceNumber?: bigint | number | null;
+  recordedAt?: Date | string | null;
+  ph?: number | null;
+  tds?: number | null;
+  ec?: number | null;
+  status?: string | null;
+  validationStatus?: TelemetryValidationStatus | string;
+}
+
+export interface WaterTelemetryIngestionResult {
+  readingId: string;
+  deviceId: string;
+  canonicalDeviceId: string;
+  messageId: string;
+  recordedAt: Date | null;
+  receivedAt: Date;
+  isDuplicate: boolean;
+  validationStatus: string;
+}
+
+/**
  * Shared Reservoir-Water Telemetry Data Schema & Type (Water Tank Node)
  * Source of truth: docs/DEVICE_COMMUNICATION.md §14.1
  */
@@ -157,3 +217,4 @@ export interface IngestReservoirTelemetryInput {
   status?: string | null;
   validationStatus?: TelemetryValidationStatus | string;
 }
+

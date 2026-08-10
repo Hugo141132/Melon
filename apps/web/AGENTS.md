@@ -16,10 +16,10 @@ This document specifies operational guidelines and system boundaries for coding 
 
 ## 1. Domain Telemetry Rules
 
-- **Soil Monitoring (`SOIL_NODE`)**: Nitrogen, Phosphorus, Potassium (`mg/kg`), Temperature (`°C`), Moisture (`%`), pH (unitless), Electrical Conductivity (`mS/cm`), Battery (`BAT`, `%` or Volts), Soil Status.
-- **Water Quality Monitoring (`WATER_QUALITY_NODE`)**: pH (unitless), TDS (`ppm`), EC (`mS/cm`), Battery (`BAT`, `%` or Volts), Water Status.
-- **Battery Parameter (`BAT`)**: `BAT` stands for **Battery** (not "Water BAT"). It is incorporated directly into soil and water quality sensor nodes to monitor equipment power supply.
-- **Deleted Parameters**: `latitude` and `longitude` are **DELETED** from Water Quality telemetry monitoring and shall not be displayed or processed.
+- **Soil Monitoring (`SOIL_NODE`)**: Nitrogen, Phosphorus, Potassium (`mg/kg`), Temperature (`°C`), Moisture (`%`), pH (unitless), Electrical Conductivity (`mS/cm`), Soil Status. (Battery `BAT` removed per `DEC-MON-086`).
+- **Water Quality Monitoring (`WATER_QUALITY_NODE`)**: pH (unitless), TDS (`ppm`), EC (`mS/cm`), Water Status. (Battery `BAT`, `latitude`, and `longitude` deleted per `DEC-MON-086`).
+- **Battery Parameter (`BAT`)**: `BAT` monitoring parameter is completely removed from soil and water quality monitoring domains (`DEC-MON-086`, superseding `DEC-MON-085`).
+- **Deleted Parameters**: `battery`, `latitude`, and `longitude` are **DELETED** from Soil & Water Quality telemetry monitoring and shall not be displayed or processed.
 - **Water Tank Monitoring (`WATER_TANK_NODE`)**: Tank Volume (`L`), Flow Rate (`m³/h`), Tank Status.
 
 ---

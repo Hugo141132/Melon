@@ -709,12 +709,10 @@ Recommended payload:
 | `ph` | Number or null | Yes when capability exists | Unitless |
 | `tds` | Number or null | Yes when capability exists | `TBD` |
 | `ec` | Number or null | Yes when capability exists | `TBD` |
-| `battery` | Number or null | Yes when capability exists | `%`, volts, or `TBD` |
+| `battery` | Number or null | DELETED | Deleted parameter (`DEC-MON-086`) |
 | `latitude` | Number or null | DELETED | Deleted parameter |
 | `longitude` | Number or null | DELETED | Deleted parameter |
 | `status` | Canonical enum | Recommended | Defined by external status rules |
-| `tankVolume` | Number or null | When tank capability exists | `TBD` |
-| `flowRate` | Number or null | When flow capability exists | `TBD` |
 
 Allowed provisional water status values:
 
@@ -727,7 +725,7 @@ UNAVAILABLE
 INVALID
 ```
 
-The `battery` (`BAT`) parameter stands for **Battery** (not "Water BAT") and measures equipment power supply incorporated directly into soil and water quality sensor nodes (`DEC-MON-085`).
+The `battery` (`BAT`) parameter is removed completely from soil and water quality monitoring (`DEC-MON-086`, superseding `DEC-MON-085`).
 
 ---
 

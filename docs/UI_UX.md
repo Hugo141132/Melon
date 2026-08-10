@@ -509,10 +509,7 @@ The water section shall display:
 
 ### 11.1 Equipment Battery (BAT)
 
-`BAT` stands for **Battery** (`DEC-MON-085`) incorporated directly into soil and water quality monitoring sensor nodes:
-
-- display the supplied unit (`%` or Volts);
-- label unavailable semantics clearly.
+`BAT` (Battery) parameter is **REMOVED** from soil and water quality monitoring sensor nodes (`DEC-MON-086`, superseding `DEC-MON-085`). It shall not be rendered in soil or water quality dashboard cards.
 
 ### 11.2 Water Location
 

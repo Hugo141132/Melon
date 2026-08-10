@@ -231,7 +231,7 @@ Standard Next.js App Router workspace with `app/`, `components/`, `lib/`, `docs/
 `app/tanah/page.tsx`, `components/charts/NPKChart.tsx`, inline `NPKMeter` cards. Telemetry values present: N (145 mg/kg), P (42 mg/kg), K (198 mg/kg), Soil status ("Optimal"). Temp, Moisture, pH, EC are rendered on dashboard (`app/page.tsx`).
 
 ### 21. Existing Water-Monitoring Components
-`app/air/page.tsx`, `components/charts/WaterNutrientChart.tsx`, inline `ECGauge` (1.8 mS/cm), `PHBar` (6.2), TDS metric (920 ppm), Tank Volume progress bar (450/600L), Flow Rate metric (12.5 L/min). Note: `BAT` (Battery) parameter is incorporated into soil & water quality nodes (`DEC-MON-085`). Latitude and Longitude parameters are deleted.
+`app/air/page.tsx`, `components/charts/WaterNutrientChart.tsx`, inline `ECGauge` (1.8 mS/cm), `PHBar` (6.2), TDS metric (920 ppm), Tank Volume progress bar (450/600L), Flow Rate metric (12.5 L/min). Note: `BAT` (Battery) parameter is removed from soil & water quality nodes (`DEC-MON-086`, superseding `DEC-MON-085`). Latitude and Longitude parameters are deleted.
 
 ### 22. Existing Device-Selection Components
 None. Current UI assumes a single farm view without device picker, multi-device list, or `deviceId` context.
@@ -316,7 +316,7 @@ None. No `Dockerfile`, `docker-compose.yml`, or CI/CD deployment files exist.
 | Auth & RBAC | Simulated UI state only, no server-side auth/RBAC | **Confirmed** |
 | API & IoT | 100% static mock data (`lib/constants.ts`), no HTTP/MQTT | **Confirmed** |
 | Tests | No unit, integration, or E2E tests installed | **Confirmed** |
-| `BAT` Parameter Meaning | Resolved via `DEC-MON-085` (`BAT` = Battery for soil & water quality nodes) | **Resolved** |
+| `BAT` Parameter Meaning | Resolved via `DEC-MON-086` (`BAT` removed from soil & water quality nodes) | **Resolved** |
 | Release Decisions | Product decisions in `TASK-0002` unresolved | **BLOCKED / TBD** |
 
 ---

@@ -1,3 +1,6 @@
 import WaterPage from '../water/page';
 
-export default WaterPage;
+export default function AirPage() {
+  return <WaterPage />;
+}
+

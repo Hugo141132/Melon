@@ -33,7 +33,7 @@ The system monitors:
 
 ### Water Quality Monitoring (REST API over Wi-Fi)
 
-- pH, TDS, EC, Battery (`BAT`), Water status (Latitude and Longitude deleted).
+- pH, TDS, EC, Water status (Battery, Latitude, and Longitude deleted).
 
 ### Reservoir-Water Monitoring (MQTT 5.0 over TLS via EMQX Broker)
 
@@ -41,7 +41,7 @@ The system monitors:
 
 ### Sensor Battery (`BAT`)
 
-- Equipment power supply battery monitoring incorporated into soil and water quality sensor nodes via REST API over Wi-Fi. (`BAT` stands for Battery, not Water BAT).
+- Battery (`BAT`) parameter is completely removed from soil and water quality monitoring domains (`DEC-MON-086`, superseding `DEC-MON-085`).
 
 ### Faucet Control Presets
 

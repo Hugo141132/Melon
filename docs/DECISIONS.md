@@ -155,17 +155,22 @@
   1. **Soil Monitoring**: REST API over Wi-Fi submitted directly to backend ingestion endpoint (No MQTT broker).
   2. **Water Monitoring**: REST API over Wi-Fi submitted directly to backend ingestion endpoint (No MQTT broker).
   3. **Reservoir-Water Monitoring**: MQTT 5.0 over TLS via EMQX broker ingested through long-running backend IoT Gateway service.
-  4. **Sensor Battery (`BAT`)**: `BAT` stands for **Battery** (not "Water BAT"). It is incorporated directly into soil and water quality sensor nodes to monitor equipment power supply (`DEC-MON-085`).
+  4. **Sensor Battery (`BAT`)**: `BAT` parameter is removed completely from soil and water quality monitoring (`DEC-MON-086`, superseding `DEC-MON-085`).
   5. **Protocol Routing Determinism**: Protocol selection is deterministically resolved using `DeviceType` (`SOIL_NODE`, `WATER_QUALITY_NODE`, `WATER_TANK_NODE`) combined with registered `DeviceCapability` entries (`SOIL_TELEMETRY`, `WATER_TELEMETRY`, `TANK_MONITORING`, `FLOW_MONITORING`, `FAUCET_CONTROL`). The existing `DeviceType` enum values are sufficient without schema modification.
 
 #### DEC-MON-085: Battery (BAT) Parameter Identity & Sensor Node Incorporation
 * **Related Task IDs**: `TASK-0405`, `TASK-0406`
 * **Related Documentation**: `DEVICE_COMMUNICATION.md` §14, `DATABASE.md` §8.5, `AGENTS.md` §2
+* **Status**: **SUPERSEDED BY DEC-MON-086**
+
+#### DEC-MON-086: Complete Removal of Sensor Battery (BAT) Parameter from Soil & Water Quality Domains
+* **Related Task IDs**: `TASK-0405`, `TASK-0406`
+* **Related Documentation**: `DEVICE_COMMUNICATION.md` §14, `DATABASE.md` §8.5, `AGENTS.md` §2
 * **Status**: **APPROVED BY USER (2026-08-10)**
 * **Approved Decision**:
-  1. The `BAT` parameter stands for **Battery** (not "Water BAT").
-  2. The Battery (`BAT`) parameter is incorporated directly into both **soil monitoring sensors** (`SOIL_NODE`) and **water quality sensors** (`WATER_QUALITY_NODE`) to measure equipment power supply.
-  Per-device unique username/password with per-device topic ACLs for reservoir MQTT. No anonymous production access. No direct browser-to-MQTT or browser-to-EMQX connections. No retained faucet commands.
+  1. The `BAT` (Battery) monitoring parameter is removed completely from both **soil monitoring sensors** (`SOIL_NODE`) and **water quality sensors** (`WATER_QUALITY_NODE`).
+  2. Battery power telemetry is not part of soil or water-quality payload schemas or database ingestion.
+  3. `DEC-MON-085` is officially SUPERSEDED by `DEC-MON-086`.
 
 ---
 
