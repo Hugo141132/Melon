@@ -1033,14 +1033,13 @@ flowchart LR
 
 ### 22.2 Staging
 
-Staging shall use:
+Staging environment topology is fully provisioned and verified:
 
-- Separate database.
-- Separate broker namespace.
-- Separate device credentials.
-- Separate secrets.
-- Test devices or device simulators.
-- Production-like TLS.
+- **Web Frontend**: Railway PaaS (`https://melon-monitor.up.railway.app`)
+- **IoT Gateway Service**: Railway PaaS (`https://iot-gateway-production-7e17.up.railway.app`)
+- **Staging Database**: Supabase PostgreSQL (`scqrbtfilmttqrutynyo`) via Supavisor Session Pooler (`aws-0-ap-south-1.pooler.supabase.com:6543`)
+- **Staging MQTT Broker**: EMQX Cloud Serverless (`wss://` WebSockets / TLS, client password authentication, per-device topic ACLs)
+- **Safety Policy**: `ENABLE_FAUCET_CONTROL=false` strictly enforced
 
 ### 22.3 Production
 

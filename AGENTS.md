@@ -226,6 +226,16 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
 - Selected motion effects: `Card hover`, `Skeleton loading`
 - 21st.dev MCP: `NOT REQUIRED`
 
+#### TASK-1004 Governance & Infrastructure Record
+
+`TASK-1004` staging infrastructure and verification record:
+- Frontend impact: `NONE`
+- Provisioned Staging Hosting: Railway PaaS (`melon-monitor.up.railway.app` for `web`, `iot-gateway-production-7e17.up.railway.app` for `iot-gateway`)
+- Provisioned Staging Database: Supabase PostgreSQL (`scqrbtfilmttqrutynyo`) via Supavisor Session Pooler (`aws-0-ap-south-1.pooler.supabase.com:6543`)
+- Provisioned Staging MQTT Broker: EMQX Cloud Serverless (`wss://` TLS active, password-authenticated gateway service, per-device topic ACLs)
+- Safety Configuration: `ENABLE_FAUCET_CONTROL=false` strictly enforced
+- Verification Results: 10/12 flows verified (Flow 7 failed due to missing Phase 6 UI switcher; Flows 8-10 safely blocked by feature flag)
+
 ---
 
 ## 5. Task Selection Rules

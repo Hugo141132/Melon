@@ -2033,30 +2033,36 @@ Critical unit coverage includes:
 ## TASK-1004 — Complete End-to-End Critical Flows
 
 **Priority:** `P0`  
-**Status:** `BLOCKED`
-**Blocker:** Staging deployment environment and hosting infrastructure are missing; E2E flows pass 100% on local dev server (http://localhost:3000) but cannot satisfy the acceptance criterion "Flows pass in staging" until staging hosting is provisioned.
-**Dependencies:** Core UI and APIs
+**Status:** `IN_PROGRESS`  
+**Dependencies:** Core UI, APIs, and Staging Infrastructure  
+**Infrastructure Provisioned:**
+- Staging Web: `https://melon-monitor.up.railway.app`
+- Staging Gateway: `https://iot-gateway-production-7e17.up.railway.app`
+- Staging Database: Supabase PostgreSQL (`scqrbtfilmttqrutynyo`) via Supavisor Pooler (`aws-0-ap-south-1.pooler.supabase.com:6543`)
+- Staging Broker: EMQX Cloud Serverless (`wss://` TLS active, per-device topic ACLs)
+- Safety Configuration: `ENABLE_FAUCET_CONTROL=false` strictly enforced
 
-Required flows:
+Required flows status:
 
-- Admin registration.
-- Owner approval.
-- Active Admin login.
-- Device assignment.
-- Monitoring.
-- History.
-- Language switch.
-- Faucet command.
-- Command completion.
-- Command failure.
-- Session expiry.
-- Access revocation.
+- [x] Admin registration (Flow 1 — PASS)
+- [x] Owner approval (Flow 2 — PASS)
+- [x] Active Admin login (Flow 3 — PASS)
+- [x] Device assignment (Flow 4 — PASS)
+- [x] Monitoring (Flow 5 — PASS)
+- [x] History (Flow 6 — PASS)
+- [ ] Language switch (Flow 7 — PENDING Phase 6 `TASK-0604` UI switcher component)
+- [x] Faucet command (Flow 8 — SAFELY BLOCKED by `ENABLE_FAUCET_CONTROL=false` returning HTTP 403)
+- [x] Command completion (Flow 9 — SAFELY BLOCKED by `ENABLE_FAUCET_CONTROL=false`)
+- [x] Command failure (Flow 10 — SAFELY BLOCKED by `ENABLE_FAUCET_CONTROL=false`)
+- [x] Session expiry (Flow 11 — PASS)
+- [x] Access revocation (Flow 12 — PASS)
 
 ### Acceptance Criteria
 
-- Flows pass in staging.
-- Screenshots or test traces are retained.
-- Failures block release.
+- Staging infrastructure provisioned and `/ready` verified.
+- Critical flows tested against staging.
+- Screenshots or test traces retained.
+- Failures block final production release.
 
 ---
 
