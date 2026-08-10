@@ -42,8 +42,9 @@ coverage/
 test-results/
 playwright-report/
 blob-report/
+kebun Melon-1.html
 
 # MQTT Broker — Generated Runtime & Credentials (do NOT track)
 docker/mosquitto/config/pwfile
 docker/mosquitto/data/
-docker/mosquitto/log/
+docker/mosquitto/log/
