@@ -217,4 +217,3 @@ export interface IngestReservoirTelemetryInput {
   status?: string | null;
   validationStatus?: TelemetryValidationStatus | string;
 }
-
