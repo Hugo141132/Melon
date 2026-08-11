@@ -7,6 +7,8 @@ import {
   SoilMonitoringResponseDtoSchema,
   WaterMonitoringResponseDtoSchema,
   LatestMonitoringSnapshotDtoSchema,
+  SoilHistoryQuerySchema,
+  SoilHistoryResponseDtoSchema,
   MonitoringStatus,
   DeviceType,
   DeviceConnectionStatus,
@@ -335,6 +337,51 @@ describe('Soil & Water Telemetry Contract Schemas', () => {
       expect(result.connectionStatus).toBe(DeviceConnectionStatus.ONLINE);
       expect(result.soil).toBeNull();
       expect(result.water?.data.tankVolume).toBe(500);
+    });
+  });
+
+  describe('Historical Query & Response Schemas (TASK-0503)', () => {
+    it('parses SoilHistoryQuerySchema with default and custom values', () => {
+      const defaultParsed = SoilHistoryQuerySchema.parse({});
+      expect(defaultParsed.page).toBe(1);
+      expect(defaultParsed.pageSize).toBe(20);
+
+      const customParsed = SoilHistoryQuerySchema.parse({
+        page: '2',
+        pageSize: '10',
+      });
+      expect(customParsed.page).toBe(2);
+      expect(customParsed.pageSize).toBe(10);
+    });
+    it('rejects pageSize exceeding 100', () => {
+      expect(() => SoilHistoryQuerySchema.parse({ pageSize: '101' })).toThrow();
+    });
+
+    it('parses SoilHistoryResponseDtoSchema preserving null vs zero semantics', () => {
+      const response = {
+        deviceId: 'DEV-SOIL-001',
+        from: '2026-08-01T00:00:00Z',
+        to: '2026-08-02T00:00:00Z',
+        interval: 'raw',
+        series: [
+          {
+            timestamp: '2026-08-01T10:00:00Z',
+            nitrogen: 0,
+            phosphorus: null,
+            ph: 6.8,
+          },
+        ],
+        pagination: {
+          page: 1,
+          pageSize: 50,
+          totalRecords: 1,
+          totalPages: 1,
+        },
+      };
+
+      const result = SoilHistoryResponseDtoSchema.parse(response);
+      expect(result.series[0].nitrogen).toBe(0);
+      expect(result.series[0].phosphorus).toBeNull();
     });
   });
 });

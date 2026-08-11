@@ -172,6 +172,18 @@
   2. Battery power telemetry is not part of soil or water-quality payload schemas or database ingestion.
   3. `DEC-MON-085` is officially SUPERSEDED by `DEC-MON-086`.
 
+#### DEC-MON-087: Historical Query API Range Bounds, Pagination Limits & Aggregation Policy
+* **Related Task IDs**: `TASK-0503`
+* **Related Documentation**: `docs/API.md` §17, `docs/DATABASE.md` §8.5, `AGENTS.md` §2
+* **Status**: **APPROVED BY PRODUCT OWNER (2026-08-11)**
+* **Approved Decision**:
+  1. **Default History Range**: Default query range is the last 24 hours (`from` defaults to `now - 24 hours`, `to` defaults to `now`).
+  2. **Maximum History Range**: Maximum date range is 31 days (`to - from <= 31 days`). Queries exceeding 31 days are rejected with HTTP 400 (`DATE_RANGE_EXCEEDED`).
+  3. **Default Page Size**: Default `pageSize` is `20` per `API.md`.
+  4. **Maximum Page Size**: Maximum `pageSize` is `100`. Queries requesting `pageSize > 100` are rejected with HTTP 400 (`VALIDATION_ERROR`).
+  5. **Raw Bounded Pagination Only**: `TASK-0503` implements raw bounded pagination only. Bucket aggregation (`interval` parameter) is deferred until its rules are separately approved.
+  6. **Telemetry Scope Isolation**: Water-quality history queries remain strictly separate from reservoir water telemetry. Optional combined-history endpoint is unapproved and omitted.
+
 ---
 
 ### 2.4 Faucet Control Safety Rules

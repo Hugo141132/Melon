@@ -18,11 +18,15 @@ describe('TelemetryRepository Unit Tests (TASK-0405)', () => {
         create: vi.fn(),
         findUnique: vi.fn(),
         findFirst: vi.fn(),
+        count: vi.fn(),
+        findMany: vi.fn(),
       },
       waterReading: {
         create: vi.fn(),
         findUnique: vi.fn(),
         findFirst: vi.fn(),
+        count: vi.fn(),
+        findMany: vi.fn(),
       },
       sensorBatteryReading: {
         create: vi.fn(),
@@ -32,6 +36,8 @@ describe('TelemetryRepository Unit Tests (TASK-0405)', () => {
         create: vi.fn(),
         findUnique: vi.fn(),
         findFirst: vi.fn(),
+        count: vi.fn(),
+        findMany: vi.fn(),
       },
       $transaction: vi.fn(async (cb: any) => cb(mockPrisma)),
     };
@@ -358,6 +364,93 @@ describe('TelemetryRepository Unit Tests (TASK-0405)', () => {
         orderBy: { receivedAt: 'desc' },
       });
       expect(res?.id).toBe('reading-tank-1');
+    });
+  });
+
+  describe('Historical Query Methods (TASK-0503)', () => {
+    const mockDevice = {
+      id: 'dev-uuid-1',
+      deviceId: 'DEV-SOIL-001',
+    };
+
+    describe('getSoilHistory', () => {
+      it('returns raw soil history series preserving 0 vs null semantics and pagination meta', async () => {
+        mockPrisma.device.findFirst.mockResolvedValue(mockDevice);
+        mockPrisma.soilReading.count.mockResolvedValue(2);
+        mockPrisma.soilReading.findMany.mockResolvedValue([
+          {
+            recordedAt: new Date('2026-08-01T10:00:00Z'),
+            receivedAt: new Date('2026-08-01T10:00:01Z'),
+            nitrogen: new Prisma.Decimal(0), // zero
+            phosphorus: null, // null
+            potassium: new Prisma.Decimal(50.5),
+            temperature: new Prisma.Decimal(25.0),
+            moisture: new Prisma.Decimal(60.0),
+            ph: new Prisma.Decimal(6.5),
+            ec: new Prisma.Decimal(1.1),
+            status: 'NORMAL',
+          },
+        ]);
+
+        const result = await repo.getSoilHistory({
+          deviceIdentifier: 'DEV-SOIL-001',
+          from: new Date('2026-08-01T00:00:00Z'),
+          to: new Date('2026-08-02T00:00:00Z'),
+          interval: 'raw',
+          page: 1,
+          pageSize: 50,
+        });
+
+        expect(result.deviceId).toBe('DEV-SOIL-001');
+        expect(result.series.length).toBe(1);
+        expect(result.series[0].nitrogen).toBe(0); // preserved zero
+        expect(result.series[0].phosphorus).toBeNull(); // preserved null
+        expect(result.pagination).toEqual({
+          page: 1,
+          pageSize: 50,
+          totalRecords: 2,
+          totalPages: 1,
+        });
+      });
+
+      it('throws DeviceNotFoundError when device does not exist', async () => {
+        mockPrisma.device.findFirst.mockResolvedValue(null);
+
+        await expect(
+          repo.getSoilHistory({
+            deviceIdentifier: 'NONEXISTENT',
+            from: new Date(),
+            to: new Date(),
+          })
+        ).rejects.toThrow(DeviceNotFoundError);
+      });
+    });
+
+    describe('getWaterHistory', () => {
+      it('returns water quality readings', async () => {
+        mockPrisma.device.findFirst.mockResolvedValue(mockDevice);
+        mockPrisma.waterReading.findMany.mockResolvedValue([
+          {
+            recordedAt: new Date('2026-08-01T10:00:00Z'),
+            receivedAt: new Date('2026-08-01T10:00:01Z'),
+            ph: new Prisma.Decimal(7.0),
+            tds: new Prisma.Decimal(300),
+            ec: new Prisma.Decimal(0.9),
+            status: 'NORMAL',
+          },
+        ]);
+        mockPrisma.waterReading.count.mockResolvedValue(1);
+
+        const result = await repo.getWaterHistory({
+          deviceIdentifier: 'DEV-WATER-001',
+          from: new Date('2026-08-01T00:00:00Z'),
+          to: new Date('2026-08-02T00:00:00Z'),
+        });
+
+        expect(result.series.length).toBe(1);
+        expect(result.series[0].ph).toBe(7.0);
+        expect((result.series[0] as any).tankVolume).toBeUndefined();
+      });
     });
   });
 });

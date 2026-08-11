@@ -1415,6 +1415,13 @@ Response:
 
 # 17. Historical Monitoring Endpoints
 
+> **Approved Rules (`DEC-MON-087`):**
+> - **Default Range:** Last 24 hours (`from` defaults to `now - 24 hours`, `to` defaults to `now`).
+> - **Maximum Range:** 31 days (`to - from <= 31 days`). Range > 31 days returns HTTP 400 (`DATE_RANGE_EXCEEDED`).
+> - **Pagination:** Default `pageSize = 20`, Maximum `pageSize = 100`. `pageSize > 100` returns HTTP 400 (`VALIDATION_ERROR`). Default `page = 1`.
+> - **Raw Bounded Pagination Only:** Raw query telemetry series. Aggregation (`interval` parameter) is deferred until rules are approved.
+> - **Telemetry Isolation:** Water-quality history (`ph`, `tds`, `ec`) is separate from reservoir telemetry (`tankVolume`, `flowRate`).
+
 ## 17.1 Get Soil History
 
 ```http
@@ -1427,18 +1434,17 @@ GET /api/v1/devices/{deviceId}/monitoring/soil/history
 Query parameters:
 
 ```text
-from
-to
-metrics
-interval
-page
-pageSize
+from (ISO 8601 string, optional, default: now - 24h)
+to (ISO 8601 string, optional, default: now)
+metrics (comma-separated string, optional)
+page (integer, optional, default: 1)
+pageSize (integer, optional, default: 20, max: 100)
 ```
 
 Example:
 
 ```http
-GET /api/v1/devices/water-node-001/monitoring/soil/history?from=2026-07-01T00:00:00%2B07:00&to=2026-07-27T23:59:59%2B07:00&metrics=nitrogen,ph,moisture&interval=hour
+GET /api/v1/devices/soil-node-001/monitoring/soil/history?from=2026-08-01T00:00:00Z&to=2026-08-02T00:00:00Z&metrics=nitrogen,ph,moisture&page=1&pageSize=20
 ```
 
 Response:
@@ -1448,17 +1454,22 @@ Response:
   "success": true,
   "data": {
     "deviceId": "soil-node-001",
-    "from": "2026-07-01T00:00:00+07:00",
-    "to": "2026-07-27T23:59:59+07:00",
-    "interval": "hour",
+    "from": "2026-08-01T00:00:00.000Z",
+    "to": "2026-08-02T00:00:00.000Z",
     "series": [
       {
-        "timestamp": "2026-07-27T14:00:00+07:00",
+        "timestamp": "2026-08-01T14:00:00.000Z",
         "nitrogen": 45.2,
         "ph": 6.5,
         "moisture": 67.3
       }
-    ]
+    ],
+    "pagination": {
+      "page": 1,
+      "pageSize": 20,
+      "totalRecords": 1,
+      "totalPages": 1
+    }
   }
 }
 ```
@@ -1473,7 +1484,7 @@ Missing intervals shall remain absent or use `null`, not zero.
 GET /api/v1/devices/{deviceId}/monitoring/water/history
 ```
 
-Same requirements as soil history.
+Same requirements and pagination rules as soil history.
 
 Supported metrics for water-quality:
 
@@ -1491,9 +1502,8 @@ ec
 GET /api/v1/devices/{deviceId}/monitoring/history
 ```
 
-Status: Optional.
-
-Use only when the frontend benefits from one combined endpoint.
+**Status:** Removed / Unused (`DEC-MON-087`).  
+Domain telemetry endpoints (`/soil/history` and `/water/history`) are used independently. Combined history endpoint is not provided.
 
 ---
 

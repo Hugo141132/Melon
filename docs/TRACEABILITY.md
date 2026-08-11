@@ -14,7 +14,7 @@
 | `PRD-FR-002` | Multi-device ESP32/NodeMCU support | `docs/PRD.md` | `DEC-DEV-020` | `TASK-0302` | `TEST-API-003` | `READY_FOR_IMPLEMENTATION` |
 | `PRD-FR-003` | Display latest soil and water monitoring data | `docs/PRD.md` | `DEC-MON-036` | `TASK-0502` | `TEST-E2E-003` | `READY_FOR_IMPLEMENTATION` |
 | `PRD-FR-004` | Display device connectivity and status | `docs/PRD.md` | `` | `TASK-0407` | `TEST-MQTT-002` | `DECISION_REQUIRED` |
-| `PRD-FR-005` | Store and present historical monitoring data | `docs/PRD.md` | `DEC-MON-048` | `TASK-0503` | `TEST-API-004` | `READY_FOR_IMPLEMENTATION` |
+| `PRD-FR-005` | Store and present historical monitoring data | `docs/PRD.md` | `DEC-MON-087` | `TASK-0503` | `TEST-API-004` | `IMPLEMENTED` |
 | `PRD-FR-006` | Send predefined faucet-control commands | `docs/PRD.md` | `DEC-CTRL-051` | `TASK-0803` | `TEST-CTRL-001` | `DECISION_REQUIRED` |
 | `PRD-FR-007` | Record faucet-control activity and outcomes | `docs/PRD.md` | `DEC-CTRL-051` | `TASK-0802` | `TEST-DB-002` | `READY_FOR_IMPLEMENTATION` |
 | `PRD-FR-008` | Enforce Owner and Admin RBAC permissions | `docs/PRD.md` | `DEC-RBAC-015` | `TASK-0209` | `TEST-SEC-001` | `READY_FOR_IMPLEMENTATION` |
@@ -37,7 +37,7 @@
 | `PRD-FR-025` | Canonical status values display | `docs/PRD.md` | - | `TASK-0501` | `TEST-UNIT-003` | `READY_FOR_IMPLEMENTATION` |
 | `PRD-FR-026` | Data freshness and stale data indication | `docs/PRD.md` | `` | `TASK-0407` | `TEST-UNIT-003` | `DECISION_REQUIRED` |
 | `PRD-FR-027` | Dashboard monitoring refresh without full reload | `docs/PRD.md` | `DEC-INF-077` | `TASK-0505` | `TEST-E2E-003` | `DECISION_REQUIRED` |
-| `PRD-FR-028` | Historical data query and chart display | `docs/PRD.md` | `DEC-MON-048` | `TASK-0503` | `TEST-API-004` | `READY_FOR_IMPLEMENTATION` |
+| `PRD-FR-028` | Historical data query and chart display | `docs/PRD.md` | `DEC-MON-087` | `TASK-0503` | `TEST-API-004` | `IMPLEMENTED` |
 | `PRD-FR-029` | Faucet control preset phase volumes | `docs/PRD.md` | `DEC-CTRL-051` | `TASK-0802` | `TEST-CTRL-001` | `READY_FOR_IMPLEMENTATION` |
 | `PRD-FR-030` | Faucet control execution workflow | `docs/PRD.md` | `DEC-CTRL-051` | `TASK-0803` | `TEST-CTRL-002` | `READY_FOR_IMPLEMENTATION` |
 | `PRD-FR-031` | Server-side faucet control authorization check | `docs/PRD.md` | `DEC-RBAC-015` | `TASK-0803` | `TEST-SEC-004` | `READY_FOR_IMPLEMENTATION` |
@@ -48,7 +48,7 @@
 | `PRD-FR-036` | User profile management rules and scope | `docs/PRD.md` | - | `TASK-0211` | `TEST-SEC-002` | `READY_FOR_IMPLEMENTATION` |
 | `PRD-FR-037` | Internationalisation locale support | `docs/PRD.md` | `DEC-I18N-068` | `TASK-0601` | `TEST-E2E-004` | `READY_FOR_IMPLEMENTATION` |
 | `PRD-NFR-001` | Application security controls and baseline defenses | `docs/PRD.md` | `DEC-AUTH-001` | `TASK-0901` | `TEST-SEC-001` | `READY_FOR_IMPLEMENTATION` |
-| `PRD-NFR-002` | Dashboard load and data query performance | `docs/PRD.md` | `` | `TASK-0503` | `TEST-API-004` | `DECISION_REQUIRED` |
+| `PRD-NFR-002` | Dashboard load and data query performance | `docs/PRD.md` | `DEC-MON-087` | `TASK-0503` | `TEST-API-004` | `IMPLEMENTED` |
 | `PRD-NFR-003` | System reliability and fault-tolerant telemetry processing | `docs/PRD.md` | `DEC-DEV-020` | `TASK-0401` | `TEST-MQTT-003` | `READY_FOR_IMPLEMENTATION` |
 | `PRD-NFR-004` | Accessibility compliance standards | `docs/PRD.md` | `` | `TASK-1006` | `TEST-E2E-005` | `DECISION_REQUIRED` |
 | `PRD-NFR-005` | Maintainability and component structure reuse | `docs/PRD.md` | `DEC-INF-075` | `TASK-0102` | `TEST-UNIT-001` | `READY_FOR_IMPLEMENTATION` |
@@ -167,7 +167,7 @@
 | `API-DEV-003` | POST /api/v1/devices creation endpoint | `docs/API.md` | - | `TASK-0302` | `TEST-API-003` | `READY_FOR_IMPLEMENTATION` |
 | `API-DEV-004` | POST /api/v1/user-devices assignment endpoint | `docs/API.md` | `DEC-RBAC-016` | `TASK-0304` | `TEST-API-003` | `READY_FOR_IMPLEMENTATION` |
 | `API-MON-001` | GET /api/v1/devices/{deviceId}/monitoring/latest endpoint | `docs/API.md` | `DEC-MON-036` | `TASK-0501` | `TEST-API-003` | `READY_FOR_IMPLEMENTATION` |
-| `API-MON-002` | GET /api/v1/devices/{deviceId}/monitoring/history endpoint | `docs/API.md` | `DEC-MON-048` | `TASK-0503` | `TEST-API-004` | `READY_FOR_IMPLEMENTATION` |
+| `API-MON-002` | Historical query API endpoints (soil & water history) | `docs/API.md` | `DEC-MON-087` | `TASK-0503` | `TEST-API-004` | `IMPLEMENTED` |
 | `API-MON-003` | GET /api/v1/devices/{deviceId}/monitoring/stream endpoint | `docs/API.md` | `DEC-INF-077` | `TASK-0505` | `TEST-API-003` | `DECISION_REQUIRED` |
 | `API-CTRL-001` | POST /api/v1/devices/{deviceId}/faucet-commands endpoint | `docs/API.md` | `DEC-CTRL-051` | `TASK-0803` | `TEST-CTRL-002` | `DECISION_REQUIRED` |
 | `API-CTRL-002` | GET /api/v1/faucet-commands/{commandId} status endpoint | `docs/API.md` | `DEC-CTRL-051` | `TASK-0803` | `TEST-CTRL-002` | `READY_FOR_IMPLEMENTATION` |
@@ -212,7 +212,7 @@
 | `TEST-API-001` | Authentication API endpoint integration tests | `docs/TESTING.md` | `DEC-AUTH-001` | `TASK-0204` | `TEST-API-001` | `READY_FOR_IMPLEMENTATION` |
 | `TEST-API-002` | User and approval API integration tests | `docs/TESTING.md` | `DEC-AUTH-006` | `TASK-0207` | `TEST-API-002` | `READY_FOR_IMPLEMENTATION` |
 | `TEST-API-003` | Device and monitoring API integration tests | `docs/TESTING.md` | `DEC-MON-036` | `TASK-0501` | `TEST-API-003` | `READY_FOR_IMPLEMENTATION` |
-| `TEST-API-004` | Historical query API integration tests | `docs/TESTING.md` | `DEC-MON-048` | `TASK-0503` | `TEST-API-004` | `READY_FOR_IMPLEMENTATION` |
+| `TEST-API-004` | Historical query API integration tests | `docs/TESTING.md` | `DEC-MON-087` | `TASK-0503` | `TEST-API-004` | `IMPLEMENTED` |
 | `TEST-API-005` | Alerts and audit log API integration tests | `docs/TESTING.md` | - | `TASK-0701` | `TEST-API-005` | `READY_FOR_IMPLEMENTATION` |
 | `TEST-DB-001` | Database migration and schema constraint tests | `docs/TESTING.md` | `DEC-INF-075` | `TASK-0104` | `TEST-DB-001` | `DEFINED` |
 | `TEST-DB-002` | Audit log and command history append-only tests | `docs/TESTING.md` | - | `TASK-0903` | `TEST-DB-002` | `READY_FOR_IMPLEMENTATION` |

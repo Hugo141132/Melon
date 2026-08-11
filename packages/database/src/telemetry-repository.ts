@@ -400,6 +400,9 @@ export class TelemetryRepository {
   /**
    * Fetches the latest ReservoirWaterReading (water tank) for a given device internal UUID or canonical deviceId.
    */
+  /**
+   * Fetches the latest ReservoirWaterReading (water tank) for a given device internal UUID or canonical deviceId.
+   */
   async getLatestWaterTankReading(deviceIdentifier: string) {
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
       deviceIdentifier
@@ -411,4 +414,173 @@ export class TelemetryRepository {
       orderBy: { receivedAt: 'desc' },
     });
   }
+
+  /**
+   * Fetches historical Soil Telemetry readings for a given device within a validated date range.
+   * TASK-0503
+   */
+  async getSoilHistory(options: {
+    deviceIdentifier: string;
+    from: Date;
+    to: Date;
+    metrics?: string[];
+    page?: number;
+    pageSize?: number;
+  }) {
+    const canonicalDeviceId = options.deviceIdentifier.trim();
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      canonicalDeviceId
+    );
+
+    const device = await this.prisma.device.findFirst({
+      where: isUuid
+        ? { OR: [{ id: canonicalDeviceId }, { deviceId: canonicalDeviceId }] }
+        : { deviceId: canonicalDeviceId },
+      select: { id: true, deviceId: true },
+    });
+
+    if (!device) {
+      throw new DeviceNotFoundError(`Device '${canonicalDeviceId}' not found.`);
+    }
+
+    const page = options.page || 1;
+    const pageSize = options.pageSize || 20;
+
+    const whereClause: Prisma.SoilReadingWhereInput = {
+      deviceId: device.id,
+      receivedAt: {
+        gte: options.from,
+        lte: options.to,
+      },
+    };
+
+    const filterMetric = (field: string) => {
+      if (!options.metrics || options.metrics.length === 0) return true;
+      return options.metrics.includes(field);
+    };
+
+    const totalRecords = await this.prisma.soilReading.count({ where: whereClause });
+    const skip = (page - 1) * pageSize;
+
+    const readings = await this.prisma.soilReading.findMany({
+      where: whereClause,
+      orderBy: { receivedAt: 'asc' },
+      skip,
+      take: pageSize,
+    });
+
+    const series = readings.map((r) => {
+      const item: Record<string, any> = {
+        timestamp: (r.recordedAt || r.receivedAt).toISOString(),
+      };
+      if (filterMetric('nitrogen')) item.nitrogen = toNumberOrNull(r.nitrogen);
+      if (filterMetric('phosphorus')) item.phosphorus = toNumberOrNull(r.phosphorus);
+      if (filterMetric('potassium')) item.potassium = toNumberOrNull(r.potassium);
+      if (filterMetric('temperature')) item.temperature = toNumberOrNull(r.temperature);
+      if (filterMetric('moisture')) item.moisture = toNumberOrNull(r.moisture);
+      if (filterMetric('ph')) item.ph = toNumberOrNull(r.ph);
+      if (filterMetric('ec')) item.ec = toNumberOrNull(r.ec);
+      if (filterMetric('status')) item.status = r.status || null;
+      return item;
+    });
+
+    return {
+      deviceId: device.deviceId,
+      from: options.from.toISOString(),
+      to: options.to.toISOString(),
+      series,
+      pagination: {
+        page,
+        pageSize,
+        totalRecords,
+        totalPages: Math.ceil(totalRecords / pageSize) || 1,
+      },
+    };
+  }
+
+  /**
+   * Fetches historical Water Quality and Reservoir Telemetry readings for a device.
+   * TASK-0503
+   */
+  async getWaterHistory(options: {
+    deviceIdentifier: string;
+    from: Date;
+    to: Date;
+    metrics?: string[];
+    page?: number;
+    pageSize?: number;
+  }) {
+    const canonicalDeviceId = options.deviceIdentifier.trim();
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      canonicalDeviceId
+    );
+
+    const device = await this.prisma.device.findFirst({
+      where: isUuid
+        ? { OR: [{ id: canonicalDeviceId }, { deviceId: canonicalDeviceId }] }
+        : { deviceId: canonicalDeviceId },
+      select: { id: true, deviceId: true },
+    });
+
+    if (!device) {
+      throw new DeviceNotFoundError(`Device '${canonicalDeviceId}' not found.`);
+    }
+
+    const page = options.page || 1;
+    const pageSize = options.pageSize || 20;
+
+    const filterMetric = (field: string) => {
+      if (!options.metrics || options.metrics.length === 0) return true;
+      return options.metrics.includes(field);
+    };
+
+    const waterWhere: Prisma.WaterReadingWhereInput = {
+      deviceId: device.id,
+      receivedAt: { gte: options.from, lte: options.to },
+    };
+
+    const skip = (page - 1) * pageSize;
+    const totalRecords = await this.prisma.waterReading.count({ where: waterWhere });
+
+    const waterReadings = await this.prisma.waterReading.findMany({
+      where: waterWhere,
+      orderBy: { receivedAt: 'asc' },
+      skip,
+      take: pageSize,
+    });
+
+    const series = waterReadings.map((w) => {
+      const item: Record<string, any> = {
+        timestamp: (w.recordedAt || w.receivedAt).toISOString(),
+      };
+      if (filterMetric('ph')) item.ph = toNumberOrNull(w.ph);
+      if (filterMetric('tds')) item.tds = toNumberOrNull(w.tds);
+      if (filterMetric('ec')) item.ec = toNumberOrNull(w.ec);
+      if (filterMetric('status')) item.status = w.status || null;
+      return item;
+    });
+
+    return {
+      deviceId: device.deviceId,
+      from: options.from.toISOString(),
+      to: options.to.toISOString(),
+      series,
+      pagination: {
+        page,
+        pageSize,
+        totalRecords,
+        totalPages: Math.ceil(totalRecords / pageSize) || 1,
+      },
+    };
+  }
+}
+
+function toNumberOrNull(val: any): number | null {
+  if (val === null || val === undefined) return null;
+  if (typeof val === 'number') return val;
+  if (typeof val === 'object' && typeof val.toNumber === 'function') {
+    return val.toNumber();
+  }
+  const num = Number(val);
+  return isNaN(num) ? null : num;
 }

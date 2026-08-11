@@ -1272,9 +1272,9 @@ Display:
 ## TASK-0503 — Implement Historical Query API
 
 **Priority:** `P1`  
-**Status:** `BACKLOG`  
+**Status:** `DONE`  
 **Dependencies:** `TASK-0405`  
-**Notes:** Adapted to query historical Soil Telemetry (`TASK-0405`).
+**Completed:** 2026-08-11 — Implemented Historical Query API endpoints (`GET /api/v1/devices/[deviceId]/monitoring/soil/history` and `GET /api/v1/devices/[deviceId]/monitoring/water/history`) adhering to `DEC-MON-087` (default range: last 24h, max range: 31 days, default `pageSize`: 20, max `pageSize`: 100). Enforced RBAC and device access authorization, preserved null/missing values without zero-coercion, separated water-quality telemetry from reservoir data, omitted combined-history endpoint, and utilized indexed database queries (`soil_readings_device_received_idx` and `water_readings_device_received_idx`). Updated unit and integration test coverage across contract, database, and API layers.
 
 ### Work
 

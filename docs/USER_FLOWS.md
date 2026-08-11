@@ -1793,7 +1793,7 @@ Each audit event shall include relevant actor, target, timestamp, result, and sa
 2. Owner and Admin roles are confirmed, but faucet-control permissions for each role remain unresolved.
 3. Multiple devices are required, but Owner scope and Admin assignment rules require final approval.
 4. Device online, offline, and stale states are required, but timing thresholds are not defined.
-5. Monitoring history is required, but retention, date-range, and aggregation rules are not defined.
+5. Monitoring history query rules are defined for v1 under DEC-MON-087 (default 24h, max 31 days, default pageSize 20, max pageSize 100, raw bounded series; bucket aggregation deferred).
 6. The language switch is required, but the default locale and locale-precedence rules are not confirmed.
 7. Faucet phase targets are confirmed, but command timeout, cancellation, concurrency, and acknowledgement rules are not final.
 8. The system must display command progress, but the hardware contract may not provide numeric progress.

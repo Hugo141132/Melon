@@ -217,3 +217,89 @@ export interface IngestReservoirTelemetryInput {
   status?: string | null;
   validationStatus?: TelemetryValidationStatus | string;
 }
+
+/**
+ * Soil History Query Schema & Response DTOs
+ * TASK-0503
+ */
+export const SoilHistoryQuerySchema = z.object({
+  from: z.string().optional(),
+  to: z.string().optional(),
+  metrics: z.string().optional(),
+  interval: z.string().optional(),
+  page: z.coerce.number().int().positive().optional().default(1),
+  pageSize: z.coerce.number().int().positive().max(100).optional().default(20),
+});
+
+export type SoilHistoryQueryParams = z.infer<typeof SoilHistoryQuerySchema>;
+
+export const SoilHistorySeriesItemSchema = z.object({
+  timestamp: z.string(),
+  nitrogen: z.number().nullable().optional(),
+  phosphorus: z.number().nullable().optional(),
+  potassium: z.number().nullable().optional(),
+  temperature: z.number().nullable().optional(),
+  moisture: z.number().nullable().optional(),
+  ph: z.number().nullable().optional(),
+  ec: z.number().nullable().optional(),
+  status: z.string().nullable().optional(),
+});
+
+export type SoilHistorySeriesItem = z.infer<typeof SoilHistorySeriesItemSchema>;
+
+export const SoilHistoryResponseDtoSchema = z.object({
+  deviceId: z.string(),
+  from: z.string(),
+  to: z.string(),
+  interval: z.string().optional(),
+  series: z.array(SoilHistorySeriesItemSchema),
+  pagination: z.object({
+    page: z.number(),
+    pageSize: z.number(),
+    totalRecords: z.number(),
+    totalPages: z.number(),
+  }),
+});
+
+export type SoilHistoryResponseDto = z.infer<typeof SoilHistoryResponseDtoSchema>;
+
+/**
+ * Water History Query Schema & Response DTOs
+ * TASK-0503
+ */
+export const WaterHistoryQuerySchema = z.object({
+  from: z.string().optional(),
+  to: z.string().optional(),
+  metrics: z.string().optional(),
+  interval: z.string().optional(),
+  page: z.coerce.number().int().positive().optional().default(1),
+  pageSize: z.coerce.number().int().positive().max(100).optional().default(20),
+});
+
+export type WaterHistoryQueryParams = z.infer<typeof WaterHistoryQuerySchema>;
+
+export const WaterHistorySeriesItemSchema = z.object({
+  timestamp: z.string(),
+  ph: z.number().nullable().optional(),
+  tds: z.number().nullable().optional(),
+  ec: z.number().nullable().optional(),
+  status: z.string().nullable().optional(),
+});
+
+export type WaterHistorySeriesItem = z.infer<typeof WaterHistorySeriesItemSchema>;
+
+export const WaterHistoryResponseDtoSchema = z.object({
+  deviceId: z.string(),
+  from: z.string(),
+  to: z.string(),
+  interval: z.string().optional(),
+  series: z.array(WaterHistorySeriesItemSchema),
+  pagination: z.object({
+    page: z.number(),
+    pageSize: z.number(),
+    totalRecords: z.number(),
+    totalPages: z.number(),
+  }),
+});
+
+export type WaterHistoryResponseDto = z.infer<typeof WaterHistoryResponseDtoSchema>;
