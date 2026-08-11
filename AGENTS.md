@@ -29,7 +29,7 @@ The system monitors:
 
 ### Soil Monitoring (REST API over Wi-Fi)
 
-- Nitrogen, Phosphorus, Potassium, Temperature, Moisture, pH, EC, Battery (`BAT`), Soil status.
+- Nitrogen, Phosphorus, Potassium, Temperature, Moisture, pH, EC, Soil status (Battery deleted per `DEC-MON-086`).
 
 ### Water Quality Monitoring (REST API over Wi-Fi)
 
@@ -235,6 +235,23 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
 - Provisioned Staging MQTT Broker: EMQX Cloud Serverless (`wss://` TLS active, password-authenticated gateway service, per-device topic ACLs)
 - Safety Configuration: `ENABLE_FAUCET_CONTROL=false` strictly enforced
 - Verification Results: 10/12 flows verified (Flow 7 failed due to missing Phase 6 UI switcher; Flows 8-10 safely blocked by feature flag)
+
+#### TASK-0408 Governance & Simulator Record
+
+`TASK-0408` simulator implementation record:
+- Frontend impact: `NONE`
+- Entry Point: `npm run sim:device` (`scripts/device-simulator.ts`)
+- Target Domains & Scenarios:
+  - Soil Telemetry (`SOIL_NODE` via REST API over Wi-Fi)
+  - Water Quality Telemetry (`WATER_QUALITY_NODE` via REST API over Wi-Fi: `ph`, `tds`, `ec`, `status`)
+  - Reservoir Telemetry (`WATER_TANK_NODE` via MQTT 5.0 over TLS: `tankVolume`, `flowRate`, `status`)
+  - Faucet Control Lifecycle (`WATER_TANK_NODE` via MQTT: `ACKNOWLEDGED`, `IN_PROGRESS`, `COMPLETED`, `FAILED`)
+  - Fault Simulation: Duplicate payload (`messageId`), out-of-order sequence, invalid JSON/schema, wrong-domain device ID rejection, disconnect/reconnect cycles
+- Safety & Blocked Constraints:
+  - Heartbeat & stale calculation remain blocked by `TASK-0407` (TBD numeric thresholds preserved)
+  - Faucet command timeouts remain blocked by `TASK-0809` (TBD numeric duration preserved)
+  - `BAT` parameter is omitted from soil and water-quality telemetry per `DEC-MON-086`
+  - Direct browser-to-MQTT connections forbidden; browser uses backend REST/SSE boundaries
 
 ---
 

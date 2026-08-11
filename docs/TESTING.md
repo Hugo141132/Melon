@@ -889,7 +889,7 @@ ec
 status
 ```
 
-## 17.2 Water Telemetry
+## 17.2 Water Quality Telemetry (REST API per DEC-DEV-020)
 
 Verify fields:
 
@@ -897,12 +897,19 @@ Verify fields:
 ph
 tds
 ec
-battery
-latitude
-longitude
 status
+```
+
+*Note:* `battery` (`BAT`), `latitude`, and `longitude` are deleted parameters per `DEC-MON-086`.
+
+## 17.2.1 Reservoir Water Telemetry (MQTT per DEC-DEV-020 & TASK-0408)
+
+Verify fields (`WATER_TANK_NODE`):
+
+```text
 tankVolume
 flowRate
+status
 ```
 
 ## 17.3 Data States

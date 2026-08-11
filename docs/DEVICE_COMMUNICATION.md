@@ -1775,7 +1775,7 @@ This specification is satisfied when:
 9. Offline threshold.
 10. Stale-data threshold.
 11. Exact units for N, P, K, temperature, moisture, EC, TDS, battery, tank volume, and flow rate.
-12. ~~Final meaning of `Water BAT`.~~ **RESOLVED** — `BAT` stands for Battery, incorporated into soil and water quality sensors (`DEC-MON-085`).
+12. ~~Final meaning of `Water BAT`.~~ **RESOLVED** — `BAT` parameter is completely removed from soil and water quality monitoring domains (`DEC-MON-086`, superseding `DEC-MON-085`).
 13. Device clock synchronisation.
 14. Maximum message size.
 15. Offline telemetry buffer size.
@@ -1806,7 +1806,7 @@ This specification is satisfied when:
 2. MQTT is the recommended protocol, but hardware-team support must be confirmed.
 3. Multiple devices are required, but the site and device-assignment model remains unresolved.
 4. The exact units for several measurements are not documented.
-5. ~~`Water BAT` remains ambiguous.~~ **RESOLVED** — `BAT` stands for Battery, incorporated into soil and water quality sensors (`DEC-MON-085`).
+5. ~~`Water BAT` remains ambiguous.~~ **RESOLVED** — `BAT` parameter is completely removed from soil and water quality monitoring domains (`DEC-MON-086`, superseding `DEC-MON-085`).
 6. Device online, offline, and stale thresholds are unresolved.
 7. Faucet volumes are confirmed, but timeout, cancellation, concurrency, retry, and late-acknowledgement rules remain unresolved.
 8. The user-role control matrix remains `TBD` in `RBAC.md`.
