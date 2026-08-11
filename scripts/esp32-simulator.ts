@@ -1,96 +1,22 @@
-import mqtt from 'mqtt';
-import { getMqttSimulatorCredentials } from './mqtt-config';
+import { DeviceSimulator } from './device-simulator';
 
 /**
- * Minimal MQTT Telemetry Simulator for Staging / Development
- *
- * Enforces contract rules:
- * - Uses existing MQTT contracts from docs/DEVICE_COMMUNICATION.md.
- * - Loads credentials via getMqttSimulatorCredentials() (MQTT_BROKER_URL, MQTT_DEV1_USERNAME, MQTT_DEV1_PASSWORD, MQTT_DEVICE_ID).
- * - Device ID configured via MQTT_DEVICE_ID (defaults to 'esp32-001').
- * - Strictly publishes telemetry only (no status/ONLINE publishing, no faucet commands).
- * - Safe handling of connection errors and graceful disconnects.
+ * Legacy CLI Wrapper for Device Simulator (sim:esp32-001)
+ * Delegates to DeviceSimulator in scripts/device-simulator.ts
  */
-
 async function runSimulator(): Promise<void> {
-  const creds = getMqttSimulatorCredentials();
-
-  const environment = process.env.NODE_ENV === 'production' ? 'production' : 'staging';
-  const siteId = process.env.MQTT_SITE_ID || 'site-01';
-  const deviceId = creds.deviceId;
-
-  // Topic pattern: agriculture/{environment}/{siteId}/{deviceId}/telemetry/reservoir
-  const topic = `agriculture/${environment}/${siteId}/${deviceId}/telemetry/reservoir`;
-
-  console.log(`[${deviceId} Simulator] Target Broker: ${creds.brokerUrl}`);
-  console.log(`[${deviceId} Simulator] Device ID: ${deviceId}`);
-  console.log(`[${deviceId} Simulator] Target Topic: ${topic}`);
-
-  const client = mqtt.connect(creds.brokerUrl, {
-    username: creds.username,
-    password: creds.password,
-    clientId: `sim-${deviceId}-${Math.random().toString(16).substring(2, 8)}`,
-    clean: true,
-    path: '/mqtt',
-    reconnectPeriod: 2000,
-  });
-
-  await new Promise<void>((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      client.end(true);
-      reject(new Error('MQTT connection timeout'));
-    }, 10000);
-
-    client.on('connect', () => {
-      clearTimeout(timeout);
-      console.log(`[${deviceId} Simulator] Connected to MQTT broker.`);
-      resolve();
-    });
-
-    client.on('error', (err) => {
-      clearTimeout(timeout);
-      client.end(true);
-      reject(err);
-    });
-  });
-
-  // Publish Reservoir Telemetry payload
-  const sequenceNumber = Math.floor(Math.random() * 10000);
-  const now = new Date().toISOString();
-  const telemetryPayload = {
-    schemaVersion: '1.0',
-    messageId: `msg-sim-${Date.now()}`,
-    deviceId,
-    siteId,
-    sequence: sequenceNumber,
-    recordedAt: now,
-    sentAt: now,
-    firmwareVersion: '1.0.0',
-    data: {
-      tankVolume: 75.5,
-      flowRate: 2.1,
-      status: 'NORMAL',
-    },
-  };
-
-  await new Promise<void>((resolve, reject) => {
-    client.publish(topic, JSON.stringify(telemetryPayload), { qos: 1 }, (err) => {
-      if (err) reject(err);
-      else resolve();
-    });
-  });
+  const simulator = new DeviceSimulator();
+  const res = await simulator.publishReservoirTelemetry();
   console.log(
-    `[${deviceId} Simulator] Published reservoir telemetry payload successfully:`,
-    telemetryPayload
+    `[${simulator.config.deviceId} Simulator] Target Broker: ${simulator.config.brokerUrl}`
   );
-
-  // Gracefully close connection
-  await new Promise<void>((resolve) => {
-    client.end(false, () => {
-      console.log(`[${deviceId} Simulator] Disconnected.`);
-      resolve();
-    });
-  });
+  console.log(`[${simulator.config.deviceId} Simulator] Device ID: ${simulator.config.deviceId}`);
+  console.log(`[${simulator.config.deviceId} Simulator] Target Topic: ${res.topic}`);
+  console.log(
+    `[${simulator.config.deviceId} Simulator] Published reservoir telemetry payload successfully:`,
+    res.payload
+  );
+  await simulator.disconnect();
 }
 
 runSimulator().catch((err) => {

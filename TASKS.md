@@ -1153,8 +1153,9 @@ Implement:
 ## TASK-0408 — Implement Device Simulator
 
 **Priority:** `P1`  
-**Status:** `BACKLOG`  
+**Status:** `DONE`
 **Dependencies:** `TASK-0402`, `TASK-0404`, `TASK-0405`  
+**Completed:** 2026-08-11 — Implemented multi-device operational simulator in `scripts/device-simulator.ts` and unit test suite in `apps/iot-gateway/src/__tests__/device-simulator.test.ts`. Configured REST API ingestion (Soil & Water telemetry per `DEC-DEV-020`, `DEC-MON-086`), MQTT Reservoir Telemetry (`WATER_TANK_NODE`), Faucet Command ACK, Progress, Completion, Failure lifecycle, duplicate/invalid/out-of-order payloads, and disconnect/reconnect cycles. Explicitly reported `TASK-0407` (heartbeat thresholds) and `TASK-0809` (command timeouts) as BLOCKED due to TBD numeric values.
 **Notes:** Adapted to simulate available Soil Telemetry (REST per `TASK-0405`), Water Tank (`WATER_TANK_NODE`) Telemetry (MQTT per `DEC-DEV-020`), and Faucet Command Acknowledgements, while ignoring blocked water quality & heartbeat payloads until unblocked.
 
 ### Work
