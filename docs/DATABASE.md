@@ -101,7 +101,9 @@ Recommended:
 UUID
 ```
 
-Device IDs may remain stable human-readable identifiers in addition to internal UUID primary keys.
+Device IDs remain stable human-readable identifiers (e.g. `soil-node-001`) in addition to internal UUID primary keys. Database repository lookups resolve both canonical string `deviceId` and internal `id` UUID values.
+
+Telemetry EC readings are persisted in canonical source units (`mS/cm`). Presentation boundaries in the web UI convert these to `µS/cm` (×1000) for visual display.
 
 ### 3.4 Timestamps
 

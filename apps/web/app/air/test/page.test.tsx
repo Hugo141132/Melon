@@ -109,7 +109,7 @@ describe('/air Page Monitoring Domain Isolation Tests', () => {
     expect(screen.getByText('pH Level')).toBeInTheDocument();
     expect(screen.getByText('Total Dissolved Solids')).toBeInTheDocument();
     expect(screen.getByText('ppm')).toBeInTheDocument();
-    expect(screen.getAllByText('mS/cm').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('µS/cm').length).toBeGreaterThan(0);
 
     // MUST NOT render WATER_TANK metrics
     expect(screen.queryByText('Volume Air Tangki')).toBeNull();

@@ -101,7 +101,7 @@ export default function Sidebar({
               pathname === item.href ||
               (item.href !== '/' && pathname.startsWith(item.href)) ||
               (item.href === '/sensor' &&
-                ['/sensor', '/soil', '/tanah', '/water', '/air', '/controls'].includes(pathname));
+                ['/sensor', '/soil', '/water', '/controls'].includes(pathname));
 
             return (
               <Link

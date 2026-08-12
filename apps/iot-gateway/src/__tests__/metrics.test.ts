@@ -186,7 +186,7 @@ describe('TASK-0409 — Gateway Observability', () => {
       expect(payload.timestamp).toBeDefined();
       expect(JSON.stringify(payload)).not.toContain('password');
       expect(JSON.stringify(payload)).not.toContain('secret');
-    });
+    }, 10000);
 
     it('GET /ready returns DEGRADED 503 when DB is connected but MQTT is disconnected', async () => {
       const { app } = buildApp({

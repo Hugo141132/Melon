@@ -81,9 +81,9 @@ The frontend shall not need to understand:
 
 ### 3.4 Multi-Device First
 
-Every device-specific operation shall be scoped by a canonical `deviceId`.
+Every device-specific operation shall be scoped by a canonical `deviceId`. Services resolve device identifiers deterministically, accepting both canonical string `deviceId` (e.g. `soil-node-001`) and internal database UUID `id`.
 
-No service shall assume that only one device exists.
+No service shall assume that only one device exists. Domain routes use canonical `/soil` and `/water` paths; legacy `/tanah` and `/air` paths return 404 Not Found.
 
 ### 3.5 Secure by Default
 

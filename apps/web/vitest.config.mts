@@ -22,7 +22,19 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
-      exclude: ['**/node_modules/**', '**/.next/**', '**/coverage/**'],
+      exclude: [
+        '**/node_modules/**',
+        '**/.next/**',
+        '**/coverage/**',
+        '**/e2e/**',
+        '**/test/**',
+        '**/tests/**',
+        '**/__tests__/**',
+        '**/*.test.*',
+        '**/*.spec.*',
+        '**/*.config.*',
+        '**/*.d.ts',
+      ],
     },
   },
 });

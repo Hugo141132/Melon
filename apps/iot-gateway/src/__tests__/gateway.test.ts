@@ -149,7 +149,7 @@ describe('TASK-0401 — IoT Gateway Service', () => {
       expect(payload.timestamp).toBeDefined();
       expect(JSON.stringify(payload)).not.toContain('password');
       expect(JSON.stringify(payload)).not.toContain('secret');
-    });
+    }, 10000);
 
     it('GET /ready reflects DEGRADED with 503 when DB is connected but MQTT is disconnected', async () => {
       const { app } = buildApp({

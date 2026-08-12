@@ -7,7 +7,7 @@ export const NPK_DATA = {
 
 // ─── Water / Nutrisi Data ─────────────────────────────────
 export const WATER_DATA = {
-  ec: { value: 1.8, unit: 'mS/cm', status: 'Stabil' },
+  ec: { value: 1.8, unit: 'µS/cm', status: 'Stabil' },
   ph: { value: 6.2, status: 'Normal', min: 1, max: 14, markerPercent: 44 },
   tds: { value: 920, unit: 'ppm', status: 'Sesuai Target' },
   tankVolume: { value: 450, unit: 'Liter', max: 600, percent: 75 },

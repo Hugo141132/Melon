@@ -26,10 +26,8 @@ export default function TopAppBar({
   const hoverTimerRef = useRef<NodeJS.Timeout | null>(null);
   const pathname = usePathname();
 
-  // Show DeviceSelector ONLY on /soil (/tanah), /water (/air), and /controls
-  const isSelectorAllowedPage = ['/soil', '/tanah', '/water', '/air', '/controls'].includes(
-    pathname
-  );
+  // Show DeviceSelector ONLY on /soil, /water, and /controls
+  const isSelectorAllowedPage = ['/soil', '/water', '/controls'].includes(pathname);
   const shouldShowDeviceSelector = showDeviceSelector && isSelectorAllowedPage;
 
   const userDisplayName = user?.fullName || user?.email || '';

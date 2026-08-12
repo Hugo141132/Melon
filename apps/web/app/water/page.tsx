@@ -2,8 +2,10 @@
 
 import dynamic from 'next/dynamic';
 import TopAppBar from '@/components/navigation/TopAppBar';
+import HistoricalChartControls from '@/components/charts/HistoricalChartControls';
 import { useDeviceContext } from '@/context/DeviceContext';
 import { useLatestMonitoring } from '@/hooks/useLatestMonitoring';
+import { useHistoricalMonitoring } from '@/hooks/useHistoricalMonitoring';
 import { WATER_DATA } from '@/lib/constants';
 import { CheckCircle, TrendingUp, Cpu } from 'lucide-react';
 
@@ -11,10 +13,11 @@ const WaterNutrientChart = dynamic(() => import('@/components/charts/WaterNutrie
   ssr: false,
 });
 
-// EC Half-gauge for Water Quality Node
 function ECGauge({ value }: { value: number }) {
-  const maxEC = 4;
-  const angle = -135 + (Math.min(value, maxEC) / maxEC) * 270;
+  // Explicit presentation conversion from source unit (mS/cm) to display unit (µS/cm)
+  const displayVal = Math.round(value * 1000);
+  const maxEC = 4000;
+  const angle = -135 + (Math.min(displayVal, maxEC) / maxEC) * 270;
   return (
     <div className="flex flex-col items-center mb-2">
       <div className="relative" style={{ width: 180, height: 90, overflow: 'hidden' }}>
@@ -24,8 +27,8 @@ function ECGauge({ value }: { value: number }) {
         <div className="ec-gauge-fill" style={{ transform: `rotate(${angle - 90}deg)` }} />
         {/* Value overlay */}
         <div className="absolute inset-0 flex flex-col items-center justify-end pb-1">
-          <span className="text-[28px] leading-9 font-bold text-app-primary">{value}</span>
-          <span className="text-[12px] leading-4 text-app-on-surface-variant">mS/cm</span>
+          <span className="text-[28px] leading-9 font-bold text-app-primary">{displayVal}</span>
+          <span className="text-[12px] leading-4 text-app-on-surface-variant">µS/cm</span>
         </div>
       </div>
       <div className="flex items-center gap-2 bg-app-primary/10 px-4 py-1.5 rounded-full mt-2">
@@ -66,6 +69,27 @@ export default function WaterPage() {
   const isSoilNode = deviceType === 'SOIL_NODE';
   const isQualityNode = !isTankNode && !isSoilNode;
 
+  const activeDeviceId = isQualityNode ? selectedDevice?.deviceId : null;
+
+  const {
+    preset,
+    setPreset,
+    selectedMetric,
+    setSelectedMetric,
+    customFrom,
+    setCustomFrom,
+    customTo,
+    setCustomTo,
+    data: historyData,
+    loading: historyLoading,
+    error: historyError,
+    dateRangeError,
+  } = useHistoricalMonitoring({
+    deviceId: activeDeviceId,
+    domain: 'water',
+    initialMetric: 'ec',
+  });
+
   const waterData = snapshot?.water?.data;
   const phVal = waterData?.ph ?? WATER_DATA.ph.value;
   const tdsVal = waterData?.tds ?? WATER_DATA.tds.value;
@@ -76,7 +100,7 @@ export default function WaterPage() {
     <div className="bg-app-surface text-app-on-surface min-h-dvh pb-10">
       <TopAppBar />
 
-      <main className="pt-20 px-[1rem] space-y-5">
+      <main className="pt-20 px-[1rem] max-w-4xl mx-auto space-y-5">
         {(isSoilNode || isTankNode) && (
           <section className="bg-app-surface-container-lowest rounded-xl p-5 soft-elevation-lg border border-app-outline-variant/30 flex flex-col items-center text-center animate-fade-in space-y-3">
             <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-600">
@@ -156,8 +180,26 @@ export default function WaterPage() {
               </div>
             </div>
 
-            <div className="animate-fade-in">
-              <WaterNutrientChart />
+            {/* Historical Trend Chart Section */}
+            <div className="animate-fade-in space-y-2">
+              <HistoricalChartControls
+                domain="water"
+                selectedMetric={selectedMetric}
+                onSelectMetric={setSelectedMetric}
+                preset={preset}
+                onSelectPreset={setPreset}
+                customFrom={customFrom}
+                onCustomFromChange={setCustomFrom}
+                customTo={customTo}
+                onCustomToChange={setCustomTo}
+                dateRangeError={dateRangeError}
+              />
+              <WaterNutrientChart
+                data={historyData}
+                selectedMetric={selectedMetric}
+                loading={historyLoading}
+                error={historyError}
+              />
             </div>
           </>
         )}

@@ -253,6 +253,16 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
   - `BAT` parameter is omitted from soil and water-quality telemetry per `DEC-MON-086`
   - Direct browser-to-MQTT connections forbidden; browser uses backend REST/SSE boundaries
 
+#### TASK-0504 Governance Record
+
+`TASK-0504` historical monitoring charts & controls implementation record:
+- Frontend impact: `MINOR`
+- Selected UI direction: `Premium Minimal Ops`
+- Existing color template: `UNCHANGED`
+- Selected motion effects: `Card hover`, `Skeleton loading`, `Chart loading`
+- 21st.dev MCP: `NOT REQUIRED`
+- Summary: Implemented bounded historical telemetry chart components (`NPKChart`, `WaterNutrientChart`, `HistoricalChartControls`) and data fetching hook (`useHistoricalMonitoring`) on canonical `/soil` and `/water` routes (legacy `/tanah` and `/air` return 404 Not Found). Enforced `DEC-MON-087` date-range bounds (default 24h, max 31 days) and raw pagination. Preserved null values as visual gaps (`connectNulls={false}`), supported empty history returns (HTTP 200 with empty series, no fake zero values or 404s), synchronized `DeviceSelector` context across routes, resolved canonical `deviceId` string and database UUID lookups, and formatted timestamps using Indonesian localization (`id-ID`). Verified 100% test pass rate across unit test suite (`apps/web/test/unit/historical-charts.test.tsx`), Playwright OWNER/ADMIN verification, and pre-commit suite.
+
 ---
 
 ## 5. Task Selection Rules

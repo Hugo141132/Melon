@@ -32,7 +32,7 @@
 | **Authentication** | `DEC-AUTH-001` to `DEC-AUTH-012` | **APPROVED** | HTTP-only secure cookies, PostgreSQL session table, 30m idle / 12h max timeouts, CLI Owner seed, no public Owner creation. `SameSite` cookie value: **TBD** — pending explicit user approval. |
 | **RBAC** | `DEC-RBAC-013` to `DEC-RBAC-019` | **APPROVED** | Owner has global device visibility. Admins have mandatory per-device assignments; device assignment automatically grants both monitoring and faucet control. Owners manage assignments. No separate per-user-device `canControl` permission in v1. |
 | **Devices** | `DEC-DEV-020` to `DEC-DEV-035` | **APPROVED** | Multi-protocol architecture: Soil & Water quality monitoring telemetry via REST API over Wi-Fi (no MQTT broker). Water Tank monitoring (tank volume & flow rate) via MQTT through an EMQX broker (MQTT 5.0 over TLS via IoT Gateway). Shared INA219 electrical monitoring via REST/Wi-Fi. Per-device credentials/ACLs, no anonymous access, no direct browser-to-MQTT. Offline threshold: **TBD**. Stale threshold: **TBD**. |
-| **Monitoring** | `DEC-MON-036` to `DEC-MON-050` | **APPROVED** | Three distinct monitoring domains: 1) Soil monitoring (NPK, Temp, Moisture, pH, EC, status), 2) Water Quality monitoring (pH, TDS in ppm, EC, status), 3) Water Tank monitoring (Tank Vol in `L`, Flow in `m³/h`, status). Control capabilities (Solenoid Valve, Relay) are actuators, not monitoring sensors. INA219 electrical monitoring tracks system electrical consumption (voltage, current, power) as device health/power telemetry, not as a battery percentage or primary agronomic measurement. Sensor precision and valid ranges: **TBD**. |
+| **Monitoring** | `DEC-MON-036` to `DEC-MON-050` | **APPROVED** | Three distinct monitoring domains: 1) Soil monitoring (NPK, Temp, Moisture, pH, EC in `µS/cm`, status), 2) Water Quality monitoring (pH, TDS in ppm, EC in `µS/cm`, status), 3) Water Tank monitoring (Tank Vol in `L`, Flow in `m³/h`, status). Canonical display unit for EC is `µS/cm` (values in `mS/cm` converted at presentation boundary via `×1000`). Control capabilities (Solenoid Valve, Relay) are actuators, not monitoring sensors. INA219 electrical monitoring tracks system electrical consumption (voltage, current, power) as device health/power telemetry, not as a battery percentage or primary agronomic measurement. Sensor precision and valid ranges: **TBD**. |
 | **Faucet Control** | `DEC-CTRL-051` to `DEC-CTRL-067` | **APPROVED** | Max 1 active command/device, no auto retries, `ENABLE_FAUCET_CONTROL=false` default, dual written sign-off (Owner + Hardware Lead) required before production activation. Duplicate command IDs never re-dispense. Timeout ≠ completion. ACK timeout, completion timeout, expiry duration: **TBD**. Cancellation/stop support: **TBD**. |
 | **I18N** | `DEC-I18N-068` to `DEC-I18N-074` | **APPROVED** | Default `id` (Bahasa Indonesia), `en` fallback, cookie-based locale routing (no URL path pollution), UTC storage with `Asia/Jakarta` (WIB) presentation. |
 | **Infrastructure** | `DEC-INF-075` to `DEC-INF-088` | **APPROVED (ORM DECISION REQUIRED)** | npm monorepo, PostgreSQL (ORM TBD — see §2.5). Backup schedule, retention period, RPO, and RTO: **TBD** — pending explicit user approval. |
@@ -184,6 +184,18 @@
   5. **Raw Bounded Pagination Only**: `TASK-0503` implements raw bounded pagination only. Bucket aggregation (`interval` parameter) is deferred until its rules are separately approved.
   6. **Telemetry Scope Isolation**: Water-quality history queries remain strictly separate from reservoir water telemetry. Optional combined-history endpoint is unapproved and omitted.
 
+#### DEC-MON-088: Historical Monitoring Chart Component Presentation & Route Resolution
+* **Related Task IDs**: `TASK-0504`
+* **Related Documentation**: `docs/API.md` §17, `docs/UI_UX.md` §25, `AGENTS.md` §2, §4.1
+* **Status**: **APPROVED BY PRODUCT OWNER (2026-08-11)**
+* **Approved Decision**:
+  1. **Canonical Domain Routes**: Historical telemetry charts render on canonical `/soil` and `/water` routes. Legacy `/tanah` and `/air` paths return 404 Not Found.
+  2. **Chart Controls & Metric Selection**: Visual controls allow metric selection, date range adjustments (default 24h, max 31 days per `DEC-MON-087`), and page navigation.
+  3. **Null Values & Data Absence**: Missing values are rendered as visual gaps (`connectNulls={false}`). Empty history returns HTTP 200 with an empty series and no-data UI, never fake zero values or a 404 error.
+  4. **EC Unit Conversion**: Telemetry EC is stored/contracted in `mS/cm` and converted to `µS/cm` (×1000) deterministically for UI chart presentation.
+  5. **Device & Route Synchronization**: Selected device ID is synchronized across domain routes via top-bar `DeviceSelector` context and `sessionStorage`/`localStorage` persistence.
+  6. **Device ID Resolution**: Backend lookups resolve both canonical string `deviceId` (e.g. `soil-node-001`) and internal database UUID `id`.
+
 ---
 
 ### 2.4 Faucet Control Safety Rules
@@ -256,7 +268,7 @@ The following decisions remain TBD and must be resolved before the listed tasks 
 | Command completion timeout (seconds) | `TASK-0809` | No numeric value approved. |
 | Command expiry duration (seconds) | `TASK-0809` | No numeric value approved. |
 | Cancellation and stop support (yes/no) | `TASK-0810` | Unresolved. Default: do not implement. |
-| Sensor Battery (`BAT`) parameter identity & scope | `TASK-0405`, `TASK-0406` | Approved: `BAT` stands for Battery, incorporated into soil and water quality sensors (`DEC-MON-085`). |
+| Sensor Battery (`BAT`) parameter identity & scope | `TASK-0405`, `TASK-0406` | Resolved per `DEC-MON-086`: `BAT` parameter is completely removed from soil and water quality monitoring. |
 | Reservoir-Water Volume and Flow Rate units | `TASK-0408` | Reservoir-water monitoring is a distinct domain from general water quality. Units TBD. |
 | Accessibility standard level | `TASK-1006` | WCAG level not yet approved. |
 | API performance targets (p95) | `TASK-1007` | No numeric values approved. |

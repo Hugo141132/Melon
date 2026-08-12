@@ -35,16 +35,44 @@ export async function GET(request: Request, props: { params: Promise<{ deviceId:
       );
     }
 
+    if (device.deviceType === 'SOIL_NODE') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: `Device '${targetDeviceId}' is of type '${device.deviceType}' and does not support water monitoring.`,
+          },
+          meta: { requestId },
+        },
+        { status: 400 }
+      );
+    }
+
     await requireDeviceViewAccess(session, targetDeviceId, {
       isDeviceAssignedToUser: async (userId, devId) => {
+        const cleanDevId = devId.trim();
         const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-          devId
+          cleanDevId
         );
         const assignment = await prisma.userDeviceAccess.findFirst({
           where: {
             userId,
             revokedAt: null,
-            device: isUuid ? { OR: [{ id: devId }, { deviceId: devId }] } : { deviceId: devId },
+            device: isUuid
+              ? {
+                  OR: [
+                    { id: cleanDevId },
+                    { deviceId: cleanDevId },
+                    { deviceId: { equals: cleanDevId, mode: 'insensitive' } },
+                  ],
+                }
+              : {
+                  OR: [
+                    { deviceId: cleanDevId },
+                    { deviceId: { equals: cleanDevId, mode: 'insensitive' } },
+                  ],
+                },
           },
         });
         return !!assignment;
@@ -113,6 +141,7 @@ export async function GET(request: Request, props: { params: Promise<{ deviceId:
       { status: 200 }
     );
   } catch (error: any) {
+    console.error('WATER_HISTORY_ERROR:', error);
     if (error instanceof AuthorizationError || error?.name === 'AuthorizationError') {
       return NextResponse.json(
         {

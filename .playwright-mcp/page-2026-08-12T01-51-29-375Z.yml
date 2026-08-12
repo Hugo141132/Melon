@@ -1,0 +1,29 @@
+- generic [active] [ref=f1e1]:
+  - generic [ref=f1e2]:
+    - banner [ref=f1e3]:
+      - button "Buka navigasi sidebar" [ref=f1e4] [cursor=pointer]
+      - link [ref=f1e14] [cursor=pointer]:
+        - /url: /profil
+        - img "Profile" [ref=f1e16]
+    - navigation "Navigasi Utama" [ref=f1e17]:
+      - generic [ref=f1e18]:
+        - generic [ref=f1e19]:
+          - link "Pengguna" [ref=f1e20] [cursor=pointer]:
+            - /url: /
+          - button "Tutup navigasi sidebar" [ref=f1e26] [cursor=pointer]
+        - navigation [ref=f1e30]:
+          - link "Beranda" [ref=f1e31] [cursor=pointer]:
+            - /url: /
+          - link "Sensor" [ref=f1e39] [cursor=pointer]:
+            - /url: /sensor
+          - link "Notifikasi" [ref=f1e50] [cursor=pointer]:
+            - /url: /notifikasi
+          - link "Manajemen Perangkat" [ref=f1e58] [cursor=pointer]:
+            - /url: /devices
+          - link "Pengaturan" [ref=f1e66] [cursor=pointer]:
+            - /url: /pengaturan
+          - link "Profil Saya" [ref=f1e74] [cursor=pointer]:
+            - /url: /profil
+    - main [ref=f1e82]
+  - button "Open Next.js Dev Tools" [ref=f1e88] [cursor=pointer]
+  - alert [ref=f1e92]

@@ -1,0 +1,64 @@
+- generic [active] [ref=f6e1]:
+  - generic [ref=f6e2]:
+    - banner [ref=f6e3]:
+      - button "Buka navigasi sidebar" [ref=f6e4] [cursor=pointer]
+      - link [ref=f6e14] [cursor=pointer]:
+        - /url: /profil
+        - img "Profile" [ref=f6e16]
+    - navigation "Navigasi Utama" [ref=f6e17]:
+      - generic [ref=f6e18]:
+        - generic [ref=f6e19]:
+          - link "Pengguna" [ref=f6e20] [cursor=pointer]:
+            - /url: /
+          - button "Tutup navigasi sidebar" [ref=f6e26] [cursor=pointer]
+        - navigation [ref=f6e30]:
+          - link "Beranda" [ref=f6e31] [cursor=pointer]:
+            - /url: /
+          - link "Sensor" [ref=f6e39] [cursor=pointer]:
+            - /url: /sensor
+          - link "Notifikasi" [ref=f6e50] [cursor=pointer]:
+            - /url: /notifikasi
+          - link "Manajemen Perangkat" [ref=f6e58] [cursor=pointer]:
+            - /url: /devices
+          - link "Pengaturan" [ref=f6e66] [cursor=pointer]:
+            - /url: /pengaturan
+          - link "Profil Saya" [ref=f6e74] [cursor=pointer]:
+            - /url: /profil
+    - main [ref=f6e82]:
+      - generic [ref=f6e88]:
+        - generic [ref=f6e90]:
+          - generic [ref=f6e92]:
+            - heading "Preset Dosis Penyiraman Faucet" [level=2] [ref=f6e93]
+            - paragraph [ref=f6e98]: Pilih fase preset volume air untuk dikirimkan ke alat kran otomatis.
+          - generic [ref=f6e102]:
+            - generic [ref=f6e103]: Kontrol Kran Air Berhenti Sementara
+            - text: Silakan pilih perangkat tandon air (WATER_TANK_NODE) untuk memulai penyiraman.
+          - generic [ref=f6e104]:
+            - generic [ref=f6e105]:
+              - generic [ref=f6e106]: Fase 1
+              - generic [ref=f6e110]:
+                - generic [ref=f6e111]:
+                  - generic [ref=f6e112]: "300"
+                  - generic [ref=f6e113]: mL
+                - paragraph [ref=f6e114]: Penyiraman ringan awal pertumbuhan
+              - button "Pilih 300 mL" [disabled] [ref=f6e115]
+            - generic [ref=f6e120]:
+              - generic [ref=f6e121]: Fase 2
+              - generic [ref=f6e125]:
+                - generic [ref=f6e126]:
+                  - generic [ref=f6e127]: "1.000"
+                  - generic [ref=f6e128]: mL
+                - paragraph [ref=f6e129]: Penyiraman standar fase vegetatif & pembuahan
+              - button "Pilih 1000 mL" [disabled] [ref=f6e130]
+            - generic [ref=f6e135]:
+              - generic [ref=f6e136]: Fase 3
+              - generic [ref=f6e140]:
+                - generic [ref=f6e141]:
+                  - generic [ref=f6e142]: "1.500"
+                  - generic [ref=f6e143]: mL
+                - paragraph [ref=f6e144]: Penyiraman intensif fase pematangan buah
+              - button "Pilih 1500 mL" [disabled] [ref=f6e145]
+        - generic [ref=f6e150]:
+          - paragraph [ref=f6e154]: Perangkat Tidak Dipilih
+          - paragraph [ref=f6e155]: Pilih perangkat dari dropdown navigasi di bagian atas untuk melihat riwayat perintah kran.
+  - button "Open Next.js Dev Tools" [ref=f6e161] [cursor=pointer]

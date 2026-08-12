@@ -1,0 +1,68 @@
+- generic [active] [ref=f8e1]:
+  - generic [ref=f8e2]:
+    - banner [ref=f8e3]:
+      - button "Buka navigasi sidebar" [ref=f8e4] [cursor=pointer]
+      - link [ref=f8e14] [cursor=pointer]:
+        - /url: /profil
+        - img "Profile" [ref=f8e16]
+    - navigation "Navigasi Utama" [ref=f8e17]:
+      - generic [ref=f8e18]:
+        - generic [ref=f8e19]:
+          - link "Pengguna" [ref=f8e20] [cursor=pointer]:
+            - /url: /
+          - button "Tutup navigasi sidebar" [ref=f8e26] [cursor=pointer]
+        - navigation [ref=f8e30]:
+          - link "Beranda" [ref=f8e31] [cursor=pointer]:
+            - /url: /
+          - link "Sensor" [ref=f8e39] [cursor=pointer]:
+            - /url: /sensor
+          - link "Notifikasi" [ref=f8e50] [cursor=pointer]:
+            - /url: /notifikasi
+          - link "Manajemen Perangkat" [ref=f8e58] [cursor=pointer]:
+            - /url: /devices
+          - link "Pengaturan" [ref=f8e66] [cursor=pointer]:
+            - /url: /pengaturan
+          - link "Profil Saya" [ref=f8e74] [cursor=pointer]:
+            - /url: /profil
+    - main [ref=f8e82]:
+      - generic [ref=f8e83]:
+        - generic [ref=f8e84]:
+          - generic [ref=f8e85]: "Status Kualitas Air: Optimal"
+          - generic [ref=f8e88]: "Update: Real-Time"
+        - paragraph [ref=f8e89]: "\"Kualitas air & nutrisi terukur stabil.\""
+      - generic [ref=f8e90]:
+        - heading "Electrical Conductivity (EC)" [level=3] [ref=f8e91]
+        - generic [ref=f8e92]:
+          - generic [ref=f8e96]:
+            - generic [ref=f8e97]: "1800"
+            - generic [ref=f8e98]: µS/cm
+          - generic [ref=f8e99]: "Status: Stabil"
+      - generic [ref=f8e104]:
+        - generic [ref=f8e105]:
+          - generic [ref=f8e106]:
+            - heading "pH Level" [level=3] [ref=f8e107]
+            - generic [ref=f8e108]:
+              - generic [ref=f8e109]: "6.2"
+              - generic [ref=f8e110]: Normal
+          - generic [ref=f8e114]:
+            - generic [ref=f8e115]: "1"
+            - generic [ref=f8e116]: "7"
+            - generic [ref=f8e117]: "14"
+        - generic [ref=f8e118]:
+          - generic [ref=f8e119]:
+            - heading "Total Dissolved Solids" [level=3] [ref=f8e120]
+            - generic [ref=f8e121]:
+              - generic [ref=f8e122]: "920"
+              - generic [ref=f8e123]: ppm
+          - generic [ref=f8e124]: Sesuai Target
+      - generic [ref=f8e131]:
+        - generic [ref=f8e132]:
+          - button "EC (µS/cm)" [ref=f8e133] [cursor=pointer]
+          - button "pH" [ref=f8e134] [cursor=pointer]
+          - button "TDS (ppm)" [ref=f8e135] [cursor=pointer]
+        - generic [ref=f8e136]:
+          - button "24 Jam" [ref=f8e137] [cursor=pointer]
+          - button "7 Hari" [ref=f8e138] [cursor=pointer]
+          - button "30 Hari" [ref=f8e139] [cursor=pointer]
+          - button "Kustom" [ref=f8e140] [cursor=pointer]
+  - button "Open Next.js Dev Tools" [ref=f8e146] [cursor=pointer]

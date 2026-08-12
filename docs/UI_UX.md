@@ -499,11 +499,7 @@ The water section shall display:
 - Water pH
 - Water TDS
 - Water EC
-- Water battery
-- Water latitude
-- Water longitude
 - Water status
-- Battery (`BAT`)
 - Tank volume
 - Water flow rate
 
@@ -546,6 +542,16 @@ The flow-rate component shall show:
 - active or inactive indication;
 - trend or recent history where useful;
 - no-flow, unavailable, and invalid states.
+
+### 11.5 Historical Telemetry Charts (`DEC-MON-088`)
+
+Historical charts render on domain detail pages (`/soil` and `/water`; legacy `/tanah` and `/air` return 404 Not Found):
+
+- **Chart Controls:** Metric toggle chips, date range selector (24-hour default, 31-day max range), and pagination controls.
+- **Null Value Representation:** Missing values render as visual gaps (`connectNulls={false}`).
+- **EC Display Unit:** Electrical Conductivity is stored in `mS/cm` and converted to `µS/cm` (×1000) for display.
+- **Empty State:** Queries returning zero records display a translated no-data banner (HTTP 200), not zero values or a 404 error.
+- **Localization:** Timestamps are formatted using Indonesian locale (`id-ID`).
 
 ---
 

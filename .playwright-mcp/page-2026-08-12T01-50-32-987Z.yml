@@ -1,0 +1,33 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - main [ref=e4]:
+      - generic [ref=e5]:
+        - heading "Masuk ke Kebun Melon" [level=1] [ref=e6]
+        - paragraph [ref=e7]: Kelola lahan melon Anda dengan lebih mudah
+      - generic [ref=e8]:
+        - generic [ref=e9]:
+          - generic [ref=e10]: Alamat Email
+          - textbox "Alamat Email" [ref=e15]:
+            - /placeholder: Wahyu123@gmail.com
+        - generic [ref=e16]:
+          - generic [ref=e17]: Kata Sandi
+          - generic [ref=e18]:
+            - textbox "Kata Sandi" [ref=e22]:
+              - /placeholder: ••••••••
+            - button "Tampilkan sandi" [ref=e23] [cursor=pointer]
+        - link "Lupa Password?" [ref=e28] [cursor=pointer]:
+          - /url: /forgot-password
+        - button "Masuk" [ref=e30] [cursor=pointer]
+    - contentinfo [ref=e31]:
+      - paragraph [ref=e32]:
+        - text: Belum punya akun?
+        - link "Daftar Lahan Baru" [ref=e33] [cursor=pointer]:
+          - /url: /register
+  - button "Open Next.js Dev Tools" [ref=e39] [cursor=pointer]:
+    - generic [ref=e42]:
+      - text: Compiling
+      - generic [ref=e43]:
+        - generic [ref=e44]: .
+        - generic [ref=e45]: .
+        - generic [ref=e46]: .
+  - alert [ref=e47]

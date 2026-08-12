@@ -155,14 +155,22 @@ export class DeviceRepository {
    * Retrieves a single device by canonical deviceId string OR UUID id.
    */
   async getDeviceByCanonicalId(identifier: string): Promise<PublicSafeDeviceDto | null> {
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-      identifier
-    );
+    if (!identifier || typeof identifier !== 'string') return null;
+    const cleanId = identifier.trim();
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanId);
 
     const device = await this.prisma.device.findFirst({
       where: isUuid
-        ? { OR: [{ id: identifier }, { deviceId: identifier }] }
-        : { deviceId: identifier },
+        ? {
+            OR: [
+              { id: cleanId },
+              { deviceId: cleanId },
+              { deviceId: { equals: cleanId, mode: 'insensitive' } },
+            ],
+          }
+        : {
+            OR: [{ deviceId: cleanId }, { deviceId: { equals: cleanId, mode: 'insensitive' } }],
+          },
       include: {
         capabilities: true,
       },

@@ -94,7 +94,7 @@
 | `FLOW-USER-006` | User updates own profile information flow | `docs/USER_FLOWS.md` | - | `TASK-0211` | `TEST-E2E-001` | `READY_FOR_IMPLEMENTATION` |
 | `FLOW-DEV-001` | User selects device context flow | `docs/USER_FLOWS.md` | - | `TASK-0306` | `TEST-E2E-003` | `READY_FOR_IMPLEMENTATION` |
 | `FLOW-MON-001` | User views live monitoring telemetry flow | `docs/USER_FLOWS.md` | `DEC-MON-036` | `TASK-0502` | `TEST-E2E-003` | `READY_FOR_IMPLEMENTATION` |
-| `FLOW-MON-002` | User views historical monitoring charts flow | `docs/USER_FLOWS.md` | `DEC-MON-048` | `TASK-0504` | `TEST-E2E-003` | `READY_FOR_IMPLEMENTATION` |
+| `FLOW-MON-002` | User views historical monitoring charts flow | `docs/USER_FLOWS.md` | `DEC-MON-088` | `TASK-0504` | `TEST-E2E-003` | `VERIFIED` |
 | `FLOW-CTRL-001` | User selects preset and confirms command flow | `docs/USER_FLOWS.md` | `DEC-CTRL-051` | `TASK-0807` | `TEST-CTRL-002` | `READY_FOR_IMPLEMENTATION` |
 | `FLOW-CTRL-002` | Faucet command execution and acknowledgment flow | `docs/USER_FLOWS.md` | `DEC-CTRL-051` | `TASK-0805` | `TEST-CTRL-002` | `READY_FOR_IMPLEMENTATION` |
 | `FLOW-CTRL-003` | Faucet command timeout handling flow | `docs/USER_FLOWS.md` | `DEC-CTRL-051` | `TASK-0809` | `TEST-CTRL-004` | `DECISION_REQUIRED` |

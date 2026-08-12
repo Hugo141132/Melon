@@ -1086,20 +1086,21 @@ flowchart TD
 
 **Primary actor:** Owner or Admin  
 **Preconditions:** Active user; device authorised.  
-**Trigger:** User opens history.
+**Trigger:** User opens domain telemetry page (`/soil` or `/water`; legacy `/tanah` and `/air` return 404 Not Found).
 
 **Main success flow:**
 
-1. The server verifies `monitoring.history.read`.
-2. The user selects or retains a device.
-3. The server verifies device access.
-4. The system loads default date range and metrics.
-5. The frontend displays charts or tables.
-6. Missing intervals are shown as gaps, not zeros.
-7. Dates and numbers use the active locale.
+1. The server verifies session, active account, and `monitoring.history.read`.
+2. The user selects or retains a device (resolved via canonical string `deviceId` or database UUID `id`).
+3. The server verifies device access for the target device.
+4. The system loads default date range (last 24 hours) and default metrics. Date range is capped at 31 days (`DEC-MON-087`).
+5. The frontend displays historical chart components (`NPKChart`, `WaterNutrientChart`, `HistoricalChartControls`).
+6. Missing intervals are rendered as visual gaps (`connectNulls={false}`), never synthesized zeros.
+7. Telemetry EC values stored in `mS/cm` are converted to `µS/cm` (×1000) for display.
+8. Dates and numbers are formatted using the active locale (`id-ID`).
 
-**Alternative flows:** No history exists; show empty state.  
-**Error flows:** Date range too large, query failure, unauthorised device.  
+**Alternative flows:** No historical readings exist; API returns HTTP 200 with an empty series array and the UI displays a no-data banner.  
+**Error flows:** Date range exceeds 31 days (HTTP 400 `DATE_RANGE_EXCEEDED`), query failure, or unauthorised device access (HTTP 403/404).  
 **Postconditions:** Historical data is visible for one authorised device.  
 **Required permissions:** `monitoring.history.read`.  
 **Relevant account statuses:** `ACTIVE`.  

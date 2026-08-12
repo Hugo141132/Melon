@@ -1421,6 +1421,9 @@ Response:
 > - **Pagination:** Default `pageSize = 20`, Maximum `pageSize = 100`. `pageSize > 100` returns HTTP 400 (`VALIDATION_ERROR`). Default `page = 1`.
 > - **Raw Bounded Pagination Only:** Raw query telemetry series. Aggregation (`interval` parameter) is deferred until rules are approved.
 > - **Telemetry Isolation:** Water-quality history (`ph`, `tds`, `ec`) is separate from reservoir telemetry (`tankVolume`, `flowRate`).
+> - **Identifier Resolution:** `{deviceId}` parameter accepts both canonical string `deviceId` (e.g. `soil-node-001`) and database UUID `id`.
+> - **Empty History Response:** Queries matching zero records return HTTP `200 OK` with an empty `series: []` array and `totalRecords: 0`, NOT a 404 error or fabricated zero records.
+> - **EC Unit Contract:** EC telemetry values in API contracts are stored and transmitted in source units (`mS/cm`). The web UI converts values to `µS/cm` (×1000) for presentation.
 
 ## 17.1 Get Soil History
 

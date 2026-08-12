@@ -11,6 +11,7 @@ let mockPathname = '/sensor';
 // Mock next/navigation
 vi.mock('next/navigation', () => ({
   usePathname: () => mockPathname,
+  useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({
     push: vi.fn(),
     prefetch: vi.fn(),
@@ -153,14 +154,6 @@ describe('TopAppBar Route-based DeviceSelector Visibility & Centering', () => {
     );
     expect(screen.getByTestId('device-selector-multiple')).toBeInTheDocument();
 
-    mockPathname = '/tanah';
-    rerender(
-      <DeviceProvider initialDevices={mockDevices}>
-        <TopAppBar showDeviceSelector={true} />
-      </DeviceProvider>
-    );
-    expect(screen.getByTestId('device-selector-multiple')).toBeInTheDocument();
-
     mockPathname = '/water';
     rerender(
       <DeviceProvider initialDevices={mockDevices}>
@@ -169,13 +162,21 @@ describe('TopAppBar Route-based DeviceSelector Visibility & Centering', () => {
     );
     expect(screen.getByTestId('device-selector-multiple')).toBeInTheDocument();
 
-    mockPathname = '/air';
+    mockPathname = '/controls';
     rerender(
       <DeviceProvider initialDevices={mockDevices}>
         <TopAppBar showDeviceSelector={true} />
       </DeviceProvider>
     );
     expect(screen.getByTestId('device-selector-multiple')).toBeInTheDocument();
+
+    mockPathname = '/tanah';
+    rerender(
+      <DeviceProvider initialDevices={mockDevices}>
+        <TopAppBar showDeviceSelector={true} />
+      </DeviceProvider>
+    );
+    expect(screen.queryByTestId('device-selector-multiple')).not.toBeInTheDocument();
 
     mockPathname = '/controls';
     rerender(

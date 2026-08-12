@@ -1293,8 +1293,13 @@ Implement bounded history for soil and water.
 ## TASK-0504 — Implement Historical Charts
 
 **Priority:** `P1`  
-**Status:** `BACKLOG`  
-**Dependencies:** `TASK-0503`
+**Status:** `DONE`  
+**Dependencies:** `TASK-0503`  
+**Completed:** 2026-08-12 — Implemented historical monitoring chart components and data fetching layer (`useHistoricalMonitoring` hook, `HistoricalChartControls`, `NPKChart`, `WaterNutrientChart`) on canonical `/soil` and `/water` routes (legacy `/tanah` and `/air` return 404 Not Found). Enforced `DEC-MON-087` & `DEC-MON-088` date-range validation (default 24h, max 31 days) and raw pagination item concatenation (`pageSize=100`, page 1..N). Preserved `null` values as visual gaps (`connectNulls={false}`), handled empty history with HTTP 200 and no-data UI (no fake zeros or 404s), synchronized `DeviceSelector` context across routes, resolved canonical string `deviceId` and database UUID lookups, converted stored `mS/cm` EC values to `µS/cm` for display, applied Indonesian localization (`id-ID`) for timestamps and UI text, and supported responsive mobile layouts (360px–430px). Verified 100% pass across targeted unit tests (`apps/web/test/unit/historical-charts.test.tsx`), authenticated Playwright OWNER/ADMIN E2E testing, full pre-commit verification suite (`test:coverage`, `test:integration`, `check:quality`, `test`, `test:e2e`), and 17-file specification document reconciliation.
+
+### Work
+
+Implement bounded historical chart visualization.
 
 ### Acceptance Criteria
 

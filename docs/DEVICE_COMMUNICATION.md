@@ -605,8 +605,7 @@ Recommended payload:
 | `temperature` | Number or null | Yes when capability exists | `TBD` |
 | `moisture` | Number or null | Yes when capability exists | `TBD` |
 | `ph` | Number or null | Yes when capability exists | Unitless |
-| `ec` | Number or null | Yes when capability exists | `TBD` |
-| `battery` | Number or null | Yes when capability exists | `%`, volts, or `TBD` |
+| `ec` | Number or null | Yes when capability exists | `mS/cm` (UI display converts to `µS/cm`) |
 | `status` | Canonical enum | Recommended | Defined by external status rules |
 
 Allowed provisional soil status values:

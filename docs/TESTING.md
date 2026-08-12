@@ -590,7 +590,6 @@ Test each metric:
 - Water pH.
 - TDS.
 - Water EC.
-- Battery (`BAT`).
 - Tank volume.
 - Flow rate.
 
