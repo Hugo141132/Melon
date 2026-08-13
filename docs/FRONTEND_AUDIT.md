@@ -213,7 +213,7 @@ None installed. Location is represented as text `"Kebun Melon"` with a `MapPin` 
 
 ### 15. Internationalisation (I18N) Support
 
-`next-intl` infrastructure installed and configured in `@kebun-melon/web` (`TASK-0601`) with default `id` (Bahasa Indonesia), fallback `en` (English), non-prefixed cookie resolution (`locale`), server/client support, and bootstrap dictionaries (`messages/id.json`, `messages/en.json`). Hardcoded page UI strings remain to be extracted into namespaces (`TASK-0602`) and translated (`TASK-0603`). Mandatory initial language gate and Settings UI switcher belong to `TASK-0604`.
+`next-intl` infrastructure installed and configured in `@kebun-melon/web` (`TASK-0601`). All 17 approved translation namespaces (`common`, `auth`, `navigation`, `dashboard`, `devices`, `soil`, `water`, `history`, `faucet`, `alerts`, `users`, `approvals`, `profile`, `settings`, `validation`, `errors`, `accessibility`) plus preserved `system` created in `messages/id.json` and `messages/en.json` (`TASK-0602`) with 100% key parity, matching ICU placeholders, non-empty translations, technical term preservation, and unit test coverage (`apps/web/test/unit/i18n-namespaces.test.ts`). Hardcoded page UI replacement remains `TASK-0603`, and mandatory initial language gate & Settings UI switcher belong to `TASK-0604`.
 
 ### 16. Existing Database or ORM Integration
 None. No database driver, ORM (Prisma/Drizzle), or persistence layer exists in the repository.

@@ -1372,10 +1372,13 @@ Configure `next-intl` infrastructure for `@kebun-melon/web`:
 ## TASK-0602 — Create Translation Namespaces
 
 **Priority:** `P1`  
-**Status:** `READY`  
-**Dependencies:** `TASK-0601`
+**Status:** `DONE`  
+**Dependencies:** `TASK-0601`  
+**Completed:** 2026-08-13 — Created complete translation namespaces for `id` (Bahasa Indonesia) and `en` (English) per `docs/I18N.md` §10-§17.
 
-Create:
+### Work
+
+Created the 17 approved translation namespaces across `apps/web/messages/id.json` and `apps/web/messages/en.json`:
 
 ```text
 common
@@ -1397,6 +1400,17 @@ errors
 accessibility
 ```
 
+Key Implementation Details:
+- Preserved existing TASK-0601 `system` namespace and infrastructure (`request.ts`, `config.ts`, `middleware.ts`).
+- Enforced 100% recursive key set parity between `id.json` and `en.json`.
+- Provided real, non-empty Bahasa Indonesia and English translations matching product terminology from `docs/I18N.md`.
+- Enforced matching ICU/next-intl interpolation placeholders (`{time}`, `{count}`, `{volume}`, `{name}`, `{metric}`, `{message}`, `{deviceId}`, `{deviceName}`) between locales.
+- Preserved canonical technical abbreviations untranslated (`N`, `P`, `K`, `pH`, `EC`, `TDS`, `ESP32`, `NodeMCU`, `MQTT`, `API`, `RBAC`, `mL`, `L`, `°C`, `%`).
+- Omitted soil/water quality `BAT` parameter per `DEC-MON-086`.
+- Added targeted Vitest unit test suite in `apps/web/test/unit/i18n-namespaces.test.ts` verifying 100% key parity, namespace presence, non-empty values, placeholder equivalence, and technical term preservation (7/7 tests passed).
+- Verified `npx tsc --noEmit` cleanly passed with 0 errors and `npx prettier` code formatting verified.
+- User manually executed and verified reserved pre-commit suite (`npm run check:quality`). Hard-coded component UI text replacement remains TASK-0603; language gate and settings UI selector belong to TASK-0604.
+
 ### Acceptance Criteria
 
 - Key sets match between locales.
@@ -1408,7 +1422,7 @@ accessibility
 ## TASK-0603 — Replace Hard-Coded UI Text
 
 **Priority:** `P1`  
-**Status:** `BACKLOG`  
+**Status:** `READY`  
 **Dependencies:** `TASK-0602`
 
 ### Acceptance Criteria

@@ -105,7 +105,7 @@
 | `I18N-REQ-004` | Mandatory initial language gate + Settings language selector component | `docs/I18N.md` | `DEC-I18N-068` | `TASK-0604` | `TEST-E2E-004` | `READY_FOR_IMPLEMENTATION` |
 | `I18N-REQ-005` | Authenticated user profile language persistence | `docs/I18N.md` | - | `TASK-0604` | `TEST-API-002` | `READY_FOR_IMPLEMENTATION` |
 | `I18N-REQ-006` | Cookie-based locale routing without path pollution | `docs/I18N.md` | `DEC-I18N-068` | `TASK-0604` | `TEST-E2E-004` | `READY_FOR_IMPLEMENTATION` |
-| `I18N-REQ-007` | Technical content and enums exempt from translation | `docs/I18N.md` | - | `TASK-0603` | `TEST-UNIT-004` | `READY_FOR_IMPLEMENTATION` |
+| `I18N-REQ-007` | Technical content and enums exempt from translation | `docs/I18N.md` | - | `TASK-0602` | `TEST-UNIT-004` | `IMPLEMENTED` |
 | `I18N-REQ-008` | Locale-aware DateTime and number formatting | `docs/I18N.md` | `DEC-I18N-068` | `TASK-0603` | `TEST-UNIT-004` | `READY_FOR_IMPLEMENTATION` |
 | `DEV-ID-001` | Unique canonical device identifier string | `docs/DEVICE_COMMUNICATION.md` | - | `TASK-0302` | `TEST-DB-001` | `READY_FOR_IMPLEMENTATION` |
 | `DEV-ID-002` | Device capabilities flags and registration | `docs/DEVICE_COMMUNICATION.md` | - | `TASK-0303` | `TEST-DB-001` | `READY_FOR_IMPLEMENTATION` |
@@ -207,7 +207,7 @@
 | `TEST-UNIT-001` | Environment variable validation unit tests | `docs/TESTING.md` | - | `TASK-0103` | `TEST-UNIT-001` | `READY_FOR_IMPLEMENTATION` |
 | `TEST-UNIT-002` | Role and permission matrix unit tests | `docs/TESTING.md` | - | `TASK-0105` | `TEST-UNIT-002` | `READY_FOR_IMPLEMENTATION` |
 | `TEST-UNIT-003` | Telemetry data freshness and status unit tests | `docs/TESTING.md` | `` | `TASK-0407` | `TEST-UNIT-003` | `DECISION_REQUIRED` |
-| `TEST-UNIT-004` | I18N locale key and translation unit tests | `docs/TESTING.md` | `DEC-I18N-068` | `TASK-0601` | `TEST-UNIT-004` | `READY_FOR_IMPLEMENTATION` |
+| `TEST-UNIT-004` | I18N locale key and translation unit tests | `docs/TESTING.md` | `DEC-I18N-068` | `TASK-0601` | `TEST-UNIT-004` | `VERIFIED` |
 | `TEST-UNIT-005` | Utility and format helper unit tests | `docs/TESTING.md` | - | `TASK-0102` | `TEST-UNIT-005` | `READY_FOR_IMPLEMENTATION` |
 | `TEST-API-001` | Authentication API endpoint integration tests | `docs/TESTING.md` | `DEC-AUTH-001` | `TASK-0204` | `TEST-API-001` | `READY_FOR_IMPLEMENTATION` |
 | `TEST-API-002` | User and approval API integration tests | `docs/TESTING.md` | `DEC-AUTH-006` | `TASK-0207` | `TEST-API-002` | `READY_FOR_IMPLEMENTATION` |

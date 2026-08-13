@@ -273,6 +273,16 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
 - 21st.dev MCP: `NOT REQUIRED`
 - Summary: Configured `next-intl` infrastructure in `@kebun-melon/web` per `DEC-I18N-068` with locales `id` (default) and `en` (fallback), non-prefixed cookie resolution (`locale`), server/client rendering support, bootstrap dictionaries (`messages/id.json`, `messages/en.json`), and safe missing key fallback handling. Created `i18n/request.ts` request configuration and centralized config (`lib/i18n/config.ts`). Verified 100% test pass rate on unit test suite (`apps/web/test/unit/i18n-config.test.ts`), `security-headers.test.ts`, web typecheck (`tsc --noEmit`), production build (`31/31` static pages), and Playwright non-credentialed browser smoke test on `/login`. Initial language gate UI and Settings switcher component belong to `TASK-0604` and are NOT implemented yet.
 
+#### TASK-0602 Governance Record
+
+`TASK-0602` translation namespaces implementation record:
+- Frontend impact: `NONE`
+- Selected UI direction: `Premium Minimal Ops`
+- Existing color template: `UNCHANGED`
+- Selected motion effects: `None`
+- 21st.dev MCP: `NOT REQUIRED`
+- Summary: Created all 17 approved translation namespaces (`common`, `auth`, `navigation`, `dashboard`, `devices`, `soil`, `water`, `history`, `faucet`, `alerts`, `users`, `approvals`, `profile`, `settings`, `validation`, `errors`, `accessibility`) across `apps/web/messages/id.json` and `apps/web/messages/en.json` while preserving TASK-0601 `system` infrastructure. Enforced 100% key parity, real non-empty strings, and identical ICU placeholders (`{time}`, `{count}`, `{volume}`, `{name}`, `{metric}`, `{message}`, `{deviceId}`, `{deviceName}`). Preserved technical abbreviations (`N`, `P`, `K`, `pH`, `EC`, `TDS`, `ESP32`, `NodeMCU`, `MQTT`, `API`, `RBAC`, `mL`, `L`, `°C`, `%`) untranslated and omitted `BAT` parameter per `DEC-MON-086`. Added targeted unit test suite (`apps/web/test/unit/i18n-namespaces.test.ts`) passing 7/7 tests. User manually executed and verified reserved pre-commit suite (`npm run check:quality`). Hard-coded component UI text replacement remains TASK-0603; language gate and settings UI selector belong to TASK-0604.
+
 ---
 
 ## 5. Task Selection Rules

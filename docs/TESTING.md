@@ -481,10 +481,12 @@ Test:
 
 Test:
 
-- Supported locale validation.
-- Default locale.
-- Fallback locale.
-- Translation-key lookup.
+- Supported locale validation (`apps/web/test/unit/i18n-config.test.ts`, `TASK-0601`).
+- Default locale (`TASK-0601`).
+- Fallback locale (`TASK-0601`).
+- Translation-key lookup & 17 namespace key parity (`apps/web/test/unit/i18n-namespaces.test.ts`, `TASK-0602`).
+- Non-empty translations and matching ICU interpolation placeholders (`TASK-0602`).
+- Technical parameter preservation and `BAT` parameter omission (`TASK-0602`).
 - Status translation mapping.
 - Date formatting.
 - Number formatting.
