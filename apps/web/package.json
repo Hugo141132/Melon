@@ -19,7 +19,8 @@
     "test:approve-route": "vitest run app/api/v1/approvals/[userId]/approve/test/route.test.ts",
     "test:approvals-page": "vitest run app/approvals/test/page.test.ts",
     "test:status-page": "vitest run app/(auth)/status/test/page.test.ts",
-    "test:route-protection": "vitest run test/route_protection.test.ts"
+    "test:route-protection": "vitest run test/route_protection.test.ts",
+    "test:i18n-config": "vitest run test/unit/i18n-config.test.ts"
   },
   "dependencies": {
     "@kebun-melon/contracts": "*",
@@ -34,6 +35,7 @@
     "clsx": "^2.1.1",
     "lucide-react": "^0.417.0",
     "next": "^16.3.0",
+    "next-intl": "^3.26.5",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "recharts": "^2.12.7",
@@ -41,6 +43,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.4.2",
     "@testing-library/react": "^16.2.0",
     "@testing-library/user-event": "^14.5.2",

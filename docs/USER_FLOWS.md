@@ -191,20 +191,21 @@ flowchart TD
     R --> S
 ```
 
-## 5.6 Language Switching
+## 5.6 Language Entry and Switching
 
 ```mermaid
 flowchart TD
-    A[User opens language selector] --> B[Select English or Bahasa Indonesia]
-    B --> C[Validate supported locale]
-    C --> D[Apply translated interface]
-    D --> E[Update HTML lang attribute]
-    E --> F[Persist preference]
-    F --> G{Authenticated?}
-    G -- Yes --> H[Save to user profile]
-    G -- No --> I[Save to local storage or cookie]
-    H --> J[Refresh retains language]
-    I --> J
+    A[Visitor opens page] --> B{Valid locale cookie exists?}
+    B -- No --> C[Render mandatory initial language gate]
+    C --> D[Select English or Bahasa Indonesia]
+    D --> E[Persist locale cookie]
+    E --> F[Render requested page in selected locale]
+    B -- Yes --> F
+    F --> G{User opens Settings?}
+    G -- Yes --> H[Select new language in Settings]
+    H --> I[Validate & update locale preference]
+    I --> J[Save to profile / cookie]
+    J --> K[UI updates language without re-authenticating]
 ```
 
 ---
@@ -222,8 +223,9 @@ flowchart TD
 1. The frontend requests the route.
 2. The server checks for a valid session.
 3. The server finds no authenticated session.
-4. The system redirects the visitor to the login page.
-5. The login page displays links or actions for login and account creation.
+4. The system checks for a valid persisted locale cookie (`locale`). If no valid locale cookie exists, render the mandatory initial language-selection gate (`English` → `en`, `Bahasa Indonesia` → `id`).
+5. After locale selection, persist the locale cookie (`locale`) and render the login page in that locale.
+6. The login page displays links or actions for login and account creation.
 
 **Alternative flows:**
 
@@ -1138,11 +1140,11 @@ flowchart TD
 
 # 10. Language Flow
 
-## Flow 34 — User Changes the Website Language
+## Flow 34 — User Changes the Website Language in Settings
 
-**Primary actor:** Owner or Admin; optionally unauthenticated visitor  
-**Preconditions:** Language selector is available.  
-**Trigger:** User selects English or Bahasa Indonesia.
+**Primary actor:** Owner or Admin  
+**Preconditions:** User is on the Settings page (`/settings`). Language selector is available.  
+**Trigger:** User selects English (`en`) or Bahasa Indonesia (`id`).
 
 **Main success flow:**
 
@@ -1150,43 +1152,44 @@ flowchart TD
 2. The frontend applies translated text.
 3. The HTML `lang` attribute updates.
 4. Dates, times, and numbers use locale-aware formatting where specified.
-5. Canonical values and permissions remain unchanged.
-6. For authenticated users, the preference is saved to their profile.
-7. For unauthenticated users, the preference is stored locally or in a cookie.
+5. Canonical values, roles, permissions, and device access remain unchanged.
+6. For authenticated users, the preference is saved to their profile (`preferredLocale`).
+7. For unauthenticated visitors who previously selected language via the initial gate, preference is stored in non-prefixed cookie (`locale`).
 
-**Alternative flows:** Missing translation falls back to the configured fallback language.  
+**Alternative flows:** Missing translation falls back to fallback language (`en`).  
 **Error flows:** Unsupported locale is rejected and fallback is applied.  
 **Postconditions:** Interface language changes without changing access.  
 **Required permissions:** `language.self.update` for authenticated persistence.  
 **Relevant account statuses:** Any page-eligible status.  
-**UI states:** Language menu, applying, applied.  
-**Audit events:** Usually none, or preference update.  
-**Open decisions:** Default and fallback locale.
+**UI states:** Settings language option selected, applying, applied.  
+**Audit events:** Usually none, or preference update audit record.  
+**Open decisions:** None (Default locale `id`, fallback locale `en` approved).
 
 ---
 
 ## Flow 35 — User Refreshes After Changing Language
 
 **Primary actor:** Owner, Admin, or visitor  
-**Preconditions:** A language preference has been stored.  
+**Preconditions:** A language preference has been stored in profile or cookie.  
 **Trigger:** Page refresh or new session.
 
 **Main success flow:**
 
-1. The system reads the authenticated profile preference or local preference.
-2. The system validates the locale.
-3. The interface loads in the saved language.
-4. Missing keys use fallback language.
-5. Permission checks continue using canonical values.
+1. The system reads the authenticated profile preference (`preferredLocale`) or cookie (`locale`).
+2. If no valid locale exists for an unauthenticated visitor, display mandatory initial language-selection gate.
+3. The system validates the locale.
+4. The interface loads in the saved language.
+5. Missing keys use fallback language (`en`).
+6. Permission checks continue using canonical values.
 
-**Alternative flows:** No saved preference; browser language or default locale is used according to policy.  
-**Error flows:** Invalid stored locale is ignored.  
-**Postconditions:** Language choice persists.  
+**Alternative flows:** Invalid stored locale defaults to `id` / fallback `en`.  
+**Error flows:** Invalid stored locale is ignored and fallback applied.  
+**Postconditions:** Language choice persists across navigation and page refresh.  
 **Required permissions:** None for reading own preference.  
 **Relevant account statuses:** Any eligible page state.  
-**UI states:** Correct locale on initial render.  
+**UI states:** Correct locale rendered on initial page render without path redirect.  
 **Audit events:** None.  
-**Open decisions:** Locale precedence order.
+**Open decisions:** None (Precedence: Profile > Cookie > Gate > Default `id` / Fallback `en`).
 
 ---
 

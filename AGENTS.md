@@ -234,7 +234,7 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
 - Provisioned Staging Database: Supabase PostgreSQL (`scqrbtfilmttqrutynyo`) via Supavisor Session Pooler (`aws-0-ap-south-1.pooler.supabase.com:6543`)
 - Provisioned Staging MQTT Broker: EMQX Cloud Serverless (`wss://` TLS active, password-authenticated gateway service, per-device topic ACLs)
 - Safety Configuration: `ENABLE_FAUCET_CONTROL=false` strictly enforced
-- Verification Results: 10/12 flows verified (Flow 7 failed due to missing Phase 6 UI switcher; Flows 8-10 safely blocked by feature flag)
+- Verification Results: 10/12 flows verified (Flow 7 failed due to missing Phase 6 TASK-0604 mandatory initial gate & Settings UI switcher component; Flows 8-10 safely blocked by feature flag)
 
 #### TASK-0408 Governance & Simulator Record
 
@@ -262,6 +262,16 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
 - Selected motion effects: `Card hover`, `Skeleton loading`, `Chart loading`
 - 21st.dev MCP: `NOT REQUIRED`
 - Summary: Implemented bounded historical telemetry chart components (`NPKChart`, `WaterNutrientChart`, `HistoricalChartControls`) and data fetching hook (`useHistoricalMonitoring`) on canonical `/soil` and `/water` routes (legacy `/tanah` and `/air` return 404 Not Found). Enforced `DEC-MON-087` date-range bounds (default 24h, max 31 days) and raw pagination. Preserved null values as visual gaps (`connectNulls={false}`), supported empty history returns (HTTP 200 with empty series, no fake zero values or 404s), synchronized `DeviceSelector` context across routes, resolved canonical `deviceId` string and database UUID lookups, and formatted timestamps using Indonesian localization (`id-ID`). Verified 100% test pass rate across unit test suite (`apps/web/test/unit/historical-charts.test.tsx`), Playwright OWNER/ADMIN verification, and pre-commit suite.
+
+#### TASK-0601 Governance Record
+
+`TASK-0601` I18N infrastructure & configuration record:
+- Frontend impact: `NONE`
+- Selected UI direction: `Premium Minimal Ops`
+- Existing color template: `UNCHANGED`
+- Selected motion effects: `None`
+- 21st.dev MCP: `NOT REQUIRED`
+- Summary: Configured `next-intl` infrastructure in `@kebun-melon/web` per `DEC-I18N-068` with locales `id` (default) and `en` (fallback), non-prefixed cookie resolution (`locale`), server/client rendering support, bootstrap dictionaries (`messages/id.json`, `messages/en.json`), and safe missing key fallback handling. Created `i18n/request.ts` request configuration and centralized config (`lib/i18n/config.ts`). Verified 100% test pass rate on unit test suite (`apps/web/test/unit/i18n-config.test.ts`), `security-headers.test.ts`, web typecheck (`tsc --noEmit`), production build (`31/31` static pages), and Playwright non-credentialed browser smoke test on `/login`. Initial language gate UI and Settings switcher component belong to `TASK-0604` and are NOT implemented yet.
 
 ---
 

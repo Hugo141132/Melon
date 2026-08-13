@@ -11,7 +11,7 @@
 | Primary users | Owner and Admin |
 | Hardware context | ESP32/NodeMCU devices |
 | Frontend reference | Existing frontend source code, `FRONTEND_AUDIT.md`, and `UI_UX.md` |
-| Default language | TBD |
+| Default language | Bahasa Indonesia (`id`) (Fallback: English / `en`) |
 | Supported languages | English and Bahasa Indonesia |
 
 ---
@@ -683,17 +683,18 @@ The application shall initially support:
 
 The system shall:
 
-- Provide a language selector.
+- Provide a mandatory centered initial language-selection gate for unauthenticated visitors without a valid persisted locale cookie (`English` → `en`, `Bahasa Indonesia` → `id`).
+- Provide a language selector in Settings (`/settings`) for post-entry language changes (not in the application header, user menu, login forms, or mobile nav).
 - Apply the selected language without requiring the user to sign out.
-- Persist the preference for authenticated users.
-- Use a defined fallback language.
+- Persist preference (cookie for unauthenticated, user profile for authenticated).
+- Use `en` (English) as the defined fallback language when keys are missing or invalid.
 - Translate navigation, forms, validation, statuses, alerts, account approval messages, monitoring labels, control messages, tables, and accessibility labels.
 - Update the HTML language attribute.
 - Format dates, times, and numbers according to the active locale where appropriate.
 - Keep API field names, MQTT topics, device IDs, database keys, and canonical enum values untranslated.
 - Preserve technical abbreviations such as pH, EC, TDS, N, P, and K.
 
-The default and fallback language are TBD.
+The default language is `id` (Bahasa Indonesia) and fallback language is `en` (English).
 
 ---
 
@@ -977,7 +978,7 @@ The following decisions must be resolved before their related implementation is 
 24. Account-approval notification method.
 25. First Owner provisioning process.
 26. Password-recovery process.
-27. Default and fallback language.
+27. Default and fallback language (Resolved: default `id`, fallback `en`).
 28. Whether Owner approval immediately activates the Admin.
 29. Whether an approved Admin must verify email before activation.
 30. Exact profile fields.

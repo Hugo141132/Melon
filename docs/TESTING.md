@@ -552,7 +552,7 @@ Component tests shall verify isolated frontend behaviour.
 - No Owner-only links for Admin.
 - Mobile navigation.
 - Active route.
-- Language selector.
+- User profile menu.
 
 ## 11.3 Device Selector
 

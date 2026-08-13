@@ -212,7 +212,8 @@ Static profile string `"Pemilik Lahan"` in `USER_PROFILE` constant (`lib/constan
 None installed. Location is represented as text `"Kebun Melon"` with a `MapPin` icon.
 
 ### 15. Internationalisation (I18N) Support
-Hardcoded Indonesian strings (`id`) throughout all pages. No translation keys or i18n library (e.g. `next-intl`, `react-i18next`) installed.
+
+`next-intl` infrastructure installed and configured in `@kebun-melon/web` (`TASK-0601`) with default `id` (Bahasa Indonesia), fallback `en` (English), non-prefixed cookie resolution (`locale`), server/client support, and bootstrap dictionaries (`messages/id.json`, `messages/en.json`). Hardcoded page UI strings remain to be extracted into namespaces (`TASK-0602`) and translated (`TASK-0603`). Mandatory initial language gate and Settings UI switcher belong to `TASK-0604`.
 
 ### 16. Existing Database or ORM Integration
 None. No database driver, ORM (Prisma/Drizzle), or persistence layer exists in the repository.

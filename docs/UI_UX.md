@@ -322,7 +322,7 @@ Expected regions:
 - site and device context;
 - main content area;
 - notification area;
-- user and language controls.
+- user controls.
 
 ### 6.1 Header Requirements
 
@@ -334,7 +334,6 @@ The header shall provide access to:
 - global device status;
 - last data update;
 - alerts;
-- language selector;
 - user profile menu.
 
 On smaller screens, these controls may move into a compact menu or drawer, but device context and critical status must remain visible.
@@ -741,17 +740,23 @@ Initial locales:
 - English — `en`
 - Bahasa Indonesia — `id`
 
-Default and fallback locale:
+Default locale:
+- `id` (Bahasa Indonesia)
 
-- `en`
+Fallback locale:
+- `en` (English)
 
-### 15.2 Language Selector Placement
+### 15.2 Language Selector Placement & Initial Gate UX
 
-The language selector shall be available from:
+1. **Mandatory Initial Language Gate**:
+   - For an unauthenticated visitor with **no valid persisted locale cookie**, show a small centered mandatory language-selection gate before rendering login, register, or account-status UI.
+   - Gate options: `English` (`en`) and `Bahasa Indonesia` (`id`).
+   - Prompt text must be concise bilingual/language-neutral (`Select Language / Pilih Bahasa`).
+   - If a valid locale cookie already exists, **skip the gate** and render the requested page directly.
 
-- the header or user menu;
-- the settings page;
-- the mobile navigation or profile drawer.
+2. **Subsequent Language Changes**:
+   - Available exclusively from the **Settings** page (`/settings`).
+   - Must **NOT** be placed in the application header, user menu, login/register forms, or mobile navigation.
 
 Language names shall be displayed as:
 
@@ -760,19 +765,15 @@ Language names shall be displayed as:
 
 ### 15.3 Language-Switching Behaviour
 
-The user shall be able to change language without signing out.
+The user shall be able to change language from Settings without signing out.
 
 After selection:
 
 1. visible interface text updates;
 2. the HTML `lang` attribute updates;
-3. the preference is persisted;
-4. current route and device context are preserved where possible;
-5. RBAC and device access remain unchanged.
-
-For authenticated users, save the preference to the user profile when supported.
-
-For unauthenticated contexts, use a cookie or local storage as defined by the technical architecture.
+3. the preference is persisted (cookie for unauthenticated, user profile for authenticated);
+4. current route and device context are preserved;
+5. RBAC, device assignment, and permissions remain completely unchanged.
 
 ### 15.4 Content That Must Be Translated
 
@@ -1050,7 +1051,7 @@ Control history shall clearly distinguish:
 - Dialogs manage focus correctly.
 - Status does not rely on colour alone.
 - The main monitoring and control workflows remain usable on mobile.
-- The language selector remains available on all supported screen sizes.
+- The language settings remain accessible in Settings on all supported screen sizes.
 
 ---
 

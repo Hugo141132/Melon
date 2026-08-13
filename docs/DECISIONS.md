@@ -34,7 +34,7 @@
 | **Devices** | `DEC-DEV-020` to `DEC-DEV-035` | **APPROVED** | Multi-protocol architecture: Soil & Water quality monitoring telemetry via REST API over Wi-Fi (no MQTT broker). Water Tank monitoring (tank volume & flow rate) via MQTT through an EMQX broker (MQTT 5.0 over TLS via IoT Gateway). Shared INA219 electrical monitoring via REST/Wi-Fi. Per-device credentials/ACLs, no anonymous access, no direct browser-to-MQTT. Offline threshold: **TBD**. Stale threshold: **TBD**. |
 | **Monitoring** | `DEC-MON-036` to `DEC-MON-050` | **APPROVED** | Three distinct monitoring domains: 1) Soil monitoring (NPK, Temp, Moisture, pH, EC in `µS/cm`, status), 2) Water Quality monitoring (pH, TDS in ppm, EC in `µS/cm`, status), 3) Water Tank monitoring (Tank Vol in `L`, Flow in `m³/h`, status). Canonical display unit for EC is `µS/cm` (values in `mS/cm` converted at presentation boundary via `×1000`). Control capabilities (Solenoid Valve, Relay) are actuators, not monitoring sensors. INA219 electrical monitoring tracks system electrical consumption (voltage, current, power) as device health/power telemetry, not as a battery percentage or primary agronomic measurement. Sensor precision and valid ranges: **TBD**. |
 | **Faucet Control** | `DEC-CTRL-051` to `DEC-CTRL-067` | **APPROVED** | Max 1 active command/device, no auto retries, `ENABLE_FAUCET_CONTROL=false` default, dual written sign-off (Owner + Hardware Lead) required before production activation. Duplicate command IDs never re-dispense. Timeout ≠ completion. ACK timeout, completion timeout, expiry duration: **TBD**. Cancellation/stop support: **TBD**. |
-| **I18N** | `DEC-I18N-068` to `DEC-I18N-074` | **APPROVED** | Default `id` (Bahasa Indonesia), `en` fallback, cookie-based locale routing (no URL path pollution), UTC storage with `Asia/Jakarta` (WIB) presentation. |
+| **I18N** | `DEC-I18N-068` to `DEC-I18N-074` | **APPROVED** | Default `id` (Bahasa Indonesia), `en` fallback, mandatory centered language-selection gate for unauthenticated visitors without valid locale (`English` -> `en`, `Bahasa Indonesia` -> `id`), cookie-based non-prefixed routing (no URL path pollution), subsequent language changes strictly in Settings (`/settings`), UTC storage with `Asia/Jakarta` (WIB) presentation. |
 | **Infrastructure** | `DEC-INF-075` to `DEC-INF-088` | **APPROVED (ORM DECISION REQUIRED)** | npm monorepo, PostgreSQL (ORM TBD — see §2.5). Backup schedule, retention period, RPO, and RTO: **TBD** — pending explicit user approval. |
 | **Testing** | `DEC-TST-089` to `DEC-TST-100` | **APPROVED** | Modern Evergreen browsers. Mobile viewport primary (360-430px). Accessibility standard: **TBD**. API performance targets (p95): **TBD**. Physical test run count per faucet phase: **TBD**. |
 | **UI/UX & Frontend** | `DEC-UIUX-101` | **APPROVED** | 6 primary UI directions (1 per task), authoritative Kebun Melon color palette (UNCHANGED), controlled 12-motion library, performant motion quality, mandatory task-level frontend declaration, 21st.dev MCP required ONLY for material redesigns. |
@@ -236,6 +236,22 @@
 * **Context**: PostgreSQL is the confirmed database. The current `package.json` contains neither Prisma nor Drizzle. Exactly one ORM must be selected before `TASK-0104` begins. Do not install either until this decision is recorded.
 * **Recommendation**: Prisma — mature migration system, type-safe client, broad Next.js ecosystem support.
 * **Required Action**: Record the selected ORM here once the user decides.
+
+---
+
+### 2.6 Internationalisation (I18N)
+
+#### DEC-I18N-068: Internationalisation Architecture, Mandatory Initial Language Gate, Settings Locale Selection & Non-Prefixed Cookie Routing
+* **Related Task IDs**: `TASK-0601` through `TASK-0605`
+* **Related Documentation**: `docs/I18N.md`, `docs/UI_UX.md`, `docs/USER_FLOWS.md`, `docs/PRD.md`, `TASKS.md`, `docs/TESTING.md`, `docs/TRACEABILITY.md`
+* **Status**: **APPROVED BY USER**
+* **Approved Decision**:
+  1. **Locales**: Supported locales are `id` (Bahasa Indonesia) and `en` (English). Default locale is `id`. Fallback locale is `en`.
+  2. **Unauthenticated Language-Entry UX**: An unauthenticated visitor with no valid persisted locale cookie MUST NOT see the normal login, register, or account-status UI first. Instead, render a small centered mandatory language-selection gate (`English` → `en`, `Bahasa Indonesia` → `id`) using concise bilingual/language-neutral text.
+  3. **Gate Selection & Routing**: After locale selection, validate the locale, persist it in a non-prefixed cookie (`locale`), and render the requested authentication/public page in that locale without altering URL paths (preserving non-prefixed routes like `/login`, `/register`, `/dashboard`). If a valid locale cookie already exists, skip the gate and render requested pages directly.
+  4. **Post-Entry Language Changes**: After initial gate selection, language changes are available exclusively from **Settings** (`/settings`), NOT from the application header, user menu, login/register forms, or mobile navigation.
+  5. **Authenticated Profile Persistence**: Authenticated locale preference remains stored in the user profile model (`preferredLocale`). Language selection MUST NEVER alter RBAC, device assignment, canonical values, timezone semantics, or permissions.
+  6. **TASK-0601 Implementation**: `next-intl` infrastructure configured for `@kebun-melon/web` with locales `id`/`en`, default `id`, fallback `en`, non-prefixed cookie resolution (`locale`), server/client rendering support, bootstrap dictionaries (`messages/id.json`, `messages/en.json`), and safe missing key fallback handling. Initial language gate UI and Settings switcher component belong to `TASK-0604` and are NOT implemented yet.
 
 ---
 

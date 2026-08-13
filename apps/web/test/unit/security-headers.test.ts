@@ -7,7 +7,7 @@ describe('TASK-0901 — Web Security Headers Configuration Tests', () => {
     const nextConfig = nextConfigModule.default;
 
     expect(typeof nextConfig.headers).toBe('function');
-    const headerRules = await nextConfig.headers();
+    const headerRules = (await nextConfig.headers?.()) ?? [];
 
     expect(headerRules).toHaveLength(1);
     expect(headerRules[0].source).toBe('/:path*');

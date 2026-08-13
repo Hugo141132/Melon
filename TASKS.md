@@ -1344,32 +1344,35 @@ Server-Sent Events
 ## TASK-0601 — Select and Configure I18N Library
 
 **Priority:** `P1`  
-**Status:** `BACKLOG`  
+**Status:** `DONE`  
 **Dependencies:** `TASK-0001`  
-**Notes:** `next-intl` approved for Next.js 14 App Router per `DEC-I18N-068`.
+**Notes:** `next-intl` approved for Next.js App Router per `DEC-I18N-068`. Default `id`, fallback `en`, non-prefixed cookie strategy (`locale`).
 
 ### Work
 
-Select compatible library:
+Configure `next-intl` infrastructure for `@kebun-melon/web`:
 
-- Next.js: `next-intl`.
-- React/Vite: `react-i18next`.
-- Vue: `vue-i18n`.
-- Other framework equivalent.
+- Configure locales `id` (default) and `en` (fallback).
+- Configure non-prefixed cookie routing strategy (`locale`).
+- Create `i18n/request.ts` request configuration.
+- Support Server Components and Client Components.
+- Handle missing translation keys safely without throwing or exposing raw keys.
+- Create minimal bootstrap message files to verify configuration.
 
 ### Acceptance Criteria
 
 - `en` and `id` are configured.
-- Default and fallback locale are configured.
-- Raw keys do not appear.
-- Server and client rendering are supported where needed.
+- Default (`id`) and fallback (`en`) locales are enforced.
+- Non-prefixed cookie resolution is active.
+- Safe missing key handling falls back to `en` message without exposing raw keys.
+- Server and client rendering are supported.
 
 ---
 
 ## TASK-0602 — Create Translation Namespaces
 
 **Priority:** `P1`  
-**Status:** `BACKLOG`  
+**Status:** `READY`  
 **Dependencies:** `TASK-0601`
 
 Create:
@@ -1417,18 +1420,21 @@ accessibility
 
 ---
 
-## TASK-0604 — Implement Locale Persistence
+## TASK-0604 — Implement Mandatory Initial Language Gate & Settings Locale Change Flow
 
 **Priority:** `P1`  
 **Status:** `BACKLOG`  
-**Dependencies:** `TASK-0601`, `TASK-0211`
+**Dependencies:** `TASK-0601`, `TASK-0602`, `TASK-0603`, `TASK-0211`
 
 ### Acceptance Criteria
 
-- Unauthenticated preference persists locally.
-- Authenticated preference persists in profile.
-- Refresh retains locale.
-- Locale change does not alter device selection or RBAC.
+- Mandatory initial language gate (`English` → `en`, `Bahasa Indonesia` → `id`) rendered for unauthenticated visitors without a valid persisted locale cookie.
+- Unauthenticated preference persists in non-prefixed cookie (`locale`).
+- Gate is skipped when a valid locale cookie already exists.
+- Post-gate language changes available exclusively on the Settings page (`/settings`).
+- Authenticated preference persists in user profile (`preferredLocale`).
+- Page refresh retains active locale.
+- Locale change does not alter device selection, canonical values, or RBAC.
 
 ---
 
@@ -2052,7 +2058,7 @@ Required flows status:
 - [x] Device assignment (Flow 4 — PASS)
 - [x] Monitoring (Flow 5 — PASS)
 - [x] History (Flow 6 — PASS)
-- [ ] Language switch (Flow 7 — PENDING Phase 6 `TASK-0604` UI switcher component)
+- [ ] Language switch (Flow 7 — PENDING Phase 6 `TASK-0604` mandatory initial gate & Settings UI switcher component)
 - [x] Faucet command (Flow 8 — SAFELY BLOCKED by `ENABLE_FAUCET_CONTROL=false` returning HTTP 403)
 - [x] Command completion (Flow 9 — SAFELY BLOCKED by `ENABLE_FAUCET_CONTROL=false`)
 - [x] Command failure (Flow 10 — SAFELY BLOCKED by `ENABLE_FAUCET_CONTROL=false`)
