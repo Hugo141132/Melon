@@ -1479,18 +1479,20 @@ Key Implementation Details:
 ## TASK-0605 — Add Translation Completeness Checks
 
 **Priority:** `P1`  
-**Status:** `BACKLOG`  
+**Status:** `DONE`  
+**Completed:** 2026-08-14 — Implemented translation completeness and parity checker in `scripts/check-translations.ts` and automated test suite in `apps/web/test/unit/i18n-completeness.test.ts`. Configured `i18n:check` in `package.json` (`check:quality`) and `.github/workflows/ci.yml`. Enforced detection of missing keys, extra keys, empty values, placeholder mismatches, duplicate JSON keys, and raw untranslated translation keys.
 **Dependencies:** `TASK-0602`, `TASK-0108`
 
 ### Acceptance Criteria
 
 CI detects:
 
-- Missing keys.
-- Extra keys.
-- Empty values.
-- Placeholder mismatches.
-- Raw translation keys.
+- [x] Missing keys.
+- [x] Extra keys.
+- [x] Empty values.
+- [x] Placeholder mismatches.
+- [x] Duplicate JSON keys.
+- [x] Raw translation keys.
 
 ---
 

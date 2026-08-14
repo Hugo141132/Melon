@@ -239,7 +239,7 @@ CI shall provide:
 - Contract tests.
 - API tests.
 - Database migration test.
-- Translation completeness test.
+- Translation completeness test (`npm run i18n:check`).
 - Security scanning.
 - Build verification.
 
@@ -488,6 +488,7 @@ Test:
 - Non-empty translations and matching ICU interpolation placeholders (`TASK-0602`).
 - Technical parameter preservation and `BAT` parameter omission (`TASK-0602`).
 - Hardcoded UI text replacement and component localization (`TASK-0603` verified across 15 unit test suites, 107/107 tests passed).
+- Translation completeness, duplicate key, and parity verification (`apps/web/test/unit/i18n-completeness.test.ts`, `TASK-0605`).
 - Status translation mapping at presentation time (`TASK-0603`).
 - Date and number formatting in active locale (`TASK-0603`).
 - HTML language attribute update (`TASK-0603`).

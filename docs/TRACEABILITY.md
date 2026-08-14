@@ -107,6 +107,7 @@
 | `I18N-REQ-006` | Cookie-based locale routing without path pollution | `docs/I18N.md` | `DEC-I18N-068` | `TASK-0604` | `TEST-E2E-004` | `VERIFIED` |
 | `I18N-REQ-007` | Technical content and enums exempt from translation | `docs/I18N.md` | - | `TASK-0602`, `TASK-0603` | `TEST-UNIT-004` | `VERIFIED` |
 | `I18N-REQ-008` | Locale-aware DateTime and number formatting | `docs/I18N.md` | `DEC-I18N-068` | `TASK-0603` | `TEST-UNIT-004` | `VERIFIED` |
+| `I18N-REQ-009` | Translation completeness and JSON parity checking in CI | `docs/I18N.md` | - | `TASK-0605` | `TEST-UNIT-004` | `IMPLEMENTED` |
 | `DEV-ID-001` | Unique canonical device identifier string | `docs/DEVICE_COMMUNICATION.md` | - | `TASK-0302` | `TEST-DB-001` | `READY_FOR_IMPLEMENTATION` |
 | `DEV-ID-002` | Device capabilities flags and registration | `docs/DEVICE_COMMUNICATION.md` | - | `TASK-0303` | `TEST-DB-001` | `READY_FOR_IMPLEMENTATION` |
 | `DEV-TOPIC-001` | MQTT topic hierarchy root definition | `docs/DEVICE_COMMUNICATION.md` | `DEC-DEV-020` | `TASK-0403` | `TEST-MQTT-001` | `READY_FOR_IMPLEMENTATION` |

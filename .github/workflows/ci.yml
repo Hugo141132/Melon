@@ -101,6 +101,9 @@ jobs:
       - name: Security Scan (Dependency Audit)
         run: npm run scan:deps
 
+      - name: Validate Translations Completeness
+        run: npm run i18n:check
+
       - name: Execute Unit Tests (Coverage)
         run: npm run test:coverage
 
