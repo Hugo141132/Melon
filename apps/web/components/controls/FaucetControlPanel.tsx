@@ -8,7 +8,12 @@ import FaucetStatusCard, { FaucetCommandDto, ACTIVE_COMMAND_STATUSES } from './F
 import FaucetHistoryTable from './FaucetHistoryTable';
 import { Cpu } from 'lucide-react';
 
+import { useTranslations } from 'next-intl';
+
 export default function FaucetControlPanel() {
+  const tFaucet = useTranslations('faucet');
+  const tDevices = useTranslations('devices');
+  const tCommon = useTranslations('common');
   const { selectedDevice } = useDeviceContext();
 
   // Permissions & Auth state
@@ -127,16 +132,14 @@ export default function FaucetControlPanel() {
       const json = await res.json();
 
       if (json.success && json.data) {
-        setSuccessMsg(
-          `Perintah penyiraman (${json.data.targetVolumeMl} mL) berhasil dikirim! Status awal: QUEUED.`
-        );
+        setSuccessMsg(tFaucet('commandSentSuccess', { volume: json.data.targetVolumeMl }));
         setActiveCommand(json.data);
         setModalOpen(false);
       } else {
-        setErrorMsg(json.error?.message || 'Gagal membuat perintah penyiraman.');
+        setErrorMsg(json.error?.message || tFaucet('commandCreateFailed'));
       }
     } catch {
-      setErrorMsg('Kesalahan jaringan saat mengirim perintah penyiraman.');
+      setErrorMsg(tFaucet('networkErrorDispense'));
     } finally {
       setSubmitting(false);
     }
@@ -149,7 +152,7 @@ export default function FaucetControlPanel() {
         <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium flex items-center justify-between animate-fade-in">
           <span>{successMsg}</span>
           <button onClick={() => setSuccessMsg(null)} className="font-bold hover:underline">
-            Tutup
+            {tCommon('close')}
           </button>
         </div>
       )}
@@ -158,7 +161,7 @@ export default function FaucetControlPanel() {
         <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium flex items-center justify-between animate-fade-in">
           <span>{errorMsg}</span>
           <button onClick={() => setErrorMsg(null)} className="font-bold hover:underline">
-            Tutup
+            {tCommon('close')}
           </button>
         </div>
       )}
@@ -193,11 +196,8 @@ export default function FaucetControlPanel() {
       ) : (
         <section className="p-8 bg-app-surface-container-lowest rounded-2xl border border-app-outline-variant/20 text-center text-xs text-app-on-surface-variant space-y-2">
           <Cpu size={32} className="mx-auto text-app-outline" />
-          <p className="font-semibold text-[14px]">Perangkat Tidak Dipilih</p>
-          <p>
-            Pilih perangkat dari dropdown navigasi di bagian atas untuk melihat riwayat perintah
-            kran.
-          </p>
+          <p className="font-semibold text-[14px]">{tDevices('noDeviceSelected')}</p>
+          <p>{tFaucet('noDeviceSelectedDesc')}</p>
         </section>
       )}
 

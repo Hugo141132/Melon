@@ -1,6 +1,34 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { DeviceProvider } from '@/context/DeviceContext';
+import { cookies } from 'next/headers';
+import { NextIntlClientProvider } from 'next-intl';
+import {
+  DEFAULT_LOCALE,
+  FALLBACK_LOCALE,
+  LOCALE_COOKIE_NAME,
+  isSupportedLocale,
+} from '@/lib/i18n/config';
+import idMessages from '@/messages/id.json';
+import enMessages from '@/messages/en.json';
+
+const MESSAGES = {
+  id: idMessages,
+  en: enMessages,
+};
+
+async function getLayoutLocaleAndMessages() {
+  let rawCookie: string | undefined;
+  try {
+    const store = await cookies();
+    rawCookie = store.get(LOCALE_COOKIE_NAME)?.value;
+  } catch {
+    // Fallback to default locale during static page prerendering at build time
+  }
+  const locale = isSupportedLocale(rawCookie) ? rawCookie : DEFAULT_LOCALE;
+  const messages = MESSAGES[locale] || MESSAGES[FALLBACK_LOCALE];
+  return { locale, messages };
+}
 
 export const metadata: Metadata = {
   title: {
@@ -18,11 +46,15 @@ export const viewport: Viewport = {
   viewportFit: 'cover',
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const { locale, messages } = await getLayoutLocaleAndMessages();
+
   return (
-    <html lang="id">
+    <html lang={locale}>
       <body className="min-h-dvh font-sans antialiased">
-        <DeviceProvider>{children}</DeviceProvider>
+        <NextIntlClientProvider locale={locale} messages={messages}>
+          <DeviceProvider>{children}</DeviceProvider>
+        </NextIntlClientProvider>
       </body>
     </html>
   );

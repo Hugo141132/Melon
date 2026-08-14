@@ -13,5 +13,15 @@
       "expiresDate": "2027-08-06"
     }
   ],
-  "dependencyExceptions": []
+  "dependencyExceptions": [
+    {
+      "id": "EXC-DEP-001",
+      "packageName": "nanoid",
+      "advisoryId": "GHSA-2v37-7h3g-55p8",
+      "reason": "Transitive sub-dependency of postcss; custom generator size=0 edge case is unused in application/build code paths.",
+      "approvedBy": "Security Team",
+      "approvedDate": "2026-08-14",
+      "expiresDate": "2026-09-14"
+    }
+  ]
 }

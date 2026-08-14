@@ -2,34 +2,35 @@
 
 import React from 'react';
 import { Droplets, AlertCircle, ShieldAlert, WifiOff, Loader2, Sparkles } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 import { AuthorisedDevice } from '@/context/DeviceContext';
 
 export interface FaucetPreset {
   phase: 1 | 2 | 3;
-  label: string;
+  labelKey: 'phase1' | 'phase2' | 'phase3';
+  descKey: 'phase1Desc' | 'phase2Desc' | 'phase3Desc';
   volumeMl: number;
-  description: string;
 }
 
 export const FAUCET_PRESETS: FaucetPreset[] = [
   {
     phase: 1,
-    label: 'Fase 1',
+    labelKey: 'phase1',
+    descKey: 'phase1Desc',
     volumeMl: 300,
-    description: 'Penyiraman ringan awal pertumbuhan',
   },
   {
     phase: 2,
-    label: 'Fase 2',
+    labelKey: 'phase2',
+    descKey: 'phase2Desc',
     volumeMl: 1000,
-    description: 'Penyiraman standar fase vegetatif & pembuahan',
   },
   {
     phase: 3,
-    label: 'Fase 3',
+    labelKey: 'phase3',
+    descKey: 'phase3Desc',
     volumeMl: 1500,
-    description: 'Penyiraman intensif fase pematangan buah',
   },
 ];
 
@@ -56,33 +57,41 @@ export default function FaucetPresetSelector({
   onSelectPreset,
   className,
 }: FaucetPresetSelectorProps) {
+  const tFaucet = useTranslations('faucet');
+
   // Determine disabled reason if controls cannot be used
   const getDisabledReason = (): string | null => {
     if (!isFeatureEnabled) {
-      return 'Fitur kontrol kran air sedang dinonaktifkan di konfigurasi sistem (ENABLE_FAUCET_CONTROL=false).';
+      return tFaucet('featureDisabledNotice');
     }
     if (!selectedDevice) {
-      return 'Silakan pilih perangkat tandon air (WATER_TANK_NODE) untuk memulai penyiraman.';
+      return tFaucet('selectTankPrompt');
     }
     if (!hasControlPermission) {
-      return 'Akun Anda tidak memiliki izin kontrol kran (device.control.dispense).';
+      return tFaucet('noControlPermission');
     }
     if (selectedDevice.connectionStatus === 'OFFLINE') {
-      return `Perangkat '${selectedDevice.deviceName}' sedang OFFLINE dan tidak dapat menerima perintah.`;
+      return tFaucet('deviceOfflineNotice', { deviceName: selectedDevice.deviceName });
     }
     if (selectedDevice.connectionStatus === 'INACTIVE') {
-      return `Perangkat '${selectedDevice.deviceName}' tidak aktif (INACTIVE).`;
+      return tFaucet('deviceInactiveNotice', { deviceName: selectedDevice.deviceName });
     }
     const isWaterTankNode = selectedDevice.deviceType === 'WATER_TANK_NODE';
     const hasControlCap = selectedDevice.permissions?.canControl ?? isWaterTankNode;
     if (!hasControlCap && !isWaterTankNode) {
-      return `Perangkat '${selectedDevice.deviceName}' (${selectedDevice.deviceType}) tidak mendukung kapabilitas FAUCET_CONTROL.`;
+      return tFaucet('notSupportedControl', {
+        deviceName: selectedDevice.deviceName,
+        deviceType: selectedDevice.deviceType,
+      });
     }
     if (
       activeCommand &&
       ['QUEUED', 'SENT', 'ACKNOWLEDGED', 'IN_PROGRESS'].includes(activeCommand.status)
     ) {
-      return `Perintah penyiraman (${activeCommand.targetVolumeMl} mL) sedang aktif/berjalan (Status: ${activeCommand.status}).`;
+      return tFaucet('commandActiveNotice', {
+        volume: activeCommand.targetVolumeMl,
+        status: activeCommand.status,
+      });
     }
     return null;
   };
@@ -96,11 +105,9 @@ export default function FaucetPresetSelector({
         <div>
           <h2 className="text-[18px] font-bold text-app-primary flex items-center gap-2">
             <Droplets className="text-app-primary" size={20} />
-            <span>Preset Dosis Penyiraman Faucet</span>
+            <span>{tFaucet('presetTitle')}</span>
           </h2>
-          <p className="text-[13px] text-app-on-surface-variant">
-            Pilih fase preset volume air untuk dikirimkan ke alat kran otomatis.
-          </p>
+          <p className="text-[13px] text-app-on-surface-variant">{tFaucet('presetSubtitle')}</p>
         </div>
 
         {selectedDevice && (
@@ -137,7 +144,7 @@ export default function FaucetPresetSelector({
             <AlertCircle size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
           )}
           <div className="flex-1">
-            <span className="font-bold block mb-0.5">Kontrol Kran Air Berhenti Sementara</span>
+            <span className="font-bold block mb-0.5">{tFaucet('disabledNoticeTitle')}</span>
             <span>{disabledReason}</span>
           </div>
         </div>
@@ -160,7 +167,7 @@ export default function FaucetPresetSelector({
               {/* Top Row: Phase label & badge */}
               <div className="flex items-center justify-between">
                 <span className="text-[12px] font-bold tracking-wide uppercase px-2.5 py-1 rounded-lg bg-app-primary/10 text-app-primary border border-app-primary/20">
-                  {preset.label}
+                  {tFaucet(preset.labelKey)}
                 </span>
                 <Sparkles
                   size={16}
@@ -177,7 +184,7 @@ export default function FaucetPresetSelector({
                   <span className="text-[16px] font-semibold text-app-primary">mL</span>
                 </div>
                 <p className="text-[12px] text-app-on-surface-variant mt-2 leading-snug">
-                  {preset.description}
+                  {tFaucet(preset.descKey)}
                 </p>
               </div>
 
@@ -195,7 +202,7 @@ export default function FaucetPresetSelector({
                 data-testid={`btn-select-phase-${preset.phase}`}
               >
                 <Droplets size={15} />
-                <span>Pilih {preset.volumeMl} mL</span>
+                <span>{tFaucet('selectVolume', { volume: preset.volumeMl })}</span>
               </button>
             </div>
           );

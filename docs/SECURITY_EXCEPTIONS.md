@@ -79,3 +79,4 @@ All exceptions must be recorded in `scripts/security-exceptions.json` using the 
 - All exceptions expire after a maximum of **12 months** (or shorter if specified).
 - Expired exceptions will cause automated scanners to resume blocking build execution.
 - `scripts/security-exceptions.json` is checked by automated tests during CI execution.
+- **TASK-0603 Audit:** Confirmed zero secret exceptions and zero dependency exceptions introduced.

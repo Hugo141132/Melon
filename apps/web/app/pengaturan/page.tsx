@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   Loader2,
 } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 
 interface SettingItemProps {
   icon: React.ReactNode;
@@ -46,6 +47,10 @@ function SettingItem({ icon, iconBg, title, subtitle, href }: SettingItemProps) 
 }
 
 export default function PengaturanPage() {
+  const tSettings = useTranslations('settings');
+  const tProfile = useTranslations('profile');
+  const tAuth = useTranslations('auth');
+
   const [user, setUser] = useState<{
     fullName: string;
     email: string;
@@ -91,7 +96,7 @@ export default function PengaturanPage() {
             {loading ? (
               <div className="flex items-center gap-2 text-app-on-surface-variant">
                 <Loader2 size={18} className="animate-spin" />
-                <span className="text-[14px]">Memuat profil...</span>
+                <span className="text-[14px]">{tProfile('loading')}</span>
               </div>
             ) : (
               <>
@@ -100,9 +105,9 @@ export default function PengaturanPage() {
                 </h2>
                 <p className="text-[14px] font-semibold text-app-on-surface-variant">
                   {user?.role === 'OWNER'
-                    ? 'PEMILIK LAHAN (OWNER)'
+                    ? tAuth('roleOwner')
                     : user?.role === 'ADMIN'
-                      ? 'ADMINISTRATOR'
+                      ? tAuth('roleAdmin')
                       : USER_PROFILE.role}
                 </p>
               </>
@@ -115,8 +120,8 @@ export default function PengaturanPage() {
           <SettingItem
             icon={<UserIcon size={22} className="text-app-secondary" />}
             iconBg="bg-app-secondary-fixed"
-            title="Profil & Akun"
-            subtitle="Informasi pribadi dan keamanan"
+            title={tSettings('profileAndAccount')}
+            subtitle={tSettings('profileSubtitle')}
             href="/profil"
           />
 
@@ -126,15 +131,15 @@ export default function PengaturanPage() {
               <SettingItem
                 icon={<UsersIcon size={22} className="text-blue-700" />}
                 iconBg="bg-blue-100"
-                title="Manajemen Pengguna"
-                subtitle="Kelola status dan profil pengguna"
+                title={tSettings('userManagement')}
+                subtitle={tSettings('userManagementSubtitle')}
                 href="/users"
               />
               <SettingItem
                 icon={<ShieldCheck size={22} className="text-emerald-700" />}
                 iconBg="bg-emerald-100"
-                title="Persetujuan Admin"
-                subtitle="Kelola persetujuan registrasi Admin"
+                title={tSettings('adminApprovals')}
+                subtitle={tSettings('adminApprovalsSubtitle')}
                 href="/approvals"
               />
             </>
@@ -143,22 +148,22 @@ export default function PengaturanPage() {
           <SettingItem
             icon={<Bell size={22} className="text-app-primary" />}
             iconBg="bg-app-primary/10"
-            title="Notifikasi & Lansiran"
-            subtitle="Atur peringatan sensor lahan"
+            title={tSettings('notificationsTitle')}
+            subtitle={tSettings('notificationsSubtitle')}
             href="/notifikasi"
           />
           <SettingItem
             icon={<Settings2 size={22} className="text-app-tertiary" />}
             iconBg="bg-app-tertiary-fixed/30"
-            title="Registri Perangkat IoT"
-            subtitle="Daftar dan kelola sensor & controller"
+            title={tSettings('deviceRegistry')}
+            subtitle={tSettings('deviceRegistrySubtitle')}
             href="/devices"
           />
           <SettingItem
             icon={<HelpCircle size={22} className="text-app-on-surface-variant" />}
             iconBg="bg-app-surface-container"
-            title="Bantuan & Dukungan"
-            subtitle="FAQ, tutorialnya, dan kontak"
+            title={tSettings('helpAndSupportTitle')}
+            subtitle={tSettings('helpAndSupportSubtitle')}
             href="#"
           />
         </div>

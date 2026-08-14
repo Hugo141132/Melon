@@ -15,92 +15,73 @@ import {
   Loader2,
   RefreshCw,
 } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 
 import type { LucideIcon } from 'lucide-react';
 
-interface AccountStatusConfig {
+interface AccountStatusMeta {
   icon: LucideIcon;
   iconColor: string;
   badgeBg: string;
-  badgeText: string;
+  badgeKey: string;
   titleKey: string;
-  titleDefault: string;
   descriptionKey: string;
-  descriptionDefault: string;
   actionType: 'login' | 'logout' | 'support';
 }
 
-const STATUS_CONFIGS: Record<string, AccountStatusConfig> = {
+const STATUS_META: Record<string, AccountStatusMeta> = {
   PENDING_APPROVAL: {
     icon: Clock,
     iconColor: 'text-amber-600',
     badgeBg: 'bg-amber-100 text-amber-800 border-amber-200',
-    badgeText: 'Menunggu Persetujuan',
-    titleKey: 'status.pending.title',
-    titleDefault: 'Akun Menunggu Persetujuan Owner',
-    descriptionKey: 'status.pending.description',
-    descriptionDefault:
-      'Pendaftaran akun Admin Anda telah berhasil dikirim. Mohon tunggu hingga Owner menyetujui akun Anda sebelum dapat mengakses sistem.',
+    badgeKey: 'pendingApprovalBadge',
+    titleKey: 'pendingTitle',
+    descriptionKey: 'pendingApproval',
     actionType: 'logout',
   },
   APPROVED: {
     icon: CheckCircle2,
     iconColor: 'text-emerald-600',
     badgeBg: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-    badgeText: 'Disetujui',
-    titleKey: 'status.approved.title',
-    titleDefault: 'Akun Disetujui (Belum Aktif)',
-    descriptionKey: 'status.approved.description',
-    descriptionDefault:
-      'Akun Anda telah disetujui tetapi membutuhkan aktivasi lebih lanjut. Silakan hubungi Administrator atau Owner.',
+    badgeKey: 'approved',
+    titleKey: 'approvedTitle',
+    descriptionKey: 'approved',
     actionType: 'support',
   },
   REJECTED: {
     icon: XCircle,
     iconColor: 'text-rose-600',
     badgeBg: 'bg-rose-100 text-rose-800 border-rose-200',
-    badgeText: 'Pendaftaran Ditolak',
-    titleKey: 'status.rejected.title',
-    titleDefault: 'Pendaftaran Akun Ditolak',
-    descriptionKey: 'status.rejected.description',
-    descriptionDefault:
-      'Permohonan pendaftaran akun Anda tidak disetujui oleh Owner. Silakan hubungi Owner jika ada pertanyaan.',
+    badgeKey: 'rejectedBadge',
+    titleKey: 'rejectedTitle',
+    descriptionKey: 'rejected',
     actionType: 'support',
   },
   SUSPENDED: {
     icon: AlertOctagon,
     iconColor: 'text-orange-600',
     badgeBg: 'bg-orange-100 text-orange-800 border-orange-200',
-    badgeText: 'Akun Ditangguhkan',
-    titleKey: 'status.suspended.title',
-    titleDefault: 'Akses Akun Ditangguhkan',
-    descriptionKey: 'status.suspended.description',
-    descriptionDefault:
-      'Akses akun Anda telah ditangguhkan sementara oleh Owner. Silakan hubungi dukungan atau Owner untuk pemulihan.',
+    badgeKey: 'suspendedBadge',
+    titleKey: 'suspendedTitle',
+    descriptionKey: 'suspended',
     actionType: 'support',
   },
   DEACTIVATED: {
     icon: UserX,
     iconColor: 'text-slate-600',
     badgeBg: 'bg-slate-100 text-slate-800 border-slate-200',
-    badgeText: 'Akun Dinonaktifkan',
-    titleKey: 'status.deactivated.title',
-    titleDefault: 'Akun Nonaktif',
-    descriptionKey: 'status.deactivated.description',
-    descriptionDefault:
-      'Akun ini telah dinonaktifkan secara permanen. Anda tidak lagi dapat mengakses fitur sistem.',
+    badgeKey: 'deactivatedBadge',
+    titleKey: 'deactivatedTitle',
+    descriptionKey: 'deactivated',
     actionType: 'support',
   },
   EXPIRED: {
     icon: Clock3,
     iconColor: 'text-blue-600',
     badgeBg: 'bg-blue-100 text-blue-800 border-blue-200',
-    badgeText: 'Sesi Berakhir',
-    titleKey: 'status.expired.title',
-    titleDefault: 'Sesi Selesai / Kadaluwarsa',
-    descriptionKey: 'status.expired.description',
-    descriptionDefault:
-      'Sesi masuk Anda telah berakhir demi alasan keamanan. Silakan masuk kembali untuk melanjutkan.',
+    badgeKey: 'expiredTitle',
+    titleKey: 'expiredTitle',
+    descriptionKey: 'expiredTitle',
     actionType: 'login',
   },
 };
@@ -109,8 +90,11 @@ function StatusContent() {
   const searchParams = useSearchParams();
   const rawReason = searchParams.get('reason') || searchParams.get('status') || 'PENDING_APPROVAL';
 
+  const tAuth = useTranslations('auth');
+  const tCommon = useTranslations('common');
+
   const normalizedReason = rawReason.toUpperCase();
-  const config = STATUS_CONFIGS[normalizedReason] || STATUS_CONFIGS['PENDING_APPROVAL'];
+  const meta = STATUS_META[normalizedReason] || STATUS_META['PENDING_APPROVAL'];
 
   const [loading, setLoading] = useState(true);
   const [currentStatus, setCurrentStatus] = useState<string | null>(null);
@@ -148,48 +132,48 @@ function StatusContent() {
     }
   };
 
-  const IconComponent = config.icon;
+  const IconComponent = meta.icon;
 
   return (
     <div className="bg-surface text-on-surface min-h-dvh flex flex-col justify-center items-center p-[24px]">
       <main className="w-full max-w-md bg-surface-container-lowest bento-shape p-[32px] shadow-sm border border-outline-variant text-center">
         {/* Status Badge */}
         <div className="inline-flex items-center justify-center mb-6">
-          <span className={`px-3 py-1 text-xs font-semibold rounded-full border ${config.badgeBg}`}>
-            {config.badgeText}
+          <span className={`px-3 py-1 text-xs font-semibold rounded-full border ${meta.badgeBg}`}>
+            {tAuth(meta.badgeKey as any)}
           </span>
         </div>
 
         {/* Status Icon */}
         <div className="flex justify-center mb-6">
           <div className="p-4 bg-surface rounded-2xl border border-outline-variant">
-            <IconComponent size={48} className={config.iconColor} />
+            <IconComponent size={48} className={meta.iconColor} />
           </div>
         </div>
 
         {/* Title & Description */}
         <h1 className="text-[24px] leading-[32px] font-bold text-primary mb-3">
-          {config.titleDefault}
+          {tAuth(meta.titleKey as any)}
         </h1>
         <p className="text-[16px] leading-[24px] text-on-surface-variant mb-8">
-          {config.descriptionDefault}
+          {tAuth(meta.descriptionKey as any)}
         </p>
 
         {/* Re-check status info if active session detected */}
         {loading ? (
           <div className="flex items-center justify-center gap-2 text-sm text-outline mb-6">
             <Loader2 size={16} className="animate-spin" />
-            <span>Memeriksa status akun terbaru...</span>
+            <span>{tAuth('checkingStatus')}</span>
           </div>
         ) : currentStatus && currentStatus !== normalizedReason ? (
           <div className="mb-6 p-3 bg-surface rounded-xl border border-outline-variant text-sm text-on-surface-variant flex items-center justify-between">
             <span>
-              Status akun di server: <strong>{currentStatus}</strong>
+              {tAuth('serverStatus')} <strong>{currentStatus}</strong>
             </span>
             <button
               onClick={fetchSessionStatus}
               className="p-1 text-secondary hover:text-primary transition-colors cursor-pointer"
-              title="Perbarui"
+              title={tCommon('refresh')}
             >
               <RefreshCw size={16} />
             </button>
@@ -198,16 +182,16 @@ function StatusContent() {
 
         {/* Action Buttons */}
         <div className="space-y-3">
-          {config.actionType === 'login' && (
+          {meta.actionType === 'login' && (
             <Link
               href="/login"
               className="w-full h-[48px] bg-primary text-on-primary rounded-xl text-[16px] font-semibold hover:bg-primary-container hover:text-on-primary-container transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm"
             >
-              Masuk Kembali
+              {tAuth('relogin')}
             </Link>
           )}
 
-          {config.actionType === 'logout' && (
+          {meta.actionType === 'logout' && (
             <button
               onClick={handleLogout}
               disabled={loggingOut}
@@ -216,25 +200,25 @@ function StatusContent() {
               {loggingOut ? (
                 <>
                   <Loader2 size={18} className="animate-spin" />
-                  <span>Keluar...</span>
+                  <span>{tAuth('loggingOut')}</span>
                 </>
               ) : (
                 <>
                   <LogOut size={18} />
-                  <span>Keluar dari Akun</span>
+                  <span>{tAuth('logout')}</span>
                 </>
               )}
             </button>
           )}
 
-          {config.actionType === 'support' && (
+          {meta.actionType === 'support' && (
             <div className="space-y-3">
               <a
                 href="mailto:support@kebunmelon.com"
                 className="w-full h-[48px] bg-primary text-on-primary rounded-xl text-[16px] font-semibold hover:bg-primary-container hover:text-on-primary-container transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm"
               >
                 <HelpCircle size={18} />
-                <span>Hubungi Bantuan / Owner</span>
+                <span>{tAuth('contactSupport')}</span>
               </a>
               <button
                 onClick={handleLogout}
@@ -242,7 +226,7 @@ function StatusContent() {
                 className="w-full h-[48px] bg-surface text-on-surface-variant hover:bg-outline-variant/30 rounded-xl text-[14px] font-medium transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
                 <LogOut size={16} />
-                <span>Kembali ke Halaman Masuk</span>
+                <span>{tAuth('backToLogin')}</span>
               </button>
             </div>
           )}

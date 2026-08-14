@@ -46,7 +46,13 @@ interface PaginationMeta {
   totalPages: number;
 }
 
+import { useTranslations } from 'next-intl';
+
 export default function UserManagementPage() {
+  const tUsers = useTranslations('users');
+  const tCommon = useTranslations('common');
+  const tAuth = useTranslations('auth');
+
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
 
@@ -93,32 +99,37 @@ export default function UserManagementPage() {
   const [assigningDevice, setAssigningDevice] = useState(false);
   const [revokingDeviceId, setRevokingDeviceId] = useState<string | null>(null);
 
-  const fetchUserDeviceAssignments = useCallback(async (userId: string) => {
-    setDeviceModalLoading(true);
-    try {
-      const [assignRes, devRes] = await Promise.all([
-        fetch(`/api/v1/users/${userId}/devices`),
-        fetch(`/api/v1/devices`),
-      ]);
-      const assignJson = await assignRes.json();
-      const devJson = await devRes.json();
+  const fetchUserDeviceAssignments = useCallback(
+    async (userId: string) => {
+      setDeviceModalLoading(true);
+      try {
+        const [assignRes, devRes] = await Promise.all([
+          fetch(`/api/v1/users/${userId}/devices`),
+          fetch(`/api/v1/devices`),
+        ]);
+        const assignJson = await assignRes.json();
+        const devJson = await devRes.json();
 
-      if (assignJson.success) {
-        const activeOnly = (assignJson.data.assignments || []).filter(
-          (a: any) => a.revokedAt === null
-        );
-        setUserAssignments(activeOnly);
+        if (assignJson.success) {
+          const activeOnly = (assignJson.data.assignments || []).filter(
+            (a: any) => a.revokedAt === null
+          );
+          setUserAssignments(activeOnly);
+        }
+        if (devJson.success) {
+          const rawDevices = Array.isArray(devJson.data)
+            ? devJson.data
+            : devJson.data?.devices || [];
+          setAvailableDevices(rawDevices);
+        }
+      } catch {
+        setErrorMsg(tUsers('deviceAccessLoadFailed'));
+      } finally {
+        setDeviceModalLoading(false);
       }
-      if (devJson.success) {
-        const rawDevices = Array.isArray(devJson.data) ? devJson.data : devJson.data?.devices || [];
-        setAvailableDevices(rawDevices);
-      }
-    } catch {
-      setErrorMsg('Gagal memuat daftar hak akses perangkat.');
-    } finally {
-      setDeviceModalLoading(false);
-    }
-  }, []);
+    },
+    [tUsers]
+  );
 
   const handleAssignDevice = async () => {
     if (!selectedUser || !selectedAssignDeviceId) return;
@@ -132,13 +143,13 @@ export default function UserManagementPage() {
       });
       const json = await res.json();
       if (!res.ok || !json.success) {
-        throw new Error(json.error?.message || 'Gagal menetapkan perangkat.');
+        throw new Error(json.error?.message || tUsers('deviceAssignFailed'));
       }
-      setSuccessMsg('Perangkat berhasil ditetapkan.');
+      setSuccessMsg(tUsers('deviceAssignSuccess'));
       setSelectedAssignDeviceId('');
       await fetchUserDeviceAssignments(selectedUser.id);
     } catch (err: any) {
-      setErrorMsg(err.message || 'Gagal menetapkan perangkat.');
+      setErrorMsg(err.message || tUsers('deviceAssignFailed'));
     } finally {
       setAssigningDevice(false);
     }
@@ -154,9 +165,9 @@ export default function UserManagementPage() {
       });
       if (!res.ok) {
         const json = await res.json().catch(() => ({}));
-        throw new Error(json.error?.message || 'Gagal mencabut akses perangkat.');
+        throw new Error(json.error?.message || tUsers('deviceRevokeFailed'));
       }
-      setSuccessMsg('Akses perangkat berhasil dicabut.');
+      setSuccessMsg(tUsers('deviceRevokeSuccess'));
       setUserAssignments((prev) =>
         prev.filter(
           (a) => a.canonicalDeviceId !== canonicalDeviceId && a.deviceId !== canonicalDeviceId
@@ -164,7 +175,7 @@ export default function UserManagementPage() {
       );
       await fetchUserDeviceAssignments(selectedUser.id);
     } catch (err: any) {
-      setErrorMsg(err.message || 'Gagal mencabut akses perangkat.');
+      setErrorMsg(err.message || tUsers('deviceRevokeFailed'));
     } finally {
       setRevokingDeviceId(null);
     }
@@ -231,15 +242,15 @@ export default function UserManagementPage() {
             setPagination(json.meta.pagination);
           }
         } else {
-          setErrorMsg(json.error?.message || 'Gagal memuat daftar pengguna.');
+          setErrorMsg(json.error?.message || tUsers('usersLoadFailed'));
         }
       } catch {
-        setErrorMsg('Terjadi kesalahan jaringan saat memuat daftar pengguna.');
+        setErrorMsg(tUsers('networkErrorLoadUsers'));
       } finally {
         setLoading(false);
       }
     },
-    [currentUserRole, search, statusFilter, roleFilter]
+    [currentUserRole, search, statusFilter, roleFilter, tUsers]
   );
 
   useEffect(() => {
@@ -269,14 +280,14 @@ export default function UserManagementPage() {
       const json = await res.json();
 
       if (json.success) {
-        setSuccessMsg(`Profil ${json.data.fullName} berhasil diperbarui.`);
+        setSuccessMsg(tUsers('profileUpdateSuccess', { name: json.data.fullName }));
         setEditModalOpen(false);
         fetchUsers(pagination.page);
       } else {
-        setErrorMsg(json.error?.message || 'Gagal memperbarui profil pengguna.');
+        setErrorMsg(json.error?.message || tUsers('profileUpdateFailed'));
       }
     } catch {
-      setErrorMsg('Terjadi kesalahan jaringan saat memperbarui profil.');
+      setErrorMsg(tUsers('networkErrorUpdateProfile'));
     } finally {
       setEditSubmitting(false);
     }
@@ -308,19 +319,25 @@ export default function UserManagementPage() {
         if (isDelete) {
           // Immediately remove deleted account from visible list
           setUsers((prev) => prev.filter((u) => u.id !== selectedUser.id));
-          setSuccessMsg(`Akun ${selectedUser.fullName} berhasil dihapus.`);
+          setSuccessMsg(tUsers('accountDeletedSuccess', { name: selectedUser.fullName }));
         } else {
-          const actionLabel = confirmAction === 'suspend' ? 'ditangguhkan' : 'diaktifkan kembali';
-          setSuccessMsg(`Akun ${selectedUser.fullName} berhasil ${actionLabel}.`);
+          const actionLabel =
+            confirmAction === 'suspend' ? tUsers('actionSuspended') : tUsers('actionReactivated');
+          setSuccessMsg(
+            tUsers('accountActionSuccess', {
+              name: selectedUser.fullName,
+              action: actionLabel,
+            })
+          );
           fetchUsers(pagination.page);
         }
         setConfirmAction(null);
         setActionReason('');
       } else {
-        setErrorMsg(json.error?.message || `Gagal memproses aksi.`);
+        setErrorMsg(json.error?.message || tUsers('actionProcessFailed'));
       }
     } catch {
-      setErrorMsg(`Terjadi kesalahan jaringan saat menjalankan aksi.`);
+      setErrorMsg(tUsers('networkErrorAction'));
     } finally {
       setActionSubmitting(false);
     }
@@ -332,31 +349,31 @@ export default function UserManagementPage() {
       case 'ACTIVE':
         return (
           <span className="px-2.5 py-1 text-[12px] font-semibold rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1 w-fit">
-            <CheckCircle2 size={13} /> Aktif
+            <CheckCircle2 size={13} /> {tAuth('active')}
           </span>
         );
       case 'SUSPENDED':
         return (
           <span className="px-2.5 py-1 text-[12px] font-semibold rounded-full bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1 w-fit">
-            <AlertTriangle size={13} /> Ditangguhkan
+            <AlertTriangle size={13} /> {tAuth('suspendedBadge')}
           </span>
         );
       case 'DEACTIVATED':
         return (
           <span className="px-2.5 py-1 text-[12px] font-semibold rounded-full bg-red-100 text-red-800 border border-red-300 flex items-center gap-1 w-fit">
-            Dihapus
+            {tAuth('deactivatedBadge')}
           </span>
         );
       case 'PENDING_APPROVAL':
         return (
           <span className="px-2.5 py-1 text-[12px] font-semibold rounded-full bg-blue-100 text-blue-800 border border-blue-300 flex items-center gap-1 w-fit">
-            <RefreshCw size={13} className="animate-spin" /> Menunggu Approval
+            <RefreshCw size={13} className="animate-spin" /> {tAuth('pendingApprovalBadge')}
           </span>
         );
       case 'REJECTED':
         return (
           <span className="px-2.5 py-1 text-[12px] font-semibold rounded-full bg-gray-100 text-gray-800 border border-gray-300 flex items-center gap-1 w-fit">
-            Ditolak
+            {tAuth('rejectedBadge')}
           </span>
         );
       default:
@@ -373,7 +390,9 @@ export default function UserManagementPage() {
       <div className="bg-app-surface text-app-on-surface min-h-dvh flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <Loader2 size={32} className="animate-spin text-app-primary" />
-          <p className="text-[14px] text-app-on-surface-variant font-medium">Memuat akses...</p>
+          <p className="text-[14px] text-app-on-surface-variant font-medium">
+            {tAuth('checkingSession')}
+          </p>
         </div>
       </div>
     );
@@ -389,16 +408,13 @@ export default function UserManagementPage() {
             <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center mx-auto text-red-600">
               <ShieldAlert size={32} />
             </div>
-            <h1 className="text-[20px] font-bold text-red-900">Akses Terbatas (403 Forbidden)</h1>
-            <p className="text-[14px] text-red-700">
-              Halaman Manajemen Pengguna hanya dapat diakses oleh Pemilik Lahan (OWNER). Akun
-              Administrator tidak memiliki izin untuk mengelola pengguna.
-            </p>
+            <h1 className="text-[20px] font-bold text-red-900">{tUsers('forbiddenTitle')}</h1>
+            <p className="text-[14px] text-red-700">{tUsers('forbiddenDesc')}</p>
             <Link
               href="/pengaturan"
               className="inline-block px-5 py-2.5 bg-red-700 text-white rounded-xl text-[14px] font-semibold hover:bg-red-800 transition-colors"
             >
-              Kembali ke Pengaturan
+              {tCommon('back')}
             </Link>
           </div>
         </main>
@@ -418,10 +434,8 @@ export default function UserManagementPage() {
               <UsersIcon size={24} />
             </div>
             <div>
-              <h1 className="text-[22px] font-bold text-app-primary">Manajemen Pengguna</h1>
-              <p className="text-[13px] text-app-on-surface-variant">
-                Kelola profil, status akses, dan keamanan akun pengguna sistem.
-              </p>
+              <h1 className="text-[22px] font-bold text-app-primary">{tUsers('title')}</h1>
+              <p className="text-[13px] text-app-on-surface-variant">{tUsers('subtitle')}</p>
             </div>
           </div>
           <button
@@ -430,7 +444,7 @@ export default function UserManagementPage() {
             className="self-start sm:self-auto px-4 py-2 bg-app-surface-container hover:bg-app-surface-container-high text-app-on-surface text-[13px] font-medium rounded-xl border border-app-outline-variant/40 flex items-center gap-2 transition-colors disabled:opacity-50"
           >
             <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
-            Refresh
+            {tCommon('refresh')}
           </button>
         </div>
 
@@ -472,7 +486,7 @@ export default function UserManagementPage() {
               />
               <input
                 type="text"
-                placeholder="Cari nama, email, atau username..."
+                placeholder={tUsers('searchPlaceholder')}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 bg-app-surface-container-low border border-app-outline-variant/40 rounded-xl text-[14px] focus:outline-none focus:ring-2 focus:ring-app-primary/30"
@@ -484,11 +498,11 @@ export default function UserManagementPage() {
                 onChange={(e) => setStatusFilter(e.target.value)}
                 className="px-3 py-2.5 bg-app-surface-container-low border border-app-outline-variant/40 rounded-xl text-[13px] font-medium text-app-on-surface focus:outline-none"
               >
-                <option value="ALL">Semua Status</option>
-                <option value="PENDING_APPROVAL">Menunggu Approval</option>
-                <option value="ACTIVE">Aktif</option>
-                <option value="SUSPENDED">Ditangguhkan</option>
-                <option value="REJECTED">Ditolak</option>
+                <option value="ALL">{tUsers('allStatuses')}</option>
+                <option value="PENDING_APPROVAL">{tAuth('pendingApprovalBadge')}</option>
+                <option value="ACTIVE">{tAuth('active')}</option>
+                <option value="SUSPENDED">{tAuth('suspendedBadge')}</option>
+                <option value="REJECTED">{tAuth('rejectedBadge')}</option>
               </select>
 
               <select
@@ -496,9 +510,9 @@ export default function UserManagementPage() {
                 onChange={(e) => setRoleFilter(e.target.value)}
                 className="px-3 py-2.5 bg-app-surface-container-low border border-app-outline-variant/40 rounded-xl text-[13px] font-medium text-app-on-surface focus:outline-none"
               >
-                <option value="ALL">Semua Peran</option>
-                <option value="OWNER">Pemilik (OWNER)</option>
-                <option value="ADMIN">Admin (ADMIN)</option>
+                <option value="ALL">{tUsers('allRoles')}</option>
+                <option value="OWNER">{tUsers('roleOwnerLabel')} (OWNER)</option>
+                <option value="ADMIN">{tUsers('roleAdminLabel')} (ADMIN)</option>
               </select>
             </div>
           </div>
@@ -509,15 +523,15 @@ export default function UserManagementPage() {
           {loading ? (
             <div className="p-12 text-center text-app-on-surface-variant flex flex-col items-center gap-2">
               <Loader2 size={28} className="animate-spin text-app-primary" />
-              <p className="text-[14px]">Memuat data pengguna...</p>
+              <p className="text-[14px]">{tUsers('loadingUsers')}</p>
             </div>
           ) : users.length === 0 ? (
             <div className="p-12 text-center text-app-on-surface-variant space-y-2">
               <UsersIcon size={40} className="mx-auto opacity-40 text-app-outline" />
               <p className="text-[16px] font-semibold text-app-on-surface">
-                Tidak ada pengguna ditemukan
+                {tUsers('noUsersFound')}
               </p>
-              <p className="text-[13px]">Coba sesuaikan kata kunci pencarian atau filter status.</p>
+              <p className="text-[13px]">{tUsers('noUsersSubtitle')}</p>
             </div>
           ) : (
             <div className="divide-y divide-app-outline-variant/20">
@@ -534,11 +548,11 @@ export default function UserManagementPage() {
                         <h3 className="text-[16px] font-bold text-app-on-surface">{u.fullName}</h3>
                         {isOwner ? (
                           <span className="px-2 py-0.5 text-[11px] font-bold rounded-md bg-purple-100 text-purple-900 border border-purple-300">
-                            PEMILIK LAHAN
+                            {tUsers('roleOwnerLabel')}
                           </span>
                         ) : (
                           <span className="px-2 py-0.5 text-[11px] font-bold rounded-md bg-blue-50 text-blue-800 border border-blue-200">
-                            ADMINISTRATOR
+                            {tUsers('roleAdminLabel')}
                           </span>
                         )}
                         {renderStatusBadge(u.accountStatus)}
@@ -547,11 +561,12 @@ export default function UserManagementPage() {
                         {u.email} {u.username && `(@${u.username})`}
                       </p>
                       <p className="text-[12px] text-app-outline">
-                        Terdaftar:{' '}
-                        {new Date(u.createdAt).toLocaleDateString('id-ID', {
-                          day: 'numeric',
-                          month: 'long',
-                          year: 'numeric',
+                        {tUsers('registeredDate', {
+                          date: new Date(u.createdAt).toLocaleDateString('id-ID', {
+                            day: 'numeric',
+                            month: 'long',
+                            year: 'numeric',
+                          }),
                         })}
                       </p>
                     </div>
@@ -565,7 +580,7 @@ export default function UserManagementPage() {
                         }}
                         className="px-3 py-1.5 bg-app-surface-container border border-app-outline-variant/30 text-app-on-surface text-[12px] font-medium rounded-lg hover:bg-app-surface-container-high transition-colors flex items-center gap-1.5"
                       >
-                        <Eye size={14} /> Detail
+                        <Eye size={14} /> {tCommon('viewDetails')}
                       </button>
 
                       {!isOwner && (
@@ -579,7 +594,7 @@ export default function UserManagementPage() {
                               }}
                               className="px-3 py-1.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-[12px] font-medium rounded-lg hover:bg-emerald-100 transition-colors flex items-center gap-1.5"
                             >
-                              <Cpu size={14} /> Perangkat
+                              <Cpu size={14} /> {tUsers('assignDevice')}
                             </button>
                           )}
 
@@ -592,7 +607,7 @@ export default function UserManagementPage() {
                             }}
                             className="px-3 py-1.5 bg-blue-50 border border-blue-200 text-blue-700 text-[12px] font-medium rounded-lg hover:bg-blue-100 transition-colors flex items-center gap-1.5"
                           >
-                            <Edit2 size={14} /> Edit
+                            <Edit2 size={14} /> {tCommon('edit')}
                           </button>
 
                           {/* Suspend Action (For ACTIVE) */}
@@ -604,7 +619,7 @@ export default function UserManagementPage() {
                               }}
                               className="px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-800 text-[12px] font-medium rounded-lg hover:bg-amber-100 transition-colors flex items-center gap-1.5"
                             >
-                              <UserX size={14} /> Tangguhkan
+                              <UserX size={14} /> {tUsers('suspendUser')}
                             </button>
                           )}
 
@@ -617,7 +632,7 @@ export default function UserManagementPage() {
                               }}
                               className="px-3 py-1.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-[12px] font-medium rounded-lg hover:bg-emerald-100 transition-colors flex items-center gap-1.5"
                             >
-                              <UserCheck size={14} /> Aktifkan
+                              <UserCheck size={14} /> {tUsers('reactivateUser')}
                             </button>
                           )}
 
@@ -635,7 +650,7 @@ export default function UserManagementPage() {
                                 }}
                                 className="rounded text-red-600 focus:ring-red-500 cursor-pointer"
                               />
-                              <span>Hapus Akun</span>
+                              <span>{tUsers('deleteAccount')}</span>
                             </label>
                           )}
                         </>
@@ -651,8 +666,11 @@ export default function UserManagementPage() {
           {pagination.totalPages > 1 && (
             <div className="p-4 bg-app-surface-container-low border-t border-app-outline-variant/30 flex items-center justify-between">
               <span className="text-[13px] text-app-on-surface-variant">
-                Halaman {pagination.page} dari {pagination.totalPages} ({pagination.totalItems}{' '}
-                akun)
+                {tUsers('paginationUsers', {
+                  page: pagination.page,
+                  totalPages: pagination.totalPages,
+                  total: pagination.totalItems,
+                })}
               </span>
               <div className="flex items-center gap-2">
                 <button
@@ -660,14 +678,14 @@ export default function UserManagementPage() {
                   onClick={() => fetchUsers(pagination.page - 1)}
                   className="px-3 py-1.5 bg-app-surface-container border border-app-outline-variant/30 text-app-on-surface text-[12px] font-medium rounded-lg hover:bg-app-surface-container-high transition-colors disabled:opacity-40 flex items-center gap-1"
                 >
-                  <ChevronLeft size={14} /> Seb.
+                  <ChevronLeft size={14} /> {tUsers('previousPage')}
                 </button>
                 <button
                   disabled={pagination.page >= pagination.totalPages || loading}
                   onClick={() => fetchUsers(pagination.page + 1)}
                   className="px-3 py-1.5 bg-app-surface-container border border-app-outline-variant/30 text-app-on-surface text-[12px] font-medium rounded-lg hover:bg-app-surface-container-high transition-colors disabled:opacity-40 flex items-center gap-1"
                 >
-                  Sel. <ChevronRight size={14} />
+                  {tUsers('nextPage')} <ChevronRight size={14} />
                 </button>
               </div>
             </div>
@@ -680,7 +698,9 @@ export default function UserManagementPage() {
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-app-surface-container-lowest rounded-2xl max-w-lg w-full p-6 space-y-5 border border-app-outline-variant/30 soft-elevation-lg">
             <div className="flex items-center justify-between border-b border-app-outline-variant/20 pb-3">
-              <h2 className="text-[18px] font-bold text-app-on-surface">Detail Pengguna</h2>
+              <h2 className="text-[18px] font-bold text-app-on-surface">
+                {tUsers('userDetailTitle')}
+              </h2>
               <button
                 onClick={() => setDetailModalOpen(false)}
                 className="text-app-outline hover:text-app-on-surface"
@@ -691,48 +711,56 @@ export default function UserManagementPage() {
 
             <div className="space-y-3 text-[14px]">
               <div className="grid grid-cols-3 gap-2 py-1 border-b border-app-outline-variant/10">
-                <span className="text-app-on-surface-variant font-medium">User ID</span>
+                <span className="text-app-on-surface-variant font-medium">{tUsers('userId')}</span>
                 <span className="col-span-2 font-mono text-[12px] text-app-on-surface break-all">
                   {selectedUser.id}
                 </span>
               </div>
               <div className="grid grid-cols-3 gap-2 py-1 border-b border-app-outline-variant/10">
-                <span className="text-app-on-surface-variant font-medium">Nama Lengkap</span>
+                <span className="text-app-on-surface-variant font-medium">
+                  {tUsers('userFullName')}
+                </span>
                 <span className="col-span-2 font-bold text-app-on-surface">
                   {selectedUser.fullName}
                 </span>
               </div>
               <div className="grid grid-cols-3 gap-2 py-1 border-b border-app-outline-variant/10">
-                <span className="text-app-on-surface-variant font-medium">Email</span>
+                <span className="text-app-on-surface-variant font-medium">
+                  {tUsers('userEmail')}
+                </span>
                 <span className="col-span-2 font-mono text-app-on-surface">
-                  {selectedUser.email} (read-only)
+                  {selectedUser.email} {tUsers('readOnlySuffix')}
                 </span>
               </div>
               <div className="grid grid-cols-3 gap-2 py-1 border-b border-app-outline-variant/10">
-                <span className="text-app-on-surface-variant font-medium">Username</span>
+                <span className="text-app-on-surface-variant font-medium">
+                  {tUsers('username')}
+                </span>
                 <span className="col-span-2 text-app-on-surface">
                   {selectedUser.username || '-'}
                 </span>
               </div>
               <div className="grid grid-cols-3 gap-2 py-1 border-b border-app-outline-variant/10">
-                <span className="text-app-on-surface-variant font-medium">Peran System</span>
+                <span className="text-app-on-surface-variant font-medium">{tCommon('role')}</span>
                 <span className="col-span-2 text-app-on-surface">
                   {selectedUser.activeRoles.join(', ')}
                 </span>
               </div>
               <div className="grid grid-cols-3 gap-2 py-1 border-b border-app-outline-variant/10">
-                <span className="text-app-on-surface-variant font-medium">Status Akun</span>
+                <span className="text-app-on-surface-variant font-medium">{tCommon('status')}</span>
                 <span className="col-span-2">{renderStatusBadge(selectedUser.accountStatus)}</span>
               </div>
               <div className="grid grid-cols-3 gap-2 py-1 border-b border-app-outline-variant/10">
-                <span className="text-app-on-surface-variant font-medium">Tanggal Dibuat</span>
+                <span className="text-app-on-surface-variant font-medium">
+                  {tUsers('creationDate')}
+                </span>
                 <span className="col-span-2 text-app-on-surface">
                   {new Date(selectedUser.createdAt).toLocaleString('id-ID')}
                 </span>
               </div>
               {selectedUser.suspendedAt && (
                 <div className="grid grid-cols-3 gap-2 py-1 border-b border-app-outline-variant/10 text-amber-800">
-                  <span className="font-medium">Ditangguhkan</span>
+                  <span className="font-medium">{tUsers('suspensionDate')}</span>
                   <span className="col-span-2">
                     {new Date(selectedUser.suspendedAt).toLocaleString('id-ID')}
                   </span>
@@ -745,7 +773,7 @@ export default function UserManagementPage() {
                 onClick={() => setDetailModalOpen(false)}
                 className="px-4 py-2 bg-app-surface-container text-app-on-surface text-[13px] font-medium rounded-xl border border-app-outline-variant/30 hover:bg-app-surface-container-high transition-colors"
               >
-                Tutup
+                {tCommon('close')}
               </button>
             </div>
           </div>
@@ -760,7 +788,9 @@ export default function UserManagementPage() {
             className="bg-app-surface-container-lowest rounded-2xl max-w-md w-full p-6 space-y-5 border border-app-outline-variant/30 soft-elevation-lg"
           >
             <div className="flex items-center justify-between border-b border-app-outline-variant/20 pb-3">
-              <h2 className="text-[18px] font-bold text-app-on-surface">Edit Profil Admin</h2>
+              <h2 className="text-[18px] font-bold text-app-on-surface">
+                {tUsers('editProfileTitle')}
+              </h2>
               <button
                 type="button"
                 onClick={() => setEditModalOpen(false)}
@@ -773,7 +803,7 @@ export default function UserManagementPage() {
             <div className="space-y-4">
               <div>
                 <label className="block text-[13px] font-semibold text-app-on-surface mb-1">
-                  Nama Lengkap
+                  {tUsers('userFullName')}
                 </label>
                 <input
                   type="text"
@@ -786,7 +816,7 @@ export default function UserManagementPage() {
 
               <div>
                 <label className="block text-[13px] font-semibold text-app-on-surface mb-1">
-                  Username (opsional)
+                  {tUsers('username')} {tUsers('optional')}
                 </label>
                 <input
                   type="text"
@@ -798,7 +828,7 @@ export default function UserManagementPage() {
 
               <div>
                 <label className="block text-[13px] font-semibold text-app-on-surface-variant mb-1">
-                  Email (Read-only)
+                  {tUsers('userEmail')} {tUsers('readOnlySuffix')}
                 </label>
                 <input
                   type="text"
@@ -806,9 +836,7 @@ export default function UserManagementPage() {
                   value={selectedUser.email}
                   className="w-full px-3.5 py-2.5 bg-app-surface-container/60 border border-app-outline-variant/20 rounded-xl text-[14px] text-app-on-surface-variant cursor-not-allowed font-mono"
                 />
-                <p className="text-[11px] text-app-outline mt-1">
-                  Alamat email dikontrol oleh sistem dan tidak dapat diubah oleh Owner.
-                </p>
+                <p className="text-[11px] text-app-outline mt-1">{tUsers('emailOwnerNotice')}</p>
               </div>
             </div>
 
@@ -819,7 +847,7 @@ export default function UserManagementPage() {
                 onClick={() => setEditModalOpen(false)}
                 className="px-4 py-2 bg-app-surface-container text-app-on-surface text-[13px] font-medium rounded-xl border border-app-outline-variant/30 hover:bg-app-surface-container-high transition-colors"
               >
-                Batal
+                {tCommon('cancel')}
               </button>
               <button
                 type="submit"
@@ -827,7 +855,7 @@ export default function UserManagementPage() {
                 className="px-5 py-2 bg-app-primary text-app-on-primary text-[13px] font-bold rounded-xl hover:bg-app-primary/90 transition-colors flex items-center gap-2 disabled:opacity-50"
               >
                 {editSubmitting && <Loader2 size={15} className="animate-spin" />}
-                Simpan Perubahan
+                {tCommon('saveChanges')}
               </button>
             </div>
           </form>
@@ -859,14 +887,16 @@ export default function UserManagementPage() {
               <div>
                 <h2 className="text-[18px] font-bold text-app-on-surface">
                   {confirmAction === 'suspend'
-                    ? 'Konfirmasi Penangguhan'
+                    ? tUsers('confirmSuspendTitle')
                     : confirmAction === 'deactivate'
-                      ? 'Konfirmasi Hapus Akun'
-                      : 'Konfirmasi Aktivasi'}
+                      ? tUsers('confirmDeleteAccountTitle')
+                      : tUsers('confirmActivationTitle')}
                 </h2>
                 <p className="text-[12px] text-app-on-surface-variant">
-                  Pengguna: <strong className="text-app-on-surface">{selectedUser.fullName}</strong>{' '}
-                  ({selectedUser.email})
+                  {tUsers('userLabel', {
+                    name: selectedUser.fullName,
+                    email: selectedUser.email,
+                  })}
                 </p>
               </div>
             </div>
@@ -874,33 +904,29 @@ export default function UserManagementPage() {
             <div className="text-[14px] text-app-on-surface space-y-3">
               {confirmAction === 'suspend' && (
                 <p className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-[13px]">
-                  Penangguhan akan memblokir akses pengguna ini dan secara otomatis mencabut
-                  (revoke) seluruh sesi login yang sedang aktif.
+                  {tUsers('suspendNotice')}
                 </p>
               )}
               {confirmAction === 'deactivate' && (
                 <p className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-900 text-[13px]">
-                  Penghapusan akun akan menghentikan seluruh akses akun{' '}
-                  <strong>{selectedUser.fullName}</strong>, secara otomatis mencabut seluruh sesi
-                  yang sedang aktif, dan menghapus akun ini dari daftar Manajemen Pengguna.
+                  {tUsers('deleteAccountNotice')}
                 </p>
               )}
               {confirmAction === 'activate' && (
                 <p className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-900 text-[13px]">
-                  Aktivasi akan memulihkan status akun menjadi AKTIF sehingga pengguna dapat kembali
-                  mengakses sistem.
+                  {tUsers('activateNotice')}
                 </p>
               )}
 
               <div>
                 <label className="block text-[13px] font-semibold text-app-on-surface mb-1">
-                  Alasan (opsional)
+                  {tUsers('reasonLabel')}
                 </label>
                 <textarea
                   rows={2}
                   value={actionReason}
                   onChange={(e) => setActionReason(e.target.value)}
-                  placeholder="Masukkan catatan atau alasan tindakan..."
+                  placeholder={tUsers('reasonPlaceholder')}
                   className="w-full px-3.5 py-2 bg-app-surface-container-low border border-app-outline-variant/40 rounded-xl text-[13px] focus:outline-none focus:ring-2 focus:ring-app-primary/30 resize-none"
                 />
               </div>
@@ -913,7 +939,7 @@ export default function UserManagementPage() {
                 onClick={() => setConfirmAction(null)}
                 className="px-4 py-2 bg-app-surface-container text-app-on-surface text-[13px] font-medium rounded-xl border border-app-outline-variant/30 hover:bg-app-surface-container-high transition-colors"
               >
-                Batal
+                {tCommon('cancel')}
               </button>
               <button
                 type="button"
@@ -929,10 +955,10 @@ export default function UserManagementPage() {
               >
                 {actionSubmitting && <Loader2 size={15} className="animate-spin" />}
                 {confirmAction === 'deactivate'
-                  ? 'Ya, Hapus Akun'
+                  ? tUsers('confirmDeleteAccountBtn')
                   : confirmAction === 'suspend'
-                    ? 'Ya, Tangguhkan'
-                    : 'Ya, Aktifkan'}
+                    ? tUsers('confirmSuspendBtn')
+                    : tUsers('confirmActivateBtn')}
               </button>
             </div>
           </div>
@@ -946,7 +972,7 @@ export default function UserManagementPage() {
             <div className="flex items-center justify-between border-b border-app-outline-variant/20 pb-4">
               <div>
                 <h2 className="text-[18px] font-bold text-app-on-surface flex items-center gap-2">
-                  <Cpu size={20} className="text-app-primary" /> Kelola Perangkat Admin
+                  <Cpu size={20} className="text-app-primary" /> {tUsers('manageAdminDevices')}
                 </h2>
                 <p className="text-[13px] text-app-on-surface-variant font-medium">
                   {selectedUser.fullName} ({selectedUser.email})
@@ -963,10 +989,7 @@ export default function UserManagementPage() {
             {selectedUser.accountStatus !== 'ACTIVE' && (
               <div className="p-3 bg-amber-50 border border-amber-200 text-amber-800 text-[13px] rounded-xl flex items-center gap-2">
                 <AlertTriangle size={16} className="flex-shrink-0" />
-                <span>
-                  Perhatian: Hanya pengguna dengan status <strong>ACTIVE</strong> yang dapat
-                  diberikan akses perangkat baru.
-                </span>
+                <span>{tUsers('activeOnlyDeviceNotice')}</span>
               </div>
             )}
 
@@ -974,7 +997,7 @@ export default function UserManagementPage() {
             {selectedUser.accountStatus === 'ACTIVE' && (
               <div className="space-y-2 bg-app-surface-container-low p-4 rounded-xl border border-app-outline-variant/30">
                 <label className="text-[13px] font-bold text-app-on-surface block">
-                  Tetapkan Perangkat Baru
+                  {tUsers('assignNewDevice')}
                 </label>
                 <div className="flex gap-2">
                   <select
@@ -982,7 +1005,7 @@ export default function UserManagementPage() {
                     onChange={(e) => setSelectedAssignDeviceId(e.target.value)}
                     className="flex-1 px-3 py-2 bg-app-surface-container border border-app-outline-variant/40 rounded-xl text-[13px] focus:outline-none"
                   >
-                    <option value="">-- Pilih Perangkat --</option>
+                    <option value="">{tUsers('selectDeviceOption')}</option>
                     {unassignedAvailableDevices.map((dev: any) => {
                       const canonicalId = dev.deviceId || dev.canonicalDeviceId;
                       const name = dev.name || dev.deviceName;
@@ -1000,7 +1023,8 @@ export default function UserManagementPage() {
                     onClick={handleAssignDevice}
                     className="px-4 py-2 bg-app-primary text-app-on-primary text-[13px] font-bold rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center gap-1.5"
                   >
-                    {assigningDevice && <Loader2 size={14} className="animate-spin" />} Tetapkan
+                    {assigningDevice && <Loader2 size={14} className="animate-spin" />}{' '}
+                    {tUsers('assignBtn')}
                   </button>
                 </div>
               </div>
@@ -1009,16 +1033,16 @@ export default function UserManagementPage() {
             {/* Active Assigned Devices List */}
             <div className="space-y-3">
               <h3 className="text-[14px] font-bold text-app-on-surface">
-                Perangkat Aktif Pengguna ({userAssignments.length})
+                {tUsers('userActiveDevices', { count: userAssignments.length })}
               </h3>
               {deviceModalLoading ? (
                 <div className="p-6 text-center text-app-on-surface-variant flex items-center justify-center gap-2">
                   <Loader2 size={18} className="animate-spin text-app-primary" />
-                  <span className="text-[13px]">Memuat akses perangkat...</span>
+                  <span className="text-[13px]">{tCommon('loading')}</span>
                 </div>
               ) : userAssignments.length === 0 ? (
                 <p className="text-[13px] text-app-outline italic text-center p-4">
-                  Belum ada perangkat yang ditetapkan untuk akun admin ini.
+                  {tUsers('noAssignedDevices')}
                 </p>
               ) : (
                 <div className="divide-y divide-app-outline-variant/20 max-h-60 overflow-y-auto pr-1">
@@ -1033,18 +1057,19 @@ export default function UserManagementPage() {
                             {assignment.deviceName || assignment.canonicalDeviceId}
                           </span>
                           <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-emerald-50 text-emerald-800 border border-emerald-200">
-                            AKTIF
+                            {tUsers('activeBadge')}
                           </span>
                         </div>
                         <p className="text-[11px] text-app-outline font-mono">
                           ID: {assignment.canonicalDeviceId}
                         </p>
                         <p className="text-[11px] text-app-outline">
-                          Ditetapkan:{' '}
-                          {new Date(assignment.assignedAt).toLocaleDateString('id-ID', {
-                            day: 'numeric',
-                            month: 'short',
-                            year: 'numeric',
+                          {tUsers('assignedDate', {
+                            date: new Date(assignment.assignedAt).toLocaleDateString('id-ID', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                            }),
                           })}
                         </p>
                       </div>
@@ -1058,7 +1083,7 @@ export default function UserManagementPage() {
                         {revokingDeviceId === assignment.canonicalDeviceId ? (
                           <Loader2 size={12} className="animate-spin" />
                         ) : (
-                          'Cabut Akses'
+                          tUsers('revokeAccess')
                         )}
                       </button>
                     </div>
@@ -1073,7 +1098,7 @@ export default function UserManagementPage() {
                 onClick={() => setDeviceModalOpen(false)}
                 className="px-4 py-2 bg-app-surface-container text-app-on-surface text-[13px] font-medium rounded-xl border border-app-outline-variant/30 hover:bg-app-surface-container-high transition-colors"
               >
-                Tutup
+                {tCommon('close')}
               </button>
             </div>
           </div>

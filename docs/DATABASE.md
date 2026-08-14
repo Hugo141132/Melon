@@ -79,7 +79,7 @@ Terhubung
 Selesai
 ```
 
-Translations belong in the frontend.
+Translations belong in the frontend (implemented via `next-intl` presentation namespaces, `TASK-0603`).
 
 ### 3.3 Server-Generated Identifiers
 

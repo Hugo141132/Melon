@@ -48,7 +48,13 @@ interface PaginationMeta {
   totalPages: number;
 }
 
+import { useTranslations } from 'next-intl';
+
 export default function DeviceRegistryPage() {
+  const tDevices = useTranslations('devices');
+  const tCommon = useTranslations('common');
+  const tAuth = useTranslations('auth');
+
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
 
@@ -287,7 +293,7 @@ export default function DeviceRegistryPage() {
       <div className="bg-app-surface min-h-dvh flex items-center justify-center p-4">
         <div className="flex items-center gap-3 text-app-primary">
           <Loader2 size={24} className="animate-spin" />
-          <span className="font-semibold text-[16px]">Memeriksa sesi pengguna...</span>
+          <span className="font-semibold text-[16px]">{tAuth('checkingSession')}</span>
         </div>
       </div>
     );
@@ -308,11 +314,9 @@ export default function DeviceRegistryPage() {
             </div>
             <div>
               <h1 className="text-[22px] leading-7 font-bold text-app-primary">
-                Registri Perangkat IoT
+                {tDevices('title')}
               </h1>
-              <p className="text-[14px] text-app-on-surface-variant">
-                Daftar & status koneksi sensor lahan dan alat kontrol
-              </p>
+              <p className="text-[14px] text-app-on-surface-variant">{tDevices('subtitle')}</p>
             </div>
           </div>
 
@@ -322,7 +326,7 @@ export default function DeviceRegistryPage() {
               className="inline-flex items-center justify-center gap-2 bg-app-primary text-white font-semibold py-2.5 px-4 rounded-xl hover:bg-app-primary-container transition-colors shadow-sm cursor-pointer active:scale-95"
             >
               <Plus size={18} />
-              <span>Tambah Perangkat</span>
+              <span>{tDevices('addDevice')}</span>
             </button>
           )}
         </section>
@@ -358,7 +362,7 @@ export default function DeviceRegistryPage() {
               <Search size={18} className="absolute left-3.5 top-3 text-app-outline" />
               <input
                 type="text"
-                placeholder="Cari ID Perangkat, nama, atau versi firmware..."
+                placeholder={tDevices('searchPlaceholder')}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && fetchDevices(1)}
@@ -370,7 +374,7 @@ export default function DeviceRegistryPage() {
               className="inline-flex items-center justify-center gap-2 bg-app-surface-container border border-app-outline-variant/40 text-app-on-surface font-medium py-2.5 px-4 rounded-xl hover:bg-app-surface-container-high transition-colors cursor-pointer"
             >
               <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-              <span>Muat Ulang</span>
+              <span>{tCommon('refresh')}</span>
             </button>
           </div>
 
@@ -380,7 +384,7 @@ export default function DeviceRegistryPage() {
               onChange={(e) => setTypeFilter(e.target.value)}
               className="px-3 py-1.5 bg-app-surface border border-app-outline-variant/40 rounded-lg text-[13px] font-medium text-app-on-surface"
             >
-              <option value="ALL">Semua Tipe Perangkat</option>
+              <option value="ALL">{tDevices('allTypes')}</option>
               <option value="SOIL_NODE">Soil Monitoring</option>
               <option value="WATER_QUALITY_NODE">Water Quality Monitoring</option>
               <option value="WATER_TANK_NODE">Water Tank Monitoring</option>
@@ -391,7 +395,7 @@ export default function DeviceRegistryPage() {
               onChange={(e) => setStatusFilter(e.target.value)}
               className="px-3 py-1.5 bg-app-surface border border-app-outline-variant/40 rounded-lg text-[13px] font-medium text-app-on-surface"
             >
-              <option value="ALL">Semua Status Koneksi</option>
+              <option value="ALL">{tDevices('allStatuses')}</option>
               <option value="ONLINE">ONLINE</option>
               <option value="OFFLINE">OFFLINE</option>
               <option value="STALE">STALE</option>
@@ -429,10 +433,10 @@ export default function DeviceRegistryPage() {
           <div className="p-12 bg-app-surface-container-lowest rounded-xl border border-app-outline-variant/20 text-center space-y-3">
             <Radio size={40} className="mx-auto text-app-outline" />
             <h3 className="text-[16px] font-semibold text-app-on-surface">
-              Tidak ada perangkat ditemukan
+              {tDevices('noDevicesFound')}
             </h3>
             <p className="text-[14px] text-app-on-surface-variant max-w-md mx-auto">
-              Belum ada perangkat yang terdaftar atau sesuai dengan filter pencarian.
+              {tDevices('noDevicesSubtitle')}
             </p>
           </div>
         ) : (
@@ -487,7 +491,7 @@ export default function DeviceRegistryPage() {
                               setEditModalOpen(true);
                             }}
                             className="p-1.5 rounded-lg hover:bg-app-surface-container text-app-on-surface-variant transition-colors active:scale-95"
-                            title="Edit Perangkat"
+                            title={tCommon('edit')}
                           >
                             <Edit2 size={16} />
                           </button>
@@ -499,7 +503,7 @@ export default function DeviceRegistryPage() {
                               setDeactivateModalOpen(true);
                             }}
                             className="p-1.5 rounded-lg hover:bg-amber-50 text-amber-700 transition-colors active:scale-95"
-                            title="Nonaktifkan Perangkat"
+                            title={tDevices('deactivateConfirmTitle')}
                           >
                             <PowerOff size={16} />
                           </button>
@@ -511,7 +515,7 @@ export default function DeviceRegistryPage() {
                             setDeleteModalOpen(true);
                           }}
                           className="p-1.5 rounded-lg hover:bg-rose-50 text-rose-600 transition-colors active:scale-95"
-                          title="Hapus Perangkat Permanen"
+                          title={tDevices('deleteConfirmTitle')}
                         >
                           <X size={16} />
                         </button>
@@ -523,7 +527,7 @@ export default function DeviceRegistryPage() {
                     <div className="flex items-center justify-between">
                       <span className="flex items-center gap-1.5">
                         <Sliders size={14} className="text-app-outline" />
-                        Tipe:
+                        {tDevices('domain')}:
                       </span>
                       <span className="font-semibold text-app-on-surface">{device.deviceType}</span>
                     </div>
@@ -531,12 +535,12 @@ export default function DeviceRegistryPage() {
                     <div className="flex items-center justify-between">
                       <span className="flex items-center gap-1.5">
                         <Clock size={14} className="text-app-outline" />
-                        Terakhir Terlihat:
+                        {tDevices('lastSeen')}:
                       </span>
                       <span>
                         {device.lastSeenAt
                           ? new Date(device.lastSeenAt).toLocaleString('id-ID')
-                          : 'Belum pernah'}
+                          : '-'}
                       </span>
                     </div>
 
@@ -569,7 +573,7 @@ export default function DeviceRegistryPage() {
                             {monitoringCaps.length > 0 && (
                               <div>
                                 <span className="text-[11px] font-bold text-app-outline uppercase tracking-wider block mb-1">
-                                  Pemantauan (Monitoring):
+                                  {tDevices('registeredMonitoringParams')}
                                 </span>
                                 <div className="flex flex-wrap gap-1.5">
                                   {monitoringCaps.map((cap) => (
@@ -587,7 +591,7 @@ export default function DeviceRegistryPage() {
                             {controlCaps.length > 0 && (
                               <div>
                                 <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block mb-1">
-                                  Kontrol (Control):
+                                  {tDevices('controlCapabilities')}
                                 </span>
                                 <div className="flex flex-wrap gap-1.5">
                                   {controlCaps.map((cap) => (
@@ -616,8 +620,11 @@ export default function DeviceRegistryPage() {
         {pagination.totalPages > 1 && (
           <div className="flex items-center justify-between bg-app-surface-container-lowest p-4 rounded-xl border border-app-outline-variant/20 text-[14px]">
             <span className="text-app-on-surface-variant">
-              Halaman {pagination.page} dari {pagination.totalPages} ({pagination.totalItems}{' '}
-              perangkat)
+              {tDevices('paginationDevices', {
+                page: pagination.page,
+                totalPages: pagination.totalPages,
+                total: pagination.totalItems,
+              })}
             </span>
             <div className="flex items-center gap-2">
               <button
@@ -644,7 +651,9 @@ export default function DeviceRegistryPage() {
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-app-surface-container-lowest rounded-2xl max-w-md w-full p-6 space-y-5 soft-elevation-lg animate-scale-up">
             <div className="flex items-center justify-between border-b border-app-outline-variant/20 pb-3">
-              <h3 className="text-[18px] font-bold text-app-primary">Tambah Perangkat Baru</h3>
+              <h3 className="text-[18px] font-bold text-app-primary">
+                {tDevices('addDeviceModalTitle')}
+              </h3>
               <button
                 onClick={() => setAddModalOpen(false)}
                 className="text-app-outline hover:text-app-on-surface"
@@ -656,7 +665,7 @@ export default function DeviceRegistryPage() {
             <form onSubmit={handleCreateDevice} className="space-y-4">
               <div>
                 <label className="block text-[13px] font-semibold text-app-on-surface mb-1">
-                  Nama Perangkat *
+                  {tDevices('deviceName')} *
                 </label>
                 <input
                   type="text"
@@ -670,7 +679,7 @@ export default function DeviceRegistryPage() {
 
               <div>
                 <label className="block text-[13px] font-semibold text-app-on-surface mb-1">
-                  Jenis Perangkat *
+                  {tDevices('domain')} *
                 </label>
                 <select
                   value={addType}
@@ -690,7 +699,7 @@ export default function DeviceRegistryPage() {
               {/* Automatically Derived Monitoring Parameters */}
               <div className="p-3 bg-app-surface-container rounded-xl border border-app-outline-variant/20 space-y-2 text-[12px]">
                 <span className="font-bold text-app-primary block">
-                  Parameter Pemantauan Terdaftar (Otomatis):
+                  {tDevices('registeredMonitoringParams')}
                 </span>
                 {addType === 'SOIL_NODE' && (
                   <ul className="grid grid-cols-2 gap-1 text-app-on-surface-variant font-mono">
@@ -718,7 +727,7 @@ export default function DeviceRegistryPage() {
                     </ul>
                     <div className="pt-1.5 border-t border-app-outline-variant/20">
                       <span className="font-bold text-app-primary block mb-0.5">
-                        Kapabilitas Kontrol:
+                        {tDevices('controlCapabilities')}
                       </span>
                       <ul className="space-y-0.5 text-app-on-surface-variant font-mono">
                         <li>• Irrigation Valve Control (FAUCET_CONTROL)</li>
@@ -734,7 +743,7 @@ export default function DeviceRegistryPage() {
                   onClick={() => setAddModalOpen(false)}
                   className="px-4 py-2 text-[14px] font-semibold text-app-on-surface-variant hover:bg-app-surface-container rounded-xl"
                 >
-                  Batal
+                  {tCommon('cancel')}
                 </button>
                 <button
                   type="submit"
@@ -742,7 +751,7 @@ export default function DeviceRegistryPage() {
                   className="inline-flex items-center gap-2 px-5 py-2 text-[14px] font-semibold bg-app-primary text-white rounded-xl hover:bg-app-primary-container disabled:opacity-50"
                 >
                   {addSubmitting && <Loader2 size={16} className="animate-spin" />}
-                  <span>Tambah Perangkat</span>
+                  <span>{tDevices('addDevice')}</span>
                 </button>
               </div>
             </form>
@@ -755,7 +764,9 @@ export default function DeviceRegistryPage() {
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-app-surface-container-lowest rounded-2xl max-w-md w-full p-6 space-y-5 soft-elevation-lg animate-scale-up">
             <div className="flex items-center justify-between border-b border-app-outline-variant/20 pb-3">
-              <h3 className="text-[18px] font-bold text-app-primary">Edit Nama Perangkat</h3>
+              <h3 className="text-[18px] font-bold text-app-primary">
+                {tDevices('editDeviceModalTitle')}
+              </h3>
               <button
                 onClick={() => setEditModalOpen(false)}
                 className="text-app-outline hover:text-app-on-surface"
@@ -767,7 +778,7 @@ export default function DeviceRegistryPage() {
             <form onSubmit={handleUpdateDevice} className="space-y-4">
               <div>
                 <label className="block text-[13px] font-semibold text-app-on-surface mb-1">
-                  Nama Perangkat *
+                  {tDevices('deviceName')} *
                 </label>
                 <input
                   type="text"
@@ -784,7 +795,7 @@ export default function DeviceRegistryPage() {
                   onClick={() => setEditModalOpen(false)}
                   className="px-4 py-2 text-[14px] font-semibold text-app-on-surface-variant hover:bg-app-surface-container rounded-xl"
                 >
-                  Batal
+                  {tCommon('cancel')}
                 </button>
                 <button
                   type="submit"
@@ -792,7 +803,7 @@ export default function DeviceRegistryPage() {
                   className="inline-flex items-center gap-2 px-5 py-2 text-[14px] font-semibold bg-app-primary text-white rounded-xl hover:bg-app-primary-container disabled:opacity-50"
                 >
                   {editSubmitting && <Loader2 size={16} className="animate-spin" />}
-                  <span>Perbarui</span>
+                  <span>{tCommon('save')}</span>
                 </button>
               </div>
             </form>
@@ -806,18 +817,14 @@ export default function DeviceRegistryPage() {
           <div className="bg-app-surface-container-lowest rounded-2xl max-w-md w-full p-6 space-y-5 soft-elevation-lg animate-scale-up">
             <div className="flex items-center gap-3 text-amber-600">
               <AlertTriangle size={24} />
-              <h3 className="text-[18px] font-bold">Nonaktifkan Perangkat?</h3>
+              <h3 className="text-[18px] font-bold">{tDevices('deactivateConfirmTitle')}</h3>
             </div>
 
             <p className="text-[14px] text-app-on-surface-variant leading-relaxed">
-              Apakah Anda yakin ingin menonaktifkan perangkat{' '}
-              <strong className="text-app-on-surface">{deactivateDevice.name}</strong>?
+              <strong className="text-app-on-surface">{deactivateDevice.name}</strong>
               <br />
               <br />
-              <span className="text-amber-700 font-medium">
-                Perangkat yang dinonaktifkan tidak dapat menerima perintah fisik atau faucet
-                commands.
-              </span>
+              <span className="text-amber-700 font-medium">{tDevices('deactivateWarning')}</span>
             </p>
 
             <div className="flex items-center justify-end gap-3 pt-3 border-t border-app-outline-variant/20">
@@ -826,7 +833,7 @@ export default function DeviceRegistryPage() {
                 onClick={() => setDeactivateModalOpen(false)}
                 className="px-4 py-2 text-[14px] font-semibold text-app-on-surface-variant hover:bg-app-surface-container rounded-xl"
               >
-                Batal
+                {tCommon('cancel')}
               </button>
               <button
                 type="button"
@@ -835,7 +842,7 @@ export default function DeviceRegistryPage() {
                 className="inline-flex items-center gap-2 px-5 py-2 text-[14px] font-semibold bg-amber-600 text-white rounded-xl hover:bg-amber-700 disabled:opacity-50"
               >
                 {deactivateSubmitting && <Loader2 size={16} className="animate-spin" />}
-                <span>Ya, Nonaktifkan</span>
+                <span>{tDevices('deactivateConfirmBtn')}</span>
               </button>
             </div>
           </div>
@@ -848,18 +855,17 @@ export default function DeviceRegistryPage() {
           <div className="bg-app-surface-container-lowest rounded-2xl max-w-md w-full p-6 space-y-5 soft-elevation-lg animate-scale-up border border-rose-200">
             <div className="flex items-center gap-3 text-rose-600">
               <AlertTriangle size={24} />
-              <h3 className="text-[18px] font-bold text-rose-700">Hapus Perangkat Permanen</h3>
+              <h3 className="text-[18px] font-bold text-rose-700">
+                {tDevices('deleteConfirmTitle')}
+              </h3>
             </div>
 
             <p className="text-[14px] text-app-on-surface-variant leading-relaxed">
-              Hapus perangkat <strong className="text-app-on-surface">{deleteDevice.name}</strong>{' '}
-              secara permanen?
+              <strong className="text-app-on-surface">{deleteDevice.name}</strong>
               <br />
               <br />
               <span className="text-rose-700 font-medium block bg-rose-50 p-3 rounded-xl border border-rose-200">
-                Tindakan ini akan menghapus seluruh data perangkat dan riwayat telemetry yang
-                terkait secara permanen dari database PostgreSQL. Tindakan ini tidak dapat
-                dibatalkan.
+                {tDevices('deleteWarning')}
               </span>
             </p>
 
@@ -871,7 +877,7 @@ export default function DeviceRegistryPage() {
                   onChange={(e) => setDeleteConfirmedChecked(e.target.checked)}
                   className="w-4 h-4 text-rose-600 rounded focus:ring-rose-500 border-rose-300"
                 />
-                <span>Saya setuju untuk menghapus perangkat ini secara permanen</span>
+                <span>{tDevices('deleteAgreeCheckbox')}</span>
               </label>
             </div>
 
@@ -885,7 +891,7 @@ export default function DeviceRegistryPage() {
                 }}
                 className="px-4 py-2 text-[14px] font-semibold text-app-on-surface-variant hover:bg-app-surface-container rounded-xl"
               >
-                Batal
+                {tCommon('cancel')}
               </button>
               <button
                 type="button"
@@ -894,7 +900,7 @@ export default function DeviceRegistryPage() {
                 className="inline-flex items-center gap-2 px-5 py-2 text-[14px] font-semibold bg-rose-600 text-white rounded-xl hover:bg-rose-700 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {deleteSubmitting && <Loader2 size={16} className="animate-spin" />}
-                <span>Hapus Permanen</span>
+                <span>{tDevices('deleteConfirmBtn')}</span>
               </button>
             </div>
           </div>

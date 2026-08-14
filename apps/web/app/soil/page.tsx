@@ -7,6 +7,7 @@ import { useDeviceContext } from '@/context/DeviceContext';
 import { useHistoricalMonitoring } from '@/hooks/useHistoricalMonitoring';
 import { NPK_DATA } from '@/lib/constants';
 import { CheckCircle, TrendingUp, Cpu } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 
 const NPKChart = dynamic(() => import('@/components/charts/NPKChart'), { ssr: false });
 
@@ -31,6 +32,8 @@ function NPKMeter({
   description,
   color,
 }: NPKMeterProps) {
+  const tSoil = useTranslations('soil');
+
   return (
     <div className="bg-app-surface-container-lowest rounded-xl p-5 soft-elevation-lg border border-app-outline-variant/30">
       <div className="flex items-center justify-between mb-4">
@@ -69,18 +72,19 @@ function NPKMeter({
       </div>
 
       <div className="flex justify-between items-center">
-        <span className="text-[11px] text-app-on-surface-variant">Rendah</span>
+        <span className="text-[11px] text-app-on-surface-variant">{tSoil('low')}</span>
         <div className="flex items-center gap-1">
           <CheckCircle size={14} className="text-app-primary" />
           <span className="text-[12px] font-semibold text-app-primary">{status}</span>
         </div>
-        <span className="text-[11px] text-app-on-surface-variant">Tinggi</span>
+        <span className="text-[11px] text-app-on-surface-variant">{tSoil('high')}</span>
       </div>
     </div>
   );
 }
 
 export default function SoilPage() {
+  const tSoil = useTranslations('soil');
   const { selectedDevice } = useDeviceContext();
 
   const isSoilNode = selectedDevice?.deviceType === 'SOIL_NODE';
@@ -107,33 +111,33 @@ export default function SoilPage() {
 
   const npkItems: NPKMeterProps[] = [
     {
-      label: 'Nitrogen (N)',
+      label: `${tSoil('nitrogen')} (N)`,
       symbol: 'N',
       value: NPK_DATA.nitrogen.value,
       unit: NPK_DATA.nitrogen.unit,
       percent: NPK_DATA.nitrogen.percent,
       status: NPK_DATA.nitrogen.status,
-      description: 'Pertumbuhan daun & batang',
+      description: tSoil('leafGrowthDesc'),
       color: '#0d631b',
     },
     {
-      label: 'Fosfor (P)',
+      label: `${tSoil('phosphorus')} (P)`,
       symbol: 'P',
       value: NPK_DATA.fosfor.value,
       unit: NPK_DATA.fosfor.unit,
       percent: NPK_DATA.fosfor.percent,
       status: NPK_DATA.fosfor.status,
-      description: 'Pengembangan akar & buah',
+      description: tSoil('rootGrowthDesc'),
       color: '#884200',
     },
     {
-      label: 'Kalium (K)',
+      label: `${tSoil('potassium')} (K)`,
       symbol: 'K',
       value: NPK_DATA.kalium.value,
       unit: NPK_DATA.kalium.unit,
       percent: NPK_DATA.kalium.percent,
       status: NPK_DATA.kalium.status,
-      description: 'Kualitas buah & daya tahan',
+      description: tSoil('fruitQualityDesc'),
       color: '#476800',
     },
   ];
@@ -150,15 +154,13 @@ export default function SoilPage() {
             </div>
             <div>
               <h3 className="text-[16px] font-bold text-app-on-surface">
-                Bukan Perangkat Pemantauan Tanah
+                {tSoil('notSoilNodeTitle')}
               </h3>
               <p className="text-[12px] text-app-on-surface-variant mt-1 max-w-sm">
-                Perangkat{' '}
-                <code className="bg-app-surface-container px-1 py-0.5 rounded font-mono">
-                  {selectedDevice?.deviceName}
-                </code>{' '}
-                adalah node pemantauan {selectedDevice?.deviceType.replace('_NODE', '')}. Pilih Soil
-                Node di selector untuk melihat data tanah.
+                {tSoil('soilDeviceNotice', {
+                  deviceName: selectedDevice?.deviceName,
+                  deviceType: selectedDevice?.deviceType.replace('_NODE', ''),
+                })}
               </p>
             </div>
           </section>
@@ -172,18 +174,20 @@ export default function SoilPage() {
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-app-primary animate-pulse" />
                   <span className="text-[14px] font-semibold text-app-primary">
-                    Status NPK: Optimal
+                    {tSoil('npkOptimal')}
                   </span>
                 </div>
-                <span className="text-[12px] text-app-on-surface-variant">Update: Real-Time</span>
+                <span className="text-[12px] text-app-on-surface-variant">
+                  {tSoil('realtimeUpdate')}
+                </span>
               </div>
               <p className="text-[18px] leading-7 font-semibold text-app-on-surface">
-                "Pupuk cukup, tanaman akan tumbuh kuat."
+                {tSoil('fertilizerQuote')}
               </p>
               <div className="mt-3 flex items-center gap-2 bg-app-primary/5 px-4 py-2 rounded-full w-fit">
                 <TrendingUp size={16} className="text-app-primary" />
                 <span className="text-[14px] font-semibold text-app-primary">
-                  Ideal for Fase Generatif
+                  {tSoil('idealPhase')}
                 </span>
               </div>
             </section>
@@ -220,13 +224,13 @@ export default function SoilPage() {
             {/* Recommendation */}
             <section className="bg-app-surface-container-lowest rounded-xl p-5 soft-elevation border border-app-outline-variant/20 animate-fade-in">
               <h3 className="text-[20px] leading-7 font-bold text-app-on-surface mb-3">
-                Rekomendasi Pemupukan
+                {tSoil('recommendationTitle')}
               </h3>
               <div className="space-y-3">
                 {[
-                  { label: 'Nitrogen', rec: 'Pertahankan level saat ini' },
-                  { label: 'Fosfor', rec: 'Tambahkan 10 mg/kg minggu ini' },
-                  { label: 'Kalium', rec: 'Pertahankan level saat ini' },
+                  { label: tSoil('nitrogen'), rec: tSoil('maintainCurrentLevel') },
+                  { label: tSoil('phosphorus'), rec: tSoil('addPhosThisWeek') },
+                  { label: tSoil('potassium'), rec: tSoil('maintainCurrentLevel') },
                 ].map(({ label, rec }) => (
                   <div key={label} className="flex items-start gap-3">
                     <CheckCircle size={16} className="text-app-primary mt-0.5 flex-shrink-0" />

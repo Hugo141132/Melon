@@ -1552,7 +1552,7 @@ COMMAND_TIMEOUT
 COMMAND_STATE_CONFLICT
 ```
 
-The web frontend shall translate these codes according to `I18N.md`.
+The web frontend shall translate these codes according to `I18N.md` (implemented via `next-intl` keys, `TASK-0603`).
 
 Device payloads and logs shall retain canonical codes.
 

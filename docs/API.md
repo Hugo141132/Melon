@@ -2473,7 +2473,7 @@ The API is accepted when:
 11. Faucet phases map to fixed server-side volumes.
 12. Faucet command creation is idempotent.
 13. The API does not expose MQTT credentials.
-14. The API does not return translated canonical values.
+14. The API does not return translated canonical values (frontend presentation translation is decoupled via `next-intl` namespaces, `TASK-0603`).
 15. Error codes are stable and machine-readable.
 16. Request validation rejects unsupported fields.
 17. High-risk operations create audit records.

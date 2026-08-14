@@ -60,4 +60,19 @@ const nextConfig = {
 
 const withNextIntl = createNextIntlPlugin('./i18n/request.ts');
 
-export default withNextIntl(nextConfig);
+const baseConfig = {
+  ...nextConfig,
+  turbopack: {
+    resolveAlias: {
+      'next-intl/config': './i18n/request.ts',
+    },
+  },
+};
+
+const finalConfig = withNextIntl(baseConfig);
+
+if (finalConfig.experimental?.turbo) {
+  delete finalConfig.experimental.turbo;
+}
+
+export default finalConfig;

@@ -1478,3 +1478,12 @@ Security controls enforced during initial system bootstrap:
 4. **PostgreSQL Advisory Locking:** Acquires `pg_advisory_xact_lock(84736291106)` inside a `Serializable` transaction to eliminate race conditions between concurrent provisioning processes.
 5. **Auditing without Leakage:** Logs a system `AuditLog` record (`eventKey = ACCOUNT_PROVISION_OWNER`, `actorUserId = null`, `result = SUCCESS`) containing target ID and role without any passwords, hashes, tokens, or database URLs.
 6. **No Pre-created Approval Records:** Omits `AccountApproval` rows to maintain foreign key integrity when no approving Owner user exists.
+
+---
+
+## 35. Presentation Localization Security Boundary (`TASK-0603`)
+
+Frontend presentation translation (`TASK-0603`) operates strictly in the presentation layer:
+1. **Canonical Authorisation:** All RBAC checks, session validations, permission guards, and account statuses remain strictly canonical and untranslated.
+2. **Audit & Log Integrity:** All audit log keys (`eventKey`), error codes, and server logs retain canonical, language-neutral identifiers.
+3. **No Injection via Dictionaries:** Translation strings are loaded from static, server-validated JSON dictionaries with typed keys, preventing injection into runtime security contexts.

@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   CheckCircle2,
 } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 
 function PasswordStrengthMeter({ password }: { password: string }) {
   const getStrength = (val: string): number => {
@@ -44,6 +45,13 @@ function PasswordStrengthMeter({ password }: { password: string }) {
 
 export default function RegisterPage() {
   const router = useRouter();
+
+  const tAuth = useTranslations('auth');
+  const tCommon = useTranslations('common');
+  const tValidation = useTranslations('validation');
+  const tUsers = useTranslations('users');
+  const tAccessibility = useTranslations('accessibility');
+  const tErrors = useTranslations('errors');
 
   const [step, setStep] = useState<1 | 2>(1);
   const [selectedRole, setSelectedRole] = useState<'OWNER' | 'ADMIN'>('ADMIN');
@@ -92,7 +100,7 @@ export default function RegisterPage() {
     setErrorMessage('');
 
     if (!formData.fullName.trim() || !formData.email.trim() || !formData.password) {
-      setErrorMessage('Semua bidang harus diisi.');
+      setErrorMessage(tValidation('allFieldsRequired'));
       return;
     }
 
@@ -113,30 +121,24 @@ export default function RegisterPage() {
 
       if (!res.ok || !json.success) {
         if (json.error?.code === 'OWNER_ALREADY_EXISTS') {
-          setErrorMessage(
-            'Akun Pemilik (Owner) sudah terdaftar di sistem. Pendaftaran Pemilik tidak tersedia.'
-          );
+          setErrorMessage(tAuth('ownerExistsError'));
           setOwnerAvailable(false);
           setSelectedRole('ADMIN');
-          setStep(1); // Return to step 1 so user sees disabled card
+          setStep(1);
         } else {
-          setErrorMessage(
-            json.error?.message || 'Gagal mendaftarkan akun. Silakan periksa kembali data Anda.'
-          );
+          setErrorMessage(json.error?.message || tAuth('registerFailed'));
         }
         setLoadingSubmit(false);
         return;
       }
 
       if (json.data?.user?.accountStatus === 'ACTIVE') {
-        // First Owner registered - redirect to login
         router.push('/login?registered=owner');
       } else {
-        // Admin registered - redirect to pending approval status
         router.push('/status?reason=PENDING_APPROVAL');
       }
     } catch {
-      setErrorMessage('Terjadi kesalahan koneksi. Silakan coba lagi.');
+      setErrorMessage(tErrors('networkError'));
       setLoadingSubmit(false);
     }
   };
@@ -154,7 +156,7 @@ export default function RegisterPage() {
               }}
               type="button"
               className="text-primary hover:bg-surface-container-low transition-colors active:scale-95 duration-150 p-2 rounded-full cursor-pointer"
-              aria-label="Kembali ke pilih peran"
+              aria-label={tAccessibility('backToRole')}
             >
               <ArrowLeft size={22} />
             </button>
@@ -167,7 +169,7 @@ export default function RegisterPage() {
             </Link>
           )}
           <h1 className="text-[24px] leading-[32px] font-semibold text-primary">
-            Daftar Akun Baru
+            {tAuth('registerTitle')}
           </h1>
         </div>
       </header>
@@ -178,20 +180,20 @@ export default function RegisterPage() {
           <section className="space-y-6">
             <div>
               <span className="text-[12px] leading-[16px] font-bold text-secondary tracking-widest uppercase block mb-1">
-                Langkah 1 dari 2
+                {tAuth('step1Of2')}
               </span>
               <h2 className="text-[24px] leading-[32px] font-bold text-primary mb-2">
-                Pilih Tipe Peran Akun
+                {tAuth('chooseRoleTitle')}
               </h2>
               <p className="text-[16px] leading-[24px] text-on-surface-variant">
-                Tentukan jenis akun yang ingin Anda daftarkan di Kebun Melon.
+                {tAuth('chooseRoleSubtitle')}
               </p>
             </div>
 
             {loadingCapabilities ? (
               <div className="py-12 flex flex-col items-center justify-center gap-3 text-on-surface-variant">
                 <Loader2 size={24} className="animate-spin text-primary" />
-                <span className="text-[14px]">Memeriksa ketersediaan peran...</span>
+                <span className="text-[14px]">{tAuth('checkingCapabilities')}</span>
               </div>
             ) : (
               <div className="space-y-4">
@@ -224,17 +226,19 @@ export default function RegisterPage() {
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center justify-between">
-                      <h3 className="text-[18px] font-bold text-on-surface">Pemilik (Owner)</h3>
+                      <h3 className="text-[18px] font-bold text-on-surface">
+                        {tUsers('ownerRole')} (Owner)
+                      </h3>
                       {selectedRole === 'OWNER' && ownerAvailable && (
                         <CheckCircle2 size={20} className="text-primary" />
                       )}
                     </div>
                     <p className="text-[14px] leading-[20px] text-on-surface-variant mt-1">
-                      Akses penuh kontrol sistem dan manajemen pengguna.
+                      {tAuth('firstOwnerDesc')}
                     </p>
                     {!ownerAvailable && (
                       <p className="text-[12px] leading-[16px] font-semibold text-error mt-2.5 bg-error-container/20 p-2 rounded-lg border border-error/20">
-                        Akun Pemilik sudah terdaftar di sistem.
+                        {tAuth('ownerAlreadyExists')}
                       </p>
                     )}
                   </div>
@@ -255,13 +259,15 @@ export default function RegisterPage() {
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center justify-between">
-                      <h3 className="text-[18px] font-bold text-on-surface">Administrator</h3>
+                      <h3 className="text-[18px] font-bold text-on-surface">
+                        {tUsers('adminRole')}
+                      </h3>
                       {selectedRole === 'ADMIN' && (
                         <CheckCircle2 size={20} className="text-primary" />
                       )}
                     </div>
                     <p className="text-[14px] leading-[20px] text-on-surface-variant mt-1">
-                      Akses pemantauan sensor dan kontrol alat (memerlukan persetujuan Pemilik).
+                      {tAuth('adminRegistrationDesc')}
                     </p>
                   </div>
                 </button>
@@ -271,7 +277,7 @@ export default function RegisterPage() {
                   onClick={() => setStep(2)}
                   className="w-full mt-4 h-[56px] bg-primary text-on-primary text-[18px] leading-[24px] font-semibold rounded-xl hover:bg-primary-container hover:text-on-primary-container active:scale-[0.98] transition-all shadow-md flex items-center justify-center cursor-pointer"
                 >
-                  Lanjut ke Isian Data
+                  {tAuth('continueToForm')}
                 </button>
               </div>
             )}
@@ -281,18 +287,17 @@ export default function RegisterPage() {
           <section>
             <div className="mb-[24px]">
               <span className="text-[12px] leading-[16px] font-bold text-secondary tracking-widest uppercase block mb-1">
-                Langkah 2 dari 2 — Peran:{' '}
-                <span className="text-primary">
-                  {selectedRole === 'OWNER' ? 'PEMILIK (OWNER)' : 'ADMINISTRATOR'}
-                </span>
+                {tAuth('step2Of2', {
+                  role: selectedRole === 'OWNER' ? 'PEMILIK (OWNER)' : 'ADMINISTRATOR',
+                })}
               </span>
               <h2 className="text-[24px] leading-[32px] font-bold text-primary mb-2">
-                Isi Data Pendaftaran
+                {tAuth('fillRegistrationData')}
               </h2>
               <p className="text-[16px] leading-[24px] text-on-surface-variant">
                 {selectedRole === 'OWNER'
-                  ? 'Daftarkan akun Pemilik pertama untuk mengaktifkan sistem Kebun Melon.'
-                  : 'Daftarkan diri Anda untuk mengajukan akses Admin Kebun Melon.'}
+                  ? tAuth('firstOwnerDesc')
+                  : tAuth('adminRegistrationDesc')}
               </p>
             </div>
 
@@ -310,7 +315,7 @@ export default function RegisterPage() {
                   htmlFor="reg-fullname"
                   className="text-[14px] leading-[20px] font-semibold tracking-[0.05em] text-on-surface-variant uppercase"
                 >
-                  Nama Lengkap
+                  {tAuth('name')}
                 </label>
                 <div className="relative group">
                   <User
@@ -334,7 +339,7 @@ export default function RegisterPage() {
                   htmlFor="reg-email"
                   className="text-[14px] leading-[20px] font-semibold tracking-[0.05em] text-on-surface-variant uppercase"
                 >
-                  Alamat Email
+                  {tAuth('email')}
                 </label>
                 <div className="relative group">
                   <Mail
@@ -358,7 +363,7 @@ export default function RegisterPage() {
                   htmlFor="reg-password"
                   className="text-[14px] leading-[20px] font-semibold tracking-[0.05em] text-on-surface-variant uppercase"
                 >
-                  Kata Sandi
+                  {tAuth('password')}
                 </label>
                 <div className="relative group">
                   <Lock
@@ -368,7 +373,7 @@ export default function RegisterPage() {
                   <input
                     type={showPassword ? 'text' : 'password'}
                     id="reg-password"
-                    placeholder="Minimal 12 karakter"
+                    placeholder={tValidation('passwordPlaceholder')}
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                     className="w-full h-[56px] pl-12 pr-12 border border-outline rounded-xl bg-surface focus:ring-2 focus:ring-secondary/10 focus:border-secondary text-[18px] leading-[28px] outline-none transition-all text-on-surface"
@@ -377,14 +382,14 @@ export default function RegisterPage() {
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-4 top-1/2 -translate-y-1/2 text-outline hover:text-secondary transition-colors flex items-center justify-center w-10 h-10 cursor-pointer"
-                    aria-label={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
+                    aria-label={showPassword ? tAuth('hidePassword') : tAuth('showPassword')}
                   >
                     {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                   </button>
                 </div>
                 <PasswordStrengthMeter password={formData.password} />
                 <p className="text-[12px] leading-[16px] font-medium text-on-surface-variant italic">
-                  Minimal 12 karakter (huruf besar, kecil, angka, dan simbol).
+                  {tValidation('passwordPolicyHint')}
                 </p>
               </div>
 
@@ -397,12 +402,12 @@ export default function RegisterPage() {
                 {loadingSubmit ? (
                   <>
                     <Loader2 size={20} className="animate-spin" />
-                    <span>Memproses...</span>
+                    <span>{tCommon('processing')}</span>
                   </>
                 ) : selectedRole === 'OWNER' ? (
-                  'Daftar Sebagai Pemilik (Owner)'
+                  tAuth('registerAsOwner')
                 ) : (
-                  'Daftar Sebagai Admin'
+                  tAuth('registerAsAdmin')
                 )}
               </button>
             </form>
@@ -411,9 +416,9 @@ export default function RegisterPage() {
 
         <div className="mt-6 pt-4 border-t border-outline-variant/40 flex flex-col items-center gap-[16px]">
           <p className="text-[16px] leading-[24px] text-on-surface-variant">
-            Sudah punya akun?{' '}
+            {tAuth('alreadyHaveAccount')}{' '}
             <Link href="/login" className="text-secondary font-bold hover:underline">
-              Masuk
+              {tAuth('loginButton')}
             </Link>
           </p>
         </div>

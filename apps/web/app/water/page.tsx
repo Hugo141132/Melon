@@ -8,12 +8,14 @@ import { useLatestMonitoring } from '@/hooks/useLatestMonitoring';
 import { useHistoricalMonitoring } from '@/hooks/useHistoricalMonitoring';
 import { WATER_DATA } from '@/lib/constants';
 import { CheckCircle, TrendingUp, Cpu } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 
 const WaterNutrientChart = dynamic(() => import('@/components/charts/WaterNutrientChart'), {
   ssr: false,
 });
 
 function ECGauge({ value }: { value: number }) {
+  const tWater = useTranslations('water');
   // Explicit presentation conversion from source unit (mS/cm) to display unit (µS/cm)
   const displayVal = Math.round(value * 1000);
   const maxEC = 4000;
@@ -33,7 +35,7 @@ function ECGauge({ value }: { value: number }) {
       </div>
       <div className="flex items-center gap-2 bg-app-primary/10 px-4 py-1.5 rounded-full mt-2">
         <CheckCircle size={16} className="text-app-primary" />
-        <span className="text-[14px] font-semibold text-app-primary">Status: Stabil</span>
+        <span className="text-[14px] font-semibold text-app-primary">{tWater('statusStable')}</span>
       </div>
     </div>
   );
@@ -60,6 +62,9 @@ function PHBar({ value }: { value: number }) {
 }
 
 export default function WaterPage() {
+  const tWater = useTranslations('water');
+  const tSoil = useTranslations('soil');
+  const tCommon = useTranslations('common');
   const { selectedDevice } = useDeviceContext();
   const { snapshot } = useLatestMonitoring();
 
@@ -94,7 +99,7 @@ export default function WaterPage() {
   const phVal = waterData?.ph ?? WATER_DATA.ph.value;
   const tdsVal = waterData?.tds ?? WATER_DATA.tds.value;
   const ecVal = waterData?.ec ?? WATER_DATA.ec.value;
-  const statusLabel = waterData?.status || 'Optimal';
+  const statusLabel = waterData?.status || tCommon('optimal');
 
   return (
     <div className="bg-app-surface text-app-on-surface min-h-dvh pb-10">
@@ -108,16 +113,12 @@ export default function WaterPage() {
             </div>
             <div>
               <h3 className="text-[16px] font-bold text-app-on-surface">
-                {isSoilNode ? 'Perangkat Sensor Tanah Aktif' : 'Perangkat Tangki Air Aktif'}
+                {isSoilNode ? tWater('activeSoilDeviceTitle') : tWater('activeTankDeviceTitle')}
               </h3>
               <p className="text-[12px] text-app-on-surface-variant mt-1 max-w-sm">
-                Perangkat{' '}
-                <code className="bg-app-surface-container px-1 py-0.5 rounded font-mono">
-                  {selectedDevice?.deviceName}
-                </code>{' '}
                 {isSoilNode
-                  ? 'adalah node pemantauan tanah. Pilih Water Quality Node di selector untuk melihat kualitas air.'
-                  : 'adalah node tangki air (pemantauan berada di halaman Kontrol). Pilih Water Quality Node di selector untuk melihat kualitas air.'}
+                  ? tWater('soilDeviceNotice', { deviceName: selectedDevice?.deviceName })
+                  : tWater('tankDeviceNotice', { deviceName: selectedDevice?.deviceName })}
               </p>
             </div>
           </section>
@@ -130,19 +131,21 @@ export default function WaterPage() {
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-app-primary animate-pulse" />
                   <span className="text-[14px] font-semibold text-app-primary">
-                    Status Kualitas Air: {statusLabel}
+                    {tWater('statusLabel', { status: statusLabel })}
                   </span>
                 </div>
-                <span className="text-[12px] text-app-on-surface-variant">Update: Real-Time</span>
+                <span className="text-[12px] text-app-on-surface-variant">
+                  {tSoil('realtimeUpdate')}
+                </span>
               </div>
               <p className="text-[18px] leading-7 font-semibold text-app-on-surface">
-                "Kualitas air &amp; nutrisi terukur stabil."
+                {tWater('qualityQuote')}
               </p>
             </section>
 
             <section className="bg-app-surface-container-lowest rounded-xl p-5 soft-elevation-lg border border-app-outline-variant/30 flex flex-col items-center animate-fade-in">
               <h3 className="text-[14px] font-semibold text-app-on-surface-variant self-start mb-4">
-                Electrical Conductivity (EC)
+                {tWater('ecCardTitle')}
               </h3>
               <ECGauge value={ecVal} />
             </section>
@@ -151,12 +154,12 @@ export default function WaterPage() {
               <div className="bg-app-surface-container-lowest rounded-xl p-5 soft-elevation-lg border border-app-outline-variant/30 flex flex-col justify-between">
                 <div>
                   <h3 className="text-[14px] font-semibold text-app-on-surface-variant mb-2">
-                    pH Level
+                    {tWater('phLevelTitle')}
                   </h3>
                   <div className="flex items-baseline gap-1">
                     <span className="text-[28px] font-bold text-app-on-surface">{phVal}</span>
                     <span className="text-[12px] text-app-on-surface-variant">
-                      {WATER_DATA.ph.status}
+                      {tCommon('normal')}
                     </span>
                   </div>
                 </div>
@@ -166,7 +169,7 @@ export default function WaterPage() {
               <div className="bg-app-surface-container-lowest rounded-xl p-5 soft-elevation-lg border border-app-outline-variant/30 flex flex-col justify-between">
                 <div>
                   <h3 className="text-[14px] font-semibold text-app-on-surface-variant mb-2">
-                    Total Dissolved Solids
+                    {tWater('tdsCardTitle')}
                   </h3>
                   <div className="flex items-baseline gap-1">
                     <span className="text-[28px] font-bold text-app-on-surface">{tdsVal}</span>
@@ -175,7 +178,7 @@ export default function WaterPage() {
                 </div>
                 <div className="mt-4 flex items-center gap-1 text-app-primary">
                   <TrendingUp size={14} />
-                  <span className="text-[12px] font-semibold">{WATER_DATA.tds.status}</span>
+                  <span className="text-[12px] font-semibold">{tWater('statusOptimal')}</span>
                 </div>
               </div>
             </div>

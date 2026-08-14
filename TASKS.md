@@ -1422,15 +1422,38 @@ Key Implementation Details:
 ## TASK-0603 — Replace Hard-Coded UI Text
 
 **Priority:** `P1`  
-**Status:** `READY`  
-**Dependencies:** `TASK-0602`
+**Status:** `DONE`  
+**Completed:** 2026-08-14 — Replaced hard-coded user-facing text across all auth and protected routes using `next-intl` translation hooks with 100% key parity across `messages/id.json` and `messages/en.json`. Enforced presentation-layer translation while keeping API, database, MQTT, and RBAC values canonical and untranslated. Verified 100% pass rate across 15 unit test suites (107/107 tests passed), clean TypeScript typecheck (`tsc --noEmit` 0 errors), Next.js production build (`31/31` static pages), Playwright browser verification on `/login` and `/register`, and verified user-reported completion of all 5 reserved pre-commit checks (`test:coverage`, `test:integration`, `check:quality`, `test`, `test:e2e`).
+**Dependencies:** `TASK-0602`  
+**Frontend Impact:** `MINOR`  
+**Selected UI Direction:** `Premium Minimal Ops`  
+**Existing Color Template:** `UNCHANGED`  
+**Selected Motion Effects:** `None`  
+**21st.dev MCP:** `NOT REQUIRED`  
+
+### Work
+
+- Conducted exhaustive literal sweeps and replaced hard-coded user-facing text with `next-intl` translation keys across all auth and protected pages:
+  - Auth routes: `/(auth)/login`, `/(auth)/register`, `/(auth)/status`, `/(auth)/forgot-password`
+  - Core navigation: `Sidebar.tsx`, `TopAppBar.tsx`, `DeviceSelector.tsx`
+  - Protected views: `/` (`MonitoringDashboard.tsx`), `/sensor`, `/soil`, `/water` (`WaterTankMonitoringCard.tsx`), `/controls` (`FaucetControlPanel.tsx`, `FaucetPresetSelector.tsx`, `FaucetConfirmationModal.tsx`, `FaucetStatusCard.tsx`, `FaucetHistoryTable.tsx`), `/devices`, `/users`, `/approvals`, `/pengaturan`, `/profil`, `/notifikasi`
+  - Historical telemetry charts & controls: `NPKChart.tsx`, `WaterNutrientChart.tsx`, `HistoricalChartControls.tsx`
+- Enforced 100% key parity across `messages/id.json` and `messages/en.json` (all 17 namespaces + `system`).
+- Preserved internal untranslated canonical values (API enums, database fields, MQTT topics, audit keys, hardware types, raw measurements, and unit symbols: `N`, `P`, `K`, `pH`, `EC`, `TDS`, `ESP32`, `NodeMCU`, `MQTT`, `mL`, `L`, `°C`, `m³/h`, `ppm`, `µS/cm`).
+- Preserved `BAT` parameter removal per `DEC-MON-086`.
+- Maintained request-scoped `i18n/request.ts` configuration compatible with default Next.js 16 Turbopack build and dev execution.
+- Verified all 15 targeted unit test suites (107/107 tests passed) via Vitest.
+- User personally executed and confirmed all 5 reserved pre-commit checks (`test:coverage`, `test:integration`, `check:quality`, `test`, `test:e2e`).
 
 ### Acceptance Criteria
 
-- Authentication and protected pages are translated.
-- Status badges are translated at presentation time.
-- Canonical API values remain unchanged.
-- Accessibility labels are translated.
+- [x] Authentication and protected pages are translated.
+- [x] Status badges are translated at presentation time.
+- [x] Canonical API values remain unchanged.
+- [x] Accessibility labels are translated.
+- [x] Key sets match between locales (100% parity).
+- [x] Interpolation placeholders are consistent.
+
 
 ---
 

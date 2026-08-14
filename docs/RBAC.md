@@ -828,7 +828,7 @@ An Admin shall not:
 - Change system-wide authorisation policy.
 - Use a language change to bypass permissions.
 
-Authorisation decisions shall use canonical role, permission, account-status, and resource values, not translated labels.
+Authorisation decisions shall use canonical role, permission, account-status, and resource values, not translated labels (frontend presentation translation is decoupled via `next-intl` namespaces, `TASK-0603`).
 
 ---
 

@@ -12,6 +12,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
+import { useTranslations } from 'next-intl';
 import { NPK_TREND_DATA } from '@/lib/constants';
 import { BaseSeriesItem } from '@/hooks/useHistoricalMonitoring';
 
@@ -19,16 +20,6 @@ const NPK_COLORS = {
   n: '#0d631b',
   p: '#884200',
   k: '#476800',
-};
-
-const SINGLE_METRIC_CONFIG: Record<
-  string,
-  { label: string; unit: string; color: string; dataKey: string }
-> = {
-  temperature: { label: 'Suhu Tanah', unit: '°C', color: '#d97706', dataKey: 'temperature' },
-  moisture: { label: 'Kelembapan Tanah', unit: '%', color: '#0284c7', dataKey: 'moisture' },
-  ph: { label: 'pH Tanah', unit: '', color: '#884200', dataKey: 'ph' },
-  ec: { label: 'Konduktivitas Listrik (EC)', unit: 'µS/cm', color: '#0d631b', dataKey: 'ec' },
 };
 
 export interface NPKChartProps {
@@ -44,12 +35,31 @@ export default function NPKChart({
   loading = false,
   error = null,
 }: NPKChartProps) {
+  const tSoil = useTranslations('soil');
+  const tHistory = useTranslations('history');
+  const tCommon = useTranslations('common');
+
+  const singleMetricConfig: Record<
+    string,
+    { label: string; unit: string; color: string; dataKey: string }
+  > = {
+    temperature: {
+      label: tSoil('temperature'),
+      unit: '°C',
+      color: '#d97706',
+      dataKey: 'temperature',
+    },
+    moisture: { label: tSoil('moisture'), unit: '%', color: '#0284c7', dataKey: 'moisture' },
+    ph: { label: tSoil('ph'), unit: '', color: '#884200', dataKey: 'ph' },
+    ec: { label: tSoil('ec'), unit: 'µS/cm', color: '#0d631b', dataKey: 'ec' },
+  };
+
   const isSingleMetric = selectedMetric !== 'npk';
-  const singleConfig = SINGLE_METRIC_CONFIG[selectedMetric];
+  const singleConfig = singleMetricConfig[selectedMetric];
 
   const titleText = isSingleMetric
-    ? `Riwayat ${singleConfig?.label || selectedMetric}`
-    : 'Tren NPK Tanah';
+    ? tSoil('metricHistoryTitle', { metric: singleConfig?.label || selectedMetric })
+    : tSoil('npkTrend');
 
   return (
     <div className="bg-app-surface-container-lowest rounded-xl p-5 soft-elevation-lg border border-app-outline-variant/30">
@@ -76,7 +86,7 @@ export default function NPKChart({
       {loading ? (
         <div className="h-44 w-full flex items-center justify-center bg-app-surface-container/20 rounded-lg animate-pulse">
           <span className="text-[13px] text-app-on-surface-variant font-medium">
-            Memuat data riwayat...
+            {tHistory('loadingHistory')}
           </span>
         </div>
       ) : error ? (
@@ -86,7 +96,7 @@ export default function NPKChart({
       ) : data.length === 0 ? (
         <div className="h-44 w-full flex items-center justify-center bg-app-surface-container/20 rounded-lg p-4 text-center">
           <span className="text-[13px] text-app-on-surface-variant font-medium">
-            Tidak ada data riwayat untuk rentang waktu ini.
+            {tHistory('noData')}
           </span>
         </div>
       ) : (
@@ -118,7 +128,7 @@ export default function NPKChart({
                   formatter={(value: any) => [
                     value !== null && value !== undefined
                       ? `${value} ${singleConfig.unit}`.trim()
-                      : 'Tidak ada data',
+                      : tCommon('unavailable'),
                     singleConfig.label,
                   ]}
                 />
@@ -162,13 +172,30 @@ export default function NPKChart({
                     fontSize: '12px',
                   }}
                   formatter={(value: any, name: any) => [
-                    value !== null && value !== undefined ? `${value} mg/kg` : 'Tidak ada data',
+                    value !== null && value !== undefined
+                      ? `${value} mg/kg`
+                      : tCommon('unavailable'),
                     name,
                   ]}
                 />
-                <Bar dataKey="n" name="Nitrogen" fill={NPK_COLORS.n} radius={[4, 4, 0, 0]} />
-                <Bar dataKey="p" name="Fosfor" fill={NPK_COLORS.p} radius={[4, 4, 0, 0]} />
-                <Bar dataKey="k" name="Kalium" fill={NPK_COLORS.k} radius={[4, 4, 0, 0]} />
+                <Bar
+                  dataKey="n"
+                  name={tSoil('nitrogen')}
+                  fill={NPK_COLORS.n}
+                  radius={[4, 4, 0, 0]}
+                />
+                <Bar
+                  dataKey="p"
+                  name={tSoil('phosphorus')}
+                  fill={NPK_COLORS.p}
+                  radius={[4, 4, 0, 0]}
+                />
+                <Bar
+                  dataKey="k"
+                  name={tSoil('potassium')}
+                  fill={NPK_COLORS.k}
+                  radius={[4, 4, 0, 0]}
+                />
               </BarChart>
             )}
           </ResponsiveContainer>

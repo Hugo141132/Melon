@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { MapPin, Bell } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { USER_PROFILE } from '@/lib/constants';
 import DeviceSelector from './DeviceSelector';
 import Sidebar from './Sidebar';
@@ -22,6 +23,7 @@ export default function TopAppBar({
   showDeviceSelector = true,
   user,
 }: TopAppBarProps) {
+  const tAccessibility = useTranslations('accessibility');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const hoverTimerRef = useRef<NodeJS.Timeout | null>(null);
   const pathname = usePathname();
@@ -104,7 +106,7 @@ export default function TopAppBar({
           onMouseEnter={handleLogoMouseEnter}
           onMouseLeave={handleLogoMouseLeave}
           onFocus={handleLogoFocus}
-          aria-label="Buka navigasi sidebar"
+          aria-label={tAccessibility('openSidebar')}
           aria-expanded={sidebarOpen}
           className="flex items-center gap-2 flex-shrink-0 cursor-pointer p-1.5 -ml-1.5 rounded-xl hover:bg-app-surface-container-low transition-colors group text-left z-10"
           data-testid="top-logo-trigger"

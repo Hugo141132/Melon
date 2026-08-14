@@ -793,7 +793,9 @@ Translate:
 - table headings;
 - chart labels;
 - accessibility labels;
-- date and relative-time text.
+- audit log presentations.
+
+All user-facing UI text elements have been migrated to `next-intl` translation keys across all auth and protected views (`TASK-0603`). Mandatory initial gate and Settings UI selector belong to `TASK-0604`.
 
 ### 15.5 Content That Must Not Be Translated
 

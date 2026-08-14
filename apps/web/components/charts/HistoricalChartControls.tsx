@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { DateRangePreset, DomainType } from '@/hooks/useHistoricalMonitoring';
+import { useTranslations } from 'next-intl';
 
 export interface MetricOption {
   key: string;
@@ -22,27 +23,6 @@ export interface HistoricalChartControlsProps {
   dateRangeError?: string | null;
 }
 
-const SOIL_METRICS: MetricOption[] = [
-  { key: 'npk', label: 'NPK' },
-  { key: 'temperature', label: 'Suhu', unit: '°C' },
-  { key: 'moisture', label: 'Kelembapan', unit: '%' },
-  { key: 'ph', label: 'pH' },
-  { key: 'ec', label: 'EC', unit: 'µS/cm' },
-];
-
-const WATER_METRICS: MetricOption[] = [
-  { key: 'ec', label: 'EC', unit: 'µS/cm' },
-  { key: 'ph', label: 'pH' },
-  { key: 'tds', label: 'TDS', unit: 'ppm' },
-];
-
-const PRESETS: { key: DateRangePreset; label: string }[] = [
-  { key: '24h', label: '24 Jam' },
-  { key: '7d', label: '7 Hari' },
-  { key: '30d', label: '30 Hari' },
-  { key: 'custom', label: 'Kustom' },
-];
-
 export default function HistoricalChartControls({
   domain,
   selectedMetric,
@@ -55,7 +35,31 @@ export default function HistoricalChartControls({
   onCustomToChange,
   dateRangeError,
 }: HistoricalChartControlsProps) {
-  const metrics = domain === 'soil' ? SOIL_METRICS : WATER_METRICS;
+  const tHistory = useTranslations('history');
+  const tCommon = useTranslations('common');
+
+  const soilMetrics: MetricOption[] = [
+    { key: 'npk', label: 'NPK' },
+    { key: 'temperature', label: tHistory('temperature'), unit: '°C' },
+    { key: 'moisture', label: tHistory('moisture'), unit: '%' },
+    { key: 'ph', label: 'pH' },
+    { key: 'ec', label: 'EC', unit: 'µS/cm' },
+  ];
+
+  const waterMetrics: MetricOption[] = [
+    { key: 'ec', label: 'EC', unit: 'µS/cm' },
+    { key: 'ph', label: 'pH' },
+    { key: 'tds', label: 'TDS', unit: 'ppm' },
+  ];
+
+  const metrics = domain === 'soil' ? soilMetrics : waterMetrics;
+
+  const presets: { key: DateRangePreset; label: string }[] = [
+    { key: '24h', label: tHistory('preset24h') },
+    { key: '7d', label: tHistory('preset7d') },
+    { key: '30d', label: tHistory('preset30d') },
+    { key: 'custom', label: tHistory('customRange') },
+  ];
 
   return (
     <div className="space-y-3 mb-4">
@@ -84,7 +88,7 @@ export default function HistoricalChartControls({
 
         {/* Date Range Preset Pills */}
         <div className="flex items-center gap-1 bg-app-surface-container/60 p-1 rounded-lg">
-          {PRESETS.map((p) => {
+          {presets.map((p) => {
             const isActive = preset === p.key;
             return (
               <button
@@ -109,7 +113,7 @@ export default function HistoricalChartControls({
         <div className="bg-app-surface-container/30 p-3 rounded-lg flex flex-wrap items-center gap-3 text-[12px]">
           <div className="flex items-center gap-2">
             <label htmlFor="custom-from-input" className="text-app-on-surface-variant font-medium">
-              Dari:
+              {tCommon('from')}
             </label>
             <input
               id="custom-from-input"
@@ -121,7 +125,7 @@ export default function HistoricalChartControls({
           </div>
           <div className="flex items-center gap-2">
             <label htmlFor="custom-to-input" className="text-app-on-surface-variant font-medium">
-              Sampai:
+              {tCommon('to')}
             </label>
             <input
               id="custom-to-input"
@@ -132,7 +136,7 @@ export default function HistoricalChartControls({
             />
           </div>
           <span className="text-[11px] text-app-on-surface-variant">
-            (Maks. 31 hari per DEC-MON-087)
+            {tHistory('max31DaysNote')}
           </span>
         </div>
       )}

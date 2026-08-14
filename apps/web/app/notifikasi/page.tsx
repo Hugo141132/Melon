@@ -1,4 +1,5 @@
-import type { Metadata } from 'next';
+'use client';
+
 import TopAppBar from '@/components/navigation/TopAppBar';
 import { ALERTS, type Alert, type AlertSeverity } from '@/lib/constants';
 import {
@@ -10,17 +11,13 @@ import {
   CheckCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-export const metadata: Metadata = {
-  title: 'Notifikasi - Kebun Melon',
-  description: 'Peringatan dan notifikasi kondisi lahan melon Anda.',
-};
+import { useTranslations } from 'next-intl';
 
 const severityConfig: Record<
   AlertSeverity,
   {
     icon: LucideIcon;
-    label: string;
+    labelKey: 'critical' | 'warning' | 'info';
     bgColor: string;
     borderColor: string;
     iconColor: string;
@@ -30,7 +27,7 @@ const severityConfig: Record<
 > = {
   error: {
     icon: AlertCircle,
-    label: 'Kritis',
+    labelKey: 'critical',
     bgColor: 'bg-app-error/5',
     borderColor: 'border-app-error/30',
     iconColor: 'text-app-error',
@@ -39,7 +36,7 @@ const severityConfig: Record<
   },
   warning: {
     icon: AlertTriangle,
-    label: 'Peringatan',
+    labelKey: 'warning',
     bgColor: 'bg-yellow-50',
     borderColor: 'border-yellow-300/50',
     iconColor: 'text-yellow-600',
@@ -48,7 +45,7 @@ const severityConfig: Record<
   },
   info: {
     icon: Info,
-    label: 'Info',
+    labelKey: 'info',
     bgColor: 'bg-app-primary/5',
     borderColor: 'border-app-primary/20',
     iconColor: 'text-app-primary',
@@ -58,8 +55,29 @@ const severityConfig: Record<
 };
 
 function AlertCard({ alert }: { alert: Alert }) {
+  const tAlerts = useTranslations('alerts');
+  const tCommon = useTranslations('common');
+
   const cfg = severityConfig[alert.severity];
   const Icon = cfg.icon;
+
+  const severityLabel = tCommon(cfg.labelKey);
+
+  // Map mock alert IDs to translated titles
+  const getAlertTitle = (id: number, fallback: string) => {
+    switch (id) {
+      case 1:
+        return tAlerts('alertPhLowTitle');
+      case 2:
+        return tAlerts('alertNitrogenHighTitle');
+      case 3:
+        return tAlerts('alertPotassiumLowTitle');
+      case 4:
+        return tAlerts('alertWaterLevelLowTitle');
+      default:
+        return fallback;
+    }
+  };
 
   return (
     <div
@@ -93,23 +111,25 @@ function AlertCard({ alert }: { alert: Alert }) {
             cfg.chipText
           )}
         >
-          {cfg.label.toUpperCase()}
+          {severityLabel.toUpperCase()}
         </div>
 
         {/* Title */}
-        <h3 className="text-[14px] leading-5 font-bold text-app-on-surface mb-2">{alert.title}</h3>
+        <h3 className="text-[14px] leading-5 font-bold text-app-on-surface mb-2">
+          {getAlertTitle(alert.id, alert.title)}
+        </h3>
 
         {/* Values comparison */}
         <div className="grid grid-cols-2 gap-2">
           <div>
             <p className="text-[11px] text-app-on-surface-variant uppercase tracking-wide">
-              Saat Ini
+              {tAlerts('currentValue')}
             </p>
             <p className={cn('text-[18px] font-bold', cfg.iconColor)}>{alert.current}</p>
           </div>
           <div>
             <p className="text-[11px] text-app-on-surface-variant uppercase tracking-wide">
-              Range Optimal
+              {tAlerts('optimalRange')}
             </p>
             <p className="text-[18px] font-bold text-app-primary">{alert.optimal}</p>
           </div>
@@ -122,6 +142,7 @@ function AlertCard({ alert }: { alert: Alert }) {
 }
 
 export default function NotifikasiPage() {
+  const tAlerts = useTranslations('alerts');
   const errorCount = ALERTS.filter((a) => a.severity === 'error').length;
   const warningCount = ALERTS.filter((a) => a.severity === 'warning').length;
 
@@ -133,13 +154,15 @@ export default function NotifikasiPage() {
         {/* Header Summary */}
         <section className="flex items-center justify-between animate-fade-in">
           <div>
-            <h1 className="text-[24px] leading-8 font-bold text-app-on-surface">Notifikasi</h1>
+            <h1 className="text-[24px] leading-8 font-bold text-app-on-surface">
+              {tAlerts('title')}
+            </h1>
             <p className="text-[14px] text-app-on-surface-variant">
-              {errorCount} kritis · {warningCount} peringatan
+              {tAlerts('alertsSummary', { critical: errorCount, warning: warningCount })}
             </p>
           </div>
           <button className="text-[12px] font-semibold text-app-primary border border-app-primary/30 px-3 py-1.5 rounded-full hover:bg-app-primary/5 transition-colors cursor-pointer">
-            Tandai Semua Dibaca
+            {tAlerts('clearAll')}
           </button>
         </section>
 
@@ -147,12 +170,14 @@ export default function NotifikasiPage() {
         <div className="flex gap-2 flex-wrap animate-fade-in">
           <div className="flex items-center gap-1.5 bg-app-error/10 px-3 py-1.5 rounded-full">
             <AlertCircle size={14} className="text-app-error" />
-            <span className="text-[12px] font-semibold text-app-error">{errorCount} Kritis</span>
+            <span className="text-[12px] font-semibold text-app-error">
+              {tAlerts('criticalCount', { count: errorCount })}
+            </span>
           </div>
           <div className="flex items-center gap-1.5 bg-yellow-100 px-3 py-1.5 rounded-full">
             <AlertTriangle size={14} className="text-yellow-600" />
             <span className="text-[12px] font-semibold text-yellow-700">
-              {warningCount} Peringatan
+              {tAlerts('warningCount', { count: warningCount })}
             </span>
           </div>
         </div>
@@ -174,9 +199,9 @@ export default function NotifikasiPage() {
             </div>
             <div>
               <p className="text-[14px] font-bold text-app-on-surface">
-                3 Peringatan Terselesaikan
+                {tAlerts('resolvedAlerts', { count: 3 })}
               </p>
-              <p className="text-[12px] text-app-on-surface-variant">Dalam 24 jam terakhir</p>
+              <p className="text-[12px] text-app-on-surface-variant">{tAlerts('inLast24Hours')}</p>
             </div>
           </div>
         </section>

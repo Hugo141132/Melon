@@ -4,11 +4,17 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, Suspense } from 'react';
 import { Mail, Lock, Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectPath = searchParams.get('redirect') || '/';
+
+  const tAuth = useTranslations('auth');
+  const tCommon = useTranslations('common');
+  const tValidation = useTranslations('validation');
+  const tErrors = useTranslations('errors');
 
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -21,7 +27,7 @@ function LoginForm() {
     setErrorMessage('');
 
     if (!email || !password) {
-      setErrorMessage('Email dan password harus diisi.');
+      setErrorMessage(tValidation('emailAndPasswordRequired'));
       return;
     }
 
@@ -40,15 +46,15 @@ function LoginForm() {
           router.push('/status');
           return;
         }
-        setErrorMessage(json.error?.message || 'Gagal masuk. Periksa email dan kata sandi Anda.');
+        setErrorMessage(json.error?.message || tAuth('loginFailed'));
         setLoading(false);
         return;
       }
 
       router.push(redirectPath);
       router.refresh();
-    } catch (err: any) {
-      setErrorMessage('Terjadi kesalahan koneksi. Silakan coba lagi.');
+    } catch {
+      setErrorMessage(tErrors('networkError'));
       setLoading(false);
     }
   };
@@ -68,7 +74,7 @@ function LoginForm() {
           className="text-[14px] leading-[20px] font-semibold tracking-[0.05em] text-on-surface-variant uppercase block"
           htmlFor="email"
         >
-          Alamat Email
+          {tAuth('email')}
         </label>
         <div className="relative group">
           <Mail
@@ -92,7 +98,7 @@ function LoginForm() {
           className="text-[14px] leading-[20px] font-semibold tracking-[0.05em] text-on-surface-variant uppercase block"
           htmlFor="password"
         >
-          Kata Sandi
+          {tAuth('password')}
         </label>
         <div className="relative group">
           <Lock
@@ -111,7 +117,7 @@ function LoginForm() {
             className="absolute right-4 top-1/2 -translate-y-1/2 text-outline hover:text-secondary active:scale-90 transition-all cursor-pointer"
             onClick={() => setShowPassword(!showPassword)}
             type="button"
-            aria-label={showPassword ? 'Sembunyikan sandi' : 'Tampilkan sandi'}
+            aria-label={showPassword ? tAuth('hidePassword') : tAuth('showPassword')}
           >
             {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
           </button>
@@ -124,7 +130,7 @@ function LoginForm() {
           href="/forgot-password"
           className="text-[14px] leading-[20px] font-semibold tracking-[0.05em] text-secondary hover:underline underline-offset-4 decoration-2"
         >
-          Lupa Password?
+          {tAuth('forgotPassword')}
         </Link>
       </div>
 
@@ -138,10 +144,10 @@ function LoginForm() {
           {loading ? (
             <>
               <Loader2 size={20} className="animate-spin" />
-              <span className="text-[16px]">Memproses...</span>
+              <span className="text-[16px]">{tCommon('processing')}</span>
             </>
           ) : (
-            'Masuk'
+            tAuth('loginButton')
           )}
         </button>
       </div>
@@ -150,20 +156,23 @@ function LoginForm() {
 }
 
 export default function LoginPage() {
+  const tAuth = useTranslations('auth');
+  const tCommon = useTranslations('common');
+
   return (
     <div className="bg-surface text-on-surface min-h-dvh flex flex-col justify-center items-center p-[24px]">
       <main className="w-full max-w-md bg-surface-container-lowest bento-shape p-[32px] shadow-sm border border-outline-variant">
         {/* Header */}
         <header className="mb-[32px] text-center">
           <h1 className="text-[32px] leading-[40px] font-bold tracking-[-0.01em] text-primary mb-2 md:text-[32px] text-[24px]">
-            Masuk ke Kebun Melon
+            {tAuth('loginHeading')}
           </h1>
           <p className="text-[16px] leading-[24px] text-on-surface-variant">
-            Kelola lahan melon Anda dengan lebih mudah
+            {tAuth('loginSubtitle')}
           </p>
         </header>
 
-        <Suspense fallback={<div className="text-center py-8">Memuat form...</div>}>
+        <Suspense fallback={<div className="text-center py-8">{tCommon('loading')}</div>}>
           <LoginForm />
         </Suspense>
       </main>
@@ -171,9 +180,9 @@ export default function LoginPage() {
       {/* Footer */}
       <footer className="mt-[32px] text-center">
         <p className="text-[16px] leading-[24px] text-on-surface-variant">
-          Belum punya akun?{' '}
+          {tAuth('noAccount')}{' '}
           <Link href="/register" className="text-secondary font-bold hover:underline">
-            Daftar Lahan Baru
+            {tAuth('registerLand')}
           </Link>
         </p>
       </footer>

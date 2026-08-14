@@ -4,9 +4,11 @@ import React, { useState, useEffect } from 'react';
 import TopAppBar from '@/components/navigation/TopAppBar';
 import { DASHBOARD_DATA, ALERTS } from '@/lib/constants';
 import { Sun } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 
 // ─── Health Score Half Gauge ────────────────────────────
 function HealthScoreGauge({ score }: { score: number }) {
+  const tDash = useTranslations('dashboard');
   const angle = -135 + (score / 100) * 270;
   return (
     <div className="flex flex-col items-center">
@@ -21,13 +23,14 @@ function HealthScoreGauge({ score }: { score: number }) {
         </div>
       </div>
       <span className="text-[14px] leading-5 font-semibold text-app-primary">
-        {DASHBOARD_DATA.healthLabel}
+        {tDash('healthExcellent')}
       </span>
     </div>
   );
 }
 
 export default function DashboardPage() {
+  const tDash = useTranslations('dashboard');
   const criticalCount = ALERTS.filter((a) => a.severity === 'error').length;
   const [userName, setUserName] = useState<string>('');
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -64,14 +67,14 @@ export default function DashboardPage() {
               <div className="flex items-center gap-2 mb-1">
                 <div className="w-2 h-2 rounded-full bg-app-primary animate-pulse" />
                 <span className="text-[12px] leading-4 font-semibold text-app-primary">
-                  Sistem Real-Time
+                  {tDash('realtimeSystem')}
                 </span>
               </div>
               <h2 className="text-[20px] leading-7 font-bold text-app-on-surface mb-1">
-                Selamat Pagi{userName ? `, ${userName}` : ''} 👋
+                {tDash('greeting', { name: userName ? `, ${userName}` : '' })} 👋
               </h2>
               <p className="text-[16px] leading-6 text-app-on-surface-variant">
-                {DASHBOARD_DATA.subtitle}
+                {tDash('farmConditionOptimal')}
               </p>
             </div>
 
@@ -83,12 +86,10 @@ export default function DashboardPage() {
         <section className="bg-app-primary text-white rounded-2xl p-5 flex items-center justify-between soft-elevation-lg animate-fade-in">
           <div>
             <p className="text-[12px] leading-4 font-medium opacity-80 mb-1">
-              Kondisi Cuaca Lingkungan
+              {tDash('weatherTitle')}
             </p>
-            <h3 className="text-[20px] leading-7 font-bold mb-1">
-              {DASHBOARD_DATA.weather.condition}
-            </h3>
-            <p className="text-[14px] leading-5 opacity-80">{DASHBOARD_DATA.weather.note}</p>
+            <h3 className="text-[20px] leading-7 font-bold mb-1">{tDash('weatherCondition')}</h3>
+            <p className="text-[14px] leading-5 opacity-80">{tDash('weatherNote')}</p>
           </div>
           <div className="text-right">
             <div className="text-[40px] leading-none font-bold mb-1">

@@ -150,4 +150,64 @@ describe('TASK-0602: Translation Namespaces and Key Parity', () => {
     expect(idMessages.faucet.phase1Volume).toContain('mL');
     expect(enMessages.faucet.phase1Volume).toContain('mL');
   });
+
+  it('should ensure all translation keys referenced in frontend code exist in translation dictionaries', () => {
+    const fs = require('fs');
+    const path = require('path');
+
+    function getFiles(dir: string): string[] {
+      const subdirs = fs.readdirSync(dir);
+      const files = subdirs.map((subdir: string) => {
+        const res = path.resolve(dir, subdir);
+        return fs.statSync(res).isDirectory() ? getFiles(res) : res;
+      });
+      return files.reduce((acc: string[], val: string[]) => acc.concat(val), []);
+    }
+
+    const appDir = path.resolve(__dirname, '../../app');
+    const componentsDir = path.resolve(__dirname, '../../components');
+
+    const tsxFiles = [...getFiles(appDir), ...getFiles(componentsDir)].filter((f) =>
+      /\.(tsx|ts)$/.test(f)
+    );
+
+    const missingKeys: string[] = [];
+
+    for (const filePath of tsxFiles) {
+      const content = fs.readFileSync(filePath, 'utf-8');
+
+      // Match hook usage: const t = useTranslations('auth') or const tAuth = useTranslations('auth')
+      const hookMatches = [
+        ...content.matchAll(
+          /const\s+([a-zA-Z0-9_]+)\s*=\s*useTranslations\(\s*['"]([a-zA-Z0-9_]+)['"]\s*\)/g
+        ),
+      ];
+
+      for (const match of hookMatches) {
+        const varName = match[1];
+        const namespace = match[2];
+
+        // Match call usage: varName('keyName' or varName('keyName', { ... })
+        const keyRegex = new RegExp(`\\b${varName}\\(\\s*['"]([a-zA-Z0-9_.]+)['"]`, 'g');
+        const keyMatches = [...content.matchAll(keyRegex)];
+
+        for (const kMatch of keyMatches) {
+          const key = kMatch[1];
+          const fullPath = `${namespace}.${key}`;
+          const idVal = getValueByPath(idMessages as Record<string, unknown>, fullPath);
+
+          if (idVal === undefined) {
+            missingKeys.push(
+              `${fullPath} referenced in ${path.relative(path.resolve(__dirname, '../..'), filePath)}`
+            );
+          }
+        }
+      }
+    }
+
+    expect(
+      missingKeys,
+      `Referenced translation keys missing in dictionary: \n${missingKeys.join('\n')}`
+    ).toEqual([]);
+  });
 });

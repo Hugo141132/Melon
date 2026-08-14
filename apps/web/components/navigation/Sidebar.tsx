@@ -16,6 +16,7 @@ import {
   MapPin,
   ChevronRight,
 } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 
 export interface SidebarProps {
@@ -28,14 +29,14 @@ export interface SidebarProps {
 }
 
 export const SIDEBAR_NAV_ITEMS = [
-  { href: '/', label: 'Beranda', icon: Home },
-  { href: '/sensor', label: 'Sensor', icon: Radio },
-  { href: '/notifikasi', label: 'Notifikasi', icon: Bell },
-  { href: '/devices', label: 'Manajemen Perangkat', icon: Cpu },
-  { href: '/users', label: 'Manajemen Pengguna', icon: Users, roleRequired: 'OWNER' },
-  { href: '/approvals', label: 'Persetujuan Admin', icon: ShieldCheck, roleRequired: 'OWNER' },
-  { href: '/pengaturan', label: 'Pengaturan', icon: Settings },
-  { href: '/profil', label: 'Profil Saya', icon: User },
+  { href: '/', key: 'home', icon: Home },
+  { href: '/sensor', key: 'sensor', icon: Radio },
+  { href: '/notifikasi', key: 'alerts', icon: Bell },
+  { href: '/devices', key: 'devices', icon: Cpu },
+  { href: '/users', key: 'users', icon: Users, roleRequired: 'OWNER' },
+  { href: '/approvals', key: 'approvals', icon: ShieldCheck, roleRequired: 'OWNER' },
+  { href: '/pengaturan', key: 'settings', icon: Settings },
+  { href: '/profil', key: 'profile', icon: User },
 ];
 
 export default function Sidebar({
@@ -47,12 +48,15 @@ export default function Sidebar({
   userName,
 }: SidebarProps) {
   const pathname = usePathname();
+  const tNav = useTranslations('navigation');
+  const tCommon = useTranslations('common');
+
   const displayName = userName ? userName.trim().replace(/^pak\s+/i, '') : '';
-  const headerTitle = displayName || 'Pengguna';
+  const headerTitle = displayName || tCommon('user');
 
   return (
     <aside
-      aria-label="Navigasi Utama"
+      aria-label={tNav('mainNavigation')}
       role="navigation"
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
@@ -85,7 +89,7 @@ export default function Sidebar({
             type="button"
             onClick={onClose}
             className="p-1.5 text-app-on-surface-variant hover:text-app-on-surface rounded-xl hover:bg-app-surface-container transition-colors cursor-pointer flex-shrink-0"
-            aria-label="Tutup navigasi sidebar"
+            aria-label={tNav('closeSidebar')}
           >
             <X size={18} />
           </button>
@@ -127,7 +131,7 @@ export default function Sidebar({
                         : 'text-app-on-surface-variant group-hover:text-app-primary'
                     )}
                   />
-                  <span>{item.label}</span>
+                  <span>{tNav(item.key as any)}</span>
                 </div>
                 <ChevronRight
                   size={14}

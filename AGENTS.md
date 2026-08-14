@@ -283,6 +283,17 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
 - 21st.dev MCP: `NOT REQUIRED`
 - Summary: Created all 17 approved translation namespaces (`common`, `auth`, `navigation`, `dashboard`, `devices`, `soil`, `water`, `history`, `faucet`, `alerts`, `users`, `approvals`, `profile`, `settings`, `validation`, `errors`, `accessibility`) across `apps/web/messages/id.json` and `apps/web/messages/en.json` while preserving TASK-0601 `system` infrastructure. Enforced 100% key parity, real non-empty strings, and identical ICU placeholders (`{time}`, `{count}`, `{volume}`, `{name}`, `{metric}`, `{message}`, `{deviceId}`, `{deviceName}`). Preserved technical abbreviations (`N`, `P`, `K`, `pH`, `EC`, `TDS`, `ESP32`, `NodeMCU`, `MQTT`, `API`, `RBAC`, `mL`, `L`, `°C`, `%`) untranslated and omitted `BAT` parameter per `DEC-MON-086`. Added targeted unit test suite (`apps/web/test/unit/i18n-namespaces.test.ts`) passing 7/7 tests. User manually executed and verified reserved pre-commit suite (`npm run check:quality`). Hard-coded component UI text replacement remains TASK-0603; language gate and settings UI selector belong to TASK-0604.
 
+#### TASK-0603 Governance Record
+
+`TASK-0603` hard-coded UI text replacement record:
+- Status: `DONE` (Completed 2026-08-14)
+- Frontend impact: `MINOR`
+- Selected UI direction: `Premium Minimal Ops`
+- Existing color template: `UNCHANGED`
+- Selected motion effects: `None`
+- 21st.dev MCP: `NOT REQUIRED`
+- Summary: Replaced hard-coded user-facing text across all authentication pages, protected dashboard and sensor views (`/`, `/sensor`, `/soil`, `/water`, `/controls`, `/devices`, `/users`, `/approvals`, `/pengaturan`, `/profil`, `/notifikasi`), historical charts (`NPKChart`, `WaterNutrientChart`, `HistoricalChartControls`), faucet control components, and shell navigation (`Sidebar`, `TopAppBar`, `DeviceSelector`) using `next-intl` translation hooks. Preserved 100% key parity across `messages/id.json` and `messages/en.json` with matching ICU placeholders. Preserved canonical internal API/DB/MQTT values, hardware names, raw measurement numbers, and units (`N`, `P`, `K`, `pH`, `EC`, `TDS`, `ESP32`, `NodeMCU`, `MQTT`, `mL`, `L`, `m³/h`, `ppm`, `µS/cm`). Preserved `BAT` parameter omission per `DEC-MON-086`. Verified 100% test pass rate across 15 targeted unit test suites (107/107 tests), TypeScript typecheck (`tsc --noEmit` 0 errors), Next.js production build (`31/31` static pages), Playwright browser verification on `/login` and `/register`, and verified user-reported completion of all 5 reserved pre-commit checks (`test:coverage`, `test:integration`, `check:quality`, `test`, `test:e2e`). Initial language gate and settings UI switcher belong to `TASK-0604`.
+
 ---
 
 ## 5. Task Selection Rules

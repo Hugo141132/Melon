@@ -17,6 +17,7 @@ import {
   CheckCircle2,
   Sliders,
 } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { cn, formatDeviceDisplayName } from '@/lib/utils';
 
 // Helper to format numeric values nicely or return placeholder
@@ -26,18 +27,21 @@ function formatMetricValue(val: number | null | undefined, decimals = 1, fallbac
 }
 
 // Format timestamp cleanly into Indonesian format
-function formatTimestamp(isoString: string | null | undefined): string {
-  if (!isoString) return 'Belum ada data';
+function formatTimestamp(
+  isoString: string | null | undefined,
+  fallbackText = 'Belum ada data'
+): string {
+  if (!isoString) return fallbackText;
   try {
     const date = new Date(isoString);
-    if (isNaN(date.getTime())) return 'Belum ada data';
+    if (isNaN(date.getTime())) return fallbackText;
     return date.toLocaleTimeString('id-ID', {
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',
     });
   } catch {
-    return 'Belum ada data';
+    return fallbackText;
   }
 }
 
@@ -118,6 +122,9 @@ interface SoilSectionProps {
 }
 
 function SoilMonitoringSection({ data, recordedAt }: SoilSectionProps) {
+  const tSoil = useTranslations('soil');
+  const tCommon = useTranslations('common');
+
   return (
     <section className="bg-app-surface-container-lowest rounded-2xl p-5 border border-app-outline-variant/30 soft-elevation-lg space-y-4">
       <div className="flex items-center justify-between pb-3 border-b border-app-outline-variant/20">
@@ -127,10 +134,12 @@ function SoilMonitoringSection({ data, recordedAt }: SoilSectionProps) {
           </div>
           <div>
             <h3 className="text-[16px] leading-6 font-bold text-app-on-surface">
-              Pemantauan Tanah (SOIL)
+              {tSoil('soilMonitoringTitle')}
             </h3>
             <p className="text-[12px] leading-4 text-app-on-surface-variant">
-              Tercatat: {formatTimestamp(recordedAt)}
+              {tCommon('recordedAt', {
+                time: formatTimestamp(recordedAt, tCommon('noDataAvailable')),
+              })}
             </p>
           </div>
         </div>
@@ -144,25 +153,31 @@ function SoilMonitoringSection({ data, recordedAt }: SoilSectionProps) {
       {/* NPK Summary */}
       <div className="bg-app-surface-container-low/50 rounded-xl p-4 border border-app-outline-variant/20">
         <p className="text-[12px] font-semibold text-app-on-surface-variant mb-2">
-          HARA UTAMA (NPK)
+          {tSoil('mainNutrients')}
         </p>
         <div className="grid grid-cols-3 gap-3">
           <div className="text-center p-2 rounded-lg bg-emerald-500/10">
-            <span className="text-[11px] font-bold text-emerald-700 block">Nitrogen (N)</span>
+            <span className="text-[11px] font-bold text-emerald-700 block">
+              {tSoil('nitrogen')} (N)
+            </span>
             <span className="text-[18px] font-bold text-app-on-surface">
               {formatMetricValue(data.nitrogen, 0)}
             </span>
             <span className="text-[10px] text-app-on-surface-variant block">mg/kg</span>
           </div>
           <div className="text-center p-2 rounded-lg bg-amber-500/10">
-            <span className="text-[11px] font-bold text-amber-700 block">Fosfor (P)</span>
+            <span className="text-[11px] font-bold text-amber-700 block">
+              {tSoil('phosphorus')} (P)
+            </span>
             <span className="text-[18px] font-bold text-app-on-surface">
               {formatMetricValue(data.phosphorus, 0)}
             </span>
             <span className="text-[10px] text-app-on-surface-variant block">mg/kg</span>
           </div>
           <div className="text-center p-2 rounded-lg bg-lime-500/10">
-            <span className="text-[11px] font-bold text-lime-700 block">Kalium (K)</span>
+            <span className="text-[11px] font-bold text-lime-700 block">
+              {tSoil('potassium')} (K)
+            </span>
             <span className="text-[18px] font-bold text-app-on-surface">
               {formatMetricValue(data.potassium, 0)}
             </span>
@@ -174,24 +189,24 @@ function SoilMonitoringSection({ data, recordedAt }: SoilSectionProps) {
       {/* Environmental & Chemical Soil Parameters */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <MetricItem
-          label="Suhu Tanah"
+          label={tSoil('temperature')}
           value={formatMetricValue(data.temperature, 1)}
           unit="°C"
           icon={<Thermometer size={16} />}
         />
         <MetricItem
-          label="Kelembapan"
+          label={tSoil('moisture')}
           value={formatMetricValue(data.moisture, 1)}
           unit="%"
           icon={<Droplets size={16} />}
         />
         <MetricItem
-          label="pH Tanah"
+          label={tSoil('ph')}
           value={formatMetricValue(data.ph, 2)}
           icon={<Activity size={16} />}
         />
         <MetricItem
-          label="Konduktivitas (EC)"
+          label={`${tSoil('ec')} (${tSoil('status')})`}
           value={formatMetricValue(data.ec, 2)}
           unit="mS/cm"
           icon={<Gauge size={16} />}
@@ -213,6 +228,9 @@ interface WaterQualitySectionProps {
 }
 
 function WaterQualitySection({ data, recordedAt }: WaterQualitySectionProps) {
+  const tWater = useTranslations('water');
+  const tCommon = useTranslations('common');
+
   return (
     <section className="bg-app-surface-container-lowest rounded-2xl p-5 border border-app-outline-variant/30 soft-elevation-lg space-y-4">
       <div className="flex items-center justify-between pb-3 border-b border-app-outline-variant/20">
@@ -222,10 +240,12 @@ function WaterQualitySection({ data, recordedAt }: WaterQualitySectionProps) {
           </div>
           <div>
             <h3 className="text-[16px] leading-6 font-bold text-app-on-surface">
-              Kualitas Air Irigasi
+              {tWater('irrigationWaterQuality')}
             </h3>
             <p className="text-[12px] leading-4 text-app-on-surface-variant">
-              Tercatat: {formatTimestamp(recordedAt)}
+              {tCommon('recordedAt', {
+                time: formatTimestamp(recordedAt, tCommon('noDataAvailable')),
+              })}
             </p>
           </div>
         </div>
@@ -238,18 +258,18 @@ function WaterQualitySection({ data, recordedAt }: WaterQualitySectionProps) {
 
       <div className="grid grid-cols-3 gap-3">
         <MetricItem
-          label="pH Air"
+          label={tWater('ph')}
           value={formatMetricValue(data.ph, 2)}
           icon={<Activity size={16} />}
         />
         <MetricItem
-          label="TDS Air"
+          label={tWater('tds')}
           value={formatMetricValue(data.tds, 0)}
           unit="ppm"
           icon={<Sliders size={16} />}
         />
         <MetricItem
-          label="Konduktivitas (EC)"
+          label={tWater('ec')}
           value={formatMetricValue(data.ec, 2)}
           unit="mS/cm"
           icon={<Gauge size={16} />}
@@ -270,6 +290,9 @@ interface WaterTankSectionProps {
 }
 
 function WaterTankSection({ data, recordedAt }: WaterTankSectionProps) {
+  const tWater = useTranslations('water');
+  const tCommon = useTranslations('common');
+
   return (
     <section className="bg-app-surface-container-lowest rounded-2xl p-5 border border-app-outline-variant/30 soft-elevation-lg space-y-4">
       <div className="flex items-center justify-between pb-3 border-b border-app-outline-variant/20">
@@ -279,10 +302,12 @@ function WaterTankSection({ data, recordedAt }: WaterTankSectionProps) {
           </div>
           <div>
             <h3 className="text-[16px] leading-6 font-bold text-app-on-surface">
-              Pemantauan Tangki Air
+              {tWater('waterTankMonitoringTitle')}
             </h3>
             <p className="text-[12px] leading-4 text-app-on-surface-variant">
-              Tercatat: {formatTimestamp(recordedAt)}
+              {tCommon('recordedAt', {
+                time: formatTimestamp(recordedAt, tCommon('noDataAvailable')),
+              })}
             </p>
           </div>
         </div>
@@ -295,13 +320,13 @@ function WaterTankSection({ data, recordedAt }: WaterTankSectionProps) {
 
       <div className="grid grid-cols-2 gap-3">
         <MetricItem
-          label="Volume Air Tangki"
+          label={tWater('tankVolume')}
           value={formatMetricValue(data.tankVolume, 1)}
           unit="L"
           icon={<Database size={16} />}
         />
         <MetricItem
-          label="Laju Aliran Air"
+          label={tWater('flowRate')}
           value={formatMetricValue(data.flowRate, 1)}
           unit="m³/h"
           icon={<Activity size={16} />}
@@ -313,6 +338,10 @@ function WaterTankSection({ data, recordedAt }: WaterTankSectionProps) {
 
 // ─── Main Monitoring Dashboard Component ──────────────────
 export default function MonitoringDashboard() {
+  const tDashboard = useTranslations('dashboard');
+  const tDevices = useTranslations('devices');
+  const tCommon = useTranslations('common');
+
   const { selectedDevice, isLoading: isDeviceLoading } = useDeviceContext();
   const {
     snapshot,
@@ -334,11 +363,10 @@ export default function MonitoringDashboard() {
           <Sprout size={24} />
         </div>
         <h3 className="text-[18px] font-bold text-app-on-surface mb-1">
-          Tidak Ada Perangkat Dipilih
+          {tDevices('noDeviceSelectedTitle')}
         </h3>
         <p className="text-[14px] text-app-on-surface-variant max-w-sm mx-auto">
-          Silakan pilih perangkat pada bagian pemilih perangkat di atas untuk melihat data
-          pemantauan real-time.
+          {tDevices('noDeviceSelectedDesc')}
         </p>
       </div>
     );
@@ -356,14 +384,16 @@ export default function MonitoringDashboard() {
         <div className="w-12 h-12 rounded-full bg-app-error/10 flex items-center justify-center text-app-error mx-auto">
           <AlertTriangle size={24} />
         </div>
-        <h3 className="text-[16px] font-bold text-app-error">Gagal Memuat Data Pemantauan</h3>
+        <h3 className="text-[16px] font-bold text-app-error">
+          {tDashboard('loadMonitoringFailed')}
+        </h3>
         <p className="text-[13px] text-app-on-surface-variant max-w-md mx-auto">{error}</p>
         <button
           onClick={() => refetch()}
           className="inline-flex items-center gap-2 bg-app-primary text-white text-[13px] font-semibold px-4 py-2 rounded-xl hover:bg-app-primary/90 transition-colors shadow-sm cursor-pointer"
         >
           <RefreshCw size={14} className={isRevalidating ? 'animate-spin' : ''} />
-          Coba Lagi
+          {tCommon('retry')}
         </button>
       </div>
     );
@@ -413,8 +443,11 @@ export default function MonitoringDashboard() {
             </div>
             <p className="text-[12px] text-app-on-surface-variant flex items-center gap-1 mt-0.5">
               <Clock size={13} />
-              Terakhir Terlihat:{' '}
-              {formatTimestamp(snapshot?.lastSeenAt || selectedDevice?.lastSeenAt)}
+              {tDevices('lastSeen')}:{' '}
+              {formatTimestamp(
+                snapshot?.lastSeenAt || selectedDevice?.lastSeenAt,
+                tCommon('noDataAvailable')
+              )}
             </p>
           </div>
         </div>
@@ -423,24 +456,24 @@ export default function MonitoringDashboard() {
         <div className="flex items-center gap-2">
           {isOffline && (
             <span className="inline-flex items-center gap-1 text-[12px] font-semibold px-3 py-1 rounded-full bg-rose-500/10 text-rose-700">
-              <WifiOff size={14} /> Terputus (Offline)
+              <WifiOff size={14} /> {tDevices('offlineStatus')}
             </span>
           )}
           {isStaleStatus && !isOffline && (
             <span className="inline-flex items-center gap-1 text-[12px] font-semibold px-3 py-1 rounded-full bg-amber-500/10 text-amber-700">
-              <AlertTriangle size={14} /> Data Usang (Stale)
+              <AlertTriangle size={14} /> {tDevices('staleStatus')}
             </span>
           )}
           {isOnline && !isStaleStatus && (
             <span className="inline-flex items-center gap-1 text-[12px] font-semibold px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-700">
-              <CheckCircle2 size={14} /> Terhubung (Online)
+              <CheckCircle2 size={14} /> {tDevices('onlineStatus')}
             </span>
           )}
 
           <button
             onClick={() => refetch()}
             disabled={isRevalidating}
-            title="Perbarui Data"
+            title={tCommon('refresh')}
             className="p-2 rounded-xl border border-app-outline-variant/30 text-app-on-surface-variant hover:bg-app-surface-container-low transition-colors cursor-pointer"
           >
             <RefreshCw size={16} className={isRevalidating ? 'animate-spin' : ''} />
@@ -453,8 +486,7 @@ export default function MonitoringDashboard() {
         <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-center gap-3">
           <AlertTriangle size={20} className="text-amber-600 flex-shrink-0" />
           <p className="text-[13px] leading-5 text-amber-800 font-medium">
-            Perhatian: Data pemantauan saat ini tidak diperbarui secara real-time. Perangkat sedang
-            stale atau terputus.
+            {tDashboard('staleWarningNotice')}
           </p>
         </div>
       )}
@@ -466,10 +498,10 @@ export default function MonitoringDashboard() {
             <Database size={24} />
           </div>
           <h3 className="text-[16px] font-bold text-app-on-surface mb-1">
-            Belum Ada Data Pemantauan
+            {tDashboard('noMonitoringData')}
           </h3>
           <p className="text-[13px] text-app-on-surface-variant max-w-sm mx-auto">
-            Perangkat {selectedDevice?.deviceName} belum pernah mengirimkan data pemantauan.
+            {tDashboard('deviceNeverSentData', { deviceName: selectedDevice?.deviceName })}
           </p>
         </div>
       )}

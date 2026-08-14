@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, Droplets, AlertTriangle, Loader2, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { AuthorisedDevice } from '@/context/DeviceContext';
 
 export interface FaucetConfirmationModalProps {
@@ -25,6 +26,10 @@ export default function FaucetConfirmationModal({
   isSubmitting = false,
   errorMsg = null,
 }: FaucetConfirmationModalProps) {
+  const tFaucet = useTranslations('faucet');
+  const tDevices = useTranslations('devices');
+  const tCommon = useTranslations('common');
+
   const [customKey, setCustomKey] = useState('');
 
   // Generate fresh idempotency key when modal opens
@@ -57,8 +62,10 @@ export default function FaucetConfirmationModal({
               <Droplets size={20} />
             </div>
             <div>
-              <h3 className="text-[17px] font-bold text-app-primary">Konfirmasi Penyiraman</h3>
-              <p className="text-[11px] text-app-on-surface-variant">Tindakan fisik kran air</p>
+              <h3 className="text-[17px] font-bold text-app-primary">{tFaucet('confirmTitle')}</h3>
+              <p className="text-[11px] text-app-on-surface-variant">
+                {tFaucet('physicalActionNote')}
+              </p>
             </div>
           </div>
           <button
@@ -66,7 +73,7 @@ export default function FaucetConfirmationModal({
             onClick={onClose}
             disabled={isSubmitting}
             className="text-app-outline hover:text-app-on-surface p-1 rounded-lg transition-colors cursor-pointer"
-            aria-label="Tutup modal"
+            aria-label={tCommon('close')}
           >
             <X size={20} />
           </button>
@@ -86,17 +93,16 @@ export default function FaucetConfirmationModal({
         {/* Primary Confirmation Prompt */}
         <div className="p-4 bg-app-primary/5 rounded-xl border border-app-primary/20 space-y-3">
           <p className="text-[14px] font-bold text-app-on-surface leading-snug">
-            Konfirmasi penyiraman{' '}
-            <span className="text-app-primary text-[16px] underline decoration-app-primary/40">
-              {volumeMl.toLocaleString('id-ID')} mL
-            </span>{' '}
-            dari perangkat <span className="text-app-primary">{selectedDevice.deviceName}</span>.
+            {tFaucet('confirmPrompt', {
+              volume: volumeMl.toLocaleString('id-ID'),
+              deviceName: selectedDevice.deviceName,
+            })}
           </p>
 
           <div className="grid grid-cols-2 gap-2 pt-2 border-t border-app-primary/10 text-xs">
             <div>
               <span className="text-app-on-surface-variant block text-[10px] uppercase font-bold">
-                Perangkat:
+                {tDevices('deviceName')}:
               </span>
               <span className="font-semibold text-app-on-surface truncate block">
                 {selectedDevice.deviceName}
@@ -105,25 +111,25 @@ export default function FaucetConfirmationModal({
 
             <div>
               <span className="text-app-on-surface-variant block text-[10px] uppercase font-bold">
-                Lokasi Lahan / Site:
+                {tDevices('siteLocation')}:
               </span>
               <span className="font-semibold text-app-on-surface">
-                {selectedDevice.siteName || 'Kebun Melon Utama'}
+                {selectedDevice.siteName || tDevices('mainSiteDefault')}
               </span>
             </div>
 
             <div>
               <span className="text-app-on-surface-variant block text-[10px] uppercase font-bold">
-                Fase Presets:
+                {tFaucet('preset')}:
               </span>
               <span className="font-bold text-app-primary">
-                Fase {phase} ({volumeMl} mL)
+                {tFaucet('phaseVolumeLabel', { phase, volume: volumeMl })}
               </span>
             </div>
 
             <div>
               <span className="text-app-on-surface-variant block text-[10px] uppercase font-bold">
-                Status Koneksi:
+                {tDevices('connectionStatus')}:
               </span>
               <span className="inline-flex items-center gap-1 font-semibold text-emerald-600">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -138,12 +144,9 @@ export default function FaucetConfirmationModal({
           <div className="p-3 bg-app-surface-container rounded-xl text-[11px] text-app-on-surface-variant space-y-1">
             <div className="flex items-center gap-1.5 font-bold text-app-on-surface">
               <ShieldCheck size={14} className="text-app-primary" />
-              <span>Keamanan Perintah Otomatis</span>
+              <span>{tFaucet('automaticSafetyTitle')}</span>
             </div>
-            <p>
-              Perintah akan dicatat secara permanen di database backend sebelum dikirimkan melalui
-              IoT Gateway.
-            </p>
+            <p>{tFaucet('automaticSafetyDesc')}</p>
           </div>
 
           {/* Form Actions */}
@@ -154,7 +157,7 @@ export default function FaucetConfirmationModal({
               disabled={isSubmitting}
               className="px-4 py-2.5 rounded-xl text-xs font-semibold text-app-on-surface-variant hover:bg-app-surface-container transition-colors disabled:opacity-50 cursor-pointer"
             >
-              Batal
+              {tCommon('cancel')}
             </button>
             <button
               type="submit"
@@ -165,12 +168,12 @@ export default function FaucetConfirmationModal({
               {isSubmitting ? (
                 <>
                   <Loader2 size={16} className="animate-spin" />
-                  <span>Mengirim Perintah...</span>
+                  <span>{tCommon('processing')}</span>
                 </>
               ) : (
                 <>
                   <CheckCircle2 size={16} />
-                  <span>Kirimkan Perintah ({volumeMl} mL)</span>
+                  <span>{tFaucet('sendBatchCommand', { volume: volumeMl })}</span>
                 </>
               )}
             </button>

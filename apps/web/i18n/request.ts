@@ -7,17 +7,24 @@ import {
   isSupportedLocale,
 } from '../lib/i18n/config';
 
-export default getRequestConfig(async () => {
-  const store = await cookies();
-  const rawCookie = store.get(LOCALE_COOKIE_NAME)?.value;
-  const locale = isSupportedLocale(rawCookie) ? rawCookie : DEFAULT_LOCALE;
+import idMessages from '../messages/id.json';
+import enMessages from '../messages/en.json';
 
-  let messages;
+const MESSAGES = {
+  id: idMessages,
+  en: enMessages,
+};
+
+export default getRequestConfig(async () => {
+  let rawCookie: string | undefined;
   try {
-    messages = (await import(`../messages/${locale}.json`)).default;
+    const store = await cookies();
+    rawCookie = store.get(LOCALE_COOKIE_NAME)?.value;
   } catch {
-    messages = (await import(`../messages/${FALLBACK_LOCALE}.json`)).default;
+    // Fallback to default locale during static page prerendering at build time
   }
+  const locale = isSupportedLocale(rawCookie) ? rawCookie : DEFAULT_LOCALE;
+  const messages = MESSAGES[locale] || MESSAGES[FALLBACK_LOCALE];
 
   return {
     locale,

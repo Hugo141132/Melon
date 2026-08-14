@@ -15,6 +15,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { USER_PROFILE } from '@/lib/constants';
+import { useTranslations } from 'next-intl';
 
 interface UserProfileState {
   id: string;
@@ -26,6 +27,9 @@ interface UserProfileState {
 }
 
 export default function ProfilPage() {
+  const tProfile = useTranslations('profile');
+  const tCommon = useTranslations('common');
+
   const [profile, setProfile] = useState<UserProfileState | null>(null);
   const [fullName, setFullName] = useState('');
   const [username, setUsername] = useState('');
@@ -188,7 +192,7 @@ export default function ProfilPage() {
             >
               <ArrowLeft size={22} className="text-app-on-surface" />
             </Link>
-            <h1 className="text-[20px] font-bold text-app-on-surface">Profil &amp; Keamanan</h1>
+            <h1 className="text-[20px] font-bold text-app-on-surface">{tProfile('title')}</h1>
           </div>
           <button className="active:scale-95 transition-transform p-2 cursor-pointer">
             <MoreVertical size={22} className="text-app-primary" />
@@ -235,11 +239,11 @@ export default function ProfilPage() {
             {/* Nama Lengkap (Editable) */}
             <div className="space-y-2">
               <label className="text-[14px] font-semibold text-app-on-surface-variant px-1 block">
-                Nama Lengkap
+                {tProfile('fullName')}
               </label>
               <input
                 className="w-full h-[56px] px-4 bg-white border-[1.5px] border-app-outline-variant rounded-xl focus:border-app-primary focus:ring-1 focus:ring-app-primary outline-none transition-all text-[16px]"
-                placeholder="Nama Lengkap"
+                placeholder={tProfile('fullName')}
                 type="text"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
@@ -250,7 +254,7 @@ export default function ProfilPage() {
             {/* Email (Read-Only) */}
             <div className="space-y-2">
               <label className="text-[14px] font-semibold text-app-on-surface-variant px-1 block">
-                Email (Terdaftar)
+                {tProfile('email')}
               </label>
               <input
                 className="w-full h-[56px] px-4 bg-app-surface-container-low border-[1.5px] border-app-outline-variant rounded-xl text-app-on-surface-variant outline-none cursor-not-allowed text-[16px]"
@@ -279,7 +283,9 @@ export default function ProfilPage() {
 
         {/* Section 2: Security */}
         <section className="space-y-[1rem]">
-          <h2 className="text-[20px] font-semibold text-app-on-surface px-1">Keamanan Akun</h2>
+          <h2 className="text-[20px] font-semibold text-app-on-surface px-1">
+            {tProfile('securityTitle')}
+          </h2>
           <div className="bg-white rounded-2xl soft-elevation overflow-hidden divide-y divide-app-surface-container">
             {/* Password */}
             <button className="w-full flex items-center justify-between p-4 active:bg-app-surface-container transition-colors text-left group cursor-pointer">
@@ -288,7 +294,9 @@ export default function ProfilPage() {
                   <Lock size={18} />
                 </div>
                 <div>
-                  <p className="text-[16px] font-semibold text-app-on-surface">Ubah Kata Sandi</p>
+                  <p className="text-[16px] font-semibold text-app-on-surface">
+                    {tProfile('changePassword')}
+                  </p>
                   <p className="text-[12px] text-app-on-surface-variant">
                     Terakhir diubah {USER_PROFILE.lastPasswordChange}
                   </p>
@@ -307,7 +315,9 @@ export default function ProfilPage() {
                   <Smartphone size={18} />
                 </div>
                 <div>
-                  <p className="text-[16px] font-semibold text-app-on-surface">Perangkat Tertaut</p>
+                  <p className="text-[16px] font-semibold text-app-on-surface">
+                    {tProfile('linkedDevices')}
+                  </p>
                   <p className="text-[12px] text-app-primary font-medium">
                     {USER_PROFILE.devicesCount} Perangkat Aktif
                   </p>
@@ -329,7 +339,7 @@ export default function ProfilPage() {
             className="w-full flex items-center gap-3 p-4 text-app-error font-semibold active:bg-app-error-container/10 transition-colors rounded-xl cursor-pointer disabled:opacity-60"
           >
             <LogOut size={20} />
-            <span>{loggingOut ? 'Keluar...' : 'Keluar dari Akun'}</span>
+            <span>{loggingOut ? 'Keluar...' : tProfile('logout')}</span>
           </button>
         </section>
       </main>
@@ -345,7 +355,7 @@ export default function ProfilPage() {
             {saving ? (
               <>
                 <Loader2 size={20} className="animate-spin" />
-                Menyimpan...
+                {tCommon('saving')}
               </>
             ) : saved ? (
               <>
@@ -353,7 +363,7 @@ export default function ProfilPage() {
                 Tersimpan!
               </>
             ) : (
-              'Simpan Perubahan'
+              tCommon('save')
             )}
           </button>
         </div>

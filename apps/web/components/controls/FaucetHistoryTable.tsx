@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { History, RefreshCw, ChevronLeft, ChevronRight, Droplets } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 
 export interface FaucetHistoryItem {
@@ -25,6 +26,9 @@ export interface FaucetHistoryTableProps {
 }
 
 export default function FaucetHistoryTable({ deviceId, className }: FaucetHistoryTableProps) {
+  const tFaucet = useTranslations('faucet');
+  const tCommon = useTranslations('common');
+
   const [history, setHistory] = useState<FaucetHistoryItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -35,6 +39,11 @@ export default function FaucetHistoryTable({ deviceId, className }: FaucetHistor
     totalItems: 0,
     totalPages: 1,
   });
+
+  const tFaucetRef = React.useRef(tFaucet);
+  React.useEffect(() => {
+    tFaucetRef.current = tFaucet;
+  }, [tFaucet]);
 
   const fetchHistory = useCallback(
     async (pageToFetch = 1) => {
@@ -59,10 +68,10 @@ export default function FaucetHistoryTable({ deviceId, className }: FaucetHistor
             setPagination(json.data.meta.pagination);
           }
         } else {
-          setErrorMsg(json.error?.message || 'Gagal memuat riwayat kran.');
+          setErrorMsg(json.error?.message || tFaucetRef.current('historySubtitle'));
         }
       } catch {
-        setErrorMsg('Kesalahan jaringan saat memuat riwayat.');
+        setErrorMsg(tFaucetRef.current('networkErrorDispense'));
       } finally {
         setLoading(false);
       }
@@ -110,12 +119,8 @@ export default function FaucetHistoryTable({ deviceId, className }: FaucetHistor
         <div className="flex items-center gap-2">
           <History className="text-app-primary" size={20} />
           <div>
-            <h3 className="text-[16px] font-bold text-app-on-surface">
-              Riwayat Perintah Penyiraman
-            </h3>
-            <p className="text-[12px] text-app-on-surface-variant">
-              Log eksekusi kran otomatis perangkat
-            </p>
+            <h3 className="text-[16px] font-bold text-app-on-surface">{tFaucet('historyTitle')}</h3>
+            <p className="text-[12px] text-app-on-surface-variant">{tFaucet('historySubtitle')}</p>
           </div>
         </div>
 
@@ -126,7 +131,9 @@ export default function FaucetHistoryTable({ deviceId, className }: FaucetHistor
             className="px-3 py-1.5 bg-app-surface border border-app-outline-variant/40 rounded-xl text-xs font-semibold text-app-on-surface focus:outline-none focus:border-app-primary"
             data-testid="history-status-filter"
           >
-            <option value="ALL">Semua Status</option>
+            <option value="ALL">
+              {tCommon('all')} {tCommon('status')}
+            </option>
             <option value="COMPLETED">COMPLETED</option>
             <option value="IN_PROGRESS">IN_PROGRESS</option>
             <option value="FAILED">FAILED</option>
@@ -139,7 +146,7 @@ export default function FaucetHistoryTable({ deviceId, className }: FaucetHistor
           <button
             onClick={() => fetchHistory(pagination.page)}
             className="p-2 rounded-xl border border-app-outline-variant/30 bg-app-surface hover:bg-app-surface-container text-app-on-surface transition-colors cursor-pointer"
-            title="Muat ulang riwayat"
+            title={tCommon('refresh')}
             data-testid="btn-refresh-history"
           >
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
@@ -152,7 +159,7 @@ export default function FaucetHistoryTable({ deviceId, className }: FaucetHistor
         <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs flex items-center justify-between">
           <span>{errorMsg}</span>
           <button onClick={() => fetchHistory(pagination.page)} className="font-bold underline">
-            Coba lagi
+            {tCommon('retry')}
           </button>
         </div>
       )}
@@ -162,11 +169,11 @@ export default function FaucetHistoryTable({ deviceId, className }: FaucetHistor
         <table className="w-full text-left border-collapse text-xs">
           <thead>
             <tr className="bg-app-surface-container-low/60 border-b border-app-outline-variant/20 text-app-on-surface-variant">
-              <th className="p-3 font-semibold">Fase / Target</th>
-              <th className="p-3 font-semibold">Volume Aktual</th>
-              <th className="p-3 font-semibold">Status</th>
-              <th className="p-3 font-semibold">Waktu Minta</th>
-              <th className="p-3 font-semibold">Aktor</th>
+              <th className="p-3 font-semibold">{tFaucet('phaseTargetHeader')}</th>
+              <th className="p-3 font-semibold">{tFaucet('actualVolumeHeader')}</th>
+              <th className="p-3 font-semibold">{tCommon('status')}</th>
+              <th className="p-3 font-semibold">{tFaucet('requestedAtHeader')}</th>
+              <th className="p-3 font-semibold">{tFaucet('actorHeader')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-app-outline-variant/10">
@@ -194,10 +201,8 @@ export default function FaucetHistoryTable({ deviceId, className }: FaucetHistor
               <tr>
                 <td colSpan={5} className="p-8 text-center text-app-on-surface-variant">
                   <Droplets size={28} className="mx-auto mb-2 opacity-30 text-app-primary" />
-                  <p className="font-semibold text-[13px]">Belum ada riwayat perintah faucet</p>
-                  <p className="text-[11px] opacity-80">
-                    Perintah penyiraman yang dikirimkan akan muncul di tabel ini.
-                  </p>
+                  <p className="font-semibold text-[13px]">{tFaucet('noHistoryTitle')}</p>
+                  <p className="text-[11px] opacity-80">{tFaucet('noHistorySubtitle')}</p>
                 </td>
               </tr>
             ) : (
@@ -211,7 +216,7 @@ export default function FaucetHistoryTable({ deviceId, className }: FaucetHistor
                       {item.targetVolumeMl.toLocaleString('id-ID')} mL
                     </span>
                     <span className="text-[10px] text-app-on-surface-variant block font-mono">
-                      (Fase {item.phase})
+                      {tFaucet('phaseBadge', { phase: item.phase })}
                     </span>
                   </td>
 
@@ -236,7 +241,7 @@ export default function FaucetHistoryTable({ deviceId, className }: FaucetHistor
                     {new Date(item.requestedAt).toLocaleString('id-ID')}
                   </td>
 
-                  <td className="p-3 font-medium">{item.initiatedByRole || 'User'}</td>
+                  <td className="p-3 font-medium">{item.initiatedByRole || tCommon('user')}</td>
                 </tr>
               ))
             )}
@@ -248,7 +253,11 @@ export default function FaucetHistoryTable({ deviceId, className }: FaucetHistor
       {pagination.totalPages > 1 && (
         <div className="flex items-center justify-between pt-2 text-xs text-app-on-surface-variant">
           <span>
-            Halaman {pagination.page} dari {pagination.totalPages} ({pagination.totalItems} riwayat)
+            {tFaucet('paginationHistory', {
+              page: pagination.page,
+              totalPages: pagination.totalPages,
+              total: pagination.totalItems,
+            })}
           </span>
           <div className="flex items-center gap-2">
             <button

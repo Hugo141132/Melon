@@ -487,10 +487,10 @@ Test:
 - Translation-key lookup & 17 namespace key parity (`apps/web/test/unit/i18n-namespaces.test.ts`, `TASK-0602`).
 - Non-empty translations and matching ICU interpolation placeholders (`TASK-0602`).
 - Technical parameter preservation and `BAT` parameter omission (`TASK-0602`).
-- Status translation mapping.
-- Date formatting.
-- Number formatting.
-- HTML language value.
+- Hardcoded UI text replacement and component localization (`TASK-0603` verified across 15 unit test suites, 107/107 tests passed).
+- Status translation mapping at presentation time (`TASK-0603`).
+- Date and number formatting in active locale (`TASK-0603`).
+- HTML language attribute update (`TASK-0603`).
 
 ## 10.4 Telemetry Units
 
@@ -1826,3 +1826,23 @@ Test Coverage Enforced:
 7. **Transaction Rollback:** Verifies complete rollback on simulated failure (`simulateFailure`), leaving 0 users, 0 assignments, 0 audit records.
 8. **Ordinary RBAC Seed Separation:** Verifies ordinary `npm run db:seed` creates 0 users, 0 sessions, 0 device assignments.
 9. **Separate OS Process Concurrency Test:** Spawns two separate OS processes simultaneously running `seed-owner.ts` against the same database, verifying exactly 1 process exits 0 and 1 process exits 1 (non-zero).
+
+---
+
+# 43. UI Localization & Hard-Coded Text Replacement Test Suite (`TASK-0603`)
+
+Automated unit and component verification for hard-coded UI text migration to `next-intl` translation keys is verified across 15 Vitest unit test suites:
+
+### Agent-Executed Automated Tests
+1. **Unit Test Suite Pass:** 15 test files, **107/107 tests passed** (`apps/web/test/unit/*`, including `faucet-control-ui.test.tsx`, `i18n-namespaces.test.ts`, `historical-charts.test.tsx`, `monitoring-dashboard.test.tsx`, `water-tank-monitoring-card.test.tsx`, `sidebar-navigation.test.tsx`, `i18n-config.test.ts`).
+2. **Static Typecheck:** Clean `npx tsc --noEmit` pass with 0 errors across `@kebun-melon/web`.
+3. **Production Build:** Static page generation pass (`31/31` static pages generated cleanly).
+4. **Browser Verification:** Playwright visual smoke check on public auth pages (`/login`, `/register`).
+
+### User-Reported Pre-Commit Suite Verification
+The user independently executed and confirmed 100% pass across all five reserved pre-commit commands:
+- `npm run test:coverage` — PASSED (User-reported)
+- `npm run test:integration` — PASSED (User-reported)
+- `npm run check:quality` — PASSED (User-reported)
+- `npm run test` — PASSED (User-reported)
+- `npm run test:e2e` — PASSED (User-reported)

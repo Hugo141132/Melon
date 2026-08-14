@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useDeviceContext, AuthorisedDevice } from '@/context/DeviceContext';
 import { useRouter } from 'next/navigation';
 import { ChevronDown, Search, Check, AlertTriangle, Cpu, RefreshCw, X } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { cn, formatDeviceDisplayName } from '@/lib/utils';
 
 export interface DeviceSelectorProps {
@@ -12,6 +13,10 @@ export interface DeviceSelectorProps {
 
 export default function DeviceSelector({ className }: DeviceSelectorProps) {
   const router = useRouter();
+  const tDevices = useTranslations('devices');
+  const tCommon = useTranslations('common');
+  const tAccessibility = useTranslations('accessibility');
+
   const {
     devices,
     selectedDevice,
@@ -145,7 +150,7 @@ export default function DeviceSelector({ className }: DeviceSelectorProps) {
         <button
           onClick={() => refetchDevices()}
           className="p-0.5 hover:bg-app-error/20 rounded transition-colors"
-          title="Coba lagi"
+          title={tCommon('retry')}
         >
           <RefreshCw size={12} />
         </button>
@@ -164,7 +169,7 @@ export default function DeviceSelector({ className }: DeviceSelectorProps) {
         data-testid="device-selector-zero"
       >
         <Cpu size={14} className="text-app-on-surface-variant/70" />
-        <span>Tanpa Perangkat</span>
+        <span>{tDevices('noDevices')}</span>
       </div>
     );
   }
@@ -209,6 +214,7 @@ export default function DeviceSelector({ className }: DeviceSelectorProps) {
         )}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
+        aria-label={tAccessibility('deviceSelector')}
         data-testid="device-selector-trigger"
       >
         <span
@@ -221,7 +227,7 @@ export default function DeviceSelector({ className }: DeviceSelectorProps) {
           className="truncate max-w-[120px] sm:max-w-[160px]"
           title={formatDeviceDisplayName(selectedDevice)}
         >
-          {formatDeviceDisplayName(selectedDevice) || 'Pilih Perangkat'}
+          {formatDeviceDisplayName(selectedDevice) || tDevices('selectDevice')}
         </span>
         <ChevronDown
           size={14}
@@ -240,16 +246,17 @@ export default function DeviceSelector({ className }: DeviceSelectorProps) {
         >
           <AlertTriangle size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
           <div className="flex-1">
-            <p className="font-semibold text-amber-900 mb-0.5">Akses Perangkat Dialihkan</p>
+            <p className="font-semibold text-amber-900 mb-0.5">
+              {tDevices('accessRedirectedTitle')}
+            </p>
             <p className="text-amber-800 text-[11px] leading-4">
-              Perangkat <code className="bg-amber-100 px-1 rounded">{revokedDeviceId}</code> tidak
-              lagi diizinkan. Perangkat diubah ke daftar aktif.
+              {tDevices('accessRedirectedDesc', { deviceId: revokedDeviceId || '' })}
             </p>
           </div>
           <button
             onClick={dismissRevokedNotice}
             className="text-amber-700 hover:text-amber-900 p-0.5 rounded cursor-pointer"
-            aria-label="Tutup pemberitahuan"
+            aria-label={tCommon('close')}
           >
             <X size={14} />
           </button>
@@ -275,7 +282,7 @@ export default function DeviceSelector({ className }: DeviceSelectorProps) {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Cari nama atau lokasi..."
+                placeholder={tDevices('searchPlaceholder')}
                 className="w-full bg-app-surface-container-lowest border border-app-outline-variant/30 rounded-lg pl-8 pr-3 py-1.5 text-xs text-app-on-surface placeholder:text-app-on-surface-variant/50 focus:outline-none focus:ring-1 focus:ring-app-primary"
                 data-testid="device-search-input"
               />
@@ -292,9 +299,9 @@ export default function DeviceSelector({ className }: DeviceSelectorProps) {
             {/* Quick Status Tabs */}
             <div className="flex items-center gap-1">
               {[
-                { key: 'ALL', label: 'Semua' },
-                { key: 'ONLINE', label: 'Online' },
-                { key: 'OFFLINE', label: 'Offline' },
+                { key: 'ALL', label: tCommon('all') },
+                { key: 'ONLINE', label: tDevices('online') },
+                { key: 'OFFLINE', label: tDevices('offline') },
               ].map((tab) => (
                 <button
                   key={tab.key}
@@ -317,7 +324,7 @@ export default function DeviceSelector({ className }: DeviceSelectorProps) {
           <div className="max-h-60 overflow-y-auto p-1 divide-y divide-app-outline-variant/10">
             {filteredDevices.length === 0 ? (
               <div className="p-4 text-center text-xs text-app-on-surface-variant">
-                Tidak ada perangkat yang cocok dengan pencarian.
+                {tDevices('noDevicesFound')}
               </div>
             ) : (
               filteredDevices.map((device) => {
@@ -372,7 +379,7 @@ export default function DeviceSelector({ className }: DeviceSelectorProps) {
 
           {/* Footer Info */}
           <div className="px-3 py-2 bg-app-surface-container-low/50 border-t border-app-outline-variant/10 flex items-center justify-between text-[10px] text-app-on-surface-variant">
-            <span>Total Perangkat: {devices.length}</span>
+            <span>{tDevices('totalDevicesCount', { count: devices.length })}</span>
             <button
               onClick={() => {
                 refetchDevices();
@@ -380,7 +387,7 @@ export default function DeviceSelector({ className }: DeviceSelectorProps) {
               }}
               className="flex items-center gap-1 text-app-primary font-medium hover:underline cursor-pointer"
             >
-              <RefreshCw size={10} /> Refresh
+              <RefreshCw size={10} /> {tCommon('refresh')}
             </button>
           </div>
         </div>

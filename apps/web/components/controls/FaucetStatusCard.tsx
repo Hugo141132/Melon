@@ -12,6 +12,7 @@ import {
   ArrowRight,
   ShieldCheck,
 } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 
 export interface FaucetCommandEventDto {
@@ -62,6 +63,9 @@ export default function FaucetStatusCard({
   onCommandUpdated,
   className,
 }: FaucetStatusCardProps) {
+  const tFaucet = useTranslations('faucet');
+  const tCommon = useTranslations('common');
+
   const [currentCommand, setCurrentCommand] = useState<FaucetCommandDto>(command);
   const [isPolling, setIsPolling] = useState(false);
   const onCommandUpdatedRef = useRef(onCommandUpdated);
@@ -144,56 +148,56 @@ export default function FaucetStatusCard({
         return {
           bg: 'bg-blue-50 text-blue-800 border-blue-200',
           icon: Clock,
-          label: 'Dalam Antrean (QUEUED)',
+          label: `${tFaucet('queued')} (QUEUED)`,
           animate: false,
         };
       case 'SENT':
         return {
           bg: 'bg-indigo-50 text-indigo-800 border-indigo-200',
           icon: Loader2,
-          label: 'Terkirim ke Broker (SENT)',
+          label: `${tFaucet('sent')} (SENT)`,
           animate: true,
         };
       case 'ACKNOWLEDGED':
         return {
           bg: 'bg-cyan-50 text-cyan-800 border-cyan-200',
           icon: ShieldCheck,
-          label: 'Diterima Alat (ACKNOWLEDGED)',
+          label: `${tFaucet('acknowledged')} (ACKNOWLEDGED)`,
           animate: false,
         };
       case 'IN_PROGRESS':
         return {
           bg: 'bg-amber-50 text-amber-800 border-amber-300',
           icon: Loader2,
-          label: 'Sedang Menyiram (IN_PROGRESS)',
+          label: `${tFaucet('inProgress')} (IN_PROGRESS)`,
           animate: true,
         };
       case 'COMPLETED':
         return {
           bg: 'bg-emerald-50 text-emerald-800 border-emerald-300',
           icon: CheckCircle2,
-          label: 'Selesai (COMPLETED)',
+          label: `${tFaucet('completed')} (COMPLETED)`,
           animate: false,
         };
       case 'FAILED':
         return {
           bg: 'bg-rose-50 text-rose-800 border-rose-300',
           icon: XCircle,
-          label: 'Gagal (FAILED)',
+          label: `${tFaucet('failed')} (FAILED)`,
           animate: false,
         };
       case 'TIMEOUT':
         return {
           bg: 'bg-amber-50 text-amber-900 border-amber-300',
           icon: AlertTriangle,
-          label: 'Waktu Habis (TIMEOUT)',
+          label: `${tFaucet('timeout')} (TIMEOUT)`,
           animate: false,
         };
       case 'EXPIRED':
         return {
           bg: 'bg-gray-100 text-gray-800 border-gray-300',
           icon: Clock,
-          label: 'Kadaluarsa (EXPIRED)',
+          label: `${tFaucet('expired')} (EXPIRED)`,
           animate: false,
         };
       default:
@@ -224,7 +228,9 @@ export default function FaucetStatusCard({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Droplets className="text-app-primary" size={20} />
-          <h3 className="text-[16px] font-bold text-app-on-surface">Status Perintah Penyiraman</h3>
+          <h3 className="text-[16px] font-bold text-app-on-surface">
+            {tFaucet('statusCardTitle')}
+          </h3>
         </div>
 
         <div className="flex items-center gap-2">
@@ -233,13 +239,13 @@ export default function FaucetStatusCard({
               className="text-[11px] text-app-primary font-medium flex items-center gap-1 bg-app-primary/10 px-2 py-0.5 rounded-full"
               data-testid="live-polling-indicator"
             >
-              <Loader2 size={12} className="animate-spin" /> Live Updates
+              <Loader2 size={12} className="animate-spin" /> {tFaucet('liveUpdates')}
             </span>
           )}
           <button
             onClick={() => fetchCommandStatus()}
             className="p-1 rounded-lg hover:bg-app-surface-container text-app-on-surface-variant transition-colors cursor-pointer"
-            title="Muat ulang status"
+            title={tCommon('refresh')}
             data-testid="btn-refresh-status"
           >
             <RefreshCw size={14} />
@@ -266,7 +272,7 @@ export default function FaucetStatusCard({
             mL
           </span>
           <span className="text-[10px] uppercase font-bold opacity-80">
-            Fase {currentCommand.phase} Target
+            {tFaucet('phaseTargetSubtitle', { phase: currentCommand.phase })}
           </span>
         </div>
       </div>
@@ -275,7 +281,7 @@ export default function FaucetStatusCard({
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs bg-app-surface-container/40 p-3 rounded-xl border border-app-outline-variant/10">
         <div>
           <span className="text-app-on-surface-variant text-[10px] font-bold uppercase block">
-            Diminta Pada:
+            {tFaucet('requestedAtHeader')}:
           </span>
           <span className="font-medium text-app-on-surface">
             {new Date(currentCommand.requestedAt).toLocaleTimeString('id-ID')}
@@ -284,7 +290,7 @@ export default function FaucetStatusCard({
 
         <div>
           <span className="text-app-on-surface-variant text-[10px] font-bold uppercase block">
-            Target Volume:
+            {tFaucet('targetVolumeHeader')}
           </span>
           <span className="font-bold text-app-primary">
             {currentCommand.targetVolumeMl.toLocaleString('id-ID')} mL
@@ -293,12 +299,12 @@ export default function FaucetStatusCard({
 
         <div>
           <span className="text-app-on-surface-variant text-[10px] font-bold uppercase block">
-            Volume Aktual:
+            {tFaucet('actualVolumeHeader')}:
           </span>
           <span className="font-bold text-app-on-surface">
             {currentCommand.actualVolumeMl !== null && currentCommand.actualVolumeMl !== undefined
               ? `${currentCommand.actualVolumeMl.toLocaleString('id-ID')} mL`
-              : 'Menunggu...'}
+              : tCommon('waiting')}
           </span>
         </div>
       </div>
@@ -306,7 +312,7 @@ export default function FaucetStatusCard({
       {/* Reason / Failure Banner if FAILED */}
       {currentCommand.status === 'FAILED' && currentCommand.reasonCode && (
         <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800">
-          <span className="font-bold">Alasan Kegagalan: </span>
+          <span className="font-bold">{tFaucet('failureReasonLabel')}</span>
           <span>{currentCommand.reasonCode}</span>
         </div>
       )}
@@ -315,7 +321,7 @@ export default function FaucetStatusCard({
       {currentCommand.events && currentCommand.events.length > 0 && (
         <div className="space-y-2 pt-2 border-t border-app-outline-variant/20">
           <span className="text-[11px] font-bold text-app-on-surface-variant uppercase tracking-wider block">
-            Riwayat Event Perintah:
+            {tFaucet('eventHistoryTitle')}
           </span>
 
           <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">

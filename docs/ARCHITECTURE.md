@@ -936,7 +936,7 @@ The following remain canonical:
 - Audit event keys.
 - Device payload keys.
 
-Locale preference shall be stored in the user profile and, for unauthenticated pages, in a cookie or local storage.
+Locale preference shall be stored in the user profile and, for unauthenticated pages, in a cookie or local storage. All user-facing UI text across authentication, dashboard, monitoring, controls, navigation, and historical charts is wired to `next-intl` translation keys (`TASK-0603`).
 
 ---
 

@@ -5,7 +5,12 @@ import Image from 'next/image';
 import { useState } from 'react';
 import { ArrowLeft, Mail, Send, Loader2, CheckCircle } from 'lucide-react';
 
+import { useTranslations } from 'next-intl';
+
 export default function ForgotPasswordPage() {
+  const tAuth = useTranslations('auth');
+  const tCommon = useTranslations('common');
+
   const [email, setEmail] = useState('');
   const [state, setState] = useState<'idle' | 'loading' | 'sent'>('idle');
 
@@ -23,7 +28,7 @@ export default function ForgotPasswordPage() {
       <header className="w-full top-0 sticky bg-surface border-b border-outline-variant z-50 flex items-center justify-between px-[24px] h-[56px]">
         <Link
           href="/login"
-          aria-label="Back"
+          aria-label={tAuth('backToLogin')}
           className="flex items-center justify-center w-10 h-10 rounded-full hover:bg-surface-container-low transition-colors active:scale-95 duration-100 cursor-pointer"
         >
           <ArrowLeft size={22} className="text-primary" />
@@ -50,10 +55,10 @@ export default function ForgotPasswordPage() {
         {/* Typography */}
         <div className="mb-[32px]">
           <h1 className="text-[24px] leading-[32px] font-bold text-on-surface mb-[8px]">
-            Lupa Kata Sandi
+            {tAuth('forgotPasswordTitle')}
           </h1>
           <p className="text-[18px] leading-[28px] text-on-surface-variant">
-            Kami akan mengirimkan link untuk mengatur ulang kata sandi ke email Anda.
+            {tAuth('forgotPasswordSubtitle')}
           </p>
         </div>
 
@@ -64,7 +69,7 @@ export default function ForgotPasswordPage() {
               className="text-[14px] leading-[20px] font-semibold tracking-[0.05em] text-primary uppercase"
               htmlFor="email"
             >
-              Email
+              {tAuth('email')}
             </label>
             <div className="relative group">
               <Mail
@@ -92,18 +97,18 @@ export default function ForgotPasswordPage() {
             {state === 'loading' && (
               <>
                 <Loader2 size={20} className="animate-spin" />
-                <span className="text-[16px]">Mengirim...</span>
+                <span className="text-[16px]">{tCommon('processing')}</span>
               </>
             )}
             {state === 'sent' && (
               <>
                 <CheckCircle size={20} />
-                <span className="text-[16px]">Email Terkirim</span>
+                <span className="text-[16px]">{tAuth('emailSent')}</span>
               </>
             )}
             {state === 'idle' && (
               <>
-                <span>Kirim Link Reset</span>
+                <span>{tAuth('sendResetLink')}</span>
                 <Send size={18} />
               </>
             )}
@@ -113,7 +118,7 @@ export default function ForgotPasswordPage() {
         {/* Toast notification */}
         {state === 'sent' && (
           <div className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-on-surface text-surface px-6 py-3 rounded-full shadow-2xl text-[16px] z-[100] animate-slide-up">
-            Silakan periksa kotak masuk email Anda.
+            {tAuth('checkEmailInbox')}
           </div>
         )}
       </main>

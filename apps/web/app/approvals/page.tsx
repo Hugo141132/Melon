@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import TopAppBar from '@/components/navigation/TopAppBar';
 import { User, ShieldAlert, CheckCircle, XCircle, RefreshCw, Search } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 
 interface PendingApprovalItem {
   userId: string;
@@ -20,6 +21,11 @@ interface PaginationMeta {
 }
 
 export default function PendingApprovalsPage() {
+  const tApprovals = useTranslations('approvals');
+  const tCommon = useTranslations('common');
+  const tProfile = useTranslations('profile');
+  const tErrors = useTranslations('errors');
+
   const [items, setItems] = useState<PendingApprovalItem[]>([]);
   const [pagination, setPagination] = useState<PaginationMeta | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -49,7 +55,7 @@ export default function PendingApprovalsPage() {
       });
       const json = await res.json();
       if (!res.ok || !json.success) {
-        setApproveError(json.error?.message || 'Gagal menyetujui pendaftaran. Silakan coba lagi.');
+        setApproveError(json.error?.message || tApprovals('approvedToast'));
       } else {
         setApproveSuccess(true);
         setDecisionNote('');
@@ -61,7 +67,7 @@ export default function PendingApprovalsPage() {
         }, 1200);
       }
     } catch {
-      setApproveError('Gagal terhubung ke server saat memproses persetujuan.');
+      setApproveError(tErrors('networkError'));
     } finally {
       setSubmittingApprove(false);
     }
@@ -79,7 +85,7 @@ export default function PendingApprovalsPage() {
       });
       const json = await res.json();
       if (!res.ok || !json.success) {
-        setRejectError(json.error?.message || 'Gagal menolak pendaftaran. Silakan coba lagi.');
+        setRejectError(json.error?.message || tApprovals('rejectedToast'));
       } else {
         setRejectSuccess(true);
         setDecisionNote('');
@@ -91,7 +97,7 @@ export default function PendingApprovalsPage() {
         }, 1200);
       }
     } catch {
-      setRejectError('Gagal terhubung ke server saat memproses penolakan.');
+      setRejectError(tErrors('networkError'));
     } finally {
       setSubmittingReject(false);
     }
@@ -117,7 +123,7 @@ export default function PendingApprovalsPage() {
         if (!res.ok || !json.success) {
           setError({
             code: json.error?.code || 'UNKNOWN_ERROR',
-            message: json.error?.message || 'Gagal memuat daftar persetujuan pendaftaran.',
+            message: json.error?.message || tApprovals('noPendingRequestsDesc'),
           });
           setItems([]);
           setPagination(null);
@@ -125,16 +131,16 @@ export default function PendingApprovalsPage() {
           setItems(json.data || []);
           setPagination(json.meta?.pagination || null);
         }
-      } catch (err: unknown) {
+      } catch {
         setError({
           code: 'NETWORK_ERROR',
-          message: 'Gagal terhubung ke server. Periksa koneksi jaringan Anda.',
+          message: tErrors('networkError'),
         });
       } finally {
         setLoading(false);
       }
     },
-    [search]
+    [search, tApprovals, tErrors]
   );
 
   const fetchDetail = async (userId: string) => {
@@ -166,18 +172,16 @@ export default function PendingApprovalsPage() {
         <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-app-surface-container-lowest p-5 rounded-xl soft-elevation-lg border border-app-outline-variant/30">
           <div>
             <h1 className="text-[24px] leading-8 font-bold text-app-primary flex items-center gap-2">
-              <User size={24} /> Permohonan Pendaftaran Admin (Owner)
+              <User size={24} /> {tApprovals('title')}
             </h1>
-            <p className="text-[14px] text-app-on-surface-variant">
-              Daftar akun Admin baru yang memerlukan persetujuan Owner.
-            </p>
+            <p className="text-[14px] text-app-on-surface-variant">{tApprovals('subtitle')}</p>
           </div>
           <button
             onClick={() => fetchApprovals(pagination?.page || 1)}
             disabled={loading}
             className="self-start sm:self-auto flex items-center gap-2 px-4 py-2 bg-app-primary/10 text-app-primary rounded-lg font-medium hover:bg-app-primary/20 transition-colors disabled:opacity-50"
           >
-            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> Muat Ulang
+            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> {tCommon('refresh')}
           </button>
         </header>
 
@@ -190,7 +194,7 @@ export default function PendingApprovalsPage() {
             />
             <input
               type="text"
-              placeholder="Cari nama atau email..."
+              placeholder={tApprovals('searchPlaceholder')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && fetchApprovals(1)}
@@ -201,7 +205,7 @@ export default function PendingApprovalsPage() {
             onClick={() => fetchApprovals(1)}
             className="px-4 py-2.5 bg-app-primary text-app-on-primary rounded-lg text-sm font-medium hover:bg-app-primary/90 transition-colors"
           >
-            Cari
+            {tCommon('search')}
           </button>
         </div>
 
@@ -210,7 +214,7 @@ export default function PendingApprovalsPage() {
           <div className="bg-app-surface-container-lowest p-12 rounded-xl border border-app-outline-variant/20 text-center space-y-3">
             <RefreshCw size={32} className="mx-auto text-app-primary animate-spin" />
             <p className="text-sm font-medium text-app-on-surface-variant">
-              Memuat permohonan pendaftaran...
+              {tApprovals('loadingApprovals')}
             </p>
           </div>
         )}
@@ -220,13 +224,11 @@ export default function PendingApprovalsPage() {
           <div className="bg-app-error-container/20 p-6 rounded-xl border border-app-error/30 text-app-error space-y-2">
             <div className="flex items-center gap-2 font-semibold">
               <ShieldAlert size={20} />
-              <span>Akses Ditolak / Kesalahan ({error.code})</span>
+              <span>{tApprovals('accessDeniedError', { code: error.code })}</span>
             </div>
             <p className="text-sm">{error.message}</p>
             {error.code === 'FORBIDDEN' && (
-              <p className="text-xs opacity-80 pt-1">
-                Halaman ini khusus untuk pengguna dengan peran Owner yang aktif.
-              </p>
+              <p className="text-xs opacity-80 pt-1">{tApprovals('ownerOnlyNotice')}</p>
             )}
           </div>
         )}
@@ -236,10 +238,10 @@ export default function PendingApprovalsPage() {
           <div className="bg-app-surface-container-lowest p-12 rounded-xl border border-app-outline-variant/20 text-center space-y-3">
             <CheckCircle size={40} className="mx-auto text-app-primary/60" />
             <h3 className="text-lg font-semibold text-app-on-surface">
-              Tidak Ada Permohonan Pending
+              {tApprovals('noPendingRequests')}
             </h3>
             <p className="text-sm text-app-on-surface-variant max-w-md mx-auto">
-              Saat ini tidak ada pendaftaran Admin yang menunggu persetujuan.
+              {tApprovals('noPendingRequestsDesc')}
             </p>
           </div>
         )}
@@ -268,7 +270,9 @@ export default function PendingApprovalsPage() {
                     </span>
                   </div>
                   <p className="text-[11px] text-app-outline mt-2">
-                    Daftar pada: {new Date(item.createdAt).toLocaleString('id-ID')}
+                    {tApprovals('registeredAt', {
+                      date: new Date(item.createdAt).toLocaleString('id-ID'),
+                    })}
                   </p>
                 </div>
               ))}
@@ -281,18 +285,21 @@ export default function PendingApprovalsPage() {
                     onClick={() => fetchApprovals(pagination.page - 1)}
                     className="px-3 py-1.5 text-xs bg-app-surface-container border rounded disabled:opacity-40"
                   >
-                    Sebelumnya
+                    {tCommon('back')}
                   </button>
                   <span className="text-xs text-app-on-surface-variant">
-                    Halaman {pagination.page} dari {pagination.totalPages} ({pagination.totalItems}{' '}
-                    total)
+                    {tCommon('paginationPage', {
+                      page: pagination.page,
+                      totalPages: pagination.totalPages,
+                      total: pagination.totalItems,
+                    })}
                   </span>
                   <button
                     disabled={pagination.page >= pagination.totalPages}
                     onClick={() => fetchApprovals(pagination.page + 1)}
                     className="px-3 py-1.5 text-xs bg-app-surface-container border rounded disabled:opacity-40"
                   >
-                    Selanjutnya
+                    {tCommon('submit')}
                   </button>
                 </div>
               )}
@@ -301,11 +308,11 @@ export default function PendingApprovalsPage() {
             {/* Detail View */}
             <div className="bg-app-surface-container-lowest p-5 rounded-xl border border-app-outline-variant/30 h-fit space-y-4">
               <h3 className="text-base font-semibold text-app-on-surface border-b pb-2">
-                Detail Pendaftaran
+                {tApprovals('requestDetailTitle')}
               </h3>
               {loadingDetail ? (
                 <div className="p-8 text-center text-sm text-app-on-surface-variant">
-                  Memuat detail...
+                  {tApprovals('loadingDetail')}
                 </div>
               ) : detailItem ? (
                 <div className="space-y-3 text-sm">
@@ -316,19 +323,21 @@ export default function PendingApprovalsPage() {
                     </p>
                   </div>
                   <div>
-                    <label className="text-xs text-app-outline">Nama Lengkap</label>
+                    <label className="text-xs text-app-outline">{tProfile('fullName')}</label>
                     <p className="font-medium text-app-on-surface">{detailItem.fullName}</p>
                   </div>
                   <div>
-                    <label className="text-xs text-app-outline">Email Registrasi</label>
+                    <label className="text-xs text-app-outline font-medium">
+                      {tProfile('email')}
+                    </label>
                     <p className="font-medium text-app-on-surface">{detailItem.email}</p>
                   </div>
                   <div>
-                    <label className="text-xs text-app-outline">Status Akun</label>
+                    <label className="text-xs text-app-outline">{tCommon('status')}</label>
                     <p className="font-medium text-amber-600">{detailItem.accountStatus}</p>
                   </div>
                   <div>
-                    <label className="text-xs text-app-outline">Tanggal Pengajuan</label>
+                    <label className="text-xs text-app-outline">{tApprovals('requestDate')}</label>
                     <p className="text-app-on-surface">
                       {new Date(detailItem.createdAt).toLocaleString('id-ID')}
                     </p>
@@ -336,11 +345,11 @@ export default function PendingApprovalsPage() {
                   <div className="pt-3 border-t border-app-outline-variant/30 space-y-3">
                     <div>
                       <label className="text-xs text-app-outline font-medium">
-                        Catatan Persetujuan (Opsional)
+                        {tApprovals('decisionNoteLabel')}
                       </label>
                       <textarea
                         rows={2}
-                        placeholder="Contoh: Identitas terverifikasi via telepon..."
+                        placeholder={tApprovals('decisionNoteLabel')}
                         value={decisionNote}
                         onChange={(e) => setDecisionNote(e.target.value)}
                         className="w-full mt-1 p-2 bg-app-surface-container border border-app-outline-variant/30 rounded-lg text-xs text-app-on-surface focus:outline-none focus:border-app-primary resize-none"
@@ -354,7 +363,7 @@ export default function PendingApprovalsPage() {
                     )}
                     {approveSuccess && (
                       <div className="p-2 bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 rounded text-xs flex items-center gap-1.5 font-medium">
-                        <CheckCircle size={14} /> Permohonan berhasil disetujui!
+                        <CheckCircle size={14} /> {tApprovals('approvedToast')}
                       </div>
                     )}
 
@@ -365,7 +374,7 @@ export default function PendingApprovalsPage() {
                     )}
                     {rejectSuccess && (
                       <div className="p-2 bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 rounded text-xs flex items-center gap-1.5 font-medium">
-                        <XCircle size={14} /> Permohonan berhasil ditolak!
+                        <XCircle size={14} /> {tApprovals('rejectedToast')}
                       </div>
                     )}
 
@@ -380,7 +389,7 @@ export default function PendingApprovalsPage() {
                         ) : (
                           <CheckCircle size={14} />
                         )}
-                        Setujui
+                        {tApprovals('approve')}
                       </button>
                       <button
                         onClick={() => handleReject(detailItem.userId)}
@@ -392,14 +401,14 @@ export default function PendingApprovalsPage() {
                         ) : (
                           <XCircle size={14} />
                         )}
-                        Tolak
+                        {tApprovals('reject')}
                       </button>
                     </div>
                   </div>
                 </div>
               ) : (
                 <p className="text-sm text-app-on-surface-variant text-center py-6">
-                  Pilih salah satu item di sebelah kiri untuk melihat detail permohonan.
+                  {tApprovals('selectItemPrompt')}
                 </p>
               )}
             </div>

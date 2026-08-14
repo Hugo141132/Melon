@@ -19,7 +19,7 @@
 | `PRD-FR-007` | Record faucet-control activity and outcomes | `docs/PRD.md` | `DEC-CTRL-051` | `TASK-0802` | `TEST-DB-002` | `READY_FOR_IMPLEMENTATION` |
 | `PRD-FR-008` | Enforce Owner and Admin RBAC permissions | `docs/PRD.md` | `DEC-RBAC-015` | `TASK-0209` | `TEST-SEC-001` | `READY_FOR_IMPLEMENTATION` |
 | `PRD-FR-009` | Require Owner approval for new Admin registrations | `docs/PRD.md` | `DEC-AUTH-006` | `TASK-0203` | `TEST-E2E-002` | `READY_FOR_IMPLEMENTATION` |
-| `PRD-FR-010` | Provide English and Bahasa Indonesia UI | `docs/PRD.md` | `DEC-I18N-068` | `TASK-0603` | `TEST-E2E-004` | `READY_FOR_IMPLEMENTATION` |
+| `PRD-FR-010` | Provide English and Bahasa Indonesia UI | `docs/PRD.md` | `DEC-I18N-068` | `TASK-0603` | `TEST-E2E-004` | `VERIFIED` |
 | `PRD-FR-011` | Preserve existing visual frontend design | `docs/PRD.md` | - | `TASK-0001` | `TEST-E2E-001` | `IMPLEMENTED` |
 | `PRD-FR-012` | Separate website logic from hardware measurement implementation | `docs/PRD.md` | `DEC-DEV-020` | `TASK-0401` | `TEST-MQTT-001` | `READY_FOR_IMPLEMENTATION` |
 | `PRD-FR-013` | Owner role capabilities and management scope | `docs/PRD.md` | `DEC-RBAC-013` | `TASK-0212` | `TEST-SEC-002` | `READY_FOR_IMPLEMENTATION` |
@@ -105,8 +105,8 @@
 | `I18N-REQ-004` | Mandatory initial language gate + Settings language selector component | `docs/I18N.md` | `DEC-I18N-068` | `TASK-0604` | `TEST-E2E-004` | `READY_FOR_IMPLEMENTATION` |
 | `I18N-REQ-005` | Authenticated user profile language persistence | `docs/I18N.md` | - | `TASK-0604` | `TEST-API-002` | `READY_FOR_IMPLEMENTATION` |
 | `I18N-REQ-006` | Cookie-based locale routing without path pollution | `docs/I18N.md` | `DEC-I18N-068` | `TASK-0604` | `TEST-E2E-004` | `READY_FOR_IMPLEMENTATION` |
-| `I18N-REQ-007` | Technical content and enums exempt from translation | `docs/I18N.md` | - | `TASK-0602` | `TEST-UNIT-004` | `IMPLEMENTED` |
-| `I18N-REQ-008` | Locale-aware DateTime and number formatting | `docs/I18N.md` | `DEC-I18N-068` | `TASK-0603` | `TEST-UNIT-004` | `READY_FOR_IMPLEMENTATION` |
+| `I18N-REQ-007` | Technical content and enums exempt from translation | `docs/I18N.md` | - | `TASK-0602`, `TASK-0603` | `TEST-UNIT-004` | `VERIFIED` |
+| `I18N-REQ-008` | Locale-aware DateTime and number formatting | `docs/I18N.md` | `DEC-I18N-068` | `TASK-0603` | `TEST-UNIT-004` | `VERIFIED` |
 | `DEV-ID-001` | Unique canonical device identifier string | `docs/DEVICE_COMMUNICATION.md` | - | `TASK-0302` | `TEST-DB-001` | `READY_FOR_IMPLEMENTATION` |
 | `DEV-ID-002` | Device capabilities flags and registration | `docs/DEVICE_COMMUNICATION.md` | - | `TASK-0303` | `TEST-DB-001` | `READY_FOR_IMPLEMENTATION` |
 | `DEV-TOPIC-001` | MQTT topic hierarchy root definition | `docs/DEVICE_COMMUNICATION.md` | `DEC-DEV-020` | `TASK-0403` | `TEST-MQTT-001` | `READY_FOR_IMPLEMENTATION` |

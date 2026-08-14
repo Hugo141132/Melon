@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   Waves,
 } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { cn, formatDeviceDisplayName } from '@/lib/utils';
 
 // Helper to format numeric values nicely or return placeholder
@@ -21,22 +22,29 @@ function formatMetricValue(val: number | null | undefined, decimals = 1, fallbac
 }
 
 // Format timestamp cleanly into Indonesian format
-function formatTimestamp(isoString: string | null | undefined): string {
-  if (!isoString) return 'Belum ada data';
+function formatTimestamp(
+  isoString: string | null | undefined,
+  fallbackText = 'Belum ada data'
+): string {
+  if (!isoString) return fallbackText;
   try {
     const date = new Date(isoString);
-    if (isNaN(date.getTime())) return 'Belum ada data';
+    if (isNaN(date.getTime())) return fallbackText;
     return date.toLocaleTimeString('id-ID', {
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',
     });
   } catch {
-    return 'Belum ada data';
+    return fallbackText;
   }
 }
 
 export function WaterTankMonitoringCard() {
+  const tWater = useTranslations('water');
+  const tDevices = useTranslations('devices');
+  const tCommon = useTranslations('common');
+
   const { selectedDevice, isLoading: isDeviceLoading } = useDeviceContext();
   const {
     snapshot,
@@ -58,11 +66,10 @@ export function WaterTankMonitoringCard() {
           <Database size={20} />
         </div>
         <h3 className="text-[16px] font-bold text-app-on-surface mb-1">
-          Tidak Ada Perangkat Dipilih
+          {tDevices('noDeviceSelected')}
         </h3>
         <p className="text-[13px] text-app-on-surface-variant max-w-sm mx-auto">
-          Pilih perangkat tangki air pada pemilih perangkat untuk melihat status volume &amp; debit
-          air.
+          {tWater('selectTankDeviceDesc')}
         </p>
       </div>
     );
@@ -94,14 +101,16 @@ export function WaterTankMonitoringCard() {
         <div className="w-10 h-10 rounded-full bg-app-error/10 flex items-center justify-center text-app-error mx-auto">
           <AlertTriangle size={20} />
         </div>
-        <h3 className="text-[15px] font-bold text-app-error">Gagal Memuat Data Tangki Air</h3>
+        <h3 className="text-[15px] font-bold text-app-error">
+          {tWater('waterTankDataLoadFailed')}
+        </h3>
         <p className="text-[12px] text-app-on-surface-variant max-w-md mx-auto">{error}</p>
         <button
           onClick={() => refetch()}
           className="inline-flex items-center gap-2 bg-app-primary text-white text-[12px] font-semibold px-3.5 py-1.5 rounded-xl hover:bg-app-primary/90 transition-colors shadow-sm cursor-pointer"
         >
           <RefreshCw size={14} className={isRevalidating ? 'animate-spin' : ''} />
-          Coba Lagi
+          {tCommon('retry')}
         </button>
       </div>
     );
@@ -147,8 +156,11 @@ export function WaterTankMonitoringCard() {
             </div>
             <p className="text-[11px] text-app-on-surface-variant flex items-center gap-1 mt-0.5">
               <Clock size={12} />
-              Terakhir Terlihat:{' '}
-              {formatTimestamp(snapshot?.lastSeenAt || selectedDevice?.lastSeenAt)}
+              {tDevices('lastSeen')}:{' '}
+              {formatTimestamp(
+                snapshot?.lastSeenAt || selectedDevice?.lastSeenAt,
+                tCommon('noDataAvailable')
+              )}
             </p>
           </div>
         </div>
@@ -157,24 +169,24 @@ export function WaterTankMonitoringCard() {
         <div className="flex items-center gap-2">
           {isOffline && (
             <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full bg-rose-500/10 text-rose-700">
-              <WifiOff size={13} /> Terputus (Offline)
+              <WifiOff size={13} /> {tDevices('offlineStatus')}
             </span>
           )}
           {isStaleStatus && !isOffline && (
             <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-700">
-              <AlertTriangle size={13} /> Data Usang (Stale)
+              <AlertTriangle size={13} /> {tDevices('staleStatus')}
             </span>
           )}
           {isOnline && !isStaleStatus && (
             <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-700">
-              <CheckCircle2 size={13} /> Terhubung (Online)
+              <CheckCircle2 size={13} /> {tDevices('onlineStatus')}
             </span>
           )}
 
           <button
             onClick={() => refetch()}
             disabled={isRevalidating}
-            title="Perbarui Data"
+            title={tCommon('refresh')}
             className="p-1.5 rounded-xl border border-app-outline-variant/30 text-app-on-surface-variant hover:bg-app-surface-container-low transition-colors cursor-pointer"
           >
             <RefreshCw size={14} className={isRevalidating ? 'animate-spin' : ''} />
@@ -187,7 +199,7 @@ export function WaterTankMonitoringCard() {
         <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3.5 flex items-center gap-2.5">
           <AlertTriangle size={18} className="text-amber-600 flex-shrink-0" />
           <p className="text-[12px] leading-4 text-amber-800 font-medium">
-            Data pemantauan tangki air saat ini tidak diperbarui secara real-time (stale/offline).
+            {tWater('staleOfflineNotice')}
           </p>
         </div>
       )}
@@ -198,7 +210,7 @@ export function WaterTankMonitoringCard() {
         <div className="bg-app-surface-container-lowest rounded-xl p-5 soft-elevation-lg border border-app-outline-variant/30 flex flex-col justify-between">
           <div>
             <h3 className="text-[14px] font-semibold text-app-on-surface-variant mb-2">
-              Volume Air Tangki
+              {tWater('tankVolume')}
             </h3>
             <div className="flex items-baseline gap-1">
               <span className="text-[28px] font-bold text-app-on-surface">
@@ -208,7 +220,7 @@ export function WaterTankMonitoringCard() {
             </div>
             {isVolumeNull && (
               <p className="text-[11px] text-app-on-surface-variant/70 mt-0.5 font-medium">
-                Belum ada data
+                {tCommon('noDataAvailable')}
               </p>
             )}
           </div>
@@ -230,7 +242,7 @@ export function WaterTankMonitoringCard() {
         <div className="bg-app-surface-container-lowest rounded-xl p-5 soft-elevation-lg border border-app-outline-variant/30 flex flex-col justify-between">
           <div>
             <h3 className="text-[14px] font-semibold text-app-on-surface-variant mb-2">
-              Debit Air
+              {tWater('flowRate')}
             </h3>
             <div className="flex items-baseline gap-1">
               <span className="text-[28px] font-bold text-app-on-surface">
@@ -240,14 +252,14 @@ export function WaterTankMonitoringCard() {
             </div>
             {isFlowNull && (
               <p className="text-[11px] text-app-on-surface-variant/70 mt-0.5 font-medium">
-                Belum ada data
+                {tCommon('noDataAvailable')}
               </p>
             )}
           </div>
           <div className="mt-4 flex items-center gap-1 text-app-primary">
             <Waves size={14} />
             <span className="text-[12px] font-semibold">
-              {waterData?.status || 'Aliran Lancar'}
+              {waterData?.status || tWater('smoothFlow')}
             </span>
           </div>
         </div>
