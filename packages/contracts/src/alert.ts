@@ -1,10 +1,11 @@
 import { z } from 'zod';
-import { AlertSeverity, AlertStatus } from './enums';
+import { AlertSeverity, AlertStatus, AlertType } from './enums';
 
-export { AlertSeverity, AlertStatus };
+export { AlertSeverity, AlertStatus, AlertType };
 
 export const AlertSeveritySchema = z.nativeEnum(AlertSeverity);
 export const AlertStatusSchema = z.nativeEnum(AlertStatus);
+export const AlertTypeSchema = z.nativeEnum(AlertType);
 
 export const AlertDtoSchema = z.object({
   id: z.string().uuid(),

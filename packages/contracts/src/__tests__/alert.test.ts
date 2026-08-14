@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   AlertSeverity,
   AlertStatus,
+  AlertType,
   AlertDtoSchema,
   AlertQueryInputSchema,
   CreateAlertInputSchema,
@@ -80,5 +81,55 @@ describe('Alert Contracts & Zod Validation', () => {
       expect(parsed.data.status).toBe(AlertStatus.OPEN);
       expect(parsed.data.sourceType).toBe('device');
     }
+  });
+
+  it('validates COMMAND_FAILED and COMMAND_TIMEOUT AlertDto schemas', () => {
+    const failedAlert = {
+      id: '11111111-1111-1111-1111-111111111111',
+      deviceId: '22222222-2222-2222-2222-222222222222',
+      userId: null,
+      alertType: AlertType.COMMAND_FAILED,
+      severity: AlertSeverity.CRITICAL,
+      status: AlertStatus.OPEN,
+      sourceType: 'faucet_command',
+      sourceId: '33333333-3333-3333-3333-333333333333',
+      titleKey: 'alerts.commandFailedTitle',
+      messageKey: 'alerts.commandFailedMessage',
+      messageParams: {
+        commandId: 'cmd-01JXYZ123',
+        deviceName: 'Water Tank Node 1',
+        reason: 'VALVE_MALFUNCTION',
+      },
+      openedAt: new Date().toISOString(),
+      resolvedAt: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    const timeoutAlert = {
+      id: '44444444-4444-4444-4444-444444444444',
+      deviceId: '22222222-2222-2222-2222-222222222222',
+      userId: null,
+      alertType: AlertType.COMMAND_TIMEOUT,
+      severity: AlertSeverity.CRITICAL,
+      status: AlertStatus.OPEN,
+      sourceType: 'faucet_command',
+      sourceId: '33333333-3333-3333-3333-333333333333',
+      titleKey: 'alerts.commandTimeoutTitle',
+      messageKey: 'alerts.commandTimeoutMessage',
+      messageParams: {
+        commandId: 'cmd-01JXYZ123',
+        deviceName: 'Water Tank Node 1',
+        physicalOutcome: 'UNKNOWN',
+      },
+      openedAt: new Date().toISOString(),
+      resolvedAt: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    expect(AlertDtoSchema.safeParse(failedAlert).success).toBe(true);
+    expect(AlertDtoSchema.safeParse(timeoutAlert).success).toBe(true);
+    expect(failedAlert.alertType).not.toBe(timeoutAlert.alertType);
   });
 });

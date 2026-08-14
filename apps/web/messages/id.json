@@ -391,7 +391,11 @@
     "alertPhLowTitle": "pH Air: Terlalu Rendah",
     "alertNitrogenHighTitle": "Nitrogen (N): Terlalu Tinggi",
     "alertPotassiumLowTitle": "Kalium (K): Terlalu Rendah",
-    "alertWaterLevelLowTitle": "Level Air: Terlalu Rendah"
+    "alertWaterLevelLowTitle": "Level Air: Terlalu Rendah",
+    "commandFailedTitle": "Perintah Keran Gagal",
+    "commandFailedMessage": "Perintah keran {commandId} untuk {deviceName} gagal: {reason}",
+    "commandTimeoutTitle": "Perintah Keran Kehabisan Waktu",
+    "commandTimeoutMessage": "Perintah keran {commandId} untuk {deviceName} kehabisan waktu tanpa konfirmasi."
   },
   "users": {
     "title": "Manajemen Pengguna",

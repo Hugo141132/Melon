@@ -3,6 +3,7 @@ import {
   prisma as defaultPrisma,
   FaucetCommandRepository,
   DeviceRepository,
+  AlertRepository,
 } from '@kebun-melon/database';
 import {
   FaucetCommandStatus,
@@ -22,12 +23,14 @@ export interface AcknowledgementProcessorOptions {
   prisma?: PrismaClient;
   faucetCommandRepo?: FaucetCommandRepository;
   deviceRepo?: DeviceRepository;
+  alertRepo?: AlertRepository;
 }
 
 export class AcknowledgementProcessor {
   private prisma: PrismaClient | null;
   private faucetCommandRepo: FaucetCommandRepository | null;
   private deviceRepo: DeviceRepository | null;
+  private alertRepo: AlertRepository | null;
   private mqttClient: GatewayMqttClient | null;
   private env: GatewayEnv | null;
   private unsubscribeFn: (() => void) | null = null;
@@ -41,6 +44,7 @@ export class AcknowledgementProcessor {
       options.faucetCommandRepo ?? (this.prisma ? new FaucetCommandRepository(this.prisma) : null);
     this.deviceRepo =
       options.deviceRepo ?? (this.prisma ? new DeviceRepository(this.prisma) : null);
+    this.alertRepo = options.alertRepo ?? (this.prisma ? new AlertRepository(this.prisma) : null);
   }
 
   /**
@@ -285,6 +289,28 @@ export class AcknowledgementProcessor {
           reasonCode,
           messageId: payload.messageId,
         });
+
+        if (this.alertRepo) {
+          try {
+            await this.alertRepo.createCommandFailureAlert({
+              deviceId: device.id,
+              commandId: command.id,
+              reasonCode,
+              openedAt: recordedAt,
+              metadata: {
+                source: 'ACKNOWLEDGEMENT_REJECTION',
+                messageId: payload.messageId,
+                ackData: payload.data,
+              },
+            });
+          } catch (alertErr) {
+            logger.error('Failed to create command failure alert on rejected ACK', alertErr, {
+              commandId: command.commandId,
+              deviceId: device.id,
+            });
+          }
+        }
+
         return { success: true };
       } else {
         // ACKs for QUEUED, ACKNOWLEDGED, IN_PROGRESS, or final states must be ignored/logged without regression

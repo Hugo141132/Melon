@@ -391,7 +391,11 @@
     "alertPhLowTitle": "Water pH: Too Low",
     "alertNitrogenHighTitle": "Nitrogen (N): Too High",
     "alertPotassiumLowTitle": "Potassium (K): Too Low",
-    "alertWaterLevelLowTitle": "Water Level: Too Low"
+    "alertWaterLevelLowTitle": "Water Level: Too Low",
+    "commandFailedTitle": "Faucet Command Failed",
+    "commandFailedMessage": "Faucet command {commandId} for {deviceName} failed: {reason}",
+    "commandTimeoutTitle": "Faucet Command Timed Out",
+    "commandTimeoutMessage": "Faucet command {commandId} for {deviceName} timed out without confirmation."
   },
   "users": {
     "title": "User Management",

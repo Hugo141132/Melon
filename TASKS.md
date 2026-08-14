@@ -1536,14 +1536,15 @@ Implement:
 ## TASK-0703 — Implement Command Failure and Timeout Alerts
 
 **Priority:** `P1`  
-**Status:** `BACKLOG`  
-**Dependencies:** `TASK-0806`
+**Status:** `DONE`  
+**Dependencies:** `TASK-0806`  
+**Completed:** 2026-08-14 — Implemented distinct alert types for physical faucet command failures (`COMMAND_FAILED`) and timeouts (`COMMAND_TIMEOUT`) in `@kebun-melon/contracts`. Implemented centralized, idempotent alert creation in `AlertRepository` (`createCommandFailureAlert`, `createCommandTimeoutAlert`) linking device UUID (`deviceId`) and faucet command UUID (`sourceId`, `sourceType: 'faucet_command'`). Guaranteed that command timeouts record `physicalOutcome: 'UNKNOWN'` without claiming known physical completion. Integrated failure alert creation into IoT Gateway `AcknowledgementProcessor` (rejected ACKs) and `FaucetEventProcessor` (`FAILED` execution events). Added full English and Indonesian translation keys (`commandFailedTitle`, `commandFailedMessage`, `commandTimeoutTitle`, `commandTimeoutMessage`) with ICU placeholders (`{commandId}`, `{deviceName}`, `{reason}`) and verified 100% key/placeholder parity. Preserved task boundaries keeping automated timeout scheduling/durations blocked under `TASK-0809` without inventing thresholds. Verified 100% test pass rate across targeted test suites and user-verified pre-commit suite.
 
 ### Acceptance Criteria
 
-- Failure and timeout are distinct.
-- Alert links to device and command.
-- Timeout does not claim known physical state.
+- [x] Failure and timeout are distinct.
+- [x] Alert links to device and command.
+- [x] Timeout does not claim known physical state.
 
 ---
 

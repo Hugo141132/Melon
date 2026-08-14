@@ -292,10 +292,19 @@ describe('TASK-0805: AcknowledgementProcessor (Device Acknowledgement Processing
           id === 'water-tank-001' ? (mockWaterNodeDevice as any) : null,
       };
 
+      let createdAlertInput: any = null;
+      const mockAlertRepo = {
+        createCommandFailureAlert: async (input: any) => {
+          createdAlertInput = input;
+          return { id: 'alert-fail-001', ...input };
+        },
+      };
+
       const processor = new AcknowledgementProcessor({
         env,
         faucetCommandRepo: mockFaucetCommandRepo as any,
         deviceRepo: mockDeviceRepo as any,
+        alertRepo: mockAlertRepo as any,
       });
 
       const topic = 'agriculture/development/site-01/water-tank-001/ack/faucet';
@@ -320,6 +329,11 @@ describe('TASK-0805: AcknowledgementProcessor (Device Acknowledgement Processing
       expect(updatedStatus).toBe(FaucetCommandStatus.FAILED);
       expect(updateEventData).toMatchObject({
         messageId: 'ack-msg-002',
+        reasonCode: 'DEVICE_BUSY',
+      });
+      expect(createdAlertInput).toMatchObject({
+        deviceId: mockWaterNodeDevice.id,
+        commandId: mockCommand.id,
         reasonCode: 'DEVICE_BUSY',
       });
     });

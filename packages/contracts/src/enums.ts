@@ -45,6 +45,13 @@ export enum AlertStatus {
   RESOLVED = 'RESOLVED',
 }
 
+export enum AlertType {
+  DEVICE_OFFLINE = 'DEVICE_OFFLINE',
+  STALE_MONITORING = 'STALE_MONITORING',
+  COMMAND_FAILED = 'COMMAND_FAILED',
+  COMMAND_TIMEOUT = 'COMMAND_TIMEOUT',
+}
+
 export enum FaucetCommandStatus {
   QUEUED = 'QUEUED',
   SENT = 'SENT',

@@ -266,10 +266,19 @@ describe('TASK-0806: FaucetEventProcessor (Faucet Execution State Machine & Even
           id === 'water-tank-001' ? (mockWaterNodeDevice as any) : null,
       };
 
+      let createdAlertInput: any = null;
+      const mockAlertRepo = {
+        createCommandFailureAlert: async (input: any) => {
+          createdAlertInput = input;
+          return { id: 'alert-fail-002', ...input };
+        },
+      };
+
       const processor = new FaucetEventProcessor({
         env,
         faucetCommandRepo: mockFaucetCommandRepo as any,
         deviceRepo: mockDeviceRepo as any,
+        alertRepo: mockAlertRepo as any,
       });
 
       const topic = 'agriculture/development/site-01/water-tank-001/event/faucet';
@@ -292,6 +301,11 @@ describe('TASK-0806: FaucetEventProcessor (Faucet Execution State Machine & Even
       expect(updatedStatus).toBe(FaucetCommandStatus.FAILED);
       expect(updateEventData).toMatchObject({
         messageId: 'event-msg-004',
+        reasonCode: 'FLOW_NOT_DETECTED',
+      });
+      expect(createdAlertInput).toMatchObject({
+        deviceId: mockWaterNodeDevice.id,
+        commandId: mockCommand.id,
         reasonCode: 'FLOW_NOT_DETECTED',
       });
     });

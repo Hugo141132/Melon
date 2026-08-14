@@ -3,6 +3,7 @@ import {
   prisma as defaultPrisma,
   FaucetCommandRepository,
   DeviceRepository,
+  AlertRepository,
 } from '@kebun-melon/database';
 import {
   FaucetCommandStatus,
@@ -22,12 +23,14 @@ export interface FaucetEventProcessorOptions {
   prisma?: PrismaClient;
   faucetCommandRepo?: FaucetCommandRepository;
   deviceRepo?: DeviceRepository;
+  alertRepo?: AlertRepository;
 }
 
 export class FaucetEventProcessor {
   private prisma: PrismaClient | null;
   private faucetCommandRepo: FaucetCommandRepository | null;
   private deviceRepo: DeviceRepository | null;
+  private alertRepo: AlertRepository | null;
   private mqttClient: GatewayMqttClient | null;
   private env: GatewayEnv | null;
   private unsubscribeFn: (() => void) | null = null;
@@ -41,6 +44,7 @@ export class FaucetEventProcessor {
       options.faucetCommandRepo ?? (this.prisma ? new FaucetCommandRepository(this.prisma) : null);
     this.deviceRepo =
       options.deviceRepo ?? (this.prisma ? new DeviceRepository(this.prisma) : null);
+    this.alertRepo = options.alertRepo ?? (this.prisma ? new AlertRepository(this.prisma) : null);
   }
 
   /**
@@ -374,6 +378,28 @@ export class FaucetEventProcessor {
           reasonCode,
           messageId: payload.messageId,
         });
+
+        if (this.alertRepo) {
+          try {
+            await this.alertRepo.createCommandFailureAlert({
+              deviceId: device.id,
+              commandId: command.id,
+              reasonCode,
+              openedAt: recordedAt,
+              metadata: {
+                source: 'EXECUTION_EVENT_FAILURE',
+                messageId: payload.messageId,
+                eventData: payload.data,
+              },
+            });
+          } catch (alertErr) {
+            logger.error('Failed to create command failure alert on FAILED event', alertErr, {
+              commandId: command.commandId,
+              deviceId: device.id,
+            });
+          }
+        }
+
         return { success: true };
       } else {
         logger.warn('Ignored FAILED event: invalid initial command status', {

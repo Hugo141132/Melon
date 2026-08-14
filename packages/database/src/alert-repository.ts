@@ -5,6 +5,7 @@ import {
   CreateAlertInput,
   AlertSeverity,
   AlertStatus,
+  AlertType,
   PaginatedAlertsDto,
 } from '@kebun-melon/contracts';
 
@@ -267,5 +268,172 @@ export class AlertRepository {
       status: AlertStatus.ACKNOWLEDGED,
       acknowledgedAt: now,
     };
+  }
+
+  /**
+   * Creates or returns an existing COMMAND_FAILED alert linked to a device and faucet command.
+   * Ensures idempotency: duplicate calls for the same failed command will not create multiple open alerts.
+   */
+  async createCommandFailureAlert(input: {
+    deviceId: string;
+    commandId: string;
+    reasonCode?: string;
+    severity?: AlertSeverity;
+    openedAt?: Date;
+    metadata?: Record<string, unknown>;
+  }): Promise<AlertDto> {
+    const isUuid = (val: string) =>
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+
+    // Resolve device
+    let deviceUuid = input.deviceId;
+    let deviceName = input.deviceId;
+    const deviceRecord = await this.prisma.device.findFirst({
+      where: isUuid(input.deviceId)
+        ? { OR: [{ id: input.deviceId }, { deviceId: input.deviceId }] }
+        : { deviceId: input.deviceId },
+      select: { id: true, deviceId: true, name: true },
+    });
+    if (deviceRecord) {
+      deviceUuid = deviceRecord.id;
+      deviceName = deviceRecord.name || deviceRecord.deviceId;
+    }
+
+    // Resolve command
+    let commandUuid = input.commandId;
+    let canonicalCommandId = input.commandId;
+    const commandRecord = await this.prisma.faucetCommand.findFirst({
+      where: isUuid(input.commandId)
+        ? { OR: [{ id: input.commandId }, { commandId: input.commandId }] }
+        : { commandId: input.commandId },
+      select: { id: true, commandId: true, deviceId: true },
+    });
+    if (commandRecord) {
+      commandUuid = commandRecord.id;
+      canonicalCommandId = commandRecord.commandId;
+      if (!deviceRecord && commandRecord.deviceId) {
+        deviceUuid = commandRecord.deviceId;
+      }
+    }
+
+    // Idempotency: check if an alert already exists for this faucet command failure
+    const existing = await this.prisma.alert.findFirst({
+      where: {
+        sourceType: 'faucet_command',
+        sourceId: commandUuid,
+        alertType: AlertType.COMMAND_FAILED,
+      },
+    });
+
+    if (existing) {
+      return this.formatAlertDto(existing);
+    }
+
+    const reason = input.reasonCode || 'COMMAND_FAILED';
+    const created = await this.prisma.alert.create({
+      data: {
+        deviceId: deviceUuid,
+        alertType: AlertType.COMMAND_FAILED,
+        severity: input.severity || AlertSeverity.CRITICAL,
+        status: AlertStatus.OPEN,
+        sourceType: 'faucet_command',
+        sourceId: commandUuid,
+        titleKey: 'alerts.commandFailedTitle',
+        messageKey: 'alerts.commandFailedMessage',
+        messageParams: {
+          commandId: canonicalCommandId,
+          deviceName,
+          reason,
+          ...(input.metadata ? { metadata: input.metadata } : {}),
+        } as Prisma.InputJsonValue,
+        openedAt: input.openedAt || new Date(),
+      },
+    });
+
+    return this.formatAlertDto(created);
+  }
+
+  /**
+   * Creates or returns an existing COMMAND_TIMEOUT alert linked to a device and faucet command.
+   * Note: Command timeout does NOT claim a known physical state (physical state unconfirmed).
+   * Ensures idempotency: duplicate calls for the same command timeout will not create multiple open alerts.
+   */
+  async createCommandTimeoutAlert(input: {
+    deviceId: string;
+    commandId: string;
+    reasonCode?: string;
+    severity?: AlertSeverity;
+    openedAt?: Date;
+    metadata?: Record<string, unknown>;
+  }): Promise<AlertDto> {
+    const isUuid = (val: string) =>
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+
+    // Resolve device
+    let deviceUuid = input.deviceId;
+    let deviceName = input.deviceId;
+    const deviceRecord = await this.prisma.device.findFirst({
+      where: isUuid(input.deviceId)
+        ? { OR: [{ id: input.deviceId }, { deviceId: input.deviceId }] }
+        : { deviceId: input.deviceId },
+      select: { id: true, deviceId: true, name: true },
+    });
+    if (deviceRecord) {
+      deviceUuid = deviceRecord.id;
+      deviceName = deviceRecord.name || deviceRecord.deviceId;
+    }
+
+    // Resolve command
+    let commandUuid = input.commandId;
+    let canonicalCommandId = input.commandId;
+    const commandRecord = await this.prisma.faucetCommand.findFirst({
+      where: isUuid(input.commandId)
+        ? { OR: [{ id: input.commandId }, { commandId: input.commandId }] }
+        : { commandId: input.commandId },
+      select: { id: true, commandId: true, deviceId: true },
+    });
+    if (commandRecord) {
+      commandUuid = commandRecord.id;
+      canonicalCommandId = commandRecord.commandId;
+      if (!deviceRecord && commandRecord.deviceId) {
+        deviceUuid = commandRecord.deviceId;
+      }
+    }
+
+    // Idempotency: check if an alert already exists for this faucet command timeout
+    const existing = await this.prisma.alert.findFirst({
+      where: {
+        sourceType: 'faucet_command',
+        sourceId: commandUuid,
+        alertType: AlertType.COMMAND_TIMEOUT,
+      },
+    });
+
+    if (existing) {
+      return this.formatAlertDto(existing);
+    }
+
+    const created = await this.prisma.alert.create({
+      data: {
+        deviceId: deviceUuid,
+        alertType: AlertType.COMMAND_TIMEOUT,
+        severity: input.severity || AlertSeverity.CRITICAL,
+        status: AlertStatus.OPEN,
+        sourceType: 'faucet_command',
+        sourceId: commandUuid,
+        titleKey: 'alerts.commandTimeoutTitle',
+        messageKey: 'alerts.commandTimeoutMessage',
+        messageParams: {
+          commandId: canonicalCommandId,
+          deviceName,
+          physicalOutcome: 'UNKNOWN',
+          ...(input.reasonCode ? { reason: input.reasonCode } : {}),
+          ...(input.metadata ? { metadata: input.metadata } : {}),
+        } as Prisma.InputJsonValue,
+        openedAt: input.openedAt || new Date(),
+      },
+    });
+
+    return this.formatAlertDto(created);
   }
 }

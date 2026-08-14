@@ -43,7 +43,7 @@
 | `PRD-FR-031` | Server-side faucet control authorization check | `docs/PRD.md` | `DEC-RBAC-015` | `TASK-0803` | `TEST-SEC-004` | `READY_FOR_IMPLEMENTATION` |
 | `PRD-FR-032` | Faucet control safety states and prevention rules | `docs/PRD.md` | `DEC-CTRL-051` | `TASK-0801` | `TEST-CTRL-003` | `DECISION_REQUIRED` |
 | `PRD-FR-033` | Faucet command audit record logging | `docs/PRD.md` | `DEC-CTRL-051` | `TASK-0802` | `TEST-DB-002` | `READY_FOR_IMPLEMENTATION` |
-| `PRD-FR-034` | System alerts and scope-filtered alert display | `docs/PRD.md` | - | `TASK-0701` | `TEST-API-005` | `READY_FOR_IMPLEMENTATION` |
+| `PRD-FR-034` | System alerts and scope-filtered alert display | `docs/PRD.md` | - | `TASK-0701, TASK-0703` | `TEST-API-005` | `READY_FOR_IMPLEMENTATION` |
 | `PRD-FR-035` | Exact application roles (OWNER and ADMIN) | `docs/PRD.md` | - | `TASK-0105` | `TEST-UNIT-002` | `READY_FOR_IMPLEMENTATION` |
 | `PRD-FR-036` | User profile management rules and scope | `docs/PRD.md` | - | `TASK-0211` | `TEST-SEC-002` | `READY_FOR_IMPLEMENTATION` |
 | `PRD-FR-037` | Internationalisation locale support | `docs/PRD.md` | `DEC-I18N-068` | `TASK-0601` | `TEST-E2E-004` | `READY_FOR_IMPLEMENTATION` |
