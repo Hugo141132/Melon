@@ -5,6 +5,7 @@ build
 package-lock.json
 *.log
 *.html
+*.tsbuildinfo
 docs/
 TASKS.md
 AGENTS.md
@@ -15,3 +16,4 @@ test-results/
 playwright-report/
 blob-report/
 .playwright-mcp/
+.agents/
