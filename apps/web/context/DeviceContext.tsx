@@ -229,6 +229,14 @@ export function DeviceProvider({
     if (initialDevices) {
       processDeviceList(initialDevices);
     } else {
+      if (typeof window !== 'undefined') {
+        const path = window.location.pathname;
+        const isAuthRoute = ['/login', '/register', '/forgot-password', '/status'].includes(path);
+        if (isAuthRoute) {
+          setIsLoading(false);
+          return;
+        }
+      }
       refetchDevices();
     }
     // eslint-disable-next-deps

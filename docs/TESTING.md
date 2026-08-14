@@ -1846,3 +1846,27 @@ The user independently executed and confirmed 100% pass across all five reserved
 - `npm run check:quality` — PASSED (User-reported)
 - `npm run test` — PASSED (User-reported)
 - `npm run test:e2e` — PASSED (User-reported)
+
+---
+
+# 44. Language Gate & Settings Locale Change Test Suite (`TASK-0604`)
+
+Automated unit, API contract, and component verification for the mandatory initial language gate, Settings modal language switcher, preferences persistence API, default device label localization, and responsive mobile layout:
+
+### Agent-Executed Automated Tests
+1. **Unit Test Suite Pass:** 18 test files, **136/136 tests passed** (`apps/web/test/unit/*`), including:
+   - `i18n-language-gate-and-settings.test.tsx` (14 tests): Gate rendering for unauthenticated visitors without cookie, cookie persistence (`locale`), gate skip on valid cookie, accessible Settings modal dialog trigger & radio options, `PATCH /api/v1/me/preferences` invocation, error handling display, and route/device context preservation.
+   - `me-preferences-api.test.ts` (7 tests): Route validation for `preferredLocale`, RBAC `language.self.update` enforcement, unauthenticated rejection (401), invalid locale rejection (400), transaction persistence to `user_preferences` table, and `profile.self.updated` audit logging.
+   - `device-selector-localization.test.tsx` (8 tests): `formatDeviceDisplayName` localization of default labels in `id` and `en`, custom device name preservation, canonical `deviceId`/`deviceType` enum stability, DeviceSelector rendering in `id` and `en`, selected device persistence across locale switch, TopAppBar responsive centering, and dropdown viewport bounding at mobile widths (360px, 390px, 430px).
+2. **Static Typecheck:** Clean `npx tsc --noEmit` pass with 0 errors across `@kebun-melon/web`.
+3. **Production Build:** Static page generation pass (`32/32` static pages generated cleanly).
+4. **Browser & Mobile Viewport Verification:** Playwright testing on `/login`, `/register`, and `/forgot-password` across 360px, 390px, 430px, and 1280px widths with 0 console errors and clean layout.
+
+### User-Reported Pre-Commit Suite Verification
+The user independently executed and confirmed 100% pass across all five reserved pre-commit commands:
+- `npm run test:coverage` — PASSED (User-reported)
+- `npm run test:integration` — PASSED (User-reported)
+- `npm run check:quality` — PASSED (User-reported)
+- `npm run test` — PASSED (User-reported)
+- `npm run test:e2e` — PASSED (User-reported)
+

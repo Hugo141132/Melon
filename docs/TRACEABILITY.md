@@ -98,13 +98,13 @@
 | `FLOW-CTRL-001` | User selects preset and confirms command flow | `docs/USER_FLOWS.md` | `DEC-CTRL-051` | `TASK-0807` | `TEST-CTRL-002` | `READY_FOR_IMPLEMENTATION` |
 | `FLOW-CTRL-002` | Faucet command execution and acknowledgment flow | `docs/USER_FLOWS.md` | `DEC-CTRL-051` | `TASK-0805` | `TEST-CTRL-002` | `READY_FOR_IMPLEMENTATION` |
 | `FLOW-CTRL-003` | Faucet command timeout handling flow | `docs/USER_FLOWS.md` | `DEC-CTRL-051` | `TASK-0809` | `TEST-CTRL-004` | `DECISION_REQUIRED` |
-| `FLOW-I18N-001` | User switches UI language flow | `docs/USER_FLOWS.md` | `DEC-I18N-068` | `TASK-0604` | `TEST-E2E-004` | `READY_FOR_IMPLEMENTATION` |
+| `FLOW-I18N-001` | User switches UI language flow | `docs/USER_FLOWS.md` | `DEC-I18N-068` | `TASK-0604` | `TEST-E2E-004` | `VERIFIED` |
 | `I18N-REQ-001` | Supported application locales (en and id) | `docs/I18N.md` | `DEC-I18N-068` | `TASK-0601` | `TEST-UNIT-004` | `VERIFIED` |
 | `I18N-REQ-002` | Default (id) and fallback (en) locale settings | `docs/I18N.md` | `DEC-I18N-068` | `TASK-0601` | `TEST-UNIT-004` | `VERIFIED` |
-| `I18N-REQ-003` | Locale selection resolution order | `docs/I18N.md` | `DEC-I18N-068` | `TASK-0604` | `TEST-UNIT-004` | `READY_FOR_IMPLEMENTATION` |
-| `I18N-REQ-004` | Mandatory initial language gate + Settings language selector component | `docs/I18N.md` | `DEC-I18N-068` | `TASK-0604` | `TEST-E2E-004` | `READY_FOR_IMPLEMENTATION` |
-| `I18N-REQ-005` | Authenticated user profile language persistence | `docs/I18N.md` | - | `TASK-0604` | `TEST-API-002` | `READY_FOR_IMPLEMENTATION` |
-| `I18N-REQ-006` | Cookie-based locale routing without path pollution | `docs/I18N.md` | `DEC-I18N-068` | `TASK-0604` | `TEST-E2E-004` | `READY_FOR_IMPLEMENTATION` |
+| `I18N-REQ-003` | Locale selection resolution order | `docs/I18N.md` | `DEC-I18N-068` | `TASK-0604` | `TEST-UNIT-004` | `VERIFIED` |
+| `I18N-REQ-004` | Mandatory initial language gate + Settings language selector component | `docs/I18N.md` | `DEC-I18N-068` | `TASK-0604` | `TEST-E2E-004` | `VERIFIED` |
+| `I18N-REQ-005` | Authenticated user profile language persistence | `docs/I18N.md` | - | `TASK-0604` | `TEST-API-002` | `VERIFIED` |
+| `I18N-REQ-006` | Cookie-based locale routing without path pollution | `docs/I18N.md` | `DEC-I18N-068` | `TASK-0604` | `TEST-E2E-004` | `VERIFIED` |
 | `I18N-REQ-007` | Technical content and enums exempt from translation | `docs/I18N.md` | - | `TASK-0602`, `TASK-0603` | `TEST-UNIT-004` | `VERIFIED` |
 | `I18N-REQ-008` | Locale-aware DateTime and number formatting | `docs/I18N.md` | `DEC-I18N-068` | `TASK-0603` | `TEST-UNIT-004` | `VERIFIED` |
 | `DEV-ID-001` | Unique canonical device identifier string | `docs/DEVICE_COMMUNICATION.md` | - | `TASK-0302` | `TEST-DB-001` | `READY_FOR_IMPLEMENTATION` |

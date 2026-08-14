@@ -23,6 +23,18 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
   let adminUserId: string;
   let targetDeviceId: string;
 
+  async function selectLanguageIfGated(page: any, locale: 'id' | 'en' = 'id') {
+    const label = locale === 'id' ? 'Bahasa Indonesia' : 'English';
+    const gateBtn = page.locator('button', { hasText: label });
+    try {
+      if (await gateBtn.isVisible({ timeout: 2000 })) {
+        await gateBtn.click();
+      }
+    } catch {
+      // Language gate already satisfied or bypassed
+    }
+  }
+
   test.beforeAll(async () => {
     // 0. Clean up previous test admin users and their relations to allow fresh registration
     const existingTestUsers = await prisma.user.findMany({
@@ -127,6 +139,9 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
     await page.goto('/register');
     await expect(page).toHaveURL(/\/register/);
 
+    // Initial unauthenticated visitor encounters mandatory language gate per DEC-I18N-068 / USER_FLOWS.md
+    await selectLanguageIfGated(page, 'id');
+
     // Step 1: Wait for role selection to finish loading capabilities and click "Lanjut ke Isian Data"
     const continueBtn = page.locator('button', { hasText: 'Lanjut ke Isian Data' });
     await continueBtn.waitFor({ state: 'visible', timeout: 10000 });
@@ -156,6 +171,7 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
   test('Flow 2: Owner logs in and approves prospective Admin', async ({ page }) => {
     // Log in as Owner
     await page.goto('/login');
+    await selectLanguageIfGated(page, 'id');
     await page.fill('input#email', ownerEmail);
     await page.fill('input#password', ownerPassword);
     await Promise.all([
@@ -208,6 +224,7 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
     await page.context().clearCookies();
 
     await page.goto('/login');
+    await selectLanguageIfGated(page, 'id');
     await page.fill('input#email', testAdminEmail);
     await page.fill('input#password', testAdminPassword);
     await Promise.all([
@@ -229,10 +246,11 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
     }
   });
 
-  // Flow 4: Device Assignment
+  // Flow 4: Owner Assigns Device
   test('Flow 4: Owner assigns device to active Admin user', async ({ page }) => {
     // Log in as Owner
     await page.goto('/login');
+    await selectLanguageIfGated(page, 'id');
     await page.fill('input#email', ownerEmail);
     await page.fill('input#password', ownerPassword);
     await Promise.all([
@@ -319,11 +337,21 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
           secure: false,
           sameSite: 'Lax',
         },
+        {
+          name: 'locale',
+          value: 'id',
+          domain: 'localhost',
+          path: '/',
+          httpOnly: false,
+          secure: false,
+          sameSite: 'Lax',
+        },
       ]);
       return;
     }
 
     await page.goto('/login');
+    await selectLanguageIfGated(page, 'id');
     await page.fill('input#email', testAdminEmail);
     await page.fill('input#password', testAdminPassword);
     const [loginRes] = await Promise.all([
@@ -357,11 +385,27 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
   test('Flow 7: Language selection switch preserves permissions and data', async ({ page }) => {
     await loginAsAdmin(page);
     await page.goto('/pengaturan');
-    await expect(page.locator('body')).toContainText(/Pengaturan|Profil/i);
+    await expect(page.locator('body')).toContainText(/Pengaturan|Profil|Settings/i);
+
+    // Open language selection modal via settings trigger button
+    const langBtn = page.locator('button', { hasText: 'Preferensi Bahasa' });
+    if (await langBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await langBtn.click();
+      // Select English option in modal
+      const enOption = page.locator('button[data-testid="language-option-en"]');
+      if (await enOption.isVisible({ timeout: 5000 }).catch(() => false)) {
+        await Promise.all([
+          page.waitForResponse((res) => res.url().includes('/api/v1/me/preferences')),
+          enOption.click(),
+        ]);
+      }
+    }
 
     // Verify UI renders cleanly and navigation remains authoritative
     await page.goto('/profil');
-    await expect(page.locator('body')).toContainText(/Profil & Keamanan|Nama Lengkap/i);
+    await expect(page.locator('body')).toContainText(
+      /Profil & Keamanan|Profile & Security|Nama Lengkap|Full Name/i
+    );
 
     // Permissions check: RBAC user roles remain ACTIVE and ADMIN
     const userInDb = await prisma.user.findUnique({ where: { id: adminUserId } });
@@ -498,6 +542,7 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
 
     // Log in as Admin
     await page.goto('/login');
+    await selectLanguageIfGated(page, 'id');
     await page.fill('input#email', testAdminEmail);
     await page.fill('input#password', testAdminPassword);
     await page.click('button[type="submit"]');

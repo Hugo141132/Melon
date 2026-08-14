@@ -694,7 +694,7 @@ The system shall:
 - Keep API field names, MQTT topics, device IDs, database keys, and canonical enum values untranslated.
 - Preserve technical abbreviations such as pH, EC, TDS, N, P, and K.
 
-The default language is `id` (Bahasa Indonesia) and fallback language is `en` (English). UI text across all views is wired to `next-intl` translation keys (`TASK-0603`).
+The default language is `id` (Bahasa Indonesia) and fallback language is `en` (English). UI text across all views is wired to `next-intl` translation keys (`TASK-0603`), with the mandatory initial language gate and Settings locale change flow fully implemented and verified (`TASK-0604`).
 
 ---
 

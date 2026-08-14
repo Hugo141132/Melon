@@ -121,8 +121,8 @@ export default function TopAppBar({
 
         {/* Device Selector — Centered in Top Bar */}
         {shouldShowDeviceSelector && (
-          <div className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 max-w-xs sm:max-w-md w-full flex justify-center pointer-events-none z-10">
-            <div className="pointer-events-auto">
+          <div className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 max-w-[calc(100vw-6.5rem)] sm:max-w-md w-full flex items-center justify-center pointer-events-none z-10">
+            <div className="pointer-events-auto flex items-center justify-center">
               <DeviceSelector />
             </div>
           </div>
@@ -147,7 +147,7 @@ export default function TopAppBar({
               ) : (
                 <Image
                   src={USER_PROFILE.avatar}
-                  alt="Profile"
+                  alt={userDisplayName || 'User Profile'}
                   width={32}
                   height={32}
                   className="w-full h-full object-cover"

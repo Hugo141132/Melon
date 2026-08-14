@@ -237,3 +237,16 @@ export const UserLifecycleActionInputSchema = z
   .strict();
 
 export type UserLifecycleActionInput = z.infer<typeof UserLifecycleActionInputSchema>;
+
+/**
+ * Schema for updating user preferences.
+ */
+export const UserPreferenceUpdateInputSchema = z
+  .object({
+    preferredLocale: z.enum(['id', 'en']).optional(),
+    timezone: z.string().max(100).optional(),
+    defaultDeviceId: z.string().uuid().nullable().optional(),
+  })
+  .strict();
+
+export type UserPreferenceUpdateInput = z.infer<typeof UserPreferenceUpdateInputSchema>;

@@ -177,16 +177,22 @@ export default function DeviceSelector({ className }: DeviceSelectorProps) {
   // 4. Single Device State (1 device authorised)
   if (devices.length === 1 && selectedDevice) {
     return (
-      <div className={cn('relative', className)} data-testid="device-selector-single">
-        <div className="flex items-center gap-2 bg-app-surface-container-lowest border border-app-outline-variant/30 px-3 py-1.5 rounded-xl text-xs font-semibold text-app-on-surface shadow-xs">
+      <div
+        className={cn('relative inline-flex items-center justify-center max-w-full', className)}
+        data-testid="device-selector-single"
+      >
+        <div className="flex items-center justify-center gap-1.5 sm:gap-2 bg-app-surface-container-lowest border border-app-outline-variant/30 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold text-app-on-surface shadow-xs max-w-full">
           <span
             className={cn(
               'w-2 h-2 rounded-full flex-shrink-0',
               getStatusColor(selectedDevice.connectionStatus)
             )}
           />
-          <span className="truncate max-w-[130px]" title={formatDeviceDisplayName(selectedDevice)}>
-            {formatDeviceDisplayName(selectedDevice)}
+          <span
+            className="truncate max-w-[95px] xs:max-w-[130px] sm:max-w-[160px]"
+            title={formatDeviceDisplayName(selectedDevice, tDevices)}
+          >
+            {formatDeviceDisplayName(selectedDevice, tDevices)}
           </span>
           <span className="text-[10px] text-app-on-surface-variant bg-app-surface-container px-1.5 py-0.5 rounded font-mono">
             {selectedDevice.deviceType.replace('_NODE', '')}
@@ -200,7 +206,10 @@ export default function DeviceSelector({ className }: DeviceSelectorProps) {
   return (
     <div
       ref={dropdownRef}
-      className={cn('relative inline-block text-left', className)}
+      className={cn(
+        'relative inline-flex items-center justify-center text-left max-w-full',
+        className
+      )}
       data-testid="device-selector-multiple"
       onKeyDown={handleKeyDown}
     >
@@ -209,7 +218,7 @@ export default function DeviceSelector({ className }: DeviceSelectorProps) {
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          'flex items-center gap-2 bg-app-surface-container-lowest hover:bg-app-surface-container-low border border-app-outline-variant/40 px-3 py-1.5 rounded-xl text-xs font-semibold text-app-on-surface transition-all active:scale-[0.98] shadow-xs cursor-pointer',
+          'flex items-center justify-center gap-1.5 sm:gap-2 bg-app-surface-container-lowest hover:bg-app-surface-container-low border border-app-outline-variant/40 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold text-app-on-surface transition-all active:scale-[0.98] shadow-xs cursor-pointer max-w-full',
           isOpen && 'ring-2 ring-app-primary/20 border-app-primary/40'
         )}
         aria-haspopup="listbox"
@@ -224,15 +233,15 @@ export default function DeviceSelector({ className }: DeviceSelectorProps) {
           )}
         />
         <span
-          className="truncate max-w-[120px] sm:max-w-[160px]"
-          title={formatDeviceDisplayName(selectedDevice)}
+          className="truncate max-w-[95px] xs:max-w-[130px] sm:max-w-[160px]"
+          title={formatDeviceDisplayName(selectedDevice, tDevices)}
         >
-          {formatDeviceDisplayName(selectedDevice) || tDevices('selectDevice')}
+          {formatDeviceDisplayName(selectedDevice, tDevices) || tDevices('selectDevice')}
         </span>
         <ChevronDown
           size={14}
           className={cn(
-            'text-app-on-surface-variant transition-transform duration-200',
+            'text-app-on-surface-variant transition-transform duration-200 flex-shrink-0',
             isOpen && 'rotate-180'
           )}
         />
@@ -241,7 +250,7 @@ export default function DeviceSelector({ className }: DeviceSelectorProps) {
       {/* Revoked Access Alert Notice */}
       {isRevoked && (
         <div
-          className="absolute right-0 top-full mt-2 w-72 z-50 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-3 shadow-lg flex items-start gap-2.5 text-xs animate-fade-in"
+          className="absolute left-1/2 -translate-x-1/2 sm:left-auto sm:right-0 sm:translate-x-0 top-full mt-2 w-[calc(100vw-2rem)] max-w-xs sm:w-72 z-50 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-3 shadow-lg flex items-start gap-2.5 text-xs animate-fade-in"
           data-testid="revoked-access-banner"
         >
           <AlertTriangle size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
@@ -266,7 +275,7 @@ export default function DeviceSelector({ className }: DeviceSelectorProps) {
       {/* Dropdown Menu Overlay */}
       {isOpen && (
         <div
-          className="absolute right-0 top-full mt-2 w-72 sm:w-80 z-50 bg-app-surface-container-lowest border border-app-outline-variant/30 rounded-2xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150"
+          className="absolute left-1/2 -translate-x-1/2 sm:left-auto sm:right-0 sm:translate-x-0 top-full mt-2 w-[calc(100vw-2rem)] max-w-xs sm:w-80 z-50 bg-app-surface-container-lowest border border-app-outline-variant/30 rounded-2xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150"
           role="listbox"
           data-testid="device-selector-menu"
         >
@@ -354,7 +363,7 @@ export default function DeviceSelector({ className }: DeviceSelectorProps) {
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5">
                           <p className="text-xs font-bold truncate">
-                            {formatDeviceDisplayName(device)}
+                            {formatDeviceDisplayName(device, tDevices)}
                           </p>
                           <span className="text-[10px] text-app-on-surface-variant/80 font-mono bg-app-surface-container/60 px-1 py-0.2 rounded">
                             {device.deviceType.replace('_NODE', '')}

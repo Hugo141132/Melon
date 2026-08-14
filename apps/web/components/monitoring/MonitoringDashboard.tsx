@@ -435,7 +435,7 @@ export default function MonitoringDashboard() {
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-[16px] font-bold text-app-on-surface">
-                {formatDeviceDisplayName(selectedDevice)}
+                {formatDeviceDisplayName(selectedDevice, tDevices)}
               </h2>
               <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded bg-app-surface-container text-app-on-surface-variant">
                 {selectedDevice?.deviceType}

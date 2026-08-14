@@ -1163,7 +1163,7 @@ flowchart TD
 **Relevant account statuses:** Any page-eligible status.  
 **UI states:** Settings language option selected, applying, applied.  
 **Audit events:** Usually none, or preference update audit record.  
-**Open decisions:** None (Default locale `id`, fallback locale `en` approved; all UI text wired to `next-intl` keys under `TASK-0603`; Settings UI switcher and initial language gate belong to `TASK-0604`).
+**Open decisions:** None (Default locale `id`, fallback locale `en` approved; all UI text wired to `next-intl` keys under `TASK-0603`; Settings modal language switcher and initial language gate implemented and verified under `TASK-0604`).
 
 ---
 

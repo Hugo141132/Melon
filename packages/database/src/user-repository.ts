@@ -1619,6 +1619,112 @@ export class UserRepository {
   }
 
   /**
+   * Updates a user's preferences.
+   * Inserts an AuditLog entry with eventKey='profile.self.updated' (without secrets).
+   */
+  async updateUserPreference(input: {
+    userId: string;
+    preferredLocale?: string;
+    timezone?: string;
+    defaultDeviceId?: string | null;
+    requestId?: string;
+    ipAddress?: string;
+    userAgent?: string;
+  }): Promise<{
+    success: boolean;
+    error?: string;
+    message?: string;
+    preferences?: {
+      preferredLocale: string;
+      timezone: string | null;
+      defaultDeviceId: string | null;
+    };
+  }> {
+    try {
+      const result = await this.prisma.$transaction(
+        async (tx) => {
+          const user = await tx.user.findUnique({
+            where: { id: input.userId },
+          });
+
+          if (!user) {
+            throw new Error('USER_NOT_FOUND');
+          }
+
+          const existingPref = await tx.userPreference.findUnique({
+            where: { userId: input.userId },
+          });
+
+          const updateData: Record<string, any> = {};
+          if (input.preferredLocale !== undefined)
+            updateData.preferredLocale = input.preferredLocale;
+          if (input.timezone !== undefined) updateData.timezone = input.timezone;
+          if (input.defaultDeviceId !== undefined)
+            updateData.defaultDeviceId = input.defaultDeviceId;
+
+          const updated = await tx.userPreference.upsert({
+            where: { userId: input.userId },
+            update: updateData,
+            create: {
+              userId: input.userId,
+              preferredLocale: input.preferredLocale || 'id',
+              timezone: input.timezone || 'Asia/Jakarta',
+              defaultDeviceId: input.defaultDeviceId || null,
+            },
+          });
+
+          await tx.auditLog.create({
+            data: {
+              eventKey: 'profile.self.updated',
+              actorUserId: input.userId,
+              targetType: 'USER',
+              targetId: input.userId,
+              result: 'SUCCESS',
+              previousValues: existingPref
+                ? {
+                    preferredLocale: existingPref.preferredLocale,
+                    timezone: existingPref.timezone,
+                    defaultDeviceId: existingPref.defaultDeviceId,
+                  }
+                : {},
+              newValues: updateData,
+              metadata: {},
+              requestId: input.requestId || null,
+              ipAddress: input.ipAddress || null,
+              userAgent: input.userAgent || null,
+            },
+          });
+
+          return updated;
+        },
+        { isolationLevel: 'RepeatableRead' }
+      );
+
+      return {
+        success: true,
+        preferences: {
+          preferredLocale: result.preferredLocale,
+          timezone: result.timezone,
+          defaultDeviceId: result.defaultDeviceId,
+        },
+      };
+    } catch (error: any) {
+      if (error.message === 'USER_NOT_FOUND') {
+        return {
+          success: false,
+          error: 'USER_NOT_FOUND',
+          message: 'The requested user could not be found.',
+        };
+      }
+      return {
+        success: false,
+        error: 'INTERNAL_ERROR',
+        message: 'A database error occurred while updating user preferences.',
+      };
+    }
+  }
+
+  /**
    * Private helper to convert Prisma allow-listed selection into contract interface.
    * Sets dummy empty passwordHash internally for toPublicSafeUserDto mapper compliance.
    */

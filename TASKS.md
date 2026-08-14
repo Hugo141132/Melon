@@ -1460,18 +1460,19 @@ Key Implementation Details:
 ## TASK-0604 — Implement Mandatory Initial Language Gate & Settings Locale Change Flow
 
 **Priority:** `P1`  
-**Status:** `BACKLOG`  
-**Dependencies:** `TASK-0601`, `TASK-0602`, `TASK-0603`, `TASK-0211`
+**Status:** `DONE`  
+**Dependencies:** `TASK-0601`, `TASK-0602`, `TASK-0603`, `TASK-0211`  
+**Implementation Summary:** Implemented mandatory initial language gate (`Select Language / Pilih Bahasa`, English -> `en`, Bahasa Indonesia -> `id`) on `(auth)/layout.tsx` for visitors without valid `locale` cookie. Implemented authenticated language modal selector on `/pengaturan` (`SettingsLocaleSwitcher`) with accessible dialog pattern adhering to `Premium Minimal Ops` (clear active indicator, localized error handling, preserved route & device context), backed by `PATCH /api/v1/me/preferences` with strict Zod validation (`UserPreferenceUpdateInputSchema`), `language.self.update` RBAC check, database persistence with audit logging, and `/settings` Next.js permanent redirect. Fixed system default device display labels (`Node Sensor Tanah` <-> `Soil Sensor Node`, `Node Kualitas Air` <-> `Water Quality Node`, `Node Tangki Air` <-> `Water Tank Node`) in presentation layer while preserving custom names, device IDs, and canonical enums. Responsive mobile selector centering and dropdown viewport bounding enforced across 360px, 390px, 430px, and desktop viewports. Verified 100% test pass rate across 18 unit test suites (136/136 tests), 0 type errors, 32/32 static build routes, and Playwright verification across desktop and mobile with 0 console errors.
 
 ### Acceptance Criteria
 
-- Mandatory initial language gate (`English` → `en`, `Bahasa Indonesia` → `id`) rendered for unauthenticated visitors without a valid persisted locale cookie.
-- Unauthenticated preference persists in non-prefixed cookie (`locale`).
-- Gate is skipped when a valid locale cookie already exists.
-- Post-gate language changes available exclusively on the Settings page (`/settings`).
-- Authenticated preference persists in user profile (`preferredLocale`).
-- Page refresh retains active locale.
-- Locale change does not alter device selection, canonical values, or RBAC.
+- [x] Mandatory initial language gate (`English` → `en`, `Bahasa Indonesia` → `id`) rendered for unauthenticated visitors without a valid persisted locale cookie.
+- [x] Unauthenticated preference persists in non-prefixed cookie (`locale`).
+- [x] Gate is skipped when a valid locale cookie already exists.
+- [x] Post-gate language changes available exclusively on the Settings page (`/settings`).
+- [x] Authenticated preference persists in user profile (`preferredLocale`).
+- [x] Page refresh retains active locale.
+- [x] Locale change does not alter device selection, canonical values, or RBAC.
 
 ---
 
@@ -2095,7 +2096,7 @@ Required flows status:
 - [x] Device assignment (Flow 4 — PASS)
 - [x] Monitoring (Flow 5 — PASS)
 - [x] History (Flow 6 — PASS)
-- [ ] Language switch (Flow 7 — PENDING Phase 6 `TASK-0604` mandatory initial gate & Settings UI switcher component)
+- [x] Language switch (Flow 7 — PASS under Phase 6 `TASK-0604`)
 - [x] Faucet command (Flow 8 — SAFELY BLOCKED by `ENABLE_FAUCET_CONTROL=false` returning HTTP 403)
 - [x] Command completion (Flow 9 — SAFELY BLOCKED by `ENABLE_FAUCET_CONTROL=false`)
 - [x] Command failure (Flow 10 — SAFELY BLOCKED by `ENABLE_FAUCET_CONTROL=false`)

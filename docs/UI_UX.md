@@ -795,7 +795,7 @@ Translate:
 - accessibility labels;
 - audit log presentations.
 
-All user-facing UI text elements have been migrated to `next-intl` translation keys across all auth and protected views (`TASK-0603`). Mandatory initial gate and Settings UI selector belong to `TASK-0604`.
+All user-facing UI text elements have been migrated to `next-intl` translation keys across all auth and protected views (`TASK-0603`). The mandatory initial language gate, Settings modal language switcher (`SettingsLocaleSwitcher` on `/pengaturan`), `/settings` redirect, default device label localization, and responsive mobile selector centering have been implemented and verified (`TASK-0604`).
 
 ### 15.5 Content That Must Not Be Translated
 

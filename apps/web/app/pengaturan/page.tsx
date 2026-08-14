@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import TopAppBar from '@/components/navigation/TopAppBar';
+import { SettingsLocaleSwitcher } from '@/components/settings/locale-switcher';
 import { USER_PROFILE } from '@/lib/constants';
 import {
   User as UserIcon,
@@ -144,6 +145,8 @@ export default function PengaturanPage() {
               />
             </>
           )}
+
+          <SettingsLocaleSwitcher />
 
           <SettingItem
             icon={<Bell size={22} className="text-app-primary" />}

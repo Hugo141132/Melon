@@ -202,4 +202,70 @@ describe('UserRepository Unit Tests', () => {
     expect(prevValues).not.toHaveProperty('sessionToken');
     expect(prevValues).not.toHaveProperty('secret');
   });
+
+  it('updateUserPreference upserts preference and writes audit log', async () => {
+    const userId = '10000000-0000-0000-0000-000000000001';
+    const mockAuditLogCreate = vi.fn().mockResolvedValue({ id: 'audit-1' });
+    const mockUpsert = vi.fn().mockResolvedValue({
+      id: 'pref-1',
+      userId,
+      preferredLocale: 'en',
+      timezone: 'Asia/Jakarta',
+      defaultDeviceId: null,
+    });
+
+    const mockTx: any = {
+      user: {
+        findUnique: vi.fn().mockResolvedValue({ id: userId, accountStatus: 'ACTIVE' }),
+      },
+      userPreference: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: 'pref-1',
+          userId,
+          preferredLocale: 'id',
+          timezone: 'Asia/Jakarta',
+          defaultDeviceId: null,
+        }),
+        upsert: mockUpsert,
+      },
+      auditLog: {
+        create: mockAuditLogCreate,
+      },
+    };
+
+    const mockPrismaClient: any = {
+      $transaction: vi.fn().mockImplementation((cb: any) => cb(mockTx)),
+    };
+
+    const repo = new UserRepository(mockPrismaClient);
+    const result = await repo.updateUserPreference({
+      userId,
+      preferredLocale: 'en',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.preferences?.preferredLocale).toBe('en');
+    expect(mockUpsert).toHaveBeenCalledWith({
+      where: { userId },
+      update: { preferredLocale: 'en' },
+      create: {
+        userId,
+        preferredLocale: 'en',
+        timezone: 'Asia/Jakarta',
+        defaultDeviceId: null,
+      },
+    });
+    expect(mockAuditLogCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          eventKey: 'profile.self.updated',
+          actorUserId: userId,
+          targetType: 'USER',
+          targetId: userId,
+          result: 'SUCCESS',
+          newValues: { preferredLocale: 'en' },
+        }),
+      })
+    );
+  });
 });
