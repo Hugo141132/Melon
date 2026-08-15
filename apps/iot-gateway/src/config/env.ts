@@ -77,11 +77,6 @@ export function validateGatewayEnv(
         'Production gateway requirement failed: MQTT_BROKER_URL, MQTT_GATEWAY_CLIENT_ID, MQTT_GATEWAY_USERNAME, and MQTT_GATEWAY_PASSWORD are required in production.'
       );
     }
-    if (!env.INTERNAL_SERVICE_TOKEN) {
-      throw new Error(
-        'Production gateway requirement failed: INTERNAL_SERVICE_TOKEN is required in production.'
-      );
-    }
     if (
       !env.MQTT_BROKER_URL.startsWith('mqtts://') &&
       !env.MQTT_BROKER_URL.startsWith('ssl://') &&
@@ -89,6 +84,11 @@ export function validateGatewayEnv(
     ) {
       throw new Error(
         'Production gateway requirement failed: MQTT_BROKER_URL must use a secure scheme (mqtts://, ssl://, or wss://).'
+      );
+    }
+    if (!env.INTERNAL_SERVICE_TOKEN) {
+      throw new Error(
+        'Production gateway requirement failed: INTERNAL_SERVICE_TOKEN is required in production.'
       );
     }
   }

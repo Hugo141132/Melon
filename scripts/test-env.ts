@@ -192,5 +192,39 @@ try {
   assert(false, 'Custom rate limit env test failed: ' + e.message);
 }
 
+// 15. Production gateway requires INTERNAL_SERVICE_TOKEN
+try {
+  validateGatewayEnv({
+    NODE_ENV: 'production',
+    APP_ENV: 'production',
+    MQTT_BROKER_URL: 'mqtts://secure.example.com',
+    MQTT_GATEWAY_CLIENT_ID: 'g1',
+    MQTT_GATEWAY_USERNAME: 'u1',
+    MQTT_GATEWAY_PASSWORD: 'p1',
+  });
+  assert(false, 'Production gateway without INTERNAL_SERVICE_TOKEN must fail');
+} catch (e: any) {
+  assert(
+    e.message.includes('INTERNAL_SERVICE_TOKEN is required in production'),
+    'Production gateway missing INTERNAL_SERVICE_TOKEN correctly rejected'
+  );
+}
+
+// 16. Production web requires INTERNAL_GATEWAY_URL and INTERNAL_SERVICE_TOKEN
+try {
+  validateServerEnv({
+    NODE_ENV: 'production',
+    APP_ENV: 'production',
+    DATABASE_URL: 'postgresql://user:pass@localhost:5432/db',
+    NEXTAUTH_SECRET: 'supersecret_value_at_least_32_chars_long_12345',
+  });
+  assert(false, 'Production web without internal gateway config must fail');
+} catch (e: any) {
+  assert(
+    e.message.includes('INTERNAL_GATEWAY_URL') || e.message.includes('INTERNAL_SERVICE_TOKEN'),
+    'Production web missing internal gateway configuration correctly rejected'
+  );
+}
+
 console.log('\nSummary: ' + passed + ' passed, ' + failed + ' failed.');
 if (failed > 0) process.exit(1);
