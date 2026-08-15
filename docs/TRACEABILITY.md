@@ -173,7 +173,7 @@
 | `API-CTRL-001` | POST /api/v1/devices/{deviceId}/faucet-commands endpoint | `docs/API.md` | `DEC-CTRL-051` | `TASK-0803` | `TEST-CTRL-002` | `DECISION_REQUIRED` |
 | `API-CTRL-002` | GET /api/v1/faucet-commands/{commandId} status endpoint | `docs/API.md` | `DEC-CTRL-051` | `TASK-0803` | `TEST-CTRL-002` | `READY_FOR_IMPLEMENTATION` |
 | `API-ALERT-001` | GET /api/v1/alerts endpoint | `docs/API.md` | - | `TASK-0701` | `TEST-API-005` | `READY_FOR_IMPLEMENTATION` |
-| `API-ALERT-002` | PATCH /api/v1/alerts/{alertId}/ack endpoint | `docs/API.md` | - | `TASK-0704` | `TEST-API-005` | `DECISION_REQUIRED` |
+| `API-ALERT-002` | POST /api/v1/alerts/{alertId}/acknowledge endpoint | `docs/API.md` | - | `TASK-0704` | `TEST-API-005` | `IMPLEMENTED` |
 | `API-AUDIT-001` | GET /api/v1/audit-logs endpoint | `docs/API.md` | - | `TASK-0903` | `TEST-API-005` | `READY_FOR_IMPLEMENTATION` |
 | `API-ERR-001` | Standard JSON API error envelope format | `docs/API.md` | - | `TASK-0102` | `TEST-API-001` | `READY_FOR_IMPLEMENTATION` |
 | `API-ERR-002` | Canonical error code mapping and HTTP status rules | `docs/API.md` | - | `TASK-0102` | `TEST-API-001` | `READY_FOR_IMPLEMENTATION` |

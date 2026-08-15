@@ -314,6 +314,17 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
 - 21st.dev MCP: `NOT REQUIRED`
 - Summary: Implemented physical faucet command failure (`COMMAND_FAILED`) and timeout (`COMMAND_TIMEOUT`) alerts. Added canonical `AlertType` enum to `@kebun-melon/contracts`. Implemented centralized, idempotent alert creation in `AlertRepository` (`createCommandFailureAlert`, `createCommandTimeoutAlert`) linking device UUID (`deviceId`) and faucet command UUID (`sourceId`, `sourceType: 'faucet_command'`). Guaranteed that command timeouts record `physicalOutcome: 'UNKNOWN'` without claiming known physical completion. Integrated failure alert creation into IoT Gateway `AcknowledgementProcessor` (rejected ACKs) and `FaucetEventProcessor` (`FAILED` execution events). Added full English and Indonesian translation keys (`commandFailedTitle`, `commandFailedMessage`, `commandTimeoutTitle`, `commandTimeoutMessage`) with ICU placeholders (`{commandId}`, `{deviceName}`, `{reason}`) and verified 100% key/placeholder parity. Preserved task boundaries keeping automated timeout scheduling/durations blocked under `TASK-0809` without inventing thresholds. Verified 100% test pass rate across targeted test suites (contracts, alert repository, gateway ACK/event processors, translation checks, web alert API tests) and confirmed user pass across all 5 reserved pre-commit checks (`test:coverage`, `test:integration`, `check:quality`, `test`, `test:e2e`).
 
+#### TASK-0704 Governance Record
+
+`TASK-0704` alert acknowledgement implementation record:
+- Status: `DONE` (Completed 2026-08-15)
+- Frontend impact: `MINOR`
+- Selected UI direction: `Premium Minimal Ops`
+- Existing color template: `UNCHANGED`
+- Selected motion effects: `None`
+- 21st.dev MCP: `NOT REQUIRED`
+- Summary: Implemented alert acknowledgement data contracts (`AcknowledgeAlertInputSchema`, `AlertAcknowledgementDto`), database transactional acknowledgement in `AlertRepository` (`acknowledgeAlert`) persisting acknowledgement records to `alert_acknowledgements` and emitting `alert.acknowledged` audit logs, `POST /api/v1/alerts/{alertId}/acknowledge` API route handler with RBAC enforcement (`alert.acknowledge` for OWNER global scope, ADMIN assigned-device scope), and `/notifikasi` frontend page wiring with `Premium Minimal Ops` modal for optional operator notes. Preserved alerts without deletion, handled duplicate acknowledgements safely and idempotently, and ensured 100% key parity and placeholder alignment for English and Indonesian translations. Reconciled documentation in `API.md`, `USER_FLOWS.md`, and `TRACEABILITY.md` to remove stale Admin acknowledgement TBD wording.
+
 ---
 
 ## 5. Task Selection Rules

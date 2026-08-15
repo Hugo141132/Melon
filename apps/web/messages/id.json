@@ -29,6 +29,7 @@
     "normal": "Normal",
     "warning": "Peringatan",
     "critical": "Kritis",
+    "info": "Info",
     "lastUpdated": "Terakhir diperbarui {time}",
     "minutesAgo": "{count} menit yang lalu",
     "secondsAgo": "{count} detik yang lalu",
@@ -395,7 +396,14 @@
     "commandFailedTitle": "Perintah Keran Gagal",
     "commandFailedMessage": "Perintah keran {commandId} untuk {deviceName} gagal: {reason}",
     "commandTimeoutTitle": "Perintah Keran Kehabisan Waktu",
-    "commandTimeoutMessage": "Perintah keran {commandId} untuk {deviceName} kehabisan waktu tanpa konfirmasi."
+    "commandTimeoutMessage": "Perintah keran {commandId} untuk {deviceName} kehabisan waktu tanpa konfirmasi.",
+    "acknowledgeAction": "Acknowledge Peringatan",
+    "acknowledgeConfirm": "Apakah Anda yakin ingin melakukan acknowledge pada peringatan ini?",
+    "acknowledgedBy": "Di-acknowledge oleh",
+    "operatorNote": "Catatan Operator",
+    "notePlaceholder": "Masukkan catatan (opsional)...",
+    "acknowledgeSuccess": "Peringatan berhasil di-acknowledge.",
+    "acknowledgeError": "Gagal melakukan acknowledge peringatan."
   },
   "users": {
     "title": "Manajemen Pengguna",

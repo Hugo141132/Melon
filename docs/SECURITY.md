@@ -1432,7 +1432,7 @@ The security implementation is accepted when:
 9. Multiple Owner policy.
 10. Owner device scope.
 11. Admin control permission.
-12. Admin alert acknowledgement.
+12. ~~Admin alert acknowledgement.~~ **RESOLVED** — Permitted for assigned devices (`alert.acknowledge`) per `RBAC.md`.
 13. Concurrent faucet-command policy.
 14. Cancel and stop support.
 15. Command timeout.

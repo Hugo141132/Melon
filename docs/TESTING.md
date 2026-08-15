@@ -1794,7 +1794,7 @@ The testing strategy is satisfied when:
 24. Command late-event reconciliation tests.
 25. Cancel and stop tests.
 26. Admin control permission test matrix.
-27. Admin alert acknowledgement test matrix.
+27. ~~Admin alert acknowledgement test matrix.~~ **RESOLVED** — Verified for OWNER global scope and ADMIN assigned-device scope (`TEST-API-005`, `TASK-0704`).
 
 ---
 

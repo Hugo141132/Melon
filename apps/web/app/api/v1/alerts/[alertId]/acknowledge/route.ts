@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma, AlertRepository, AlertNotFoundError } from '@kebun-melon/database';
-import { UserRole } from '@kebun-melon/contracts';
+import { UserRole, AcknowledgeAlertInputSchema } from '@kebun-melon/contracts';
 import {
   requireSession,
   requirePermission,
@@ -17,6 +17,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ aler
 
     const alertId = params.alertId;
     const body = await request.json().catch(() => ({}));
+    const parsedBody = AcknowledgeAlertInputSchema.parse(body);
 
     let authorizedDeviceIds: string[] | undefined = undefined;
     const isOwner = session.activeRoles.includes(UserRole.OWNER);
@@ -35,7 +36,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ aler
     const result = await alertRepo.acknowledgeAlert(
       alertId,
       session.id,
-      body.note,
+      parsedBody.note || undefined,
       authorizedDeviceIds
     );
 
@@ -59,6 +60,21 @@ export async function POST(request: NextRequest, props: { params: Promise<{ aler
           meta: { requestId },
         },
         { status: 404 }
+      );
+    }
+
+    if (error?.name === 'ZodError' || error?.issues) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'Invalid request payload',
+            details: error.issues,
+          },
+          meta: { requestId },
+        },
+        { status: 422 }
       );
     }
 

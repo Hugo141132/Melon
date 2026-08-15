@@ -1240,7 +1240,7 @@ flowchart TD
 **Relevant account statuses:** `ACTIVE`.  
 **UI states:** Confirming, acknowledged, conflict.  
 **Audit events:** `alert.acknowledged`.  
-**Open decisions:** Whether Admins may acknowledge alerts.
+**Scope rules:** System-wide for Owner; assigned devices for Admin per `RBAC.md`.
 
 ---
 
@@ -1771,7 +1771,7 @@ Each audit event shall include relevant actor, target, timestamp, result, and sa
 11. Stale and offline thresholds.
 12. Historical-data retention and aggregation.
 13. Exact alert categories and thresholds.
-14. Whether Admins may acknowledge alerts.
+14. ~~Whether Admins may acknowledge alerts.~~ **RESOLVED** — Permitted for assigned devices per `RBAC.md`.
 15. Whether Owners may control faucets.
 16. Whether Admins may control faucets.
 17. Whether control permission is role-based, user-based, device-based, or combined.
@@ -1801,5 +1801,5 @@ Each audit event shall include relevant actor, target, timestamp, result, and sa
 6. The language switch is required, but the default locale and locale-precedence rules are not confirmed.
 7. Faucet phase targets are confirmed, but command timeout, cancellation, concurrency, and acknowledgement rules are not final.
 8. The system must display command progress, but the hardware contract may not provide numeric progress.
-9. Alert workflows exist, but Admin acknowledgement permission and alert thresholds are unresolved.
+9. ~~Alert workflows exist, but Admin acknowledgement permission and alert thresholds are unresolved.~~ **PARTIALLY RESOLVED** — Admin alert acknowledgement is permitted for assigned devices (`alert.acknowledge`) per `RBAC.md`; alert thresholds remain TBD.
 10. The existing frontend must be checked against every shared UI state listed in this document.

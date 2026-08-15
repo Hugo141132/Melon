@@ -1817,7 +1817,7 @@ Response:
 }
 ```
 
-Admin acknowledgement permission remains `TBD`.
+Admin acknowledgement permission is permitted for assigned devices in accordance with `RBAC.md`.
 
 ---
 
@@ -2521,7 +2521,7 @@ The API is accepted when:
 1. The final authentication mechanism is not selected.
 2. The activation workflow after Owner approval remains unresolved.
 3. Faucet-control permissions for Owner and Admin are not final.
-4. Admin alert acknowledgement is unresolved.
+4. ~~Admin alert acknowledgement is unresolved.~~ **RESOLVED** — Admin alert acknowledgement is permitted for assigned devices (`alert.acknowledge`) per `RBAC.md`.
 5. Device-management permissions are unresolved.
 6. Historical export and retention rules are not final.
 7. The real-time transport is not final.

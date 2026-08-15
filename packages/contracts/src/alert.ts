@@ -66,3 +66,19 @@ export interface PaginatedAlertsDto {
     totalPages: number;
   };
 }
+
+export const AcknowledgeAlertInputSchema = z.object({
+  note: z.string().trim().max(500).optional().nullable(),
+});
+
+export type AcknowledgeAlertInput = z.input<typeof AcknowledgeAlertInputSchema>;
+
+export const AlertAcknowledgementDtoSchema = z.object({
+  id: z.string().uuid(),
+  alertId: z.string().uuid(),
+  acknowledgedByUserId: z.string().uuid(),
+  note: z.string().nullable(),
+  acknowledgedAt: z.union([z.date(), z.string()]),
+});
+
+export type AlertAcknowledgementDto = z.infer<typeof AlertAcknowledgementDtoSchema>;

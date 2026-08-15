@@ -13,7 +13,17 @@ describe('AlertRepository Unit Tests', () => {
         findMany: vi.fn(),
         findUnique: vi.fn(),
         create: vi.fn(),
+        update: vi.fn(),
       },
+      alertAcknowledgement: {
+        create: vi.fn(),
+      },
+      auditLog: {
+        create: vi.fn(),
+      },
+      $transaction: vi.fn(async (callback) => {
+        return await callback(mockPrisma);
+      }),
     };
     alertRepo = new AlertRepository(mockPrisma as any);
   });
@@ -110,6 +120,109 @@ describe('AlertRepository Unit Tests', () => {
 
     expect(mockPrisma.alert.create).toHaveBeenCalled();
     expect(result.id).toBe(mockAlertRecord.id);
+  });
+
+  describe('acknowledgeAlert', () => {
+    it('acknowledges an alert successfully and records audit log', async () => {
+      mockPrisma.alert.findUnique.mockResolvedValue(mockAlertRecord);
+      mockPrisma.alert.update.mockResolvedValue({
+        ...mockAlertRecord,
+        status: AlertStatus.ACKNOWLEDGED,
+      });
+
+      const userId = 'user-owner-uuid';
+      const result = await alertRepo.acknowledgeAlert(mockAlertRecord.id, userId, 'Test note');
+
+      expect(mockPrisma.alert.update).toHaveBeenCalledWith({
+        where: { id: mockAlertRecord.id },
+        data: { status: AlertStatus.ACKNOWLEDGED },
+      });
+      expect(mockPrisma.alertAcknowledgement.create).toHaveBeenCalledWith({
+        data: {
+          alertId: mockAlertRecord.id,
+          acknowledgedByUserId: userId,
+          note: 'Test note',
+          acknowledgedAt: expect.any(Date),
+        },
+      });
+      expect(mockPrisma.auditLog.create).toHaveBeenCalledWith({
+        data: {
+          eventKey: 'alert.acknowledged',
+          actorUserId: userId,
+          targetType: 'Alert',
+          targetId: mockAlertRecord.id,
+          result: 'SUCCESS',
+          previousValues: { status: mockAlertRecord.status },
+          newValues: { status: AlertStatus.ACKNOWLEDGED },
+          metadata: { note: 'Test note' },
+        },
+      });
+      expect(result.status).toBe(AlertStatus.ACKNOWLEDGED);
+      expect(result.alertId).toBe(mockAlertRecord.id);
+    });
+
+    it('throws AlertNotFoundError if alert does not exist', async () => {
+      mockPrisma.alert.findUnique.mockResolvedValue(null);
+
+      await expect(alertRepo.acknowledgeAlert('non-existent', 'user-id')).rejects.toThrow(
+        'not found'
+      );
+    });
+
+    it('throws AlertNotFoundError if ADMIN is not authorized for the device', async () => {
+      mockPrisma.alert.findUnique.mockResolvedValue(mockAlertRecord);
+      const assignedDevices = ['33333333-3333-3333-3333-333333333333']; // different device
+
+      await expect(
+        alertRepo.acknowledgeAlert(mockAlertRecord.id, 'admin-id', 'note', assignedDevices)
+      ).rejects.toThrow('not found or device access revoked');
+    });
+
+    it('allows ADMIN to acknowledge alert for assigned device', async () => {
+      mockPrisma.alert.findUnique.mockResolvedValue(mockAlertRecord);
+      const assignedDevices = [mockAlertRecord.deviceId];
+
+      const result = await alertRepo.acknowledgeAlert(
+        mockAlertRecord.id,
+        'admin-id',
+        undefined,
+        assignedDevices
+      );
+      expect(result.status).toBe(AlertStatus.ACKNOWLEDGED);
+      expect(mockPrisma.alert.update).toHaveBeenCalled();
+    });
+
+    it('handles duplicate acknowledgement idempotently without throwing', async () => {
+      const alreadyAcknowledgedRecord = {
+        ...mockAlertRecord,
+        status: AlertStatus.ACKNOWLEDGED,
+      };
+      mockPrisma.alert.findUnique.mockResolvedValue(alreadyAcknowledgedRecord);
+      mockPrisma.alert.update.mockResolvedValue(alreadyAcknowledgedRecord);
+
+      const result = await alertRepo.acknowledgeAlert(
+        alreadyAcknowledgedRecord.id,
+        'owner-user-id',
+        'Second acknowledgment note'
+      );
+
+      expect(result.status).toBe(AlertStatus.ACKNOWLEDGED);
+      expect(mockPrisma.alertAcknowledgement.create).toHaveBeenCalledWith({
+        data: {
+          alertId: alreadyAcknowledgedRecord.id,
+          acknowledgedByUserId: 'owner-user-id',
+          note: 'Second acknowledgment note',
+          acknowledgedAt: expect.any(Date),
+        },
+      });
+      expect(mockPrisma.auditLog.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          eventKey: 'alert.acknowledged',
+          previousValues: { status: AlertStatus.ACKNOWLEDGED },
+          newValues: { status: AlertStatus.ACKNOWLEDGED },
+        }),
+      });
+    });
   });
 
   describe('createCommandFailureAlert & createCommandTimeoutAlert', () => {

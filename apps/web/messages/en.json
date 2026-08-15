@@ -29,6 +29,7 @@
     "normal": "Normal",
     "warning": "Warning",
     "critical": "Critical",
+    "info": "Info",
     "lastUpdated": "Last updated {time}",
     "minutesAgo": "{count} minutes ago",
     "secondsAgo": "{count} seconds ago",
@@ -395,7 +396,14 @@
     "commandFailedTitle": "Faucet Command Failed",
     "commandFailedMessage": "Faucet command {commandId} for {deviceName} failed: {reason}",
     "commandTimeoutTitle": "Faucet Command Timed Out",
-    "commandTimeoutMessage": "Faucet command {commandId} for {deviceName} timed out without confirmation."
+    "commandTimeoutMessage": "Faucet command {commandId} for {deviceName} timed out without confirmation.",
+    "acknowledgeAction": "Acknowledge Alert",
+    "acknowledgeConfirm": "Are you sure you want to acknowledge this alert?",
+    "acknowledgedBy": "Acknowledged by",
+    "operatorNote": "Operator Note",
+    "notePlaceholder": "Enter note (optional)...",
+    "acknowledgeSuccess": "Alert successfully acknowledged.",
+    "acknowledgeError": "Failed to acknowledge alert."
   },
   "users": {
     "title": "User Management",

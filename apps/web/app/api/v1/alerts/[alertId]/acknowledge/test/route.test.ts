@@ -78,6 +78,28 @@ describe('POST /api/v1/alerts/[alertId]/acknowledge', () => {
     expect(json.error.code).toBe('INSUFFICIENT_PERMISSION');
   });
 
+  it('returns 422 VALIDATION_ERROR on malformed payload', async () => {
+    vi.mocked(rbacModule.requireSession).mockResolvedValue({
+      id: 'owner-001',
+      fullName: 'Owner One',
+      email: 'owner1@example.com',
+      accountStatus: 'ACTIVE' as any,
+      activeRoles: [UserRole.OWNER],
+    });
+    vi.mocked(rbacModule.requirePermission).mockReturnValue({} as any);
+
+    const req = new NextRequest('http://localhost/api/v1/alerts/alert-001/acknowledge', {
+      method: 'POST',
+      body: JSON.stringify({ note: 'A'.repeat(501) }), // Exceeds max length
+    });
+
+    const res = await POST(req, { params: Promise.resolve({ alertId: 'alert-001' }) });
+    expect(res.status).toBe(422);
+    const json = await res.json();
+    expect(json.success).toBe(false);
+    expect(json.error.code).toBe('VALIDATION_ERROR');
+  });
+
   it('returns 404 ALERT_NOT_FOUND if alert does not exist or access denied', async () => {
     vi.mocked(rbacModule.requireSession).mockResolvedValue({
       id: 'owner-001',

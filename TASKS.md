@@ -1551,16 +1551,16 @@ Implement:
 ## TASK-0704 — Implement Alert Acknowledgement
 
 **Priority:** `P2`  
-**Status:** `BACKLOG`  
+**Status:** `DONE`
 **Dependencies:** `TASK-0701`  
-**Notes:** `TASK-0701` (`DONE`) established alert schema and API; RBAC permissions finalized in `DEC-RBAC-015`.
+**Completed:** 2026-08-15 — Implemented alert acknowledgement contracts (`AcknowledgeAlertInputSchema`, `AlertAcknowledgementDto`), database transactional acknowledgement in `AlertRepository` (`acknowledgeAlert`), `POST /api/v1/alerts/{alertId}/acknowledge` API route handler with RBAC enforcement (`alert.acknowledge` for OWNER global scope, ADMIN assigned-device scope), audit logging (`alert.acknowledged`), and frontend `/notifikasi` page wiring with `Premium Minimal Ops` modal for optional operator notes. Preserved alerts without deletion, supported duplicate acknowledgement safety, and synchronized English/Indonesian localization. Authenticated manual verification passed for Owner and Admin access scopes.
 
 ### Acceptance Criteria
 
-- Permission is checked.
-- Device scope is checked.
-- Acknowledgement is audited.
-- Alert is not deleted.
+- [x] Permission is checked.
+- [x] Device scope is checked.
+- [x] Acknowledgement is audited.
+- [x] Alert is not deleted.
 
 ---
 
