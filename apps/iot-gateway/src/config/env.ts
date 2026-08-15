@@ -29,6 +29,7 @@ export const gatewayEnvSchema = z.object({
   MQTT_CA_CERT_PATH: z.string().optional(),
   MQTT_CLIENT_CERT_PATH: z.string().optional(),
   MQTT_CLIENT_KEY_PATH: z.string().optional(),
+  INTERNAL_SERVICE_TOKEN: z.string().min(16).optional(),
   HOST: z.string().default('0.0.0.0'),
   PORT: z
     .preprocess(
@@ -74,6 +75,11 @@ export function validateGatewayEnv(
     ) {
       throw new Error(
         'Production gateway requirement failed: MQTT_BROKER_URL, MQTT_GATEWAY_CLIENT_ID, MQTT_GATEWAY_USERNAME, and MQTT_GATEWAY_PASSWORD are required in production.'
+      );
+    }
+    if (!env.INTERNAL_SERVICE_TOKEN) {
+      throw new Error(
+        'Production gateway requirement failed: INTERNAL_SERVICE_TOKEN is required in production.'
       );
     }
     if (

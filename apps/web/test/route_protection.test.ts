@@ -24,14 +24,33 @@ describe('TASK-0210 — Route and API Protection Integration Tests', () => {
   });
 
   describe('Next.js Middleware Protection Checks', () => {
-    it('1. Allows public auth routes without session cookie', () => {
-      const publicPaths = ['/login', '/register', '/status', '/api/v1/auth/login'];
+    it('1. Allows public auth, health, and readiness routes without session cookie', () => {
+      const publicPaths = [
+        '/login',
+        '/register',
+        '/status',
+        '/health',
+        '/ready',
+        '/api/v1/auth/login',
+      ];
       for (const path of publicPaths) {
         const req = new NextRequest(`http://localhost:3000${path}`);
         const res = middleware(req);
         expect(res.headers.get('x-middleware-rewrite') || res.status).not.toBe(401);
         expect(res.headers.get('location')).toBeNull();
       }
+    });
+
+    it('1b. Allows public /health and /ready without redirecting to /login', () => {
+      const healthReq = new NextRequest('http://localhost:3000/health');
+      const healthRes = middleware(healthReq);
+      expect(healthRes.status).toBe(200); // NextResponse.next()
+      expect(healthRes.headers.get('location')).toBeNull();
+
+      const readyReq = new NextRequest('http://localhost:3000/ready');
+      const readyRes = middleware(readyReq);
+      expect(readyRes.status).toBe(200); // NextResponse.next()
+      expect(readyRes.headers.get('location')).toBeNull();
     });
 
     it('2. Redirects unauthenticated page request to /login with redirect query param', () => {

@@ -336,6 +336,17 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
 - 21st.dev MCP: `NOT REQUIRED`
 - Summary: Implemented structured JSON application logging across `@kebun-melon/contracts`, `@kebun-melon/web`, and `@kebun-melon/iot-gateway`. Defined `LogLevel` enum/priorities, `LogMeta` correlation schema (`requestId`, `correlationId`, `userId`, `deviceId`, `commandId`, `messageId`, `traceId`), `StructuredLogEntry` schema, `shouldLog` level comparison, and `serializeStructuredLog` with recursive secret redaction (`redactSecrets`). Added `LOG_LEVEL` environment variable validation to `serverEnvSchema` and `gatewayEnvSchema` with defaults to `'info'`. Created unified `Logger` class supporting correlation context binding (`withContext`/`child`), dynamic level adjustment (`setLevel`/`getLevel`), service/environment tags, and structured error serialization. Replaced ad-hoc `console.error` calls across web routes and audit services. Added 100% test coverage across contract, web, gateway unit test suites, and environment validation test suites.
 
+#### TASK-0905 Governance Record
+
+`TASK-0905` health and readiness checks implementation record:
+- Status: `DONE` (Completed 2026-08-15)
+- Frontend impact: `NONE`
+- Selected UI direction: `N/A`
+- Existing color template: `UNCHANGED`
+- Selected motion effects: `None`
+- 21st.dev MCP: `NOT REQUIRED`
+- Summary: Implemented health and readiness endpoints across `@kebun-melon/contracts`, `@kebun-melon/web`, and `@kebun-melon/iot-gateway` conforming to `docs/API.md` §23/§24 and `DEC-INF-078`. Defined `LivenessResponseDto` and `ReadinessResponseDto` in `@kebun-melon/contracts`. Created public `GET /health` (liveness independent of dependencies) and `GET /ready` in `@kebun-melon/web` checking database and internal IoT Gateway reachability via authenticated internal probe. Added `GET /internal/v1/health` and `GET /internal/v1/ready` to `@kebun-melon/iot-gateway` with mandatory `Authorization: Bearer <INTERNAL_SERVICE_TOKEN>` verification, evaluating database and broker connectivity. Enforced strict environment configuration in production/staging (`INTERNAL_GATEWAY_URL`, `INTERNAL_SERVICE_TOKEN`, `INTERNAL_GATEWAY_TIMEOUT_MS=2000`) and verified zero credential or stack trace leakage in responses and logs across all failure modes.
+
 ---
 
 ## 5. Task Selection Rules

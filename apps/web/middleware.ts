@@ -3,7 +3,15 @@ import type { NextRequest } from 'next/server';
 
 const SESSION_COOKIE_NAME = 'session_token';
 
-const PUBLIC_PATH_PREFIXES = ['/(auth)/', '/login', '/register', '/status', '/api/v1/auth/'];
+const PUBLIC_PATH_PREFIXES = [
+  '/(auth)/',
+  '/login',
+  '/register',
+  '/status',
+  '/health',
+  '/ready',
+  '/api/v1/auth/',
+];
 
 /**
  * Helper to identify device telemetry ingestion paths (e.g. /api/v1/devices/[deviceId]/telemetry/soil).

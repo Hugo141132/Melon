@@ -22,6 +22,7 @@
 | `DEC-DEV-020` | Device Communication Protocol | **APPROVED** | MQTT 5.0 over TLS via long-running backend IoT Gateway service | Implement in `TASK-0401` (per-device username/password & ACLs) |
 | `DEC-CTRL-051` | Faucet Command Concurrency | **APPROVED** | Maximum 1 active command per device; no auto retries; idempotency key required | Implement in `TASK-0802` & `TASK-0803` |
 | `DEC-CTRL-067` | Production Feature Flag | **APPROVED** | `ENABLE_FAUCET_CONTROL=false` by default; requires dual written Owner & Hardware Lead sign-off before production activation | Feature flag in `TASK-0103`; faucet code may be built and tested behind flag; production activation blocked until dual sign-off recorded |
+| `DEC-INF-078` | Web-to-Gateway Internal Health & Readiness Probe | **APPROVED** | Internal HTTP probe with mandatory `Authorization: Bearer <INTERNAL_SERVICE_TOKEN>`, 2000ms default timeout | Implemented in `TASK-0905` |
 
 ---
 
@@ -232,12 +233,29 @@
 #### DEC-INF-076: ORM Selection
 * **Related Task IDs**: `TASK-0104`
 * **Related Documentation**: `DATABASE.md` §2.1
-* **Status**: **DECISION REQUIRED FROM USER**
-* **Context**: PostgreSQL is the confirmed database. The current `package.json` contains neither Prisma nor Drizzle. Exactly one ORM must be selected before `TASK-0104` begins. Do not install either until this decision is recorded.
-* **Recommendation**: Prisma — mature migration system, type-safe client, broad Next.js ecosystem support.
-* **Required Action**: Record the selected ORM here once the user decides.
+* **Status**: **APPROVED BY USER**
+* **Approved Decision**: Prisma selected as ORM for `@kebun-melon/database`.
 
 ---
+
+#### DEC-INF-078: Web-to-Gateway Internal Health & Readiness Probe
+* **Related Task IDs**: `TASK-0905`
+* **Related Documentation**: `docs/API.md` §23, §24; `docs/ARCHITECTURE.md` §32.1, §32.2; `docs/SECURITY.md` §16
+* **Status**: **APPROVED BY USER**
+* **Approved Decision**:
+  1. **Internal Endpoint**: `apps/iot-gateway` shall expose `GET /internal/v1/health` and `GET /internal/v1/ready` matching `docs/API.md` §23.
+  2. **Caller Authentication**: Caller authentication is mandatory via `Authorization: Bearer <INTERNAL_SERVICE_TOKEN>`. Secrets must remain strictly environment-only and never appear in logs, responses, or client bundles.
+  3. **Configuration**: `apps/web` shall configure `INTERNAL_GATEWAY_URL` and `INTERNAL_SERVICE_TOKEN`. In staging/production, these must be explicitly configured; localhost fallback is rejected. In development/test, default fallback to `http://127.0.0.1:3001` is allowed.
+  4. **Probe Timeout**: Approved default probe timeout duration is `INTERNAL_GATEWAY_TIMEOUT_MS=2000` (2000 ms).
+  5. **Failure Semantics**:
+     - Gateway HTTP 200 $\rightarrow$ `dependencies.gateway = "up"`, `dependencies.broker` as reported by gateway (`"up"` / `"down"`).
+     - Gateway HTTP 503 $\rightarrow$ `dependencies.gateway = "up"`, `dependencies.broker` as reported by gateway.
+     - Gateway unreachable / network failure / timeout / 401 $\rightarrow$ `dependencies.gateway = "down"`, `dependencies.broker = "down"`.
+     - Web overall readiness (`GET /ready`) returns HTTP 200 when `database`, `gateway`, and `broker` are all `"up"`, and HTTP 503 when any dependency is `"down"`.
+     - Liveness (`GET /health`) remains strictly independent of all downstream dependency failures (always HTTP 200 `{ "status": "ok" }`).
+
+---
+
 
 ### 2.6 Internationalisation (I18N)
 

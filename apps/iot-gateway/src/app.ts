@@ -151,7 +151,7 @@ export function buildApp(options: AppOptions): {
   });
 
   // Register routes
-  registerHealthRoutes(app, mqttClient, options.dbChecker);
+  registerHealthRoutes(app, mqttClient, options.dbChecker, options.env);
 
   // Global error handler with secret redaction (typed for Fastify v5)
   app.setErrorHandler((error: FastifyError | Error | unknown, _request, reply) => {

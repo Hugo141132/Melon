@@ -60,6 +60,7 @@ describe('TASK-0401 — IoT Gateway Service', () => {
           MQTT_GATEWAY_CLIENT_ID: 'gateway-01',
           MQTT_GATEWAY_USERNAME: 'gw-user',
           MQTT_GATEWAY_PASSWORD: 'secretpassword',
+          INTERNAL_SERVICE_TOKEN: 'super_secret_token_12345',
         })
       ).toThrowError(/must use a secure scheme/);
     });
@@ -72,6 +73,7 @@ describe('TASK-0401 — IoT Gateway Service', () => {
           MQTT_GATEWAY_CLIENT_ID: 'gateway-01',
           MQTT_GATEWAY_USERNAME: 'gw-user',
           MQTT_GATEWAY_PASSWORD: 'secretpassword',
+          INTERNAL_SERVICE_TOKEN: 'super_secret_token_12345',
           ENABLE_FAUCET_CONTROL: 'true',
         })
       ).toThrowError(/ENABLE_FAUCET_CONTROL=true is rejected in production/);
@@ -84,6 +86,7 @@ describe('TASK-0401 — IoT Gateway Service', () => {
           MQTT_GATEWAY_CLIENT_ID: 'gateway-01',
           MQTT_GATEWAY_USERNAME: 'gw-user',
           MQTT_GATEWAY_PASSWORD: 'secretpassword',
+          INTERNAL_SERVICE_TOKEN: 'super_secret_token_12345',
           ENABLE_FAUCET_CONTROL: 'true',
         })
       ).toThrowError(/ENABLE_FAUCET_CONTROL=true is rejected in production/);
@@ -97,6 +100,7 @@ describe('TASK-0401 — IoT Gateway Service', () => {
         MQTT_GATEWAY_CLIENT_ID: 'gateway-01',
         MQTT_GATEWAY_USERNAME: 'gw-user',
         MQTT_GATEWAY_PASSWORD: 'secretpassword',
+        INTERNAL_SERVICE_TOKEN: 'super_secret_token_12345',
         ENABLE_FAUCET_CONTROL: 'true',
       });
 

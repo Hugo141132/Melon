@@ -2019,15 +2019,37 @@ The internal service shall verify caller identity.
 
 ```http
 GET /internal/v1/health
+Authorization: Bearer <INTERNAL_SERVICE_TOKEN>
+```
+
+Response:
+
+```json
+{
+  "status": "ok"
+}
 ```
 
 ## 23.3 Gateway Readiness
 
 ```http
 GET /internal/v1/ready
+Authorization: Bearer <INTERNAL_SERVICE_TOKEN>
 ```
 
-The exact web-to-gateway communication method remains `TBD`.
+Response:
+
+```json
+{
+  "status": "ready",
+  "dependencies": {
+    "database": "up",
+    "broker": "up"
+  }
+}
+```
+
+Web readiness probes query `GET /internal/v1/ready` over internal HTTP(S) via `INTERNAL_GATEWAY_URL` using `Authorization: Bearer <INTERNAL_SERVICE_TOKEN>` with default timeout `INTERNAL_GATEWAY_TIMEOUT_MS=2000` per `DEC-INF-078`. Caller identity is validated via the bearer token.
 
 ---
 
@@ -2501,7 +2523,7 @@ The API is accepted when:
 14. Maximum page size.
 15. Historical query limits.
 16. Realtime transport.
-17. Web-to-gateway communication method.
+17. ~~Web-to-gateway communication method.~~ **RESOLVED** — Internal HTTP probe via `INTERNAL_GATEWAY_URL` with `Authorization: Bearer <INTERNAL_SERVICE_TOKEN>` and default 2000ms timeout (`DEC-INF-078`, `TASK-0905`).
 18. Rate limits.
 19. Idempotency retention.
 20. Command concurrency.
@@ -2525,6 +2547,6 @@ The API is accepted when:
 5. Device-management permissions are unresolved.
 6. Historical export and retention rules are not final.
 7. The real-time transport is not final.
-8. The gateway integration method is not final.
+8. ~~The gateway integration method is not final.~~ **RESOLVED** — Web-to-gateway internal health and readiness probe protocol defined and implemented per `DEC-INF-078` (`TASK-0905`).
 9. Command cancellation and stop behaviour remain unresolved.
 10. ~~`Water BAT` semantics.~~ **RESOLVED** — `BAT` parameter is removed completely from soil and water quality monitoring (`DEC-MON-086`, superseding `DEC-MON-085`).

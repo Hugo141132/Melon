@@ -177,6 +177,7 @@
 | `API-AUDIT-001` | GET /api/v1/audit-logs endpoint | `docs/API.md` | - | `TASK-0903` | `TEST-API-005` | `READY_FOR_IMPLEMENTATION` |
 | `API-ERR-001` | Standard JSON API error envelope format | `docs/API.md` | - | `TASK-0102` | `TEST-API-001` | `READY_FOR_IMPLEMENTATION` |
 | `API-ERR-002` | Canonical error code mapping and HTTP status rules | `docs/API.md` | - | `TASK-0102` | `TEST-API-001` | `READY_FOR_IMPLEMENTATION` |
+| `API-HLT-001` | Health and readiness check endpoints (web /health, /ready; gateway /internal/v1/*) | `docs/API.md` | `DEC-INF-078` | `TASK-0905` | `TEST-API-005` | `IMPLEMENTED` |
 | `SEC-AUTH-001` | HTTP-only secure cookie session storage | `docs/SECURITY.md` | `DEC-AUTH-001` | `TASK-0204` | `TEST-SEC-001` | `IMPLEMENTED` |
 | `SEC-AUTH-002` | Password hashing using Argon2id algorithm | `docs/SECURITY.md` | - | `TASK-0202` | `TEST-SEC-001` | `IMPLEMENTED` |
 | `SEC-AUTH-003` | Public registration forbidden from creating Owner | `docs/SECURITY.md` | `DEC-AUTH-006` | `TASK-0203` | `TEST-SEC-001` | `READY_FOR_IMPLEMENTATION` |

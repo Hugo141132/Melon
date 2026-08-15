@@ -42,6 +42,7 @@ describe('TASK-0901 — IoT Gateway Security Headers Integration Tests', () => {
       MQTT_GATEWAY_CLIENT_ID: 'gateway-prod-01',
       MQTT_GATEWAY_USERNAME: 'gw-user-prod',
       MQTT_GATEWAY_PASSWORD: 'secretpassword123',
+      INTERNAL_SERVICE_TOKEN: 'super_secret_token_12345',
     });
 
     const { app } = buildApp({ env: envProd });

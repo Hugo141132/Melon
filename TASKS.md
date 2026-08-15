@@ -1891,16 +1891,17 @@ Apply to:
 
 ## TASK-0905 — Implement Health and Readiness Checks
 
-**Priority:** `P1`  
-**Status:** `BACKLOG`  
+**Priority:** `P1`
+**Status:** `DONE`
 **Dependencies:** `TASK-0104`, `TASK-0401`
+**Completed:** 2026-08-15 — Implemented canonical health and readiness endpoints across `@kebun-melon/contracts`, `@kebun-melon/web`, and `@kebun-melon/iot-gateway` per `docs/API.md` §23, §24 and `DEC-INF-078`. Defined `LivenessResponseDto` and `ReadinessResponseDto` in `@kebun-melon/contracts`. Implemented public `GET /health` (liveness independent of dependencies) and public `GET /ready` (readiness probing PostgreSQL and IoT Gateway) in `@kebun-melon/web`. Implemented `GET /internal/v1/health` and `GET /internal/v1/ready` (guarded by mandatory `Authorization: Bearer <INTERNAL_SERVICE_TOKEN>`) in `@kebun-melon/iot-gateway` probing PostgreSQL and MQTT broker. Enforced strict environment validation in production/staging (`INTERNAL_GATEWAY_URL` and `INTERNAL_SERVICE_TOKEN`), approved 2000ms default probe timeout (`INTERNAL_GATEWAY_TIMEOUT_MS`), and verified zero credential or stack trace leakage in responses and logs across all failure modes. Verified passing full pre-commit suite and targeted tests.
 
 ### Acceptance Criteria
 
-- Web liveness is independent from temporary dependency failure.
-- Readiness checks database and gateway.
-- Gateway readiness checks broker and database.
-- No credentials are returned.
+- [x] Web liveness is independent from temporary dependency failure.
+- [x] Readiness checks database and gateway.
+- [x] Gateway readiness checks broker and database.
+- [x] No credentials are returned.
 
 ---
 

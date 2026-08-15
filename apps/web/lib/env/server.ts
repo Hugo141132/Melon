@@ -9,6 +9,11 @@ export const serverEnvSchema = z.object({
   DEFAULT_LOCALE: z.enum(['en', 'id']).optional(),
   FALLBACK_LOCALE: z.enum(['en', 'id']).optional(),
   REALTIME_TRANSPORT: z.string().optional(),
+  INTERNAL_GATEWAY_URL: z.string().url().optional(),
+  INTERNAL_SERVICE_TOKEN: z.string().min(16).optional(),
+  INTERNAL_GATEWAY_TIMEOUT_MS: z
+    .preprocess((val) => (val ? parseInt(String(val), 10) : 2000), z.number().int().min(100))
+    .default(2000),
   ENABLE_FAUCET_CONTROL: z
     .preprocess(
       (val) => {
@@ -57,7 +62,38 @@ export function validateServerEnv(
     );
   }
 
+  if (isStrictProd) {
+    if (!env.INTERNAL_GATEWAY_URL) {
+      throw new Error(
+        'Production gateway requirement failed: INTERNAL_GATEWAY_URL is required in production.'
+      );
+    }
+    if (
+      env.INTERNAL_GATEWAY_URL.includes('localhost') ||
+      env.INTERNAL_GATEWAY_URL.includes('127.0.0.1')
+    ) {
+      throw new Error(
+        'Production gateway requirement failed: INTERNAL_GATEWAY_URL cannot use localhost/127.0.0.1 in production.'
+      );
+    }
+    if (!env.INTERNAL_SERVICE_TOKEN) {
+      throw new Error(
+        'Production gateway requirement failed: INTERNAL_SERVICE_TOKEN is required in production.'
+      );
+    }
+  }
+
   const dynamicSchema = serverEnvSchema.extend({
+    INTERNAL_GATEWAY_URL: z
+      .string()
+      .url()
+      .optional()
+      .default(
+        isTest ? 'http://127.0.0.1:3001' : env.INTERNAL_GATEWAY_URL || 'http://127.0.0.1:3001'
+      ),
+    INTERNAL_GATEWAY_TIMEOUT_MS: z
+      .preprocess((val) => (val ? parseInt(String(val), 10) : 2000), z.number().int().min(100))
+      .default(2000),
     RATE_LIMIT_LOGIN_MAX: z
       .preprocess(
         (val) => (val ? parseInt(String(val), 10) : isTest ? 1000 : 5),

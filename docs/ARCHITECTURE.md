@@ -1549,7 +1549,7 @@ The architecture is acceptable when:
 7. Final MQTT adoption.
 8. MQTT broker.
 9. Final gateway framework.
-10. Web-to-gateway communication method.
+10. ~~Web-to-gateway communication method.~~ **RESOLVED** — Internal HTTP probe with `Authorization: Bearer <INTERNAL_SERVICE_TOKEN>` and default 2000ms timeout per `DEC-INF-078` (`TASK-0905`).
 11. Realtime transport.
 12. Redis requirement.
 13. Job queue requirement.
