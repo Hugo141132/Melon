@@ -197,7 +197,7 @@
 | `SEC-CTRL-004` | Dual written sign-off required for production physical control | `docs/SECURITY.md` | `DEC-CTRL-067` | `TASK-1010` | `TEST-CTRL-005` | `DECISION_REQUIRED` |
 | `SEC-CTRL-005` | Mandatory idempotency key on command creation | `docs/SECURITY.md` | `DEC-CTRL-051` | `TASK-0808` | `TEST-CTRL-003` | `READY_FOR_IMPLEMENTATION` |
 | `SEC-CTRL-006` | Command timeout distinct from physical completion state | `docs/SECURITY.md` | `DEC-CTRL-051` | `TASK-0809` | `TEST-CTRL-004` | `READY_FOR_IMPLEMENTATION` |
-| `SEC-DATA-001` | Passwords, hashes, and secrets redacted from logs | `docs/SECURITY.md` | - | `TASK-0903` | `TEST-SEC-005` | `READY_FOR_IMPLEMENTATION` |
+| `SEC-DATA-001` | Passwords, hashes, and secrets redacted from logs | `docs/SECURITY.md` | - | `TASK-0904` | `TEST-SEC-005` | `IMPLEMENTED` |
 | `SEC-DATA-002` | CSRF token protection and CORS allowlist enforcement | `docs/SECURITY.md` | - | `TASK-0901` | `TEST-SEC-005` | `READY_FOR_IMPLEMENTATION` |
 | `SEC-DATA-003` | Content Security Policy (CSP) and security headers | `docs/SECURITY.md` | - | `TASK-0901` | `TEST-SEC-005` | `IMPLEMENTED` |
 | `SEC-DATA-004` | Immutable append-only audit log storage | `docs/SECURITY.md` | - | `TASK-0903` | `TEST-DB-002` | `READY_FOR_IMPLEMENTATION` |

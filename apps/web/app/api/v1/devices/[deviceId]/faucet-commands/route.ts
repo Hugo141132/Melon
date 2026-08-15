@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logger } from '@/lib/observability/logger';
 import {
   prisma,
   DeviceRepository,
@@ -223,7 +224,10 @@ export async function POST(request: Request, props: { params: Promise<{ deviceId
         { status: 409 }
       );
     }
-    console.error('[Faucet Commands POST Error]:', error);
+    logger.error('Failed to process faucet command creation', error, {
+      deviceId: params.deviceId,
+      requestId,
+    });
     return NextResponse.json(
       {
         success: false,
@@ -371,7 +375,10 @@ export async function GET(request: Request, props: { params: Promise<{ deviceId:
       );
     }
 
-    console.error('[Faucet Commands GET Error]:', error);
+    logger.error('Failed to fetch faucet command history', error, {
+      deviceId: params.deviceId,
+      requestId,
+    });
     return NextResponse.json(
       {
         success: false,

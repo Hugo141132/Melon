@@ -3,6 +3,7 @@ import { z } from 'zod';
 export const serverEnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   APP_ENV: z.enum(['development', 'staging', 'production', 'test']).default('development'),
+  LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   DATABASE_URL: z.string().optional(),
   AUTH_SECRET: z.string().optional(),
   DEFAULT_LOCALE: z.enum(['en', 'id']).optional(),

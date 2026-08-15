@@ -325,6 +325,17 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
 - 21st.dev MCP: `NOT REQUIRED`
 - Summary: Implemented alert acknowledgement data contracts (`AcknowledgeAlertInputSchema`, `AlertAcknowledgementDto`), database transactional acknowledgement in `AlertRepository` (`acknowledgeAlert`) persisting acknowledgement records to `alert_acknowledgements` and emitting `alert.acknowledged` audit logs, `POST /api/v1/alerts/{alertId}/acknowledge` API route handler with RBAC enforcement (`alert.acknowledge` for OWNER global scope, ADMIN assigned-device scope), and `/notifikasi` frontend page wiring with `Premium Minimal Ops` modal for optional operator notes. Preserved alerts without deletion, handled duplicate acknowledgements safely and idempotently, and ensured 100% key parity and placeholder alignment for English and Indonesian translations. Reconciled documentation in `API.md`, `USER_FLOWS.md`, and `TRACEABILITY.md` to remove stale Admin acknowledgement TBD wording.
 
+#### TASK-0904 Governance Record
+
+`TASK-0904` structured application logging implementation record:
+- Status: `DONE` (Completed 2026-08-15)
+- Frontend impact: `NONE`
+- Selected UI direction: `N/A`
+- Existing color template: `UNCHANGED`
+- Selected motion effects: `None`
+- 21st.dev MCP: `NOT REQUIRED`
+- Summary: Implemented structured JSON application logging across `@kebun-melon/contracts`, `@kebun-melon/web`, and `@kebun-melon/iot-gateway`. Defined `LogLevel` enum/priorities, `LogMeta` correlation schema (`requestId`, `correlationId`, `userId`, `deviceId`, `commandId`, `messageId`, `traceId`), `StructuredLogEntry` schema, `shouldLog` level comparison, and `serializeStructuredLog` with recursive secret redaction (`redactSecrets`). Added `LOG_LEVEL` environment variable validation to `serverEnvSchema` and `gatewayEnvSchema` with defaults to `'info'`. Created unified `Logger` class supporting correlation context binding (`withContext`/`child`), dynamic level adjustment (`setLevel`/`getLevel`), service/environment tags, and structured error serialization. Replaced ad-hoc `console.error` calls across web routes and audit services. Added 100% test coverage across contract, web, gateway unit test suites, and environment validation test suites.
+
 ---
 
 ## 5. Task Selection Rules

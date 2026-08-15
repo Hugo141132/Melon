@@ -1875,16 +1875,17 @@ Apply to:
 ## TASK-0904 — Implement Structured Application Logging
 
 **Priority:** `P1`  
-**Status:** `BACKLOG`  
+**Status:** `DONE`
 **Dependencies:** `TASK-0103`
+**Completed:** 2026-08-15 — Implemented centralized structured application logging across monorepo (`packages/contracts`, `apps/web`, `apps/iot-gateway`). Defined `LogLevel`, `LogMeta`, `StructuredLogRecord`, and `formatLogRecord` in `@kebun-melon/contracts`. Configured `LOG_LEVEL` environment variable validation with default `info`. Created `apps/web/lib/observability/logger.ts` and upgraded `apps/iot-gateway/src/observability/logger.ts` with structured JSON output, level threshold filtering, correlation IDs, child context propagation, and recursive secret redaction (`SECURITY.md` §20.2). Replaced unformatted `console.*` calls in Web API error handlers. Added unit test suites with 100% pass rate. Verified passing full pre-commit suite and targeted tests.
 
 ### Acceptance Criteria
 
-- JSON or structured format.
-- Correlation IDs.
-- Environment and service name.
-- No secrets.
-- Log levels are configurable.
+- [x] JSON or structured format.
+- [x] Correlation IDs.
+- [x] Environment and service name.
+- [x] No secrets.
+- [x] Log levels are configurable.
 
 ---
 

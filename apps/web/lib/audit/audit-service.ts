@@ -1,3 +1,4 @@
+import { logger } from '@/lib/observability/logger';
 import { prisma, AuditRepository } from '@kebun-melon/database';
 import {
   CreateAuditLogInput,
@@ -73,9 +74,12 @@ export async function logAuthorizationDenial(
       request
     );
   } catch (err) {
-    if (process.env.NODE_ENV !== 'test') {
-      console.error('Failed to log authorization denial audit record:', err);
-    }
+    logger.error('Failed to log authorization denial audit record', err, {
+      permissionCode,
+      targetType,
+      targetId,
+      actorUserId: session?.id,
+    });
     return null;
   }
 }

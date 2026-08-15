@@ -6,3 +6,4 @@ export * from './telemetry';
 export * from './alert';
 export * from './faucet';
 export * from './audit';
+export * from './logging';

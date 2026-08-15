@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logger } from '@/lib/observability/logger';
 import { prisma, DeviceRepository, TelemetryRepository } from '@kebun-melon/database';
 import { WaterHistoryQuerySchema } from '@kebun-melon/contracts';
 import {
@@ -141,7 +142,6 @@ export async function GET(request: Request, props: { params: Promise<{ deviceId:
       { status: 200 }
     );
   } catch (error: any) {
-    console.error('WATER_HISTORY_ERROR:', error);
     if (error instanceof AuthorizationError || error?.name === 'AuthorizationError') {
       return NextResponse.json(
         {
@@ -155,6 +155,11 @@ export async function GET(request: Request, props: { params: Promise<{ deviceId:
         { status: error.statusCode }
       );
     }
+
+    logger.error('Unexpected error fetching water monitoring history', error, {
+      deviceId: targetDeviceId,
+      requestId,
+    });
 
     return NextResponse.json(
       {
