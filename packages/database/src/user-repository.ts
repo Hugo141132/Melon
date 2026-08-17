@@ -99,6 +99,49 @@ export type ResetPasswordWithTokenResult =
       message: string;
     };
 
+export interface CreateEmailVerificationTokenInput {
+  userId: string;
+  expiryMinutes?: number;
+  requestId?: string;
+  ipAddress?: string;
+  userAgent?: string;
+}
+
+export type CreateEmailVerificationTokenResult =
+  | {
+      success: true;
+      rawToken: string;
+      user: PublicSafeUserDto;
+      expiresAt: Date;
+    }
+  | {
+      success: false;
+      userExists: false;
+    };
+
+export interface VerifyEmailWithTokenInput {
+  token: string;
+  requestId?: string;
+  ipAddress?: string;
+  userAgent?: string;
+}
+
+export type VerifyEmailWithTokenResult =
+  | {
+      success: true;
+      user: PublicSafeUserDto;
+    }
+  | {
+      success: false;
+      error:
+        | 'INVALID_TOKEN'
+        | 'TOKEN_EXPIRED'
+        | 'INTERNAL_ERROR'
+        | 'TOKEN_ALREADY_USED'
+        | 'CONCURRENCY_CONFLICT';
+      message: string;
+    };
+
 export interface UserLifecycleInput {
   targetUserId: string;
   actorUserId: string;
@@ -343,6 +386,7 @@ export class UserRepository {
 
     const where: any = {
       accountStatus: AccountStatus.PENDING_APPROVAL,
+      emailVerifiedAt: { not: null },
     };
 
     if (search) {
@@ -414,10 +458,11 @@ export class UserRepository {
         email: true,
         accountStatus: true,
         createdAt: true,
+        emailVerifiedAt: true,
       },
     });
 
-    if (!user || user.accountStatus !== AccountStatus.PENDING_APPROVAL) {
+    if (!user || user.accountStatus !== AccountStatus.PENDING_APPROVAL || !user.emailVerifiedAt) {
       return null;
     }
 
@@ -451,6 +496,7 @@ export class UserRepository {
               email: true,
               username: true,
               accountStatus: true,
+              emailVerifiedAt: true,
               createdAt: true,
               updatedAt: true,
             },
@@ -469,6 +515,16 @@ export class UserRepository {
               success: false as const,
               error: 'INVALID_STATUS' as const,
               message: `Target user is in status '${targetUser.accountStatus}', not PENDING_APPROVAL. Approval cannot be processed.`,
+              currentStatus: targetUser.accountStatus as AccountStatus,
+            };
+          }
+
+          if (!targetUser.emailVerifiedAt) {
+            return {
+              success: false as const,
+              error: 'INVALID_STATUS' as const,
+              message:
+                'Target user email has not been verified. Approval cannot be processed until email is verified.',
               currentStatus: targetUser.accountStatus as AccountStatus,
             };
           }
@@ -605,6 +661,7 @@ export class UserRepository {
               email: true,
               username: true,
               accountStatus: true,
+              emailVerifiedAt: true,
               createdAt: true,
               updatedAt: true,
             },
@@ -623,6 +680,16 @@ export class UserRepository {
               success: false as const,
               error: 'INVALID_STATUS' as const,
               message: `Target user is in status '${targetUser.accountStatus}', not PENDING_APPROVAL. Rejection cannot be processed.`,
+              currentStatus: targetUser.accountStatus as AccountStatus,
+            };
+          }
+
+          if (!targetUser.emailVerifiedAt) {
+            return {
+              success: false as const,
+              error: 'INVALID_STATUS' as const,
+              message:
+                'Target user email has not been verified. Rejection cannot be processed until email is verified.',
               currentStatus: targetUser.accountStatus as AccountStatus,
             };
           }
@@ -2063,6 +2130,212 @@ export class UserRepository {
         message: 'A database error occurred while updating user preferences.',
       };
     }
+  }
+
+  /**
+   * Generates a secure, single-use email verification token.
+   * Invalidates any existing unused tokens for the user.
+   * Never stores the raw token, only the SHA-256 hash.
+   */
+  async createEmailVerificationToken(
+    input: CreateEmailVerificationTokenInput
+  ): Promise<CreateEmailVerificationTokenResult> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: input.userId },
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        username: true,
+        accountStatus: true,
+        emailVerifiedAt: true,
+        lastLoginAt: true,
+        suspendedAt: true,
+        deactivatedAt: true,
+        createdAt: true,
+        updatedAt: true,
+        userRoles: {
+          where: { revokedAt: null },
+          select: {
+            id: true,
+            userId: true,
+            roleId: true,
+            assignedByUserId: true,
+            assignedAt: true,
+            revokedAt: true,
+            role: { select: { code: true } },
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      return { success: false, userExists: false };
+    }
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const expiryMinutes = input.expiryMinutes ?? 1440; // Default 24 hours
+    const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.emailVerificationToken.deleteMany({
+        where: { userId: user.id },
+      });
+
+      await tx.emailVerificationToken.create({
+        data: {
+          tokenHash,
+          userId: user.id,
+          expiresAt,
+        },
+      });
+    });
+
+    const safeUser = toPublicSafeUserDto(this.mapPrismaUserToRawDbUser(user));
+
+    return {
+      success: true,
+      rawToken,
+      user: safeUser,
+      expiresAt,
+    };
+  }
+
+  /**
+   * Verifies an email ownership token.
+   * Validates token existence and expiry.
+   * Updates emailVerifiedAt on the User model.
+   * Deletes the token after use.
+   */
+  async verifyEmailWithToken(
+    input: VerifyEmailWithTokenInput
+  ): Promise<VerifyEmailWithTokenResult> {
+    const tokenHash = crypto.createHash('sha256').update(input.token).digest('hex');
+    const MAX_RETRIES = 3;
+    let attempt = 0;
+
+    while (attempt < MAX_RETRIES) {
+      try {
+        const result = await this.prisma.$transaction(
+          async (tx) => {
+            const tokenRecord = await tx.emailVerificationToken.findUnique({
+              where: { tokenHash },
+              include: {
+                user: {
+                  include: {
+                    userRoles: {
+                      where: { revokedAt: null },
+                      include: { role: true },
+                    },
+                  },
+                },
+              },
+            });
+
+            if (!tokenRecord) {
+              return {
+                success: false as const,
+                error: 'INVALID_TOKEN' as const,
+                message: 'Invalid or missing email verification token.',
+              };
+            }
+
+            if (tokenRecord.expiresAt < new Date()) {
+              await tx.emailVerificationToken.delete({
+                where: { id: tokenRecord.id },
+              });
+              return {
+                success: false as const,
+                error: 'TOKEN_EXPIRED' as const,
+                message: 'Email verification token has expired.',
+              };
+            }
+
+            const updatedUser = await tx.user.update({
+              where: { id: tokenRecord.userId },
+              data: { emailVerifiedAt: new Date() },
+              include: {
+                userRoles: {
+                  where: { revokedAt: null },
+                  include: { role: true },
+                },
+              },
+            });
+
+            await tx.emailVerificationToken.delete({
+              where: { id: tokenRecord.id },
+            });
+
+            await tx.auditLog.create({
+              data: {
+                eventKey: 'account.email.verified',
+                actorUserId: updatedUser.id,
+                actorRole: null,
+                targetType: 'USER',
+                targetId: updatedUser.id,
+                result: 'SUCCESS',
+                previousValues: { emailVerifiedAt: null },
+                newValues: { emailVerifiedAt: updatedUser.emailVerifiedAt },
+                metadata: {
+                  action: 'EMAIL_VERIFICATION',
+                },
+                requestId: input.requestId,
+                ipAddress: input.ipAddress,
+                userAgent: input.userAgent,
+              },
+            });
+
+            return {
+              success: true as const,
+              user: toPublicSafeUserDto(this.mapPrismaUserToRawDbUser(updatedUser)),
+            };
+          },
+          {
+            isolationLevel: 'RepeatableRead',
+          }
+        );
+
+        return result;
+      } catch (err: any) {
+        if (err.code === 'P2034') {
+          // Write conflict/deadlock. We will retry if attempts remain.
+          attempt++;
+          if (attempt < MAX_RETRIES) {
+            // Small exponential backoff + jitter
+            const delayMs = Math.pow(2, attempt) * 50 + Math.random() * 50;
+            await new Promise((resolve) => setTimeout(resolve, delayMs));
+            continue;
+          }
+          return {
+            success: false,
+            error: 'CONCURRENCY_CONFLICT',
+            message: 'A concurrent request is already processing this token.',
+          };
+        }
+
+        if (err.code === 'P2025') {
+          return {
+            success: false,
+            error: 'TOKEN_ALREADY_USED',
+            message: 'Email verification token has already been used.',
+          };
+        }
+
+        return {
+          success: false,
+          error: 'INTERNAL_ERROR',
+          message: 'An internal error occurred during email verification.',
+        };
+      }
+    }
+
+    // Fallback if loop exits (should not happen due to returns/continues)
+    return {
+      success: false,
+      error: 'INTERNAL_ERROR',
+      message: 'Failed to verify email after maximum retries.',
+    };
   }
 
   /**

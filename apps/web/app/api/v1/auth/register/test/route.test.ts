@@ -2,6 +2,15 @@ import { describe, it, expect, vi } from 'vitest';
 import { POST } from '../route';
 import * as dbModule from '@kebun-melon/database';
 import { AccountStatus, UserRole } from '@kebun-melon/contracts';
+import * as resendModule from '@/lib/email/resend';
+
+vi.spyOn(dbModule.UserRepository.prototype, 'createEmailVerificationToken').mockResolvedValue({
+  success: true,
+  rawToken: 'mock-token',
+  tokenHash: 'mock-hash',
+} as any);
+
+vi.spyOn(resendModule, 'sendVerificationEmail').mockResolvedValue(true as any);
 
 describe('POST /api/v1/auth/register Route Handler Unit Tests', () => {
   it('1. Returns 201 Created and safe user DTO on valid registration', async () => {

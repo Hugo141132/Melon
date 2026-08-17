@@ -268,4 +268,344 @@ describe('UserRepository Unit Tests', () => {
       })
     );
   });
+
+  describe('rejectPendingAdmin and approvePendingAdmin unit tests', () => {
+    const ownerId = '10000000-0000-0000-0000-000000000001';
+    const adminId = '10000000-0000-0000-0000-000000000002';
+
+    it('rejectPendingAdmin succeeds for verified PENDING_APPROVAL admin', async () => {
+      const mockTx: any = {
+        user: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: adminId,
+            fullName: 'Pending Admin',
+            email: 'admin.pending@example.com',
+            username: null,
+            accountStatus: 'PENDING_APPROVAL',
+            emailVerifiedAt: new Date(),
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }),
+          update: vi.fn().mockResolvedValue({
+            id: adminId,
+            fullName: 'Pending Admin',
+            email: 'admin.pending@example.com',
+            username: null,
+            accountStatus: 'REJECTED',
+            emailVerifiedAt: new Date(),
+            lastLoginAt: null,
+            suspendedAt: null,
+            deactivatedAt: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            userRoles: [],
+          }),
+        },
+        accountApproval: {
+          create: vi.fn().mockResolvedValue({ id: 'appr-1' }),
+        },
+        auditLog: {
+          create: vi.fn().mockResolvedValue({ id: 'audit-1' }),
+        },
+      };
+
+      const mockPrismaClient: any = {
+        $transaction: vi.fn().mockImplementation((cb: any) => cb(mockTx)),
+      };
+
+      const repo = new UserRepository(mockPrismaClient);
+      const result = await repo.rejectPendingAdmin({
+        targetUserId: adminId,
+        decidedByUserId: ownerId,
+        decisionNote: 'Not eligible',
+      });
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.user.accountStatus).toBe(AccountStatus.REJECTED);
+      expect(result.approvalRecordId).toBe('appr-1');
+      expect(mockTx.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: adminId },
+          data: { accountStatus: 'REJECTED' },
+        })
+      );
+    });
+
+    it('rejectPendingAdmin rejects unverified PENDING_APPROVAL admin (emailVerifiedAt is null)', async () => {
+      const mockTx: any = {
+        user: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: adminId,
+            fullName: 'Unverified Admin',
+            email: 'admin.unverif@example.com',
+            username: null,
+            accountStatus: 'PENDING_APPROVAL',
+            emailVerifiedAt: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }),
+        },
+      };
+
+      const mockPrismaClient: any = {
+        $transaction: vi.fn().mockImplementation((cb: any) => cb(mockTx)),
+      };
+
+      const repo = new UserRepository(mockPrismaClient);
+      const result = await repo.rejectPendingAdmin({
+        targetUserId: adminId,
+        decidedByUserId: ownerId,
+      });
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error).toBe('INVALID_STATUS');
+      expect(result.message).toContain('email has not been verified');
+    });
+
+    it('rejectPendingAdmin rejects already decided admin with INVALID_STATUS and currentStatus', async () => {
+      const mockTx: any = {
+        user: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: adminId,
+            fullName: 'Already Active Admin',
+            email: 'admin.active@example.com',
+            username: null,
+            accountStatus: 'ACTIVE',
+            emailVerifiedAt: new Date(),
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }),
+        },
+      };
+
+      const mockPrismaClient: any = {
+        $transaction: vi.fn().mockImplementation((cb: any) => cb(mockTx)),
+      };
+
+      const repo = new UserRepository(mockPrismaClient);
+      const result = await repo.rejectPendingAdmin({
+        targetUserId: adminId,
+        decidedByUserId: ownerId,
+      });
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error).toBe('INVALID_STATUS');
+      expect(result.currentStatus).toBe(AccountStatus.ACTIVE);
+    });
+
+    it('approvePendingAdmin succeeds for verified PENDING_APPROVAL admin', async () => {
+      const mockTx: any = {
+        user: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: adminId,
+            fullName: 'Pending Admin',
+            email: 'admin.pending@example.com',
+            username: null,
+            accountStatus: 'PENDING_APPROVAL',
+            emailVerifiedAt: new Date(),
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }),
+          update: vi.fn().mockResolvedValue({
+            id: adminId,
+            fullName: 'Pending Admin',
+            email: 'admin.pending@example.com',
+            username: null,
+            accountStatus: 'ACTIVE',
+            emailVerifiedAt: new Date(),
+            lastLoginAt: null,
+            suspendedAt: null,
+            deactivatedAt: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            userRoles: [],
+          }),
+        },
+        accountApproval: {
+          create: vi.fn().mockResolvedValue({ id: 'appr-2' }),
+        },
+        auditLog: {
+          create: vi.fn().mockResolvedValue({ id: 'audit-2' }),
+        },
+      };
+
+      const mockPrismaClient: any = {
+        $transaction: vi.fn().mockImplementation((cb: any) => cb(mockTx)),
+      };
+
+      const repo = new UserRepository(mockPrismaClient);
+      const result = await repo.approvePendingAdmin({
+        targetUserId: adminId,
+        decidedByUserId: ownerId,
+        decisionNote: 'Verified identity',
+      });
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.user.accountStatus).toBe(AccountStatus.ACTIVE);
+      expect(result.approvalRecordId).toBe('appr-2');
+      expect(mockTx.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: adminId },
+          data: { accountStatus: 'ACTIVE' },
+        })
+      );
+    });
+
+    it('approvePendingAdmin rejects unverified PENDING_APPROVAL admin (emailVerifiedAt is null)', async () => {
+      const mockTx: any = {
+        user: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: adminId,
+            fullName: 'Unverified Admin',
+            email: 'admin.unverif@example.com',
+            username: null,
+            accountStatus: 'PENDING_APPROVAL',
+            emailVerifiedAt: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }),
+        },
+      };
+
+      const mockPrismaClient: any = {
+        $transaction: vi.fn().mockImplementation((cb: any) => cb(mockTx)),
+      };
+
+      const repo = new UserRepository(mockPrismaClient);
+      const result = await repo.approvePendingAdmin({
+        targetUserId: adminId,
+        decidedByUserId: ownerId,
+      });
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error).toBe('INVALID_STATUS');
+      expect(result.message).toContain('email has not been verified');
+    });
+
+    it('approvePendingAdmin rejects already decided admin with INVALID_STATUS and currentStatus', async () => {
+      const mockTx: any = {
+        user: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: adminId,
+            fullName: 'Already Rejected Admin',
+            email: 'admin.rejected@example.com',
+            username: null,
+            accountStatus: 'REJECTED',
+            emailVerifiedAt: new Date(),
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }),
+        },
+      };
+
+      const mockPrismaClient: any = {
+        $transaction: vi.fn().mockImplementation((cb: any) => cb(mockTx)),
+      };
+
+      const repo = new UserRepository(mockPrismaClient);
+      const result = await repo.approvePendingAdmin({
+        targetUserId: adminId,
+        decidedByUserId: ownerId,
+      });
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error).toBe('INVALID_STATUS');
+      expect(result.currentStatus).toBe(AccountStatus.REJECTED);
+    });
+    describe('verifyEmailWithToken concurrency', () => {
+      it('simulated P2034 retries and then succeeds', async () => {
+        let attempts = 0;
+        const mockTx = {
+          emailVerificationToken: {
+            findUnique: vi.fn().mockResolvedValue({
+              id: 't1',
+              userId: 'u1',
+              expiresAt: new Date(Date.now() + 100000),
+            }),
+            delete: vi.fn(),
+          },
+          user: {
+            update: vi.fn().mockResolvedValue({
+              id: '550e8400-e29b-41d4-a716-446655440000',
+              fullName: 'Test User',
+              email: 'test@example.com',
+              username: 'testuser',
+              passwordHash: 'dummy',
+              accountStatus: 'PENDING_APPROVAL',
+              emailVerifiedAt: new Date(),
+              lastLoginAt: null,
+              suspendedAt: null,
+              deactivatedAt: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              userRoles: [],
+            }),
+          },
+          auditLog: {
+            create: vi.fn(),
+          },
+        };
+
+        const mockPrismaClient: any = {
+          $transaction: vi.fn().mockImplementation(async (cb) => {
+            attempts++;
+            if (attempts < 3) {
+              const err = new Error('Write conflict');
+              (err as any).code = 'P2034';
+              throw err;
+            }
+            return cb(mockTx);
+          }),
+        };
+
+        const repo = new UserRepository(mockPrismaClient);
+        const result = await repo.verifyEmailWithToken({ token: 'test-token' });
+
+        expect(attempts).toBe(3);
+        expect(result.success).toBe(true);
+      });
+
+      it('retry exhaustion is controlled, never 500', async () => {
+        const mockPrismaClient: any = {
+          $transaction: vi.fn().mockImplementation(async () => {
+            const err = new Error('Write conflict');
+            (err as any).code = 'P2034';
+            throw err;
+          }),
+        };
+
+        const repo = new UserRepository(mockPrismaClient);
+        const result = await repo.verifyEmailWithToken({ token: 'test-token' });
+
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          expect(result.error).toBe('CONCURRENCY_CONFLICT');
+        }
+      });
+
+      it('reused token remains rejected safely', async () => {
+        const mockPrismaClient: any = {
+          $transaction: vi.fn().mockImplementation(async () => {
+            const err = new Error('Not found');
+            (err as any).code = 'P2025';
+            throw err;
+          }),
+        };
+
+        const repo = new UserRepository(mockPrismaClient);
+        const result = await repo.verifyEmailWithToken({ token: 'test-token' });
+
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          expect(result.error).toBe('TOKEN_ALREADY_USED');
+        }
+      });
+    });
+  });
 });

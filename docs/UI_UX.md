@@ -78,11 +78,12 @@ The application shall support two authenticated user roles:
 * the login page (`/login`);
 * the create-account page (`/register`);
 * the password-recovery page (`/forgot-password`);
-* the password-reset page (`/reset-password`).
+* the password-reset page (`/reset-password`);
+* the email-verification page (`/verify-email`).
 
-Per `DEC-AUTH-103`, active authenticated users attempting to access these guest pages are immediately redirected server-side to `/` with zero UI flash. Users must log out or use an unauthenticated session before consuming a password reset link.
+Per `DEC-AUTH-103`, active authenticated users attempting to access these guest pages are immediately redirected server-side to `/` with zero UI flash. Users must log out or use an unauthenticated session before consuming a password reset or email verification link.
 
-The `/forgot-password` page features a clean minimalist layout without decorative illustration frames, an empty email input with neutral placeholder, a 15:00 countdown timer matching token lifetime, `sessionStorage` refresh persistence, and an auto-dismissing success toast (5s).
+The `/forgot-password` and `/verify-email` pages feature clean minimalist layouts adhering to `Premium Minimal Ops` without decorative illustration frames. The `/verify-email` page extracts verification tokens from query parameters, executes StrictMode-safe in-flight deduplicated requests with settlement cache eviction, automatically redirects verified Admin applicants to `/status?status=PENDING_APPROVAL`, provides direct login prompts for Owners, and includes a public resend verification form with cooldown timers.
 
 Monitoring, device, alert, control, user-management, audit-log, and settings interfaces shall only be accessible after successful authentication.
 

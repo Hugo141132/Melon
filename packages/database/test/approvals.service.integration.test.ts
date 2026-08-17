@@ -40,6 +40,7 @@ describe('TASK-0206 Approvals Database Integration & Security Test Suite', () =>
         email: 'alpha@example.com',
         passwordHash: '$argon2id$v=19$m=65536,t=3,p=4$dummyhash1',
         accountStatus: AccountStatus.PENDING_APPROVAL,
+        emailVerifiedAt: new Date(),
       },
     });
 
@@ -82,6 +83,7 @@ describe('TASK-0206 Approvals Database Integration & Security Test Suite', () =>
         email: 'delta@example.com',
         passwordHash: '$argon2id$v=19$m=65536,t=3,p=4$dummyhash4',
         accountStatus: AccountStatus.PENDING_APPROVAL,
+        emailVerifiedAt: new Date(),
       },
     });
 
@@ -125,6 +127,7 @@ describe('TASK-0206 Approvals Database Integration & Security Test Suite', () =>
           email: 'admin.pending@example.com',
           passwordHash: '$argon2id$v=19$m=65536,t=3,p=4$dummyhashpending',
           accountStatus: AccountStatus.PENDING_APPROVAL,
+          emailVerifiedAt: new Date(),
         },
       });
 
@@ -217,6 +220,37 @@ describe('TASK-0206 Approvals Database Integration & Security Test Suite', () =>
       expect(approvals.length).toBe(0);
     });
 
+    it('rejects approval with INVALID_STATUS if target is unverified (emailVerifiedAt is null)', async () => {
+      const ownerUser = await prisma.user.create({
+        data: {
+          fullName: 'Owner User',
+          email: 'owner2_unverif@example.com',
+          passwordHash: '$argon2id$v=19$m=65536,t=3,p=4$dummyhashowner2',
+          accountStatus: AccountStatus.ACTIVE,
+        },
+      });
+
+      const unverifiedUser = await prisma.user.create({
+        data: {
+          fullName: 'Unverified Admin',
+          email: 'admin.unverified@example.com',
+          passwordHash: '$argon2id$v=19$m=65536,t=3,p=4$dummyhashapp',
+          accountStatus: AccountStatus.PENDING_APPROVAL,
+          emailVerifiedAt: null,
+        },
+      });
+
+      const result = await userRepo.approvePendingAdmin({
+        targetUserId: unverifiedUser.id,
+        decidedByUserId: ownerUser.id,
+      });
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error).toBe('INVALID_STATUS');
+      expect(result.message).toContain('email has not been verified');
+    });
+
     it('isolates decision from notification failure (notification throwing error does not roll back approval)', async () => {
       const ownerUser = await prisma.user.create({
         data: {
@@ -233,6 +267,7 @@ describe('TASK-0206 Approvals Database Integration & Security Test Suite', () =>
           email: 'admin.failnotify@example.com',
           passwordHash: '$argon2id$v=19$m=65536,t=3,p=4$dummyhashfailnotify',
           accountStatus: AccountStatus.PENDING_APPROVAL,
+          emailVerifiedAt: new Date(),
         },
       });
 
@@ -269,6 +304,7 @@ describe('TASK-0206 Approvals Database Integration & Security Test Suite', () =>
           email: 'admin.concurrent@example.com',
           passwordHash: '$argon2id$v=19$m=65536,t=3,p=4$dummyhashconcurrent',
           accountStatus: AccountStatus.PENDING_APPROVAL,
+          emailVerifiedAt: new Date(),
         },
       });
 
@@ -324,6 +360,7 @@ describe('TASK-0206 Approvals Database Integration & Security Test Suite', () =>
           email: 'admin.txfail@example.com',
           passwordHash: '$argon2id$v=19$m=65536,t=3,p=4$dummyhashtxfail',
           accountStatus: AccountStatus.PENDING_APPROVAL,
+          emailVerifiedAt: new Date(),
         },
       });
 
@@ -369,6 +406,7 @@ describe('TASK-0206 Approvals Database Integration & Security Test Suite', () =>
           email: 'admin.pending.reject@example.com',
           passwordHash: '$argon2id$v=19$m=65536,t=3,p=4$dummyhashpending',
           accountStatus: AccountStatus.PENDING_APPROVAL,
+          emailVerifiedAt: new Date(),
         },
       });
 
@@ -461,6 +499,37 @@ describe('TASK-0206 Approvals Database Integration & Security Test Suite', () =>
       expect(approvals.length).toBe(0);
     });
 
+    it('rejects rejection request with INVALID_STATUS if target is unverified (emailVerifiedAt is null)', async () => {
+      const ownerUser = await prisma.user.create({
+        data: {
+          fullName: 'Owner User',
+          email: 'owner_reject_unverif@example.com',
+          passwordHash: '$argon2id$v=19$m=65536,t=3,p=4$dummyhashowner2',
+          accountStatus: AccountStatus.ACTIVE,
+        },
+      });
+
+      const unverifiedUser = await prisma.user.create({
+        data: {
+          fullName: 'Unverified Admin Reject',
+          email: 'admin.reject.unverified@example.com',
+          passwordHash: '$argon2id$v=19$m=65536,t=3,p=4$dummyhashapp',
+          accountStatus: AccountStatus.PENDING_APPROVAL,
+          emailVerifiedAt: null,
+        },
+      });
+
+      const result = await userRepo.rejectPendingAdmin({
+        targetUserId: unverifiedUser.id,
+        decidedByUserId: ownerUser.id,
+      });
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error).toBe('INVALID_STATUS');
+      expect(result.message).toContain('email has not been verified');
+    });
+
     it('handles two concurrent rejection/approval requests producing exactly 1 success and 1 conflict', async () => {
       const ownerUser = await prisma.user.create({
         data: {
@@ -477,6 +546,7 @@ describe('TASK-0206 Approvals Database Integration & Security Test Suite', () =>
           email: 'admin.concurrent.reject@example.com',
           passwordHash: '$argon2id$v=19$m=65536,t=3,p=4$dummyhashconcurrent',
           accountStatus: AccountStatus.PENDING_APPROVAL,
+          emailVerifiedAt: new Date(),
         },
       });
 

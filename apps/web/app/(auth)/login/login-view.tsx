@@ -46,6 +46,10 @@ function LoginForm() {
           router.push('/status');
           return;
         }
+        if (json.error?.code === 'EMAIL_NOT_VERIFIED') {
+          router.push(`/verify-email?email=${encodeURIComponent(email.trim())}`);
+          return;
+        }
         setErrorMessage(json.error?.message || tAuth('loginFailed'));
         setLoading(false);
         return;

@@ -6,6 +6,7 @@ import {
   AccountStatusForbiddenError,
   SESSION_COOKIE_NAME,
   SESSION_ABSOLUTE_LIFETIME_SECONDS,
+  UnverifiedEmailError,
 } from '@kebun-melon/database';
 import { AccountStatus, LoginInputSchema } from '@kebun-melon/contracts';
 import { ZodError } from 'zod';
@@ -122,6 +123,18 @@ export async function POST(request: Request) {
           success: false,
           error: {
             code,
+            message: error.message,
+          },
+          meta: { requestId },
+        },
+        { status: 403 }
+      );
+    } else if (error instanceof UnverifiedEmailError || error?.name === 'UnverifiedEmailError') {
+      errResponse = NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'EMAIL_NOT_VERIFIED',
             message: error.message,
           },
           meta: { requestId },

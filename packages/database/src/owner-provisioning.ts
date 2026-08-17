@@ -104,7 +104,7 @@ export async function provisionFirstOwner(
   // Pre-hash password before entering transaction to keep transaction window small
   const passwordHash = await hashPassword(input.password);
 
-  return await prisma.$transaction(
+  const result = await prisma.$transaction(
     async (tx) => {
       // 1. Acquire transaction-scoped PostgreSQL advisory lock for first-Owner critical section
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(${FIRST_OWNER_PROVISIONING_LOCK_ID})`;
@@ -208,6 +208,8 @@ export async function provisionFirstOwner(
       isolationLevel: 'Serializable',
     }
   );
+
+  return result;
 }
 
 /**

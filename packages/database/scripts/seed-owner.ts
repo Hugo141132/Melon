@@ -123,7 +123,12 @@ async function main() {
     console.log(`Email: ${result.user.email}`);
     console.log(`Full Name: ${result.user.fullName}`);
     console.log(`Account Status: ${result.user.accountStatus}`);
-    console.log(`Role: OWNER`);
+    console.log(`Role: OWNER\n`);
+    console.log(
+      'ACTION REQUIRED: Email verification dispatch is delegated to the application layer to preserve architectural boundaries.'
+    );
+    console.log('Please login to the web interface using the newly provisioned credentials.');
+    console.log('The system will prompt you to send a verification email to complete activation.');
   } catch (error: any) {
     password = '';
     console.error(`PROVISIONING FAILED: ${error.message}`);

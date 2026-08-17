@@ -55,12 +55,17 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
     const ownerPasswordHash = await hashPassword(ownerPassword);
     const owner = await prisma.user.upsert({
       where: { email: ownerEmail },
-      update: { passwordHash: ownerPasswordHash, accountStatus: 'ACTIVE' },
+      update: {
+        passwordHash: ownerPasswordHash,
+        accountStatus: 'ACTIVE',
+        emailVerifiedAt: new Date(),
+      },
       create: {
         email: ownerEmail,
         fullName: 'Hugo P Owner',
         passwordHash: ownerPasswordHash,
         accountStatus: 'ACTIVE',
+        emailVerifiedAt: new Date(),
       },
     });
 
@@ -154,9 +159,9 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
 
     await page.click('button[type="submit"]');
 
-    // Page should redirect to status page showing pending approval
-    await expect(page).toHaveURL(/\/status/, { timeout: 10000 });
-    await expect(page.locator('body')).toContainText(/menunggu persetujuan|pending_approval/i);
+    // Page should redirect to verify-email page showing verification instructions
+    await expect(page).toHaveURL(/\/verify-email/, { timeout: 10000 });
+    await expect(page.locator('body')).toContainText(/verifikasi|verify/i);
 
     // Fetch created admin user ID from DB for assertions & cleanup
     const createdUser = await prisma.user.findUnique({
@@ -165,6 +170,12 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
     expect(createdUser).not.toBeNull();
     expect(createdUser?.accountStatus).toBe('PENDING_APPROVAL');
     adminUserId = createdUser!.id;
+
+    // Simulate email verification so subsequent flows (like login) pass
+    await prisma.user.update({
+      where: { id: adminUserId },
+      data: { emailVerifiedAt: new Date() },
+    });
   });
 
   // Flow 2: Owner Approval

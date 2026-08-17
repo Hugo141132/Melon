@@ -144,6 +144,44 @@ describe('TASK-0207 Owner Approve API Route Unit Tests', () => {
     expect(json.error.details.currentStatus).toBe(AccountStatus.APPROVED);
   });
 
+  it('returns 409 CONFLICT if target user email is unverified', async () => {
+    mockCookieToken = 'valid-owner-token';
+
+    mockValidateSession.mockResolvedValueOnce({
+      session: { id: 's2', userId: 'owner-id-1' },
+      user: {
+        id: 'owner-id-1',
+        fullName: 'Owner User',
+        email: 'owner@test.com',
+        accountStatus: AccountStatus.ACTIVE,
+        activeRoles: [UserRole.OWNER],
+      },
+    });
+
+    mockReadActiveRoleAssignments.mockResolvedValueOnce([UserRole.OWNER]);
+
+    mockApprovePendingAdmin.mockResolvedValueOnce({
+      success: false,
+      error: 'INVALID_STATUS',
+      message:
+        'Target user email has not been verified. Approval cannot be processed until email is verified.',
+      currentStatus: AccountStatus.PENDING_APPROVAL,
+    });
+
+    const req = new Request('http://localhost:3000/api/v1/approvals/unverified-id/approve', {
+      method: 'POST',
+    });
+    const res = await approvePOST(req, {
+      params: Promise.resolve({ userId: 'unverified-id' }),
+    });
+
+    expect(res.status).toBe(409);
+    const json = await res.json();
+    expect(json.success).toBe(false);
+    expect(json.error.code).toBe('CONFLICT');
+    expect(json.error.message).toContain('email has not been verified');
+  });
+
   it('returns 200 OK with approved user DTO for valid OWNER approval', async () => {
     mockCookieToken = 'valid-owner-token';
 

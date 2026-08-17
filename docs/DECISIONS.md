@@ -308,10 +308,26 @@
 * **Related Documentation**: `docs/SECURITY.md`, `docs/USER_FLOWS.md`, `AGENTS.md`
 * **Status**: **APPROVED BY USER**
 * **Approved Decision**:
-  1. **Server-Side Verification**: Guest-only authentication pages (`/login`, `/register`, `/forgot-password`, `/reset-password`) execute `requireGuestSession` server-side before rendering any component HTML.
+  1. **Server-Side Verification**: Guest-only authentication pages (`/login`, `/register`, `/forgot-password`, `/reset-password`, `/verify-email`) execute `requireGuestSession` server-side before rendering any component HTML.
   2. **Active Session Handling**: If a genuinely valid session with `accountStatus === 'ACTIVE'` exists in PostgreSQL, the server immediately issues an HTTP 307 redirect to `/` with zero HTML streamed for the auth page and zero page flash.
   3. **Stale/Invalid Session Handling**: Invalid, expired, revoked, malformed, or absent session tokens render the guest page normally with zero redirect loops.
-  4. **Reset-Password Policy**: `/reset-password` is inaccessible while authenticated; an authenticated user must log out or use an unauthenticated session before consuming a password reset link.
+  4. **Reset-Password & Verify-Email Policy**: `/reset-password` and `/verify-email` are inaccessible while authenticated; an authenticated user must log out or use an unauthenticated session.
+
+#### DEC-AUTH-104: Mandatory Registration Email Verification
+* **Related Task IDs**: `TASK-0214`
+* **Related Documentation**: `docs/PRD.md`, `docs/API.md`, `docs/DATABASE.md`, `docs/SECURITY.md`, `docs/USER_FLOWS.md`, `AGENTS.md`, `TASKS.md`
+* **Status**: **APPROVED BY USER**
+* **Approved Decision**:
+  1. **Independent Verification State**: Email ownership verification is tracked via a nullable `emailVerifiedAt` timestamp on the `users` table, completely decoupled from `accountStatus`. Verifying email ownership does NOT modify or auto-activate `accountStatus`.
+  2. **Owner Login Gate**: Although the first Owner is created as `ACTIVE`, login and protected access remain strictly blocked with `EMAIL_NOT_VERIFIED` (HTTP 403) until `emailVerifiedAt` is populated.
+  3. **Admin Approval Gate**: Pending Admin registrations cannot be approved or rejected by an Owner via `approvePendingAdmin` or `rejectPendingAdmin` until `emailVerifiedAt` is populated (unverified requests return `INVALID_STATUS` / HTTP 409). Unverified Admin accounts are filtered from the active Owner approval queue (`getPendingApprovals`).
+  4. **Admin Status Preservation**: Verifying email ownership leaves an Admin account in `PENDING_APPROVAL` status and automatically redirects to `/status?status=PENDING_APPROVAL` until explicitly reviewed and approved by an Owner.
+  5. **Session-Free Verification Endpoint**: `POST /api/v1/auth/verify-email` verifies email ownership exclusively and MUST NOT issue, create, or return an authentication session.
+  6. **Token Security**: Verification tokens are generated as 256-bit CSPRNG random hex strings. Only the SHA-256 hash is persisted in `email_verification_tokens`. Token expiry is 24 hours (`AUTH_VERIFY_TOKEN_EXPIRY_HOURS = 24`). Creating a new token invalidates prior unused tokens for that user.
+  7. **Rate Limiting & Anti-Enumeration**: `POST /api/v1/auth/resend-verification` enforces 3 req/min rate limit (`RATE_LIMIT_RESEND_VERIFICATION_MAX = 3`), timing attack mitigations, and returns generic HTTP 200 without exposing account existence.
+  8. **Concurrency & Database Retries**: In `verifyEmailWithToken`, Prisma `P2034` transaction write conflicts are retried with bounded exponential backoff (3 attempts), returning controlled `CONCURRENCY_CONFLICT` (HTTP 409) if exhausted and `TOKEN_ALREADY_USED` (HTTP 400) for `P2025` (deleted token).
+  9. **Frontend In-Flight Deduplication**: `/verify-email` utilizes a token-keyed in-flight Promise map with immediate cache eviction upon settlement (`finally`), ensuring exactly 1 network POST in React Strict Mode/remounts while delivering the result to the active mount and removing decorative illustrations for a clean layout.
+  10. **Delivery & Testing Status**: Email verification has been manually exercised using Resend test mode/test recipients and the Resend-provided verification link. We have not yet tested delivery to arbitrary real email recipients using a verified custom sending domain, because no such domain is currently configured. Real-mailbox deliverability is treated as pending deployment/infrastructure acceptance, not an application logic failure.
 
 ---
 

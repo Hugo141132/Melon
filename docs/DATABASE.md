@@ -190,6 +190,7 @@ erDiagram
     USERS ||--o{ USER_PREFERENCES : owns
     USERS ||--o{ SESSIONS : creates
     USERS ||--o{ PASSWORD_RESET_TOKENS : requests
+    USERS ||--o{ EMAIL_VERIFICATION_TOKENS : receives
 ```
 
 ---
@@ -208,7 +209,7 @@ Stores user identity, role-independent profile fields, account status, and appro
 | `username` | VARCHAR(100) | Yes | Unique when used |
 | `password_hash` | TEXT | No | Never returned to frontend |
 | `account_status` | VARCHAR(40) or enum | No | Canonical status |
-| `email_verified_at` | TIMESTAMPTZ | Yes | If email verification is implemented |
+| `email_verified_at` | TIMESTAMPTZ | Yes | Nullable timestamp recording email ownership verification (`DEC-AUTH-104` / `TASK-0214`) |
 | `last_login_at` | TIMESTAMPTZ | Yes | Updated after successful login |
 | `suspended_at` | TIMESTAMPTZ | Yes | Status metadata |
 | `deactivated_at` | TIMESTAMPTZ | Yes | Status metadata |
@@ -426,6 +427,37 @@ Stores cryptographic hashes for single-use password recovery tokens.
 INDEX password_reset_tokens_user_id_idx ON password_reset_tokens (user_id)
 INDEX password_reset_tokens_expires_at_idx ON password_reset_tokens (expires_at)
 INDEX password_reset_tokens_token_hash_idx ON password_reset_tokens (token_hash)
+```
+
+---
+
+## 6.8 `email_verification_tokens` (DB-AUTH-006 / DEC-AUTH-104)
+
+Stores cryptographic hashes for registration email ownership verification tokens.
+
+| Column | Type | Nullable | Notes |
+|---|---|---:|---|
+| `id` | UUID | No | Primary key |
+| `user_id` | UUID | No | Foreign key referencing `users(id) ON DELETE CASCADE` |
+| `token_hash` | VARCHAR(64) | No | Unique cryptographic SHA-256 hex digest of raw 256-bit token |
+| `expires_at` | TIMESTAMPTZ | No | Expiration timestamp (configurable, default 24 hours) |
+| `created_at` | TIMESTAMPTZ | No | Token generation timestamp (`DEFAULT NOW()`) |
+
+### Constraints & Security Rules
+
+- **Raw Token Storage Forbidden**: Raw token is never stored in plaintext; only the SHA-256 hash is persisted.
+- **Single Use**: Upon successful verification (`verifyEmailWithToken`), the token is consumed/deleted and `users.email_verified_at` is stamped with `NOW()`.
+- **Status Decoupling**: Verification updates `email_verified_at` independently and strictly preserves `account_status` (`ADMIN` remains `PENDING_APPROVAL`, `OWNER` remains `ACTIVE`).
+- **Transactional Invalidation**: Creating a new verification token transactionally invalidates/replaces prior unused tokens for the user.
+- **Concurrency & Conflict Handling**: `verifyEmailWithToken` wraps transactions in bounded exponential backoff retries (3 attempts) on Prisma `P2034` write conflicts. If retries are exhausted, it raises `CONCURRENCY_CONFLICT`. If the token is already deleted/consumed (`P2025`), it returns `TOKEN_ALREADY_USED`.
+- **Approval & Rejection Integrity**: `approvePendingAdmin` and `rejectPendingAdmin` select `emailVerifiedAt` in their transactional projections and strictly require `emailVerifiedAt IS NOT NULL`, rejecting unverified accounts with `INVALID_STATUS`.
+
+### Recommended Indexes
+
+```text
+UNIQUE INDEX email_verification_tokens_token_hash_key ON email_verification_tokens (token_hash)
+INDEX email_verification_tokens_user_id_idx ON email_verification_tokens (user_id)
+INDEX email_verification_tokens_expires_at_idx ON email_verification_tokens (expires_at)
 ```
 
 ---
@@ -1091,16 +1123,14 @@ Recommended minimum:
 
 ## 11.3 Password Reset and Verification Tables
 
-Optional tables:
+Implemented tables:
 
 ```text
 password_reset_tokens
 email_verification_tokens
 ```
 
-Tokens shall be stored hashed where practical.
-
-The password recovery and email-verification process is `TBD`.
+Tokens are generated as 256-bit CSPRNG values and stored as SHA-256 hashes (`DEC-AUTH-102`, `DEC-AUTH-104`). Password recovery tokens expire in 15 minutes (`TASK-0213`), and email verification tokens expire in 24 hours (`TASK-0214`). Both enforce single-use replay-safe token deletion upon consumption.
 
 ---
 

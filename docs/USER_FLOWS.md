@@ -262,14 +262,15 @@ flowchart TD
 7. The server assigns role `ADMIN`.
 8. The server assigns status `PENDING_APPROVAL`.
 9. The server stores the new account securely.
-10. The system creates an account-registration audit event.
-11. The system makes the registration visible to an Owner.
-12. The applicant sees an approval-pending message.
+10. The server generates a 256-bit email verification token and dispatches a verification link to the applicant's email via Resend (`DEC-AUTH-104` / `TASK-0214`).
+11. The system creates an account-registration audit event.
+12. The applicant sees an approval-pending and verification-required message.
+13. The registration becomes visible in the Owner's approval queue once email ownership is verified.
 
 **Alternative flows:**
 
-- The system sends an approval-request notification to an Owner.
-- The applicant receives an email confirming that registration was received.
+- The applicant verifies email via `/verify-email?token=...`; account remains `PENDING_APPROVAL` until Owner approval.
+- The applicant requests a new verification link via `/verify-email` (rate-limited to 3/min).
 
 **Error flows:**
 
@@ -279,12 +280,75 @@ flowchart TD
 - Registration service unavailable.
 - Rate limit exceeded.
 
-**Postconditions:** A pending Admin account exists but cannot access protected pages.  
+**Postconditions:** A pending Admin account exists with an unverified or verified email, but cannot access protected pages until approved by an Owner.  
 **Required permissions:** `account.register`.  
 **Relevant account statuses:** Created as `PENDING_APPROVAL`.  
 **UI states:** Form, submitting, success/pending, validation error, server error.  
 **Audit events:** `account.registration.created`.  
-**Open decisions:** Required profile fields, email verification, notification channel.
+**Open decisions:** Notification channel for approval decisions.
+
+---
+
+## Flow 2b — Email Ownership Verification (DEC-AUTH-104 / TASK-0214)
+
+**Primary actor:** Prospective Admin or Initial Owner  
+**Preconditions:** Account exists with unverified email (`emailVerifiedAt IS NULL`). User is not currently authenticated (authenticated users navigating to `/verify-email` are redirected to `/` via server guest guard `DEC-AUTH-103`).  
+**Trigger:** User clicks verification link in email or opens `/verify-email?token=...`.
+
+**Main success flow:**
+
+1. The frontend extracts the verification token from query parameters.
+2. The frontend passes the token to the in-flight deduplicated verification fetcher.
+3. If React Strict Mode or a concurrent remount triggers while the request is in flight, the pending Promise is shared (exactly 1 POST is sent).
+4. The server receives `POST /api/v1/auth/verify-email` with `{ token }`.
+5. The server looks up the token by SHA-256 hash in `email_verification_tokens`.
+6. The server validates token expiration (24 hours) and single-use status.
+7. The server updates `emailVerifiedAt = NOW()`, transactionally deletes the token, handles any Prisma `P2034` write conflicts with bounded retries, and logs `auth.email_verified`.
+8. The server returns HTTP 200 OK with `{ verified: true, accountStatus }` without creating an authenticated session.
+9. Upon promise settlement, the token is evicted from the in-flight cache map (`finally`).
+10. The active mounted view receives the response:
+    - If `accountStatus === 'PENDING_APPROVAL'` (Admin), the frontend automatically redirects to `/status?status=PENDING_APPROVAL`.
+    - If `accountStatus === 'ACTIVE'` (Owner), the frontend displays the verified success view with a button directing to `/login`.
+
+**Error flows:**
+
+- Invalid or missing token: display clear error with option to request a new link.
+- Expired token: display expiration notice with link to resend verification.
+- Already used token (P2025 / duplicate): server returns HTTP 400 `TOKEN_ALREADY_USED`; frontend displays clear used-token message.
+- Reopening consumed link: cache is clear, server returns HTTP 400 `TOKEN_ALREADY_USED`.
+- Concurrency conflict exhaustion: server returns HTTP 409 `CONCURRENCY_CONFLICT`.
+
+**Postconditions:** `emailVerifiedAt` is set; account status is preserved (`ADMIN` remains `PENDING_APPROVAL`, `OWNER` remains `ACTIVE`).  
+**Required permissions:** None (public verification endpoint; guest-only page).  
+**Relevant account statuses:** Any.  
+**UI states:** Verifying spinner, verification success, token invalid/expired error, resend cooldown.  
+**Audit events:** `auth.email_verified`.
+
+---
+
+## Flow 2c — Resend Verification Email (DEC-AUTH-104 / TASK-0214)
+
+**Primary actor:** Unverified User (Admin or Owner)  
+**Preconditions:** User has registered but needs a new verification link.  
+**Trigger:** User enters email and submits resend request on `/verify-email`.
+
+**Main success flow:**
+
+1. The user enters their email address.
+2. The server validates rate limits (max 3 req/min).
+3. The server checks if an account exists and is unverified.
+4. If eligible, the server generates a new 256-bit token, invalidates prior tokens, and dispatches email via Resend.
+5. The server returns generic HTTP 200 OK with anti-enumeration guarantee.
+6. The frontend begins a resend cooldown timer and displays confirmation toast.
+
+**Error flows:**
+
+- Rate limit exceeded (HTTP 429): frontend disables resend button and displays cooldown.
+
+**Postconditions:** Verification email dispatched if account eligible; no sensitive state leaked.  
+**Required permissions:** None (public rate-limited endpoint).  
+**UI states:** Resend form, cooldown countdown, success confirmation.  
+**Audit events:** Optional resend dispatch event.
 
 ---
 
@@ -365,8 +429,8 @@ flowchart TD
 1. The server validates the session.
 2. The server verifies role `OWNER`.
 3. The server verifies `account.approve` or equivalent review permission.
-4. The server loads accounts with `PENDING_APPROVAL`.
-5. The frontend displays pending users without exposing secrets.
+4. The server queries accounts where `accountStatus = 'PENDING_APPROVAL'` and `emailVerifiedAt IS NOT NULL` (`DEC-AUTH-104`). Unverified accounts are excluded.
+5. The frontend displays pending verified users without exposing secrets.
 6. The Owner opens a registration record.
 7. The system displays submitted profile information and approval history.
 
@@ -382,7 +446,7 @@ flowchart TD
 
 **Postconditions:** No account status changes until the Owner acts.  
 **Required permissions:** `account.approve` and/or `account.reject`.  
-**Relevant account statuses:** Owner `ACTIVE`; targets `PENDING_APPROVAL`.  
+**Relevant account statuses:** Owner `ACTIVE`; targets `PENDING_APPROVAL` (verified).  
 **UI states:** Loading, list, empty, details, stale decision.  
 **Audit events:** Optional approval-record view.  
 **Open decisions:** Multiple-Owner policy.
@@ -392,78 +456,66 @@ flowchart TD
 ## Flow 6 — Owner Approves an Admin
 
 **Primary actor:** Owner  
-**Preconditions:** Owner is active; target is `PENDING_APPROVAL`.  
+**Preconditions:** Owner is active; target is `PENDING_APPROVAL` with `emailVerifiedAt IS NOT NULL`.  
 **Trigger:** Owner confirms approval.
 
 **Main success flow:**
 
 1. The frontend asks for confirmation.
 2. The server validates the Owner session and permission.
-3. The server reloads the target account and verifies current status.
-4. The server prevents duplicate or conflicting decisions.
-5. The server changes status to `APPROVED` or `ACTIVE` according to the final activation policy.
-6. The server records acting Owner, previous status, new status, timestamp, and optional note.
-7. The system notifies the applicant through the configured channel.
-8. The Owner sees confirmation.
-
-**Alternative flows:**
-
-- If email verification or another activation step is required, status becomes `APPROVED` before `ACTIVE`.
+3. The server reloads the target account and verifies `accountStatus === 'PENDING_APPROVAL'`.
+4. The server verifies `emailVerifiedAt IS NOT NULL` (`DEC-AUTH-104`).
+5. The server transitions status to `ACTIVE`.
+6. The server records acting Owner, previous status, new status, timestamp, and optional note in `approval_history` and `audit_logs`.
+7. The Owner sees confirmation and the table refreshes.
 
 **Error flows:**
 
-- Target already approved or rejected: return `409 Conflict`.
-- Owner loses permission during the operation: return `403`.
-- Notification fails: approval remains valid, notification failure is recorded.
+- Target is unverified (`emailVerifiedAt IS NULL`): return HTTP 409 `INVALID_STATUS`.
+- Target already approved or rejected: return HTTP 409 `INVALID_STATUS`.
+- Owner loses permission during the operation: return HTTP 403 `FORBIDDEN`.
 
-**Postconditions:** Account is approved; access depends on final activation status.  
-**Required permissions:** `account.approve`, possibly `account.activate`.  
-**Relevant account statuses:** Target `PENDING_APPROVAL`.  
+**Postconditions:** Account is approved and active; Admin can now log in.  
+**Required permissions:** `account.approve`.  
+**Relevant account statuses:** Target `PENDING_APPROVAL` -> `ACTIVE`.  
 **UI states:** Confirmation, processing, success, conflict, error.  
-**Audit events:** `account.approved`; optionally `account.activated`.  
-**Open decisions:** Whether approval directly produces `ACTIVE`.
+**Audit events:** `account.approved`.
 
 ---
 
 ## Flow 7 — Owner Rejects an Admin
 
 **Primary actor:** Owner  
-**Preconditions:** Owner is active; target is `PENDING_APPROVAL`.  
+**Preconditions:** Owner is active; target is `PENDING_APPROVAL` with `emailVerifiedAt IS NOT NULL`.  
 **Trigger:** Owner confirms rejection.
 
 **Main success flow:**
 
-1. The Owner selects reject.
+1. The Owner selects reject in `/approvals`.
 2. The UI requests confirmation and optional reason.
-3. The server validates Owner permission.
-4. The server verifies the target is still pending.
+3. The server validates Owner permission (`account.reject`).
+4. The server reloads the target account asserting `accountStatus === 'PENDING_APPROVAL'` and `emailVerifiedAt IS NOT NULL` (via `emailVerifiedAt: true` select projection, `DEC-AUTH-104`).
 5. The server changes status to `REJECTED`.
-6. The system records the decision.
-7. The system notifies the applicant through the configured channel.
-8. The Owner sees confirmation.
-
-**Alternative flows:**
-
-- A rejection reason may be mandatory if policy requires it.
+6. The server records the decision in `approval_history` and emits `account.rejected` audit event.
+7. The Owner sees confirmation.
 
 **Error flows:**
 
-- Target already decided: return conflict.
-- Notification fails: rejection remains effective.
+- Target is unverified (`emailVerifiedAt IS NULL`): return HTTP 409 `INVALID_STATUS`.
+- Target already decided: return HTTP 409 `INVALID_STATUS`.
 
-**Postconditions:** Target cannot access protected pages.  
+**Postconditions:** Target status is `REJECTED`; target cannot log in.  
 **Required permissions:** `account.reject`.  
 **Relevant account statuses:** Target `PENDING_APPROVAL` to `REJECTED`.  
 **UI states:** Confirmation, reason field, success, conflict.  
-**Audit events:** `account.rejected`.  
-**Open decisions:** Reapplication and appeal process.
+**Audit events:** `account.rejected`.
 
 ---
 
 ## Flow 8 — Approved Admin Logs In
 
 **Primary actor:** Admin  
-**Preconditions:** Account is `ACTIVE`; valid credentials exist.  
+**Preconditions:** Account is `ACTIVE`; `emailVerifiedAt IS NOT NULL`; valid credentials exist.  
 **Trigger:** Admin submits login form.
 
 **Main success flow:**
@@ -471,9 +523,10 @@ flowchart TD
 1. The server validates credentials.
 2. The server loads canonical role and status.
 3. The server verifies status `ACTIVE`.
-4. The server creates a secure session.
-5. The server loads permissions and assigned devices.
-6. The frontend redirects to the authorised landing page.
+4. The server verifies `emailVerifiedAt IS NOT NULL` (returns HTTP 403 `EMAIL_NOT_VERIFIED` if null).
+5. The server creates a secure session.
+6. The server loads permissions and assigned devices.
+7. The frontend redirects to `/`.
 7. The interface displays only permitted navigation items.
 
 **Alternative flows:**
@@ -1774,6 +1827,9 @@ device.access.removed
 auth.login.success
 auth.login.failed
 auth.logout
+auth.password_reset.requested
+auth.password_reset.completed
+auth.email_verified
 alert.acknowledged
 faucet.command.created
 faucet.command.sent
@@ -1814,7 +1870,7 @@ Each audit event shall include relevant actor, target, timestamp, result, and sa
 
 1. Whether `APPROVED` and `ACTIVE` remain separate statuses.
 2. Exact activation process after Owner approval.
-3. Whether email verification is required.
+3. ~~Whether email verification is required.~~ **RESOLVED** — Mandatory email ownership verification enforced for `OWNER` and `ADMIN` accounts via independent `emailVerifiedAt` state per `DEC-AUTH-104` / `TASK-0214`.
 4. Whether rejected applicants may reapply.
 5. First Owner provisioning process.
 6. Whether multiple Owners are allowed.

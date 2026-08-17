@@ -86,4 +86,5 @@ All exceptions must be recorded in `scripts/security-exceptions.json` using the 
 - **TASK-0904 Audit:** Confirmed zero secret exceptions and zero dependency exceptions introduced.
 - **TASK-0905 Audit:** Confirmed zero secret exceptions and zero dependency exceptions introduced.
 - **TASK-0213 Audit:** Confirmed zero secret exceptions and zero dependency exceptions introduced; Resend API key and password reset tokens adhere strictly to zero-plaintext policy with environment validation and SHA-256 token hashing.
+- **TASK-0214 Audit:** Confirmed zero secret exceptions and zero dependency exceptions introduced; email verification tokens adhere strictly to zero-plaintext policy with 256-bit CSPRNG generation, SHA-256 token hashing in `email_verification_tokens`, and secure transactional deletion upon consumption.
 

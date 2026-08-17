@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@kebun-melon/database';
 import {
   registerUser,
+  UserRepository,
   DuplicateEmailError,
   PasswordPolicyError,
   MissingRoleError,
@@ -15,6 +16,7 @@ import {
   applyRateLimitToResponse,
 } from '@/lib/rate-limit';
 import { validateServerEnv } from '@/lib/env/server';
+import { sendVerificationEmail } from '@/lib/email/resend';
 
 export async function POST(request: Request) {
   const requestId = `req-${Date.now()}`;
@@ -34,6 +36,28 @@ export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}));
     const result = await registerUser(prisma, body);
+
+    const userRepository = new UserRepository(prisma);
+    const tokenResult = await userRepository.createEmailVerificationToken({
+      userId: result.user.id,
+      requestId,
+      ipAddress: clientIp,
+      userAgent: request.headers.get('user-agent') || undefined,
+    });
+
+    if (tokenResult.success) {
+      try {
+        await sendVerificationEmail({
+          toEmail: result.user.email,
+          recipientName: result.user.fullName,
+          rawToken: tokenResult.rawToken,
+          requestId,
+        });
+      } catch (emailError: any) {
+        // Log the error but don't fail the registration
+        console.error('[Register] Failed to send verification email:', emailError);
+      }
+    }
 
     const response = NextResponse.json(
       {

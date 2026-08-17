@@ -86,4 +86,31 @@ describe('TASK-0213 requireGuestSession Server Guard Unit Tests', () => {
     await expect(requireGuestSession('/')).resolves.toBeUndefined();
     expect(mockRedirect).not.toHaveBeenCalled();
   });
+
+  it('6. VerifyEmailPage server component redirects authenticated user with active session to /', async () => {
+    const VerifyEmailPage = (await import('@/app/(auth)/verify-email/page')).default;
+
+    mockCookieStore['session_token'] = 'valid-active-session-token';
+    mockValidateSession.mockResolvedValueOnce({
+      session: { id: 'sess-1', userId: 'user-1' },
+      user: {
+        id: 'user-1',
+        email: 'user@example.com',
+        accountStatus: AccountStatus.ACTIVE,
+      },
+    });
+
+    await expect(VerifyEmailPage()).rejects.toThrow('NEXT_REDIRECT');
+    expect(mockRedirect).toHaveBeenCalledWith('/');
+  });
+
+  it('7. VerifyEmailPage server component renders for unauthenticated guest', async () => {
+    const VerifyEmailPage = (await import('@/app/(auth)/verify-email/page')).default;
+
+    mockCookieStore = {};
+
+    const element = await VerifyEmailPage();
+    expect(element).toBeDefined();
+    expect(mockRedirect).not.toHaveBeenCalled();
+  });
 });

@@ -297,12 +297,29 @@ Password recovery and email reset shall conform to:
 
 ### 7.7 Server-Side Guest Route Guard Security (DEC-AUTH-103)
 
-Guest-only authentication entry points (`/login`, `/register`, `/forgot-password`, `/reset-password`) shall enforce:
+Guest-only authentication entry points (`/login`, `/register`, `/forgot-password`, `/reset-password`, `/verify-email`) shall enforce:
 
 - **Zero UI Page Flash**: Server Components invoke `requireGuestSession` to evaluate session validity in PostgreSQL before streaming component markup. Valid active sessions immediately receive an HTTP 307 redirect to `/`.
 - **Database Session Validation**: Cookie presence alone is never trusted. Only genuinely valid sessions with `accountStatus = ACTIVE` trigger redirection.
 - **Stale / Malformed Cookie Resilience**: Invalid, expired, revoked, or fake session cookies resolve cleanly without triggering redirect loops, allowing visitors to re-authenticate normally.
-- **Reset-Password Isolation**: Authenticated active sessions are barred from accessing `/reset-password` to prevent accidental consumption of recovery links while logged into another account; users must log out or use an unauthenticated browser.
+- **Reset-Password & Verify-Email Isolation**: Authenticated active sessions are barred from accessing `/reset-password` or `/verify-email` to prevent accidental consumption of links while logged into another account; users must log out or use an unauthenticated browser.
+
+### 7.8 Registration Email Verification Security (DEC-AUTH-104 / TASK-0214)
+
+Registration email ownership verification shall enforce the following security controls:
+
+- **Decoupled Verification State**: Verification status is recorded in a nullable `emailVerifiedAt` timestamp on the `users` table, completely decoupled from `accountStatus`. Verifying email ownership MUST NEVER alter or automatically activate an account.
+- **Owner Authentication Gate**: Although the first Owner is created as `ACTIVE`, login and protected access remain strictly blocked with `EMAIL_NOT_VERIFIED` (HTTP 403) until `emailVerifiedAt` is populated.
+- **Admin Approval & Rejection Gate**: Pending Admin registrations cannot be approved or rejected by an Owner via `approvePendingAdmin` or `rejectPendingAdmin` until the applicant's email ownership is verified (`emailVerifiedAt IS NOT NULL`, returning HTTP 409 `INVALID_STATUS` if unverified). Unverified Admin accounts are filtered from the active approval queue (`getPendingApprovals`).
+- **Admin Status Preservation**: When an Admin verifies their email, their account status strictly remains `PENDING_APPROVAL` and automatically redirects to `/status?status=PENDING_APPROVAL` until an Owner explicitly reviews and approves the registration.
+- **Session-Free Verification**: `POST /api/v1/auth/verify-email` verifies email ownership exclusively and MUST NOT issue, create, or return an authentication session. Normal authentication remains a separate login step.
+- **Token Security & Cryptography**: Verification tokens are generated as 256-bit (32 bytes) CSPRNG random hex strings. Only the SHA-256 hash is persisted in `email_verification_tokens`. Raw tokens are never logged or persisted in plaintext.
+- **Token Expiry & Replay Protection**: Tokens expire after 24 hours (`AUTH_VERIFY_TOKEN_EXPIRY_HOURS = 24`). Creating a new verification token transactionally invalidates prior unused tokens for the user. Upon successful verification, the token is consumed/deleted.
+- **Anti-Enumeration & Rate Limiting**: `POST /api/v1/auth/resend-verification` unconditionally returns HTTP 200 with a generic message regardless of email existence or verification state, applies timing attack mitigations, and is rate-limited to 3 requests per minute (`RATE_LIMIT_RESEND_VERIFICATION_MAX = 3`).
+- **Trusted URL Construction**: Verification URLs are constructed strictly from server-configured `APP_URL` / `NEXT_PUBLIC_APP_URL`, ignoring untrusted request `Host` headers.
+- **Database Concurrency & Conflict Protection**: In `verifyEmailWithToken`, Prisma `P2034` transaction write conflicts are retried with bounded exponential backoff (3 attempts), returning `CONCURRENCY_CONFLICT` (HTTP 409) upon exhaustion and `TOKEN_ALREADY_USED` (HTTP 400) for `P2025` records.
+- **Frontend In-Flight Request Deduplication**: The `/verify-email` view uses a module-level in-flight Promise map with immediate cache eviction on settlement (`finally`), preventing competing network requests during React Strict Mode or remounts while delivering navigation triggers to the active mount.
+- **Delivery & Testing Scope**: Verification has been manually exercised using Resend test mode/test recipients and the Resend-provided verification link. We have not yet tested delivery to arbitrary real email recipients using a verified custom sending domain, because no such domain is currently configured. Real-mailbox deliverability is treated as pending deployment/infrastructure acceptance, not an application logic failure.
 
 ---
 

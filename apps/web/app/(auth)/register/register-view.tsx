@@ -132,11 +132,8 @@ export default function RegisterView() {
         return;
       }
 
-      if (json.data?.user?.accountStatus === 'ACTIVE') {
-        router.push('/login?registered=owner');
-      } else {
-        router.push('/status?reason=PENDING_APPROVAL');
-      }
+      // Registration successful. Both OWNER and ADMIN need to verify their email.
+      router.push(`/verify-email?email=${encodeURIComponent(formData.email.trim())}`);
     } catch {
       setErrorMessage(tErrors('networkError'));
       setLoadingSubmit(false);

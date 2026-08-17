@@ -31,6 +31,13 @@ export class AccountStatusForbiddenError extends Error {
   }
 }
 
+export class UnverifiedEmailError extends Error {
+  constructor() {
+    super('Email verification is required before accessing the account.');
+    this.name = 'UnverifiedEmailError';
+  }
+}
+
 /**
  * Hashes a raw session token using SHA-256 (hex-encoded).
  * Raw session tokens are never stored in the database.
@@ -97,6 +104,10 @@ export async function loginUser(
     .map((ur) => ur.role.code as UserRole);
 
   const primaryRole = activeRoles[0] ?? UserRole.ADMIN;
+
+  if (primaryRole === UserRole.OWNER && !user.emailVerifiedAt) {
+    throw new UnverifiedEmailError();
+  }
 
   const sessionId = crypto.randomUUID();
 

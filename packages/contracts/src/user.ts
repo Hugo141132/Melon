@@ -278,3 +278,25 @@ export const ResetPasswordInputSchema = z
   .strict();
 
 export type ResetPasswordInput = z.infer<typeof ResetPasswordInputSchema>;
+
+/**
+ * Public input schema for verifying email ownership.
+ */
+export const VerifyEmailInputSchema = z
+  .object({
+    token: z.string().min(1, 'Verification token is required.'),
+  })
+  .strict();
+
+export type VerifyEmailInput = z.infer<typeof VerifyEmailInputSchema>;
+
+/**
+ * Public input schema for resending email verification.
+ */
+export const ResendVerificationEmailInputSchema = z
+  .object({
+    email: z.string().trim().email('Invalid email address format.'),
+  })
+  .strict();
+
+export type ResendVerificationEmailInput = z.infer<typeof ResendVerificationEmailInputSchema>;

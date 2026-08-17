@@ -182,8 +182,9 @@ Responsibilities:
 
 - Authentication and session management.
 - Password recovery and transactional email delivery via Resend (`DEC-AUTH-102` / `TASK-0213`).
-- Server-side guest route guards (`DEC-AUTH-103` / `TASK-0213`).
-- RBAC.
+- Registration email ownership verification and token management via Resend (`DEC-AUTH-104` / `TASK-0214`).
+- Server-side guest route guards (`DEC-AUTH-103` on `/login`, `/register`, `/forgot-password`, `/reset-password`, `/verify-email`).
+- RBAC and account approval/rejection gating via `emailVerifiedAt` (`DEC-AUTH-104`).
 - Account approval.
 - User-profile management.
 - Device access assignment.

@@ -272,43 +272,33 @@ The account has been registered but has not yet been approved by an Owner.
 
 A user with this status shall:
 
-- Be unable to access protected application pages.
+- Be unverified initially (`emailVerifiedAt = NULL`), remaining hidden from the Owner's approval queue (`/approvals`). Unverified accounts cannot be approved or rejected server-side (both return HTTP 409 `INVALID_STATUS`).
+- Verify email ownership via Resend link (`DEC-AUTH-104`), populating `emailVerifiedAt = NOW()`, remaining in `PENDING_APPROVAL`, and becoming visible in `/approvals`.
+- Be unable to access protected application pages or obtain authenticated sessions.
 - Be unable to call protected APIs.
-- Be allowed to see an account-pending message after login or registration.
-- Be allowed to use limited account-status or support pages where implemented.
+- Be allowed to see an account-pending message (`/status?status=PENDING_APPROVAL`).
 
 #### `APPROVED` (RBAC-STATE-002)
 
-The Owner has approved the account, but the account may still require an activation step.
-
-The separate use of `APPROVED` and `ACTIVE` is currently `TBD`.
-
-Possible activation dependencies include:
-
-- Email verification.
-- Owner activation.
-- Password setup.
-- Device assignment.
-- Acceptance of terms.
-
-Until the activation policy is finalised, protected access shall require `ACTIVE`.
+Intermediate lifecycle state if separate approval and activation steps are used. In the current implementation, Owner approval directly transitions verified accounts from `PENDING_APPROVAL` to `ACTIVE`.
 
 #### `ACTIVE` (RBAC-STATE-003)
 
 The account is approved, enabled, and permitted to authenticate into protected application areas.
 
+A user with this status shall:
+- Require `emailVerifiedAt IS NOT NULL` to log in or obtain an active session (unverified Owners receive HTTP 403 `EMAIL_NOT_VERIFIED` until verified).
+- Have full access to protected UI routes and APIs according to their assigned role and device access scope.
+
 #### `REJECTED` (RBAC-STATE-004)
 
-The Owner rejected the account registration.
+The Owner rejected the verified account registration.
 
 A rejected account shall:
 
-- Be denied protected access.
+- Be denied protected access and login.
 - Be prevented from gaining access through an earlier session.
-- Display an appropriate account-status message.
-- Require a defined reapplication or review process before reconsideration.
-
-The reapplication policy is `TBD`.
+- Display an appropriate account-status message (`/status?status=REJECTED`).
 
 #### `SUSPENDED` (RBAC-STATE-005)
 
@@ -333,18 +323,28 @@ A deactivated account shall:
 - Remain in historical records for audit purposes where soft-deactivated.
 - When an Owner explicitly executes the 'Delete Account' action on an eligible Admin, permanent hard deletion (`DELETE /api/v1/users/{userId}`) removes the user row and account-owned records from the database in a transaction, leaving an `account.deleted` audit event with anonymized actor references.
 
+### 7.2 Email Verification State (DEC-AUTH-104 / TASK-0214)
+
+Email ownership verification (`emailVerifiedAt`) is tracked independently from `accountStatus`:
+
+1. **Decoupled Lifecycle**: `emailVerifiedAt` is a nullable timestamp. Setting it records email ownership but does NOT alter `accountStatus`.
+2. **Owner Verification Flow**: Initial Owner is provisioned with `role = OWNER` and `accountStatus = ACTIVE`, but login is blocked with HTTP 403 `EMAIL_NOT_VERIFIED` until `emailVerifiedAt IS NOT NULL`.
+3. **Admin Verification Flow**: Admin registers as `role = ADMIN`, `accountStatus = PENDING_APPROVAL`, and `emailVerifiedAt = NULL`. The unverified Admin cannot be approved or rejected. After verifying email ownership, `emailVerifiedAt` is populated, the status remains `PENDING_APPROVAL`, and the Admin appears in `/approvals`.
+4. **Owner Review**: The Owner reviews the verified Admin in `/approvals` and can either approve (transitions to `ACTIVE`) or reject (transitions to `REJECTED`).
+
 ---
 
 ## 8. Account-Status Access Matrix
 
-| Account status | Login attempt | Protected UI | Protected API | Profile access | Notes |
-|---|---:|---:|---:|---:|---|
-| `PENDING_APPROVAL` | Limited response | No | No | Limited status page only | Awaiting Owner decision |
-| `APPROVED` | TBD | No unless activated | No unless activated | TBD | Depends on activation policy |
-| `ACTIVE` | Yes | Yes, subject to permissions | Yes, subject to permissions | Yes |
-| `REJECTED` | Denied | No | No | Limited status page only | Reapplication policy TBD |
-| `SUSPENDED` | Denied | No | No | No or limited support page | Existing sessions must be invalidated |
-| `DEACTIVATED` | Denied | No | No | No | Historical record retained |
+| Account status | Email Verified? | Login attempt | Protected UI | Protected API | Notes |
+|---|---|---:|---:|---:|---|
+| `PENDING_APPROVAL` | No | Denied (403/401) | No | No | Hidden from `/approvals`; cannot be approved/rejected |
+| `PENDING_APPROVAL` | Yes | Denied (403/401) | No | No | Visible in `/approvals`; awaiting Owner decision |
+| `ACTIVE` | No (Owner) | Denied (403 `EMAIL_NOT_VERIFIED`) | No | No | Must verify email via Resend link before login |
+| `ACTIVE` | Yes | Permitted (200) | Yes | Yes | Full access subject to role and device scope |
+| `REJECTED` | Any | Denied (403/401) | No | No | Registration rejected by Owner |
+| `SUSPENDED` | Any | Denied | No | No | Sessions revoked; temporarily blocked |
+| `DEACTIVATED` | Any | Denied | No | No | Sessions revoked; disabled |
 
 ---
 

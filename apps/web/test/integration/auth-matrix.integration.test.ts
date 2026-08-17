@@ -35,6 +35,9 @@ vi.mock('@kebun-melon/database', async (importOriginal) => {
       changeUserPassword(...args: any[]) {
         return mockChangeUserPassword(...args);
       }
+      createEmailVerificationToken() {
+        return Promise.resolve({ success: true, rawToken: 'mock-verification-token' });
+      }
     },
   };
 });

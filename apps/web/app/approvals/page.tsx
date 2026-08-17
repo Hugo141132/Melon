@@ -117,7 +117,13 @@ export default function PendingApprovalsPage() {
           query.set('search', search.trim());
         }
 
-        const res = await fetch(`/api/v1/approvals/pending?${query.toString()}`);
+        const res = await fetch(`/api/v1/approvals/pending?${query.toString()}`, {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+            Pragma: 'no-cache',
+          },
+        });
         const json = await res.json();
 
         if (!res.ok || !json.success) {

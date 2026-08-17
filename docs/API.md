@@ -391,6 +391,7 @@ Server rules:
 - Never create `OWNER`.
 - Validate email uniqueness.
 - Hash password securely.
+- Generate 256-bit CSPRNG verification token and dispatch verification email via Resend (`DEC-AUTH-104` / `TASK-0214`).
 - Record registration audit event.
 
 Response:
@@ -466,6 +467,7 @@ ACCOUNT_APPROVED_NOT_ACTIVE
 ACCOUNT_REJECTED
 ACCOUNT_SUSPENDED
 ACCOUNT_DEACTIVATED
+EMAIL_NOT_VERIFIED
 ```
 
 ---
@@ -645,6 +647,106 @@ Server rules:
 Possible errors:
 - `400 Bad Request`: `VALIDATION_ERROR`, `INVALID_TOKEN`, `TOKEN_EXPIRED`, `TOKEN_ALREADY_USED`
 - `422 Unprocessable Entity`: `WEAK_PASSWORD`, `PASSWORD_CONFIRMATION_MISMATCH`
+- `429 Too Many Requests`: `TOO_MANY_REQUESTS`
+
+---
+
+## 10.8 Verify Email (DEC-AUTH-104 / TASK-0214)
+
+```http
+POST /api/v1/auth/verify-email
+```
+
+**Authentication:** Public / Verification Token  
+**Rate Limit:** Standard public rate limit
+
+Request:
+
+```json
+{
+  "token": "a1b2c3d4e5f6..."
+}
+```
+
+Response (HTTP 200 OK):
+
+```json
+{
+  "success": true,
+  "message": "Email ownership verified successfully.",
+  "data": {
+    "verified": true,
+    "email": "admin@example.com",
+    "accountStatus": "PENDING_APPROVAL"
+  },
+  "meta": {
+    "requestId": "req-1718000000002"
+  }
+}
+```
+
+Server rules:
+- Verifies token by SHA-256 hash in `email_verification_tokens`.
+- Asserts token is unexpired (24-hour validity) and unconsumed.
+- Sets `users.email_verified_at = NOW()` for the associated user account.
+- Strictly preserves existing `accountStatus` (`ADMIN` accounts remain `PENDING_APPROVAL`, `OWNER` accounts remain `ACTIVE`).
+- Strictly does NOT issue, create, or return an authentication session. Verification confirms ownership only; normal login remains a separate step.
+- Deletes the token upon successful verification.
+- Handles Prisma `P2034` transaction write conflicts with bounded retries (3 attempts), returning `CONCURRENCY_CONFLICT` (HTTP 409) upon exhaustion.
+- Returns `TOKEN_ALREADY_USED` (HTTP 400) if token was already deleted (`P2025`).
+- Emits structured audit log `auth.email_verified`.
+
+Frontend rules:
+- Employs token-keyed in-flight Promise map deduplication with immediate cache eviction on settlement (`finally`) to ensure exactly 1 network POST in React Strict Mode / remounts while delivering navigation triggers to the active mount.
+- If `accountStatus === 'PENDING_APPROVAL'`, redirects to `/status?status=PENDING_APPROVAL`.
+- Enforces server-side guest guard (`DEC-AUTH-103`), redirecting authenticated sessions on `/verify-email` to `/`.
+
+Testing status:
+- *Delivery & Testing Status*: Verification has been manually exercised using Resend test mode/test recipients and the Resend-provided verification link. We have not yet tested delivery to arbitrary real email recipients using a verified custom sending domain, because no such domain is currently configured. Real-mailbox deliverability is treated as pending deployment/infrastructure acceptance, not an application logic failure.
+
+Possible errors:
+- `400 Bad Request`: `VALIDATION_ERROR`, `INVALID_TOKEN`, `TOKEN_EXPIRED`, `TOKEN_ALREADY_USED`
+- `409 Conflict`: `CONCURRENCY_CONFLICT`
+- `429 Too Many Requests`: `TOO_MANY_REQUESTS`
+
+---
+
+## 10.9 Resend Email Verification (DEC-AUTH-104 / TASK-0214)
+
+```http
+POST /api/v1/auth/resend-verification
+```
+
+**Authentication:** Public  
+**Rate Limit:** 3 requests/minute (configurable via `RATE_LIMIT_RESEND_VERIFICATION_MAX`, default: 3)
+
+Request:
+
+```json
+{
+  "email": "admin@example.com"
+}
+```
+
+Response (HTTP 200 OK — strictly anti-enumeration):
+
+```json
+{
+  "success": true,
+  "message": "If an unverified account exists with that email, a verification link has been sent.",
+  "meta": {
+    "requestId": "req-1718000000003"
+  }
+}
+```
+
+Server rules:
+- Unconditionally returns HTTP 200 with generic message whether user exists, is already verified, or does not exist (anti-enumeration).
+- Applies timing-mitigation equalizers to prevent side-channel timing attacks.
+- If an account exists and `email_verified_at` is null, invalidates prior verification tokens, generates a new 256-bit token (valid for 24 hours), and dispatches bilingual verification email via Resend.
+
+Possible errors:
+- `400 Bad Request`: `VALIDATION_ERROR` (invalid email)
 - `429 Too Many Requests`: `TOO_MANY_REQUESTS`
 
 ---
@@ -1058,9 +1160,10 @@ Request:
 
 Server behaviour:
 
-1. Verify current status is `PENDING_APPROVAL`.
-2. Prevent duplicate/conflicting decisions.
-3. Update to `APPROVED` or `ACTIVE`.
+1. Verify target user exists and `accountStatus` is `PENDING_APPROVAL`.
+2. Verify target user has verified email ownership (`emailVerifiedAt` is not null per `DEC-AUTH-104`).
+3. Prevent duplicate/conflicting decisions.
+4. Update to `APPROVED` or `ACTIVE`.
 4. Insert approval history.
 5. Insert audit log.
 6. Commit transaction.
@@ -1119,11 +1222,43 @@ Request:
 }
 ```
 
-Response status:
+Server behaviour:
 
-```text
-REJECTED
+1. Verify target user exists and `accountStatus` is `PENDING_APPROVAL`.
+2. Verify target user has verified email ownership (`emailVerifiedAt` is not null, selected via `emailVerifiedAt: true` projection per `DEC-AUTH-104`). Unverified targets return HTTP 409 `INVALID_STATUS`.
+3. Prevent duplicate or conflicting decisions.
+4. Update `accountStatus` to `REJECTED`.
+5. Insert approval history record in `approval_history`.
+6. Insert audit log (`account.rejected`).
+7. Commit transaction.
+
+Response (HTTP 200 OK):
+
+```json
+{
+  "success": true,
+  "data": {
+    "user": {
+      "id": "user-pending-001",
+      "fullName": "Pending Admin",
+      "email": "pending@example.com",
+      "accountStatus": "REJECTED",
+      "roles": ["ADMIN"]
+    },
+    "approvalRecordId": "approval-uuid-002"
+  },
+  "meta": {
+    "requestId": "req-002"
+  }
+}
 ```
+
+Possible errors:
+- `400 Bad Request`: `VALIDATION_ERROR`
+- `401 Unauthorized`: `UNAUTHENTICATED`
+- `403 Forbidden`: `FORBIDDEN`
+- `404 Not Found`: `USER_NOT_FOUND`
+- `409 Conflict`: `INVALID_STATUS` (target user is unverified or already approved/rejected)
 
 ---
 

@@ -119,8 +119,10 @@ Unauthenticated users shall only be able to access:
 
 - Login page.
 - Create-account page.
-- Password-recovery page, if implemented.
-- Account-status page, if implemented.
+- Password-recovery pages (`/forgot-password`, `/reset-password`).
+- Email-verification page (`/verify-email`).
+- Account-status page (`/status`).
+- Public health endpoints (`/health`, `/ready`).
 - Public legal or help pages, if explicitly approved.
 
 All protected routes shall verify authentication on the server side.
@@ -134,20 +136,20 @@ The create-account page shall allow a prospective Admin to submit an account reg
 The registration form shall collect at least:
 
 - Full name.
-- Email address or username.
+- Email address.
+- Username.
 - Password.
 - Password confirmation.
-- Other required identity or organisation fields: TBD.
-- Preferred language: optional or TBD.
 
 The system shall validate:
 
 - Required fields.
-- Email or username uniqueness.
+- Email and username uniqueness.
 - Password policy.
 - Password confirmation.
 - Valid data formats.
-- Acceptance of any required terms or policies: TBD.
+
+Upon successful submission, the system generates a 256-bit email verification token, dispatches a verification link via Resend (`DEC-AUTH-104` / `TASK-0214`), and redirects the applicant to the email verification instruction page.
 
 ### 6.3 Admin Approval Workflow (PRD-FR-017)
 
@@ -156,16 +158,16 @@ A newly registered Admin account shall not receive application access immediatel
 The default Admin account lifecycle shall be:
 
 ```text
-PENDING_APPROVAL
-→ APPROVED
-→ ACTIVE
+PENDING_APPROVAL (unverified, emailVerifiedAt = NULL)
+→ PENDING_APPROVAL (verified, emailVerifiedAt = NOW())
+→ ACTIVE (approved by Owner)
 ```
 
 Alternative outcomes shall include:
 
 ```text
-PENDING_APPROVAL
-→ REJECTED
+PENDING_APPROVAL (verified)
+→ REJECTED (rejected by Owner)
 
 ACTIVE
 → SUSPENDED
@@ -176,40 +178,37 @@ ACTIVE or SUSPENDED
 
 After registration:
 
-1. The system shall create the Admin account with `PENDING_APPROVAL` status.
-2. The system shall prevent the account from entering protected application pages.
-3. The system shall make the registration visible to an Owner.
-4. The Owner shall be able to review the registration.
-5. The Owner shall be able to approve or reject it.
-6. When approved, the account shall become `APPROVED` or `ACTIVE` according to the final activation process.
-7. When rejected, the account shall remain unable to access the protected application.
-8. The system shall record the Owner, timestamp, decision, and optional decision note.
-9. The system shall notify the applicant of the decision through the selected notification channel: TBD.
+1. The system shall create the Admin account with `PENDING_APPROVAL` status and `emailVerifiedAt = NULL`.
+2. The system shall prevent the account from entering protected application pages or obtaining an authenticated session.
+3. Unverified Admin accounts shall remain absent from the Owner's pending approval list (`/approvals`) and cannot be directly approved or rejected server-side (both return HTTP 409 `INVALID_STATUS`).
+4. The Admin shall verify email ownership via the link sent to their email.
+5. Verifying email ownership records `emailVerifiedAt = NOW()`, preserves `PENDING_APPROVAL` status, creates NO session, and redirects to `/status?status=PENDING_APPROVAL`.
+6. Once verified, the Admin account becomes visible in the Owner's approval queue (`/approvals`).
+7. The Owner shall be able to review the registration.
+8. The Owner shall be able to approve or reject the verified registration.
+9. When approved, the account status transitions to `ACTIVE`, and the Admin can log in.
+10. When rejected, the account status transitions to `REJECTED`, and login remains blocked.
+11. The system shall record the Owner, timestamp, decision, and optional decision note in `approval_history` and `audit_logs`.
 
 ### 6.4 Owner Account Provisioning (PRD-FR-018)
 
-The first Owner account shall not be created through the normal Admin self-registration workflow unless explicitly designed.
-
-The first Owner provisioning method is TBD and may be implemented through one of the following:
-
-- Database seed.
-- Secure installation command.
-- System administrator process.
-- Invitation from an existing Owner.
-
-The application shall not allow an unapproved public user to self-assign the Owner role.
+The initial Owner account is provisioned via CLI seed (`scripts/seed-owner.ts`).
+- Created with `role = OWNER` and `accountStatus = ACTIVE`.
+- Login and session issuance remain blocked server-side with `EMAIL_NOT_VERIFIED` (HTTP 403) until the Owner verifies email ownership (`emailVerifiedAt IS NOT NULL`).
+- The provisioning process outputs a secure email verification link or dispatches verification via Resend.
 
 ### 6.5 Login Behaviour (PRD-FR-019)
 
 The login page shall:
 
-- Accept the configured login identifier.
+- Accept the configured login identifier (email).
 - Accept a password.
 - Display translated validation and authentication messages.
 - Prevent access for invalid credentials.
+- Prevent access with HTTP 403 `EMAIL_NOT_VERIFIED` for unverified accounts (`emailVerifiedAt IS NULL`).
 - Prevent access for `PENDING_APPROVAL`, `REJECTED`, `SUSPENDED`, or `DEACTIVATED` accounts.
 - Display an appropriate account-status message without exposing sensitive system information.
-- Redirect an approved and active user to the appropriate authenticated landing page.
+- Redirect an approved and active user to the appropriate authenticated landing page (`/`).
 - Record successful and failed login attempts according to the security policy.
 
 ### 6.6 Password Recovery and Reset (PRD-FR-020)
@@ -223,7 +222,22 @@ The password recovery workflow shall:
 - Validate new passwords against password policy (min 8 chars, uppercase, lowercase, number, special char) and hash with Argon2id.
 - Transactionally revoke all active user sessions upon successful password reset.
 - Strictly preserve existing `accountStatus` (password reset never approves or activates pending accounts).
-- Enforce server-side guest route guards (`DEC-AUTH-103`): active sessions visiting `/login`, `/register`, `/forgot-password`, or `/reset-password` are immediately redirected to `/` with zero UI flash.
+- Enforce server-side guest route guards (`DEC-AUTH-103`): active sessions visiting `/login`, `/register`, `/forgot-password`, `/reset-password`, or `/verify-email` are immediately redirected to `/` with zero UI flash.
+
+### 6.7 Registration Email Verification (PRD-FR-039 / DEC-AUTH-104)
+
+The registration email verification workflow shall:
+
+- Provide mandatory email ownership verification for `OWNER` and `ADMIN` roles using Resend (`DEC-AUTH-104` / `TASK-0214`).
+- Track email verification via an independent, nullable `emailVerifiedAt` timestamp on the `users` table, completely decoupled from `accountStatus`.
+- Issue 256-bit CSPRNG verification tokens valid for 24 hours (`AUTH_VERIFY_TOKEN_EXPIRY_HOURS = 24`), storing only SHA-256 hashes in `email_verification_tokens`.
+- Invalidate prior unused verification tokens for that user upon issuing a new token.
+- Support `POST /api/v1/auth/verify-email`: verifies token, updates `emailVerifiedAt`, deletes token, and returns user status without creating an authentication session.
+- Support `POST /api/v1/auth/resend-verification`: public endpoint with anti-enumeration (unconditional generic 200) and 3 req/min rate limit.
+- Handle database concurrency safely: bounded exponential backoff retries (3 attempts) on Prisma `P2034` write conflicts, returning `CONCURRENCY_CONFLICT` (HTTP 409) on retry exhaustion and `TOKEN_ALREADY_USED` (HTTP 400) for consumed tokens.
+- Handle frontend StrictMode/remount concurrency safely: token-keyed in-flight Promise deduplication with immediate cache eviction upon settlement (`finally`), ensuring single network requests while delivering navigation triggers to the active mount.
+- Enforce server-side guest guard (`DEC-AUTH-103`): authenticated users navigating to `/verify-email` are redirected server-side to `/`.
+- *Delivery & Testing Status*: Verification has been manually exercised using Resend test mode/test recipients and the Resend-provided verification link. We have not yet tested delivery to arbitrary real email recipients using a verified custom sending domain, because no such domain is currently configured. Real-mailbox deliverability is treated as pending deployment/infrastructure acceptance, not an application logic failure.
 
 ---
 
@@ -235,6 +249,7 @@ The first product scope includes:
 
 - Login.
 - Admin account registration.
+- Registration email ownership verification.
 - Owner approval and rejection workflow.
 - Owner and Admin role enforcement.
 - Own-profile management.

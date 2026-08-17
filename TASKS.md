@@ -845,6 +845,56 @@ Implemented complete Owner User Management:
 
 ---
 
+## TASK-0214 — Implement Registration Email Verification
+
+**Priority:** `P1`  
+**Status:** `IN_ACCEPTANCE`  
+**Dependencies:** `TASK-0203`, `TASK-0204`, `TASK-0213`  
+**Implementation Note:** Implemented mandatory email ownership verification for `OWNER` and `ADMIN` accounts using Resend per `DEC-AUTH-104`. Added `EmailVerificationToken` model, decoupled `emailVerifiedAt` verification state from `accountStatus`, enforced Owner authentication gate, enforced Admin approval and rejection gates (including fixing missing `emailVerifiedAt` projection on `rejectPendingAdmin`), created `/api/v1/auth/verify-email` and `/api/v1/auth/resend-verification` endpoints with bounded `P2034` concurrency retries, implemented `/verify-email` UI page with React StrictMode-safe in-flight deduplication and cache eviction, removed decorative illustrations, and integrated server-side guest route guard (`DEC-AUTH-103`). All 42 unit test files (321 tests) pass cleanly.
+
+### Work
+
+- Added `EmailVerificationToken` database model and versioned migration `20260817082153_add_email_verification_tokens/migration.sql`.
+- Added nullable `emailVerifiedAt` timestamp field on `User` entity to track email verification independently of `accountStatus`.
+- Implemented `createEmailVerificationToken` and `verifyEmailWithToken` in `UserRepository` (`packages/database/src/user-repository.ts`):
+  - Generates 256-bit (32 bytes) CSPRNG random tokens.
+  - Computes and stores SHA-256 hash in `email_verification_tokens.token_hash`.
+  - Transactionally invalidates previous unused verification tokens for the user.
+  - Sets `emailVerifiedAt = NOW()` upon successful verification without mutating `accountStatus` (`ADMIN` remains `PENDING_APPROVAL`, `OWNER` remains `ACTIVE`).
+  - Single-use and replay-safe token invalidation/deletion.
+  - Bounded exponential backoff retries (3 attempts) on Prisma `P2034` transaction write conflicts, returning `CONCURRENCY_CONFLICT` (HTTP 409) upon exhaustion.
+  - Maps `P2025` record-not-found errors to `TOKEN_ALREADY_USED` (HTTP 400).
+- Updated `loginUser` in `session-service.ts` to enforce email verification:
+  - Throws `UnverifiedEmailError` (HTTP 403 `EMAIL_NOT_VERIFIED`) when an `OWNER` attempts to login without a verified email.
+- Updated Owner approval queries (`getPendingApprovals`, `getPendingApprovalById`, `approvePendingAdmin`, and `rejectPendingAdmin`) to require `emailVerifiedAt IS NOT NULL` before a pending Admin can be approved or rejected (fixed 409 Reject bug caused by missing `emailVerifiedAt: true` projection in `tx.user.findUnique`).
+- Unverified Admin accounts remain hidden from the Owner approval list (`/approvals`).
+- Updated `registerAdminUser` / `POST /api/v1/auth/register` to dispatch email verification email upon successful registration.
+- Updated first-Owner provisioning CLI (`npm run seed:owner`) to generate verification token and dispatch/log verification instructions.
+- Implemented public API route handlers:
+  - `POST /api/v1/auth/verify-email`: verifies email ownership token without creating or returning a session.
+  - `POST /api/v1/auth/resend-verification`: rate-limited (3 req/min) anti-enumeration endpoint with 24-hour token expiry (`AUTH_VERIFY_TOKEN_EXPIRY_HOURS = 24`).
+- Implemented `/verify-email` page adhering to `Premium Minimal Ops` with module-level in-flight Promise map deduplication, immediate cache eviction upon settlement (`finally`), automatic redirect to `/status?status=PENDING_APPROVAL` for Admin applicants, login prompt for Owners, and clean layout without decorative illustration frames.
+- Integrated server-side guest guard (`DEC-AUTH-103`) redirecting authenticated users visiting `/verify-email` to `/`.
+- Added bilingual translation keys to `messages/id.json` and `messages/en.json` (100% key and placeholder parity).
+- Extended Resend email service with bilingual verification email templates (`sendEmailVerificationEmail`).
+- *Delivery & Testing Status*: Verification has been manually exercised using Resend test mode/test recipients and the Resend-provided verification link. We have not yet tested delivery to arbitrary real email recipients using a verified custom sending domain, because no such domain is currently configured. Real-mailbox deliverability is treated as pending deployment/infrastructure acceptance, not an application logic failure.
+
+### Acceptance Criteria
+
+- [x] Independent verification state: `emailVerifiedAt` is decoupled from `accountStatus`.
+- [x] Owner login gate: Unverified Owner accounts are blocked from logging in (HTTP 403 `EMAIL_NOT_VERIFIED`).
+- [x] Admin approval and rejection gates: Unverified Admin applicants cannot be approved or rejected by Owner until email is verified (unverified returns 409 `INVALID_STATUS`).
+- [x] Admin status preservation: Verified Admin accounts strictly remain `PENDING_APPROVAL` and redirect to `/status?status=PENDING_APPROVAL` until Owner approval.
+- [x] Session-free verification: `POST /api/v1/auth/verify-email` strictly verifies email ownership without issuing authentication sessions.
+- [x] Token security: Tokens are 256-bit CSPRNG, stored as SHA-256 hashes, expiring (24h), and single-use/replay-safe.
+- [x] Rate limiting & Anti-enumeration: `POST /api/v1/auth/resend-verification` enforces 3/min rate limit and returns generic HTTP 200 without exposing account existence.
+- [x] Concurrency & Deduplication: Handled Prisma `P2034` write conflict retries and React StrictMode in-flight request deduplication with settlement eviction.
+- [x] Server-side guest guard: Authenticated users navigating to `/verify-email` are redirected to `/` with zero UI flash.
+- [x] Full I18N support: Bilingual verification UI and email templates with 100% key parity across `id` and `en`.
+- [ ] Final manual acceptance & custom-domain delivery verification in staging/production environment.
+
+---
+
 # 11. Phase 3 — Device Registry and Access
 
 ## TASK-0301 — Implement Site Model

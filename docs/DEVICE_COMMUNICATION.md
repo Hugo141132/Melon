@@ -1811,3 +1811,9 @@ This specification is satisfied when:
 8. The user-role control matrix remains `TBD` in `RBAC.md`.
 9. The hardware team must confirm whether progress and actual dispensed volume can be reported.
 10. The existing frontend shall consume normalised backend data and must not be coupled directly to raw device payload variants.
+
+---
+
+## 45. Authentication Scope & Device Protocol Independence
+
+`TASK-0214` (Mandatory Registration Email Verification & Approvals Integrity) operates exclusively within the user authentication, registration, Resend email dispatch, and Owner approval domains. `TASK-0214` does not modify ESP32, NodeMCU, REST telemetry ingestion, MQTT 5.0 over TLS, broker topic ACLs, or device-gateway communication contracts.
