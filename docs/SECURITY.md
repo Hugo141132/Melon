@@ -279,12 +279,30 @@ Multi-factor authentication is recommended for Owner accounts.
 
 Initial MFA support is `TBD`.
 
-If introduced, it should be mandatory for:
+### 7.6 Password Recovery & Email Reset Security (DEC-AUTH-102)
 
-- Owner accounts.
-- High-risk administrative actions.
-- Credential recovery.
-- New-device login, where appropriate.
+Password recovery and email reset shall conform to:
+
+- **Approved Email Provider**: Resend is the approved transactional email provider for password recovery notifications.
+- **Anti-Enumeration Guarantee**: `POST /api/v1/auth/forgot-password` unconditionally returns HTTP 200 with a generic message (`If an account exists with that email, a password reset link has been sent.`) regardless of account existence or status, and applies cryptographic timing equalizers to prevent side-channel timing enumeration.
+- **Token Security & Cryptography**: Reset tokens are generated as 256-bit (32 bytes) CSPRNG random hex strings. Only the SHA-256 hash (`token_hash`) is stored in the database. Raw tokens are never stored, logged, or serialized into audit records.
+- **Trusted Link URL Construction**: Reset URLs are strictly constructed from trusted server environment configuration (`APP_URL` / `NEXT_PUBLIC_APP_URL`). In production, an explicit trusted HTTPS URL is required (cannot point to localhost/127.0.0.1). The untrusted request `Host` header is strictly ignored, preventing password-reset poisoning.
+- **Approved Operational Policies**:
+  - Token expiry is formally approved as **15 minutes** (`AUTH_RESET_TOKEN_EXPIRY_MINUTES = 15`).
+  - Forgot-password rate limit is formally approved as **3 requests per minute** (`RATE_LIMIT_FORGOT_PASSWORD_MAX = 3`).
+  - Reset-password rate limit is formally approved as **5 requests per minute** (`RATE_LIMIT_RESET_PASSWORD_MAX = 5`).
+  - Environment variables remain available for operational configuration with these approved values as defaults.
+- **Single-Use & Replay Protection**: Consumed tokens are marked `used_at = NOW()` and cannot be replayed. Requesting a new token invalidates prior unused tokens for that user.
+- **Session Revocation & Account Status Preservation**: Resetting password transactionally revokes all active user sessions across all devices per `TASK-0908`. Password recovery is available to any existing account with an email, but password reset NEVER activates or modifies the account's `accountStatus` (e.g. `PENDING_APPROVAL` or `SUSPENDED` accounts remain unchanged). Normal login status checks continue to enforce access control.
+
+### 7.7 Server-Side Guest Route Guard Security (DEC-AUTH-103)
+
+Guest-only authentication entry points (`/login`, `/register`, `/forgot-password`, `/reset-password`) shall enforce:
+
+- **Zero UI Page Flash**: Server Components invoke `requireGuestSession` to evaluate session validity in PostgreSQL before streaming component markup. Valid active sessions immediately receive an HTTP 307 redirect to `/`.
+- **Database Session Validation**: Cookie presence alone is never trusted. Only genuinely valid sessions with `accountStatus = ACTIVE` trigger redirection.
+- **Stale / Malformed Cookie Resilience**: Invalid, expired, revoked, or fake session cookies resolve cleanly without triggering redirect loops, allowing visitors to re-authenticate normally.
+- **Reset-Password Isolation**: Authenticated active sessions are barred from accessing `/reset-password` to prevent accidental consumption of recovery links while logged into another account; users must log out or use an unauthenticated browser.
 
 ---
 
@@ -342,16 +360,21 @@ Password change shall:
 - Generate an audit event.
 - Never return the password hash.
 
-### 8.4 Password Reset
+### 8.4 Password Reset and Recovery (DEC-AUTH-102 / TASK-0213)
 
-Reset tokens shall:
+Password recovery and email reset flow shall conform to the following security controls:
 
-- Be random and high entropy.
-- Be single use.
-- Expire.
-- Be stored hashed where possible.
-- Be invalidated after successful use.
-- Not reveal whether an email address exists.
+- **Approved Email Provider**: Transactional recovery emails are dispatched via **Resend** using `resend.emails.send`. In non-production/test environments without API keys, delivery is safely simulated without crashing.
+- **Token Cryptography**: Tokens are generated using 256-bit (32 bytes) CSPRNG random hex strings (`crypto.randomBytes(32).toString('hex')`).
+- **Storage**: Only the cryptographic SHA-256 hash of the token (`crypto.createHash('sha256').update(rawToken).digest('hex')`) is stored in the `password_reset_tokens.token_hash` column. Raw tokens are NEVER stored in the database.
+- **Redaction & Masking**: Raw tokens and constructed reset URLs are strictly forbidden from appearing in application logs, database tables, or error responses.
+- **Trusted Reset URLs**: Reset URLs (`${baseUrl}/reset-password?token=${rawToken}`) are constructed strictly from server-configured environment variables (`APP_URL` / `NEXT_PUBLIC_APP_URL`). The untrusted request `Host` header MUST NEVER be used, preventing Host Header poisoning attacks.
+- **Anti-Enumeration Guarantee**: `POST /api/v1/auth/forgot-password` unconditionally returns HTTP 200 with a generic message (`If an account exists with that email, a password reset link has been sent.`) regardless of whether the email exists, has pending approval, or is suspended.
+- **Single-Use and Invalidation**: Prior unused tokens for the user are invalidated upon new token creation. Once consumed, the token is marked `used_at = NOW()` and cannot be replayed.
+- **Configurable Expiration**: Token expiry is environment-configurable via `AUTH_RESET_TOKEN_EXPIRY_MINUTES` (default: 15 minutes).
+- **Session Revocation**: Successful password reset transactionally invalidates the used token, invalidates any other pending tokens for the user, and revokes all existing user sessions across devices (`session-service.ts` / `TASK-0908`).
+- **Account Eligibility**: Password reset is restricted to accounts with `ACTIVE` status. Password reset MUST NEVER activate, approve, or alter the `accountStatus` of pending or suspended accounts.
+- **Audit Logging**: Structured audit logs are emitted for `auth.password_reset.requested`, `auth.password_reset.completed`, and `auth.password_reset.failed` without logging passwords, tokens, or hashes.
 
 ---
 

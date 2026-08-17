@@ -212,6 +212,19 @@ The login page shall:
 - Redirect an approved and active user to the appropriate authenticated landing page.
 - Record successful and failed login attempts according to the security policy.
 
+### 6.6 Password Recovery and Reset (PRD-FR-020)
+
+The password recovery workflow shall:
+
+- Provide self-service password recovery via email using the approved provider (Resend, `DEC-AUTH-102` / `TASK-0213`).
+- Generate single-use 256-bit CSPRNG reset tokens valid for 15 minutes, persisting only SHA-256 hashes in `password_reset_tokens`.
+- Enforce strict anti-enumeration on `POST /api/v1/auth/forgot-password` (generic 200 response with timing attack mitigation).
+- Enforce rate limits: 3 requests/min for forgot password, 5 requests/min for reset password.
+- Validate new passwords against password policy (min 8 chars, uppercase, lowercase, number, special char) and hash with Argon2id.
+- Transactionally revoke all active user sessions upon successful password reset.
+- Strictly preserve existing `accountStatus` (password reset never approves or activates pending accounts).
+- Enforce server-side guest route guards (`DEC-AUTH-103`): active sessions visiting `/login`, `/register`, `/forgot-password`, or `/reset-password` are immediately redirected to `/` with zero UI flash.
+
 ---
 
 ## 7. Product Scope

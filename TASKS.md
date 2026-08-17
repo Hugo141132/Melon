@@ -792,6 +792,59 @@ Implemented complete Owner User Management:
 
 ---
 
+## TASK-0213 — Implement Password Recovery and Email Reset Flow
+
+**Priority:** `P1`  
+**Status:** `DONE`  
+**Dependencies:** `TASK-0202`, `TASK-0204`, `TASK-0908`  
+**Completed:** 2026-08-17 — Implemented end-to-end password recovery and email reset flow with Resend per `DEC-AUTH-102` and server-side guest route guard per `DEC-AUTH-103`. Live Resend credential delivery, password reset completion, single-use token replay rejection, transactional session revocation, account-status preservation, server-side guest redirection with zero UI flash, focused test suites (67/67 tests passed), and the five reserved pre-commit checks (`test:coverage`, `test:integration`, `check:quality`, `test`, `test:e2e`) verified and passed 100%.
+
+### Work
+
+- Added input validation schemas (`ForgotPasswordInputSchema`, `ResetPasswordInputSchema`) with strict object checking and audit events (`AUTH_PASSWORD_RESET_REQUESTED`, `AUTH_PASSWORD_RESET_COMPLETED`, `AUTH_PASSWORD_RESET_FAILED`) in `@kebun-melon/contracts`.
+- Created `PasswordResetToken` database model in `packages/database/prisma/schema.prisma` and versioned SQL migration `packages/database/prisma/migrations/20260817000000_add_password_reset_tokens/migration.sql`.
+- Implemented `createPasswordResetToken` and `resetPasswordWithToken` in `UserRepository` (`packages/database/src/user-repository.ts`):
+  - Generates 256-bit (32 bytes) CSPRNG random tokens.
+  - Computes and persists cryptographic SHA-256 hash in `password_reset_tokens.token_hash`. Raw token is never persisted in database, logged, or serialized.
+  - Transactionally invalidates previous unused tokens for the requesting user.
+  - Permits password recovery for any existing account with an email, while strictly preserving `accountStatus` (password reset never activates or changes account status; normal login access checks govern access).
+  - Validates password complexity against policy (`validatePasswordPolicy`) and hashes with Argon2id (`@node-rs/argon2`).
+  - Marks token used (`used_at = NOW()`), invalidates other tokens for the user, and transactionally revokes all active user sessions across devices (`session-service.ts` per `TASK-0908`).
+  - Creates structured audit logs without sensitive tokens, URLs, or passwords.
+- Implemented Resend email service (`apps/web/lib/email/resend.ts`) per `DEC-AUTH-102`:
+  - Constructs reset URL strictly from server-configured environment (`APP_URL` / `NEXT_PUBLIC_APP_URL`), never trusting request `Host` headers.
+  - Enforces strict production validation: requires explicit trusted HTTPS `APP_URL` (rejects `localhost`/`127.0.0.1`) and verified `RESEND_FROM_EMAIL` (rejects `onboarding@resend.dev`).
+  - Awaits email delivery without fire-and-forget race conditions.
+  - Redacts tokens and credentials from logs.
+  - Provides bilingual email templates (Bahasa Indonesia and English) with plain text and clean HTML.
+  - Safely simulates delivery in test and unconfigured environments.
+- Implemented public API route handlers:
+  - `POST /api/v1/auth/forgot-password`: strictly anti-enumeration returning generic HTTP 200 whether email exists or not, with cryptographic timing equalizers, rate-limited at approved 3 requests per minute (`RATE_LIMIT_FORGOT_PASSWORD_MAX = 3`).
+  - `POST /api/v1/auth/reset-password`: single-use token verification, password policy check, password confirmation match, session revocation, rate-limited at approved 5 requests per minute (`RATE_LIMIT_RESET_PASSWORD_MAX = 5`). Token expiry is approved as 15 minutes (`AUTH_RESET_TOKEN_EXPIRY_MINUTES = 15`).
+- Wired frontend UI:
+  - Updated `apps/web/app/(auth)/forgot-password/page.tsx` as Server Component with `requireGuestSession` rendering `ForgotPasswordView` (clean minimalist layout without image frames, empty email input with neutral placeholder, 15:00 countdown timer matching token lifetime with disabled button state, `sessionStorage` cooldown persistence across page refreshes, and 5s auto-dismissing success toast).
+  - Created `apps/web/app/(auth)/reset-password/page.tsx` as Server Component with `requireGuestSession` rendering `ResetPasswordView` adhering to `Premium Minimal Ops` (token extraction from query string, show/hide password toggles, client mismatch check, success screen linking to `/login`, invalid token state linking to `/forgot-password`, wrapped in Suspense, inaccessible while authenticated).
+  - Implemented server-side guest route guard (`DEC-AUTH-103` / `apps/web/lib/auth/server-guest-guard.ts`) on `/login`, `/register`, `/forgot-password`, and `/reset-password` issuing immediate HTTP 307 redirects to `/` for active sessions with zero UI page flash, while allowing stale/fake sessions to render normally.
+- Added bilingual translation keys to `messages/id.json` and `messages/en.json` (100% key and ICU placeholder parity verified via `npm run i18n:check`).
+- Added comprehensive unit test coverage across contracts, database, email service, API routes, UI components, and server guest guard (67/67 tests passed 100%).
+- Verified responsive layout and zero console errors via Playwright browser testing across desktop and mobile viewports.
+
+### Acceptance Criteria
+
+- [x] Anti-enumeration guarantee: `POST /api/v1/auth/forgot-password` unconditionally returns generic HTTP 200 without revealing account existence.
+- [x] Raw reset tokens are high-entropy 256-bit CSPRNG strings and are NEVER stored in plaintext or logged.
+- [x] Reset URLs are built solely from trusted server environment configuration, preventing Host Header injection attacks.
+- [x] Single-use tokens cannot be reused or replayed after successful password reset.
+- [x] Reset tokens expire according to configurable duration (`AUTH_RESET_TOKEN_EXPIRY_MINUTES`, default 15 minutes).
+- [x] Password recovery is available for any existing account with an email, while password reset strictly preserves `accountStatus` (never auto-approves pending accounts).
+- [x] Successful password reset transactionally revokes all active login sessions across devices (`TASK-0908`).
+- [x] Email dispatch via Resend is explicitly awaited and handles failure gracefully.
+- [x] Both Indonesian and English locales supported with 100% translation key parity.
+- [x] Server-side guest route guards (`DEC-AUTH-103`) eliminate UI page flash on auth routes for active sessions.
+- [x] `/forgot-password` UX includes clean input, neutral placeholder, 15:00 countdown timer, `sessionStorage` cooldown persistence, and 5s auto-dismiss toast.
+
+---
+
 # 11. Phase 3 — Device Registry and Access
 
 ## TASK-0301 — Implement Site Model

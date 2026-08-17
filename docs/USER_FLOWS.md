@@ -589,7 +589,61 @@ flowchart TD
 **Relevant account statuses:** Normally `ACTIVE`.  
 **UI states:** Logging out, login page.  
 **Audit events:** Optional `auth.logout`.  
-**Open decisions:** Session revocation mechanism.
+**Open decisions:** Session revocation mechanism (Resolved: database session revocation per `TASK-0908`).
+
+---
+
+## Flow 12A — Password Recovery and Email Reset Flow (FLOW-AUTH-008)
+
+**Primary actor:** Any user with an existing account / Visitor  
+**Preconditions:** User is unauthenticated.  
+**Trigger:** User clicks "Forgot Password?" or opens `/forgot-password`.
+
+**Main success flow:**
+
+1. The user opens `/forgot-password` (clean minimalist layout without image frames, empty email input).
+2. The user enters their email address and clicks "Send Reset Link".
+3. The server validates email format and enforces rate limiting (3 requests/min per `RATE_LIMIT_FORGOT_PASSWORD_MAX`).
+4. The server checks user existence. If found, generates a 256-bit CSPRNG token, persists SHA-256 hash in `password_reset_tokens` (15-minute expiry), and dispatches email via Resend (`DEC-AUTH-102`).
+5. The server unconditionally returns HTTP 200 generic anti-enumeration response with timing equalizers.
+6. The frontend displays an auto-dismissing (5s) success toast (*"Please check your email inbox."*).
+7. The submit button enters a disabled 15:00 countdown timer, e.g. `Send Reset Link (14:32)`, persisted in `sessionStorage`.
+8. The user clicks the trusted reset link received via email, opening `/reset-password?token=<rawToken>`.
+9. The user enters a new password meeting policy (min 8 chars, uppercase, lowercase, number, special char) and confirms.
+10. The server validates the token hash in PostgreSQL, verifies token expiry (< 15 min) and single-use status (`used_at IS NULL`).
+11. The server hashes the password with Argon2id, marks the token consumed, and transactionally revokes all active login sessions for the user across all devices.
+12. The server strictly preserves the user's existing `accountStatus`.
+13. The user is notified of success and directed to `/login`.
+
+**Error flows:**
+- Expired, already used, or invalid token: displays warning banner with link to request a new reset link.
+- Weak password: shows validation error without consuming token.
+- Rate limit exceeded (3/min on forgot, 5/min on reset): returns `429 Too Many Requests`.
+
+**Postconditions:** Password updated, active sessions revoked, account status preserved.  
+**Audit events:** `auth.password_reset.requested`, `auth.password_reset.completed`.
+
+---
+
+## Flow 12B — Authenticated User Visits Guest-Only Route (FLOW-AUTH-009)
+
+**Primary actor:** Authenticated User with `ACTIVE` session  
+**Preconditions:** Valid active session exists in PostgreSQL.  
+**Trigger:** User navigates to `/login`, `/register`, `/forgot-password`, or `/reset-password`.
+
+**Main success flow:**
+
+1. The server receives the HTTP request at the App Router Server Component boundary (`requireGuestSession`).
+2. The server validates the `session_token` cookie against PostgreSQL.
+3. The server confirms the session is valid and the user has `accountStatus = ACTIVE`.
+4. The server immediately returns an HTTP 307 redirect to `/`.
+5. Zero HTML bytes of the guest/auth page are streamed to the client; no UI page flash occurs.
+6. The existing active session is preserved without logout or rotation.
+
+**Alternative flows:**
+- Visitor has an invalid, expired, revoked, or fake session cookie: `requireGuestSession` resolves cleanly, allowing the guest page to render normally with zero redirect loops.
+
+**Postconditions:** Active user redirected to dashboard; guest pages protected from authenticated leakage.
 
 ---
 

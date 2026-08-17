@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { PrismaClient, Prisma } from '@prisma/client';
 import {
   AccountStatus,
@@ -46,6 +47,52 @@ export type ChangeUserPasswordResult =
       error:
         | 'USER_NOT_FOUND'
         | 'INVALID_CURRENT_PASSWORD'
+        | 'WEAK_PASSWORD'
+        | 'ACCOUNT_NOT_ACTIVE'
+        | 'INTERNAL_ERROR';
+      message: string;
+    };
+
+export interface CreatePasswordResetTokenInput {
+  email: string;
+  expiryMinutes?: number;
+  requestId?: string;
+  ipAddress?: string;
+  userAgent?: string;
+}
+
+export type CreatePasswordResetTokenResult =
+  | {
+      success: true;
+      rawToken: string;
+      user: PublicSafeUserDto;
+      expiresAt: Date;
+    }
+  | {
+      success: false;
+      userExists: false;
+    };
+
+export interface ResetPasswordWithTokenInput {
+  token: string;
+  newPassword: string;
+  requestId?: string;
+  ipAddress?: string;
+  userAgent?: string;
+}
+
+export type ResetPasswordWithTokenResult =
+  | {
+      success: true;
+      user: PublicSafeUserDto;
+      revokedSessionsCount: number;
+    }
+  | {
+      success: false;
+      error:
+        | 'INVALID_TOKEN'
+        | 'TOKEN_EXPIRED'
+        | 'TOKEN_ALREADY_USED'
         | 'WEAK_PASSWORD'
         | 'ACCOUNT_NOT_ACTIVE'
         | 'INTERNAL_ERROR';
@@ -969,6 +1016,300 @@ export class UserRepository {
         success: false,
         error: 'INTERNAL_ERROR',
         message: 'A database error occurred during password change.',
+      };
+    }
+  }
+
+  /**
+   * Generates a single-use cryptographically secure reset token with expiry and stores only its SHA-256 hash.
+   * Transactionally invalidates previous unused tokens and logs an audit event without secrets/tokens.
+   * Rejects non-active accounts internally to maintain anti-enumeration security.
+   */
+  async createPasswordResetToken(
+    input: CreatePasswordResetTokenInput
+  ): Promise<CreatePasswordResetTokenResult> {
+    try {
+      const normalised = normaliseEmail(input.email);
+
+      const user = await this.prisma.user.findUnique({
+        where: { email: normalised },
+        include: {
+          userRoles: {
+            where: { revokedAt: null },
+            include: { role: true },
+          },
+        },
+      });
+
+      // If user does not exist, return false without revealing account absence
+      if (!user) {
+        return { success: false, userExists: false };
+      }
+
+      // Generate 256-bit CSPRNG token (32 bytes hex)
+      const rawToken = crypto.randomBytes(32).toString('hex');
+      const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+
+      const expiryMinutes = input.expiryMinutes ?? 15;
+      const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000);
+
+      await this.prisma.$transaction(
+        async (tx) => {
+          const now = new Date();
+          // Invalidate previous unused reset tokens for this user
+          await tx.passwordResetToken.updateMany({
+            where: {
+              userId: user.id,
+              usedAt: null,
+            },
+            data: {
+              usedAt: now,
+            },
+          });
+
+          // Create new token record (stores ONLY SHA-256 tokenHash, NEVER raw token)
+          await tx.passwordResetToken.create({
+            data: {
+              tokenHash,
+              userId: user.id,
+              expiresAt,
+            },
+          });
+
+          // Audit log (strictly without raw tokens, secrets, or URLs)
+          await tx.auditLog.create({
+            data: {
+              eventKey: AuditEventKey.AUTH_PASSWORD_RESET_REQUESTED,
+              actorUserId: null,
+              targetType: 'USER',
+              targetId: user.id,
+              result: 'SUCCESS',
+              previousValues: Prisma.JsonNull,
+              newValues: Prisma.JsonNull,
+              metadata: {
+                expiresAt: expiresAt.toISOString(),
+              },
+              requestId: input.requestId || null,
+              ipAddress: input.ipAddress || null,
+              userAgent: input.userAgent || null,
+            },
+          });
+        },
+        { isolationLevel: 'RepeatableRead' }
+      );
+
+      return {
+        success: true,
+        rawToken,
+        user: toPublicSafeUserDto(this.mapPrismaUserToRawDbUser(user)),
+        expiresAt,
+      };
+    } catch {
+      return { success: false, userExists: false };
+    }
+  }
+
+  /**
+   * Resets password using a validated single-use reset token.
+   * Enforces password policy, Argon2id hashing, single-use token consumption,
+   * transactional session revocation (TASK-0908), and secret-redacted audit logging.
+   */
+  async resetPasswordWithToken(
+    input: ResetPasswordWithTokenInput
+  ): Promise<ResetPasswordWithTokenResult> {
+    try {
+      const policyCheck = validatePasswordPolicy(input.newPassword);
+      if (!policyCheck.valid) {
+        return {
+          success: false,
+          error: 'WEAK_PASSWORD',
+          message: policyCheck.reason || 'Password does not meet required security policy.',
+        };
+      }
+
+      if (!input.token || typeof input.token !== 'string' || input.token.trim().length === 0) {
+        return {
+          success: false,
+          error: 'INVALID_TOKEN',
+          message: 'Reset token is required.',
+        };
+      }
+
+      const tokenHash = crypto.createHash('sha256').update(input.token.trim()).digest('hex');
+
+      const tokenRecord = await this.prisma.passwordResetToken.findUnique({
+        where: { tokenHash },
+        include: {
+          user: {
+            include: {
+              userRoles: {
+                where: { revokedAt: null },
+                include: { role: true },
+              },
+            },
+          },
+        },
+      });
+
+      if (!tokenRecord || !tokenRecord.user) {
+        await this.prisma.auditLog.create({
+          data: {
+            eventKey: AuditEventKey.AUTH_PASSWORD_RESET_FAILED,
+            actorUserId: null,
+            targetType: 'USER',
+            targetId: null,
+            result: 'FAILURE',
+            previousValues: Prisma.JsonNull,
+            newValues: Prisma.JsonNull,
+            metadata: { reason: 'TOKEN_NOT_FOUND' },
+            requestId: input.requestId || null,
+            ipAddress: input.ipAddress || null,
+            userAgent: input.userAgent || null,
+          },
+        });
+
+        return {
+          success: false,
+          error: 'INVALID_TOKEN',
+          message: 'Invalid or unknown password reset token.',
+        };
+      }
+
+      if (tokenRecord.usedAt !== null) {
+        await this.prisma.auditLog.create({
+          data: {
+            eventKey: AuditEventKey.AUTH_PASSWORD_RESET_FAILED,
+            actorUserId: null,
+            targetType: 'USER',
+            targetId: tokenRecord.userId,
+            result: 'FAILURE',
+            previousValues: Prisma.JsonNull,
+            newValues: Prisma.JsonNull,
+            metadata: { reason: 'TOKEN_ALREADY_USED' },
+            requestId: input.requestId || null,
+            ipAddress: input.ipAddress || null,
+            userAgent: input.userAgent || null,
+          },
+        });
+
+        return {
+          success: false,
+          error: 'TOKEN_ALREADY_USED',
+          message: 'This password reset token has already been used.',
+        };
+      }
+
+      if (tokenRecord.expiresAt.getTime() < Date.now()) {
+        await this.prisma.auditLog.create({
+          data: {
+            eventKey: AuditEventKey.AUTH_PASSWORD_RESET_FAILED,
+            actorUserId: null,
+            targetType: 'USER',
+            targetId: tokenRecord.userId,
+            result: 'FAILURE',
+            previousValues: Prisma.JsonNull,
+            newValues: Prisma.JsonNull,
+            metadata: { reason: 'TOKEN_EXPIRED' },
+            requestId: input.requestId || null,
+            ipAddress: input.ipAddress || null,
+            userAgent: input.userAgent || null,
+          },
+        });
+
+        return {
+          success: false,
+          error: 'TOKEN_EXPIRED',
+          message: 'This password reset token has expired.',
+        };
+      }
+
+      const newHash = await hashPassword(input.newPassword);
+
+      const result = await this.prisma.$transaction(
+        async (tx) => {
+          const now = new Date();
+
+          // 1. Update user passwordHash (without changing accountStatus or other fields)
+          const updatedUser = await tx.user.update({
+            where: { id: tokenRecord.userId },
+            data: { passwordHash: newHash },
+            select: {
+              id: true,
+              fullName: true,
+              email: true,
+              username: true,
+              accountStatus: true,
+              emailVerifiedAt: true,
+              lastLoginAt: true,
+              suspendedAt: true,
+              deactivatedAt: true,
+              createdAt: true,
+              updatedAt: true,
+              userRoles: {
+                where: { revokedAt: null },
+                select: {
+                  id: true,
+                  userId: true,
+                  roleId: true,
+                  assignedByUserId: true,
+                  assignedAt: true,
+                  revokedAt: true,
+                  role: { select: { code: true } },
+                },
+              },
+            },
+          });
+
+          // 2. Consume this reset token
+          await tx.passwordResetToken.update({
+            where: { id: tokenRecord.id },
+            data: { usedAt: now },
+          });
+
+          // 3. Invalidate any other active reset tokens for this user
+          await tx.passwordResetToken.updateMany({
+            where: {
+              userId: tokenRecord.userId,
+              usedAt: null,
+            },
+            data: { usedAt: now },
+          });
+
+          // 4. Revoke ALL active sessions for the user transactionally (TASK-0908)
+          const revokedCount = await revokeAllUserSessions(tx, tokenRecord.userId);
+
+          // 5. Create audit log for password reset completion (strictly without passwords/tokens)
+          await tx.auditLog.create({
+            data: {
+              eventKey: AuditEventKey.AUTH_PASSWORD_RESET_COMPLETED,
+              actorUserId: null,
+              targetType: 'USER',
+              targetId: tokenRecord.userId,
+              result: 'SUCCESS',
+              previousValues: Prisma.JsonNull,
+              newValues: Prisma.JsonNull,
+              metadata: { revokedSessionsCount: revokedCount },
+              requestId: input.requestId || null,
+              ipAddress: input.ipAddress || null,
+              userAgent: input.userAgent || null,
+            },
+          });
+
+          return {
+            success: true as const,
+            revokedSessionsCount: revokedCount,
+            user: toPublicSafeUserDto(this.mapPrismaUserToRawDbUser(updatedUser)),
+          };
+        },
+        { isolationLevel: 'RepeatableRead' }
+      );
+
+      return result;
+    } catch (error) {
+      return {
+        success: false,
+        error: 'INTERNAL_ERROR',
+        message: 'A database error occurred during password reset.',
       };
     }
   }

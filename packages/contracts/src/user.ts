@@ -250,3 +250,31 @@ export const UserPreferenceUpdateInputSchema = z
   .strict();
 
 export type UserPreferenceUpdateInput = z.infer<typeof UserPreferenceUpdateInputSchema>;
+
+/**
+ * Public input schema for Forgot Password requests.
+ * Accepts email to request a single-use password recovery link.
+ * Strict object validation rejects unapproved injected fields.
+ */
+export const ForgotPasswordInputSchema = z
+  .object({
+    email: z.string().trim().email('Invalid email address format.'),
+  })
+  .strict();
+
+export type ForgotPasswordInput = z.infer<typeof ForgotPasswordInputSchema>;
+
+/**
+ * Public input schema for Reset Password requests.
+ * Requires single-use raw token and new password (optional confirmation).
+ * Strict object validation rejects extraneous injected fields.
+ */
+export const ResetPasswordInputSchema = z
+  .object({
+    token: z.string().min(1, 'Reset token is required.'),
+    newPassword: z.string().min(1, 'New password is required.'),
+    newPasswordConfirmation: z.string().min(1, 'Password confirmation is required.').optional(),
+  })
+  .strict();
+
+export type ResetPasswordInput = z.infer<typeof ResetPasswordInputSchema>;

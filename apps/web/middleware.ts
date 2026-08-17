@@ -7,6 +7,8 @@ const PUBLIC_PATH_PREFIXES = [
   '/(auth)/',
   '/login',
   '/register',
+  '/forgot-password',
+  '/reset-password',
   '/status',
   '/health',
   '/ready',

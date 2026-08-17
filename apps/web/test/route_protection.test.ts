@@ -87,6 +87,18 @@ describe('TASK-0210 — Route and API Protection Integration Tests', () => {
       expect(res.status).toBe(200); // NextResponse.next() -> allows request to proceed to route handler
       expect(res.headers.get('location')).toBeNull();
     });
+
+    it('6. Allows public auth routes to pass through middleware without redirect loops', () => {
+      const guestPaths = ['/login', '/register', '/forgot-password', '/reset-password'];
+      for (const path of guestPaths) {
+        const req = new NextRequest(`http://localhost:3000${path}`, {
+          headers: { cookie: 'session_token=some-token-xyz' },
+        });
+        const res = middleware(req);
+        expect(res.status).toBe(200); // NextResponse.next()
+        expect(res.headers.get('location')).toBeNull();
+      }
+    });
   });
 
   describe('Server-Side Session & RBAC Enforcement Helpers', () => {

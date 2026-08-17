@@ -543,53 +543,109 @@ Response:
 204 No Content
 ```
 
-Open decisions:
+Open decisions & resolved policies:
 
-- Whether all sessions are revoked after password change.
-- Password policy.
-- Multi-factor authentication.
+- All active sessions are transactionally revoked across devices upon successful password reset (`DEC-AUTH-102` / `TASK-0213`).
+- Password policy: Minimum 8 characters, at least 1 uppercase letter, 1 lowercase letter, 1 number, and 1 special character with Argon2id hashing (`DEC-AUTH-102` / `TASK-0213`).
+- Multi-factor authentication remains TBD.
 
 ---
 
-## 10.6 Forgot Password
+## 10.6 Forgot Password (DEC-AUTH-102 / TASK-0213)
 
 ```http
 POST /api/v1/auth/forgot-password
 ```
 
 **Authentication:** Public  
-**Status:** `TBD`
+**Rate Limit:** 3 requests/minute (configurable via `RATE_LIMIT_FORGOT_PASSWORD_MAX`, default: 3)
 
 Request:
 
 ```json
 {
-  "email": "admin@example.com"
+  "email": "user@example.com"
 }
 ```
 
-Response shall not reveal whether the account exists.
+Response (HTTP 200 OK — strictly anti-enumeration):
+
+```json
+{
+  "success": true,
+  "message": "If an account exists with that email, a password reset link has been sent.",
+  "meta": {
+    "requestId": "req-1718000000000"
+  }
+}
+```
+
+Server rules:
+- Unconditionally returns HTTP 200 with generic message whether user exists, is pending, is suspended, or does not exist.
+- Never reveals user existence or returns user profile metadata.
+- Applies timing-mitigation equalizers to prevent side-channel timing enumeration of account existence.
+- If user exists, generates a 256-bit CSPRNG token (valid for 15 minutes by default, configurable via `AUTH_RESET_TOKEN_EXPIRY_MINUTES`), persists SHA-256 hash in `password_reset_tokens`, and dispatches email via Resend (`sendPasswordResetEmail`).
+- Reset link URL is constructed strictly from configured `APP_URL` / `NEXT_PUBLIC_APP_URL` (in production, explicit HTTPS URL is required).
+
+Possible errors:
+- `400 Bad Request`: `VALIDATION_ERROR` (invalid email or unrecognized fields)
+- `429 Too Many Requests`: `TOO_MANY_REQUESTS` (rate limit exceeded)
 
 ---
 
-## 10.7 Reset Password
+## 10.7 Reset Password (DEC-AUTH-102 / TASK-0213)
 
 ```http
 POST /api/v1/auth/reset-password
 ```
 
-**Authentication:** Reset token  
-**Status:** `TBD`
+**Authentication:** Public / Reset Token  
+**Rate Limit:** 5 requests/minute (configurable via `RATE_LIMIT_RESET_PASSWORD_MAX`, default: 5)
 
 Request:
 
 ```json
 {
-  "token": "reset-token",
-  "newPassword": "new-secure-password",
-  "newPasswordConfirmation": "new-secure-password"
+  "token": "4f9d2a6c8b1e...",
+  "newPassword": "NewSecurePassword123!",
+  "newPasswordConfirmation": "NewSecurePassword123!"
 }
 ```
+
+Response (HTTP 200 OK):
+
+```json
+{
+  "success": true,
+  "message": "Password has been successfully reset.",
+  "data": {
+    "user": {
+      "id": "9eea2fa7-9fb5-45bb-9aa5-d963f68252b3",
+      "email": "admin@example.com",
+      "fullName": "Admin User"
+    },
+    "revokedSessionsCount": 2
+  },
+  "meta": {
+    "requestId": "req-1718000000001"
+  }
+}
+```
+
+Server rules:
+- Validates password complexity against policy (minimum 12 chars, uppercase, lowercase, numbers, special characters).
+- Looks up token by SHA-256 hash in `password_reset_tokens`.
+- Verifies token has not expired (token lifetime: 15 minutes, configurable via `AUTH_RESET_TOKEN_EXPIRY_MINUTES`) and has not been used (`used_at IS NULL`).
+- Hashes new password with Argon2id and updates `users.password_hash`.
+- Strictly preserves existing `accountStatus` (password reset NEVER activates or approves pending accounts; normal login guards control access).
+- Marks token `used_at = NOW()` and invalidates other pending tokens for user.
+- Revokes all active user sessions across devices (`session-service.ts` / `TASK-0908`).
+- Emits structured audit log `auth.password_reset.completed`.
+
+Possible errors:
+- `400 Bad Request`: `VALIDATION_ERROR`, `INVALID_TOKEN`, `TOKEN_EXPIRED`, `TOKEN_ALREADY_USED`
+- `422 Unprocessable Entity`: `WEAK_PASSWORD`, `PASSWORD_CONFIRMATION_MISMATCH`
+- `429 Too Many Requests`: `TOO_MANY_REQUESTS`
 
 ---
 

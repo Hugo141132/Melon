@@ -116,6 +116,25 @@
 
 ---
 
+#### DEC-AUTH-102: Password-Recovery Email Provider & Token Lifecycle Architecture
+* **Related Task IDs**: `TASK-0213`
+* **Related Documentation**: `docs/SECURITY.md`, `docs/DATABASE.md`, `docs/API.md`, `docs/USER_FLOWS.md`, `docs/TRACEABILITY.md`, `TASKS.md`
+* **Status**: **APPROVED BY USER**
+* **Approved Decision**:
+  1. **Approved Email Provider**: **Resend** is the formally approved transactional email provider for password recovery notifications.
+  2. **Token Cryptography & Security**: Reset tokens are generated as 256-bit (32 bytes) CSPRNG random hex strings. Only the SHA-256 hash (`token_hash`) is persisted in `password_reset_tokens`. The raw token is NEVER stored in the database, logged, or serialized.
+  3. **Reset Link URL Construction**: Reset URLs are constructed strictly from server-configured trusted environment variables (`APP_URL` / `NEXT_PUBLIC_APP_URL`). In production, an explicit trusted HTTPS URL is required (cannot point to localhost/127.0.0.1). The untrusted request `Host` header MUST NEVER be used, preventing Host Header injection / password reset poisoning.
+  4. **Email Dispatch & Anti-Enumeration**: Email dispatch is explicitly `await`ed (preventing lost sends or unhandled promise rejections). `POST /api/v1/auth/forgot-password` unconditionally returns HTTP 200 with a generic message (`If an account exists with that email, a password reset link has been sent.`) and applies timing-mitigation equalizers to prevent side-channel account existence enumeration. In production with Resend, `RESEND_FROM_EMAIL` must use a verified sender domain (not `onboarding@resend.dev`).
+  5. **Approved Operational Policies**:
+     - Reset-token expiry is formally approved as **15 minutes** (`AUTH_RESET_TOKEN_EXPIRY_MINUTES = 15`).
+     - Forgot-password rate limit is formally approved as **3 requests per minute** (`RATE_LIMIT_FORGOT_PASSWORD_MAX = 3`).
+     - Reset-password rate limit is formally approved as **5 requests per minute** (`RATE_LIMIT_RESET_PASSWORD_MAX = 5`).
+     - Environment variables remain available for operational configuration with these approved values as defaults.
+  6. **Single-Use, Invalidation & Session Revocation**: When a token is created, any prior unused tokens for the user are invalidated. Once consumed, the token is marked `used_at = NOW()` and cannot be replayed. Successful password reset transactionally revokes all active user sessions across devices per `TASK-0908`.
+  7. **Account Status Policy**: Password recovery is permitted for any existing user account with an email. Password reset MUST NEVER activate, approve, or alter the `accountStatus` of an account (e.g. `PENDING_APPROVAL` or `SUSPENDED` accounts remain unchanged). Normal login status checks continue to enforce system access control.
+
+---
+
 ### 2.2 Roles and Permissions (RBAC)
 
 #### DEC-RBAC-015: Admin Faucet Control Authorization Policy
@@ -272,6 +291,27 @@
   6. **TASK-0601 Implementation**: `next-intl` infrastructure configured for `@kebun-melon/web` with locales `id`/`en`, default `id`, fallback `en`, non-prefixed cookie resolution (`locale`), server/client rendering support, bootstrap dictionaries (`messages/id.json`, `messages/en.json`), and safe missing key fallback handling.
   7. **TASK-0603 Implementation**: Hard-coded user-facing UI text migrated to `next-intl` translation keys across all authentication pages, protected dashboard and sensor views, historical charts, faucet controls, and shell navigation. 100% key parity and ICU placeholder consistency verified with 15 unit test suites (107/107 tests passed) and user-reported pre-commit suite.
   8. **TASK-0604 Implementation**: Implemented mandatory initial language gate (`Select Language / Pilih Bahasa`, English -> `en`, Bahasa Indonesia -> `id`) on `(auth)/layout.tsx` for visitors without a valid `locale` cookie. Implemented authenticated language modal selector exclusively on `/pengaturan` (`SettingsLocaleSwitcher`) backed by `PATCH /api/v1/me/preferences` with strict Zod schema validation (`UserPreferenceUpdateInputSchema`), `language.self.update` RBAC check, transactional persistence to `user_preferences` table with `profile.self.updated` audit logging, immediate client-side `locale` cookie synchronization, and `/settings` Next.js permanent redirect. Fixed system default device display labels (`Node Sensor Tanah` <-> `Soil Sensor Node`, `Node Kualitas Air` <-> `Water Quality Node`, `Node Tangki Air` <-> `Water Tank Node`) in presentation layer while preserving custom names, device IDs, and canonical enums. Responsive mobile selector centering and dropdown viewport bounding enforced across 360px, 390px, 430px, and desktop viewports. Verified with 18 unit test suites (136/136 tests passed), 0 TypeScript errors, 32/32 static build routes, automated Playwright desktop/mobile checks, and user-verified credentialed pre-commit suite.
+
+#### DEC-AUTH-102: Password Recovery and Email Reset Architecture via Resend
+* **Related Task IDs**: `TASK-0213`
+* **Related Documentation**: `docs/SECURITY.md`, `docs/API.md`, `docs/DATABASE.md`, `TASKS.md`, `AGENTS.md`
+* **Status**: **APPROVED BY USER**
+* **Approved Decision**:
+  1. **Email Provider**: Resend is approved as the email service provider for password recovery.
+  2. **Token Security**: 256-bit CSPRNG tokens, stored as SHA-256 hashes in `password_reset_tokens` table. Single-use, invalidating prior tokens upon creation and upon successful password reset.
+  3. **Approved Expiry & Rate Limits**: 15 minutes token expiry (`AUTH_RESET_TOKEN_EXPIRY_MINUTES = 15`), 3 requests/min for forgot password (`RATE_LIMIT_FORGOT_PASSWORD_MAX = 3`), 5 requests/min for reset password (`RATE_LIMIT_RESET_PASSWORD_MAX = 5`).
+  4. **Account Scope**: Supports password recovery for any existing account with email/password regardless of status; password resets preserve existing `accountStatus` (never auto-activates pending accounts).
+  5. **Session Revocation**: Password reset transactionally revokes all active sessions for the user.
+
+#### DEC-AUTH-103: Server-Side Guest Route Guard with Zero Page Flash
+* **Related Task IDs**: `TASK-0213`
+* **Related Documentation**: `docs/SECURITY.md`, `docs/USER_FLOWS.md`, `AGENTS.md`
+* **Status**: **APPROVED BY USER**
+* **Approved Decision**:
+  1. **Server-Side Verification**: Guest-only authentication pages (`/login`, `/register`, `/forgot-password`, `/reset-password`) execute `requireGuestSession` server-side before rendering any component HTML.
+  2. **Active Session Handling**: If a genuinely valid session with `accountStatus === 'ACTIVE'` exists in PostgreSQL, the server immediately issues an HTTP 307 redirect to `/` with zero HTML streamed for the auth page and zero page flash.
+  3. **Stale/Invalid Session Handling**: Invalid, expired, revoked, malformed, or absent session tokens render the guest page normally with zero redirect loops.
+  4. **Reset-Password Policy**: `/reset-password` is inaccessible while authenticated; an authenticated user must log out or use an unauthenticated session before consuming a password reset link.
 
 ---
 

@@ -90,11 +90,65 @@ describe('Web Server Environment Guard', () => {
         INTERNAL_GATEWAY_URL: 'https://gateway.example.com',
         INTERNAL_SERVICE_TOKEN: 'super_secret_token_12345',
         INTERNAL_GATEWAY_TIMEOUT_MS: '3000',
+        APP_URL: 'https://melon.example.com',
       });
 
       expect(config.INTERNAL_GATEWAY_URL).toBe('https://gateway.example.com');
       expect(config.INTERNAL_SERVICE_TOKEN).toBe('super_secret_token_12345');
       expect(config.INTERNAL_GATEWAY_TIMEOUT_MS).toBe(3000);
+      expect(config.APP_URL).toBe('https://melon.example.com');
+    });
+
+    it('rejects missing APP_URL in strict production', () => {
+      expect(() =>
+        validateServerEnv({
+          NODE_ENV: 'production',
+          APP_ENV: 'production',
+          INTERNAL_GATEWAY_URL: 'https://gateway.example.com',
+          INTERNAL_SERVICE_TOKEN: 'super_secret_token_12345',
+        })
+      ).toThrowError(/APP_URL is required in production/);
+    });
+
+    it('rejects non-HTTPS or localhost APP_URL in strict production', () => {
+      expect(() =>
+        validateServerEnv({
+          NODE_ENV: 'production',
+          APP_ENV: 'production',
+          INTERNAL_GATEWAY_URL: 'https://gateway.example.com',
+          INTERNAL_SERVICE_TOKEN: 'super_secret_token_12345',
+          APP_URL: 'http://localhost:3000',
+        })
+      ).toThrowError(/APP_URL must be an explicit trusted HTTPS URL/);
+    });
+
+    it('rejects default onboarding@resend.dev sender email in strict production when RESEND_API_KEY is configured', () => {
+      expect(() =>
+        validateServerEnv({
+          NODE_ENV: 'production',
+          APP_ENV: 'production',
+          INTERNAL_GATEWAY_URL: 'https://gateway.example.com',
+          INTERNAL_SERVICE_TOKEN: 'super_secret_token_12345',
+          APP_URL: 'https://melon.example.com',
+          RESEND_API_KEY: 're_test_12345678901234567890',
+          RESEND_FROM_EMAIL: 'Kebun Melon <onboarding@resend.dev>',
+        })
+      ).toThrowError(/RESEND_FROM_EMAIL must use a verified sender domain in production/);
+    });
+
+    it('accepts valid production config with custom verified RESEND_FROM_EMAIL', () => {
+      const config = validateServerEnv({
+        NODE_ENV: 'production',
+        APP_ENV: 'production',
+        INTERNAL_GATEWAY_URL: 'https://gateway.example.com',
+        INTERNAL_SERVICE_TOKEN: 'super_secret_token_12345',
+        APP_URL: 'https://melon.example.com',
+        RESEND_API_KEY: 're_test_12345678901234567890',
+        RESEND_FROM_EMAIL: 'Kebun Melon <notifications@app.kebunmelon.id>',
+      });
+
+      expect(config.APP_URL).toBe('https://melon.example.com');
+      expect(config.RESEND_FROM_EMAIL).toBe('Kebun Melon <notifications@app.kebunmelon.id>');
     });
   });
 });

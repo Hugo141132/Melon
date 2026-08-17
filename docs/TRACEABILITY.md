@@ -47,6 +47,7 @@
 | `PRD-FR-035` | Exact application roles (OWNER and ADMIN) | `docs/PRD.md` | - | `TASK-0105` | `TEST-UNIT-002` | `READY_FOR_IMPLEMENTATION` |
 | `PRD-FR-036` | User profile management rules and scope | `docs/PRD.md` | - | `TASK-0211` | `TEST-SEC-002` | `READY_FOR_IMPLEMENTATION` |
 | `PRD-FR-037` | Internationalisation locale support | `docs/PRD.md` | `DEC-I18N-068` | `TASK-0601` | `TEST-E2E-004` | `READY_FOR_IMPLEMENTATION` |
+| `PRD-FR-038` | Password recovery and email reset flow via Resend | `docs/PRD.md` | `DEC-AUTH-102` | `TASK-0213` | `TEST-API-001` | `VERIFIED` |
 | `PRD-NFR-001` | Application security controls and baseline defenses | `docs/PRD.md` | `DEC-AUTH-001` | `TASK-0901` | `TEST-SEC-001` | `READY_FOR_IMPLEMENTATION` |
 | `PRD-NFR-002` | Dashboard load and data query performance | `docs/PRD.md` | `DEC-MON-087` | `TASK-0503` | `TEST-API-004` | `IMPLEMENTED` |
 | `PRD-NFR-003` | System reliability and fault-tolerant telemetry processing | `docs/PRD.md` | `DEC-DEV-020` | `TASK-0401` | `TEST-MQTT-003` | `READY_FOR_IMPLEMENTATION` |
@@ -86,6 +87,8 @@
 | `FLOW-AUTH-005` | Active user successful authentication flow | `docs/USER_FLOWS.md` | `DEC-AUTH-001` | `TASK-0204` | `TEST-E2E-001` | `READY_FOR_IMPLEMENTATION` |
 | `FLOW-AUTH-006` | Invalid credentials login failure flow | `docs/USER_FLOWS.md` | - | `TASK-0204` | `TEST-API-001` | `READY_FOR_IMPLEMENTATION` |
 | `FLOW-AUTH-007` | Suspended user login restriction flow | `docs/USER_FLOWS.md` | - | `TASK-0204` | `TEST-SEC-001` | `READY_FOR_IMPLEMENTATION` |
+| `FLOW-AUTH-008` | Password recovery and email reset flow | `docs/USER_FLOWS.md` | `DEC-AUTH-102` | `TASK-0213` | `TEST-API-001` | `VERIFIED` |
+| `FLOW-AUTH-009` | Server-side guest route redirection with zero UI flash | `docs/USER_FLOWS.md` | `DEC-AUTH-103` | `TASK-0213` | `TEST-E2E-001` | `VERIFIED` |
 | `FLOW-USER-001` | Owner views pending registration list flow | `docs/USER_FLOWS.md` | `DEC-AUTH-006` | `TASK-0206` | `TEST-E2E-002` | `IMPLEMENTED` |
 | `FLOW-USER-002` | Owner approves Admin registration flow | `docs/USER_FLOWS.md` | `DEC-AUTH-006` | `TASK-0207` | `TEST-E2E-002` | `READY_FOR_IMPLEMENTATION` |
 | `FLOW-USER-003` | Owner rejects Admin registration flow | `docs/USER_FLOWS.md` | - | `TASK-0208` | `TEST-E2E-002` | `IMPLEMENTED` |

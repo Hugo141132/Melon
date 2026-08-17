@@ -40,9 +40,21 @@ export const serverEnvSchema = z.object({
   RATE_LIMIT_HISTORY_MAX: z
     .preprocess((val) => (val ? parseInt(String(val), 10) : 30), z.number().int().min(1))
     .default(30),
+  RATE_LIMIT_FORGOT_PASSWORD_MAX: z
+    .preprocess((val) => (val ? parseInt(String(val), 10) : 3), z.number().int().min(1))
+    .default(3),
+  RATE_LIMIT_RESET_PASSWORD_MAX: z
+    .preprocess((val) => (val ? parseInt(String(val), 10) : 5), z.number().int().min(1))
+    .default(5),
   RATE_LIMIT_WINDOW_MS: z
     .preprocess((val) => (val ? parseInt(String(val), 10) : 60000), z.number().int().min(1000))
     .default(60000),
+  RESEND_API_KEY: z.string().optional(),
+  RESEND_FROM_EMAIL: z.string().optional().default('Kebun Melon <onboarding@resend.dev>'),
+  APP_URL: z.string().url().optional(),
+  AUTH_RESET_TOKEN_EXPIRY_MINUTES: z
+    .preprocess((val) => (val ? parseInt(String(val), 10) : 15), z.number().int().min(1))
+    .default(15),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
@@ -80,6 +92,25 @@ export function validateServerEnv(
       throw new Error(
         'Production gateway requirement failed: INTERNAL_SERVICE_TOKEN is required in production.'
       );
+    }
+    if (!env.APP_URL) {
+      throw new Error('Production requirement failed: APP_URL is required in production.');
+    }
+    if (
+      !env.APP_URL.startsWith('https://') ||
+      env.APP_URL.includes('localhost') ||
+      env.APP_URL.includes('127.0.0.1')
+    ) {
+      throw new Error(
+        'Production requirement failed: APP_URL must be an explicit trusted HTTPS URL and cannot point to localhost or 127.0.0.1.'
+      );
+    }
+    if (env.RESEND_API_KEY) {
+      if (!env.RESEND_FROM_EMAIL || env.RESEND_FROM_EMAIL.includes('onboarding@resend.dev')) {
+        throw new Error(
+          'Production requirement failed: RESEND_FROM_EMAIL must use a verified sender domain in production and cannot use onboarding@resend.dev.'
+        );
+      }
     }
   }
 
@@ -124,6 +155,18 @@ export function validateServerEnv(
         z.number().int().min(1)
       )
       .default(isTest ? 1000 : 30),
+    RATE_LIMIT_FORGOT_PASSWORD_MAX: z
+      .preprocess(
+        (val) => (val ? parseInt(String(val), 10) : isTest ? 1000 : 3),
+        z.number().int().min(1)
+      )
+      .default(isTest ? 1000 : 3),
+    RATE_LIMIT_RESET_PASSWORD_MAX: z
+      .preprocess(
+        (val) => (val ? parseInt(String(val), 10) : isTest ? 1000 : 5),
+        z.number().int().min(1)
+      )
+      .default(isTest ? 1000 : 5),
   });
 
   const result = dynamicSchema.safeParse(env);

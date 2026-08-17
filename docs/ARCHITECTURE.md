@@ -180,8 +180,9 @@ The presentation layer shall not:
 
 Responsibilities:
 
-- Authentication.
-- Session management.
+- Authentication and session management.
+- Password recovery and transactional email delivery via Resend (`DEC-AUTH-102` / `TASK-0213`).
+- Server-side guest route guards (`DEC-AUTH-103` / `TASK-0213`).
 - RBAC.
 - Account approval.
 - User-profile management.

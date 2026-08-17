@@ -459,6 +459,18 @@ Test:
   - Secret leak prevention (no plain passwords in error objects or strings).
   - Immutability of input strings.
 - Password verification integration.
+- Password recovery and reset unit test suite (`TASK-0213` / `DEC-AUTH-102`):
+  - Token creation and SHA-256 hashing (`packages/database/test/user-repository-reset-password.test.ts`, 10 tests).
+  - Reset token validation, 15-minute expiry, and single-use enforcement.
+  - Transactional user session revocation upon reset.
+  - Account status preservation across resets (never auto-approves pending accounts).
+  - Validation contracts for forgot/reset schemas (`packages/contracts/src/__tests__/user.test.ts`, 10 tests).
+  - Resend email delivery service and simulated fallback (`apps/web/test/unit/resend-email.test.ts`, 5 tests).
+  - Anti-enumeration generic 200 responses and rate limits on forgot-password (`apps/web/test/unit/forgot-password-route.test.ts`, 6 tests).
+  - Reset-password route validation and rate limits (`apps/web/test/unit/reset-password-route.test.ts`, 8 tests).
+  - Forgot-password UI with 15:00 countdown, `sessionStorage` persistence, and 5s auto-dismiss toast (`apps/web/test/unit/forgot-password-ui.test.tsx`, 6 tests).
+  - Reset-password UI form and invalid token banner (`apps/web/test/unit/reset-password-ui.test.tsx`, 4 tests).
+  - Server-side guest route guard (`apps/web/test/unit/server-guest-guard.test.ts`, 5 tests) enforcing instant HTTP 307 redirect to `/` for active sessions with zero UI flash (`DEC-AUTH-103`).
 - Account-status access decision.
 - Session-expiry calculation.
 - Session-revocation check.

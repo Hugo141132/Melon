@@ -75,12 +75,14 @@ The application shall support two authenticated user roles:
 * `OWNER`
 * `ADMIN`
 
-Unauthenticated users shall only be able to access:
+* the login page (`/login`);
+* the create-account page (`/register`);
+* the password-recovery page (`/forgot-password`);
+* the password-reset page (`/reset-password`).
 
-* the login page;
-* the create-account page;
-* the password-recovery page, if implemented;
-* the account-status page, if implemented.
+Per `DEC-AUTH-103`, active authenticated users attempting to access these guest pages are immediately redirected server-side to `/` with zero UI flash. Users must log out or use an unauthenticated session before consuming a password reset link.
+
+The `/forgot-password` page features a clean minimalist layout without decorative illustration frames, an empty email input with neutral placeholder, a 15:00 countdown timer matching token lifetime, `sessionStorage` refresh persistence, and an auto-dismissing success toast (5s).
 
 Monitoring, device, alert, control, user-management, audit-log, and settings interfaces shall only be accessible after successful authentication.
 

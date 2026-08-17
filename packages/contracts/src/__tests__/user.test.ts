@@ -7,6 +7,8 @@ import {
   UserProfileUpdateInputSchema,
   PublicSafeUserDtoSchema,
   RawDbUserWithRoles,
+  ForgotPasswordInputSchema,
+  ResetPasswordInputSchema,
 } from '../index';
 
 describe('TASK-0201 Contracts & DTO Verification', () => {
@@ -185,5 +187,59 @@ describe('TASK-0201 Contracts & DTO Verification', () => {
     expect(rawDbUser.passwordHash).toBe('hash123');
     expect(rawDbUser.email).toBe('  UNMUTATED@EXAMPLE.COM ');
     expect(rawDbUser).toEqual(rawCopy);
+  });
+
+  describe('TASK-0213 Password Recovery & Reset Schemas', () => {
+    it('validates ForgotPasswordInputSchema correctly', () => {
+      expect(ForgotPasswordInputSchema.safeParse({ email: 'user@example.com' }).success).toBe(true);
+      expect(ForgotPasswordInputSchema.safeParse({ email: '  user@example.com  ' }).success).toBe(
+        true
+      );
+
+      // Invalid formats
+      expect(ForgotPasswordInputSchema.safeParse({ email: 'invalid-email' }).success).toBe(false);
+      expect(ForgotPasswordInputSchema.safeParse({ email: '' }).success).toBe(false);
+      expect(ForgotPasswordInputSchema.safeParse({}).success).toBe(false);
+
+      // Rejects injected fields (strict)
+      expect(
+        ForgotPasswordInputSchema.safeParse({ email: 'user@example.com', role: 'OWNER' }).success
+      ).toBe(false);
+    });
+
+    it('validates ResetPasswordInputSchema correctly', () => {
+      expect(
+        ResetPasswordInputSchema.safeParse({
+          token: 'valid-reset-token-12345',
+          newPassword: 'SuperSecurePassword123!',
+        }).success
+      ).toBe(true);
+
+      expect(
+        ResetPasswordInputSchema.safeParse({
+          token: 'valid-reset-token-12345',
+          newPassword: 'SuperSecurePassword123!',
+          newPasswordConfirmation: 'SuperSecurePassword123!',
+        }).success
+      ).toBe(true);
+
+      // Missing token or password
+      expect(ResetPasswordInputSchema.safeParse({ token: '', newPassword: 'abc' }).success).toBe(
+        false
+      );
+      expect(ResetPasswordInputSchema.safeParse({ token: 'abc', newPassword: '' }).success).toBe(
+        false
+      );
+      expect(ResetPasswordInputSchema.safeParse({}).success).toBe(false);
+
+      // Rejects injected fields (strict)
+      expect(
+        ResetPasswordInputSchema.safeParse({
+          token: 'tok',
+          newPassword: 'pass',
+          accountStatus: 'ACTIVE',
+        }).success
+      ).toBe(false);
+    });
   });
 });

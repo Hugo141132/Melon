@@ -189,6 +189,7 @@ erDiagram
     USERS ||--o{ AUDIT_LOGS : acts
     USERS ||--o{ USER_PREFERENCES : owns
     USERS ||--o{ SESSIONS : creates
+    USERS ||--o{ PASSWORD_RESET_TOKENS : requests
 ```
 
 ---
@@ -395,6 +396,36 @@ Recommended index:
 ```text
 INDEX account_approvals_applicant_idx
 ON account_approvals (applicant_user_id, decided_at DESC)
+```
+
+---
+
+## 6.7 `password_reset_tokens` (DB-AUTH-005 / DEC-AUTH-102)
+
+Stores cryptographic hashes for single-use password recovery tokens.
+
+| Column | Type | Nullable | Notes |
+|---|---|---:|---|
+| `id` | UUID | No | Primary key (`DEFAULT gen_random_uuid()`) |
+| `user_id` | UUID | No | Foreign key referencing `users(id) ON DELETE CASCADE` |
+| `token_hash` | VARCHAR(64) | No | Cryptographic SHA-256 hex digest of the raw 256-bit token |
+| `expires_at` | TIMESTAMPTZ | No | Token expiration timestamp (configurable, default 15 minutes) |
+| `used_at` | TIMESTAMPTZ | Yes | Timestamp when the token was successfully consumed (NULL until used) |
+| `created_at` | TIMESTAMPTZ | No | Token generation timestamp (`DEFAULT NOW()`) |
+
+### Constraints & Security Rules
+
+- **Raw Token Storage Forbidden**: The raw CSPRNG token is NEVER stored in plaintext; only the SHA-256 hash is persisted.
+- **Single Use**: Once consumed, `used_at` is populated transactionally. A token with `used_at IS NOT NULL` is permanently invalidated and cannot be replayed.
+- **Transactional Invalidation**: Creating a new password reset token marks/invalidates any prior unused tokens for that user.
+- **Session Revocation**: Consuming a valid reset token transactionally revokes all active login sessions for the associated `user_id` across devices per `TASK-0908`.
+
+### Recommended Indexes
+
+```text
+INDEX password_reset_tokens_user_id_idx ON password_reset_tokens (user_id)
+INDEX password_reset_tokens_expires_at_idx ON password_reset_tokens (expires_at)
+INDEX password_reset_tokens_token_hash_idx ON password_reset_tokens (token_hash)
 ```
 
 ---

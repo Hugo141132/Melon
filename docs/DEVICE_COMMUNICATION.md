@@ -11,7 +11,7 @@
 | Hardware | ESP32 / NodeMCU |
 | Recommended protocol | MQTT 5.0 over TLS |
 | Network connectivity | Wi-Fi with internet or private-network access |
-| Related documents | `FRONTEND_AUDIT.md`, `UI_UX.md`, `PRD.md`, `RBAC.md`, `USER_FLOWS.md`, `I18N.md` |
+| Related documents | `FRONTEND_AUDIT.md`, `UI_UX.md`, `PRD.md`, `RBAC.md`, `USER_FLOWS.md`, `I18N.md`, `SECURITY.md`, `DECISIONS.md` |
 
 ---
 

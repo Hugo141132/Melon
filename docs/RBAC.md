@@ -84,6 +84,16 @@ Unauthenticated users shall not access protected:
 - Settings pages.
 - Protected API endpoints.
 
+Unauthenticated / guest-only pages:
+- `/login`
+- `/register`
+- `/forgot-password`
+- `/reset-password` (consumed via recovery token)
+
+Per `DEC-AUTH-103`, active authenticated users (`accountStatus = ACTIVE`) requesting guest pages are immediately redirected server-side to `/` with zero UI flash. Users must log out or use an unauthenticated session before consuming a reset token.
+
+Per `DEC-AUTH-102`, any existing account may request password recovery; completing a password reset strictly preserves the user's existing `accountStatus` (never bypassing Owner approval) and transactionally revokes all active login sessions.
+
 ### 4.2 Server-Side Enforcement (RBAC-PERM-002)
 
 The system shall enforce authorisation on the server.
