@@ -918,16 +918,21 @@ Implement sites if required for version 1.
 
 ## TASK-0302 — Implement Device Registry
 
-**Priority:** `P0`  
+**Priority:** `P0`
 **Status:** `DONE`
 **Dependencies:** `TASK-0104`
 **Completed:** 2026-07-30 — Implemented Device Registry with Zod DTO contracts (`packages/contracts/src/device.ts`), database repository abstraction (`packages/database/src/device-repository.ts`), REST API route handlers (`/api/v1/devices`, `/[deviceId]`, `/[deviceId]/deactivate`), and IoT Device Management UI (`apps/web/app/devices/page.tsx`). Strictly protected device secrets and credentials, prevented client overrides of server-controlled status/telemetry fields via `.strict()` schema stripping, enforced canonical untranslated device lifecycle (`ACTIVE`, `INACTIVE`, `DEACTIVATED`) and connection status values (`ONLINE`, `OFFLINE`, `STALE`, `UNKNOWN`, `INACTIVE`), and added comprehensive unit test suites covering contracts, database repository, RBAC API authorization, and frontend pages.
+**Reconciliation Note (2026-08-18):** Reconciled specifications per `DEC-DEV-027` and `DEC-DEV-028`:
+- In-app device creation (`POST /api/v1/devices` and "Add Device" UI modal) is REMOVED (`DEC-DEV-027`); existing devices remain provisioned in the database.
+- Internal database primary key UUID (`devices.id`) is immutable; Owner may update external canonical `deviceId` and `name` via `PATCH /api/v1/devices/{deviceId}` (`DEC-DEV-028`).
+- Admin users MUST NOT view or edit external canonical `deviceId` in API responses or UI (`DEC-DEV-028`).
+- Reconciliation of physical ESP32/NodeMCU firmware configurations and EMQX broker credentials/ACLs following a `deviceId` rename is marked as **TBD / BLOCKING** automation (`DEC-DEV-028`).
 
 ### Work
 
 Implement:
 
-- Device identity.
+- Device identity (immutable DB UUID `id`, Owner-editable external `deviceId`).
 - Device type.
 - Lifecycle status.
 - Connection status.
@@ -942,12 +947,14 @@ Implement:
 - Device IDs are canonical and untranslated.
 - Device credentials are not exposed.
 - Inactive devices cannot receive commands.
+- In-app device creation is removed (`DEC-DEV-027`).
+- Canonical `deviceId` is editable by Owner and concealed from Admin (`DEC-DEV-028`).
 
 ---
 
 ## TASK-0303 — Implement Device Capabilities
 
-**Priority:** `P1`  
+**Priority:** `P1`
 **Status:** `DONE`
 **Dependencies:** `TASK-0302`
 **Completed:** 2026-07-30 — Implemented typed device capabilities with single server-authoritative mapping source in `@kebun-melon/contracts`, runtime feature detection helper `supportsCapability`, MONITORING vs CONTROL capability categorization (`getCapabilityCategory`), atomic transaction reconciliation on device profile (`deviceType`) update in `@kebun-melon/database`, controlled one-time DB reconciliation removing obsolete `RELAY_CONTROL` & `SOLENOID_VALVE_CONTROL` rows on `water-tank-node-ryd0at`, and read-only capability rendering under Monitoring and Control headers on `/devices` UI. Added unit and integration test coverage across contract, database, and frontend layers.
@@ -1010,6 +1017,9 @@ revokedAt
 **Status:** `DONE`
 **Dependencies:** `TASK-0304`
 **Completed:** 2026-07-31 — Implemented authorised device listing and device detail access endpoints (`GET /api/v1/devices`, `GET /api/v1/devices/{deviceId}`). `OWNER` role receives global device visibility across all sites. `ADMIN` role receives strictly scoped device access filtered by active `UserDeviceAccess` assignments (`revokedAt === null`), with revoked or unassigned devices disappearing immediately and direct access attempts returning HTTP 403 `DEVICE_NOT_ASSIGNED`. Integrated dynamic `permissions` DTO (`canView`, `canControl`) on all returned device objects, dynamically evaluated using RBAC, active account status, device capabilities, and the `ENABLE_FAUCET_CONTROL` feature flag. Added comprehensive unit and integration test coverage across list filtering, detail authorization, permissions computation, and negative auth security rules.
+**Reconciliation Note (2026-08-18):** Reconciled endpoints per `DEC-DEV-028`:
+- `GET /api/v1/devices` and `GET /api/v1/devices/{deviceId}` enforce role-based projection: canonical `deviceId` is included for Owner users and strictly concealed (omitted or masked) for Admin users (`DEC-DEV-028`).
+- `PATCH /api/v1/devices/{deviceId}` supports Owner updating canonical `deviceId` and user-facing `name` while preserving immutable database UUID `id`.
 
 ### Work
 
@@ -1018,12 +1028,14 @@ Implement:
 ```text
 GET /api/v1/devices
 GET /api/v1/devices/{deviceId}
+PATCH /api/v1/devices/{deviceId}
 ```
 
 ### Acceptance Criteria
 
 - Admin sees only assigned devices.
 - Owner sees devices within approved scope.
+- Canonical `deviceId` is concealed from Admin users across all responses (`DEC-DEV-028`).
 - Device permissions include `canView` and `canControl`.
 - Device ID manipulation fails.
 
@@ -1035,6 +1047,10 @@ GET /api/v1/devices/{deviceId}
 **Status:** `DONE`
 **Dependencies:** `TASK-0305`
 **Completed:** 2026-07-31 — Implemented DeviceContext provider and DeviceSelector component in apps/web. Sourced authorised devices exclusively from GET /api/v1/devices, adhering strictly to OWNER global scope and ADMIN assigned device scope. Handled 6 core UI states: Loading (skeleton), 0 devices (empty state, metrics/controls disabled), 1 device (active badge), multiple devices (>1 dropdown with search and status filters), revoked access (notice banner and safe fallback), and API error. Implemented URL (?deviceId=...) and localStorage candidate validation against the server-authorised list to prevent client-side tampering. Integrated selector into TopAppBar and RootLayout. Added comprehensive unit and integration test coverage (apps/web/app/devices/test/selector.test.ts).
+**Reconciliation Note (2026-08-18):** Reconciled component per `DEC-DEV-028` and `DEC-DEV-029`:
+- Canonical `deviceId` in selector UI is displayed only for Owner users; Admin users see only user-facing device `name` or localized default label (`DEC-DEV-028`).
+- Persistent restoration of previously/last-accessed device history across logins/persistent storage is REMOVED (`DEC-DEV-029`). Selection resolves fresh on load/session.
+- Historical telemetry charts (`TASK-0503`/`TASK-0504`), faucet commands, assignments, status events, and audit logs remain 100% intact (`DEC-DEV-029`).
 
 ### Work
 
@@ -1050,9 +1066,11 @@ Frontend states:
 ### Acceptance Criteria
 
 - All device-specific panels use one selected device.
+- Canonical `deviceId` is hidden from Admins in selector UI (`DEC-DEV-028`).
 - Switching devices clears misleading prior values.
 - Unauthorised devices cannot be selected through URL manipulation.
-- Default selection follows approved policy.
+- Default selection resolves fresh without persistent last-accessed history restoration (`DEC-DEV-029`).
+- All telemetry, command, assignment, status, and audit history remain intact (`DEC-DEV-029`).
 
 ---
 

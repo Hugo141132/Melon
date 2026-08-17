@@ -1275,6 +1275,10 @@ GET /api/v1/devices
 
 The server shall return only authorised devices.
 
+Role-based response filtering (`DEC-DEV-028`):
+- For `OWNER`: All fields including the canonical `deviceId` string are returned.
+- For `ADMIN`: The canonical `deviceId` field is strictly concealed (omitted or masked). Admin users only see user-facing device `name` and status metadata.
+
 Query parameters:
 
 ```text
@@ -1286,12 +1290,38 @@ connectionStatus
 search
 ```
 
-Response item:
+Response item (Owner view):
 
 ```json
 {
   "id": "device-db-uuid",
   "deviceId": "water-node-001",
+  "name": "Water Node 1",
+  "siteId": "site-01",
+  "deviceType": "WATER_TANK_NODE",
+  "connectionStatus": "ONLINE",
+  "accountStatus": "ACTIVE",
+  "lastSeenAt": "2026-07-27T14:15:00+07:00",
+  "firmwareVersion": "1.0.0",
+  "capabilities": [
+    "WATER_TELEMETRY",
+    "LOCATION",
+    "TANK_MONITORING",
+    "FLOW_MONITORING",
+    "FAUCET_CONTROL"
+  ],
+  "permissions": {
+    "canView": true,
+    "canControl": false
+  }
+}
+```
+
+Response item (Admin view — `deviceId` concealed per `DEC-DEV-028`):
+
+```json
+{
+  "id": "device-db-uuid",
   "name": "Water Node 1",
   "siteId": "site-01",
   "deviceType": "WATER_TANK_NODE",
@@ -1321,38 +1351,21 @@ Response item:
 GET /api/v1/devices/{deviceId}
 ```
 
-**Authentication:** Required  
-**Permission:** `device.read`  
+**Authentication:** Required
+**Permission:** `device.read`
 **Resource check:** Device access required
+**Role filtering:** Canonical `deviceId` is returned for Owner; concealed for Admin (`DEC-DEV-028`).
 
 ---
 
-## 14.3 Create Device
+## 14.3 Create Device (REMOVED)
 
 ```http
 POST /api/v1/devices
 ```
 
-**Authentication:** Required  
-**Permission:** `device.create`  
-**Status:** `TBD`
-
-Request:
-
-```json
-{
-  "deviceId": "water-node-002",
-  "name": "Water Node 2",
-  "siteId": "site-01",
-  "deviceType": "WATER_TANK_NODE",
-  "capabilities": [
-    "WATER_TELEMETRY",
-    "FAUCET_CONTROL"
-  ]
-}
-```
-
-Device credentials shall not be returned through normal device listing endpoints.
+**Status:** `REMOVED / SUPERSEDED` per `DEC-DEV-027`
+**Description:** In-app and API-based device creation is removed. Devices cannot be registered through the application UI or REST API. Pre-existing devices remain in the database, and new device provisioning is managed out-of-band via database seeding/administrative scripts.
 
 ---
 
@@ -1362,9 +1375,25 @@ Device credentials shall not be returned through normal device listing endpoints
 PATCH /api/v1/devices/{deviceId}
 ```
 
-**Authentication:** Required  
-**Permission:** `device.update`  
-**Status:** `TBD`
+**Authentication:** Required
+**Permission:** `device.update` (Owner only; Admins denied per `DEC-DEV-028`)
+**Status:** `APPROVED` (`DEC-DEV-028`)
+
+Request body:
+
+```json
+{
+  "deviceId": "water-node-002-renamed",
+  "name": "Water Node 2 Renamed",
+  "siteId": "site-01"
+}
+```
+
+Rules:
+- The internal database primary key UUID (`devices.id`) is immutable and never updated.
+- The Owner may update the canonical `deviceId` string and user-facing `name`.
+- Renaming `deviceId` preserves all relational foreign keys (`devices.id` references).
+- Physical ESP32/NodeMCU firmware reconfiguration and EMQX broker credential/ACL synchronization following a `deviceId` rename are operational workflows marked as **TBD / BLOCKING** automation (`DEC-DEV-028`).
 
 ---
 

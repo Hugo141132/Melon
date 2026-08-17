@@ -975,53 +975,53 @@ flowchart TD
 **Main success flow:**
 
 1. The server validates session and account status.
-2. The server loads devices within the user's scope.
+2. The server loads devices within the user's scope (including canonical `deviceId` for Owner; strictly concealing canonical `deviceId` for Admin per `DEC-DEV-028`).
 3. The frontend loads dashboard shell and available devices.
-4. The system selects a default device according to the final rule.
-5. The system loads current monitoring data.
+4. The system selects a default device (first authorized device in list on fresh load per `DEC-DEV-029`).
+5. The system loads current monitoring data for the selected device.
 6. The dashboard displays soil, water, tank, flow, status, and timestamp components.
 
-**Alternative flows:** No assigned devices; show dedicated state.  
-**Error flows:** Device or monitoring service unavailable.  
-**Postconditions:** Authorised monitoring context is visible.  
-**Required permissions:** `device.read`, `monitoring.current.read`.  
-**Relevant account statuses:** `ACTIVE`.  
-**UI states:** Loading, dashboard, no devices, error.  
-**Audit events:** Normally none.  
-**Open decisions:** Default device-selection rule.
+**Alternative flows:** No assigned devices; show dedicated empty state.
+**Error flows:** Device or monitoring service unavailable.
+**Postconditions:** Authorised monitoring context is visible.
+**Required permissions:** `device.read`, `monitoring.current.read`.
+**Relevant account statuses:** `ACTIVE`.
+**UI states:** Loading, dashboard, no devices, error.
+**Audit events:** Normally none.
+**Open decisions:** None. Default selection resolves fresh on initial load (`DEC-DEV-029`).
 
 ---
 
 ## Flow 24 — User Selects a Device
 
-**Primary actor:** Owner or Admin  
-**Preconditions:** User has access to more than one device.  
-**Trigger:** User selects a device.
+**Primary actor:** Owner or Admin
+**Preconditions:** User has access to more than one device.
+**Trigger:** User selects a device from the selector.
 
 **Main success flow:**
 
-1. The frontend identifies the selected device ID.
+1. The frontend identifies the selected device (displaying device name for all users, with canonical `deviceId` visible only to Owner per `DEC-DEV-028`).
 2. The server verifies the user may access that device.
 3. The system clears or marks previous device data as transitioning.
 4. The system loads the selected device's latest status and data.
 5. All device-specific components update consistently.
-6. The selected device is retained where appropriate.
+6. The selected device is retained in-memory during active navigation. Persistent restoration of previously/last-accessed device history across logins is removed (`DEC-DEV-029`), while all telemetry/command/assignment/audit history remains 100% intact.
 
-**Alternative flows:** Device becomes unavailable during selection.  
-**Error flows:** Unauthorised device ID; load failure.  
-**Postconditions:** All visible data belongs to one selected device.  
-**Required permissions:** `device.read`, relevant monitoring permissions.  
-**Relevant account statuses:** `ACTIVE`.  
-**UI states:** Device changing, loading, loaded, forbidden.  
-**Audit events:** Normally none.  
-**Open decisions:** URL, session, or local persistence of selected device.
+**Alternative flows:** Device becomes unavailable during selection.
+**Error flows:** Unauthorised device ID; load failure.
+**Postconditions:** All visible data belongs to one selected device.
+**Required permissions:** `device.read`, relevant monitoring permissions.
+**Relevant account statuses:** `ACTIVE`.
+**UI states:** Device changing, loading, loaded, forbidden.
+**Audit events:** Normally none.
+**Open decisions:** None. Resolved per `DEC-DEV-029` (fresh selection; no persistent last-accessed history).
 
 ---
 
 ## Flow 25 — User Has No Assigned Devices
 
-**Primary actor:** Admin, or Owner with no scope  
-**Preconditions:** Active user has zero authorised devices.  
+**Primary actor:** Admin, or Owner with no scope
+**Preconditions:** Active user has zero authorised devices.
 **Trigger:** Dashboard loads.
 
 **Main success flow:**
@@ -1032,14 +1032,14 @@ flowchart TD
 4. Monitoring and control components remain unavailable.
 5. The UI provides appropriate next steps.
 
-**Alternative flows:** Owner may open device-management features if permitted.  
-**Error flows:** Empty list must not be confused with loading failure.  
-**Postconditions:** No device data is shown.  
-**Required permissions:** Authenticated access only.  
-**Relevant account statuses:** `ACTIVE`.  
-**UI states:** Empty device assignment.  
-**Audit events:** None.  
-**Open decisions:** Admin support message and Owner device-creation permissions.
+**Alternative flows:** Owner may view device management table. Note: In-app device creation is removed (`DEC-DEV-027`).
+**Error flows:** Empty list must not be confused with loading failure.
+**Postconditions:** No device data is shown.
+**Required permissions:** Authenticated access only.
+**Relevant account statuses:** `ACTIVE`.
+**UI states:** Empty device assignment.
+**Audit events:** None.
+**Open decisions:** None. In-app device creation is removed per `DEC-DEV-027`.
 
 ---
 

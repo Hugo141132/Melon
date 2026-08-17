@@ -486,12 +486,12 @@ Whether sites are required in version 1 is `TBD`, but the schema is recommended 
 
 ## 7.2 `devices` (DB-DEV-001)
 
-Stores registered ESP32/NodeMCU devices.
+Stores registered ESP32/NodeMCU devices. Devices are provisioned out-of-band / via database seeding; in-app device creation is removed (`DEC-DEV-027`).
 
 | Column | Type | Nullable | Notes |
 |---|---|---:|---|
-| `id` | UUID | No | Internal primary key |
-| `device_id` | VARCHAR(150) | No | Unique canonical hardware identity |
+| `id` | UUID | No | Internal immutable primary key (`DEC-DEV-028`) |
+| `device_id` | VARCHAR(150) | No | Unique canonical hardware identity (Owner-editable; concealed from Admin per `DEC-DEV-028`) |
 | `site_id` | UUID | Yes | Foreign key to `sites` |
 | `name` | VARCHAR(200) | No | User-facing device name |
 | `device_type` | VARCHAR(60) | No | Canonical type |
@@ -534,9 +534,13 @@ UNKNOWN
 INACTIVE
 ```
 
-### Constraints
+### Constraints and Identity Governance
 
-- `device_id` shall be unique.
+- `id` (UUID) is strictly immutable and serves as the relational foreign key target for all dependent tables (`user_device_access`, `soil_readings`, `water_readings`, `telemetry_reservoir`, `faucet_commands`, `alerts`, `device_status_events`).
+- `device_id` shall be unique across active and inactive records.
+- `device_id` is editable only by Owner users. Admin users cannot view or edit canonical `device_id` (`DEC-DEV-028`).
+- In-app device creation is removed; new device records are provisioned via administrative seeds (`DEC-DEV-027`).
+- Previously/last-accessed device history is not stored or persisted (`DEC-DEV-029`). All historical telemetry, command, assignment/revocation, status, and audit data are fully preserved.
 - Device coordinates shall remain within valid latitude and longitude ranges.
 - A deactivated device shall not receive new faucet commands.
 - Device credentials shall not be stored in plain text in this table.

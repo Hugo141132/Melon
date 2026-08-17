@@ -345,14 +345,14 @@ On smaller screens, these controls may move into a compact menu or drawer, but d
 
 ## 7. Multi-Device Context
 
-The application supports multiple ESP32/NodeMCU devices.
+The application supports multiple ESP32/NodeMCU devices. Devices are pre-provisioned in the database; in-app device creation ("Add Device") is removed (`DEC-DEV-027`).
 
 ### 7.1 Device Selector
 
 The device selector shall display:
 
-- device name;
-- device ID where useful;
+- device name (or localized system default name);
+- canonical `deviceId` for Owner users only (strictly concealed from Admin users across all UI components and API responses per `DEC-DEV-028`);
 - site or location;
 - online, offline, warning, or unknown status;
 - last-seen information where space permits.
@@ -368,7 +368,11 @@ The selector shall support:
 
 ### 7.2 Device Context Persistence
 
-The selected device should persist during navigation where technically appropriate.
+The selected device is retained in-memory during active application navigation.
+
+**Removal of Previously/Last-Accessed Device History**: The application shall NOT track, persist, or restore previously/last-accessed device history across logins or persistent storage (`DEC-DEV-029`). Device selection resolves fresh on initial load/session (defaulting to the first available authorized device).
+
+**History Protection**: This policy applies strictly to device selector persistence and does NOT affect telemetry history/charts (`TASK-0503`/`TASK-0504`), faucet-command history, device assignment/revocation history, status history, or audit logs (`DEC-DEV-029`).
 
 A device selection shall not grant access to a device the user is not authorised to view.
 

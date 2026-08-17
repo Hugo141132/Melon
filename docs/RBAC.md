@@ -202,6 +202,7 @@ The Owner shall be able to:
 - Suspend Admin accounts.
 - Deactivate Admin accounts.
 - Assign or remove device access for Admin users.
+- Edit external canonical `deviceId` and device `name` (`DEC-DEV-028`). Note: in-app device creation is removed per `DEC-DEV-027`.
 - View account and control audit records.
 - Manage access-related settings permitted by the final system policy.
 - Access faucet-control functionality only where the final control policy allows it.
@@ -226,7 +227,7 @@ The Admin shall be able to:
 - Edit only their own permitted profile fields.
 - Change their own password.
 - Change their own language preference.
-- View devices assigned to them.
+- View devices assigned to them (user-facing device `name` and status; canonical `deviceId` is strictly concealed per `DEC-DEV-028`).
 - View current monitoring data for assigned devices.
 - View historical monitoring data for assigned devices.
 - View alerts within their authorised device scope.
@@ -234,6 +235,7 @@ The Admin shall be able to:
 
 The Admin shall not be able to:
 
+- View or edit the external canonical `deviceId` across any UI component or API response (`DEC-DEV-028`).
 - View another user's private profile.
 - Edit another user's profile.
 - Approve or reject account registrations.
@@ -376,11 +378,11 @@ profile.password.update.self
 profile.password.reset.other
 ```
 
-### 9.3 Device Permissions
+#### 9.3 Device Permissions
 
 ```text
 device.read
-device.create
+device.create (REMOVED per DEC-DEV-027)
 device.update
 device.deactivate
 device.assign
@@ -458,9 +460,9 @@ Legend:
 | `profile.other.update` | Allow | Deny |
 | `profile.password.update.self` | Allow | Allow |
 | `profile.password.reset.other` | Allow | Deny |
-| `device.read` | Allow within scope | Allow for assigned devices |
-| `device.create` | Allow | Deny |
-| `device.update` | Allow | Deny |
+| `device.read` | Allow within scope (includes canonical `deviceId`) | Allow for assigned devices (canonical `deviceId` strictly concealed per `DEC-DEV-028`) |
+| `device.create` | Removed per `DEC-DEV-027` | Deny / Removed |
+| `device.update` | Allow (can edit canonical `deviceId` & `name` per `DEC-DEV-028`) | Deny |
 | `device.deactivate` | Allow | Deny |
 | `device.assign` | Allow | Deny |
 | `device.unassign` | Allow | Deny |

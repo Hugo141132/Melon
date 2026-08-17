@@ -969,7 +969,10 @@ The API shall:
 - Return machine-readable error codes.
 - Avoid exposing raw broker details.
 - Apply server-side validation.
-- Apply RBAC and device access.
+- Apply RBAC and device access boundaries.
+- Enforce role-based field filtering: expose external canonical `deviceId` exclusively to Owner; strictly conceal `deviceId` in Admin responses (`DEC-DEV-028`).
+- Prohibit in-app device creation via application API; device provisioning is managed out-of-band (`DEC-DEV-027`).
+- Manage active device selection in-memory during navigation without persisting last-accessed device history across logins (`DEC-DEV-029`).
 - Support pagination.
 - Support idempotency for control requests.
 

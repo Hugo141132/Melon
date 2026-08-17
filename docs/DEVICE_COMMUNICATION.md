@@ -263,7 +263,7 @@ Minimum identity fields:
 
 | Field | Type | Required | Description |
 |---|---|---:|---|
-| `deviceId` | String | Yes | Unique immutable device identifier |
+| `deviceId` | String | Yes | Unique external canonical hardware identifier (Owner-editable per `DEC-DEV-028`; internal DB UUID immutable) |
 | `siteId` | String | Yes or TBD | Site, project, or location identifier |
 | `deviceName` | String | No | User-facing device name stored by backend |
 | `deviceType` | Enum | Yes | Device capability category |
@@ -283,10 +283,13 @@ Rules:
 
 - `deviceId` shall not be translated.
 - `deviceId` shall not contain personal information.
-- `deviceId` shall not be editable by Admin users.
+- `deviceId` is editable ONLY by the Owner (`DEC-DEV-028`).
+- `deviceId` shall NOT be viewable or editable by Admin users across UI and API responses (`DEC-DEV-028`).
+- Internal database primary key UUID is immutable across all relational tables.
 - A device shall not publish as another device.
 - Device credentials shall be bound to the permitted `deviceId`.
 - Topic authorisation shall prevent cross-device access.
+- Operational and hardware procedures for reconciling physical ESP32/NodeMCU firmware configurations and EMQX broker credentials/ACLs following a `deviceId` rename are **TBD / BLOCKING** automation (`DEC-DEV-028`).
 
 ---
 

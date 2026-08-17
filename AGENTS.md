@@ -608,7 +608,7 @@ auditId
 
 ---
 
-## 11. Device Access Rules
+## 11. Device Access and Identity Rules
 
 Every device-specific action must verify access to the exact target device.
 
@@ -626,6 +626,14 @@ Active ADMIN
 Separate per-user-device `canControl` permission grants are not used.
 
 Owners manage device assignments. Admins may not assign devices to themselves or other users.
+
+Device identity and governance rules:
+
+- **No In-App Device Creation**: Devices cannot be created via `/devices` or application APIs; device registration is seeded/provisioned out-of-band (`DEC-DEV-027`).
+- **Owner-Only Canonical `deviceId` Edit**: The Owner may update the external canonical `deviceId` string. The internal database UUID (`devices.id`) remains strictly immutable (`DEC-DEV-028`).
+- **Strict Admin `deviceId` Concealment**: Admin users MUST NOT view or edit the external canonical `deviceId` across any UI component or API response. Admins only see the user-facing device `name` or localized default label (`DEC-DEV-028`).
+- **Hardware/Broker Rename Reconciliation**: Physical ESP32/NodeMCU firmware reconfiguration and EMQX broker credential/ACL synchronization following a `deviceId` rename are operational workflows marked as **TBD / BLOCKING** automation (`DEC-DEV-028`).
+- **Removal of Previously/Last-Accessed Device History**: Persistent restoration or tracking of previously/last-accessed device history across logins or storage is removed (`DEC-DEV-029`). Device selection resolves fresh on initial load. Historical telemetry charts (`TASK-0503`/`TASK-0504`), faucet commands, assignments, status events, and audit logs remain 100% intact.
 
 Agents shall prevent access through:
 

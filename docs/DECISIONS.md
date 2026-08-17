@@ -32,7 +32,7 @@
 |---|---|---|---|
 | **Authentication** | `DEC-AUTH-001` to `DEC-AUTH-012` | **APPROVED** | HTTP-only secure cookies, PostgreSQL session table, 30m idle / 12h max timeouts, CLI Owner seed, no public Owner creation. `SameSite` cookie value: **TBD** — pending explicit user approval. |
 | **RBAC** | `DEC-RBAC-013` to `DEC-RBAC-019` | **APPROVED** | Owner has global device visibility. Admins have mandatory per-device assignments; device assignment automatically grants both monitoring and faucet control. Owners manage assignments. No separate per-user-device `canControl` permission in v1. |
-| **Devices** | `DEC-DEV-020` to `DEC-DEV-035` | **APPROVED** | Multi-protocol architecture: Soil & Water quality monitoring telemetry via REST API over Wi-Fi (no MQTT broker). Water Tank monitoring (tank volume & flow rate) via MQTT through an EMQX broker (MQTT 5.0 over TLS via IoT Gateway). Shared INA219 electrical monitoring via REST/Wi-Fi. Per-device credentials/ACLs, no anonymous access, no direct browser-to-MQTT. Offline threshold: **TBD**. Stale threshold: **TBD**. |
+| **Devices** | `DEC-DEV-020` to `DEC-DEV-029` | **APPROVED** | Multi-protocol architecture: Soil & Water quality monitoring telemetry via REST API over Wi-Fi (no MQTT broker). Water Tank monitoring (tank volume & flow rate) via MQTT through an EMQX broker (MQTT 5.0 over TLS via IoT Gateway). Shared INA219 electrical monitoring via REST/Wi-Fi. Per-device credentials/ACLs, no anonymous access, no direct browser-to-MQTT. Offline threshold: **TBD**. Stale threshold: **TBD**. In-app device creation / Add Device removed (`DEC-DEV-027`). External `deviceId` editable by OWNER only; internal DB UUID immutable; canonical `deviceId` strictly hidden from ADMIN in UI & API (`DEC-DEV-028`). Previously/last-accessed device history & persistent restoration removed while preserving all telemetry/command/assignment/audit history (`DEC-DEV-029`). |
 | **Monitoring** | `DEC-MON-036` to `DEC-MON-050` | **APPROVED** | Three distinct monitoring domains: 1) Soil monitoring (NPK, Temp, Moisture, pH, EC in `µS/cm`, status), 2) Water Quality monitoring (pH, TDS in ppm, EC in `µS/cm`, status), 3) Water Tank monitoring (Tank Vol in `L`, Flow in `m³/h`, status). Canonical display unit for EC is `µS/cm` (values in `mS/cm` converted at presentation boundary via `×1000`). Control capabilities (Solenoid Valve, Relay) are actuators, not monitoring sensors. INA219 electrical monitoring tracks system electrical consumption (voltage, current, power) as device health/power telemetry, not as a battery percentage or primary agronomic measurement. Sensor precision and valid ranges: **TBD**. |
 | **Faucet Control** | `DEC-CTRL-051` to `DEC-CTRL-067` | **APPROVED** | Max 1 active command/device, no auto retries, `ENABLE_FAUCET_CONTROL=false` default, dual written sign-off (Owner + Hardware Lead) required before production activation. Duplicate command IDs never re-dispense. Timeout ≠ completion. ACK timeout, completion timeout, expiry duration: **TBD**. Cancellation/stop support: **TBD**. |
 | **I18N** | `DEC-I18N-068` to `DEC-I18N-074` | **APPROVED** | Default `id` (Bahasa Indonesia), `en` fallback, mandatory centered language-selection gate for unauthenticated visitors without valid locale (`English` -> `en`, `Bahasa Indonesia` -> `id`), cookie-based non-prefixed routing (no URL path pollution), subsequent language changes strictly in Settings (`/settings`), UTC storage with `Asia/Jakarta` (WIB) presentation. |
@@ -192,6 +192,39 @@
   2. Battery power telemetry is not part of soil or water-quality payload schemas or database ingestion.
   3. `DEC-MON-085` is officially SUPERSEDED by `DEC-MON-086`.
 
+#### DEC-DEV-027: Removal of In-App Device Creation / Add Device Requirement
+* **Related Task IDs**: `TASK-0302`, `TASK-0305`
+* **Related Documentation**: `docs/PRD.md` §8.1, `docs/API.md` §14.3, `docs/RBAC.md` §9.3, §10, `docs/UI_UX.md` §6, `docs/TRACEABILITY.md` (`API-DEV-003`)
+* **Status**: **APPROVED BY USER (2026-08-18)**
+* **Approved Decision**:
+  1. **No In-App Device Creation**: Devices can no longer be created from `/devices` or through the application UI or application API (`POST /api/v1/devices`).
+  2. **Add Device Requirement Removed**: The "Add Device" product requirement, UI button/modal, and `device.create` permission are removed.
+  3. **Existing Devices Preserved**: Pre-existing registered devices remain in the system. Device provisioning is managed out-of-band / via database seeding scripts.
+
+#### DEC-DEV-028: Owner-Only External deviceId Modification, Immutable Database UUID, and Strict Admin deviceId Concealment
+* **Related Task IDs**: `TASK-0302`, `TASK-0305`, `TASK-0306`
+* **Related Documentation**: `docs/PRD.md` §8.1, §13.4, `docs/RBAC.md` §6.1, §9.3, §10, `docs/API.md` §14.1, §14.2, §14.4, `docs/DATABASE.md` §7.2, `docs/DEVICE_COMMUNICATION.md` §6, `docs/SECURITY.md` §10.5, `docs/UI_UX.md` §7.1
+* **Status**: **APPROVED BY USER (2026-08-18)**
+* **Approved Decision**:
+  1. **Owner-Only External deviceId Edit**: The Project Owner is authorized to edit the external/canonical `deviceId` string (as well as user-facing `name`) via `PATCH /api/v1/devices/{deviceId}`.
+  2. **Immutable Database UUID**: The internal database primary key UUID (`devices.id`) is strictly immutable. All internal relational foreign key relationships (`user_device_access`, `soil_readings`, `water_readings`, `telemetry_reservoir`, `faucet_commands`, `alerts`, `device_status_events`) reference `devices.id` and are preserved without cascading mutations across the relational database.
+  3. **Strict Admin deviceId Concealment**: Admin users MUST NOT be able to view or edit the external/canonical `deviceId`, across all UI views and API responses (`GET /api/v1/devices`, `GET /api/v1/devices/{deviceId}`, alerts, commands, telemetry). Admin-facing responses omit or mask canonical `deviceId`, presenting only the user-facing device name (`name`) or localized system default display name.
+  4. **Hardware & Broker Rename Reconciliation TBD (BLOCKING)**: Operational and hardware procedures for reconciling physical ESP32/NodeMCU firmware configurations, MQTT client identifiers, and EMQX broker credentials/topic ACLs after an Owner renames a `deviceId` are NOT resolved and are marked as **TBD / BLOCKING** further rename automation.
+
+#### DEC-DEV-029: Removal of Previously/Last-Accessed Device History and Persistent Restoration
+* **Related Task IDs**: `TASK-0306`, `TASK-0504`
+* **Related Documentation**: `docs/PRD.md` §8.2, `docs/USER_FLOWS.md` §9 (Flow 23, Flow 24), `docs/UI_UX.md` §7.2, `docs/DECISIONS.md` (`DEC-MON-088`)
+* **Status**: **APPROVED BY USER (2026-08-18)**
+* **Approved Decision**:
+  1. **No Stored Access History**: Persistent tracking, storage, and restoration of previously/last-accessed device history across logins, sessions, cookies, or user profile records is completely removed.
+  2. **Fresh Selection Resolution**: Device selection resolves fresh on initial load/login (defaulting to the first available authorized device, or a neutral initial state). Active navigation retains selection in-memory during the current session without persisting historical "last-accessed" state.
+  3. **Non-Selection History 100% Intact**: This removal strictly applies to the device selector and access tracking. It does NOT remove or affect:
+     - Telemetry historical data and charts (`TASK-0503` / `TASK-0504`, `/soil`, `/water`);
+     - Faucet command execution and event history;
+     - User-device assignment and revocation history (`user_device_access` with `revokedAt`);
+     - Device connectivity and status history (`device_status_events`);
+     - Security, authentication, and audit history (`audit_logs`).
+
 #### DEC-MON-087: Historical Query API Range Bounds, Pagination Limits & Aggregation Policy
 * **Related Task IDs**: `TASK-0503`
 * **Related Documentation**: `docs/API.md` §17, `docs/DATABASE.md` §8.5, `AGENTS.md` §2
@@ -213,7 +246,7 @@
   2. **Chart Controls & Metric Selection**: Visual controls allow metric selection, date range adjustments (default 24h, max 31 days per `DEC-MON-087`), and page navigation.
   3. **Null Values & Data Absence**: Missing values are rendered as visual gaps (`connectNulls={false}`). Empty history returns HTTP 200 with an empty series and no-data UI, never fake zero values or a 404 error.
   4. **EC Unit Conversion**: Telemetry EC is stored/contracted in `mS/cm` and converted to `µS/cm` (×1000) deterministically for UI chart presentation.
-  5. **Device & Route Synchronization**: Selected device ID is synchronized across domain routes via top-bar `DeviceSelector` context and `sessionStorage`/`localStorage` persistence.
+  5. **Device & Route Synchronization**: Selected device ID is synchronized across domain routes via top-bar `DeviceSelector` in-memory context; persistent restoration of previously/last-accessed device history across logins/sessions is removed per `DEC-DEV-029`.
   6. **Device ID Resolution**: Backend lookups resolve both canonical string `deviceId` (e.g. `soil-node-001`) and internal database UUID `id`.
 
 ---
@@ -368,6 +401,7 @@ The following decisions remain TBD and must be resolved before the listed tasks 
 | Telemetry publish interval | `TASK-0405`, `TASK-0406` | Not defined. |
 | Heartbeat interval | `TASK-0407` | Not defined. |
 | Backup schedule, retention, RPO, RTO | `TASK-0909` | Not yet explicitly approved. |
+| Physical device firmware & EMQX credentials/ACLs rename reconciliation | Post-Phase 3 device rename automation | Unresolved operational/hardware workflow (`DEC-DEV-028`). Manual/TBD. |
 
 ---
 

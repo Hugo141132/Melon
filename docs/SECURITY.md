@@ -499,6 +499,7 @@ The Admin may:
 
 The Admin shall not:
 
+- View or edit the external canonical `deviceId` across any UI component or API response (`DEC-DEV-028`).
 - View another user's private profile.
 - Edit another user.
 - Approve an account.
@@ -508,7 +509,7 @@ The Admin shall not:
 - Assign devices to themselves or other users.
 - Access Owner-only endpoints.
 
-### 10.5 Object-Level Authorisation
+### 10.5 Object-Level Authorisation and Identity Concealment
 
 The system shall prevent IDOR/BOLA attacks.
 
@@ -523,6 +524,11 @@ auditId
 ```
 
 the server shall verify that the authenticated user is authorised for that specific object.
+
+For device resources:
+- Internal database primary key UUIDs (`devices.id`) are immutable and anchor all relational integrity.
+- Admin users are restricted to assigned devices, and API responses strictly conceal the canonical `deviceId` (`DEC-DEV-028`).
+- In-app device creation is forbidden; device endpoints do not accept client-side creation requests (`DEC-DEV-027`).
 
 ### 10.6 Mass Assignment
 

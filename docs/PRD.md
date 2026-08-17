@@ -299,20 +299,26 @@ Unless added through a later approved requirement, the following are outside the
 
 The system shall support multiple ESP32/NodeMCU devices.
 
-Each device shall have a unique identifier.
+Each device record shall support:
 
-Each device record shall support at least:
-
-- Device ID.
-- Device name.
-- Device type.
-- Site or location association: TBD.
+- Internal database primary key: immutable UUID (`id`).
+- External canonical device ID: unique string (`deviceId`), editable only by Owner (`DEC-DEV-028`).
+- Device name (`name`).
+- Device type (`deviceType`).
+- Site or location association: single primary site in v1.
 - Current connection status.
 - Last-seen timestamp.
 - Firmware version, if supplied.
 - Latitude and longitude, if supplied.
 - Active or inactive state.
 - Created and updated timestamps.
+
+Device provisioning and identity rules:
+
+- **No In-App Device Creation**: Devices cannot be created from `/devices` or through the application UI/API. The Add Device requirement is removed (`DEC-DEV-027`). Existing devices remain provisioned in the database.
+- **Owner-Only Canonical `deviceId` Edit**: The Owner may update the external canonical `deviceId` string and `name`. The internal database UUID remains immutable to safeguard relational integrity (`DEC-DEV-028`).
+- **Strict Admin `deviceId` Concealment**: Admin users MUST NOT view or edit the external canonical `deviceId` in any UI component or API response. Admins only see the user-facing device name (`name`) or localized system default name (`DEC-DEV-028`).
+- **Hardware/Broker Rename Reconciliation**: Physical ESP32/NodeMCU firmware reconfiguration and EMQX broker credential/ACL synchronization following a `deviceId` rename are operational workflows marked as **TBD / BLOCKING** automation (`DEC-DEV-028`).
 
 ### 8.2 Device Selection (PRD-FR-021)
 
@@ -321,26 +327,21 @@ The authenticated interface shall provide a device selector when more than one d
 The system shall:
 
 - Display only devices the user is authorised to access.
-- Preserve the selected device while navigating related monitoring pages where appropriate.
-- Clearly display the selected device name and ID.
+- Clearly display the selected device name for all users, and canonical `deviceId` for Owner users only (concealed from Admins per `DEC-DEV-028`).
+- Resolve device selection fresh per session/load (defaulting to the first available authorized device).
+- **Removal of Previously/Last-Accessed Device History**: The system shall NOT track, persist, or restore previously/last-accessed device history across logins or persistent storage (`DEC-DEV-029`). Active in-memory navigation maintains selection during the session.
+- **History Scope Protection**: Telemetry historical charts (`TASK-0503`/`TASK-0504`), faucet-command history, device assignment/revocation history, status history, and audit history remain 100% intact (`DEC-DEV-029`).
 - Prevent data from different devices from being mixed.
 - Display an empty state when no devices are assigned or available.
 - Display a clear state when the selected device is inactive or offline.
 
-The default selected-device rule is TBD.
-
 ### 8.3 Device Access Scope (PRD-FR-022)
 
-The system shall support device-level access rules.
+The system shall support device-level access rules:
 
-The final assignment model is TBD and may be one of:
-
-- All Owners see all devices; Admins see assigned devices.
-- Owners and Admins see assigned devices.
-- Site-based access.
-- Organisation-based access.
-
-The application shall not assume that every Admin may access every device unless this is explicitly approved.
+- All Owners see all devices in the global scope; Admins see only assigned devices.
+- Device assignment is mandatory for Admin access; unassigned devices are completely hidden and inaccessible to Admins.
+- Admins cannot self-assign or reassign devices.
 
 ---
 
