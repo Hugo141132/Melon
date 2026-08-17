@@ -217,6 +217,17 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
 
 21st.dev MCP is **NOT REQUIRED** for minor API wiring, data binding, text changes, small state indicators, small additions using existing components, or bug fixes that preserve the established layout.
 
+#### TASK-0302 Governance Record
+
+`TASK-0302` device registry reconciliation record:
+- Status: `DONE` (Completed 2026-08-18)
+- Frontend impact: `MINOR`
+- Selected UI direction: `Premium Minimal Ops`
+- Existing color template: `UNCHANGED`
+- Selected motion effects: `Card hover`, `Modal`
+- 21st.dev MCP: `NOT REQUIRED`
+- Summary: Reconciled device registry per `DEC-DEV-027` and `DEC-DEV-028`. Removed all in-app and API device creation (`POST /api/v1/devices`, "Add Device" button/modal, `device.create` permission, `CreateDeviceInputSchema`). Preserved existing pre-provisioned devices. Kept internal database primary key UUID (`devices.id`) strictly immutable, preserving all relational foreign key references (`user_device_access`, telemetry, commands, alerts) across renames. Supported Owner-only external canonical `deviceId` string and `name` updates via `PATCH /api/v1/devices/{deviceId}` with duplicate rejection (`DeviceConflictError` -> HTTP 409 `DUPLICATE_DEVICE_ID`). Enforced strict Admin canonical `deviceId` concealment across `GET /api/v1/devices`, `GET /api/v1/devices/{deviceId}`, and `/devices` UI cards. Documented physical ESP32/NodeMCU firmware reconfiguration and EMQX broker credential/ACL synchronization following a rename as `TBD / BLOCKING` operational automation. Verified 100% test pass rate across 4 test suites (42/42 tests), Semgrep scan (0 findings), TypeScript typecheck (0 errors), Next.js build (37/37 routes), and Playwright runtime verification.
+
 #### TASK-0303 Governance Record
 
 `TASK-0303` frontend implementation record:

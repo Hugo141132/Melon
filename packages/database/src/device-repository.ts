@@ -1,6 +1,5 @@
 import { PrismaClient, Prisma } from '@prisma/client';
 import {
-  CreateDeviceInput,
   UpdateDeviceInput,
   DeviceQueryInput,
   PublicSafeDeviceDto,
@@ -184,95 +183,13 @@ export class DeviceRepository {
   }
 
   /**
-   * Helper to generate a unique canonical deviceId server-side based on device type.
-   * Format: soil-node-<random>, water-quality-node-<random>, water-tank-node-<random>
-   */
-  private generateCanonicalDeviceId(deviceType: DeviceType): string {
-    const prefix = deviceType.toLowerCase().replace(/_/g, '-');
-    const randomSuffix = Math.random().toString(36).substring(2, 8);
-    return `${prefix}-${randomSuffix}`;
-  }
-
-  /**
-   * Creates a new device in the registry (Owner-only operation).
-   * Generates canonical deviceId server-side if omitted.
-   * Audits action using device.created event.
-   */
-  async createDevice(input: CreateDeviceInput, actorUserId: string): Promise<PublicSafeDeviceDto> {
-    const finalDeviceId =
-      input.deviceId?.trim() || this.generateCanonicalDeviceId(input.deviceType as DeviceType);
-
-    const existing = await this.prisma.device.findUnique({
-      where: { deviceId: finalDeviceId },
-    });
-
-    if (existing) {
-      throw new DeviceConflictError(
-        `Device with canonical deviceId '${finalDeviceId}' already exists.`
-      );
-    }
-
-    const created = await this.prisma.$transaction(async (tx) => {
-      const newDevice = await tx.device.create({
-        data: {
-          deviceId: finalDeviceId,
-          name: input.name,
-          deviceType: input.deviceType,
-          siteId: input.siteId || null,
-          firmwareVersion: input.firmwareVersion || null,
-          hardwareRevision: input.hardwareRevision || null,
-          schemaVersion: input.schemaVersion || '1.0',
-          latitude:
-            input.latitude !== undefined && input.latitude !== null
-              ? new Prisma.Decimal(input.latitude)
-              : null,
-          longitude:
-            input.longitude !== undefined && input.longitude !== null
-              ? new Prisma.Decimal(input.longitude)
-              : null,
-          accountStatus: DeviceAccountStatus.ACTIVE,
-          connectionStatus: DeviceConnectionStatus.UNKNOWN,
-          capabilities: {
-            create: getCanonicalCapabilitiesForDeviceType(input.deviceType as DeviceType).map(
-              (cap) => ({
-                capability: cap,
-                enabled: true,
-                source: 'PROVISIONED',
-              })
-            ),
-          },
-        },
-        include: {
-          capabilities: true,
-        },
-      });
-
-      const isUuidActor =
-        actorUserId && typeof actorUserId === 'string' && actorUserId.trim().length > 0;
-      await tx.auditLog.create({
-        data: {
-          eventKey: 'device.created',
-          actorUserId: isUuidActor ? actorUserId : null,
-          targetType: 'Device',
-          targetId: newDevice.id,
-          result: 'SUCCESS',
-          newValues: {
-            deviceId: newDevice.deviceId,
-            name: newDevice.name,
-            deviceType: newDevice.deviceType,
-            accountStatus: newDevice.accountStatus,
-          },
-        },
-      });
-
-      return newDevice;
-    });
-
-    return this.formatPublicSafeDto(created);
-  }
-
-  /**
-   * Updates existing device metadata (Owner-only operation).
+   * Updates existing device metadata and/or external canonical deviceId (Owner-only operation).
+   * Per DEC-DEV-028:
+   * - Internal database primary key UUID (devices.id) is strictly immutable.
+   * - Relational foreign keys (user_device_access, readings, commands, alerts) reference devices.id and remain 100% intact.
+   * - Canonical deviceId uniqueness is strictly enforced across devices.
+   * - Operational reconciliation of physical ESP32/NodeMCU firmware and EMQX broker credentials/ACLs
+   *   following a deviceId rename is TBD / BLOCKING automation.
    * Audits action using device.updated event.
    */
   async updateDevice(
@@ -286,6 +203,24 @@ export class DeviceRepository {
     }
 
     const updateData: Prisma.DeviceUpdateInput = {};
+
+    if (input.deviceId !== undefined && input.deviceId.trim() !== target.deviceId) {
+      const trimmedDeviceId = input.deviceId.trim();
+      const existingConflict = await this.prisma.device.findFirst({
+        where: {
+          deviceId: trimmedDeviceId,
+          id: { not: target.id },
+        },
+      });
+
+      if (existingConflict) {
+        throw new DeviceConflictError(
+          `Device with canonical deviceId '${trimmedDeviceId}' already exists.`
+        );
+      }
+
+      updateData.deviceId = trimmedDeviceId;
+    }
 
     if (input.name !== undefined) updateData.name = input.name;
     if (input.deviceType !== undefined) updateData.deviceType = input.deviceType;
@@ -324,11 +259,13 @@ export class DeviceRepository {
           targetId: dev.id,
           result: 'SUCCESS',
           previousValues: {
+            deviceId: target.deviceId,
             name: target.name,
             deviceType: target.deviceType,
             accountStatus: target.accountStatus,
           },
           newValues: {
+            deviceId: dev.deviceId,
             name: dev.name,
             deviceType: dev.deviceType,
             accountStatus: dev.accountStatus,

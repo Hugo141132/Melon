@@ -7,21 +7,6 @@ export enum DeviceType {
 }
 
 /**
- * Supported device types allowed for NEW device creation.
- */
-export const NEW_DEVICE_TYPES = [
-  DeviceType.SOIL_NODE,
-  DeviceType.WATER_QUALITY_NODE,
-  DeviceType.WATER_TANK_NODE,
-] as const;
-
-export const NewDeviceTypeSchema = z.enum([
-  DeviceType.SOIL_NODE,
-  DeviceType.WATER_QUALITY_NODE,
-  DeviceType.WATER_TANK_NODE,
-]);
-
-/**
  * Server-Enforced Canonical Monitoring Parameters per Device Type
  */
 export const SOIL_NODE_MONITORING_PARAMETERS = [
@@ -165,6 +150,13 @@ export const PublicSafeDeviceDtoSchema = z.object({
 export type PublicSafeDeviceDto = z.infer<typeof PublicSafeDeviceDtoSchema>;
 
 /**
+ * Admin-projected Safe Device DTO schema where canonical deviceId is concealed (DEC-DEV-028).
+ */
+export const AdminSafeDeviceDtoSchema = PublicSafeDeviceDtoSchema.omit({ deviceId: true });
+export type AdminSafeDeviceDto = z.infer<typeof AdminSafeDeviceDtoSchema>;
+export type ProjectedDeviceDto = PublicSafeDeviceDto | AdminSafeDeviceDto;
+
+/**
  * Validates canonical device identifier.
  * Unique, stable, machine-readable, untranslated, not derived from display label.
  */
@@ -178,40 +170,13 @@ export const CanonicalDeviceIdSchema = z
   );
 
 /**
- * Input schema for creating a new device (Owner-only).
- * deviceId is optional on input (server-side auto-generated if omitted).
- */
-export const CreateDeviceInputSchema = z.object({
-  deviceId: CanonicalDeviceIdSchema.optional(),
-  name: z.string().min(1, 'Nama perangkat wajib diisi').max(200),
-  deviceType: NewDeviceTypeSchema,
-  siteId: z.string().uuid().optional().nullable(),
-  firmwareVersion: z.string().max(100).optional().nullable(),
-  hardwareRevision: z.string().max(100).optional().nullable(),
-  schemaVersion: z.string().max(30).optional().nullable(),
-  latitude: z
-    .number()
-    .min(-90, 'Latitude must be between -90 and 90')
-    .max(90, 'Latitude must be between -90 and 90')
-    .optional()
-    .nullable(),
-  longitude: z
-    .number()
-    .min(-180, 'Longitude must be between -180 and 180')
-    .max(180, 'Longitude must be between -180 and 180')
-    .optional()
-    .nullable(),
-  capabilities: z.array(z.string()).optional(),
-});
-
-export type CreateDeviceInput = z.infer<typeof CreateDeviceInputSchema>;
-
-/**
  * Input schema for updating an existing device (Owner-only).
- * Reject security-sensitive/read-only fields (deviceId, connectionStatus, lastSeenAt, etc.).
+ * Supports updating canonical deviceId string and user-facing name per DEC-DEV-028.
+ * Rejects security-sensitive/server-controlled fields (connectionStatus, lastSeenAt, etc.).
  */
 export const UpdateDeviceInputSchema = z
   .object({
+    deviceId: CanonicalDeviceIdSchema.optional(),
     name: z.string().min(1, 'Nama perangkat wajib diisi').max(200).optional(),
     deviceType: DeviceTypeSchema.optional(),
     accountStatus: DeviceAccountStatusSchema.optional(),

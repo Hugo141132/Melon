@@ -208,6 +208,7 @@
     "addDevice": "Tambah Perangkat",
     "searchPlaceholder": "Cari ID Perangkat, nama, atau versi firmware...",
     "allTypes": "Semua Tipe Perangkat",
+    "allDomains": "Semua Domain",
     "allStatuses": "Semua Status Koneksi",
     "noDevicesFound": "Tidak ada perangkat ditemukan",
     "noDevices": "Tanpa Perangkat",

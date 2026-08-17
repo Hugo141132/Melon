@@ -921,12 +921,14 @@ Implement sites if required for version 1.
 **Priority:** `P0`
 **Status:** `DONE`
 **Dependencies:** `TASK-0104`
-**Completed:** 2026-07-30 — Implemented Device Registry with Zod DTO contracts (`packages/contracts/src/device.ts`), database repository abstraction (`packages/database/src/device-repository.ts`), REST API route handlers (`/api/v1/devices`, `/[deviceId]`, `/[deviceId]/deactivate`), and IoT Device Management UI (`apps/web/app/devices/page.tsx`). Strictly protected device secrets and credentials, prevented client overrides of server-controlled status/telemetry fields via `.strict()` schema stripping, enforced canonical untranslated device lifecycle (`ACTIVE`, `INACTIVE`, `DEACTIVATED`) and connection status values (`ONLINE`, `OFFLINE`, `STALE`, `UNKNOWN`, `INACTIVE`), and added comprehensive unit test suites covering contracts, database repository, RBAC API authorization, and frontend pages.
-**Reconciliation Note (2026-08-18):** Reconciled specifications per `DEC-DEV-027` and `DEC-DEV-028`:
-- In-app device creation (`POST /api/v1/devices` and "Add Device" UI modal) is REMOVED (`DEC-DEV-027`); existing devices remain provisioned in the database.
-- Internal database primary key UUID (`devices.id`) is immutable; Owner may update external canonical `deviceId` and `name` via `PATCH /api/v1/devices/{deviceId}` (`DEC-DEV-028`).
-- Admin users MUST NOT view or edit external canonical `deviceId` in API responses or UI (`DEC-DEV-028`).
-- Reconciliation of physical ESP32/NodeMCU firmware configurations and EMQX broker credentials/ACLs following a `deviceId` rename is marked as **TBD / BLOCKING** automation (`DEC-DEV-028`).
+**Completed:** 2026-08-18 — Reconciled and implemented Device Registry per `DEC-DEV-027` and `DEC-DEV-028`:
+- Removed all in-app/API device creation (`POST /api/v1/devices`, "Add Device" button/modal, creation DTOs/types, and `device.create` permission from `seed.ts` and `device-repository.ts` per `DEC-DEV-027`); existing pre-provisioned devices remain preserved in PostgreSQL database.
+- Enforced internal database primary key UUID (`devices.id`) immutability, preserving all relational references (`user_device_access`, telemetry, commands, alerts) across external renames.
+- Allowed Owner to update external canonical `deviceId` and `name` via `PATCH /api/v1/devices/{deviceId}` with canonical uniqueness enforcement (`DeviceConflictError` -> HTTP 409 `DUPLICATE_DEVICE_ID`).
+- Enforced strict Admin canonical `deviceId` concealment across `GET /api/v1/devices`, `GET /api/v1/devices/{deviceId}`, and `/devices` UI cards via role-based projection (`DEC-DEV-028`).
+- Strictly protected device secrets and credentials, preventing client overrides of server-controlled status/telemetry fields via `.strict()` schema stripping.
+- Documented physical ESP32/NodeMCU firmware reconfiguration and EMQX broker credential/ACL synchronization following a rename as **TBD / BLOCKING** operational automation (`DEC-DEV-028`).
+- Verified 100% test pass rate across all 4 unit test suites (42/42 tests), Semgrep scan (0 findings), TypeScript typecheck (0 errors), Next.js production build (37/37 routes), and Playwright runtime verification.
 
 ### Work
 

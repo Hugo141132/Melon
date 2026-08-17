@@ -208,6 +208,7 @@
     "addDevice": "Add Device",
     "searchPlaceholder": "Search Device ID, name, or firmware version...",
     "allTypes": "All Device Types",
+    "allDomains": "All Domains",
     "allStatuses": "All Connection Statuses",
     "noDevicesFound": "No devices found",
     "noDevices": "No Devices",

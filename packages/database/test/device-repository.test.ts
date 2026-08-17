@@ -83,17 +83,15 @@ describe('DeviceRepository Unit Tests (TASK-0302)', () => {
     });
   });
 
-  describe('createDevice', () => {
-    it('creates device, derives profile capabilities server-side, and records audit event', async () => {
-      mockPrisma.device.findUnique.mockResolvedValue(null);
-
-      const createdRaw = {
+  describe('updateDevice (TASK-0302 / DEC-DEV-028)', () => {
+    it('updates canonical deviceId and name, preserving immutable database UUID id and logging audit', async () => {
+      const existingDevice = {
         id: '22222222-2222-2222-2222-222222222222',
-        deviceId: 'soil-node-001',
-        name: 'Soil Node 1',
-        deviceType: 'SOIL_NODE',
+        deviceId: 'water-node-001',
+        name: 'Water Node 1',
+        deviceType: 'WATER_QUALITY_NODE',
         accountStatus: 'ACTIVE',
-        connectionStatus: 'UNKNOWN',
+        connectionStatus: 'ONLINE',
         firmwareVersion: '1.0.0',
         hardwareRevision: null,
         schemaVersion: '1.0',
@@ -104,53 +102,85 @@ describe('DeviceRepository Unit Tests (TASK-0302)', () => {
         createdAt: new Date(),
         updatedAt: new Date(),
         deactivatedAt: null,
-        capabilities: [
-          { capability: 'SOIL_NITROGEN', enabled: true },
-          { capability: 'SOIL_PHOSPHORUS', enabled: true },
-          { capability: 'SOIL_POTASSIUM', enabled: true },
-          { capability: 'SOIL_TEMPERATURE', enabled: true },
-          { capability: 'SOIL_MOISTURE', enabled: true },
-          { capability: 'SOIL_PH', enabled: true },
-          { capability: 'SOIL_EC', enabled: true },
-        ],
+        capabilities: [{ capability: 'WATER_PH', enabled: true }],
       };
 
-      mockPrisma.device.create.mockResolvedValue(createdRaw);
+      mockPrisma.device.findFirst
+        .mockResolvedValueOnce(existingDevice) // getDeviceByCanonicalId initial lookup
+        .mockResolvedValueOnce(null) // conflict check findFirst (no other device has this deviceId)
+        .mockResolvedValueOnce({
+          ...existingDevice,
+          deviceId: 'water-node-001-renamed',
+          name: 'Renamed Water Node',
+        }); // format return lookup
 
-      const result = await repo.createDevice(
+      mockPrisma.device.update.mockResolvedValue({
+        ...existingDevice,
+        deviceId: 'water-node-001-renamed',
+        name: 'Renamed Water Node',
+      });
+
+      const result = await repo.updateDevice(
+        'water-node-001',
         {
-          deviceId: 'soil-node-001',
-          name: 'Soil Node 1',
-          deviceType: DeviceType.SOIL_NODE as any,
+          deviceId: 'water-node-001-renamed',
+          name: 'Renamed Water Node',
         },
         'owner-user-id'
       );
 
-      expect(result.deviceId).toBe('soil-node-001');
-      expect(result.capabilities).toContain('SOIL_NITROGEN');
-      expect(result.capabilities).toContain('SOIL_EC');
+      expect(result.id).toBe('22222222-2222-2222-2222-222222222222');
+      expect(result.deviceId).toBe('water-node-001-renamed');
+      expect(result.name).toBe('Renamed Water Node');
+      expect(mockPrisma.device.update).toHaveBeenCalledWith({
+        where: { id: '22222222-2222-2222-2222-222222222222' },
+        data: expect.objectContaining({
+          deviceId: 'water-node-001-renamed',
+          name: 'Renamed Water Node',
+        }),
+        include: { capabilities: true },
+      });
       expect(mockPrisma.auditLog.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            eventKey: 'device.created',
+            eventKey: 'device.updated',
             actorUserId: 'owner-user-id',
+            targetId: '22222222-2222-2222-2222-222222222222',
+            previousValues: expect.objectContaining({
+              deviceId: 'water-node-001',
+              name: 'Water Node 1',
+            }),
+            newValues: expect.objectContaining({
+              deviceId: 'water-node-001-renamed',
+              name: 'Renamed Water Node',
+            }),
           }),
         })
       );
     });
 
     it('rejects duplicate canonical deviceId with DeviceConflictError', async () => {
-      mockPrisma.device.findUnique.mockResolvedValue({
-        id: 'existing-id',
-        deviceId: 'soil-node-001',
-      });
+      const existingDevice = {
+        id: '22222222-2222-2222-2222-222222222222',
+        deviceId: 'water-node-001',
+        name: 'Water Node 1',
+        deviceType: 'WATER_QUALITY_NODE',
+        accountStatus: 'ACTIVE',
+        capabilities: [],
+      };
+
+      mockPrisma.device.findFirst
+        .mockResolvedValueOnce(existingDevice) // getDeviceByCanonicalId lookup
+        .mockResolvedValueOnce({
+          id: 'another-device-id-999',
+          deviceId: 'soil-node-001',
+        }); // conflict check findFirst finds another device!
 
       await expect(
-        repo.createDevice(
+        repo.updateDevice(
+          'water-node-001',
           {
             deviceId: 'soil-node-001',
-            name: 'Soil Node 1',
-            deviceType: DeviceType.SOIL_NODE,
           },
           'owner-user-id'
         )

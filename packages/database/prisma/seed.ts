@@ -99,12 +99,6 @@ export const CANONICAL_PERMISSIONS: SeedPermissionDef[] = [
   // 9.3 Device Permissions
   { code: 'device.read', description: 'View devices', ownerAccess: true, adminAccess: true },
   {
-    code: 'device.create',
-    description: 'Register new device',
-    ownerAccess: true,
-    adminAccess: false,
-  },
-  {
     code: 'device.update',
     description: 'Update device metadata',
     ownerAccess: true,

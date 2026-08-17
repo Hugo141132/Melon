@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { prisma, DeviceRepository, DeviceConflictError } from '@kebun-melon/database';
-import { DeviceQueryInputSchema, CreateDeviceInputSchema } from '@kebun-melon/contracts';
+import { prisma, DeviceRepository } from '@kebun-melon/database';
+import { DeviceQueryInputSchema, UserRole } from '@kebun-melon/contracts';
 import {
   requireSession,
   requirePermission,
@@ -47,7 +47,7 @@ export async function GET(request: Request) {
 
     // If ADMIN user, fetch their explicit assigned device IDs; if OWNER, leave undefined for global scope.
     let authorizedDeviceIds: string[] | undefined = undefined;
-    const isOwner = session.activeRoles.includes('OWNER' as any);
+    const isOwner = session.activeRoles.includes(UserRole.OWNER);
     if (!isOwner) {
       const userAssignments = await prisma.userDeviceAccess.findMany({
         where: {
@@ -61,10 +61,23 @@ export async function GET(request: Request) {
 
     const result = await deviceRepo.getDevices(parseResult.data, authorizedDeviceIds);
 
-    const itemsWithPermissions = result.items.map((device) => ({
-      ...device,
-      permissions: computeDevicePermissions(session, device, true),
-    }));
+    // Role-based projection per DEC-DEV-028:
+    // OWNER: receives full device object including canonical deviceId.
+    // ADMIN: canonical deviceId is strictly concealed (omitted).
+    const itemsWithPermissions = result.items.map((device) => {
+      const permissions = computeDevicePermissions(session, device, true);
+      if (!isOwner) {
+        const { deviceId: _concealed, ...adminDevice } = device;
+        return {
+          ...adminDevice,
+          permissions,
+        };
+      }
+      return {
+        ...device,
+        permissions,
+      };
+    });
 
     return NextResponse.json(
       {
@@ -98,85 +111,6 @@ export async function GET(request: Request) {
         error: {
           code: 'INTERNAL_ERROR',
           message: 'An unexpected error occurred while fetching device registry.',
-        },
-        meta: { requestId },
-      },
-      { status: 500 }
-    );
-  }
-}
-
-export async function POST(request: Request) {
-  const requestId = `req-${Date.now()}`;
-
-  try {
-    const session = await requireSession(request);
-    requirePermission(session, 'device.create', 'DEVICE', undefined, request);
-
-    const body = await request.json().catch(() => ({}));
-    const parseResult = CreateDeviceInputSchema.safeParse(body);
-
-    if (!parseResult.success) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: 'VALIDATION_ERROR',
-            message: 'Invalid device registration data.',
-            details: parseResult.error.flatten(),
-          },
-          meta: { requestId },
-        },
-        { status: 422 }
-      );
-    }
-
-    const deviceRepo = new DeviceRepository(prisma);
-    const createdDevice = await deviceRepo.createDevice(parseResult.data, session.id);
-
-    return NextResponse.json(
-      {
-        success: true,
-        data: createdDevice,
-        meta: { requestId },
-      },
-      { status: 201 }
-    );
-  } catch (error: any) {
-    if (error instanceof AuthorizationError || error?.name === 'AuthorizationError') {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: error.code,
-            message: error.message,
-          },
-          meta: { requestId },
-        },
-        { status: error.statusCode }
-      );
-    }
-
-    if (error instanceof DeviceConflictError || error?.name === 'DeviceConflictError') {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: 'DUPLICATE_DEVICE_ID',
-            message: error.message,
-          },
-          meta: { requestId },
-        },
-        { status: 409 }
-      );
-    }
-
-    return NextResponse.json(
-      {
-        success: false,
-        error: {
-          code: 'INTERNAL_ERROR',
-          message: 'An unexpected error occurred while creating device.',
         },
         meta: { requestId },
       },

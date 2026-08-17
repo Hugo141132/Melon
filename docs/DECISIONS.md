@@ -196,20 +196,34 @@
 * **Related Task IDs**: `TASK-0302`, `TASK-0305`
 * **Related Documentation**: `docs/PRD.md` §8.1, `docs/API.md` §14.3, `docs/RBAC.md` §9.3, §10, `docs/UI_UX.md` §6, `docs/TRACEABILITY.md` (`API-DEV-003`)
 * **Status**: **APPROVED BY USER (2026-08-18)**
+* **Implementation Status**: **IMPLEMENTED & VERIFIED (2026-08-18 / TASK-0302)**
 * **Approved Decision**:
   1. **No In-App Device Creation**: Devices can no longer be created from `/devices` or through the application UI or application API (`POST /api/v1/devices`).
   2. **Add Device Requirement Removed**: The "Add Device" product requirement, UI button/modal, and `device.create` permission are removed.
   3. **Existing Devices Preserved**: Pre-existing registered devices remain in the system. Device provisioning is managed out-of-band / via database seeding scripts.
+* **Implementation Evidence**:
+  - Removed `POST /api/v1/devices` endpoint from `apps/web/app/api/v1/devices/route.ts`.
+  - Removed "Add Device" button and creation modal from `apps/web/app/devices/page.tsx`.
+  - Removed `CreateDeviceInputSchema` and creation types from `packages/contracts/src/device.ts`.
+  - Removed `device.create` permission from `packages/database/prisma/seed.ts` and `packages/database/src/device-repository.ts`.
+  - Verified 100% test pass across unit/schema tests (`packages/contracts/src/__tests__/device.test.ts`, `apps/web/app/devices/test/page.test.ts`).
 
 #### DEC-DEV-028: Owner-Only External deviceId Modification, Immutable Database UUID, and Strict Admin deviceId Concealment
 * **Related Task IDs**: `TASK-0302`, `TASK-0305`, `TASK-0306`
 * **Related Documentation**: `docs/PRD.md` §8.1, §13.4, `docs/RBAC.md` §6.1, §9.3, §10, `docs/API.md` §14.1, §14.2, §14.4, `docs/DATABASE.md` §7.2, `docs/DEVICE_COMMUNICATION.md` §6, `docs/SECURITY.md` §10.5, `docs/UI_UX.md` §7.1
 * **Status**: **APPROVED BY USER (2026-08-18)**
+* **Implementation Status**: **IMPLEMENTED & VERIFIED (2026-08-18 / TASK-0302)**
 * **Approved Decision**:
   1. **Owner-Only External deviceId Edit**: The Project Owner is authorized to edit the external/canonical `deviceId` string (as well as user-facing `name`) via `PATCH /api/v1/devices/{deviceId}`.
   2. **Immutable Database UUID**: The internal database primary key UUID (`devices.id`) is strictly immutable. All internal relational foreign key relationships (`user_device_access`, `soil_readings`, `water_readings`, `telemetry_reservoir`, `faucet_commands`, `alerts`, `device_status_events`) reference `devices.id` and are preserved without cascading mutations across the relational database.
   3. **Strict Admin deviceId Concealment**: Admin users MUST NOT be able to view or edit the external/canonical `deviceId`, across all UI views and API responses (`GET /api/v1/devices`, `GET /api/v1/devices/{deviceId}`, alerts, commands, telemetry). Admin-facing responses omit or mask canonical `deviceId`, presenting only the user-facing device name (`name`) or localized system default display name.
   4. **Hardware & Broker Rename Reconciliation TBD (BLOCKING)**: Operational and hardware procedures for reconciling physical ESP32/NodeMCU firmware configurations, MQTT client identifiers, and EMQX broker credentials/topic ACLs after an Owner renames a `deviceId` are NOT resolved and are marked as **TBD / BLOCKING** further rename automation.
+* **Implementation Evidence**:
+  - Added `deviceId` to `UpdateDeviceInputSchema` with `.strict()` schema stripping in `packages/contracts/src/device.ts`.
+  - Implemented `updateDevice` in `DeviceRepository` (`packages/database/src/device-repository.ts`) with duplicate `deviceId` check throwing `DeviceConflictError`, while preserving immutable UUID primary key (`devices.id`).
+  - Added role-based DTO projection (`AdminSafeDeviceDtoSchema`) concealing `deviceId` for Admin role in `GET /api/v1/devices` and `GET /api/v1/devices/{deviceId}` routes.
+  - Updated `apps/web/app/devices/page.tsx` displaying `deviceId` badges only to Owners, and providing Owner Edit Modal for `deviceId` and `name` updates.
+  - Verified 100% test pass on route authorization and conflict handling (`apps/web/app/api/v1/devices/test/route.test.ts`, `packages/database/test/device-repository.test.ts`).
 
 #### DEC-DEV-029: Removal of Previously/Last-Accessed Device History and Persistent Restoration
 * **Related Task IDs**: `TASK-0306`, `TASK-0504`

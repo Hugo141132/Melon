@@ -11,7 +11,7 @@
 | Requirement ID | Requirement Summary | Source Document | Related Decision IDs | Related Task IDs | Related Test IDs | Status |
 |---|---|---|---|---|---|---|
 | `PRD-FR-001` | Authenticated access to monitoring system | `docs/PRD.md` | `DEC-AUTH-001` | `TASK-0204` | `TEST-API-001` | `READY_FOR_IMPLEMENTATION` |
-| `PRD-FR-002` | Multi-device ESP32/NodeMCU support | `docs/PRD.md` | `DEC-DEV-020` | `TASK-0302` | `TEST-API-003` | `READY_FOR_IMPLEMENTATION` |
+| `PRD-FR-002` | Multi-device ESP32/NodeMCU support | `docs/PRD.md` | `DEC-DEV-020` | `TASK-0302` | `TEST-API-003` | `VERIFIED` |
 | `PRD-FR-003` | Display latest soil and water monitoring data | `docs/PRD.md` | `DEC-MON-036` | `TASK-0502` | `TEST-E2E-003` | `READY_FOR_IMPLEMENTATION` |
 | `PRD-FR-004` | Display device connectivity and status | `docs/PRD.md` | `` | `TASK-0407` | `TEST-MQTT-002` | `DECISION_REQUIRED` |
 | `PRD-FR-005` | Store and present historical monitoring data | `docs/PRD.md` | `DEC-MON-087` | `TASK-0503` | `TEST-API-004` | `IMPLEMENTED` |
@@ -29,7 +29,7 @@
 | `PRD-FR-017` | Admin approval workflow and account status transitions | `docs/PRD.md` | `DEC-AUTH-006` | `TASK-0207` | `TEST-API-002` | `IMPLEMENTED` |
 | `PRD-FR-018` | First Owner account seed provisioning | `docs/PRD.md` | `DEC-AUTH-006` | `TASK-0106` | `TEST-API-002` | `IMPLEMENTED` |
 | `PRD-FR-019` | Login behavior and account-status validation | `docs/PRD.md` | `DEC-AUTH-001` | `TASK-0204` | `TEST-API-001` | `READY_FOR_IMPLEMENTATION` |
-| `PRD-FR-020` | Multi-device support and metadata tracking | `docs/PRD.md` | `DEC-DEV-020` | `TASK-0302` | `TEST-DB-001` | `READY_FOR_IMPLEMENTATION` |
+| `PRD-FR-020` | Multi-device support and metadata tracking | `docs/PRD.md` | `DEC-DEV-020` | `TASK-0302` | `TEST-DB-001` | `VERIFIED` |
 | `PRD-FR-021` | Device selector interface and context persistence | `docs/PRD.md` | - | `TASK-0306` | `TEST-E2E-003` | `READY_FOR_IMPLEMENTATION` |
 | `PRD-FR-022` | Device access scope enforcement | `docs/PRD.md` | `DEC-RBAC-016` | `TASK-0304` | `TEST-SEC-003` | `READY_FOR_IMPLEMENTATION` |
 | `PRD-FR-023` | Soil monitoring metrics display | `docs/PRD.md` | `DEC-MON-036` | `TASK-0501` | `TEST-API-003` | `READY_FOR_IMPLEMENTATION` |
@@ -114,7 +114,7 @@
 | `I18N-REQ-007` | Technical content and enums exempt from translation | `docs/I18N.md` | - | `TASK-0602`, `TASK-0603` | `TEST-UNIT-004` | `VERIFIED` |
 | `I18N-REQ-008` | Locale-aware DateTime and number formatting | `docs/I18N.md` | `DEC-I18N-068` | `TASK-0603` | `TEST-UNIT-004` | `VERIFIED` |
 | `I18N-REQ-009` | Translation completeness and JSON parity checking in CI | `docs/I18N.md` | - | `TASK-0605` | `TEST-UNIT-004` | `IMPLEMENTED` |
-| `DEV-ID-001` | Unique canonical device identifier string | `docs/DEVICE_COMMUNICATION.md` | - | `TASK-0302` | `TEST-DB-001` | `READY_FOR_IMPLEMENTATION` |
+| `DEV-ID-001` | Unique canonical device identifier string | `docs/DEVICE_COMMUNICATION.md` | - | `TASK-0302` | `TEST-DB-001` | `VERIFIED` |
 | `DEV-ID-002` | Device capabilities flags and registration | `docs/DEVICE_COMMUNICATION.md` | - | `TASK-0303` | `TEST-DB-001` | `READY_FOR_IMPLEMENTATION` |
 | `DEV-TOPIC-001` | MQTT topic hierarchy root definition | `docs/DEVICE_COMMUNICATION.md` | `DEC-DEV-020` | `TASK-0403` | `TEST-MQTT-001` | `READY_FOR_IMPLEMENTATION` |
 | `DEV-TOPIC-002` | Standard MQTT topic structure rules | `docs/DEVICE_COMMUNICATION.md` | `DEC-DEV-020` | `TASK-0403` | `TEST-MQTT-001` | `READY_FOR_IMPLEMENTATION` |
@@ -150,7 +150,7 @@
 | `DB-USER-003` | approval_history table schema definition | `docs/DATABASE.md` | `DEC-AUTH-006` | `TASK-0207` | `TEST-DB-001` | `READY_FOR_IMPLEMENTATION` |
 | `DB-USER-004` | roles and permissions tables schema definition | `docs/DATABASE.md` | - | `TASK-0105` | `TEST-DB-001` | `READY_FOR_IMPLEMENTATION` |
 | `DB-AUTH-006` | email_verification_tokens table schema definition | `docs/DATABASE.md` | `DEC-AUTH-104` | `TASK-0214` | `TEST-DB-001` | `IMPLEMENTED` |
-| `DB-DEV-001` | devices table schema definition | `docs/DATABASE.md` | `DEC-DEV-020` | `TASK-0302` | `TEST-DB-001` | `READY_FOR_IMPLEMENTATION` |
+| `DB-DEV-001` | devices table schema definition | `docs/DATABASE.md` | `DEC-DEV-020` | `TASK-0302` | `TEST-DB-001` | `VERIFIED` |
 | `DB-DEV-002` | user_devices assignment table schema definition | `docs/DATABASE.md` | `DEC-RBAC-016` | `TASK-0304` | `TEST-DB-001` | `READY_FOR_IMPLEMENTATION` |
 | `DB-DEV-003` | sites table schema definition | `docs/DATABASE.md` | `DEC-DEV-026` | `TASK-0301` | `TEST-DB-001` | `DEFERRED` |
 | `DB-TEL-001` | soil_telemetry table schema definition | `docs/DATABASE.md` | `DEC-MON-036` | `TASK-0405` | `TEST-DB-001` | `VERIFIED` |
@@ -176,7 +176,7 @@
 | `API-DEV-002` | GET /api/v1/devices/{deviceId} detail endpoint | `docs/API.md` | `DEC-RBAC-016`, `DEC-DEV-028` | `TASK-0305` | `TEST-API-003` | `READY_FOR_IMPLEMENTATION` |
 | `API-DEV-003` | POST /api/v1/devices creation endpoint (REMOVED) | `docs/API.md` | `DEC-DEV-027` | `TASK-0302` | `TEST-API-003` | `SUPERSEDED` |
 | `API-DEV-004` | POST /api/v1/user-devices assignment endpoint | `docs/API.md` | `DEC-RBAC-016` | `TASK-0304` | `TEST-API-003` | `READY_FOR_IMPLEMENTATION` |
-| `API-DEV-005` | PATCH /api/v1/devices/{deviceId} update endpoint | `docs/API.md` | `DEC-DEV-028` | `TASK-0302` | `TEST-API-003` | `READY_FOR_IMPLEMENTATION` |
+| `API-DEV-005` | PATCH /api/v1/devices/{deviceId} update endpoint | `docs/API.md` | `DEC-DEV-028` | `TASK-0302` | `TEST-API-003` | `VERIFIED` |
 | `API-MON-001` | GET /api/v1/devices/{deviceId}/monitoring/latest endpoint | `docs/API.md` | `DEC-MON-036` | `TASK-0501` | `TEST-API-003` | `READY_FOR_IMPLEMENTATION` |
 | `API-MON-002` | Historical query API endpoints (soil & water history) | `docs/API.md` | `DEC-MON-087` | `TASK-0503` | `TEST-API-004` | `IMPLEMENTED` |
 | `API-MON-003` | GET /api/v1/devices/{deviceId}/monitoring/stream endpoint | `docs/API.md` | `DEC-INF-077` | `TASK-0505` | `TEST-API-003` | `DECISION_REQUIRED` |

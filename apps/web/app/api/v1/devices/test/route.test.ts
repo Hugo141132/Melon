@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { GET, POST } from '../route';
+import { GET } from '../route';
 import { GET as GET_DETAIL, PATCH, DELETE } from '../[deviceId]/route';
 import { POST as DEACTIVATE } from '../[deviceId]/deactivate/route';
 import { AccountStatus, UserRole, DeviceType } from '@kebun-melon/contracts';
@@ -17,7 +17,6 @@ vi.mock('next/headers', () => ({
 
 const mockGetDevices = vi.fn();
 const mockGetDeviceByCanonicalId = vi.fn();
-const mockCreateDevice = vi.fn();
 const mockUpdateDevice = vi.fn();
 const mockDeactivateDevice = vi.fn();
 const mockDeleteDevicePermanently = vi.fn();
@@ -33,6 +32,9 @@ vi.mock('@kebun-melon/database', async (importOriginal) => {
         findMany: (...args: any[]) => mockFindManyUserDeviceAccess(...args),
         findFirst: (...args: any[]) => mockFindFirstUserDeviceAccess(...args),
       },
+      auditLog: {
+        create: vi.fn().mockResolvedValue({}),
+      },
     },
     DeviceRepository: class {
       getDevices(...args: any[]) {
@@ -40,9 +42,6 @@ vi.mock('@kebun-melon/database', async (importOriginal) => {
       }
       getDeviceByCanonicalId(...args: any[]) {
         return mockGetDeviceByCanonicalId(...args);
-      }
-      createDevice(...args: any[]) {
-        return mockCreateDevice(...args);
       }
       updateDevice(...args: any[]) {
         return mockUpdateDevice(...args);
@@ -115,7 +114,7 @@ describe('Device Registry API Endpoints (TASK-0302 & TASK-0305)', () => {
       expect(json.error.code).toBe('ACCOUNT_NOT_ACTIVE');
     });
 
-    it('returns authorized devices for OWNER globally with permissions DTO', async () => {
+    it('returns authorized devices for OWNER globally with canonical deviceId and permissions DTO', async () => {
       mockOwnerSession();
 
       mockGetDevices.mockResolvedValueOnce({
@@ -139,6 +138,7 @@ describe('Device Registry API Endpoints (TASK-0302 & TASK-0305)', () => {
       expect(res.status).toBe(200);
       expect(json.success).toBe(true);
       expect(json.data.length).toBe(1);
+      expect(json.data[0].id).toBe('dev-1');
       expect(json.data[0].deviceId).toBe('water-node-001');
       expect(json.data[0].deviceSecret).toBeUndefined();
       expect(json.data[0].permissions).toEqual({
@@ -149,7 +149,7 @@ describe('Device Registry API Endpoints (TASK-0302 & TASK-0305)', () => {
       expect(mockGetDevices).toHaveBeenCalledWith(expect.anything(), undefined);
     });
 
-    it('filters devices strictly to active assignments (revokedAt === null) for ADMIN', async () => {
+    it('filters devices strictly to active assignments and strictly conceals canonical deviceId for ADMIN (DEC-DEV-028)', async () => {
       mockAdminSession();
 
       mockFindManyUserDeviceAccess.mockResolvedValueOnce([{ deviceId: 'dev-assigned-uuid' }]);
@@ -175,6 +175,10 @@ describe('Device Registry API Endpoints (TASK-0302 & TASK-0305)', () => {
       expect(res.status).toBe(200);
       expect(json.success).toBe(true);
       expect(mockGetDevices).toHaveBeenCalledWith(expect.anything(), ['dev-assigned-uuid']);
+      expect(json.data[0].id).toBe('dev-assigned-uuid');
+      expect(json.data[0].name).toBe('Tank Node 1');
+      // DEC-DEV-028: Canonical deviceId is concealed from Admin users
+      expect(json.data[0].deviceId).toBeUndefined();
       expect(json.data[0].permissions).toBeDefined();
       expect(json.data[0].permissions.canView).toBe(true);
     });
@@ -213,7 +217,7 @@ describe('Device Registry API Endpoints (TASK-0302 & TASK-0305)', () => {
       expect(json.error.code).toBe('DEVICE_NOT_FOUND');
     });
 
-    it('returns 200 OK with permissions for OWNER for any existing device', async () => {
+    it('returns 200 OK with canonical deviceId and permissions for OWNER for any existing device', async () => {
       mockOwnerSession();
       const mockDev = {
         id: 'dev-1',
@@ -233,11 +237,12 @@ describe('Device Registry API Endpoints (TASK-0302 & TASK-0305)', () => {
 
       expect(res.status).toBe(200);
       expect(json.success).toBe(true);
+      expect(json.data.id).toBe('dev-1');
       expect(json.data.deviceId).toBe('water-node-001');
       expect(json.data.permissions).toEqual({ canView: true, canControl: false });
     });
 
-    it('returns 200 OK for ADMIN when device is actively assigned', async () => {
+    it('returns 200 OK for ADMIN when device is actively assigned, concealing canonical deviceId (DEC-DEV-028)', async () => {
       mockAdminSession();
       const mockDev = {
         id: 'dev-1',
@@ -263,6 +268,10 @@ describe('Device Registry API Endpoints (TASK-0302 & TASK-0305)', () => {
 
       expect(res.status).toBe(200);
       expect(json.success).toBe(true);
+      expect(json.data.id).toBe('dev-1');
+      expect(json.data.name).toBe('Water Node 1');
+      // DEC-DEV-028: Canonical deviceId is concealed from Admin users
+      expect(json.data.deviceId).toBeUndefined();
       expect(json.data.permissions).toEqual({ canView: true, canControl: false });
     });
 
@@ -343,87 +352,91 @@ describe('Device Registry API Endpoints (TASK-0302 & TASK-0305)', () => {
     });
   });
 
-  describe('POST /api/v1/devices', () => {
-    it('rejects creation attempt by Admin with 403 INSUFFICIENT_PERMISSION', async () => {
-      mockAdminSession();
+  describe('PATCH /api/v1/devices/[deviceId] (TASK-0302 / DEC-DEV-028)', () => {
+    it('allows Owner to update canonical deviceId and user-facing name', async () => {
+      mockOwnerSession();
 
-      const req = new Request('http://localhost/api/v1/devices', {
-        method: 'POST',
+      const updatedDto = {
+        id: 'dev-1',
+        deviceId: 'water-node-001-renamed',
+        name: 'Renamed Water Node',
+        deviceType: DeviceType.WATER_QUALITY_NODE,
+        accountStatus: 'ACTIVE',
+        connectionStatus: 'ONLINE',
+        capabilities: ['WATER_PH'],
+      };
+      mockUpdateDevice.mockResolvedValueOnce(updatedDto);
+
+      const req = new Request('http://localhost/api/v1/devices/water-node-001', {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          deviceId: 'water-node-002',
-          name: 'Water Node 2',
-          deviceType: DeviceType.WATER_QUALITY_NODE,
+          deviceId: 'water-node-001-renamed',
+          name: 'Renamed Water Node',
         }),
       });
 
-      const res = await POST(req);
+      const res = await PATCH(req, { params: Promise.resolve({ deviceId: 'water-node-001' }) });
+      const json = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(json.success).toBe(true);
+      expect(json.data.deviceId).toBe('water-node-001-renamed');
+      expect(json.data.name).toBe('Renamed Water Node');
+      expect(mockUpdateDevice).toHaveBeenCalledWith(
+        'water-node-001',
+        {
+          deviceId: 'water-node-001-renamed',
+          name: 'Renamed Water Node',
+        },
+        'owner-id-1'
+      );
+    });
+
+    it('denies Admin update attempt with 403 INSUFFICIENT_PERMISSION (DEC-DEV-028)', async () => {
+      mockAdminSession();
+
+      const req = new Request('http://localhost/api/v1/devices/water-node-001', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Admin Attempted Name',
+        }),
+      });
+
+      const res = await PATCH(req, { params: Promise.resolve({ deviceId: 'water-node-001' }) });
       const json = await res.json();
 
       expect(res.status).toBe(403);
       expect(json.error.code).toBe('INSUFFICIENT_PERMISSION');
+      expect(mockUpdateDevice).not.toHaveBeenCalled();
     });
 
-    it('creates device when requested by Owner', async () => {
+    it('returns 409 DUPLICATE_DEVICE_ID when target deviceId is already taken by another device', async () => {
       mockOwnerSession();
 
-      const createdDto = {
-        id: 'dev-2',
-        deviceId: 'water-quality-node-002',
-        name: 'Water Quality Node 2',
-        deviceType: DeviceType.WATER_QUALITY_NODE,
-        accountStatus: 'ACTIVE',
-        connectionStatus: 'UNKNOWN',
-        capabilities: ['WATER_PH', 'WATER_TDS', 'WATER_EC'],
-      };
-
-      mockCreateDevice.mockResolvedValueOnce(createdDto);
-
-      const req = new Request('http://localhost/api/v1/devices', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          deviceId: 'water-quality-node-002',
-          name: 'Water Quality Node 2',
-          deviceType: DeviceType.WATER_QUALITY_NODE,
-        }),
-      });
-
-      const res = await POST(req);
-      const json = await res.json();
-
-      expect(res.status).toBe(201);
-      expect(json.success).toBe(true);
-      expect(json.data.deviceId).toBe('water-quality-node-002');
-    });
-
-    it('returns 409 DUPLICATE_DEVICE_ID when deviceId already exists', async () => {
-      mockOwnerSession();
-
-      mockCreateDevice.mockRejectedValueOnce(
-        new dbModule.DeviceConflictError('Device with deviceId water-node-001 already exists.')
+      mockUpdateDevice.mockRejectedValueOnce(
+        new dbModule.DeviceConflictError(
+          "Device with canonical deviceId 'existing-node' already exists."
+        )
       );
 
-      const req = new Request('http://localhost/api/v1/devices', {
-        method: 'POST',
+      const req = new Request('http://localhost/api/v1/devices/water-node-001', {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          deviceId: 'water-node-001',
-          name: 'Water Node 1',
-          deviceType: DeviceType.SOIL_NODE,
+          deviceId: 'existing-node',
         }),
       });
 
-      const res = await POST(req);
+      const res = await PATCH(req, { params: Promise.resolve({ deviceId: 'water-node-001' }) });
       const json = await res.json();
 
       expect(res.status).toBe(409);
       expect(json.error.code).toBe('DUPLICATE_DEVICE_ID');
     });
-  });
 
-  describe('PATCH /api/v1/devices/[deviceId]', () => {
-    it('rejects attempt to forge connectionStatus via patch payload', async () => {
+    it('rejects attempt to forge connectionStatus or server-controlled fields via patch payload', async () => {
       mockOwnerSession();
 
       const req = new Request('http://localhost/api/v1/devices/water-node-001', {

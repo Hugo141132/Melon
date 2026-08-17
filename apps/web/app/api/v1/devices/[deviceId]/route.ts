@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
-import { prisma, DeviceRepository, DeviceNotFoundError } from '@kebun-melon/database';
-import { UpdateDeviceInputSchema } from '@kebun-melon/contracts';
+import {
+  prisma,
+  DeviceRepository,
+  DeviceNotFoundError,
+  DeviceConflictError,
+} from '@kebun-melon/database';
+import { UpdateDeviceInputSchema, UserRole } from '@kebun-melon/contracts';
 import {
   requireSession,
   requirePermission,
@@ -50,14 +55,22 @@ export async function GET(request: Request, props: { params: Promise<{ deviceId:
     });
 
     const permissions = computeDevicePermissions(session, device, true);
+    const isOwner = session.activeRoles.includes(UserRole.OWNER);
+
+    // Role-based projection per DEC-DEV-028:
+    // OWNER: receives full device object including canonical deviceId.
+    // ADMIN: canonical deviceId is strictly concealed (omitted).
+    const projectedDevice = !isOwner
+      ? (() => {
+          const { deviceId: _concealed, ...adminDevice } = device;
+          return { ...adminDevice, permissions };
+        })()
+      : { ...device, permissions };
 
     return NextResponse.json(
       {
         success: true,
-        data: {
-          ...device,
-          permissions,
-        },
+        data: projectedDevice,
         meta: { requestId },
       },
       { status: 200 }
@@ -145,6 +158,20 @@ export async function PATCH(request: Request, props: { params: Promise<{ deviceI
           meta: { requestId },
         },
         { status: error.statusCode }
+      );
+    }
+
+    if (error instanceof DeviceConflictError || error?.name === 'DeviceConflictError') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'DUPLICATE_DEVICE_ID',
+            message: error.message,
+          },
+          meta: { requestId },
+        },
+        { status: 409 }
       );
     }
 

@@ -69,8 +69,8 @@ export default function DeviceSelector({ className }: DeviceSelectorProps) {
     return devices.filter((d) => {
       const matchesSearch =
         searchQuery.trim() === '' ||
-        d.deviceName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        d.deviceId.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (d.deviceName && d.deviceName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (d.deviceId && d.deviceId.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (d.siteName && d.siteName.toLowerCase().includes(searchQuery.toLowerCase()));
 
       const matchesStatus =
@@ -84,7 +84,7 @@ export default function DeviceSelector({ className }: DeviceSelectorProps) {
 
   // Handle item selection
   const handleSelect = (device: AuthorisedDevice) => {
-    selectDevice(device.deviceId);
+    selectDevice(device.deviceId || device.id);
     setIsOpen(false);
     setSearchQuery('');
     if (device.deviceType === 'SOIL_NODE') {
@@ -337,10 +337,11 @@ export default function DeviceSelector({ className }: DeviceSelectorProps) {
               </div>
             ) : (
               filteredDevices.map((device) => {
-                const isSelected = selectedDevice?.deviceId === device.deviceId;
+                const deviceKey = device.deviceId || device.id;
+                const isSelected = (selectedDevice?.deviceId || selectedDevice?.id) === deviceKey;
                 return (
                   <button
-                    key={device.deviceId}
+                    key={deviceKey}
                     type="button"
                     onClick={() => handleSelect(device)}
                     className={cn(
@@ -351,7 +352,7 @@ export default function DeviceSelector({ className }: DeviceSelectorProps) {
                     )}
                     role="option"
                     aria-selected={isSelected}
-                    data-testid={`device-option-${device.deviceId}`}
+                    data-testid={`device-option-${deviceKey}`}
                   >
                     <div className="flex items-start gap-2.5 min-w-0">
                       <span

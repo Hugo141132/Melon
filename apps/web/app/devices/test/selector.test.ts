@@ -62,7 +62,9 @@ describe('TASK-0306 — Device Selector & Global DeviceContext State Integration
 
     // ADMIN scope returns only assigned devices (e.g. soil-node-001 & water-tank-node-001)
     const adminAssignedIds = ['soil-node-001', 'water-tank-node-001'];
-    const adminDevices = mockDevices.filter((d) => adminAssignedIds.includes(d.deviceId));
+    const adminDevices = mockDevices.filter(
+      (d) => d.deviceId && adminAssignedIds.includes(d.deviceId)
+    );
     expect(adminDevices.length).toBe(2);
     expect(adminDevices.map((d) => d.deviceId)).not.toContain('water-node-001');
   });

@@ -88,7 +88,7 @@ export default function SoilPage() {
   const { selectedDevice } = useDeviceContext();
 
   const isSoilNode = selectedDevice?.deviceType === 'SOIL_NODE';
-  const activeDeviceId = isSoilNode ? selectedDevice?.deviceId : null;
+  const activeDeviceId = isSoilNode ? selectedDevice?.deviceId || selectedDevice?.id : null;
 
   const {
     preset,

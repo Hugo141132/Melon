@@ -243,7 +243,7 @@ describe('FaucetStatusCard Polling Regression', () => {
       events: [],
     };
 
-    render(<FaucetStatusCard deviceId={mockOnlineDevice.deviceId} command={mockCommand} />);
+    render(<FaucetStatusCard deviceId={mockOnlineDevice.deviceId!} command={mockCommand} />);
 
     expect(screen.getByTestId('faucet-status-card')).toBeInTheDocument();
     expect(screen.getByText('Selesai (COMPLETED)')).toBeInTheDocument();
@@ -294,7 +294,7 @@ describe('FaucetStatusCard Polling Regression', () => {
       events: [],
     };
 
-    render(<FaucetStatusCard deviceId={mockOnlineDevice.deviceId} command={activeCommand} />);
+    render(<FaucetStatusCard deviceId={mockOnlineDevice.deviceId!} command={activeCommand} />);
 
     expect(screen.getByTestId('live-polling-indicator')).toBeInTheDocument();
 
@@ -343,7 +343,7 @@ describe('FaucetStatusCard Polling Regression', () => {
     };
 
     const { unmount } = render(
-      <FaucetStatusCard deviceId={mockOnlineDevice.deviceId} command={activeCommand} />
+      <FaucetStatusCard deviceId={mockOnlineDevice.deviceId!} command={activeCommand} />
     );
 
     // Unmount before first timer tick
@@ -370,7 +370,7 @@ describe('FaucetHistoryTable', () => {
       }),
     } as Response);
 
-    const { rerender } = render(<FaucetHistoryTable deviceId={mockOnlineDevice.deviceId} />);
+    const { rerender } = render(<FaucetHistoryTable deviceId={mockOnlineDevice.deviceId!} />);
 
     expect(screen.getByTestId('faucet-history-table')).toBeInTheDocument();
     expect(screen.getByTestId('history-status-filter')).toBeInTheDocument();
@@ -379,7 +379,7 @@ describe('FaucetHistoryTable', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(1);
 
     // Re-rendering with identical props should not re-trigger fetch
-    rerender(<FaucetHistoryTable deviceId={mockOnlineDevice.deviceId} />);
+    rerender(<FaucetHistoryTable deviceId={mockOnlineDevice.deviceId!} />);
 
     expect(fetchSpy).toHaveBeenCalledTimes(1);
 

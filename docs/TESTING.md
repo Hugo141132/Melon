@@ -586,7 +586,7 @@ Component tests shall verify isolated frontend behaviour.
 - Revoked device.
 - Loading.
 - Error.
-- Persisted selection.
+- Fresh initial selection resolution without persistent access history (`DEC-DEV-029`).
 
 ## 11.4 Monitoring Cards
 
@@ -718,7 +718,10 @@ Verify:
 
 ## 13.3 Device Integrity
 
-- Duplicate `device_id` rejected.
+- Duplicate `deviceId` rejected with conflict error.
+- Immutable database primary key UUID (`devices.id`) preserved across canonical `deviceId` renames (`DEC-DEV-028`).
+- In-app device creation removed; devices managed out-of-band (`DEC-DEV-027`).
+- Canonical `deviceId` strictly concealed from Admin role projections (`DEC-DEV-028`).
 - Invalid coordinates rejected.
 - Duplicate active assignment rejected.
 - Revoked assignments retained.

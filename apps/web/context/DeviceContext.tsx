@@ -11,7 +11,7 @@ export interface DevicePermissions {
 
 export interface AuthorisedDevice {
   id: string;
-  deviceId: string;
+  deviceId?: string;
   deviceName: string;
   deviceType: string;
   siteId: string | null;
@@ -110,17 +110,18 @@ export function DeviceProvider({
     if (typeof window === 'undefined') return;
 
     if (device) {
+      const activeId = device.deviceId || device.id;
       try {
-        localStorage.setItem(STORAGE_KEY, device.deviceId);
-        sessionStorage.setItem(STORAGE_KEY, device.deviceId);
+        localStorage.setItem(STORAGE_KEY, activeId);
+        sessionStorage.setItem(STORAGE_KEY, activeId);
       } catch {
         // Ignore storage write failure
       }
 
       try {
         const url = new URL(window.location.href);
-        if (url.searchParams.get('deviceId') !== device.deviceId) {
-          url.searchParams.set('deviceId', device.deviceId);
+        if (url.searchParams.get('deviceId') !== activeId) {
+          url.searchParams.set('deviceId', activeId);
           window.history.replaceState({}, '', url.toString());
         }
       } catch {
@@ -161,7 +162,9 @@ export function DeviceProvider({
       const candidateId = currentSelectedId ?? getCandidateDeviceId();
 
       if (candidateId) {
-        const matched = fetchedDevices.find((d) => d.deviceId === candidateId);
+        const matched = fetchedDevices.find(
+          (d) => (d.deviceId && d.deviceId === candidateId) || d.id === candidateId
+        );
         if (matched) {
           setSelectedDevice(matched);
           syncSelection(matched);
@@ -214,7 +217,7 @@ export function DeviceProvider({
 
       const json = await response.json();
       if (json.success && Array.isArray(json.data)) {
-        processDeviceList(json.data, selectedDevice?.deviceId || null);
+        processDeviceList(json.data, selectedDevice?.deviceId || selectedDevice?.id || null);
       } else {
         setError(json.error?.message || 'Format data perangkat tidak valid.');
       }
@@ -223,7 +226,7 @@ export function DeviceProvider({
     } finally {
       setIsLoading(false);
     }
-  }, [processDeviceList, selectedDevice?.deviceId]);
+  }, [processDeviceList, selectedDevice?.deviceId, selectedDevice?.id]);
 
   useEffect(() => {
     if (initialDevices) {
@@ -244,7 +247,9 @@ export function DeviceProvider({
 
   const selectDevice = useCallback(
     (deviceId: string): boolean => {
-      const target = devices.find((d) => d.deviceId === deviceId);
+      const target = devices.find(
+        (d) => (d.deviceId && d.deviceId === deviceId) || d.id === deviceId
+      );
       if (!target) {
         setError('Perangkat tidak diizinkan atau tidak ditemukan.');
         return false;
@@ -275,7 +280,7 @@ export function DeviceProvider({
       value={{
         devices,
         selectedDevice,
-        selectedDeviceId: selectedDevice?.deviceId || null,
+        selectedDeviceId: selectedDevice?.deviceId || selectedDevice?.id || null,
         isLoading,
         error,
         isRevoked,

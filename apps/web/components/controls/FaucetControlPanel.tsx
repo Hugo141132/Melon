@@ -84,15 +84,15 @@ export default function FaucetControlPanel() {
     }
   }, []);
 
-  // Fetch active command strictly when selectedDevice.deviceId changes
+  // Fetch active command strictly when selectedDevice changes
   useEffect(() => {
-    const devId = selectedDevice?.deviceId;
+    const devId = selectedDevice?.deviceId || selectedDevice?.id;
     if (devId) {
       fetchActiveCommand(devId);
     } else {
       setActiveCommand(null);
     }
-  }, [selectedDevice?.deviceId, fetchActiveCommand]);
+  }, [selectedDevice?.deviceId, selectedDevice?.id, fetchActiveCommand]);
 
   // Stable callback for status updates from card
   const handleCommandUpdated = useCallback((updated: FaucetCommandDto) => {
@@ -111,23 +111,28 @@ export default function FaucetControlPanel() {
   // Submit dispense command
   const handleConfirmDispense = async (phase: 1 | 2 | 3, idempotencyKey: string) => {
     if (!selectedDevice) return;
+    const targetDevId = selectedDevice.deviceId || selectedDevice.id;
+    if (!targetDevId) return;
 
     setSubmitting(true);
     setErrorMsg(null);
     setSuccessMsg(null);
 
     try {
-      const res = await fetch(`/api/v1/devices/${selectedDevice.deviceId}/faucet-commands`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Idempotency-Key': idempotencyKey,
-        },
-        body: JSON.stringify({
-          phase,
-          idempotencyKey,
-        }),
-      });
+      const res = await fetch(
+        `/api/v1/devices/${encodeURIComponent(targetDevId)}/faucet-commands`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Idempotency-Key': idempotencyKey,
+          },
+          body: JSON.stringify({
+            phase,
+            idempotencyKey,
+          }),
+        }
+      );
 
       const json = await res.json();
 
@@ -181,7 +186,7 @@ export default function FaucetControlPanel() {
       {selectedDevice && activeCommand && (
         <section>
           <FaucetStatusCard
-            deviceId={selectedDevice.deviceId}
+            deviceId={selectedDevice.deviceId || selectedDevice.id}
             command={activeCommand}
             onCommandUpdated={handleCommandUpdated}
           />
@@ -191,7 +196,7 @@ export default function FaucetControlPanel() {
       {/* Execution History Table */}
       {selectedDevice ? (
         <section>
-          <FaucetHistoryTable deviceId={selectedDevice.deviceId} />
+          <FaucetHistoryTable deviceId={selectedDevice.deviceId || selectedDevice.id} />
         </section>
       ) : (
         <section className="p-8 bg-app-surface-container-lowest rounded-2xl border border-app-outline-variant/20 text-center text-xs text-app-on-surface-variant space-y-2">
