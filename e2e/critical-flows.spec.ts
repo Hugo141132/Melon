@@ -427,14 +427,14 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
   test('Flow 8: Admin submits Phase 1 faucet control command', async ({ page }) => {
     await loginAsAdmin(page);
     await page.goto(`/controls?deviceId=${targetDeviceId}`);
-    
+
     // Safely skip if target server has feature disabled (e.g. reused local server)
     const disabledBanner = page.locator('text=ENABLE_FAUCET_CONTROL=false');
     if (await disabledBanner.isVisible({ timeout: 2000 }).catch(() => false)) {
       test.skip();
       return;
     }
-    
+
     await expect(page.locator('body')).toContainText(/Preset|Dosis|Penyiraman|Faucet|Fase/i);
 
     // Select Phase 1 preset (300 mL)
