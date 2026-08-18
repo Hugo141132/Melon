@@ -248,3 +248,16 @@
 | `TEST-CTRL-003` | Faucet command idempotency and duplicate tests | `docs/TESTING.md` | `DEC-CTRL-051` | `TASK-0808` | `TEST-CTRL-003` | `READY_FOR_IMPLEMENTATION` |
 | `TEST-CTRL-004` | Faucet command timeout and expiry handling tests | `docs/TESTING.md` | `DEC-CTRL-051` | `TASK-0809` | `TEST-CTRL-004` | `DECISION_REQUIRED` |
 | `TEST-CTRL-005` | Faucet control feature flag and dual sign-off tests | `docs/TESTING.md` | `DEC-CTRL-067` | `TASK-0801` | `TEST-CTRL-005` | `READY_FOR_IMPLEMENTATION` |
+
+---
+
+## TASK-0306 Implementation Note
+
+The following facts are supported by the current implementation regarding device selection and routing:
+- **Frontend Selection/Context/URL:** Uses immutable `devices.id` UUID.
+- **Bare Routes:** Remain neutral with no auto-selection (`/`, `/sensor`, `/soil`, `/water`).
+- **Rehydration:** Valid `?deviceId=<UUID>` rehydrates after authorization on hard refresh.
+- **Invalid/Revoked IDs:** Clear selection safely to `null` with a notice banner.
+- **Admin Privacy:** Admin canonical `deviceId` concealment remains enforced.
+- **Legacy Routes:** `/air` and `/tanah` are explicitly maintained as legacy 404 routes.
+- **Race Condition:** `/sensor` first-load "No Device Found" race was fixed by correcting the loading state (handling skeleton vs. true empty authorized list).

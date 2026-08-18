@@ -89,3 +89,16 @@ All exceptions must be recorded in `scripts/security-exceptions.json` using the 
 - **TASK-0214 Audit:** Confirmed zero secret exceptions and zero dependency exceptions introduced; email verification tokens adhere strictly to zero-plaintext policy with 256-bit CSPRNG generation, SHA-256 token hashing in `email_verification_tokens`, and secure transactional deletion upon consumption.
 - **TASK-0305 Audit:** Confirmed zero secret exceptions and zero dependency exceptions introduced; authorised device endpoints enforce role-based projection concealing `deviceId` from Admins, active-assignment database scoping, and IDOR prevention with zero security exceptions.
 
+
+---
+
+## TASK-0306 Implementation Note
+
+The following facts are supported by the current implementation regarding device selection and routing:
+- **Frontend Selection/Context/URL:** Uses immutable `devices.id` UUID.
+- **Bare Routes:** Remain neutral with no auto-selection (`/`, `/sensor`, `/soil`, `/water`).
+- **Rehydration:** Valid `?deviceId=<UUID>` rehydrates after authorization on hard refresh.
+- **Invalid/Revoked IDs:** Clear selection safely to `null` with a notice banner.
+- **Admin Privacy:** Admin canonical `deviceId` concealment remains enforced.
+- **Legacy Routes:** `/air` and `/tanah` are explicitly maintained as legacy 404 routes.
+- **Race Condition:** `/sensor` first-load "No Device Found" race was fixed by correcting the loading state (handling skeleton vs. true empty authorized list).

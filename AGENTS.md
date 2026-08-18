@@ -248,6 +248,17 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
 - 21st.dev MCP: `NOT REQUIRED`
 - Summary: Reconciled and verified authorized device listing and detail endpoints (`GET /api/v1/devices`, `GET /api/v1/devices/{deviceId}`). Verified Owner global access scope returning full safe DTO with canonical `deviceId`, and Admin strictly scoped to active assignments (`revokedAt === null`) with canonical `deviceId` strictly concealed per `DEC-DEV-028` while retaining safe immutable database UUID `id`. Verified dynamic `permissions` DTO (`canView`, `canControl`) dynamically evaluated using RBAC, active account status, device capabilities, and `ENABLE_FAUCET_CONTROL` feature flag. Hardened baseline permission check (`requirePermission(session, 'device.read')`) and active account enforcement on device detail route prior to DB lookup, eliminating device-existence leakage. Verified IDOR/BOLA prevention on unassigned devices, UUID/canonical ID manipulation attempts, unauthenticated requests (401), non-active accounts (403), and invalid pagination (422). Executed focused query and execution plan review via Supabase MCP on staging DB: confirmed index-only scan on `user_device_access_active_user_device_unique` for Admin assignment filtering, index scans on `devices_pkey` and `device_capabilities_device_id_capability_key`, zero N+1 queries, zero database performance regression, and zero index/schema alterations required. Preserved immutable database UUID `devices.id` and all relational foreign key histories. Verified 100% test pass rate across targeted test suites (24/24 route tests, 34/34 database/contracts/device tests, 58/58 combined), Semgrep scan (0 findings), and TypeScript typecheck (0 errors). Confirmed no device creation path reintroduced (`POST /api/v1/devices` remains removed per `DEC-DEV-027`), TASK-0306 last-accessed persistence behavior remains outside scope, and physical ESP32/EMQX rename reconciliation remains `TBD / BLOCKING`.
 
+#### TASK-0306 Governance Record
+
+`TASK-0306` device selector state reconciliation record:
+- Status: `DONE` (Reconciled 2026-08-18)
+- Frontend impact: `MINOR`
+- Selected UI direction: `Premium Minimal Ops`
+- Existing color template: `UNCHANGED`
+- Selected motion effects: `Dropdown`, `Modal`
+- 21st.dev MCP: `NOT REQUIRED`
+- Summary: Reconciled device selector and context state per `DEC-DEV-028` and `DEC-DEV-029`. Enforced neutral initial state (`selectedDevice = null`) on fresh login and bare routes (`/`, `/sensor`, `/soil` without `?deviceId=`), eliminating all automatic first-device fallbacks. Removed persistent restoration from `localStorage`, `sessionStorage`, cookies, and profile preferences (`DEC-DEV-029`). Restricted device selection strictly to explicit user action in the `/sensor` device cards or header `DeviceSelector`. Preserved active in-memory selection during client navigation and synchronized selection with route URL (`?deviceId=...`). Supported route-scoped rehydration on hard refresh (Ctrl+Shift+R) after validating against the fresh `GET /api/v1/devices` server-authorized list. Handled loading skeleton states vs true empty lists on `/sensor`. Cleared selection to `null` with a notice banner if access to the selected device is revoked, unassigned, or invalid without silent fallback. Preserved canonical `deviceId` monospace rendering for Owner users and strict concealment for Admin users (`DEC-DEV-028`). Verified 100% test pass rate across 31 test suites (239/239 tests), TypeScript typecheck (0 errors), and Semgrep scan (0 findings).
+
 #### TASK-1004 Governance & Infrastructure Record
 
 `TASK-1004` staging infrastructure and verification record:
@@ -1680,3 +1691,16 @@ Report the affected task and requirement.
 Do not invent the answer.
 ```
 
+
+---
+
+## TASK-0306 Implementation Note
+
+The following facts are supported by the current implementation regarding device selection and routing:
+- **Frontend Selection/Context/URL:** Uses immutable `devices.id` UUID.
+- **Bare Routes:** Remain neutral with no auto-selection (`/`, `/sensor`, `/soil`, `/water`).
+- **Rehydration:** Valid `?deviceId=<UUID>` rehydrates after authorization on hard refresh.
+- **Invalid/Revoked IDs:** Clear selection safely to `null` with a notice banner.
+- **Admin Privacy:** Admin canonical `deviceId` concealment remains enforced.
+- **Legacy Routes:** `/air` and `/tanah` are explicitly maintained as legacy 404 routes.
+- **Race Condition:** `/sensor` first-load "No Device Found" race was fixed by correcting the loading state (handling skeleton vs. true empty authorized list).

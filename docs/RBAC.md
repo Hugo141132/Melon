@@ -1145,3 +1145,16 @@ Key RBAC & Security Rules for Provisioning:
 3. **PostgreSQL Advisory Lock:** Uses a stable 64-bit BigInt transaction-scoped advisory lock (`84736291106`) to guarantee serialised single execution across concurrent processes.
 4. **Canonical Role Prerequisite:** Pre-checks canonical `OWNER` role existence in DB (`npm run db:seed` required prior to provisioning).
 5. **Initial State:** The provisioned Owner is created in `ACTIVE` account status with exactly 1 `OWNER` assignment, 0 `ADMIN` assignments, 0 `AccountApproval` records, and 1 system `AuditLog` record (`ACCOUNT_PROVISION_OWNER`).
+
+---
+
+## TASK-0306 Implementation Note
+
+The following facts are supported by the current implementation regarding device selection and routing:
+- **Frontend Selection/Context/URL:** Uses immutable `devices.id` UUID.
+- **Bare Routes:** Remain neutral with no auto-selection (`/`, `/sensor`, `/soil`, `/water`).
+- **Rehydration:** Valid `?deviceId=<UUID>` rehydrates after authorization on hard refresh.
+- **Invalid/Revoked IDs:** Clear selection safely to `null` with a notice banner.
+- **Admin Privacy:** Admin canonical `deviceId` concealment remains enforced.
+- **Legacy Routes:** `/air` and `/tanah` are explicitly maintained as legacy 404 routes.
+- **Race Condition:** `/sensor` first-load "No Device Found" race was fixed by correcting the loading state (handling skeleton vs. true empty authorized list).

@@ -130,7 +130,7 @@ describe('TASK-0502 — Real-Time Monitoring Dashboard Integration Tests', () =>
     global.fetch = vi.fn().mockReturnValue(new Promise(() => {})); // pending fetch
 
     render(
-      <DeviceProvider initialDevices={[mockSoilDevice]}>
+      <DeviceProvider initialDevices={[mockSoilDevice]} initialSelectedDeviceId="soil-node-001">
         <MonitoringDashboard />
       </DeviceProvider>
     );
@@ -151,7 +151,7 @@ describe('TASK-0502 — Real-Time Monitoring Dashboard Integration Tests', () =>
     });
 
     render(
-      <DeviceProvider initialDevices={[mockSoilDevice]}>
+      <DeviceProvider initialDevices={[mockSoilDevice]} initialSelectedDeviceId="soil-node-001">
         <MonitoringDashboard />
       </DeviceProvider>
     );
@@ -183,7 +183,10 @@ describe('TASK-0502 — Real-Time Monitoring Dashboard Integration Tests', () =>
     });
 
     render(
-      <DeviceProvider initialDevices={[mockWaterQualityDevice]}>
+      <DeviceProvider
+        initialDevices={[mockWaterQualityDevice]}
+        initialSelectedDeviceId="water-node-002"
+      >
         <MonitoringDashboard />
       </DeviceProvider>
     );
@@ -210,7 +213,10 @@ describe('TASK-0502 — Real-Time Monitoring Dashboard Integration Tests', () =>
     });
 
     render(
-      <DeviceProvider initialDevices={[mockWaterTankDevice]}>
+      <DeviceProvider
+        initialDevices={[mockWaterTankDevice]}
+        initialSelectedDeviceId="water-tank-003"
+      >
         <MonitoringDashboard />
       </DeviceProvider>
     );
@@ -257,7 +263,7 @@ describe('TASK-0502 — Real-Time Monitoring Dashboard Integration Tests', () =>
     });
 
     render(
-      <DeviceProvider initialDevices={[offlineDevice]}>
+      <DeviceProvider initialDevices={[offlineDevice]} initialSelectedDeviceId="soil-node-001">
         <MonitoringDashboard />
       </DeviceProvider>
     );
@@ -292,7 +298,7 @@ describe('TASK-0502 — Real-Time Monitoring Dashboard Integration Tests', () =>
     });
 
     render(
-      <DeviceProvider initialDevices={[mockSoilDevice]}>
+      <DeviceProvider initialDevices={[mockSoilDevice]} initialSelectedDeviceId="soil-node-001">
         <MonitoringDashboard />
       </DeviceProvider>
     );
@@ -324,7 +330,7 @@ describe('TASK-0502 — Real-Time Monitoring Dashboard Integration Tests', () =>
     });
 
     render(
-      <DeviceProvider initialDevices={[mockSoilDevice]}>
+      <DeviceProvider initialDevices={[mockSoilDevice]} initialSelectedDeviceId="soil-node-001">
         <MonitoringDashboard />
       </DeviceProvider>
     );

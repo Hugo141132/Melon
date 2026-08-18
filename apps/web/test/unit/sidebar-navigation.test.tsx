@@ -111,25 +111,24 @@ describe('DeviceSelector Auto-Restoration & Display Name Regression Tests', () =
     window.history.replaceState({}, '', 'http://localhost:3000/');
   });
 
-  it('automatically displays currently selected device name from sessionStorage / DeviceContext on page load/refresh', () => {
-    // Save selected device in sessionStorage
-    sessionStorage.setItem('kebun_melon_selected_device_id', 'water-node-01');
+  it('rehydrates candidate device from ?deviceId= on route refresh when authorised, and remains neutral without param', () => {
+    // 1. With valid authorised device in route URL, rehydrates selected device
+    window.history.replaceState({}, '', 'http://localhost:3000/water?deviceId=water-node-01');
 
-    render(
+    const { unmount } = render(
       <DeviceProvider initialDevices={mockDevices}>
         <DeviceSelector />
       </DeviceProvider>
     );
 
-    // Verify selector displays the restored device name automatically and is not blank
+    // Verify selector rehydrates the route candidate
     const selectorTrigger = screen.getByTestId('device-selector-trigger');
     expect(selectorTrigger).toBeInTheDocument();
     expect(selectorTrigger).toHaveTextContent('Kualitas Air Kolam A');
-    expect(selectorTrigger).not.toHaveTextContent('Pilih Perangkat');
-  });
 
-  it('automatically displays route-preferred device type if no previous selection is saved', () => {
-    mockPathname = '/water';
+    unmount();
+
+    // 2. Fresh load without query params remains neutral (Pilih Perangkat)
     window.history.replaceState({}, '', 'http://localhost:3000/water');
 
     render(
@@ -138,14 +137,13 @@ describe('DeviceSelector Auto-Restoration & Display Name Regression Tests', () =
       </DeviceProvider>
     );
 
-    // On /water route without prior stored selection, WATER_QUALITY_NODE is restored automatically
-    const selectorTrigger = screen.getByTestId('device-selector-trigger');
-    expect(selectorTrigger).toHaveTextContent('Kualitas Air Kolam A');
+    const neutralTrigger = screen.getByTestId('device-selector-trigger');
+    expect(neutralTrigger).toHaveTextContent('Pilih Perangkat');
   });
 });
 
 describe('TopAppBar Route-based DeviceSelector Visibility & Centering', () => {
-  it('shows DeviceSelector on /soil, /water, and /controls (including /tanah and /air aliases)', () => {
+  it('shows DeviceSelector strictly on canonical /soil, /water, and /controls (and hides on legacy /tanah and /air)', () => {
     mockPathname = '/soil';
     const { rerender } = render(
       <DeviceProvider initialDevices={mockDevices}>

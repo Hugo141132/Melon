@@ -42,13 +42,28 @@ export async function GET(request: Request, props: { params: Promise<{ deviceId:
 
     await requireDeviceViewAccess(session, targetDeviceId, {
       isDeviceAssignedToUser: async (userId, devId) => {
+        const cleanDevId = devId.trim();
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          cleanDevId
+        );
         const assignment = await prisma.userDeviceAccess.findFirst({
           where: {
             userId,
             revokedAt: null,
-            device: {
-              OR: [{ id: devId }, { deviceId: devId }],
-            },
+            device: isUuid
+              ? {
+                  OR: [
+                    { id: cleanDevId },
+                    { deviceId: cleanDevId },
+                    { deviceId: { equals: cleanDevId, mode: 'insensitive' } },
+                  ],
+                }
+              : {
+                  OR: [
+                    { deviceId: cleanDevId },
+                    { deviceId: { equals: cleanDevId, mode: 'insensitive' } },
+                  ],
+                },
           },
         });
         return !!assignment;

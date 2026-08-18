@@ -1820,3 +1820,16 @@ This specification is satisfied when:
 ## 45. Authentication Scope & Device Protocol Independence
 
 `TASK-0214` (Mandatory Registration Email Verification & Approvals Integrity) operates exclusively within the user authentication, registration, Resend email dispatch, and Owner approval domains. `TASK-0214` does not modify ESP32, NodeMCU, REST telemetry ingestion, MQTT 5.0 over TLS, broker topic ACLs, or device-gateway communication contracts.
+
+---
+
+## TASK-0306 Implementation Note
+
+The following facts are supported by the current implementation regarding device selection and routing:
+- **Frontend Selection/Context/URL:** Uses immutable `devices.id` UUID.
+- **Bare Routes:** Remain neutral with no auto-selection (`/`, `/sensor`, `/soil`, `/water`).
+- **Rehydration:** Valid `?deviceId=<UUID>` rehydrates after authorization on hard refresh.
+- **Invalid/Revoked IDs:** Clear selection safely to `null` with a notice banner.
+- **Admin Privacy:** Admin canonical `deviceId` concealment remains enforced.
+- **Legacy Routes:** `/air` and `/tanah` are explicitly maintained as legacy 404 routes.
+- **Race Condition:** `/sensor` first-load "No Device Found" race was fixed by correcting the loading state (handling skeleton vs. true empty authorized list).

@@ -32,7 +32,10 @@ describe('WaterTankMonitoringCard Component Tests', () => {
     );
 
     render(
-      <DeviceProvider initialDevices={[mockWaterTankDevice]}>
+      <DeviceProvider
+        initialDevices={[mockWaterTankDevice]}
+        initialSelectedDeviceId="water-tank-001"
+      >
         <WaterTankMonitoringCard />
       </DeviceProvider>
     );
@@ -60,7 +63,10 @@ describe('WaterTankMonitoringCard Component Tests', () => {
     } as Response);
 
     render(
-      <DeviceProvider initialDevices={[mockWaterTankDevice]}>
+      <DeviceProvider
+        initialDevices={[mockWaterTankDevice]}
+        initialSelectedDeviceId="water-tank-001"
+      >
         <WaterTankMonitoringCard />
       </DeviceProvider>
     );
@@ -93,7 +99,10 @@ describe('WaterTankMonitoringCard Component Tests', () => {
     } as Response);
 
     render(
-      <DeviceProvider initialDevices={[mockWaterTankDevice]}>
+      <DeviceProvider
+        initialDevices={[mockWaterTankDevice]}
+        initialSelectedDeviceId="water-tank-001"
+      >
         <WaterTankMonitoringCard />
       </DeviceProvider>
     );
@@ -114,7 +123,10 @@ describe('WaterTankMonitoringCard Component Tests', () => {
     } as Response);
 
     render(
-      <DeviceProvider initialDevices={[mockWaterTankDevice]}>
+      <DeviceProvider
+        initialDevices={[mockWaterTankDevice]}
+        initialSelectedDeviceId="water-tank-001"
+      >
         <WaterTankMonitoringCard />
       </DeviceProvider>
     );
@@ -150,7 +162,7 @@ describe('WaterTankMonitoringCard Component Tests', () => {
     } as Response);
 
     render(
-      <DeviceProvider initialDevices={[staleDevice]}>
+      <DeviceProvider initialDevices={[staleDevice]} initialSelectedDeviceId="water-tank-001">
         <WaterTankMonitoringCard />
       </DeviceProvider>
     );

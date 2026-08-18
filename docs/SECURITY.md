@@ -1535,3 +1535,16 @@ Frontend presentation translation (`TASK-0603`) operates strictly in the present
 1. **Canonical Authorisation:** All RBAC checks, session validations, permission guards, and account statuses remain strictly canonical and untranslated.
 2. **Audit & Log Integrity:** All audit log keys (`eventKey`), error codes, and server logs retain canonical, language-neutral identifiers.
 3. **No Injection via Dictionaries:** Translation strings are loaded from static, server-validated JSON dictionaries with typed keys, preventing injection into runtime security contexts.
+
+---
+
+## TASK-0306 Implementation Note
+
+The following facts are supported by the current implementation regarding device selection and routing:
+- **Frontend Selection/Context/URL:** Uses immutable `devices.id` UUID.
+- **Bare Routes:** Remain neutral with no auto-selection (`/`, `/sensor`, `/soil`, `/water`).
+- **Rehydration:** Valid `?deviceId=<UUID>` rehydrates after authorization on hard refresh.
+- **Invalid/Revoked IDs:** Clear selection safely to `null` with a notice banner.
+- **Admin Privacy:** Admin canonical `deviceId` concealment remains enforced.
+- **Legacy Routes:** `/air` and `/tanah` are explicitly maintained as legacy 404 routes.
+- **Race Condition:** `/sensor` first-load "No Device Found" race was fixed by correcting the loading state (handling skeleton vs. true empty authorized list).

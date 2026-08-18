@@ -341,3 +341,16 @@ The following reconciliation reflects the state of frontend integration against 
 | Dashboard (`/`) Telemetry | IoT/Telemetry API not implemented yet | **Category C: Deferred** | Telemetry endpoints are deferred to subsequent IoT tasks (TASK-0400+). Dashboard telemetry UI remains static until backend endpoints exist. |
 | `/soil` & `/water` Detail Pages | Telemetry APIs (`TASK-0501`–`TASK-0504`) integrated | **Category A: Integrated** | Canonical routes `/soil` and `/water` render live telemetry (`TASK-0501`/`TASK-0502`), historical telemetry query endpoints (`TASK-0503`), and historical chart components (`TASK-0504`). Legacy `/tanah` and `/air` routes return 404 Not Found. |
 | `/devices` & Device Selection | `GET /api/v1/devices`, `GET /api/v1/devices/{deviceId}`, `PATCH /api/v1/devices/{deviceId}` (`TASK-0302`/`TASK-0305`) | **Category A: Integrated** | Authorised devices sourced exclusively from `GET /api/v1/devices`. Owner receives global device visibility with canonical `deviceId` string badges and edit modal (`PATCH`). Admin visibility is strictly scoped to active assignments (`revokedAt === null`) with canonical `deviceId` strictly concealed across UI cards and selector dropdown. "Add Device" modal and `POST /api/v1/devices` are completely removed (`DEC-DEV-027`). |
+
+---
+
+## TASK-0306 Implementation Note
+
+The following facts are supported by the current implementation regarding device selection and routing:
+- **Frontend Selection/Context/URL:** Uses immutable `devices.id` UUID.
+- **Bare Routes:** Remain neutral with no auto-selection (`/`, `/sensor`, `/soil`, `/water`).
+- **Rehydration:** Valid `?deviceId=<UUID>` rehydrates after authorization on hard refresh.
+- **Invalid/Revoked IDs:** Clear selection safely to `null` with a notice banner.
+- **Admin Privacy:** Admin canonical `deviceId` concealment remains enforced.
+- **Legacy Routes:** `/air` and `/tanah` are explicitly maintained as legacy 404 routes.
+- **Race Condition:** `/sensor` first-load "No Device Found" race was fixed by correcting the loading state (handling skeleton vs. true empty authorized list).

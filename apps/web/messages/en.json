@@ -253,6 +253,7 @@
     "sensorControlsTitle": "Water Tank & Faucet",
     "sensorControlsDesc": "Tank Volume (L), Flow Rate (m³/h), Faucet Presets.",
     "totalDevicesCount": "Total Devices: {count}",
+    "devicesListTitle": "Device List",
     "accessRedirectedTitle": "Device Access Redirected",
     "accessRedirectedDesc": "Device {deviceId} is no longer permitted. Selection shifted to active device.",
     "paginationDevices": "Page {page} of {totalPages} ({total} devices)"

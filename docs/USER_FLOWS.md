@@ -977,9 +977,9 @@ flowchart TD
 1. The server validates session and active account status (`requireActiveAccount`).
 2. The server loads devices within the user's scope: Owner receives global scope with canonical `deviceId` in safe DTO; Admin receives only active assignments (`revokedAt IS NULL`) with canonical `deviceId` strictly concealed (`DEC-DEV-028` / `TASK-0305`).
 3. The frontend loads dashboard shell and available devices.
-4. The system selects a default device (first authorized device in list on fresh load per `DEC-DEV-029`).
-5. The system loads current monitoring data for the selected device.
-6. The dashboard displays soil, water, tank, flow, status, and timestamp components.
+4. The frontend initializes in a neutral device state (`selectedDevice = null` per `DEC-DEV-029`) on fresh bare routes (`/`, `/sensor`, `/soil` without `?deviceId=`). No device is selected automatically on fresh load or login.
+5. When the user explicitly selects a device (via the `/sensor` device cards or the header `DeviceSelector`), the system sets shared `DeviceContext` and synchronizes the active route URL (`?deviceId=...`). Hard refresh (Ctrl+Shift+R) on a specific device route rehydrates that candidate after server-side authorization validation.
+6. The dashboard displays soil, water, tank, flow, status, and timestamp components for the explicitly selected device.
 
 **Alternative flows:** No assigned devices; show dedicated empty state.
 **Error flows:** Unauthenticated request returns HTTP 401 `UNAUTHENTICATED`; non-active account returns HTTP 403 `ACCOUNT_NOT_ACTIVE`.
@@ -988,7 +988,7 @@ flowchart TD
 **Relevant account statuses:** `ACTIVE`.
 **UI states:** Loading, dashboard, no devices, error.
 **Audit events:** Normally none.
-**Open decisions:** None. Default selection resolves fresh on initial load (`DEC-DEV-029`).
+**Open decisions:** None. Neutral initial selection (`selectedDevice = null`) on bare routes with route-scoped rehydration on specific device routes (`DEC-DEV-029`).
 
 ---
 
@@ -1913,3 +1913,16 @@ Each audit event shall include relevant actor, target, timestamp, result, and sa
 8. The system must display command progress, but the hardware contract may not provide numeric progress.
 9. ~~Alert workflows exist, but Admin acknowledgement permission and alert thresholds are unresolved.~~ **PARTIALLY RESOLVED** — Admin alert acknowledgement is permitted for assigned devices (`alert.acknowledge`) per `RBAC.md`; alert thresholds remain TBD.
 10. The existing frontend must be checked against every shared UI state listed in this document.
+
+---
+
+## TASK-0306 Implementation Note
+
+The following facts are supported by the current implementation regarding device selection and routing:
+- **Frontend Selection/Context/URL:** Uses immutable `devices.id` UUID.
+- **Bare Routes:** Remain neutral with no auto-selection (`/`, `/sensor`, `/soil`, `/water`).
+- **Rehydration:** Valid `?deviceId=<UUID>` rehydrates after authorization on hard refresh.
+- **Invalid/Revoked IDs:** Clear selection safely to `null` with a notice banner.
+- **Admin Privacy:** Admin canonical `deviceId` concealment remains enforced.
+- **Legacy Routes:** `/air` and `/tanah` are explicitly maintained as legacy 404 routes.
+- **Race Condition:** `/sensor` first-load "No Device Found" race was fixed by correcting the loading state (handling skeleton vs. true empty authorized list).

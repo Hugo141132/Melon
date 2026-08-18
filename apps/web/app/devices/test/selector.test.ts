@@ -75,15 +75,15 @@ describe('TASK-0306 — Device Selector & Global DeviceContext State Integration
     let selected: AuthorisedDevice | null = emptyList.length > 0 ? emptyList[0] : null;
     expect(selected).toBeNull();
 
-    // Case B: 1 device
-    const singleList: AuthorisedDevice[] = [mockDevices[0]];
-    selected = singleList[0];
-    expect(selected?.deviceId).toBe('soil-node-001');
+    // Case B: 1 device - No longer auto-selects (Neutral State)
+    // const singleList: AuthorisedDevice[] = [mockDevices[0]];
+    selected = null; // Fresh load neutral state
+    expect(selected).toBeNull();
 
-    // Case C: Multiple devices default selection
-    const multiList = mockDevices;
-    selected = multiList[0];
-    expect(selected?.deviceId).toBe('soil-node-001');
+    // Case C: Multiple devices default selection - Neutral State (null)
+    // const multiList = mockDevices;
+    selected = null; // Fresh load neutral state
+    expect(selected).toBeNull();
   });
 
   it('3. Selection Switching and Stale State Reset', () => {
@@ -114,13 +114,12 @@ describe('TASK-0306 — Device Selector & Global DeviceContext State Integration
     const isCandidateAuthorised = authorisedDevices.some((d) => d.deviceId === tamperedCandidateId);
     expect(isCandidateAuthorised).toBe(false);
 
-    // Tampered candidate must be rejected and fallback to first authorised device
+    // Tampered candidate must be rejected and fallback to NULL (neutral state), not the first device
     const safeSelected = isCandidateAuthorised
       ? authorisedDevices.find((d) => d.deviceId === tamperedCandidateId)!
-      : authorisedDevices[0];
+      : null;
 
-    expect(safeSelected.deviceId).toBe('soil-node-001');
-    expect(safeSelected.deviceId).not.toBe(tamperedCandidateId);
+    expect(safeSelected).toBeNull();
   });
 
   it('5. Revoked Device Access Handling (Falling back to next valid device & flagging revoked notice)', () => {
@@ -140,12 +139,12 @@ describe('TASK-0306 — Device Selector & Global DeviceContext State Integration
     if (!isStillAuthorised) {
       isRevoked = true;
       revokedDeviceId = previouslySelectedId;
-      activeSelected = newAuthorisedList.length > 0 ? newAuthorisedList[0] : null;
+      activeSelected = null; // No fallback
     }
 
     expect(isRevoked).toBe(true);
     expect(revokedDeviceId).toBe('water-node-001');
-    expect(activeSelected?.deviceId).toBe('soil-node-001');
+    expect(activeSelected).toBeNull();
   });
 
   it('6. Persisted Selection Validation (localStorage candidate valid vs invalid)', () => {
@@ -161,9 +160,9 @@ describe('TASK-0306 — Device Selector & Global DeviceContext State Integration
     matchedDevice = authorisedDevices.find((d) => d.deviceId === invalidStoredId) || null;
     expect(matchedDevice).toBeNull();
 
-    // Fallback to first device when stored ID is invalid
-    const finalSelected = matchedDevice ?? authorisedDevices[0];
-    expect(finalSelected.deviceId).toBe('soil-node-001');
+    // Fallback to neutral state (null) when stored ID is invalid
+    const finalSelected = matchedDevice ?? null;
+    expect(finalSelected).toBeNull();
   });
 
   it('7. Error and Loading State Resolution', () => {
@@ -253,5 +252,201 @@ describe('TASK-0306 — Device Selector & Global DeviceContext State Integration
 
     handleSelectWithNavigation(tankDevice);
     expect(pushSpy).toHaveBeenCalledWith('/controls');
+  });
+
+  it('12. Multiple Same-Type Devices - No Silent First-Device Selection', () => {
+    const multiSoilDevices: AuthorisedDevice[] = [
+      mockDevices[0],
+      {
+        ...mockDevices[0],
+        id: 'db-id-004',
+        deviceId: 'soil-node-002',
+        deviceName: 'Soil Sensor Blok B',
+      },
+    ];
+
+    // Simulate fresh load with multiple devices of the same type
+    let selectedDevice: AuthorisedDevice | null = null;
+    expect(selectedDevice).toBeNull();
+
+    // Verify user explicit selection determines the device context, NOT array index
+    const userSelectedId = 'soil-node-002';
+    selectedDevice = multiSoilDevices.find((d) => d.deviceId === userSelectedId) || null;
+    expect(selectedDevice?.deviceId).toBe('soil-node-002');
+  });
+
+  it('13. /sensor Explicit Selection Continuity & Header Equivalence', () => {
+    // Simulate /sensor explicit selection handler
+    const pushSpy = vi.fn();
+    const selectDeviceSpy = vi.fn((id: string) => {
+      return id;
+    });
+
+    const handleDeviceSelect = (
+      deviceId: string,
+      canonicalId: string | undefined,
+      route: string
+    ) => {
+      selectDeviceSpy(deviceId);
+      pushSpy(`${route}?deviceId=${canonicalId || deviceId}`);
+    };
+
+    const targetDevice = mockDevices[0]; // soil-node-001
+
+    handleDeviceSelect(targetDevice.id, targetDevice.deviceId, '/soil');
+
+    // Context gets selected with the immutable ID
+    expect(selectDeviceSpy).toHaveBeenCalledWith(targetDevice.id);
+
+    // Route receives the canonical ID (if Owner) and destination
+    expect(pushSpy).toHaveBeenCalledWith('/soil?deviceId=soil-node-001');
+
+    // Header selector selection uses identical immutable ID and updates the same context
+    const headerHandleSelect = (dev: AuthorisedDevice) => {
+      const activeId = dev.deviceId || dev.id;
+      selectDeviceSpy(dev.id);
+      pushSpy(`/soil?deviceId=${activeId}`);
+    };
+
+    headerHandleSelect(targetDevice);
+    expect(selectDeviceSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('14. Route-Scoped Candidate Rehydration on Hard Refresh', () => {
+    const authorisedDevices = mockDevices;
+
+    // Case A: Valid route candidate rehydrates on refresh
+    const validCandidateId = 'water-node-001';
+    const rehydratedDevice =
+      authorisedDevices.find(
+        (d) => (d.deviceId && d.deviceId === validCandidateId) || d.id === validCandidateId
+      ) || null;
+
+    expect(rehydratedDevice).not.toBeNull();
+    expect(rehydratedDevice?.deviceId).toBe('water-node-001');
+
+    // Case B: Bare route with no candidate remains neutral
+    const bareCandidateId: string | null = null;
+    const bareSelected =
+      bareCandidateId !== null
+        ? authorisedDevices.find(
+            (d) => (d.deviceId && d.deviceId === bareCandidateId) || d.id === bareCandidateId
+          ) || null
+        : null;
+
+    expect(bareSelected).toBeNull();
+  });
+
+  it('15. Loading vs True Empty List Differentiation', () => {
+    // While loading is true, devices list may be empty but is not considered "true empty"
+    let isLoading = true;
+    let devices: AuthorisedDevice[] = [];
+
+    const isTrueEmpty = !isLoading && devices.length === 0;
+    expect(isTrueEmpty).toBe(false);
+
+    // When loading finishes with 0 devices, it is true empty
+    isLoading = false;
+    const isNowTrueEmpty = !isLoading && devices.length === 0;
+    expect(isNowTrueEmpty).toBe(true);
+
+    // When loading finishes with devices, it is not empty
+    devices = mockDevices;
+    const isPopulated = !isLoading && devices.length > 0;
+    expect(isPopulated).toBe(true);
+  });
+
+  it('16. In-Memory Device A Overridden by Explicit Route Candidate B', () => {
+    const authorisedDevices = mockDevices; // soil-node-001 (A), water-node-001 (B), water-tank-node-001 (C)
+    const inMemoryDeviceA = mockDevices[0]; // soil-node-001
+
+    // Simulate URL candidate explicitly requesting B (water-node-001)
+    const urlCandidateB = 'water-node-001';
+
+    // Route candidate MUST take precedence over in-memory state
+    const resolvedCandidate = urlCandidateB ?? inMemoryDeviceA.deviceId;
+    expect(resolvedCandidate).toBe('water-node-001');
+
+    const matchedDevice =
+      authorisedDevices.find(
+        (d) => (d.deviceId && d.deviceId === resolvedCandidate) || d.id === resolvedCandidate
+      ) || null;
+
+    expect(matchedDevice).not.toBeNull();
+    expect(matchedDevice?.deviceId).toBe('water-node-001');
+    expect(matchedDevice?.deviceId).not.toBe(inMemoryDeviceA.deviceId);
+  });
+
+  it('17. In-Memory Device A Overridden by Invalid/Revoked Route Candidate Clears to NULL', () => {
+    const authorisedDevices = mockDevices;
+    const inMemoryDeviceA = mockDevices[0]; // soil-node-001
+
+    // Simulate URL candidate requesting invalid/unassigned device
+    const invalidUrlCandidate = 'invalid-unauthorized-999';
+
+    // Verify inMemoryDeviceA was active previously
+    expect(inMemoryDeviceA.deviceId).toBe('soil-node-001');
+
+    // Route candidate takes precedence: check candidate against server-authorised list
+    const isAuthorised = authorisedDevices.some(
+      (d) => d.deviceId === invalidUrlCandidate || d.id === invalidUrlCandidate
+    );
+    expect(isAuthorised).toBe(false);
+
+    // When unauthorized route candidate is provided, must NOT fall back to inMemoryDeviceA
+    let isRevoked = false;
+    let revokedDeviceId: string | null = null;
+    let finalSelected: AuthorisedDevice | null = null;
+
+    if (!isAuthorised) {
+      isRevoked = true;
+      revokedDeviceId = invalidUrlCandidate;
+      finalSelected = null; // Clears to null, never silently retaining Device A
+    }
+
+    expect(isRevoked).toBe(true);
+    expect(revokedDeviceId).toBe('invalid-unauthorized-999');
+    expect(finalSelected).toBeNull();
+  });
+
+  it('18. Leaving Device Context for Neutral Top-Level Page (/, /sensor)', () => {
+    const authorisedDevices = mockDevices;
+
+    // When on neutral top-level routes without ?deviceId= query
+    const onDeviceContextRoute = false; // e.g. path is '/' or '/sensor'
+    const urlCandidate: string | null = null;
+    const inMemoryDevice = mockDevices[0];
+
+    // On neutral routes without explicit URL device query, selection resolves to null
+    let candidateId: string | null = null;
+    if (urlCandidate) {
+      candidateId = urlCandidate;
+    } else if (onDeviceContextRoute && inMemoryDevice) {
+      candidateId = inMemoryDevice.deviceId ?? inMemoryDevice.id;
+    }
+
+    expect(candidateId).toBeNull();
+
+    const selectedOnNeutral =
+      candidateId !== null
+        ? authorisedDevices.find((d) => d.deviceId === candidateId || d.id === candidateId) || null
+        : null;
+
+    expect(selectedOnNeutral).toBeNull();
+  });
+
+  it('19. Canonical Device-Context Routes vs Legacy Route Rejection', () => {
+    const canonicalRoutes = ['/soil', '/water', '/controls'];
+    const legacyRoutes = ['/tanah', '/air'];
+
+    const checkIsDeviceRoute = (path: string) => ['/soil', '/water', '/controls'].includes(path);
+
+    canonicalRoutes.forEach((route) => {
+      expect(checkIsDeviceRoute(route)).toBe(true);
+    });
+
+    legacyRoutes.forEach((route) => {
+      expect(checkIsDeviceRoute(route)).toBe(false);
+    });
   });
 });

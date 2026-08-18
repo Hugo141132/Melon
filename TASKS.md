@@ -1055,7 +1055,10 @@ PATCH /api/v1/devices/{deviceId}
 **Completed:** 2026-07-31 — Implemented DeviceContext provider and DeviceSelector component in apps/web. Sourced authorised devices exclusively from GET /api/v1/devices, adhering strictly to OWNER global scope and ADMIN assigned device scope. Handled 6 core UI states: Loading (skeleton), 0 devices (empty state, metrics/controls disabled), 1 device (active badge), multiple devices (>1 dropdown with search and status filters), revoked access (notice banner and safe fallback), and API error. Implemented URL (?deviceId=...) and localStorage candidate validation against the server-authorised list to prevent client-side tampering. Integrated selector into TopAppBar and RootLayout. Added comprehensive unit and integration test coverage (apps/web/app/devices/test/selector.test.ts).
 **Reconciliation Note (2026-08-18):** Reconciled component per `DEC-DEV-028` and `DEC-DEV-029`:
 - Canonical `deviceId` in selector UI is displayed only for Owner users; Admin users see only user-facing device `name` or localized default label (`DEC-DEV-028`).
-- Persistent restoration of previously/last-accessed device history across logins/persistent storage is REMOVED (`DEC-DEV-029`). Selection resolves fresh on load/session.
+- Persistent restoration of previously/last-accessed device history across logins/persistent storage is REMOVED (`DEC-DEV-029`). Selection resolves into a neutral state (`selectedDevice = null`) on fresh bare routes (`/`, `/sensor`, `/soil` without `?deviceId=`).
+- Device selection occurs strictly through explicit user interaction in `/sensor` or the header `DeviceSelector`, synchronizing to active route URL (`?deviceId=...`). Hard refresh (Ctrl+Shift+R) on a specific device route rehydrates that candidate after server-side validation against the fresh `GET /api/v1/devices` authorized list.
+- If currently selected device access is revoked/unassigned, selection clears to `null` with a notice banner, without silent fallback.
+- Handled loading skeleton states vs true empty lists on `/sensor`.
 - Historical telemetry charts (`TASK-0503`/`TASK-0504`), faucet commands, assignments, status events, and audit logs remain 100% intact (`DEC-DEV-029`).
 
 ### Work
@@ -1063,6 +1066,7 @@ PATCH /api/v1/devices/{deviceId}
 Frontend states:
 
 - Loading.
+- Neutral initial state (no device selected).
 - One device.
 - Multiple devices.
 - No assigned devices.
@@ -1075,7 +1079,7 @@ Frontend states:
 - Canonical `deviceId` is hidden from Admins in selector UI (`DEC-DEV-028`).
 - Switching devices clears misleading prior values.
 - Unauthorised devices cannot be selected through URL manipulation.
-- Default selection resolves fresh without persistent last-accessed history restoration (`DEC-DEV-029`).
+- Default selection resolves into a neutral state (`selectedDevice = null`) without auto-selection on fresh load/session (`DEC-DEV-029`).
 - All telemetry, command, assignment, status, and audit history remain intact (`DEC-DEV-029`).
 
 ---
@@ -2697,3 +2701,16 @@ The first production release is blocked until:
 12. **New (reconciliation):** TASKS.md Sections 25 and 26 had stale entries listing resolved decisions as still open. Updated above.
 13. **New (reconciliation):** Previous DECISIONS.md Table 4 used incorrect task titles and IDs not matching TASKS.md. Corrected in DECISIONS.md revision.
 14. **New (reconciliation):** Previous DECISIONS.md Table 4 marked TASK-0102 and TASK-0103 as READY despite depending on an unstarted TASK-0101. Corrected to BACKLOG.
+
+---
+
+## TASK-0306 Implementation Note
+
+The following facts are supported by the current implementation regarding device selection and routing:
+- **Frontend Selection/Context/URL:** Uses immutable `devices.id` UUID.
+- **Bare Routes:** Remain neutral with no auto-selection (`/`, `/sensor`, `/soil`, `/water`).
+- **Rehydration:** Valid `?deviceId=<UUID>` rehydrates after authorization on hard refresh.
+- **Invalid/Revoked IDs:** Clear selection safely to `null` with a notice banner.
+- **Admin Privacy:** Admin canonical `deviceId` concealment remains enforced.
+- **Legacy Routes:** `/air` and `/tanah` are explicitly maintained as legacy 404 routes.
+- **Race Condition:** `/sensor` first-load "No Device Found" race was fixed by correcting the loading state (handling skeleton vs. true empty authorized list).

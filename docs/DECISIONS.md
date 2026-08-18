@@ -227,13 +227,13 @@
   - Updated `apps/web/app/devices/page.tsx` displaying `deviceId` badges only to Owners, and providing Owner Edit Modal for `deviceId` and `name` updates.
   - Verified 100% test pass on route authorization, IDOR prevention, and conflict handling (`apps/web/app/api/v1/devices/test/route.test.ts` 24/24 tests, `packages/database/test/device-repository.test.ts` 10/10 tests, 58/58 combined device tests).
 
-#### DEC-DEV-029: Removal of Previously/Last-Accessed Device History and Persistent Restoration
+#### DEC-DEV-029: Removal of Previously/Last-Accessed Device History, Persistent Restoration, and Neutral Initial State
 * **Related Task IDs**: `TASK-0306`, `TASK-0504`
 * **Related Documentation**: `docs/PRD.md` §8.2, `docs/USER_FLOWS.md` §9 (Flow 23, Flow 24), `docs/UI_UX.md` §7.2, `docs/DECISIONS.md` (`DEC-MON-088`)
 * **Status**: **APPROVED BY USER (2026-08-18)**
 * **Approved Decision**:
   1. **No Stored Access History**: Persistent tracking, storage, and restoration of previously/last-accessed device history across logins, sessions, cookies, or user profile records is completely removed.
-  2. **Fresh Selection Resolution**: Device selection resolves fresh on initial load/login (defaulting to the first available authorized device, or a neutral initial state). Active navigation retains selection in-memory during the current session without persisting historical "last-accessed" state.
+  2. **Neutral Fresh Selection Resolution & Route-Scoped Rehydration**: Initial load, fresh login, and bare route visits (`/`, `/sensor`, `/soil` without `?deviceId=`) resolve into a neutral initial state (`selectedDevice = null`). The system does NOT auto-select the first device. Once a user explicitly selects a device on `/sensor` or the header `DeviceSelector`, selection is active in-memory and reflected in the active route URL (`?deviceId=...`). Hard refresh (Ctrl+Shift+R) on a specific device route rehydrates the route candidate after validating it against the fresh `GET /api/v1/devices` server-authorized list, without restoring historical 'last accessed' persistence across sessions. If access to the currently selected device is revoked or unassigned (or if an invalid candidate ID is provided), selection is cleared back to `null` and a notice is displayed without silent fallback.
   3. **Non-Selection History 100% Intact**: This removal strictly applies to the device selector and access tracking. It does NOT remove or affect:
      - Telemetry historical data and charts (`TASK-0503` / `TASK-0504`, `/soil`, `/water`);
      - Faucet command execution and event history;
@@ -428,3 +428,16 @@ The following decisions remain TBD and must be resolved before the listed tasks 
 * **Reconciliation Date**: 2026-07-27
 * **Reconciliation Author**: Documentation audit pass (TASK-0002)
 * **Status**: All confirmed decisions recorded in `docs/DECISIONS.md` are approved for implementation. Items restored to TBD do not have explicit approval records and must not be used as implementation constants until approved.
+
+---
+
+## TASK-0306 Implementation Note
+
+The following facts are supported by the current implementation regarding device selection and routing:
+- **Frontend Selection/Context/URL:** Uses immutable `devices.id` UUID.
+- **Bare Routes:** Remain neutral with no auto-selection (`/`, `/sensor`, `/soil`, `/water`).
+- **Rehydration:** Valid `?deviceId=<UUID>` rehydrates after authorization on hard refresh.
+- **Invalid/Revoked IDs:** Clear selection safely to `null` with a notice banner.
+- **Admin Privacy:** Admin canonical `deviceId` concealment remains enforced.
+- **Legacy Routes:** `/air` and `/tanah` are explicitly maintained as legacy 404 routes.
+- **Race Condition:** `/sensor` first-load "No Device Found" race was fixed by correcting the loading state (handling skeleton vs. true empty authorized list).

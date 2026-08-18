@@ -367,11 +367,11 @@ The selector and `/devices` card list shall support:
 - an empty state when no device is assigned;
 - role-appropriate presentation (`TASK-0305`): Owner users see canonical `deviceId` string badges alongside custom names; Admin users see only custom device names or localized default type labels (`Soil Sensor Node` / `Node Sensor Tanah`) with canonical `deviceId` strictly concealed.
 
-### 7.2 Device Context Persistence
+### 7.2 Device Context Persistence & Neutral Initial State
 
 The selected device is retained in-memory during active application navigation.
 
-**Removal of Previously/Last-Accessed Device History**: The application shall NOT track, persist, or restore previously/last-accessed device history across logins or persistent storage (`DEC-DEV-029`). Device selection resolves fresh on initial load/session (defaulting to the first available authorized device).
+**Removal of Previously/Last-Accessed Device History & Route-Scoped Rehydration**: The application shall NOT track, persist, or restore previously/last-accessed device history across logins or in persistent storage (e.g. `localStorage`, cookies, profile preferences) (`DEC-DEV-029`). Device selection initializes in a neutral state (`selectedDevice = null`) on bare routes (`/`, `/sensor`, `/soil` without `?deviceId=`). Selection occurs strictly upon explicit user interaction in `/sensor` or the header `DeviceSelector`, synchronizing to the active route URL (`?deviceId=...`). Hard refresh (Ctrl+Shift+R) on a specific device route rehydrates that selection after validating against the server-authorized list. If access to the currently selected device is revoked or unassigned (or if an invalid ID is in the query), selection is cleared to `null` and a notice is displayed without silent fallback.
 
 **History Protection**: This policy applies strictly to device selector persistence and does NOT affect telemetry history/charts (`TASK-0503`/`TASK-0504`), faucet-command history, device assignment/revocation history, status history, or audit logs (`DEC-DEV-029`).
 
@@ -1264,3 +1264,16 @@ This specification should be used with:
 The existing frontend is not merely a visual reference to imitate. It is an implementation asset to preserve and extend.
 
 New monitoring, multi-device, RBAC, language-switching, alert, and faucet-control functionality shall be integrated through reusable components and explicit state handling without replacing stable existing UI unnecessarily.
+
+---
+
+## TASK-0306 Implementation Note
+
+The following facts are supported by the current implementation regarding device selection and routing:
+- **Frontend Selection/Context/URL:** Uses immutable `devices.id` UUID.
+- **Bare Routes:** Remain neutral with no auto-selection (`/`, `/sensor`, `/soil`, `/water`).
+- **Rehydration:** Valid `?deviceId=<UUID>` rehydrates after authorization on hard refresh.
+- **Invalid/Revoked IDs:** Clear selection safely to `null` with a notice banner.
+- **Admin Privacy:** Admin canonical `deviceId` concealment remains enforced.
+- **Legacy Routes:** `/air` and `/tanah` are explicitly maintained as legacy 404 routes.
+- **Race Condition:** `/sensor` first-load "No Device Found" race was fixed by correcting the loading state (handling skeleton vs. true empty authorized list).

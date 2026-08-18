@@ -1,5 +1,5 @@
-import WaterPage from '../water/page';
+import { notFound } from 'next/navigation';
 
-export default function AirPage() {
-  return <WaterPage />;
+export default function LegacyAirPage() {
+  notFound();
 }

@@ -157,11 +157,9 @@ describe('DeviceSelector Localization & Persistence in id vs en', () => {
   });
 
   it('renders localized default device names in Indonesian mode (id)', () => {
-    sessionStorage.setItem('kebun_melon_selected_device_id', 'water-tank-01');
-
     render(
       <NextIntlClientProvider locale="id" messages={idMessages}>
-        <DeviceProvider initialDevices={mockDevices}>
+        <DeviceProvider initialDevices={mockDevices} initialSelectedDeviceId="water-tank-01">
           <DeviceSelector />
         </DeviceProvider>
       </NextIntlClientProvider>
@@ -172,22 +170,18 @@ describe('DeviceSelector Localization & Persistence in id vs en', () => {
 
     // Open dropdown
     fireEvent.click(trigger);
-    expect(screen.getByTestId('device-option-soil-node-01')).toHaveTextContent('Node Sensor Tanah');
-    expect(screen.getByTestId('device-option-water-quality-node-3uufzi')).toHaveTextContent(
-      'Node Kualitas Air'
-    );
-    expect(screen.getByTestId('device-option-water-tank-01')).toHaveTextContent('Node Tangki Air');
-    expect(screen.getByTestId('device-option-soil-custom-01')).toHaveTextContent(
+    expect(screen.getByTestId('device-option-db-uuid-1')).toHaveTextContent('Node Sensor Tanah');
+    expect(screen.getByTestId('device-option-db-uuid-2')).toHaveTextContent('Node Kualitas Air');
+    expect(screen.getByTestId('device-option-db-uuid-3')).toHaveTextContent('Node Tangki Air');
+    expect(screen.getByTestId('device-option-db-uuid-4')).toHaveTextContent(
       'Lahan Melon Premium Blok A'
     );
   });
 
   it('renders localized default device names in English mode (en)', () => {
-    sessionStorage.setItem('kebun_melon_selected_device_id', 'water-tank-01');
-
     render(
       <NextIntlClientProvider locale="en" messages={enMessages}>
-        <DeviceProvider initialDevices={mockDevices}>
+        <DeviceProvider initialDevices={mockDevices} initialSelectedDeviceId="water-tank-01">
           <DeviceSelector />
         </DeviceProvider>
       </NextIntlClientProvider>
@@ -198,22 +192,18 @@ describe('DeviceSelector Localization & Persistence in id vs en', () => {
 
     // Open dropdown
     fireEvent.click(trigger);
-    expect(screen.getByTestId('device-option-soil-node-01')).toHaveTextContent('Soil Sensor Node');
-    expect(screen.getByTestId('device-option-water-quality-node-3uufzi')).toHaveTextContent(
-      'Water Quality Node'
-    );
-    expect(screen.getByTestId('device-option-water-tank-01')).toHaveTextContent('Water Tank Node');
-    expect(screen.getByTestId('device-option-soil-custom-01')).toHaveTextContent(
+    expect(screen.getByTestId('device-option-db-uuid-1')).toHaveTextContent('Soil Sensor Node');
+    expect(screen.getByTestId('device-option-db-uuid-2')).toHaveTextContent('Water Quality Node');
+    expect(screen.getByTestId('device-option-db-uuid-3')).toHaveTextContent('Water Tank Node');
+    expect(screen.getByTestId('device-option-db-uuid-4')).toHaveTextContent(
       'Lahan Melon Premium Blok A'
     );
   });
 
   it('preserves selected device ID and selection after locale change', () => {
-    sessionStorage.setItem('kebun_melon_selected_device_id', 'soil-custom-01');
-
     const { rerender } = render(
       <NextIntlClientProvider locale="id" messages={idMessages}>
-        <DeviceProvider initialDevices={mockDevices}>
+        <DeviceProvider initialDevices={mockDevices} initialSelectedDeviceId="soil-custom-01">
           <DeviceSelector />
         </DeviceProvider>
       </NextIntlClientProvider>
@@ -226,7 +216,7 @@ describe('DeviceSelector Localization & Persistence in id vs en', () => {
     // Simulate switching locale to en
     rerender(
       <NextIntlClientProvider locale="en" messages={enMessages}>
-        <DeviceProvider initialDevices={mockDevices}>
+        <DeviceProvider initialDevices={mockDevices} initialSelectedDeviceId="soil-custom-01">
           <DeviceSelector />
         </DeviceProvider>
       </NextIntlClientProvider>
@@ -235,7 +225,6 @@ describe('DeviceSelector Localization & Persistence in id vs en', () => {
     expect(screen.getByTestId('device-selector-trigger')).toHaveTextContent(
       'Lahan Melon Premium Blok A'
     );
-    expect(sessionStorage.getItem('kebun_melon_selected_device_id')).toBe('soil-custom-01');
   });
 });
 
@@ -277,7 +266,7 @@ describe('DeviceSelector Mobile Centering & Viewport Bounding (360px, 390px, 430
     const singleDevice = [mockDevices[0]];
     render(
       <NextIntlClientProvider locale="en" messages={enMessages}>
-        <DeviceProvider initialDevices={singleDevice}>
+        <DeviceProvider initialDevices={singleDevice} initialSelectedDeviceId="db-uuid-1">
           <DeviceSelector />
         </DeviceProvider>
       </NextIntlClientProvider>

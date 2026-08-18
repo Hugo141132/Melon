@@ -253,6 +253,7 @@
     "sensorControlsTitle": "Tangki Air & Kran",
     "sensorControlsDesc": "Volume Tangki (L), Debit Air (m³/h), Preset Kran.",
     "totalDevicesCount": "Total Perangkat: {count}",
+    "devicesListTitle": "Daftar Perangkat",
     "accessRedirectedTitle": "Akses Perangkat Dialihkan",
     "accessRedirectedDesc": "Perangkat {deviceId} tidak lagi diizinkan. Perangkat diubah ke daftar aktif.",
     "paginationDevices": "Halaman {page} dari {totalPages} ({total} perangkat)"

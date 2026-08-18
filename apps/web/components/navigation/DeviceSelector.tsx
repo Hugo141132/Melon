@@ -84,15 +84,16 @@ export default function DeviceSelector({ className }: DeviceSelectorProps) {
 
   // Handle item selection
   const handleSelect = (device: AuthorisedDevice) => {
-    selectDevice(device.deviceId || device.id);
+    const activeId = device.id;
+    selectDevice(activeId);
     setIsOpen(false);
     setSearchQuery('');
     if (device.deviceType === 'SOIL_NODE') {
-      router.push('/soil');
+      router.push(`/soil?deviceId=${activeId}`);
     } else if (device.deviceType === 'WATER_QUALITY_NODE') {
-      router.push('/water');
+      router.push(`/water?deviceId=${activeId}`);
     } else if (device.deviceType === 'WATER_TANK_NODE') {
-      router.push('/controls');
+      router.push(`/controls?deviceId=${activeId}`);
     }
   };
 
@@ -234,9 +235,15 @@ export default function DeviceSelector({ className }: DeviceSelectorProps) {
         />
         <span
           className="truncate max-w-[95px] xs:max-w-[130px] sm:max-w-[160px]"
-          title={formatDeviceDisplayName(selectedDevice, tDevices)}
+          title={
+            selectedDevice
+              ? formatDeviceDisplayName(selectedDevice, tDevices)
+              : tDevices('selectDevice')
+          }
         >
-          {formatDeviceDisplayName(selectedDevice, tDevices) || tDevices('selectDevice')}
+          {selectedDevice
+            ? formatDeviceDisplayName(selectedDevice, tDevices)
+            : tDevices('selectDevice')}
         </span>
         <ChevronDown
           size={14}
@@ -337,8 +344,8 @@ export default function DeviceSelector({ className }: DeviceSelectorProps) {
               </div>
             ) : (
               filteredDevices.map((device) => {
-                const deviceKey = device.deviceId || device.id;
-                const isSelected = (selectedDevice?.deviceId || selectedDevice?.id) === deviceKey;
+                const deviceKey = device.id;
+                const isSelected = selectedDevice?.id === deviceKey;
                 return (
                   <button
                     key={deviceKey}
@@ -370,8 +377,16 @@ export default function DeviceSelector({ className }: DeviceSelectorProps) {
                             {device.deviceType.replace('_NODE', '')}
                           </span>
                         </div>
+                        {device.deviceId && (
+                          <p
+                            className="text-[10px] text-app-on-surface-variant/70 font-mono truncate mt-0.5"
+                            data-testid="device-selector-id"
+                          >
+                            {device.deviceId}
+                          </p>
+                        )}
                         {device.siteName && (
-                          <p className="text-[11px] text-app-on-surface-variant truncate">
+                          <p className="text-[11px] text-app-on-surface-variant truncate mt-0.5">
                             {device.siteName}
                           </p>
                         )}

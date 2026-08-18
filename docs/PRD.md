@@ -328,8 +328,8 @@ The system shall:
 
 - Display only devices the user is authorised to access.
 - Clearly display the selected device name for all users, and canonical `deviceId` for Owner users only (concealed from Admins per `DEC-DEV-028`).
-- Resolve device selection fresh per session/load (defaulting to the first available authorized device).
-- **Removal of Previously/Last-Accessed Device History**: The system shall NOT track, persist, or restore previously/last-accessed device history across logins or persistent storage (`DEC-DEV-029`). Active in-memory navigation maintains selection during the session.
+- Resolve device selection fresh per session/load in a neutral initial state (`selectedDevice = null`) on bare routes (`/`, `/sensor`, `/soil` without `?deviceId=`). No device is automatically selected on fresh login or load; selection occurs only via explicit user action in the `/sensor` cards or header `DeviceSelector` (`DEC-DEV-029`).
+- **Route-Scoped Selection Rehydration & Removal of Historical Persistence**: The system shall NOT track, persist, or restore historical last-accessed device state across logins or in persistent storage (e.g. `localStorage`, cookies, profile preferences) (`DEC-DEV-029`). Once explicitly selected, selection is active in-memory and reflected in the route URL (`?deviceId=...`), rehydrating upon hard refresh on that device route after validating against the server-authorized list.
 - **History Scope Protection**: Telemetry historical charts (`TASK-0503`/`TASK-0504`), faucet-command history, device assignment/revocation history, status history, and audit history remain 100% intact (`DEC-DEV-029`).
 - Prevent data from different devices from being mixed.
 - Display an empty state when no devices are assigned or available.
@@ -1030,3 +1030,16 @@ The following decisions must be resolved before their related implementation is 
 8. The first Owner account creation method is not yet defined.
 9. English and Bahasa Indonesia are required, but the default and fallback locale are not yet confirmed.
 10. The existing frontend design is the visual source of truth, but it must be verified that it includes all required authentication, approval, device, monitoring, control, status, and responsive states.
+
+---
+
+## TASK-0306 Implementation Note
+
+The following facts are supported by the current implementation regarding device selection and routing:
+- **Frontend Selection/Context/URL:** Uses immutable `devices.id` UUID.
+- **Bare Routes:** Remain neutral with no auto-selection (`/`, `/sensor`, `/soil`, `/water`).
+- **Rehydration:** Valid `?deviceId=<UUID>` rehydrates after authorization on hard refresh.
+- **Invalid/Revoked IDs:** Clear selection safely to `null` with a notice banner.
+- **Admin Privacy:** Admin canonical `deviceId` concealment remains enforced.
+- **Legacy Routes:** `/air` and `/tanah` are explicitly maintained as legacy 404 routes.
+- **Race Condition:** `/sensor` first-load "No Device Found" race was fixed by correcting the loading state (handling skeleton vs. true empty authorized list).
