@@ -1019,9 +1019,13 @@ revokedAt
 **Status:** `DONE`
 **Dependencies:** `TASK-0304`
 **Completed:** 2026-07-31 — Implemented authorised device listing and device detail access endpoints (`GET /api/v1/devices`, `GET /api/v1/devices/{deviceId}`). `OWNER` role receives global device visibility across all sites. `ADMIN` role receives strictly scoped device access filtered by active `UserDeviceAccess` assignments (`revokedAt === null`), with revoked or unassigned devices disappearing immediately and direct access attempts returning HTTP 403 `DEVICE_NOT_ASSIGNED`. Integrated dynamic `permissions` DTO (`canView`, `canControl`) on all returned device objects, dynamically evaluated using RBAC, active account status, device capabilities, and the `ENABLE_FAUCET_CONTROL` feature flag. Added comprehensive unit and integration test coverage across list filtering, detail authorization, permissions computation, and negative auth security rules.
-**Reconciliation Note (2026-08-18):** Reconciled endpoints per `DEC-DEV-028`:
-- `GET /api/v1/devices` and `GET /api/v1/devices/{deviceId}` enforce role-based projection: canonical `deviceId` is included for Owner users and strictly concealed (omitted or masked) for Admin users (`DEC-DEV-028`).
-- `PATCH /api/v1/devices/{deviceId}` supports Owner updating canonical `deviceId` and user-facing `name` while preserving immutable database UUID `id`.
+**Reconciliation & Hardening (2026-08-18):** Reconciled endpoints per `DEC-DEV-027` and `DEC-DEV-028`:
+- `GET /api/v1/devices` and `GET /api/v1/devices/{deviceId}` enforce role-based projection: canonical `deviceId` is included for Owner users and strictly concealed (omitted or masked) for Admin users (`DEC-DEV-028`) while preserving safe internal UUID `id`.
+- `GET /api/v1/devices/{deviceId}` hardened with baseline permission check (`requirePermission(session, 'device.read')`) and active account enforcement prior to database lookup, eliminating device-existence leakage on non-active accounts.
+- `PATCH /api/v1/devices/{deviceId}` verified for Owner-only updates to canonical `deviceId` string and user-facing `name` with duplicate rejection (HTTP 409 `DUPLICATE_DEVICE_ID`), while preserving immutable database UUID `devices.id` and relational foreign keys.
+- Confirmed `POST /api/v1/devices` creation path remains completely removed (`DEC-DEV-027`).
+- Verified query performance on Supabase staging DB: index-only scan on `user_device_access_active_user_device_unique` (`revokedAt IS NULL`), index scans on `devices_pkey` and `device_capabilities`, zero N+1 queries, zero performance regression, and zero schema/index changes required.
+- Verified 100% test pass rate across 5 test suites (58/58 tests: 24/24 route tests, 10/10 repository tests, 7/7 contract tests, 6/6 page tests, 11/11 selector tests), Semgrep scan (0 findings), and TypeScript typecheck (0 errors).
 
 ### Work
 

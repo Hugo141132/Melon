@@ -83,6 +83,8 @@ The frontend shall not need to understand:
 
 Every device-specific operation shall be scoped by a canonical `deviceId`. Services resolve device identifiers deterministically, accepting both canonical string `deviceId` (e.g. `soil-node-001`) and internal database UUID `id`.
 
+Authorised device endpoints (`GET /api/v1/devices`, `GET /api/v1/devices/{deviceId}`) enforce role-based projection and scoping (`DEC-DEV-028` / `TASK-0305`): Owner receives global visibility with canonical `deviceId`, while Admin visibility is strictly limited to active assignments (`revokedAt IS NULL`) with canonical `deviceId` strictly concealed. Safe internal database UUID `id` is retained.
+
 No service shall assume that only one device exists. Domain routes use canonical `/soil` and `/water` paths; legacy `/tanah` and `/air` paths return 404 Not Found.
 
 ### 3.5 Secure by Default

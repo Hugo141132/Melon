@@ -200,9 +200,46 @@ describe('Device Registry API Endpoints (TASK-0302 & TASK-0305)', () => {
       expect(json.data).toEqual([]);
       expect(mockGetDevices).toHaveBeenCalledWith(expect.anything(), []);
     });
+
+    it('returns 422 VALIDATION_ERROR when query parameters are invalid', async () => {
+      mockOwnerSession();
+
+      const res = await GET(new Request('http://localhost/api/v1/devices?pageSize=999'));
+      const json = await res.json();
+
+      expect(res.status).toBe(422);
+      expect(json.success).toBe(false);
+      expect(json.error.code).toBe('VALIDATION_ERROR');
+    });
   });
 
   describe('GET /api/v1/devices/[deviceId] (TASK-0305 Device Detail)', () => {
+    it('returns 401 when request is unauthenticated', async () => {
+      mockCookieToken = undefined;
+
+      const res = await GET_DETAIL(new Request('http://localhost/api/v1/devices/water-node-001'), {
+        params: Promise.resolve({ deviceId: 'water-node-001' }),
+      });
+      const json = await res.json();
+
+      expect(res.status).toBe(401);
+      expect(json.success).toBe(false);
+      expect(json.error.code).toBe('UNAUTHENTICATED');
+    });
+
+    it('returns 403 ACCOUNT_NOT_ACTIVE when user account is PENDING_APPROVAL', async () => {
+      mockAdminSession(AccountStatus.PENDING_APPROVAL);
+
+      const res = await GET_DETAIL(new Request('http://localhost/api/v1/devices/water-node-001'), {
+        params: Promise.resolve({ deviceId: 'water-node-001' }),
+      });
+      const json = await res.json();
+
+      expect(res.status).toBe(403);
+      expect(json.success).toBe(false);
+      expect(json.error.code).toBe('ACCOUNT_NOT_ACTIVE');
+    });
+
     it('returns 404 DEVICE_NOT_FOUND when device does not exist', async () => {
       mockOwnerSession();
       mockGetDeviceByCanonicalId.mockResolvedValueOnce(null);
@@ -293,6 +330,64 @@ describe('Device Registry API Endpoints (TASK-0302 & TASK-0305)', () => {
       const res = await GET_DETAIL(
         new Request('http://localhost/api/v1/devices/unassigned-node-002'),
         { params: Promise.resolve({ deviceId: 'unassigned-node-002' }) }
+      );
+      const json = await res.json();
+
+      expect(res.status).toBe(403);
+      expect(json.success).toBe(false);
+      expect(json.error.code).toBe('DEVICE_NOT_ASSIGNED');
+    });
+
+    it('returns 200 OK for ADMIN when looking up device by UUID id, concealing canonical deviceId (DEC-DEV-028)', async () => {
+      mockAdminSession();
+      const mockDev = {
+        id: '11111111-1111-1111-1111-111111111111',
+        deviceId: 'water-node-001',
+        name: 'Water Node 1',
+        deviceType: DeviceType.WATER_QUALITY_NODE,
+        accountStatus: 'ACTIVE',
+        connectionStatus: 'ONLINE',
+        capabilities: ['WATER_PH'],
+      };
+      mockGetDeviceByCanonicalId.mockResolvedValueOnce(mockDev);
+      mockFindFirstUserDeviceAccess.mockResolvedValueOnce({
+        id: 'assignment-1',
+        userId: 'admin-id-1',
+        deviceId: '11111111-1111-1111-1111-111111111111',
+        revokedAt: null,
+      });
+
+      const res = await GET_DETAIL(
+        new Request('http://localhost/api/v1/devices/11111111-1111-1111-1111-111111111111'),
+        { params: Promise.resolve({ deviceId: '11111111-1111-1111-1111-111111111111' }) }
+      );
+      const json = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(json.success).toBe(true);
+      expect(json.data.id).toBe('11111111-1111-1111-1111-111111111111');
+      expect(json.data.name).toBe('Water Node 1');
+      expect(json.data.deviceId).toBeUndefined();
+      expect(json.data.permissions).toEqual({ canView: true, canControl: false });
+    });
+
+    it('returns 403 DEVICE_NOT_ASSIGNED for ADMIN attempting IDOR access to unassigned UUID (IDOR mitigation)', async () => {
+      mockAdminSession();
+      const mockDev = {
+        id: '22222222-2222-2222-2222-222222222222',
+        deviceId: 'other-node-002',
+        name: 'Other Node',
+        deviceType: DeviceType.SOIL_NODE,
+        accountStatus: 'ACTIVE',
+        connectionStatus: 'ONLINE',
+        capabilities: ['SOIL_NITROGEN'],
+      };
+      mockGetDeviceByCanonicalId.mockResolvedValueOnce(mockDev);
+      mockFindFirstUserDeviceAccess.mockResolvedValueOnce(null);
+
+      const res = await GET_DETAIL(
+        new Request('http://localhost/api/v1/devices/22222222-2222-2222-2222-222222222222'),
+        { params: Promise.resolve({ deviceId: '22222222-2222-2222-2222-222222222222' }) }
       );
       const json = await res.json();
 

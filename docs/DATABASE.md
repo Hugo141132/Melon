@@ -620,11 +620,13 @@ Stores mandatory device-level access assignments.
 - Revoked assignments shall remain historically queryable.
 - Admins shall not assign devices to themselves or other users.
 
-Recommended active uniqueness:
+Recommended active uniqueness and index:
 
 ```text
-UNIQUE (user_id, device_id) WHERE revoked_at IS NULL
+UNIQUE INDEX user_device_access_active_user_device_unique ON user_device_access (user_id, device_id) WHERE revoked_at IS NULL
 ```
+
+Query performance note (`TASK-0305`): Admin active assignment filtering (`WHERE user_id = $1 AND revoked_at IS NULL`) executes as an Index-Only Scan on this partial unique index, resolving assigned device UUIDs with zero heap fetches prior to querying `devices` table via `devices_pkey`.
 
 ---
 

@@ -1282,13 +1282,21 @@ Role-based response filtering (`DEC-DEV-028`):
 Query parameters:
 
 ```text
-page
-pageSize
-siteId
-deviceType
-connectionStatus
-search
+page (integer >= 1, default 1)
+pageSize (integer 1..100, default 20)
+siteId (UUID)
+deviceType (SOIL_NODE | WATER_QUALITY_NODE | WATER_TANK_NODE)
+connectionStatus (ONLINE | OFFLINE | STALE | UNKNOWN | INACTIVE)
+accountStatus (ACTIVE | INACTIVE | DEACTIVATED)
+search (string)
+sort (field:asc | field:desc, default createdAt:desc)
 ```
+
+Error responses:
+- `401 Unauthorized`: `UNAUTHENTICATED`, `INVALID_SESSION`
+- `403 Forbidden`: `ACCOUNT_NOT_ACTIVE`, `INSUFFICIENT_PERMISSION`
+- `422 Unprocessable Entity`: `VALIDATION_ERROR` (e.g. invalid page/pageSize bounds)
+- `500 Internal Server Error`: `INTERNAL_ERROR`
 
 Response item (Owner view):
 
@@ -1352,9 +1360,16 @@ GET /api/v1/devices/{deviceId}
 ```
 
 **Authentication:** Required
-**Permission:** `device.read`
-**Resource check:** Device access required
-**Role filtering:** Canonical `deviceId` is returned for Owner; concealed for Admin (`DEC-DEV-028`).
+**Permission:** `device.read` (Active account status and baseline permission verified before DB lookup to prevent existence probing)
+**Resource check:** Device access required (Owner: global scope; Admin: actively assigned via `UserDeviceAccess` where `revokedAt IS NULL`)
+**Lookup identifier:** Accepts canonical `deviceId` string or internal database UUID (`devices.id`)
+**Role filtering:** Canonical `deviceId` is returned for Owner; strictly concealed for Admin (`DEC-DEV-028`). Safe internal database UUID `id` is always retained.
+
+Error responses:
+- `401 Unauthorized`: `UNAUTHENTICATED`, `INVALID_SESSION`
+- `403 Forbidden`: `ACCOUNT_NOT_ACTIVE`, `DEVICE_NOT_ASSIGNED` (unassigned or revoked Admin access / IDOR attempt)
+- `404 Not Found`: `DEVICE_NOT_FOUND`
+- `500 Internal Server Error`: `INTERNAL_ERROR`
 
 ---
 

@@ -527,7 +527,9 @@ the server shall verify that the authenticated user is authorised for that speci
 
 For device resources:
 - Internal database primary key UUIDs (`devices.id`) are immutable and anchor all relational integrity.
-- Admin users are restricted to assigned devices, and API responses strictly conceal the canonical `deviceId` (`DEC-DEV-028`).
+- Admin users are restricted to assigned devices, and API responses strictly conceal the canonical `deviceId` (`DEC-DEV-028` / `TASK-0305`).
+- `GET /api/v1/devices/{deviceId}` strictly enforces active-account and `device.read` permission checks before querying the database, eliminating device-existence leakage and timing attacks on non-active accounts (`TASK-0305`).
+- IDOR/BOLA attacks attempting to query unassigned or revoked devices return HTTP 403 `DEVICE_NOT_ASSIGNED`.
 - In-app device creation is forbidden; device endpoints do not accept client-side creation requests (`DEC-DEV-027`).
 
 ### 10.6 Mass Assignment

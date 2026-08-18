@@ -974,15 +974,15 @@ flowchart TD
 
 **Main success flow:**
 
-1. The server validates session and account status.
-2. The server loads devices within the user's scope (including canonical `deviceId` for Owner; strictly concealing canonical `deviceId` for Admin per `DEC-DEV-028`).
+1. The server validates session and active account status (`requireActiveAccount`).
+2. The server loads devices within the user's scope: Owner receives global scope with canonical `deviceId` in safe DTO; Admin receives only active assignments (`revokedAt IS NULL`) with canonical `deviceId` strictly concealed (`DEC-DEV-028` / `TASK-0305`).
 3. The frontend loads dashboard shell and available devices.
 4. The system selects a default device (first authorized device in list on fresh load per `DEC-DEV-029`).
 5. The system loads current monitoring data for the selected device.
 6. The dashboard displays soil, water, tank, flow, status, and timestamp components.
 
 **Alternative flows:** No assigned devices; show dedicated empty state.
-**Error flows:** Device or monitoring service unavailable.
+**Error flows:** Unauthenticated request returns HTTP 401 `UNAUTHENTICATED`; non-active account returns HTTP 403 `ACCOUNT_NOT_ACTIVE`.
 **Postconditions:** Authorised monitoring context is visible.
 **Required permissions:** `device.read`, `monitoring.current.read`.
 **Relevant account statuses:** `ACTIVE`.
@@ -1001,14 +1001,14 @@ flowchart TD
 **Main success flow:**
 
 1. The frontend identifies the selected device (displaying device name for all users, with canonical `deviceId` visible only to Owner per `DEC-DEV-028`).
-2. The server verifies the user may access that device.
+2. The server verifies the user may access that device (`GET /api/v1/devices/{deviceId}` checking session, active account, and `device.read`).
 3. The system clears or marks previous device data as transitioning.
 4. The system loads the selected device's latest status and data.
 5. All device-specific components update consistently.
 6. The selected device is retained in-memory during active navigation. Persistent restoration of previously/last-accessed device history across logins is removed (`DEC-DEV-029`), while all telemetry/command/assignment/audit history remains 100% intact.
 
 **Alternative flows:** Device becomes unavailable during selection.
-**Error flows:** Unauthorised device ID; load failure.
+**Error flows:** Admin querying unassigned device returns HTTP 403 `DEVICE_NOT_ASSIGNED`; non-existent device returns HTTP 404 `DEVICE_NOT_FOUND`; invalid pagination/parameters return HTTP 422 `VALIDATION_ERROR`.
 **Postconditions:** All visible data belongs to one selected device.
 **Required permissions:** `device.read`, relevant monitoring permissions.
 **Relevant account statuses:** `ACTIVE`.

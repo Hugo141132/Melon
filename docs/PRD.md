@@ -339,8 +339,10 @@ The system shall:
 
 The system shall support device-level access rules:
 
-- All Owners see all devices in the global scope; Admins see only assigned devices.
+- All Owners see all devices in the global scope; Admins see only assigned devices (`revokedAt IS NULL`).
 - Device assignment is mandatory for Admin access; unassigned devices are completely hidden and inaccessible to Admins.
+- Authorised device API endpoints (`GET /api/v1/devices`, `GET /api/v1/devices/{deviceId}`) enforce server-side scoping and role-based DTO projections (`DEC-DEV-028` / `TASK-0305`). Canonical `deviceId` is strictly concealed from Admin users across all JSON payloads, returning safe internal UUID `id` and dynamic `permissions` (`canView`, `canControl`).
+- The device detail endpoint strictly enforces active account verification and `device.read` permission checks before database lookup to prevent device-existence probing.
 - Admins cannot self-assign or reassign devices.
 
 ---

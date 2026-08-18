@@ -237,6 +237,17 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
 - Selected motion effects: `Card hover`, `Skeleton loading`
 - 21st.dev MCP: `NOT REQUIRED`
 
+#### TASK-0305 Governance Record
+
+`TASK-0305` authorised device list reconciliation record:
+- Status: `DONE` (Verified & Reconciled 2026-08-18)
+- Frontend impact: `NONE`
+- Selected UI direction: `N/A`
+- Existing color template: `UNCHANGED`
+- Selected motion effects: `None`
+- 21st.dev MCP: `NOT REQUIRED`
+- Summary: Reconciled and verified authorized device listing and detail endpoints (`GET /api/v1/devices`, `GET /api/v1/devices/{deviceId}`). Verified Owner global access scope returning full safe DTO with canonical `deviceId`, and Admin strictly scoped to active assignments (`revokedAt === null`) with canonical `deviceId` strictly concealed per `DEC-DEV-028` while retaining safe immutable database UUID `id`. Verified dynamic `permissions` DTO (`canView`, `canControl`) dynamically evaluated using RBAC, active account status, device capabilities, and `ENABLE_FAUCET_CONTROL` feature flag. Hardened baseline permission check (`requirePermission(session, 'device.read')`) and active account enforcement on device detail route prior to DB lookup, eliminating device-existence leakage. Verified IDOR/BOLA prevention on unassigned devices, UUID/canonical ID manipulation attempts, unauthenticated requests (401), non-active accounts (403), and invalid pagination (422). Executed focused query and execution plan review via Supabase MCP on staging DB: confirmed index-only scan on `user_device_access_active_user_device_unique` for Admin assignment filtering, index scans on `devices_pkey` and `device_capabilities_device_id_capability_key`, zero N+1 queries, zero database performance regression, and zero index/schema alterations required. Preserved immutable database UUID `devices.id` and all relational foreign key histories. Verified 100% test pass rate across targeted test suites (24/24 route tests, 34/34 database/contracts/device tests, 58/58 combined), Semgrep scan (0 findings), and TypeScript typecheck (0 errors). Confirmed no device creation path reintroduced (`POST /api/v1/devices` remains removed per `DEC-DEV-027`), TASK-0306 last-accessed persistence behavior remains outside scope, and physical ESP32/EMQX rename reconciliation remains `TBD / BLOCKING`.
+
 #### TASK-1004 Governance & Infrastructure Record
 
 `TASK-1004` staging infrastructure and verification record:

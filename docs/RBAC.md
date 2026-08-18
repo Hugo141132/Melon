@@ -381,12 +381,12 @@ profile.password.reset.other
 #### 9.3 Device Permissions
 
 ```text
-device.read
+device.read (Owner: global with canonical deviceId; Admin: active assignments with deviceId strictly concealed per DEC-DEV-028 / TASK-0305)
 device.create (REMOVED per DEC-DEV-027)
-device.update
-device.deactivate
-device.assign
-device.unassign
+device.update (Owner-only: can edit canonical deviceId & name per DEC-DEV-028)
+device.deactivate (Owner-only)
+device.assign (Owner-only)
+device.unassign (Owner-only)
 ```
 
 ### 9.4 Monitoring Permissions

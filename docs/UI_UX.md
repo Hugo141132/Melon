@@ -357,14 +357,15 @@ The device selector shall display:
 - online, offline, warning, or unknown status;
 - last-seen information where space permits.
 
-The selector shall support:
+The selector and `/devices` card list shall support:
 
 - search;
 - filtering by site;
 - filtering by connectivity status;
 - clear indication of the active device;
 - keyboard navigation;
-- an empty state when no device is assigned.
+- an empty state when no device is assigned;
+- role-appropriate presentation (`TASK-0305`): Owner users see canonical `deviceId` string badges alongside custom names; Admin users see only custom device names or localized default type labels (`Soil Sensor Node` / `Node Sensor Tanah`) with canonical `deviceId` strictly concealed.
 
 ### 7.2 Device Context Persistence
 

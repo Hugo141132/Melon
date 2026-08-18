@@ -221,9 +221,11 @@
 * **Implementation Evidence**:
   - Added `deviceId` to `UpdateDeviceInputSchema` with `.strict()` schema stripping in `packages/contracts/src/device.ts`.
   - Implemented `updateDevice` in `DeviceRepository` (`packages/database/src/device-repository.ts`) with duplicate `deviceId` check throwing `DeviceConflictError`, while preserving immutable UUID primary key (`devices.id`).
-  - Added role-based DTO projection (`AdminSafeDeviceDtoSchema`) concealing `deviceId` for Admin role in `GET /api/v1/devices` and `GET /api/v1/devices/{deviceId}` routes.
+  - Added role-based DTO projection (`AdminSafeDeviceDtoSchema`) concealing `deviceId` for Admin role in `GET /api/v1/devices` and `GET /api/v1/devices/{deviceId}` routes while preserving safe immutable UUID `id` and `permissions.canView/canControl`.
+  - Hardened `GET /api/v1/devices/{deviceId}` with early `requirePermission(session, 'device.read')` and active account enforcement before DB querying to eliminate device-existence leakage (`TASK-0305`).
+  - Verified query performance on Supabase staging DB: index-only scan on `user_device_access_active_user_device_unique` for Admin assignment filtering, zero N+1 queries, and zero DB performance regression.
   - Updated `apps/web/app/devices/page.tsx` displaying `deviceId` badges only to Owners, and providing Owner Edit Modal for `deviceId` and `name` updates.
-  - Verified 100% test pass on route authorization and conflict handling (`apps/web/app/api/v1/devices/test/route.test.ts`, `packages/database/test/device-repository.test.ts`).
+  - Verified 100% test pass on route authorization, IDOR prevention, and conflict handling (`apps/web/app/api/v1/devices/test/route.test.ts` 24/24 tests, `packages/database/test/device-repository.test.ts` 10/10 tests, 58/58 combined device tests).
 
 #### DEC-DEV-029: Removal of Previously/Last-Accessed Device History and Persistent Restoration
 * **Related Task IDs**: `TASK-0306`, `TASK-0504`

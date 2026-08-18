@@ -486,7 +486,7 @@ Test:
 - Registration role forcing.
 - Registration status forcing.
 
-## 10.2 Authorisation Units
+## 10.2 Authorisation & Device Registry Units
 
 Test:
 
@@ -497,6 +497,19 @@ Test:
 - View versus control.
 - Self-profile versus other-profile access.
 - Deny-by-default behaviour.
+- Authorised device list and detail test suite (`TASK-0305` / `DEC-DEV-028`):
+  - `apps/web/app/api/v1/devices/test/route.test.ts` (24/24 tests):
+    - Owner global scope with canonical `deviceId` returned in safe DTO.
+    - Admin scoped strictly to active assignments (`revokedAt IS NULL`) with canonical `deviceId` concealed.
+    - Admin IDOR prevention on unassigned/revoked devices returning HTTP 403 `DEVICE_NOT_ASSIGNED`.
+    - Early `device.read` permission and active account checks before database querying, returning HTTP 401 `UNAUTHENTICATED` / HTTP 403 `ACCOUNT_NOT_ACTIVE`.
+    - Identifier resolution supporting both immutable database UUID `id` and canonical `deviceId` string.
+    - Query pagination validation returning HTTP 422 `VALIDATION_ERROR`.
+    - Owner-only device update (`PATCH /api/v1/devices/{deviceId}`) with duplicate rejection (HTTP 409 `DUPLICATE_DEVICE_ID`).
+  - `packages/database/test/device-repository.test.ts` (10/10 tests): Repository querying, partial index assignment filtering, and immutable UUID integrity.
+  - `packages/contracts/src/__tests__/device.test.ts` (7/7 tests): Safe DTO contract validation and schema stripping.
+  - `apps/web/app/devices/test/page.test.ts` (6/6 tests) & `apps/web/app/devices/test/selector.test.ts` (11/11 tests): UI presentation and role-based badge rendering.
+  - Combined device test pass rate: **58/58 tests passed (100%)**.
 
 ## 10.3 Locale Units
 

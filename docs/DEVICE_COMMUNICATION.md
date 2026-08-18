@@ -284,7 +284,7 @@ Rules:
 - `deviceId` shall not be translated.
 - `deviceId` shall not contain personal information.
 - `deviceId` is editable ONLY by the Owner (`DEC-DEV-028`).
-- `deviceId` shall NOT be viewable or editable by Admin users across UI and API responses (`DEC-DEV-028`).
+- `deviceId` shall NOT be viewable or editable by Admin users across UI and API responses (`DEC-DEV-028` / `TASK-0305`). Admin responses return only user-facing device names and metadata.
 - Internal database primary key UUID is immutable across all relational tables.
 - A device shall not publish as another device.
 - Device credentials shall be bound to the permitted `deviceId`.

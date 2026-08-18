@@ -21,6 +21,7 @@ export async function GET(request: Request, props: { params: Promise<{ deviceId:
 
   try {
     const session = await requireSession(request);
+    requirePermission(session, 'device.read', 'DEVICE', targetDeviceId, request);
 
     const deviceRepo = new DeviceRepository(prisma);
     const device = await deviceRepo.getDeviceByCanonicalId(targetDeviceId);

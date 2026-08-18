@@ -79,7 +79,7 @@
 | `RBAC-STATE-007` | Account status access matrix enforcement | `docs/RBAC.md` | - | `TASK-0204` | `TEST-SEC-001` | `READY_FOR_IMPLEMENTATION` |
 | `RBAC-DEV-001` | Mandatory per-device assignment model | `docs/RBAC.md` | `DEC-RBAC-016` | `TASK-0304` | `TEST-SEC-003` | `READY_FOR_IMPLEMENTATION` |
 | `RBAC-DEV-002` | Admin assigned device monitoring and control rule | `docs/RBAC.md` | `DEC-RBAC-015` | `TASK-0304` | `TEST-SEC-003` | `READY_FOR_IMPLEMENTATION` |
-| `RBAC-DEV-003` | Owner device access scope rule | `docs/RBAC.md` | `DEC-RBAC-013` | `TASK-0305` | `TEST-SEC-003` | `READY_FOR_IMPLEMENTATION` |
+| `RBAC-DEV-003` | Owner device access scope rule | `docs/RBAC.md` | `DEC-RBAC-013`, `DEC-DEV-028` | `TASK-0305` | `TEST-SEC-003` | `VERIFIED` |
 | `RBAC-DEV-004` | Instant effect on device access revocation | `docs/RBAC.md` | - | `TASK-0304` | `TEST-SEC-003` | `READY_FOR_IMPLEMENTATION` |
 | `FLOW-AUTH-001` | Unauthenticated visitor route redirection flow | `docs/USER_FLOWS.md` | `DEC-AUTH-001` | `TASK-0210` | `TEST-E2E-001` | `READY_FOR_IMPLEMENTATION` |
 | `FLOW-AUTH-002` | Admin account registration flow | `docs/USER_FLOWS.md` | `DEC-AUTH-006` | `TASK-0203` | `TEST-E2E-002` | `READY_FOR_IMPLEMENTATION` |
@@ -172,8 +172,8 @@
 | `API-USER-004` | PATCH /api/v1/users/{userId} management endpoint | `docs/API.md` | - | `TASK-0212` | `TEST-API-002` | `READY_FOR_IMPLEMENTATION` |
 | `API-USER-005` | POST /api/v1/approvals/{userId}/approve endpoint | `docs/API.md` | `DEC-AUTH-006` | `TASK-0207` | `TEST-API-002` | `READY_FOR_IMPLEMENTATION` |
 | `API-USER-006` | POST /api/v1/approvals/{userId}/reject endpoint | `docs/API.md` | - | `TASK-0208` | `TEST-API-002` | `READY_FOR_IMPLEMENTATION` |
-| `API-DEV-001` | GET /api/v1/devices list endpoint | `docs/API.md` | `DEC-RBAC-016`, `DEC-DEV-028` | `TASK-0305` | `TEST-API-003` | `READY_FOR_IMPLEMENTATION` |
-| `API-DEV-002` | GET /api/v1/devices/{deviceId} detail endpoint | `docs/API.md` | `DEC-RBAC-016`, `DEC-DEV-028` | `TASK-0305` | `TEST-API-003` | `READY_FOR_IMPLEMENTATION` |
+| `API-DEV-001` | GET /api/v1/devices list endpoint | `docs/API.md` | `DEC-RBAC-016`, `DEC-DEV-028` | `TASK-0305` | `TEST-API-003` | `VERIFIED` |
+| `API-DEV-002` | GET /api/v1/devices/{deviceId} detail endpoint | `docs/API.md` | `DEC-RBAC-016`, `DEC-DEV-028` | `TASK-0305` | `TEST-API-003` | `VERIFIED` |
 | `API-DEV-003` | POST /api/v1/devices creation endpoint (REMOVED) | `docs/API.md` | `DEC-DEV-027` | `TASK-0302` | `TEST-API-003` | `SUPERSEDED` |
 | `API-DEV-004` | POST /api/v1/user-devices assignment endpoint | `docs/API.md` | `DEC-RBAC-016` | `TASK-0304` | `TEST-API-003` | `READY_FOR_IMPLEMENTATION` |
 | `API-DEV-005` | PATCH /api/v1/devices/{deviceId} update endpoint | `docs/API.md` | `DEC-DEV-028` | `TASK-0302` | `TEST-API-003` | `VERIFIED` |
