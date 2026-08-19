@@ -13,7 +13,7 @@ concurrency:
 jobs:
   quality-test-build:
     name: Build, Test & Security Checks
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
 
     services:
@@ -118,18 +118,8 @@ jobs:
       - name: Verify Production Build
         run: npm run build
 
-      - name: Install Playwright Browsers (Headless Shell with System Dependencies)
-        id: playwright-install-1
-        continue-on-error: true
-        timeout-minutes: 5
-        run: npx playwright install --with-deps --only-shell chromium
-
-      - name: Retry Install Playwright Browsers
-        if: steps.playwright-install-1.outcome == 'failure'
-        timeout-minutes: 5
-        run: |
-          echo "Initial Playwright installation failed; retrying once..."
-          npx playwright install --with-deps --only-shell chromium
+      - name: Verify Runner Browser Availability
+        run: microsoft-edge --version
 
       - name: Execute Playwright E2E Smoke Tests
         timeout-minutes: 7

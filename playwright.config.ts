@@ -20,10 +20,10 @@ export default defineConfig({
   },
   projects: [
     {
-      name: process.env.CI ? 'chromium' : 'msedge',
+      name: 'msedge',
       use: {
         ...devices['Desktop Chrome'],
-        ...(process.env.CI ? {} : { channel: 'msedge' }),
+        channel: 'msedge',
       },
     },
   ],
