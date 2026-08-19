@@ -146,9 +146,9 @@ export async function POST(request: Request, props: { params: Promise<{ deviceId
         {
           success: false,
           error: {
-            code: 'INVALID_PHASE',
+            code: 'VALIDATION_ERROR',
             message:
-              'Invalid faucet phase. Allowed phases are 1 (300 mL), 2 (1,000 mL), and 3 (1,500 mL).',
+              'Invalid faucet command input. DISPENSE requires phase (1-3) and plantCount (>=1). OPEN/CLOSE must not include phase or plantCount.',
             details: parseResult.error.flatten(),
           },
           meta: { requestId },

@@ -335,7 +335,7 @@ describe('Faucet Command API Endpoints (TASK-0803)', () => {
       expect(json.error.code).toBe('VALIDATION_ERROR');
     });
 
-    it('returns 422 INVALID_PHASE when requested phase is invalid (e.g. phase 4)', async () => {
+    it('returns 422 VALIDATION_ERROR when requested phase is invalid (e.g. phase 4)', async () => {
       const req = new Request(
         `http://localhost/api/v1/devices/${mockCanonicalDeviceId}/faucet-commands`,
         {
@@ -349,7 +349,128 @@ describe('Faucet Command API Endpoints (TASK-0803)', () => {
       const json = await res.json();
 
       expect(res.status).toBe(422);
-      expect(json.error.code).toBe('INVALID_PHASE');
+      expect(json.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('returns 422 VALIDATION_ERROR when DISPENSE is missing plantCount', async () => {
+      const req = new Request(
+        `http://localhost/api/v1/devices/${mockCanonicalDeviceId}/faucet-commands`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'idempotency-key': 'idem-001' },
+          body: JSON.stringify({ action: 'DISPENSE', phase: 1 }),
+        }
+      );
+
+      const res = await POST(req, { params: Promise.resolve({ deviceId: mockCanonicalDeviceId }) });
+      const json = await res.json();
+
+      expect(res.status).toBe(422);
+      expect(json.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('returns 422 VALIDATION_ERROR when DISPENSE has zero plantCount', async () => {
+      const req = new Request(
+        `http://localhost/api/v1/devices/${mockCanonicalDeviceId}/faucet-commands`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'idempotency-key': 'idem-001' },
+          body: JSON.stringify({ action: 'DISPENSE', phase: 1, plantCount: 0 }),
+        }
+      );
+
+      const res = await POST(req, { params: Promise.resolve({ deviceId: mockCanonicalDeviceId }) });
+      const json = await res.json();
+
+      expect(res.status).toBe(422);
+      expect(json.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('returns 422 VALIDATION_ERROR when OPEN provides phase or plantCount', async () => {
+      const req = new Request(
+        `http://localhost/api/v1/devices/${mockCanonicalDeviceId}/faucet-commands`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'idempotency-key': 'idem-001' },
+          body: JSON.stringify({ action: 'OPEN', phase: 1 }),
+        }
+      );
+
+      const res = await POST(req, { params: Promise.resolve({ deviceId: mockCanonicalDeviceId }) });
+      const json = await res.json();
+
+      expect(res.status).toBe(422);
+      expect(json.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('returns 422 VALIDATION_ERROR when CLOSE provides phase or plantCount', async () => {
+      const req = new Request(
+        `http://localhost/api/v1/devices/${mockCanonicalDeviceId}/faucet-commands`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'idempotency-key': 'idem-001' },
+          body: JSON.stringify({ action: 'CLOSE', plantCount: 1 }),
+        }
+      );
+
+      const res = await POST(req, { params: Promise.resolve({ deviceId: mockCanonicalDeviceId }) });
+      const json = await res.json();
+
+      expect(res.status).toBe(422);
+      expect(json.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('returns 422 VALIDATION_ERROR when DISPENSE has non-integer plantCount', async () => {
+      const req = new Request(
+        `http://localhost/api/v1/devices/${mockCanonicalDeviceId}/faucet-commands`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'idempotency-key': 'idem-001' },
+          body: JSON.stringify({ action: 'DISPENSE', phase: 1, plantCount: 1.5 }),
+        }
+      );
+
+      const res = await POST(req, { params: Promise.resolve({ deviceId: mockCanonicalDeviceId }) });
+      const json = await res.json();
+
+      expect(res.status).toBe(422);
+      expect(json.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('ignores client-authoritative targetVolumeMl and relies on server calculation', async () => {
+      // The schema doesn't even accept targetVolumeMl, so if passed, it will be stripped out by safeParse.
+      // We verify that targetVolumeMl is not passed to mockCreateCommand.
+      const req = new Request(
+        `http://localhost/api/v1/devices/${mockCanonicalDeviceId}/faucet-commands`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'idempotency-key': 'idem-001' },
+          body: JSON.stringify({
+            action: 'DISPENSE',
+            phase: 1,
+            plantCount: 1,
+            targetVolumeMl: 9999,
+          }),
+        }
+      );
+
+      const res = await POST(req, { params: Promise.resolve({ deviceId: mockCanonicalDeviceId }) });
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(json.success).toBe(true);
+      expect(mockCreateCommand).toHaveBeenCalledWith(
+        {
+          deviceId: mockDeviceUuid,
+          action: 'DISPENSE',
+          phase: 1,
+          plantCount: 1,
+          idempotencyKey: 'idem-001',
+          // Note: targetVolumeMl is NOT here. It gets generated inside createCommand.
+        },
+        mockAdminUser.id,
+        UserRole.ADMIN
+      );
     });
 
     it('successfully creates a QUEUED faucet command for active Admin with phase 1 (300 mL)', async () => {
@@ -422,6 +543,84 @@ describe('Faucet Command API Endpoints (TASK-0803)', () => {
         },
         mockOwnerUser.id,
         UserRole.OWNER
+      );
+    });
+
+    it('successfully creates a QUEUED faucet command for OPEN action', async () => {
+      mockCreateCommand.mockResolvedValue({
+        ...mockCommandRecord,
+        action: FaucetCommandAction.OPEN,
+        phase: null,
+        plantCount: null,
+        targetVolumeMl: null,
+      });
+
+      const req = new Request(
+        `http://localhost/api/v1/devices/${mockCanonicalDeviceId}/faucet-commands`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'idempotency-key': 'idem-open-001' },
+          body: JSON.stringify({ action: 'OPEN' }),
+        }
+      );
+
+      const res = await POST(req, { params: Promise.resolve({ deviceId: mockCanonicalDeviceId }) });
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(json.data.action).toBe('OPEN');
+      expect(json.data.phase).toBeNull();
+      expect(json.data.plantCount).toBeNull();
+      expect(json.data.targetVolumeMl).toBeNull();
+      expect(mockCreateCommand).toHaveBeenCalledWith(
+        {
+          deviceId: mockDeviceUuid,
+          action: 'OPEN',
+          phase: undefined,
+          plantCount: undefined,
+          idempotencyKey: 'idem-open-001',
+        },
+        mockAdminUser.id,
+        UserRole.ADMIN
+      );
+    });
+
+    it('successfully creates a QUEUED faucet command for CLOSE action', async () => {
+      mockCreateCommand.mockResolvedValue({
+        ...mockCommandRecord,
+        action: FaucetCommandAction.CLOSE,
+        phase: null,
+        plantCount: null,
+        targetVolumeMl: null,
+      });
+
+      const req = new Request(
+        `http://localhost/api/v1/devices/${mockCanonicalDeviceId}/faucet-commands`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'idempotency-key': 'idem-close-001' },
+          body: JSON.stringify({ action: 'CLOSE' }),
+        }
+      );
+
+      const res = await POST(req, { params: Promise.resolve({ deviceId: mockCanonicalDeviceId }) });
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(json.data.action).toBe('CLOSE');
+      expect(json.data.phase).toBeNull();
+      expect(json.data.plantCount).toBeNull();
+      expect(json.data.targetVolumeMl).toBeNull();
+      expect(mockCreateCommand).toHaveBeenCalledWith(
+        {
+          deviceId: mockDeviceUuid,
+          action: 'CLOSE',
+          phase: undefined,
+          plantCount: undefined,
+          idempotencyKey: 'idem-close-001',
+        },
+        mockAdminUser.id,
+        UserRole.ADMIN
       );
     });
 

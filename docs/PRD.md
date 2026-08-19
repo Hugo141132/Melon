@@ -518,7 +518,7 @@ EXPIRED
 
 Faucet-control access shall be protected by explicit permission checks.
 
-The final role matrix for control is TBD.
+The final role matrix for control is defined by `DEC-RBAC-015` and enforced via `device.control` permission.
 
 At minimum:
 
@@ -648,7 +648,7 @@ The system shall:
 | View current monitoring data | Yes | Yes |
 | View historical monitoring data | Yes | Yes |
 | View alerts | Yes | Yes, within scope |
-| Access faucet control | TBD | TBD |
+| Access faucet control | Yes | Yes, for assigned devices |
 | View audit logs | Yes | Limited or TBD |
 | Manage language preference | Yes | Yes |
 

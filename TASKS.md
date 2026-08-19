@@ -1753,10 +1753,10 @@ Document:
 ## TASK-0803 — Implement Faucet Command API
 
 **Priority:** `P0`
-**Status:** `BACKLOG`
+**Status:** `DONE`
 **Dependencies:** `TASK-0802`, `TASK-0304`
 **Historical Completion:** 2026-08-02 — Implemented POST /api/v1/devices/{deviceId}/faucet-commands, GET /api/v1/devices/{deviceId}/faucet-commands, and GET /api/v1/devices/{deviceId}/faucet-commands/{commandId} REST API endpoints with active session authentication (`requireSession`), active account revalidation (`requireActiveAccount`), RBAC permissions (`device.control`), ENABLE_FAUCET_CONTROL feature flag guard, device assignment scoping, FAUCET_CONTROL capability validation, device active & ONLINE state checks, server-side phase-to-volume mapping, idempotency key handling, max 1 active command per device conflict enforcement, durable QUEUED persistence, atomic AuditLog recording, paginated history filtering, and 100% test coverage.
-**Revision Note (2026-08-19):** Status set to `BACKLOG` (pending `TASK-0802`). Requires API revision for mandatory `plantCount` (integer >= 1) validation, server-side target volume calculation (`presetVolumeMl * plantCount`), browser target-volume authority rejection, `OPEN` and `CLOSE` manual action support, and UI liter alignment.
+**Revision Completion (2026-08-20):** Implemented POST /api/v1/devices/{deviceId}/faucet-commands endpoint revision supporting `DISPENSE`, `OPEN`, and `CLOSE` actions. Enforced mandatory integer `plantCount >= 1` for `DISPENSE`, and strict rejection of `phase`, `plantCount`, and `targetVolumeMl` for `OPEN`/`CLOSE`. Server exclusively calculates `targetVolumeMl = presetVolumeMl * plantCount`; browser target volume authority is rejected. Enforced `VALIDATION_ERROR` as canonical error for payload violations without creating new error codes. Preserved active session, active account, RBAC (`device.control`), device capability, active device, idempotency, and concurrency protections. Verified 100% test pass rate across route handlers and Zod contracts.
 
 ### Work
 

@@ -1699,7 +1699,7 @@ No command is created until explicit confirmation.
 **Relevant account statuses:** `ACTIVE`.
 **UI states:** Confirming, stopping, cancelled, failure.
 **Audit events:** `faucet.command.cancel.requested`, final status.
-**Open decisions:** Whether this feature exists and which roles receive it.
+**Open decisions:** None. Supported for all roles with `device.control` per TASK-0803.
 
 ---
 

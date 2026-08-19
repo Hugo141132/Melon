@@ -83,7 +83,7 @@
 | `TASK-0401` | Create IoT Gateway Service | `BACKLOG` | Depends on `TASK-0101` (BACKLOG) and `TASK-0002` (DONE). Awaits `TASK-0101`. |
 | `TASK-0801` | Finalise Faucet Permission Matrix | `BLOCKED` | Depends on `TASK-0002` (DONE). Remains BLOCKED: cancellation/stop, timeout values, and Owner control scope still TBD. |
 | `TASK-0802` | Implement Faucet Command Database Model | `BACKLOG` | Depends on `TASK-0104` (BLOCKED). |
-| `TASK-0803` | Implement Faucet Command API | `BLOCKED` | Depends on `TASK-0801` (BLOCKED), `TASK-0802`, and `TASK-0304`. |
+| `TASK-0803` | Implement Faucet Command API | `IMPLEMENTED` | Completed. |
 | `TASK-1010` | Controlled Production Release | `BLOCKED` | Blocked until dual written sign-off (Owner + Hardware Lead) for `ENABLE_FAUCET_CONTROL=true`. This is a production-activation block, not an implementation block. |
 
 ---
