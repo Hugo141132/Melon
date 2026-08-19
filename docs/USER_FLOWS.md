@@ -171,7 +171,7 @@ flowchart TD
     B --> C[Verify control permission]
     C --> D[Verify selected-device access]
     D --> E[Verify device controllable state]
-    E --> F[User selects phase]
+    E --> F[User selects phase and provides plantCount]
     F --> G[Server maps phase to approved volume]
     G --> H[Show confirmation]
     H --> I{User confirms?}
@@ -214,8 +214,8 @@ flowchart TD
 
 ## Flow 1 — Unauthenticated Visitor Opens the Website
 
-**Primary actor:** Unauthenticated Visitor  
-**Preconditions:** No valid session exists.  
+**Primary actor:** Unauthenticated Visitor
+**Preconditions:** No valid session exists.
 **Trigger:** Visitor opens the root URL or a protected route.
 
 **Main success flow:**
@@ -236,19 +236,19 @@ flowchart TD
 
 - When session validation fails because of a server error, the system displays a safe error state and does not expose protected content.
 
-**Postconditions:** No protected data is disclosed.  
-**Required permissions:** None.  
-**Relevant account statuses:** None.  
-**UI states:** Login page, loading, authentication service error.  
-**Audit events:** Optional protected-route access denial.  
+**Postconditions:** No protected data is disclosed.
+**Required permissions:** None.
+**Relevant account statuses:** None.
+**UI states:** Login page, loading, authentication service error.
+**Audit events:** Optional protected-route access denial.
 **Open decisions:** Which public pages, besides login and registration, are allowed.
 
 ---
 
 ## Flow 2 — Admin Account Registration
 
-**Primary actor:** Prospective Admin  
-**Preconditions:** Visitor is not authenticated.  
+**Primary actor:** Prospective Admin
+**Preconditions:** Visitor is not authenticated.
 **Trigger:** Visitor submits the create-account form.
 
 **Main success flow:**
@@ -280,19 +280,19 @@ flowchart TD
 - Registration service unavailable.
 - Rate limit exceeded.
 
-**Postconditions:** A pending Admin account exists with an unverified or verified email, but cannot access protected pages until approved by an Owner.  
-**Required permissions:** `account.register`.  
-**Relevant account statuses:** Created as `PENDING_APPROVAL`.  
-**UI states:** Form, submitting, success/pending, validation error, server error.  
-**Audit events:** `account.registration.created`.  
+**Postconditions:** A pending Admin account exists with an unverified or verified email, but cannot access protected pages until approved by an Owner.
+**Required permissions:** `account.register`.
+**Relevant account statuses:** Created as `PENDING_APPROVAL`.
+**UI states:** Form, submitting, success/pending, validation error, server error.
+**Audit events:** `account.registration.created`.
 **Open decisions:** Notification channel for approval decisions.
 
 ---
 
 ## Flow 2b — Email Ownership Verification (DEC-AUTH-104 / TASK-0214)
 
-**Primary actor:** Prospective Admin or Initial Owner  
-**Preconditions:** Account exists with unverified email (`emailVerifiedAt IS NULL`). User is not currently authenticated (authenticated users navigating to `/verify-email` are redirected to `/` via server guest guard `DEC-AUTH-103`).  
+**Primary actor:** Prospective Admin or Initial Owner
+**Preconditions:** Account exists with unverified email (`emailVerifiedAt IS NULL`). User is not currently authenticated (authenticated users navigating to `/verify-email` are redirected to `/` via server guest guard `DEC-AUTH-103`).
 **Trigger:** User clicks verification link in email or opens `/verify-email?token=...`.
 
 **Main success flow:**
@@ -318,18 +318,18 @@ flowchart TD
 - Reopening consumed link: cache is clear, server returns HTTP 400 `TOKEN_ALREADY_USED`.
 - Concurrency conflict exhaustion: server returns HTTP 409 `CONCURRENCY_CONFLICT`.
 
-**Postconditions:** `emailVerifiedAt` is set; account status is preserved (`ADMIN` remains `PENDING_APPROVAL`, `OWNER` remains `ACTIVE`).  
-**Required permissions:** None (public verification endpoint; guest-only page).  
-**Relevant account statuses:** Any.  
-**UI states:** Verifying spinner, verification success, token invalid/expired error, resend cooldown.  
+**Postconditions:** `emailVerifiedAt` is set; account status is preserved (`ADMIN` remains `PENDING_APPROVAL`, `OWNER` remains `ACTIVE`).
+**Required permissions:** None (public verification endpoint; guest-only page).
+**Relevant account statuses:** Any.
+**UI states:** Verifying spinner, verification success, token invalid/expired error, resend cooldown.
 **Audit events:** `auth.email_verified`.
 
 ---
 
 ## Flow 2c — Resend Verification Email (DEC-AUTH-104 / TASK-0214)
 
-**Primary actor:** Unverified User (Admin or Owner)  
-**Preconditions:** User has registered but needs a new verification link.  
+**Primary actor:** Unverified User (Admin or Owner)
+**Preconditions:** User has registered but needs a new verification link.
 **Trigger:** User enters email and submits resend request on `/verify-email`.
 
 **Main success flow:**
@@ -345,17 +345,17 @@ flowchart TD
 
 - Rate limit exceeded (HTTP 429): frontend disables resend button and displays cooldown.
 
-**Postconditions:** Verification email dispatched if account eligible; no sensitive state leaked.  
-**Required permissions:** None (public rate-limited endpoint).  
-**UI states:** Resend form, cooldown countdown, success confirmation.  
+**Postconditions:** Verification email dispatched if account eligible; no sensitive state leaked.
+**Required permissions:** None (public rate-limited endpoint).
+**UI states:** Resend form, cooldown countdown, success confirmation.
 **Audit events:** Optional resend dispatch event.
 
 ---
 
 ## Flow 3 — Registration Validation Failure
 
-**Primary actor:** Prospective Admin  
-**Preconditions:** Registration form is open.  
+**Primary actor:** Prospective Admin
+**Preconditions:** Registration form is open.
 **Trigger:** Submitted data fails validation.
 
 **Main success flow:**
@@ -376,19 +376,19 @@ flowchart TD
 - Translation key missing: fallback language is used.
 - Network interruption: form data remains available where practical.
 
-**Postconditions:** No account is created.  
-**Required permissions:** None.  
-**Relevant account statuses:** None.  
-**UI states:** Inline field errors, error summary, retry.  
-**Audit events:** Optional rejected registration attempt; no sensitive data stored.  
+**Postconditions:** No account is created.
+**Required permissions:** None.
+**Relevant account statuses:** None.
+**UI states:** Inline field errors, error summary, retry.
+**Audit events:** Optional rejected registration attempt; no sensitive data stored.
 **Open decisions:** Password policy and rate-limit thresholds.
 
 ---
 
 ## Flow 4 — Admin Waiting for Owner Approval
 
-**Primary actor:** Prospective Admin  
-**Preconditions:** Account exists with `PENDING_APPROVAL`.  
+**Primary actor:** Prospective Admin
+**Preconditions:** Account exists with `PENDING_APPROVAL`.
 **Trigger:** Applicant opens the account-status page or attempts login.
 
 **Main success flow:**
@@ -409,19 +409,19 @@ flowchart TD
 - The system must not incorrectly treat `PENDING_APPROVAL` as active.
 - The system must not disclose Owner identities unless approved.
 
-**Postconditions:** The user remains unable to access protected features.  
-**Required permissions:** `account.status.read.self`.  
-**Relevant account statuses:** `PENDING_APPROVAL`.  
-**UI states:** Waiting approval, contact support, retry status.  
-**Audit events:** Optional status-view event.  
+**Postconditions:** The user remains unable to access protected features.
+**Required permissions:** `account.status.read.self`.
+**Relevant account statuses:** `PENDING_APPROVAL`.
+**UI states:** Waiting approval, contact support, retry status.
+**Audit events:** Optional status-view event.
 **Open decisions:** Whether pending users can edit registration data.
 
 ---
 
 ## Flow 5 — Owner Views Pending Registrations
 
-**Primary actor:** Owner  
-**Preconditions:** Owner is authenticated and `ACTIVE`.  
+**Primary actor:** Owner
+**Preconditions:** Owner is authenticated and `ACTIVE`.
 **Trigger:** Owner opens the pending-approvals page.
 
 **Main success flow:**
@@ -444,19 +444,19 @@ flowchart TD
 - Admin requests the endpoint: server returns `403`.
 - Registration no longer exists or is already decided: display updated state.
 
-**Postconditions:** No account status changes until the Owner acts.  
-**Required permissions:** `account.approve` and/or `account.reject`.  
-**Relevant account statuses:** Owner `ACTIVE`; targets `PENDING_APPROVAL` (verified).  
-**UI states:** Loading, list, empty, details, stale decision.  
-**Audit events:** Optional approval-record view.  
+**Postconditions:** No account status changes until the Owner acts.
+**Required permissions:** `account.approve` and/or `account.reject`.
+**Relevant account statuses:** Owner `ACTIVE`; targets `PENDING_APPROVAL` (verified).
+**UI states:** Loading, list, empty, details, stale decision.
+**Audit events:** Optional approval-record view.
 **Open decisions:** Multiple-Owner policy.
 
 ---
 
 ## Flow 6 — Owner Approves an Admin
 
-**Primary actor:** Owner  
-**Preconditions:** Owner is active; target is `PENDING_APPROVAL` with `emailVerifiedAt IS NOT NULL`.  
+**Primary actor:** Owner
+**Preconditions:** Owner is active; target is `PENDING_APPROVAL` with `emailVerifiedAt IS NOT NULL`.
 **Trigger:** Owner confirms approval.
 
 **Main success flow:**
@@ -475,18 +475,18 @@ flowchart TD
 - Target already approved or rejected: return HTTP 409 `INVALID_STATUS`.
 - Owner loses permission during the operation: return HTTP 403 `FORBIDDEN`.
 
-**Postconditions:** Account is approved and active; Admin can now log in.  
-**Required permissions:** `account.approve`.  
-**Relevant account statuses:** Target `PENDING_APPROVAL` -> `ACTIVE`.  
-**UI states:** Confirmation, processing, success, conflict, error.  
+**Postconditions:** Account is approved and active; Admin can now log in.
+**Required permissions:** `account.approve`.
+**Relevant account statuses:** Target `PENDING_APPROVAL` -> `ACTIVE`.
+**UI states:** Confirmation, processing, success, conflict, error.
 **Audit events:** `account.approved`.
 
 ---
 
 ## Flow 7 — Owner Rejects an Admin
 
-**Primary actor:** Owner  
-**Preconditions:** Owner is active; target is `PENDING_APPROVAL` with `emailVerifiedAt IS NOT NULL`.  
+**Primary actor:** Owner
+**Preconditions:** Owner is active; target is `PENDING_APPROVAL` with `emailVerifiedAt IS NOT NULL`.
 **Trigger:** Owner confirms rejection.
 
 **Main success flow:**
@@ -504,18 +504,18 @@ flowchart TD
 - Target is unverified (`emailVerifiedAt IS NULL`): return HTTP 409 `INVALID_STATUS`.
 - Target already decided: return HTTP 409 `INVALID_STATUS`.
 
-**Postconditions:** Target status is `REJECTED`; target cannot log in.  
-**Required permissions:** `account.reject`.  
-**Relevant account statuses:** Target `PENDING_APPROVAL` to `REJECTED`.  
-**UI states:** Confirmation, reason field, success, conflict.  
+**Postconditions:** Target status is `REJECTED`; target cannot log in.
+**Required permissions:** `account.reject`.
+**Relevant account statuses:** Target `PENDING_APPROVAL` to `REJECTED`.
+**UI states:** Confirmation, reason field, success, conflict.
 **Audit events:** `account.rejected`.
 
 ---
 
 ## Flow 8 — Approved Admin Logs In
 
-**Primary actor:** Admin  
-**Preconditions:** Account is `ACTIVE`; `emailVerifiedAt IS NOT NULL`; valid credentials exist.  
+**Primary actor:** Admin
+**Preconditions:** Account is `ACTIVE`; `emailVerifiedAt IS NOT NULL`; valid credentials exist.
 **Trigger:** Admin submits login form.
 
 **Main success flow:**
@@ -539,19 +539,19 @@ flowchart TD
 - Authentication service failure.
 - Account changed to suspended before session creation.
 
-**Postconditions:** Admin has an authenticated session with current permissions.  
-**Required permissions:** None beyond active account eligibility.  
-**Relevant account statuses:** `ACTIVE`.  
-**UI states:** Login, loading, dashboard, no devices.  
-**Audit events:** `auth.login.success`; failures as appropriate.  
+**Postconditions:** Admin has an authenticated session with current permissions.
+**Required permissions:** None beyond active account eligibility.
+**Relevant account statuses:** `ACTIVE`.
+**UI states:** Login, loading, dashboard, no devices.
+**Audit events:** `auth.login.success`; failures as appropriate.
 **Open decisions:** Session duration and multi-factor authentication.
 
 ---
 
 ## Flow 9 — Pending Admin Attempts to Log In
 
-**Primary actor:** Admin applicant  
-**Preconditions:** Account status `PENDING_APPROVAL`.  
+**Primary actor:** Admin applicant
+**Preconditions:** Account status `PENDING_APPROVAL`.
 **Trigger:** Login attempt.
 
 **Main success flow:**
@@ -561,21 +561,21 @@ flowchart TD
 3. The server refuses protected-session creation.
 4. The system displays an approval-pending message.
 
-**Alternative flows:** None.  
-**Error flows:** The frontend must not redirect to protected pages.  
-**Postconditions:** No protected session exists.  
-**Required permissions:** `account.status.read.self` only.  
-**Relevant account statuses:** `PENDING_APPROVAL`.  
-**UI states:** Pending approval.  
-**Audit events:** Optional blocked login by status.  
+**Alternative flows:** None.
+**Error flows:** The frontend must not redirect to protected pages.
+**Postconditions:** No protected session exists.
+**Required permissions:** `account.status.read.self` only.
+**Relevant account statuses:** `PENDING_APPROVAL`.
+**UI states:** Pending approval.
+**Audit events:** Optional blocked login by status.
 **Open decisions:** Whether a limited status session is used.
 
 ---
 
 ## Flow 10 — Rejected Admin Attempts to Log In
 
-**Primary actor:** Rejected applicant  
-**Preconditions:** Account status `REJECTED`.  
+**Primary actor:** Rejected applicant
+**Preconditions:** Account status `REJECTED`.
 **Trigger:** Login attempt.
 
 **Main success flow:**
@@ -585,21 +585,21 @@ flowchart TD
 3. The server denies protected access.
 4. The system displays an appropriate rejected-account message.
 
-**Alternative flows:** Provide approved support or reapplication instructions.  
-**Error flows:** Do not disclose internal review notes unless policy allows.  
-**Postconditions:** No protected session exists.  
-**Required permissions:** Limited self-status access.  
-**Relevant account statuses:** `REJECTED`.  
-**UI states:** Rejected status.  
-**Audit events:** Optional blocked login.  
+**Alternative flows:** Provide approved support or reapplication instructions.
+**Error flows:** Do not disclose internal review notes unless policy allows.
+**Postconditions:** No protected session exists.
+**Required permissions:** Limited self-status access.
+**Relevant account statuses:** `REJECTED`.
+**UI states:** Rejected status.
+**Audit events:** Optional blocked login.
 **Open decisions:** Reapplication policy.
 
 ---
 
 ## Flow 11 — Suspended or Deactivated User Attempts to Log In
 
-**Primary actor:** Owner or Admin with restricted status  
-**Preconditions:** Account is `SUSPENDED` or `DEACTIVATED`.  
+**Primary actor:** Owner or Admin with restricted status
+**Preconditions:** Account is `SUSPENDED` or `DEACTIVATED`.
 **Trigger:** Login attempt.
 
 **Main success flow:**
@@ -610,21 +610,21 @@ flowchart TD
 4. The system displays a safe status-specific message.
 5. The system provides approved support instructions where applicable.
 
-**Alternative flows:** A suspended user may later be reactivated by an Owner.  
-**Error flows:** Existing stale sessions must not remain authorised.  
-**Postconditions:** Protected access remains blocked.  
-**Required permissions:** None.  
-**Relevant account statuses:** `SUSPENDED`, `DEACTIVATED`.  
-**UI states:** Suspended, deactivated.  
-**Audit events:** Blocked login; status-change event already exists.  
+**Alternative flows:** A suspended user may later be reactivated by an Owner.
+**Error flows:** Existing stale sessions must not remain authorised.
+**Postconditions:** Protected access remains blocked.
+**Required permissions:** None.
+**Relevant account statuses:** `SUSPENDED`, `DEACTIVATED`.
+**UI states:** Suspended, deactivated.
+**Audit events:** Blocked login; status-change event already exists.
 **Open decisions:** Reactivation process.
 
 ---
 
 ## Flow 12 — User Logs Out
 
-**Primary actor:** Owner or Admin  
-**Preconditions:** Valid session exists.  
+**Primary actor:** Owner or Admin
+**Preconditions:** Valid session exists.
 **Trigger:** User selects logout.
 
 **Main success flow:**
@@ -635,21 +635,21 @@ flowchart TD
 4. The user is redirected to login.
 5. Back navigation does not reveal protected data.
 
-**Alternative flows:** Automatic logout after session expiry.  
-**Error flows:** If network logout fails, local credentials are still cleared and the server session expires according to policy.  
-**Postconditions:** No valid application session remains.  
-**Required permissions:** Authenticated user.  
-**Relevant account statuses:** Normally `ACTIVE`.  
-**UI states:** Logging out, login page.  
-**Audit events:** Optional `auth.logout`.  
+**Alternative flows:** Automatic logout after session expiry.
+**Error flows:** If network logout fails, local credentials are still cleared and the server session expires according to policy.
+**Postconditions:** No valid application session remains.
+**Required permissions:** Authenticated user.
+**Relevant account statuses:** Normally `ACTIVE`.
+**UI states:** Logging out, login page.
+**Audit events:** Optional `auth.logout`.
 **Open decisions:** Session revocation mechanism (Resolved: database session revocation per `TASK-0908`).
 
 ---
 
 ## Flow 12A — Password Recovery and Email Reset Flow (FLOW-AUTH-008)
 
-**Primary actor:** Any user with an existing account / Visitor  
-**Preconditions:** User is unauthenticated.  
+**Primary actor:** Any user with an existing account / Visitor
+**Preconditions:** User is unauthenticated.
 **Trigger:** User clicks "Forgot Password?" or opens `/forgot-password`.
 
 **Main success flow:**
@@ -673,15 +673,15 @@ flowchart TD
 - Weak password: shows validation error without consuming token.
 - Rate limit exceeded (3/min on forgot, 5/min on reset): returns `429 Too Many Requests`.
 
-**Postconditions:** Password updated, active sessions revoked, account status preserved.  
+**Postconditions:** Password updated, active sessions revoked, account status preserved.
 **Audit events:** `auth.password_reset.requested`, `auth.password_reset.completed`.
 
 ---
 
 ## Flow 12B — Authenticated User Visits Guest-Only Route (FLOW-AUTH-009)
 
-**Primary actor:** Authenticated User with `ACTIVE` session  
-**Preconditions:** Valid active session exists in PostgreSQL.  
+**Primary actor:** Authenticated User with `ACTIVE` session
+**Preconditions:** Valid active session exists in PostgreSQL.
 **Trigger:** User navigates to `/login`, `/register`, `/forgot-password`, or `/reset-password`.
 
 **Main success flow:**
@@ -704,8 +704,8 @@ flowchart TD
 
 ## Flow 13 — Owner Views Their Own Profile
 
-**Primary actor:** Owner  
-**Preconditions:** Active Owner session.  
+**Primary actor:** Owner
+**Preconditions:** Active Owner session.
 **Trigger:** Owner opens profile.
 
 **Main success flow:**
@@ -715,21 +715,21 @@ flowchart TD
 3. The server returns the Owner's permitted profile data.
 4. The frontend displays system-managed fields as read-only.
 
-**Alternative flows:** Profile data is partially unavailable; show an error without exposing secrets.  
-**Error flows:** Session expired: redirect to login.  
-**Postconditions:** No data changes.  
-**Required permissions:** `profile.self.read`.  
-**Relevant account statuses:** `ACTIVE`.  
-**UI states:** Loading, profile, error.  
-**Audit events:** Normally none.  
+**Alternative flows:** Profile data is partially unavailable; show an error without exposing secrets.
+**Error flows:** Session expired: redirect to login.
+**Postconditions:** No data changes.
+**Required permissions:** `profile.self.read`.
+**Relevant account statuses:** `ACTIVE`.
+**UI states:** Loading, profile, error.
+**Audit events:** Normally none.
 **Open decisions:** Exact profile fields.
 
 ---
 
 ## Flow 14 — Owner Edits Their Own Profile
 
-**Primary actor:** Owner  
-**Preconditions:** Active Owner; profile open.  
+**Primary actor:** Owner
+**Preconditions:** Active Owner; profile open.
 **Trigger:** Owner submits changes.
 
 **Main success flow:**
@@ -742,21 +742,21 @@ flowchart TD
 6. The system records an audit event.
 7. The frontend shows success.
 
-**Alternative flows:** Email change requires reverification: `TBD`.  
-**Error flows:** Validation failure, duplicate email, stale version conflict.  
-**Postconditions:** Own profile is updated.  
-**Required permissions:** `profile.self.update`.  
-**Relevant account statuses:** `ACTIVE`.  
-**UI states:** Edit, saving, success, validation errors.  
-**Audit events:** `profile.self.updated`.  
+**Alternative flows:** Email change requires reverification: `TBD`.
+**Error flows:** Validation failure, duplicate email, stale version conflict.
+**Postconditions:** Own profile is updated.
+**Required permissions:** `profile.self.update`.
+**Relevant account statuses:** `ACTIVE`.
+**UI states:** Edit, saving, success, validation errors.
+**Audit events:** `profile.self.updated`.
 **Open decisions:** Editable fields and email-change policy.
 
 ---
 
 ## Flow 15 — Owner Views Another User's Profile
 
-**Primary actor:** Owner  
-**Preconditions:** Active Owner; target user exists within scope.  
+**Primary actor:** Owner
+**Preconditions:** Active Owner; target user exists within scope.
 **Trigger:** Owner selects a user.
 
 **Main success flow:**
@@ -766,21 +766,21 @@ flowchart TD
 3. The server returns permitted profile and access data.
 4. The frontend displays role, status, device assignments, and approval history as allowed.
 
-**Alternative flows:** Target is another Owner; behaviour is `TBD`.  
-**Error flows:** Out-of-scope target returns forbidden or concealed not-found.  
-**Postconditions:** No data changes.  
-**Required permissions:** `profile.other.read`.  
-**Relevant account statuses:** Owner `ACTIVE`; target any retained status.  
-**UI states:** Loading, user profile, not found, forbidden.  
-**Audit events:** Optional sensitive profile view.  
+**Alternative flows:** Target is another Owner; behaviour is `TBD`.
+**Error flows:** Out-of-scope target returns forbidden or concealed not-found.
+**Postconditions:** No data changes.
+**Required permissions:** `profile.other.read`.
+**Relevant account statuses:** Owner `ACTIVE`; target any retained status.
+**UI states:** Loading, user profile, not found, forbidden.
+**Audit events:** Optional sensitive profile view.
 **Open decisions:** Multiple-Owner management.
 
 ---
 
 ## Flow 16 — Owner Edits Another User's Permitted Profile Fields
 
-**Primary actor:** Owner  
-**Preconditions:** Owner may manage target user.  
+**Primary actor:** Owner
+**Preconditions:** Owner may manage target user.
 **Trigger:** Owner submits edits.
 
 **Main success flow:**
@@ -793,21 +793,21 @@ flowchart TD
 6. The server records before/after values where appropriate.
 7. The frontend confirms success.
 
-**Alternative flows:** Role or status changes use separate dedicated actions.  
-**Error flows:** Attempt to edit immutable or secret fields is rejected.  
-**Postconditions:** Target profile is updated.  
-**Required permissions:** `profile.other.update`.  
-**Relevant account statuses:** Owner `ACTIVE`; target varies.  
-**UI states:** Edit, saving, success, field errors.  
-**Audit events:** `profile.other.updated`.  
+**Alternative flows:** Role or status changes use separate dedicated actions.
+**Error flows:** Attempt to edit immutable or secret fields is rejected.
+**Postconditions:** Target profile is updated.
+**Required permissions:** `profile.other.update`.
+**Relevant account statuses:** Owner `ACTIVE`; target varies.
+**UI states:** Edit, saving, success, field errors.
+**Audit events:** `profile.other.updated`.
 **Open decisions:** Exact Owner-editable fields.
 
 ---
 
 ## Flow 17 — Owner Suspends or Deactivates an Admin
 
-**Primary actor:** Owner  
-**Preconditions:** Active Owner; target is an Admin within scope.  
+**Primary actor:** Owner
+**Preconditions:** Active Owner; target is an Admin within scope.
 **Trigger:** Owner confirms suspension or deactivation.
 
 **Main success flow:**
@@ -820,21 +820,21 @@ flowchart TD
 6. The system records the action and reason.
 7. The Owner receives confirmation.
 
-**Alternative flows:** Owner reactivates a suspended Admin if policy permits.  
-**Error flows:** Admin already deactivated; target is unauthorised; session invalidation service fails.  
-**Postconditions:** Target loses protected access.  
-**Required permissions:** `account.suspend` or `account.deactivate`.  
-**Relevant account statuses:** Target usually `ACTIVE`.  
-**UI states:** Confirmation, processing, success, conflict.  
-**Audit events:** `account.suspended` or `account.deactivated`.  
+**Alternative flows:** Owner reactivates a suspended Admin if policy permits.
+**Error flows:** Admin already deactivated; target is unauthorised; session invalidation service fails.
+**Postconditions:** Target loses protected access.
+**Required permissions:** `account.suspend` or `account.deactivate`.
+**Relevant account statuses:** Target usually `ACTIVE`.
+**UI states:** Confirmation, processing, success, conflict.
+**Audit events:** `account.suspended` or `account.deactivated`.
 **Open decisions:** Reactivation process and mandatory reasons.
 
 ---
 
 ## Flow 18 — Admin Views Their Own Profile
 
-**Primary actor:** Admin  
-**Preconditions:** Active Admin session.  
+**Primary actor:** Admin
+**Preconditions:** Active Admin session.
 **Trigger:** Admin opens profile.
 
 **Main success flow:**
@@ -844,21 +844,21 @@ flowchart TD
 3. The system returns only the Admin's own profile.
 4. The frontend displays role and account status as read-only.
 
-**Alternative flows:** None.  
-**Error flows:** Session expired.  
-**Postconditions:** No data changes.  
-**Required permissions:** `profile.self.read`.  
-**Relevant account statuses:** `ACTIVE`.  
-**UI states:** Loading, profile, error.  
-**Audit events:** Normally none.  
+**Alternative flows:** None.
+**Error flows:** Session expired.
+**Postconditions:** No data changes.
+**Required permissions:** `profile.self.read`.
+**Relevant account statuses:** `ACTIVE`.
+**UI states:** Loading, profile, error.
+**Audit events:** Normally none.
 **Open decisions:** Exact fields.
 
 ---
 
 ## Flow 19 — Admin Edits Their Own Profile
 
-**Primary actor:** Admin  
-**Preconditions:** Active Admin.  
+**Primary actor:** Admin
+**Preconditions:** Active Admin.
 **Trigger:** Admin saves permitted changes.
 
 **Main success flow:**
@@ -871,21 +871,21 @@ flowchart TD
 6. The system records an audit event.
 7. The frontend shows success.
 
-**Alternative flows:** Password update uses a dedicated flow.  
-**Error flows:** Invalid data, duplicate email, unauthorised field injection.  
-**Postconditions:** Admin's own profile is updated.  
-**Required permissions:** `profile.self.update`.  
-**Relevant account statuses:** `ACTIVE`.  
-**UI states:** Edit, saving, success, validation error.  
-**Audit events:** `profile.self.updated`.  
+**Alternative flows:** Password update uses a dedicated flow.
+**Error flows:** Invalid data, duplicate email, unauthorised field injection.
+**Postconditions:** Admin's own profile is updated.
+**Required permissions:** `profile.self.update`.
+**Relevant account statuses:** `ACTIVE`.
+**UI states:** Edit, saving, success, validation error.
+**Audit events:** `profile.self.updated`.
 **Open decisions:** Email-change policy.
 
 ---
 
 ## Flow 20 — Admin Attempts to Access Another User's Profile
 
-**Primary actor:** Admin  
-**Preconditions:** Active Admin.  
+**Primary actor:** Admin
+**Preconditions:** Active Admin.
 **Trigger:** Admin changes a URL, request body, or API parameter to another user ID.
 
 **Main success flow:**
@@ -896,13 +896,13 @@ flowchart TD
 4. The server returns `403` or concealed `404`.
 5. No private profile data is returned.
 
-**Alternative flows:** None.  
-**Error flows:** Frontend may show a generic access-denied page.  
-**Postconditions:** No unauthorised access occurs.  
-**Required permissions:** Missing by design.  
-**Relevant account statuses:** `ACTIVE`.  
-**UI states:** Forbidden or not found.  
-**Audit events:** High-risk authorisation denial may be recorded.  
+**Alternative flows:** None.
+**Error flows:** Frontend may show a generic access-denied page.
+**Postconditions:** No unauthorised access occurs.
+**Required permissions:** Missing by design.
+**Relevant account statuses:** `ACTIVE`.
+**UI states:** Forbidden or not found.
+**Audit events:** High-risk authorisation denial may be recorded.
 **Open decisions:** Whether to use `403` or concealed `404`.
 
 ---
@@ -911,8 +911,8 @@ flowchart TD
 
 ## Flow 21 — Owner Assigns a Device to an Admin
 
-**Primary actor:** Owner  
-**Preconditions:** Owner active; target Admin and device are within scope.  
+**Primary actor:** Owner
+**Preconditions:** Owner active; target Admin and device are within scope.
 **Trigger:** Owner confirms assignment.
 
 **Main success flow:**
@@ -926,21 +926,21 @@ flowchart TD
 7. The system records who assigned it and when.
 8. The Admin's effective access updates.
 
-**Alternative flows:** Existing assignment is already active; system reports no change.  
-**Error flows:** Device inactive, target not Admin, out-of-scope resource, duplicate conflict.  
-**Postconditions:** Admin may access the device according to granted permissions.  
-**Required permissions:** `device.assign`.  
-**Relevant account statuses:** Owner `ACTIVE`; Admin usually `ACTIVE`.  
-**UI states:** Device list, selected, saving, success.  
-**Audit events:** `device.access.assigned`.  
+**Alternative flows:** Existing assignment is already active; system reports no change.
+**Error flows:** Device inactive, target not Admin, out-of-scope resource, duplicate conflict.
+**Postconditions:** Admin may access the device according to granted permissions.
+**Required permissions:** `device.assign`.
+**Relevant account statuses:** Owner `ACTIVE`; Admin usually `ACTIVE`.
+**UI states:** Device list, selected, saving, success.
+**Audit events:** `device.access.assigned`.
 **Open decisions:** Site/organisation scope and whether pending Admins can receive assignments.
 
 ---
 
 ## Flow 22 — Owner Removes Device Access from an Admin
 
-**Primary actor:** Owner  
-**Preconditions:** Active assignment exists.  
+**Primary actor:** Owner
+**Preconditions:** Active assignment exists.
 **Trigger:** Owner confirms removal.
 
 **Main success flow:**
@@ -953,13 +953,13 @@ flowchart TD
 6. Relevant live views stop receiving new device data.
 7. The system records the removal.
 
-**Alternative flows:** No active assignment exists; return no-op or conflict.  
-**Error flows:** Active faucet command exists: handling is `TBD`.  
-**Postconditions:** Admin can no longer access the device.  
-**Required permissions:** `device.unassign`.  
-**Relevant account statuses:** Owner and Admin generally `ACTIVE`.  
-**UI states:** Confirmation, success, revoked access.  
-**Audit events:** `device.access.removed`.  
+**Alternative flows:** No active assignment exists; return no-op or conflict.
+**Error flows:** Active faucet command exists: handling is `TBD`.
+**Postconditions:** Admin can no longer access the device.
+**Required permissions:** `device.unassign`.
+**Relevant account statuses:** Owner and Admin generally `ACTIVE`.
+**UI states:** Confirmation, success, revoked access.
+**Audit events:** `device.access.removed`.
 **Open decisions:** Behaviour during active control sessions.
 
 ---
@@ -968,8 +968,8 @@ flowchart TD
 
 ## Flow 23 — User Opens the Monitoring Dashboard
 
-**Primary actor:** Owner or Admin  
-**Preconditions:** Active authenticated session.  
+**Primary actor:** Owner or Admin
+**Preconditions:** Active authenticated session.
 **Trigger:** User opens dashboard.
 
 **Main success flow:**
@@ -1045,8 +1045,8 @@ flowchart TD
 
 ## Flow 26 — Selected Device Is Online
 
-**Primary actor:** Owner or Admin  
-**Preconditions:** Selected device is authorised and currently online.  
+**Primary actor:** Owner or Admin
+**Preconditions:** Selected device is authorised and currently online.
 **Trigger:** Device state is received.
 
 **Main success flow:**
@@ -1056,21 +1056,21 @@ flowchart TD
 3. Current monitoring values are loaded.
 4. Controls are evaluated independently for permission and controllable state.
 
-**Alternative flows:** Data is stale although connection is online; stale state takes precedence for data components.  
-**Error flows:** Conflicting status sources are resolved according to the communication specification.  
-**Postconditions:** Online device state is visible.  
-**Required permissions:** `device.read`.  
-**Relevant account statuses:** User `ACTIVE`.  
-**UI states:** Online badge, current data.  
-**Audit events:** Device status events may be recorded.  
+**Alternative flows:** Data is stale although connection is online; stale state takes precedence for data components.
+**Error flows:** Conflicting status sources are resolved according to the communication specification.
+**Postconditions:** Online device state is visible.
+**Required permissions:** `device.read`.
+**Relevant account statuses:** User `ACTIVE`.
+**UI states:** Online badge, current data.
+**Audit events:** Device status events may be recorded.
 **Open decisions:** Online heartbeat and stale thresholds.
 
 ---
 
 ## Flow 27 — Selected Device Is Offline
 
-**Primary actor:** Owner or Admin  
-**Preconditions:** Selected device is authorised but offline.  
+**Primary actor:** Owner or Admin
+**Preconditions:** Selected device is authorised but offline.
 **Trigger:** Offline status or heartbeat timeout.
 
 **Main success flow:**
@@ -1082,21 +1082,21 @@ flowchart TD
 5. The backend rejects control requests for the offline device.
 6. Historical data remains accessible where permitted.
 
-**Alternative flows:** Device reconnects and status updates automatically.  
-**Error flows:** Unknown state is not falsely labelled online.  
-**Postconditions:** User understands that live communication is unavailable.  
-**Required permissions:** `device.read`; control separately denied by state.  
-**Relevant account statuses:** `ACTIVE`.  
-**UI states:** Offline, last known data, control unavailable.  
-**Audit events:** Device offline event if supported.  
+**Alternative flows:** Device reconnects and status updates automatically.
+**Error flows:** Unknown state is not falsely labelled online.
+**Postconditions:** User understands that live communication is unavailable.
+**Required permissions:** `device.read`; control separately denied by state.
+**Relevant account statuses:** `ACTIVE`.
+**UI states:** Offline, last known data, control unavailable.
+**Audit events:** Device offline event if supported.
 **Open decisions:** Offline threshold.
 
 ---
 
 ## Flow 28 — Monitoring Data Is Loading
 
-**Primary actor:** Owner or Admin  
-**Preconditions:** Monitoring request is in progress.  
+**Primary actor:** Owner or Admin
+**Preconditions:** Monitoring request is in progress.
 **Trigger:** Dashboard or device change.
 
 **Main success flow:**
@@ -1106,21 +1106,21 @@ flowchart TD
 3. Controls requiring current state remain unavailable until validation completes.
 4. The loading state ends on success or failure.
 
-**Alternative flows:** Cached data may be shown only when clearly labelled.  
-**Error flows:** Request timeout transitions to error or stale state.  
-**Postconditions:** No misleading data is shown.  
-**Required permissions:** Relevant read permissions.  
-**Relevant account statuses:** `ACTIVE`.  
-**UI states:** Loading.  
-**Audit events:** None.  
+**Alternative flows:** Cached data may be shown only when clearly labelled.
+**Error flows:** Request timeout transitions to error or stale state.
+**Postconditions:** No misleading data is shown.
+**Required permissions:** Relevant read permissions.
+**Relevant account statuses:** `ACTIVE`.
+**UI states:** Loading.
+**Audit events:** None.
 **Open decisions:** Cache policy.
 
 ---
 
 ## Flow 29 — Monitoring Data Is Empty
 
-**Primary actor:** Owner or Admin  
-**Preconditions:** Device is authorised but has no readings for the requested context.  
+**Primary actor:** Owner or Admin
+**Preconditions:** Device is authorised but has no readings for the requested context.
 **Trigger:** Server returns no measurements.
 
 **Main success flow:**
@@ -1130,21 +1130,21 @@ flowchart TD
 3. Each affected component avoids displaying fabricated values.
 4. Historical filters may be adjusted.
 
-**Alternative flows:** Some metrics have values while others are empty.  
-**Error flows:** Empty response must not be rendered as `0`.  
-**Postconditions:** Data absence is clear.  
-**Required permissions:** Relevant read permission.  
-**Relevant account statuses:** `ACTIVE`.  
-**UI states:** Empty metric or empty page.  
-**Audit events:** None.  
+**Alternative flows:** Some metrics have values while others are empty.
+**Error flows:** Empty response must not be rendered as `0`.
+**Postconditions:** Data absence is clear.
+**Required permissions:** Relevant read permission.
+**Relevant account statuses:** `ACTIVE`.
+**UI states:** Empty metric or empty page.
+**Audit events:** None.
 **Open decisions:** Partial-data presentation standards.
 
 ---
 
 ## Flow 30 — Monitoring Data Is Stale
 
-**Primary actor:** Owner or Admin  
-**Preconditions:** Latest reading exceeds the stale threshold.  
+**Primary actor:** Owner or Admin
+**Preconditions:** Latest reading exceeds the stale threshold.
 **Trigger:** Data freshness evaluation.
 
 **Main success flow:**
@@ -1155,21 +1155,21 @@ flowchart TD
 4. The system avoids representing stale data as current.
 5. Faucet control evaluates device and state rules independently.
 
-**Alternative flows:** Device remains online but readings are stale.  
-**Error flows:** Missing timestamp is treated as unknown or invalid, not current.  
-**Postconditions:** User sees last-known values with a warning.  
-**Required permissions:** Relevant monitoring read permission.  
-**Relevant account statuses:** `ACTIVE`.  
-**UI states:** Stale warning.  
-**Audit events:** Optional stale-data alert.  
+**Alternative flows:** Device remains online but readings are stale.
+**Error flows:** Missing timestamp is treated as unknown or invalid, not current.
+**Postconditions:** User sees last-known values with a warning.
+**Required permissions:** Relevant monitoring read permission.
+**Relevant account statuses:** `ACTIVE`.
+**UI states:** Stale warning.
+**Audit events:** Optional stale-data alert.
 **Open decisions:** Exact stale threshold.
 
 ---
 
 ## Flow 31 — Monitoring Data Is Invalid
 
-**Primary actor:** Owner or Admin  
-**Preconditions:** Payload or value fails the agreed contract.  
+**Primary actor:** Owner or Admin
+**Preconditions:** Payload or value fails the agreed contract.
 **Trigger:** Validation failure.
 
 **Main success flow:**
@@ -1180,21 +1180,21 @@ flowchart TD
 4. The UI does not display a fabricated replacement.
 5. The system records a validation or integration event.
 
-**Alternative flows:** Only one field is invalid; unaffected fields remain visible if contract permits partial acceptance.  
-**Error flows:** Repeated invalid payloads may generate an alert.  
-**Postconditions:** Invalid values do not silently replace valid data.  
-**Required permissions:** Monitoring read to view state.  
-**Relevant account statuses:** `ACTIVE`.  
-**UI states:** Invalid metric, integration error.  
-**Audit events:** Device payload validation event.  
+**Alternative flows:** Only one field is invalid; unaffected fields remain visible if contract permits partial acceptance.
+**Error flows:** Repeated invalid payloads may generate an alert.
+**Postconditions:** Invalid values do not silently replace valid data.
+**Required permissions:** Monitoring read to view state.
+**Relevant account statuses:** `ACTIVE`.
+**UI states:** Invalid metric, integration error.
+**Audit events:** Device payload validation event.
 **Open decisions:** Partial-payload acceptance.
 
 ---
 
 ## Flow 32 — User Views Historical Data
 
-**Primary actor:** Owner or Admin  
-**Preconditions:** Active user; device authorised.  
+**Primary actor:** Owner or Admin
+**Preconditions:** Active user; device authorised.
 **Trigger:** User opens domain telemetry page (`/soil` or `/water`; legacy `/tanah` and `/air` return 404 Not Found).
 
 **Main success flow:**
@@ -1208,21 +1208,21 @@ flowchart TD
 7. Telemetry EC values stored in `mS/cm` are converted to `µS/cm` (×1000) for display.
 8. Dates and numbers are formatted using the active locale (`id-ID`).
 
-**Alternative flows:** No historical readings exist; API returns HTTP 200 with an empty series array and the UI displays a no-data banner.  
-**Error flows:** Date range exceeds 31 days (HTTP 400 `DATE_RANGE_EXCEEDED`), query failure, or unauthorised device access (HTTP 403/404).  
-**Postconditions:** Historical data is visible for one authorised device.  
-**Required permissions:** `monitoring.history.read`.  
-**Relevant account statuses:** `ACTIVE`.  
-**UI states:** Loading, chart, table, empty, error.  
-**Audit events:** Normally none; exports separately audited if needed.  
+**Alternative flows:** No historical readings exist; API returns HTTP 200 with an empty series array and the UI displays a no-data banner.
+**Error flows:** Date range exceeds 31 days (HTTP 400 `DATE_RANGE_EXCEEDED`), query failure, or unauthorised device access (HTTP 403/404).
+**Postconditions:** Historical data is visible for one authorised device.
+**Required permissions:** `monitoring.history.read`.
+**Relevant account statuses:** `ACTIVE`.
+**UI states:** Loading, chart, table, empty, error.
+**Audit events:** Normally none; exports separately audited if needed.
 **Open decisions:** Default range, retention, aggregation, export.
 
 ---
 
 ## Flow 33 — User Changes the Historical Date Range
 
-**Primary actor:** Owner or Admin  
-**Preconditions:** History page open.  
+**Primary actor:** Owner or Admin
+**Preconditions:** History page open.
 **Trigger:** User submits a new range.
 
 **Main success flow:**
@@ -1234,13 +1234,13 @@ flowchart TD
 5. Charts and tables update.
 6. The selected range remains visible.
 
-**Alternative flows:** Aggregation level changes automatically for long periods.  
-**Error flows:** Invalid range, unsupported future dates, excessive range.  
-**Postconditions:** History reflects the selected period.  
-**Required permissions:** `monitoring.history.read`.  
-**Relevant account statuses:** `ACTIVE`.  
-**UI states:** Filtering, loading, results, range error.  
-**Audit events:** None.  
+**Alternative flows:** Aggregation level changes automatically for long periods.
+**Error flows:** Invalid range, unsupported future dates, excessive range.
+**Postconditions:** History reflects the selected period.
+**Required permissions:** `monitoring.history.read`.
+**Relevant account statuses:** `ACTIVE`.
+**UI states:** Filtering, loading, results, range error.
+**Audit events:** None.
 **Open decisions:** Maximum range and aggregation rules.
 
 ---
@@ -1249,8 +1249,8 @@ flowchart TD
 
 ## Flow 34 — User Changes the Website Language in Settings
 
-**Primary actor:** Owner or Admin  
-**Preconditions:** User is on the Settings page (`/settings`). Language selector is available.  
+**Primary actor:** Owner or Admin
+**Preconditions:** User is on the Settings page (`/settings`). Language selector is available.
 **Trigger:** User selects English (`en`) or Bahasa Indonesia (`id`).
 
 **Main success flow:**
@@ -1263,21 +1263,21 @@ flowchart TD
 6. For authenticated users, the preference is saved to their profile (`preferredLocale`).
 7. For unauthenticated visitors who previously selected language via the initial gate, preference is stored in non-prefixed cookie (`locale`).
 
-**Alternative flows:** Missing translation falls back to fallback language (`en`).  
-**Error flows:** Unsupported locale is rejected and fallback is applied.  
-**Postconditions:** Interface language changes without changing access.  
-**Required permissions:** `language.self.update` for authenticated persistence.  
-**Relevant account statuses:** Any page-eligible status.  
-**UI states:** Settings language option selected, applying, applied.  
-**Audit events:** Usually none, or preference update audit record.  
+**Alternative flows:** Missing translation falls back to fallback language (`en`).
+**Error flows:** Unsupported locale is rejected and fallback is applied.
+**Postconditions:** Interface language changes without changing access.
+**Required permissions:** `language.self.update` for authenticated persistence.
+**Relevant account statuses:** Any page-eligible status.
+**UI states:** Settings language option selected, applying, applied.
+**Audit events:** Usually none, or preference update audit record.
 **Open decisions:** None (Default locale `id`, fallback locale `en` approved; all UI text wired to `next-intl` keys under `TASK-0603`; Settings modal language switcher and initial language gate implemented and verified under `TASK-0604`).
 
 ---
 
 ## Flow 35 — User Refreshes After Changing Language
 
-**Primary actor:** Owner, Admin, or visitor  
-**Preconditions:** A language preference has been stored in profile or cookie.  
+**Primary actor:** Owner, Admin, or visitor
+**Preconditions:** A language preference has been stored in profile or cookie.
 **Trigger:** Page refresh or new session.
 
 **Main success flow:**
@@ -1289,13 +1289,13 @@ flowchart TD
 5. Missing keys use fallback language (`en`).
 6. Permission checks continue using canonical values.
 
-**Alternative flows:** Invalid stored locale defaults to `id` / fallback `en`.  
-**Error flows:** Invalid stored locale is ignored and fallback applied.  
-**Postconditions:** Language choice persists across navigation and page refresh.  
-**Required permissions:** None for reading own preference.  
-**Relevant account statuses:** Any eligible page state.  
-**UI states:** Correct locale rendered on initial page render without path redirect.  
-**Audit events:** None.  
+**Alternative flows:** Invalid stored locale defaults to `id` / fallback `en`.
+**Error flows:** Invalid stored locale is ignored and fallback applied.
+**Postconditions:** Language choice persists across navigation and page refresh.
+**Required permissions:** None for reading own preference.
+**Relevant account statuses:** Any eligible page state.
+**UI states:** Correct locale rendered on initial page render without path redirect.
+**Audit events:** None.
 **Open decisions:** None (Precedence: Profile > Cookie > Gate > Default `id` / Fallback `en`).
 
 ---
@@ -1304,8 +1304,8 @@ flowchart TD
 
 ## Flow 36 — User Views Alerts
 
-**Primary actor:** Owner or Admin  
-**Preconditions:** Active session and alert permission.  
+**Primary actor:** Owner or Admin
+**Preconditions:** Active session and alert permission.
 **Trigger:** User opens alerts.
 
 **Main success flow:**
@@ -1315,21 +1315,21 @@ flowchart TD
 3. The frontend displays alert type, severity, device, timestamp, and status.
 4. The user may filter alerts where supported.
 
-**Alternative flows:** No alerts; show empty state.  
-**Error flows:** Unauthorised device alerts are excluded.  
-**Postconditions:** User sees only authorised alerts.  
-**Required permissions:** `alert.read`.  
-**Relevant account statuses:** `ACTIVE`.  
-**UI states:** Loading, list, empty, error.  
-**Audit events:** Normally none.  
+**Alternative flows:** No alerts; show empty state.
+**Error flows:** Unauthorised device alerts are excluded.
+**Postconditions:** User sees only authorised alerts.
+**Required permissions:** `alert.read`.
+**Relevant account statuses:** `ACTIVE`.
+**UI states:** Loading, list, empty, error.
+**Audit events:** Normally none.
 **Open decisions:** Alert categories and retention.
 
 ---
 
 ## Flow 37 — User Acknowledges an Alert
 
-**Primary actor:** Owner or permitted Admin  
-**Preconditions:** Active alert exists; user has acknowledgement permission.  
+**Primary actor:** Owner or permitted Admin
+**Preconditions:** Active alert exists; user has acknowledgement permission.
 **Trigger:** User confirms acknowledgement.
 
 **Main success flow:**
@@ -1340,13 +1340,13 @@ flowchart TD
 4. The system records acknowledgement user and timestamp.
 5. The frontend updates alert state.
 
-**Alternative flows:** Alert already acknowledged; show current state.  
-**Error flows:** Admin lacks permission; alert belongs to unauthorised device.  
-**Postconditions:** Alert is acknowledged, not deleted.  
-**Required permissions:** `alert.acknowledge`.  
-**Relevant account statuses:** `ACTIVE`.  
-**UI states:** Confirming, acknowledged, conflict.  
-**Audit events:** `alert.acknowledged`.  
+**Alternative flows:** Alert already acknowledged; show current state.
+**Error flows:** Admin lacks permission; alert belongs to unauthorised device.
+**Postconditions:** Alert is acknowledged, not deleted.
+**Required permissions:** `alert.acknowledge`.
+**Relevant account statuses:** `ACTIVE`.
+**UI states:** Confirming, acknowledged, conflict.
+**Audit events:** `alert.acknowledged`.
 **Scope rules:** System-wide for Owner; assigned devices for Admin per `RBAC.md`.
 
 ---
@@ -1355,8 +1355,8 @@ flowchart TD
 
 ## Flow 38 — User Opens Faucet Control
 
-**Primary actor:** Owner or Admin  
-**Preconditions:** Active session; device selected.  
+**Primary actor:** Owner or Admin
+**Preconditions:** Active session; device selected.
 **Trigger:** User opens control panel.
 
 **Main success flow:**
@@ -1367,58 +1367,58 @@ flowchart TD
 4. If permitted and controllable, preset controls are enabled.
 5. If monitoring-only, controls remain hidden or disabled with an explanation.
 
-**Alternative flows:** Device offline or status unknown.  
-**Error flows:** Direct access without permission returns `403`.  
-**Postconditions:** Control UI reflects current permission and device state.  
-**Required permissions:** `device.control.dispense` for actionable access.  
-**Relevant account statuses:** `ACTIVE`.  
-**UI states:** Available, permission denied, offline, loading.  
-**Audit events:** Normally none.  
+**Alternative flows:** Device offline or status unknown.
+**Error flows:** Direct access without permission returns `403`.
+**Postconditions:** Control UI reflects current permission and device state.
+**Required permissions:** `device.control.dispense` for actionable access.
+**Relevant account statuses:** `ACTIVE`.
+**UI states:** Available, permission denied, offline, loading.
+**Audit events:** Normally none.
 **Open decisions:** Role control matrix.
 
 ---
 
-## Flow 39 — User Selects Phase 1: 300 mL
+## Flow 39 — User Selects Phase 1
 
-**Primary actor:** Authorised control user  
-**Preconditions:** Control panel available.  
+**Primary actor:** Authorised control user
+**Preconditions:** Control panel available.
 **Trigger:** User selects Phase 1.
 
 **Main success flow:**
 
 1. The UI selects Phase 1.
-2. The UI displays target `300 mL`.
+2. User enters plantCount (>= 1). UI displays calculated volume (e.g., 0.3 L).
 3. The UI does not allow arbitrary target substitution.
 4. The system prepares confirmation context.
 
-**Alternative flows:** User changes to another phase before confirming.  
-**Error flows:** Preset configuration missing; action is unavailable.  
-**Postconditions:** No command exists until confirmation.  
-**Required permissions:** `device.control.dispense`.  
-**Relevant account statuses:** `ACTIVE`.  
-**UI states:** Selected preset.  
-**Audit events:** None.  
+**Alternative flows:** User changes to another phase before confirming.
+**Error flows:** Preset configuration missing; action is unavailable.
+**Postconditions:** No command exists until confirmation.
+**Required permissions:** `device.control.dispense`.
+**Relevant account statuses:** `ACTIVE`.
+**UI states:** Selected preset.
+**Audit events:** None.
 **Open decisions:** None for target volume.
 
 ---
 
-## Flow 40 — User Selects Phase 2: 1,000 mL
+## Flow 40 — User Selects Phase 2
 
 Same requirements as Flow 39, with:
 
 - Phase: `2`
-- Target volume: `1,000 mL`
+- User enters plantCount (>= 1). UI displays calculated volume (e.g., 1 L).
 
 No command is created until explicit confirmation.
 
 ---
 
-## Flow 41 — User Selects Phase 3: 1,500 mL
+## Flow 41 — User Selects Phase 3
 
 Same requirements as Flow 39, with:
 
 - Phase: `3`
-- Target volume: `1,500 mL`
+- User enters plantCount (>= 1). UI displays calculated volume (e.g., 1.5 L).
 
 No command is created until explicit confirmation.
 
@@ -1426,8 +1426,8 @@ No command is created until explicit confirmation.
 
 ## Flow 42 — User Confirms a Faucet Command
 
-**Primary actor:** Authorised control user  
-**Preconditions:** Valid preset selected; device selected.  
+**Primary actor:** Authorised control user
+**Preconditions:** Valid preset selected; device selected.
 **Trigger:** User selects confirm.
 
 **Main success flow:**
@@ -1443,21 +1443,21 @@ No command is created until explicit confirmation.
 9. The integration layer receives the command.
 10. The frontend displays queued status.
 
-**Alternative flows:** User cancels confirmation; no command is created.  
-**Error flows:** Permission missing, device offline, active command conflict, invalid phase.  
-**Postconditions:** A traceable command exists.  
-**Required permissions:** `device.control.dispense`.  
-**Relevant account statuses:** `ACTIVE`.  
-**UI states:** Confirming, submitting, queued, denied.  
-**Audit events:** `faucet.command.created`.  
+**Alternative flows:** User cancels confirmation; no command is created.
+**Error flows:** Permission missing, device offline, active command conflict, invalid phase.
+**Postconditions:** A traceable command exists.
+**Required permissions:** `device.control.dispense`.
+**Relevant account statuses:** `ACTIVE`.
+**UI states:** Confirming, submitting, queued, denied.
+**Audit events:** `faucet.command.created`.
 **Open decisions:** Concurrency and tank-state validation.
 
 ---
 
 ## Flow 43 — Faucet Command Is Queued
 
-**Primary actor:** System and user  
-**Preconditions:** Command stored as `QUEUED`.  
+**Primary actor:** System and user
+**Preconditions:** Command stored as `QUEUED`.
 **Trigger:** Command awaiting transmission or processing.
 
 **Main success flow:**
@@ -1466,21 +1466,21 @@ No command is created until explicit confirmation.
 2. The system attempts to submit through the integration layer.
 3. The command transitions to `SENT`, `ACKNOWLEDGED`, `IN_PROGRESS`, or failure state.
 
-**Alternative flows:** Queue delay remains visible.  
-**Error flows:** Integration unavailable; transition to `FAILED` or `TIMEOUT` according to policy.  
-**Postconditions:** Command has an observable state.  
-**Required permissions:** Initiating user may view relevant command status.  
-**Relevant account statuses:** User session may remain active; command record persists independently.  
-**UI states:** Queued.  
-**Audit events:** Status transition.  
+**Alternative flows:** Queue delay remains visible.
+**Error flows:** Integration unavailable; transition to `FAILED` or `TIMEOUT` according to policy.
+**Postconditions:** Command has an observable state.
+**Required permissions:** Initiating user may view relevant command status.
+**Relevant account statuses:** User session may remain active; command record persists independently.
+**UI states:** Queued.
+**Audit events:** Status transition.
 **Open decisions:** Queue timeout.
 
 ---
 
 ## Flow 44 — Faucet Command Is in Progress
 
-**Primary actor:** System and user  
-**Preconditions:** Device or integration reports `IN_PROGRESS`.  
+**Primary actor:** System and user
+**Preconditions:** Device or integration reports `IN_PROGRESS`.
 **Trigger:** Progress update received.
 
 **Main success flow:**
@@ -1491,21 +1491,21 @@ No command is created until explicit confirmation.
 4. Actual progress or dispensed volume is shown only when supplied by the contract.
 5. Duplicate or out-of-order updates are handled safely.
 
-**Alternative flows:** No numeric progress is available; show status only.  
-**Error flows:** Device disconnects; transition according to timeout/failure policy.  
-**Postconditions:** User sees current execution state.  
-**Required permissions:** Relevant command-history or device access.  
-**Relevant account statuses:** Command continues even if UI session closes, subject to hardware rules.  
-**UI states:** In progress, optional progress indicator.  
-**Audit events:** Command status update.  
+**Alternative flows:** No numeric progress is available; show status only.
+**Error flows:** Device disconnects; transition according to timeout/failure policy.
+**Postconditions:** User sees current execution state.
+**Required permissions:** Relevant command-history or device access.
+**Relevant account statuses:** Command continues even if UI session closes, subject to hardware rules.
+**UI states:** In progress, optional progress indicator.
+**Audit events:** Command status update.
 **Open decisions:** Progress payload and stop capability.
 
 ---
 
 ## Flow 45 — Faucet Command Completes Successfully
 
-**Primary actor:** System and user  
-**Preconditions:** Valid completion acknowledgement received.  
+**Primary actor:** System and user
+**Preconditions:** Valid completion acknowledgement received.
 **Trigger:** Device reports completion.
 
 **Main success flow:**
@@ -1517,21 +1517,21 @@ No command is created until explicit confirmation.
 5. The frontend displays success and final result.
 6. The event appears in control history.
 
-**Alternative flows:** Actual volume is unavailable; show target and completion status only.  
-**Error flows:** Duplicate completion is idempotently ignored or reconciled.  
-**Postconditions:** Command is final and auditable.  
-**Required permissions:** Relevant control-history read.  
-**Relevant account statuses:** Not dependent on current UI session.  
-**UI states:** Completed.  
-**Audit events:** `faucet.command.completed`.  
+**Alternative flows:** Actual volume is unavailable; show target and completion status only.
+**Error flows:** Duplicate completion is idempotently ignored or reconciled.
+**Postconditions:** Command is final and auditable.
+**Required permissions:** Relevant control-history read.
+**Relevant account statuses:** Not dependent on current UI session.
+**UI states:** Completed.
+**Audit events:** `faucet.command.completed`.
 **Open decisions:** Actual-volume tolerance presentation.
 
 ---
 
 ## Flow 46 — Faucet Command Fails
 
-**Primary actor:** System and user  
-**Preconditions:** Device or integration reports failure.  
+**Primary actor:** System and user
+**Preconditions:** Device or integration reports failure.
 **Trigger:** Failure event.
 
 **Main success flow:**
@@ -1542,21 +1542,21 @@ No command is created until explicit confirmation.
 4. The frontend displays failure and recommended next step.
 5. The failure appears in history and alerts where configured.
 
-**Alternative flows:** Retry may be offered only if explicitly permitted.  
-**Error flows:** Sensitive integration details must not be exposed.  
-**Postconditions:** Command is final unless approved retry creates a new command.  
-**Required permissions:** Relevant command-history read.  
-**Relevant account statuses:** Not dependent on current session.  
-**UI states:** Failed.  
-**Audit events:** `faucet.command.failed`.  
+**Alternative flows:** Retry may be offered only if explicitly permitted.
+**Error flows:** Sensitive integration details must not be exposed.
+**Postconditions:** Command is final unless approved retry creates a new command.
+**Required permissions:** Relevant command-history read.
+**Relevant account statuses:** Not dependent on current session.
+**UI states:** Failed.
+**Audit events:** `faucet.command.failed`.
 **Open decisions:** Retry policy.
 
 ---
 
 ## Flow 47 — Faucet Command Times Out
 
-**Primary actor:** System and user  
-**Preconditions:** Expected acknowledgement or completion is not received.  
+**Primary actor:** System and user
+**Preconditions:** Expected acknowledgement or completion is not received.
 **Trigger:** Configured timeout expires.
 
 **Main success flow:**
@@ -1567,21 +1567,21 @@ No command is created until explicit confirmation.
 4. The system creates an alert where configured.
 5. A new command is not automatically issued unless retry policy explicitly allows it.
 
-**Alternative flows:** Late acknowledgement arrives; reconciliation policy is applied.  
-**Error flows:** Do not display timeout as confirmed faucet closure or completion.  
-**Postconditions:** Command requires review or reconciliation.  
-**Required permissions:** Relevant control-history read.  
-**Relevant account statuses:** Command record persists.  
-**UI states:** Timeout, uncertain state warning.  
-**Audit events:** `faucet.command.timeout`.  
+**Alternative flows:** Late acknowledgement arrives; reconciliation policy is applied.
+**Error flows:** Do not display timeout as confirmed faucet closure or completion.
+**Postconditions:** Command requires review or reconciliation.
+**Required permissions:** Relevant control-history read.
+**Relevant account statuses:** Command record persists.
+**UI states:** Timeout, uncertain state warning.
+**Audit events:** `faucet.command.timeout`.
 **Open decisions:** Timeout duration and late-acknowledgement policy.
 
 ---
 
 ## Flow 48 — User Attempts Control Without Permission
 
-**Primary actor:** Owner or Admin lacking control permission  
-**Preconditions:** User can access monitoring but not control.  
+**Primary actor:** Owner or Admin lacking control permission
+**Preconditions:** User can access monitoring but not control.
 **Trigger:** Direct control request or manipulated frontend.
 
 **Main success flow:**
@@ -1592,21 +1592,21 @@ No command is created until explicit confirmation.
 4. No command is created.
 5. The frontend displays access denied.
 
-**Alternative flows:** Control UI is hidden for usability, but server rule remains.  
-**Error flows:** None.  
-**Postconditions:** No device action occurs.  
-**Required permissions:** Missing by design.  
-**Relevant account statuses:** `ACTIVE`.  
-**UI states:** Forbidden.  
-**Audit events:** High-risk denial may be recorded.  
+**Alternative flows:** Control UI is hidden for usability, but server rule remains.
+**Error flows:** None.
+**Postconditions:** No device action occurs.
+**Required permissions:** Missing by design.
+**Relevant account statuses:** `ACTIVE`.
+**UI states:** Forbidden.
+**Audit events:** High-risk denial may be recorded.
 **Open decisions:** Final role-to-control mapping.
 
 ---
 
 ## Flow 49 — User Attempts Control of an Unauthorised Device
 
-**Primary actor:** Owner or Admin  
-**Preconditions:** User lacks access to target device.  
+**Primary actor:** Owner or Admin
+**Preconditions:** User lacks access to target device.
 **Trigger:** Manipulated device ID or stale device selection.
 
 **Main success flow:**
@@ -1617,21 +1617,21 @@ No command is created until explicit confirmation.
 4. No command is created.
 5. No unauthorised device details are returned.
 
-**Alternative flows:** Return concealed `404` instead of `403`.  
-**Error flows:** None.  
-**Postconditions:** Device remains unaffected.  
-**Required permissions:** Device access missing.  
-**Relevant account statuses:** `ACTIVE`.  
-**UI states:** Access denied or not found.  
-**Audit events:** Suspicious access denial may be recorded.  
+**Alternative flows:** Return concealed `404` instead of `403`.
+**Error flows:** None.
+**Postconditions:** Device remains unaffected.
+**Required permissions:** Device access missing.
+**Relevant account statuses:** `ACTIVE`.
+**UI states:** Access denied or not found.
+**Audit events:** Suspicious access denial may be recorded.
 **Open decisions:** Error-code concealment policy.
 
 ---
 
 ## Flow 50 — User Attempts Control While Device Is Offline
 
-**Primary actor:** Authorised control user  
-**Preconditions:** Device is offline.  
+**Primary actor:** Authorised control user
+**Preconditions:** Device is offline.
 **Trigger:** User submits control request.
 
 **Main success flow:**
@@ -1641,21 +1641,21 @@ No command is created until explicit confirmation.
 3. The server rejects the command before integration submission.
 4. The frontend displays offline-device error.
 
-**Alternative flows:** Device reconnects; user must re-confirm a new request.  
-**Error flows:** Unknown device state is handled conservatively.  
-**Postconditions:** No command is sent to an offline device.  
-**Required permissions:** Control permission may exist, but state blocks action.  
-**Relevant account statuses:** `ACTIVE`.  
-**UI states:** Offline, control disabled, rejection.  
-**Audit events:** Optional rejected command attempt.  
+**Alternative flows:** Device reconnects; user must re-confirm a new request.
+**Error flows:** Unknown device state is handled conservatively.
+**Postconditions:** No command is sent to an offline device.
+**Required permissions:** Control permission may exist, but state blocks action.
+**Relevant account statuses:** `ACTIVE`.
+**UI states:** Offline, control disabled, rejection.
+**Audit events:** Optional rejected command attempt.
 **Open decisions:** Definition of controllable/online state.
 
 ---
 
 ## Flow 51 — User Attempts to Submit a Duplicate Command
 
-**Primary actor:** Authorised control user or network retry  
-**Preconditions:** A command request with the same idempotency key or command context already exists.  
+**Primary actor:** Authorised control user or network retry
+**Preconditions:** A command request with the same idempotency key or command context already exists.
 **Trigger:** Duplicate submission.
 
 **Main success flow:**
@@ -1666,39 +1666,39 @@ No command is created until explicit confirmation.
 4. The system returns the existing command state.
 5. The frontend displays the current command.
 
-**Alternative flows:** A genuinely new request uses a new identifier after user confirmation.  
-**Error flows:** Ambiguous duplicate context returns conflict.  
-**Postconditions:** One logical command maps to at most one execution request.  
-**Required permissions:** `device.control.dispense`.  
-**Relevant account statuses:** `ACTIVE`.  
-**UI states:** Existing command, conflict.  
-**Audit events:** Duplicate request detection.  
+**Alternative flows:** A genuinely new request uses a new identifier after user confirmation.
+**Error flows:** Ambiguous duplicate context returns conflict.
+**Postconditions:** One logical command maps to at most one execution request.
+**Required permissions:** `device.control.dispense`.
+**Relevant account statuses:** `ACTIVE`.
+**UI states:** Existing command, conflict.
+**Audit events:** Duplicate request detection.
 **Open decisions:** Idempotency-key generation and retention.
 
 ---
 
-## Flow 52 — User Cancels or Stops a Command
+## Flow 52 — User Issues Manual Open/Close
 
-**Primary actor:** Authorised user  
-**Preconditions:** Command is cancellable; feature is enabled.  
-**Trigger:** User selects cancel or stop.
+**Primary actor:** Authorised user
+**Preconditions:** Command is cancellable; feature is enabled.
+**Trigger:** User requests OPEN or CLOSE.
 
 **Main success flow:**
 
 1. The UI requests confirmation.
-2. The server verifies `device.control.cancel` or `device.control.stop`.
+2. The server verifies `device.control`.
 3. The server verifies command ownership/scope and current state.
-4. The server sends the appropriate cancellation or stop instruction.
+4. The server sends the appropriate manual OPEN or CLOSE instruction.
 5. The system tracks acknowledgement and final state.
 6. The frontend displays the result.
 
-**Alternative flows:** Command already completed and cannot be cancelled.  
-**Error flows:** Stop instruction times out; physical state may be unknown.  
-**Postconditions:** Command is cancelled/stopped only when confirmed by the integration contract.  
-**Required permissions:** `device.control.cancel` or `device.control.stop`.  
-**Relevant account statuses:** `ACTIVE`.  
-**UI states:** Confirming, stopping, cancelled, failure.  
-**Audit events:** `faucet.command.cancel.requested`, final status.  
+**Alternative flows:** Command already completed and cannot be cancelled.
+**Error flows:** Stop instruction times out; physical state may be unknown.
+**Postconditions:** Command is cancelled/stopped only when confirmed by the integration contract.
+**Required permissions:** `device.control`.
+**Relevant account statuses:** `ACTIVE`.
+**UI states:** Confirming, stopping, cancelled, failure.
+**Audit events:** `faucet.command.cancel.requested`, final status.
 **Open decisions:** Whether this feature exists and which roles receive it.
 
 ---
@@ -1707,8 +1707,8 @@ No command is created until explicit confirmation.
 
 ## Flow 53 — Session Expires While User Is Active
 
-**Primary actor:** Owner or Admin  
-**Preconditions:** Session exists but expires or becomes invalid.  
+**Primary actor:** Owner or Admin
+**Preconditions:** Session exists but expires or becomes invalid.
 **Trigger:** User navigates or performs an action.
 
 **Main success flow:**
@@ -1719,21 +1719,21 @@ No command is created until explicit confirmation.
 4. The user is redirected to login.
 5. Unsaved non-sensitive form data may be handled according to policy.
 
-**Alternative flows:** Silent session renewal if securely implemented.  
-**Error flows:** Protected cached data must not remain visible indefinitely.  
-**Postconditions:** User must authenticate again.  
-**Required permissions:** None after expiry.  
-**Relevant account statuses:** Any.  
-**UI states:** Session expired, login.  
-**Audit events:** Optional session-expiry event.  
+**Alternative flows:** Silent session renewal if securely implemented.
+**Error flows:** Protected cached data must not remain visible indefinitely.
+**Postconditions:** User must authenticate again.
+**Required permissions:** None after expiry.
+**Relevant account statuses:** Any.
+**UI states:** Session expired, login.
+**Audit events:** Optional session-expiry event.
 **Open decisions:** Session duration and refresh policy.
 
 ---
 
 ## Flow 54 — User Role or Device Access Changes During an Active Session
 
-**Primary actor:** Owner changes another user's access; affected Admin is active  
-**Preconditions:** Existing active session uses prior permissions.  
+**Primary actor:** Owner changes another user's access; affected Admin is active
+**Preconditions:** Existing active session uses prior permissions.
 **Trigger:** Role, account status, permission, or device assignment changes.
 
 **Main success flow:**
@@ -1746,13 +1746,13 @@ No command is created until explicit confirmation.
 6. Live subscriptions to revoked devices are terminated or filtered.
 7. The affected UI transitions to an access-changed or session-ended state.
 
-**Alternative flows:** Granted access becomes available after refresh or permission-cache invalidation.  
-**Error flows:** Stale cached permissions must not allow continued server actions.  
-**Postconditions:** Effective access reflects the latest server state.  
-**Required permissions:** Owner change permission; affected user uses updated permissions.  
-**Relevant account statuses:** Usually `ACTIVE`, possibly changed to `SUSPENDED` or `DEACTIVATED`.  
-**UI states:** Access changed, device removed, session ended.  
-**Audit events:** Access-change event.  
+**Alternative flows:** Granted access becomes available after refresh or permission-cache invalidation.
+**Error flows:** Stale cached permissions must not allow continued server actions.
+**Postconditions:** Effective access reflects the latest server state.
+**Required permissions:** Owner change permission; affected user uses updated permissions.
+**Relevant account statuses:** Usually `ACTIVE`, possibly changed to `SUSPENDED` or `DEACTIVATED`.
+**UI states:** Access changed, device removed, session ended.
+**Audit events:** Access-change event.
 **Open decisions:** Permission cache duration and real-time invalidation method.
 
 ---

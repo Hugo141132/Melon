@@ -245,7 +245,7 @@ TEST-RBAC-001
 
 ## TASK-0101 — Establish Repository Structure
 
-**Priority:** `P1`  
+**Priority:** `P1`
 **Status:** `DONE`
 **Dependencies:** `TASK-0001`
 
@@ -300,9 +300,9 @@ TEST-RBAC-001
 
 ## TASK-0103 — Configure Environment Validation
 
-**Priority:** `P0`  
-**Status:** `DONE`  
-**Dependencies:** `TASK-0101`  
+**Priority:** `P0`
+**Status:** `DONE`
+**Dependencies:** `TASK-0101`
 **Completed:** 2026-07-29 — Implemented Zod runtime environment variable schemas for web server (`apps/web/lib/env/server.ts`), web client (`apps/web/lib/env/client.ts`), and IoT gateway (`apps/iot-gateway/src/config/env.ts`). Configured startup validation CLI (`scripts/check-env.ts`), environment unit testing suite (`scripts/test-env.ts`), placeholder `.env.example` templates, secret redacting error handlers, and strict production checks (rejecting insecure `mqtt://` brokers and unapproved `ENABLE_FAUCET_CONTROL=true`). Verified 100% test pass rate via `npm run env:test` and `npm run env:check`.
 
 ### Work
@@ -333,8 +333,8 @@ REALTIME_TRANSPORT
 
 ## TASK-0104 — Configure PostgreSQL and ORM
 
-**Priority:** `P0`  
-**Status:** `DONE`  
+**Priority:** `P0`
+**Status:** `DONE`
 **Dependencies:** `TASK-0101`, `TASK-0002`
 
 ### Work
@@ -356,7 +356,7 @@ REALTIME_TRANSPORT
 
 ## TASK-0105 — Seed Roles and Permissions
 
-**Priority:** `P0`  
+**Priority:** `P0`
 **Status:** `DONE`
 **Dependencies:** `TASK-0104`
 
@@ -412,7 +412,7 @@ Key Implementation Details:
 
 ## TASK-0107 — Configure Testing Foundation
 
-**Priority:** `P1`  
+**Priority:** `P1`
 **Status:** `DONE`
 **Dependencies:** `TASK-0101`
 **Completed:** 2026-08-02 — Configured monorepo testing foundation with unified Vitest workspace (`vitest.workspace.ts`, `vitest.config.ts`), React Testing Library setup in `apps/web` with `jsdom` environment & `@testing-library/jest-dom`, isolated API route test helpers (`apps/web/test/helpers/api-test-helper.ts`), non-destructive PostgreSQL test isolation helpers (`packages/database/src/testing/db-test-helper.ts`), Playwright E2E smoke test setup using Microsoft Edge (`playwright.config.ts` with `channel: "msedge"`, `e2e/smoke.spec.ts`), isolated MQTT test context helpers (`apps/iot-gateway/src/testing/mqtt-test-helper.ts`), V8 coverage reporting, and strongly typed reusable test data factories (`packages/contracts/src/testing/factories.ts`). Verified all unit/integration tests passed across 42 test files, E2E smoke tests passed in Microsoft Edge, environment validation passed 12/12, ESLint & TypeScript passed with 0 errors, Prettier check passed, and Next.js production build succeeded.
@@ -441,9 +441,9 @@ Configure:
 
 ## TASK-0108 — Configure CI Pipeline
 
-**Priority:** `P1`  
-**Status:** `DONE`  
-**Dependencies:** `TASK-0102`, `TASK-0107`  
+**Priority:** `P1`
+**Status:** `DONE`
+**Dependencies:** `TASK-0102`, `TASK-0107`
 **Completed:** 2026-08-02 — Configured GitHub Actions CI pipeline (`.github/workflows/ci.yml`) triggering on pull requests and pushes to `main`. Configured Node.js 20 with `npm` dependency caching, code formatting check (`npm run format:check`), ESLint linting (`npm run lint`), TypeScript type checking (`npm run typecheck`), environment schema validation (`npm run env:check`), environment unit tests (`npm run env:test`), requirement traceability verification (`python scripts/validate-requirements.py`), Prisma client generation & schema validation (`npm run db:generate`, `npm run db:validate`), ephemeral PostgreSQL migration deployment (`npm run db:migrate:deploy`), high-severity dependency security scanning (`npm audit --audit-level=high`), hardcoded credential secret pattern scanning, Vitest unit & integration test coverage (`npm run test:coverage`), Next.js & Fastify production build verification (`npm run build`), bundled Chromium installation (`npx playwright install chromium --with-deps`), and headless Playwright E2E smoke tests (`npm run test:e2e`). Updated `playwright.config.ts` to dynamically use bundled `chromium` when `process.env.CI` is true while preserving `msedge` for local testing. Verified all 44 test suites (349 tests), ESLint, TypeScript, formatting, environment schema, and traceability scripts passed 100% locally.
 - **2026-08-19 CI Hardening Reconciliation:** Hardened `.github/workflows/ci.yml` against runner package mirror stalls. Added workflow concurrency cancellation (`cancel-in-progress: true`), job-level 20-minute timeout ceiling, step-level timeouts (5 min for browser install, 7 min for E2E tests), Playwright `--only-shell` optimization to omit unused full Chrome for Testing downloads, and a bounded single-retry fallback for transient apt/network mirror errors. Preserved `TASK-0108` status as `DONE`.
 
@@ -477,7 +477,7 @@ Add checks for:
 
 ## TASK-0201 — Implement User Account Model
 
-**Priority:** `P0`  
+**Priority:** `P0`
 **Status:** `DONE`
 **Dependencies:** `TASK-0104`
 **Completed:** 2026-07-28 — Implemented shared TypeScript domain contracts in `packages/contracts` and repository abstraction in `packages/database`.
@@ -564,7 +564,7 @@ accountStatus = PENDING_APPROVAL
 
 ## TASK-0204 — Implement Login and Session Management
 
-**Priority:** `P0`  
+**Priority:** `P0`
 **Status:** `DONE`
 **Dependencies:** `TASK-0201`, `TASK-0002`
 
@@ -593,8 +593,8 @@ accountStatus = PENDING_APPROVAL
 
 ## TASK-0205 — Implement Account-Status Pages
 
-**Priority:** `P1`  
-**Status:** `DONE`  
+**Priority:** `P1`
+**Status:** `DONE`
 **Dependencies:** `TASK-0203`, `TASK-0204`
 **Completed:** 2026-07-29 — Implemented status view page (`apps/web/app/(auth)/status/page.tsx`) rendering status-specific UI for `PENDING_APPROVAL`, `APPROVED`, `REJECTED`, `SUSPENDED`, `DEACTIVATED`, and `EXPIRED`. Configured server session account-status revalidation (`GET /api/v1/auth/session`), safe logout/support actions, and unit tests.
 
@@ -620,7 +620,7 @@ Implement pages for:
 
 ## TASK-0206 — Implement Owner Pending Approval List
 
-**Priority:** `P0`  
+**Priority:** `P0`
 **Status:** `DONE`
 **Dependencies:** `TASK-0204`
 
@@ -668,8 +668,8 @@ Implement transactional approval.
 
 ## TASK-0208 — Implement Owner Rejection
 
-**Priority:** `P0`  
-**Status:** `DONE`  
+**Priority:** `P0`
+**Status:** `DONE`
 **Dependencies:** `TASK-0206`
 **Completed:** 2026-07-29 — Implemented transactional Owner rejection (`rejectPendingAdmin`) in `UserRepository` (`packages/database`), created API route handler `POST /api/v1/approvals/[userId]/reject` (`apps/web`), updated Owner UI in `apps/web/app/approvals/page.tsx` with rejection action button and error/success states, and added unit test coverage verifying `401`, `403`, `404`, `409` conflict responses, audit log recording without secret exposure, and isolated post-commit notifications.
 
@@ -685,9 +685,9 @@ Implement transactional approval.
 
 ## TASK-0209 — Implement Authorisation Library
 
-**Priority:** `P0`  
-**Status:** `DONE`  
-**Dependencies:** `TASK-0105`, `TASK-0204`  
+**Priority:** `P0`
+**Status:** `DONE`
+**Dependencies:** `TASK-0105`, `TASK-0204`
 **Completed:** 2026-07-29 — Implemented server authorisation library (`apps/web/lib/auth/rbac.ts`) with session lookup (`requireSession`), active status revalidation (`requireActiveAccount`), role guards (`requireRole`), permission checks (`requirePermission`), profile self/permission checks (`requireSelfOrPermission`), assigned device view access (`requireDeviceViewAccess`), and controllable device access (`requireDeviceControlAccess`) with strict `ENABLE_FAUCET_CONTROL` feature flag enforcement. Verified with 18 unit tests in `apps/web/lib/auth/__tests__/rbac.test.ts`.
 
 ### Work
@@ -738,9 +738,9 @@ requireDeviceControlAccess()
 
 ## TASK-0211 — Implement Self Profile
 
-**Priority:** `P1`  
-**Status:** `DONE`  
-**Completed:** `2026-07-30`  
+**Priority:** `P1`
+**Status:** `DONE`
+**Completed:** `2026-07-30`
 **Dependencies:** `TASK-0204`, `TASK-0209`
 
 ### Work
@@ -763,7 +763,7 @@ PATCH /api/v1/me
 
 ## TASK-0212 — Implement Owner User Management
 
-**Priority:** `P1`  
+**Priority:** `P1`
 **Status:** `DONE`
 **Dependencies:** `TASK-0209`
 
@@ -795,9 +795,9 @@ Implemented complete Owner User Management:
 
 ## TASK-0213 — Implement Password Recovery and Email Reset Flow
 
-**Priority:** `P1`  
-**Status:** `DONE`  
-**Dependencies:** `TASK-0202`, `TASK-0204`, `TASK-0908`  
+**Priority:** `P1`
+**Status:** `DONE`
+**Dependencies:** `TASK-0202`, `TASK-0204`, `TASK-0908`
 **Completed:** 2026-08-17 — Implemented end-to-end password recovery and email reset flow with Resend per `DEC-AUTH-102` and server-side guest route guard per `DEC-AUTH-103`. Live Resend credential delivery, password reset completion, single-use token replay rejection, transactional session revocation, account-status preservation, server-side guest redirection with zero UI flash, focused test suites (67/67 tests passed), and the five reserved pre-commit checks (`test:coverage`, `test:integration`, `check:quality`, `test`, `test:e2e`) verified and passed 100%.
 
 ### Work
@@ -848,9 +848,9 @@ Implemented complete Owner User Management:
 
 ## TASK-0214 — Implement Registration Email Verification
 
-**Priority:** `P1`  
-**Status:** `IN_ACCEPTANCE`  
-**Dependencies:** `TASK-0203`, `TASK-0204`, `TASK-0213`  
+**Priority:** `P1`
+**Status:** `IN_ACCEPTANCE`
+**Dependencies:** `TASK-0203`, `TASK-0204`, `TASK-0213`
 **Implementation Note:** Implemented mandatory email ownership verification for `OWNER` and `ADMIN` accounts using Resend per `DEC-AUTH-104`. Added `EmailVerificationToken` model, decoupled `emailVerifiedAt` verification state from `accountStatus`, enforced Owner authentication gate, enforced Admin approval and rejection gates (including fixing missing `emailVerifiedAt` projection on `rejectPendingAdmin`), created `/api/v1/auth/verify-email` and `/api/v1/auth/resend-verification` endpoints with bounded `P2034` concurrency retries, implemented `/verify-email` UI page with React StrictMode-safe in-flight deduplication and cache eviction, removed decorative illustrations, and integrated server-side guest route guard (`DEC-AUTH-103`). All 42 unit test files (321 tests) pass cleanly.
 
 ### Work
@@ -900,9 +900,9 @@ Implemented complete Owner User Management:
 
 ## TASK-0301 — Implement Site Model
 
-**Priority:** `P2`  
-**Status:** `SUPERSEDED`  
-**Dependencies:** `TASK-0302`  
+**Priority:** `P2`
+**Status:** `SUPERSEDED`
+**Dependencies:** `TASK-0302`
 **Completed:** 2026-08-02 — Superseded by single default site in device schema in `TASK-0302` (`DONE`); multi-site UI selector explicitly deferred to Phase 11 (`TASK-1105`) per `DEC-DEV-026`.
 
 ### Work
@@ -1089,7 +1089,7 @@ Frontend states:
 
 ## TASK-0401 — Create IoT Gateway Service
 
-**Priority:** `P0`  
+**Priority:** `P0`
 **Status:** `DONE`
 **Dependencies:** `TASK-0101`, `TASK-0002`
 **Completed:** 2026-07-31 — Implemented long-running IoT Gateway Fastify/TypeScript service in `apps/iot-gateway`. Integrated `GatewayMqttClient` supporting MQTT 5.0/3.1.1 fallback with TLS configuration, state tracking (`DISCONNECTED`, `CONNECTING`, `CONNECTED`, `RECONNECTING`, `ERROR`), and automatic exponential reconnect logic. Configured Zod environment validation (`apps/iot-gateway/src/config/env.ts`) and secret redaction (`redactSecrets`, `redactString`). Exposed `GET /health` (pass, uptime, timestamp) and `GET /ready` (real DB `prisma.$queryRaw` check + MQTT connection status). Created subsystem module scaffolds for topic router, message validator, telemetry processor, status processor, command publisher (`retain = false`), acknowledgement processor, and structured observability logger. Added unit test suites (`apps/iot-gateway/src/__tests__/`) verifying config validation, health/readiness, MQTT lifecycle, graceful shutdown, and secret redaction. Verified clean manual runtime testing.
@@ -1169,8 +1169,8 @@ message subtype
 
 ## TASK-0404 — Implement Shared Message Validation
 
-**Priority:** `P0`  
-**Status:** `DONE`  
+**Priority:** `P0`
+**Status:** `DONE`
 **Dependencies:** `TASK-0403`
 **Completed:** 2026-08-01 — Extended MessageValidator scaffold (`apps/iot-gateway/src/validation/validator.ts`) to validate payload byte size limits (default 64 KB, returning `MESSAGE_TOO_LARGE`), JSON parsing (`INVALID_JSON`), non-null object payload (`INVALID_SCHEMA`), schemaVersion 1.0 (`UNSUPPORTED_SCHEMA_VERSION`), envelope fields (UUID messageId, deviceId, ISO timestamp, sequence), topic/payload device ID mismatch (`TOPIC_DEVICE_MISMATCH`), and recursive non-finite numeric checks (`INVALID_VALUE`). Added comprehensive unit test suite in `apps/iot-gateway/src/__tests__/message-validator.test.ts`.
 
@@ -1198,7 +1198,7 @@ Validate:
 
 ## TASK-0405 — Implement Soil Telemetry Ingestion
 
-**Priority:** `P0`  
+**Priority:** `P0`
 **Status:** `DONE`
 **Dependencies:** `TASK-0404`, `TASK-0104`
 
@@ -1229,9 +1229,9 @@ status
 
 ## TASK-0406 — Implement Water Telemetry Ingestion
 
-**Priority:** `P0`  
-**Status:** `DONE`  
-**Dependencies:** `TASK-0404`, `TASK-0104`  
+**Priority:** `P0`
+**Status:** `DONE`
+**Dependencies:** `TASK-0404`, `TASK-0104`
 **Completed:** 2026-08-10 — Implemented Water Quality Telemetry Ingestion contracts (`WaterTelemetryDataSchema`, `WaterTelemetryPayloadSchema`, `IngestWaterTelemetryInput`), database repository ingestion method (`ingestWaterReading`), and HTTPS REST API endpoint (`POST /api/v1/devices/[deviceId]/telemetry/water`). Strictly conformed to `DEC-DEV-020` and `DEC-MON-086`: `BAT` parameter is completely removed from soil and water-quality telemetry (`DEC-MON-086`, superseding `DEC-MON-085`); `latitude` and `longitude` are deleted parameters; Water Quality Telemetry uses REST API over Wi-Fi (`ph`, `tds`, `ec`, `status`), while reservoir `tankVolume` and `flowRate` remain on the MQTT/IoT Gateway path (`WATER_TANK_NODE`). Preserved explicit numeric zero (`0`) vs `null`, handled duplicate `messageId` idempotently (returning HTTP 200 with `isDuplicate: true`), and added unit test suites in `@kebun-melon/contracts`, `@kebun-melon/database`, and `web`.
 
 ### Work
@@ -1257,9 +1257,9 @@ status
 
 ## TASK-0407 — Implement Heartbeat and Device Status
 
-**Priority:** `P0`  
-**Status:** `BLOCKED`  
-**Dependencies:** `TASK-0404`  
+**Priority:** `P0`
+**Status:** `BLOCKED`
+**Dependencies:** `TASK-0404`
 **Blocked Reason:** Blocked by `docs/DECISIONS.md` §3 (Device offline threshold minutes and stale threshold minutes TBD).
 
 ### Work
@@ -1284,10 +1284,10 @@ Implement:
 
 ## TASK-0408 — Implement Device Simulator
 
-**Priority:** `P1`  
+**Priority:** `P1`
 **Status:** `DONE`
-**Dependencies:** `TASK-0402`, `TASK-0404`, `TASK-0405`  
-**Completed:** 2026-08-11 — Implemented multi-device operational simulator in `scripts/device-simulator.ts` and unit test suite in `apps/iot-gateway/src/__tests__/device-simulator.test.ts`. Configured REST API ingestion (Soil & Water telemetry per `DEC-DEV-020`, `DEC-MON-086`), MQTT Reservoir Telemetry (`WATER_TANK_NODE`), Faucet Command ACK, Progress, Completion, Failure lifecycle, duplicate/invalid/out-of-order payloads, and disconnect/reconnect cycles. Explicitly reported `TASK-0407` (heartbeat thresholds) and `TASK-0809` (command timeouts) as BLOCKED due to TBD numeric values.
+**Dependencies:** `TASK-0402`, `TASK-0404`, `TASK-0405`
+**Completed:** 2026-08-11 — Implemented multi-device operational simulator in `scripts/device-simulator.ts` and unit test suite in `apps/iot-gateway/src/__tests__/device-simulator.test.ts`. Configured REST API ingestion (Soil & Water telemetry per `DEC-DEV-020`, `DEC-MON-086`), MQTT Reservoir Telemetry (`WATER_TANK_NODE`), Faucet Command ACK, Progress, Completion, Failure lifecycle, duplicate/invalid/out-of-order payloads, and disconnect/reconnect cycles. Explicitly reported `TASK-0407` (heartbeat thresholds) and `TASK-0809` (command timeouts) as  BLOCKED (timeout values unresolved) due to TBD numeric values.
 **Notes:** Adapted to simulate available Soil Telemetry (REST per `TASK-0405`), Water Tank (`WATER_TANK_NODE`) Telemetry (MQTT per `DEC-DEV-020`), and Faucet Command Acknowledgements, while ignoring blocked water quality & heartbeat payloads until unblocked.
 
 ### Work
@@ -1317,7 +1317,7 @@ Simulate:
 
 ## TASK-0409 — Implement Gateway Observability
 
-**Priority:** `P1`  
+**Priority:** `P1`
 **Status:** `DONE`
 **Dependencies:** `TASK-0401`
 **Completed:** 2026-08-01 — Implemented broker-agnostic `GatewayMetricsCollector` in `apps/iot-gateway/src/observability/metrics.ts` tracking broker connection states, message counters (valid, invalid, duplicate, unknown device attempts), telemetry ingestion latency statistics, active device counts, and command status. Enhanced `logger.ts` LogMeta for correlation IDs (`correlationId`, `messageId`, `commandId`, `deviceId`, `ingestionId`, `requestId`) and automated secret redaction. Integrated metric recording into `GatewayMqttClient` and `CommandPublisher`. Preserved existing `/health` and `/ready` routes without changes or unspec'd public endpoints. Added unit test suite `apps/iot-gateway/src/__tests__/metrics.test.ts`. Verified 88/88 test pass rate, lint, diff-check, and status.
@@ -1348,9 +1348,9 @@ Metrics:
 
 ## TASK-0501 — Implement Latest Monitoring API
 
-**Priority:** `P0`  
-**Status:** `DONE`  
-**Dependencies:** `TASK-0405`, `TASK-0305`  
+**Priority:** `P0`
+**Status:** `DONE`
+**Dependencies:** `TASK-0405`, `TASK-0305`
 **Completed:** 2026-08-05 — Implemented latest monitoring endpoints (`GET /api/v1/devices/[deviceId]/monitoring/latest`, `GET /api/v1/devices/[deviceId]/monitoring/soil/latest`, `GET /api/v1/devices/[deviceId]/monitoring/water/latest`) serving soil, water quality, and reservoir metrics with RBAC access verification and zero/null semantics preserved.
 **Reconciliation & Hardening (2026-08-19):** Reconciled route handlers and data access layers to accept both canonical string `deviceId` and immutable database primary key `devices.id` UUID in route params. Hardened RBAC checks (`requireDeviceViewAccess`) and repository lookup to transparently resolve device identity across both identifier forms. Preserved strict Admin canonical `deviceId` concealment (`DEC-DEV-028`). Added unit test coverage for UUID-based querying with 100% pass rate.
 
@@ -1377,9 +1377,9 @@ GET /devices/{deviceId}/monitoring/water/latest
 
 ## TASK-0502 — Implement Monitoring Dashboard
 
-**Priority:** `P1`  
-**Status:** `DONE`  
-**Dependencies:** `TASK-0501`, `TASK-0306`  
+**Priority:** `P1`
+**Status:** `DONE`
+**Dependencies:** `TASK-0501`, `TASK-0306`
 **Completed:** 2026-08-05 — Implemented full multi-device monitoring dashboard with domain route partitioning (`/soil` for soil metrics, `/water` for water quality metrics, `/controls` for reservoir water tank metrics & faucet controls, and `/sensor` overview), centered top-bar `DeviceSelector` with automatic route prefetching and device restoration from `DeviceContext`/`sessionStorage`/`localStorage`, dynamic user display name without hardcoded fallbacks, neutral `Pengguna` account placeholder during loading/unauthenticated states, preserving existing design aesthetic and responsive layout, with full unit test coverage and quality verification.
 
 ### Work
@@ -1405,9 +1405,9 @@ Display:
 
 ## TASK-0503 — Implement Historical Query API
 
-**Priority:** `P1`  
-**Status:** `DONE`  
-**Dependencies:** `TASK-0405`  
+**Priority:** `P1`
+**Status:** `DONE`
+**Dependencies:** `TASK-0405`
 **Completed:** 2026-08-11 — Implemented Historical Query API endpoints (`GET /api/v1/devices/[deviceId]/monitoring/soil/history` and `GET /api/v1/devices/[deviceId]/monitoring/water/history`) adhering to `DEC-MON-087` (default range: last 24h, max range: 31 days, default `pageSize`: 20, max `pageSize`: 100). Enforced RBAC and device access authorization, preserved null/missing values without zero-coercion, separated water-quality telemetry from reservoir data, omitted combined-history endpoint, and utilized indexed database queries (`soil_readings_device_received_idx` and `water_readings_device_received_idx`). Updated unit and integration test coverage across contract, database, and API layers.
 **Reconciliation & Hardening (2026-08-19):** Reconciled historical route handlers and `TelemetryRepository` to accept both canonical `deviceId` and immutable database UUID `devices.id`. Verified queries returning zero records return HTTP 200 `{ series: [], pagination: { ... } }`, avoiding false 404 errors per `DEC-MON-087`. Added targeted unit test suites with 100% pass rate.
 
@@ -1429,9 +1429,9 @@ Implement bounded history for soil and water.
 
 ## TASK-0504 — Implement Historical Charts
 
-**Priority:** `P1`  
-**Status:** `DONE`  
-**Dependencies:** `TASK-0503`  
+**Priority:** `P1`
+**Status:** `DONE`
+**Dependencies:** `TASK-0503`
 **Completed:** 2026-08-12 — Implemented historical monitoring chart components and data fetching layer (`useHistoricalMonitoring` hook, `HistoricalChartControls`, `NPKChart`, `WaterNutrientChart`) on canonical `/soil` and `/water` routes (legacy `/tanah` and `/air` return 404 Not Found). Enforced `DEC-MON-087` & `DEC-MON-088` date-range validation (default 24h, max 31 days) and raw pagination item concatenation (`pageSize=100`, page 1..N). Preserved `null` values as visual gaps (`connectNulls={false}`), handled empty history with HTTP 200 and no-data UI (no fake zeros or 404s), synchronized `DeviceSelector` context across routes, resolved canonical string `deviceId` and database UUID lookups, converted stored `mS/cm` EC values to `µS/cm` for display, applied Indonesian localization (`id-ID`) for timestamps and UI text, and supported responsive mobile layouts (360px–430px). Verified 100% pass across targeted unit tests (`apps/web/test/unit/historical-charts.test.tsx`), authenticated Playwright OWNER/ADMIN E2E testing, full pre-commit verification suite (`test:coverage`, `test:integration`, `check:quality`, `test`, `test:e2e`), and 17-file specification document reconciliation.
 **Reconciliation Note (2026-08-19):** Reconciled `useHistoricalMonitoring` hook and sensor domain pages (`/soil`, `/water`) to consistently pass immutable database UUID `devices.id` in `activeDeviceId`. Verified clean empty state rendering on HTTP 200 empty responses without erroneous 404 banners.
 
@@ -1451,9 +1451,9 @@ Implement bounded historical chart visualization.
 
 ## TASK-0505 — Implement Realtime Monitoring Stream
 
-**Priority:** `P1`  
+**Priority:** `P1`
 **Status:** `DONE`
-**Dependencies:** `TASK-0401`, `TASK-0501`  
+**Dependencies:** `TASK-0401`, `TASK-0501`
 **Completed:** Implemented in-memory Server-Sent Events (SSE) streaming route `GET /api/v1/realtime/stream` and `RealtimeEventHub` (`apps/web/lib/realtime/event-hub.ts`) per `DEC-INF-077` and `DEC-DEV-020`. Enforced initial session authentication (`requireSession`), active account revalidation (`requireActiveAccount`), target device view access authorization (`requireDeviceViewAccess`), and event filtering by `deviceId` and `channels`. Integrated `verifyStreamSessionActive` in heartbeat loop to emit `session.expired` and terminate stream on session expiry/revocation (completing `TASK-0908`), and rechecked device access to emit `access.revoked` and terminate stream on device unassignment. Added `useRealtimeMonitoring` hook (`apps/web/hooks/use-realtime-monitoring.ts`) with automatic fallback to polling. Verified 100% test pass rate across unit test suite (`apps/web/test/unit/realtime-stream.test.ts`).
 
 ### Work
@@ -1481,9 +1481,9 @@ Server-Sent Events
 
 ## TASK-0601 — Select and Configure I18N Library
 
-**Priority:** `P1`  
-**Status:** `DONE`  
-**Dependencies:** `TASK-0001`  
+**Priority:** `P1`
+**Status:** `DONE`
+**Dependencies:** `TASK-0001`
 **Notes:** `next-intl` approved for Next.js App Router per `DEC-I18N-068`. Default `id`, fallback `en`, non-prefixed cookie strategy (`locale`).
 
 ### Work
@@ -1509,9 +1509,9 @@ Configure `next-intl` infrastructure for `@kebun-melon/web`:
 
 ## TASK-0602 — Create Translation Namespaces
 
-**Priority:** `P1`  
-**Status:** `DONE`  
-**Dependencies:** `TASK-0601`  
+**Priority:** `P1`
+**Status:** `DONE`
+**Dependencies:** `TASK-0601`
 **Completed:** 2026-08-13 — Created complete translation namespaces for `id` (Bahasa Indonesia) and `en` (English) per `docs/I18N.md` §10-§17.
 
 ### Work
@@ -1559,15 +1559,15 @@ Key Implementation Details:
 
 ## TASK-0603 — Replace Hard-Coded UI Text
 
-**Priority:** `P1`  
-**Status:** `DONE`  
+**Priority:** `P1`
+**Status:** `DONE`
 **Completed:** 2026-08-14 — Replaced hard-coded user-facing text across all auth and protected routes using `next-intl` translation hooks with 100% key parity across `messages/id.json` and `messages/en.json`. Enforced presentation-layer translation while keeping API, database, MQTT, and RBAC values canonical and untranslated. Verified 100% pass rate across 15 unit test suites (107/107 tests passed), clean TypeScript typecheck (`tsc --noEmit` 0 errors), Next.js production build (`31/31` static pages), Playwright browser verification on `/login` and `/register`, and verified user-reported completion of all 5 reserved pre-commit checks (`test:coverage`, `test:integration`, `check:quality`, `test`, `test:e2e`).
-**Dependencies:** `TASK-0602`  
-**Frontend Impact:** `MINOR`  
-**Selected UI Direction:** `Premium Minimal Ops`  
-**Existing Color Template:** `UNCHANGED`  
-**Selected Motion Effects:** `None`  
-**21st.dev MCP:** `NOT REQUIRED`  
+**Dependencies:** `TASK-0602`
+**Frontend Impact:** `MINOR`
+**Selected UI Direction:** `Premium Minimal Ops`
+**Existing Color Template:** `UNCHANGED`
+**Selected Motion Effects:** `None`
+**21st.dev MCP:** `NOT REQUIRED`
 
 ### Work
 
@@ -1597,9 +1597,9 @@ Key Implementation Details:
 
 ## TASK-0604 — Implement Mandatory Initial Language Gate & Settings Locale Change Flow
 
-**Priority:** `P1`  
-**Status:** `DONE`  
-**Dependencies:** `TASK-0601`, `TASK-0602`, `TASK-0603`, `TASK-0211`  
+**Priority:** `P1`
+**Status:** `DONE`
+**Dependencies:** `TASK-0601`, `TASK-0602`, `TASK-0603`, `TASK-0211`
 **Implementation Summary:** Implemented mandatory initial language gate (`Select Language / Pilih Bahasa`, English -> `en`, Bahasa Indonesia -> `id`) on `(auth)/layout.tsx` for visitors without valid `locale` cookie. Implemented authenticated language modal selector on `/pengaturan` (`SettingsLocaleSwitcher`) with accessible dialog pattern adhering to `Premium Minimal Ops` (clear active indicator, localized error handling, preserved route & device context), backed by `PATCH /api/v1/me/preferences` with strict Zod validation (`UserPreferenceUpdateInputSchema`), `language.self.update` RBAC check, database persistence with audit logging, and `/settings` Next.js permanent redirect. Fixed system default device display labels (`Node Sensor Tanah` <-> `Soil Sensor Node`, `Node Kualitas Air` <-> `Water Quality Node`, `Node Tangki Air` <-> `Water Tank Node`) in presentation layer while preserving custom names, device IDs, and canonical enums. Responsive mobile selector centering and dropdown viewport bounding enforced across 360px, 390px, 430px, and desktop viewports. Verified 100% test pass rate across 18 unit test suites (136/136 tests), 0 type errors, 32/32 static build routes, and Playwright verification across desktop and mobile with 0 console errors.
 
 ### Acceptance Criteria
@@ -1616,8 +1616,8 @@ Key Implementation Details:
 
 ## TASK-0605 — Add Translation Completeness Checks
 
-**Priority:** `P1`  
-**Status:** `DONE`  
+**Priority:** `P1`
+**Status:** `DONE`
 **Completed:** 2026-08-14 — Implemented translation completeness and parity checker in `scripts/check-translations.ts` and automated test suite in `apps/web/test/unit/i18n-completeness.test.ts`. Configured `i18n:check` in `package.json` (`check:quality`) and `.github/workflows/ci.yml`. Enforced detection of missing keys, extra keys, empty values, placeholder mismatches, duplicate JSON keys, and raw untranslated translation keys.
 **Dependencies:** `TASK-0602`, `TASK-0108`
 
@@ -1638,9 +1638,9 @@ CI detects:
 
 ## TASK-0701 — Implement Alert Model and API
 
-**Priority:** `P1`  
-**Status:** `DONE`  
-**Dependencies:** `TASK-0104`, `TASK-0304`  
+**Priority:** `P1`
+**Status:** `DONE`
+**Dependencies:** `TASK-0104`, `TASK-0304`
 **Completed:** 2026-08-02 — Implemented Alert DTO contracts, Zod schemas, AlertRepository with OWNER global scope and ADMIN device assignment scoping, and REST API endpoints (GET /api/v1/alerts and GET /api/v1/alerts/[alertId]) with full RBAC, filtering, pagination, standard error envelopes, and test coverage across contract, repository, and API routes.
 
 
@@ -1658,9 +1658,9 @@ Implement:
 
 ## TASK-0702 — Implement Device Offline and Stale Alerts
 
-**Priority:** `P1`  
-**Status:** `BLOCKED`  
-**Dependencies:** `TASK-0407`  
+**Priority:** `P1`
+**Status:** `BLOCKED`
+**Dependencies:** `TASK-0407`
 **Blocked Reason:** Blocked by `TASK-0407` (Device offline and stale threshold minutes TBD).
 
 ### Acceptance Criteria
@@ -1673,9 +1673,9 @@ Implement:
 
 ## TASK-0703 — Implement Command Failure and Timeout Alerts
 
-**Priority:** `P1`  
-**Status:** `DONE`  
-**Dependencies:** `TASK-0806`  
+**Priority:** `P1`
+**Status:** `DONE`
+**Dependencies:** `TASK-0806`
 **Completed:** 2026-08-14 — Implemented distinct alert types for physical faucet command failures (`COMMAND_FAILED`) and timeouts (`COMMAND_TIMEOUT`) in `@kebun-melon/contracts`. Implemented centralized, idempotent alert creation in `AlertRepository` (`createCommandFailureAlert`, `createCommandTimeoutAlert`) linking device UUID (`deviceId`) and faucet command UUID (`sourceId`, `sourceType: 'faucet_command'`). Guaranteed that command timeouts record `physicalOutcome: 'UNKNOWN'` without claiming known physical completion. Integrated failure alert creation into IoT Gateway `AcknowledgementProcessor` (rejected ACKs) and `FaucetEventProcessor` (`FAILED` execution events). Added full English and Indonesian translation keys (`commandFailedTitle`, `commandFailedMessage`, `commandTimeoutTitle`, `commandTimeoutMessage`) with ICU placeholders (`{commandId}`, `{deviceName}`, `{reason}`) and verified 100% key/placeholder parity. Preserved task boundaries keeping automated timeout scheduling/durations blocked under `TASK-0809` without inventing thresholds. Verified 100% test pass rate across targeted test suites and user-verified pre-commit suite.
 
 ### Acceptance Criteria
@@ -1688,9 +1688,9 @@ Implement:
 
 ## TASK-0704 — Implement Alert Acknowledgement
 
-**Priority:** `P2`  
+**Priority:** `P2`
 **Status:** `DONE`
-**Dependencies:** `TASK-0701`  
+**Dependencies:** `TASK-0701`
 **Completed:** 2026-08-15 — Implemented alert acknowledgement contracts (`AcknowledgeAlertInputSchema`, `AlertAcknowledgementDto`), database transactional acknowledgement in `AlertRepository` (`acknowledgeAlert`), `POST /api/v1/alerts/{alertId}/acknowledge` API route handler with RBAC enforcement (`alert.acknowledge` for OWNER global scope, ADMIN assigned-device scope), audit logging (`alert.acknowledged`), and frontend `/notifikasi` page wiring with `Premium Minimal Ops` modal for optional operator notes. Preserved alerts without deletion, supported duplicate acknowledgement safety, and synchronized English/Indonesian localization. Authenticated manual verification passed for Owner and Admin access scopes.
 
 ### Acceptance Criteria
@@ -1706,10 +1706,10 @@ Implement:
 
 ## TASK-0801 — Finalise Faucet Permission Matrix
 
-**Priority:** `P0`  
-**Status:** `DONE`  
-**Dependencies:** `TASK-0002`  
-**Completed:** 2026-08-02 — Faucet permission matrix finalized and documented in `RBAC.md` §4.4 and `SECURITY.md` §5 per `DEC-RBAC-015` (`Active ADMIN + assigned device access = faucet-control permission`) and `DEC-CTRL-051` (`Faucet Safety Rules & Idempotency`).
+**Priority:** `P0`
+**Status:** `DONE`
+**Dependencies:** `TASK-0002`
+**Completed:** 2026-08-02 — Faucet permission matrix finalized and documented in `RBAC.md` §4.4 and `SECURITY.md` §5 per `DEC-RBAC-015` (`Active ADMIN + assigned device access = faucet-control permission`) and `DEC-CTRL-051` (`Faucet Safety Rules & Idempotency`). Reconciled per `DEC-CTRL-090` and `DEC-CTRL-091` (`device.control` standard permission).
 
 ### Work
 
@@ -1718,8 +1718,7 @@ Document:
 - Owner control permission.
 - Admin control permission.
 - Per-device `canControl`.
-- Cancellation.
-- Stop.
+- Manual Open/Close control.
 - Emergency stop.
 - Concurrent command policy.
 
@@ -1732,15 +1731,18 @@ Document:
 
 ## TASK-0802 — Implement Faucet Command Database Model
 
-**Priority:** `P0`  
-**Status:** `DONE`  
-**Dependencies:** `TASK-0104`  
-**Completed:** 2026-08-02 — Implemented FaucetCommand & FaucetCommandEvent contracts, server-side phase-volume mapping (Phase 1: 300mL, Phase 2: 1000mL, Phase 3: 1500mL), raw SQL migration for partial unique message_id index on faucet_command_events, FaucetCommandRepository with state transition safeguards, idempotency checks, active command concurrency checks, and complete test suite.
-
+**Priority:** `P0`
+**Status:** `READY`
+**Dependencies:** `TASK-0104`
+**Historical Completion:** 2026-08-02 — Implemented initial FaucetCommand & FaucetCommandEvent contracts, server-side phase-volume mapping (Phase 1: 300mL, Phase 2: 1000mL, Phase 3: 1500mL), raw SQL migration for partial unique message_id index on faucet_command_events, FaucetCommandRepository with state transition safeguards, idempotency checks, active command concurrency checks, and complete test suite.
+**Revision Note (2026-08-19):** Status set to `READY`. Requires database schema/migration and contract revisions for `plant_count` (integer >= 1) column, `OPEN` and `CLOSE` command actions, and Zod schemas per `DEC-CTRL-090`.
 
 ### Acceptance Criteria
 
-- Phase-volume check constraint exists.
+- `plant_count` column (integer, minimum 1) is supported in database model and Zod contracts for `DISPENSE`.
+- `action` supports `DISPENSE`, `OPEN`, and `CLOSE`.
+- `OPEN` and `CLOSE` do not require `phase`, `plant_count`, or `target_volume_ml`.
+- Phase-volume check constraint and server-side calculation rules exist.
 - Command ID is unique.
 - Idempotency key is unique.
 - Command events are append-only.
@@ -1750,14 +1752,15 @@ Document:
 
 ## TASK-0803 — Implement Faucet Command API
 
-**Priority:** `P0`  
-**Status:** `DONE`  
-**Dependencies:** `TASK-0802`, `TASK-0304`  
-**Completed:** 2026-08-02 — Implemented POST /api/v1/devices/{deviceId}/faucet-commands, GET /api/v1/devices/{deviceId}/faucet-commands, and GET /api/v1/devices/{deviceId}/faucet-commands/{commandId} REST API endpoints with active session authentication (`requireSession`), active account revalidation (`requireActiveAccount`), RBAC permissions (`device.control.dispense`, `device.control.history.read`), ENABLE_FAUCET_CONTROL feature flag guard, device assignment scoping, FAUCET_CONTROL capability validation, device active & ONLINE state checks, server-side phase-to-volume mapping (Phase 1: 300mL, Phase 2: 1000mL, Phase 3: 1500mL), idempotency key handling, max 1 active command per device conflict enforcement (QUEUED, SENT, ACKNOWLEDGED, IN_PROGRESS), durable QUEUED persistence with initial FaucetCommandEvent creation, atomic AuditLog recording (faucet.command.created), paginated history filtering, and 100% test coverage.
+**Priority:** `P0`
+**Status:** `BACKLOG`
+**Dependencies:** `TASK-0802`, `TASK-0304`
+**Historical Completion:** 2026-08-02 — Implemented POST /api/v1/devices/{deviceId}/faucet-commands, GET /api/v1/devices/{deviceId}/faucet-commands, and GET /api/v1/devices/{deviceId}/faucet-commands/{commandId} REST API endpoints with active session authentication (`requireSession`), active account revalidation (`requireActiveAccount`), RBAC permissions (`device.control`), ENABLE_FAUCET_CONTROL feature flag guard, device assignment scoping, FAUCET_CONTROL capability validation, device active & ONLINE state checks, server-side phase-to-volume mapping, idempotency key handling, max 1 active command per device conflict enforcement, durable QUEUED persistence, atomic AuditLog recording, paginated history filtering, and 100% test coverage.
+**Revision Note (2026-08-19):** Status set to `BACKLOG` (pending `TASK-0802`). Requires API revision for mandatory `plantCount` (integer >= 1) validation, server-side target volume calculation (`presetVolumeMl * plantCount`), browser target-volume authority rejection, `OPEN` and `CLOSE` manual action support, and UI liter alignment.
 
 ### Work
 
-Implement:
+Implement / Update:
 
 ```text
 POST /devices/{deviceId}/faucet-commands
@@ -1767,11 +1770,13 @@ POST /devices/{deviceId}/faucet-commands
 
 - Active session required.
 - Active account required.
-- Control permission required.
+- Control permission (`device.control`) required.
 - Device access required.
 - Device capability required.
 - Device online/controllable required.
-- Phase mapping is server-side.
+- `plantCount` required for `DISPENSE`, integer >= 1.
+- Target volume calculation is strictly server-side (`presetVolumeMl * plantCount`). Browser never supplies authoritative target volume.
+- `OPEN` and `CLOSE` actions supported without `phase`, `plantCount`, or `targetVolumeMl`.
 - Command is persisted before publication.
 - Idempotency is enforced.
 - Response starts as `QUEUED`.
@@ -1780,28 +1785,31 @@ POST /devices/{deviceId}/faucet-commands
 
 ## TASK-0804 — Implement Gateway Command Publisher
 
-**Priority:** `P0`  
-**Status:** `DONE`
+**Priority:** `P0`
+**Status:** `BACKLOG`
 **Dependencies:** `TASK-0401`, `TASK-0803`
-**Completed:** 2026-08-03 — Implemented `CommandPublisher` in `@kebun-melon/iot-gateway` to publish eligible, unexpired `QUEUED` faucet commands for `WATER_TANK_NODE` devices over MQTT (QoS 1, retain = false). Enforced target device type validation, phase/volume mapping, dynamic canonical topic routing (`agriculture/{environment}/{siteId}/{deviceId}/command/faucet`), payload formatting, and atomic DB state transition to `SENT` with `FaucetCommandEvent` creation. Fixed `.env` loading and non-UUID `commandId` detail API query handling. Verified manually with active Mosquitto broker and 100% unit/quality test coverage.
+**Historical Completion:** 2026-08-03 — Implemented `CommandPublisher` in `@kebun-melon/iot-gateway` to publish eligible, unexpired `QUEUED` faucet commands for `WATER_TANK_NODE` devices over MQTT (QoS 1, retain = false). Enforced target device type validation, phase/volume mapping, dynamic canonical topic routing (`agriculture/{environment}/{siteId}/{deviceId}/command/faucet`), payload formatting, and atomic DB state transition to `SENT` with `FaucetCommandEvent` creation. Fixed `.env` loading and non-UUID `commandId` detail API query handling.
+**Revision Note (2026-08-19):** Status set to `BACKLOG` (pending `TASK-0803`). Requires Gateway command publisher revision to format and publish MQTT commands with multiplied `targetVolumeMl` for `DISPENSE`, and dedicated `OPEN` / `CLOSE` command payloads.
 
 ### Acceptance Criteria
 
 - Command targets one device.
-- Command is not retained.
-- QoS matches approved specification.
+- Command is not retained (retain = false, QoS 1).
+- Multiplied `targetVolumeMl` published for `DISPENSE`.
+- Dedicated `OPEN` and `CLOSE` payload schema published for manual control.
 - Expiry is included.
-- Publication result updates status.
+- Publication result updates status to `SENT`.
 - Failed publish does not appear as sent.
 
 ---
 
 ## TASK-0805 — Implement Device Acknowledgement Processing
 
-**Priority:** `P0`  
-**Status:** `DONE`  
-**Dependencies:** `TASK-0804`  
-**Completed:** 2026-08-03 — Implemented `AcknowledgementProcessor` in `@kebun-melon/iot-gateway` to subscribe to canonical faucet ACK topics (`agriculture/{environment}/{siteId}/{deviceId}/ack/faucet`, QoS 1). Validated topic/payload deviceId matching, resolved external device ID to internal device UUID, and enforced `WATER_TANK_NODE` device type scope. Executed strict `SENT` → `ACKNOWLEDGED` (for accepted ACKs) and `SENT` → `FAILED` (for rejected ACKs with canonical reasonCode) state transitions with `FaucetCommandEvent` audit creation. Preserved duplicate `messageId` idempotency, isolated non-`SENT` command states against out-of-order state regression, and enforced that ACK processing never auto-completes commands to `COMPLETED`. Verified with 100% unit and integration test coverage (11 tests in `acknowledgement-processor.test.ts`) and verified manually via MQTT broker testing.
+**Priority:** `P0`
+**Status:** `BACKLOG`
+**Dependencies:** `TASK-0804`
+**Historical Completion:** 2026-08-03 — Implemented `AcknowledgementProcessor` in `@kebun-melon/iot-gateway` to subscribe to canonical faucet ACK topics (`agriculture/{environment}/{siteId}/{deviceId}/ack/faucet`, QoS 1). Validated topic/payload deviceId matching, resolved external device ID to internal device UUID, and enforced `WATER_TANK_NODE` device type scope. Executed strict `SENT` → `ACKNOWLEDGED` (for accepted ACKs) and `SENT` → `FAILED` (for rejected ACKs with canonical reasonCode) state transitions with `FaucetCommandEvent` audit creation.
+**Revision Note (2026-08-19):** Status set to `BACKLOG` (pending `TASK-0804`). Requires device acknowledgement processing revalidation and handler updates for `OPEN` and `CLOSE` command ACKs.
 
 ### Acceptance Criteria
 
@@ -1810,15 +1818,17 @@ POST /devices/{deviceId}/faucet-commands
 - Duplicate acknowledgement is idempotent.
 - Rejection reason is canonical.
 - `ACKNOWLEDGED` does not become `COMPLETED`.
+- Covers `DISPENSE`, `OPEN`, and `CLOSE` command acknowledgements.
 
 ---
 
 ## TASK-0806 — Implement Command Event State Machine
 
-**Priority:** `P0`  
-**Status:** `DONE`  
-**Dependencies:** `TASK-0805`  
-**Completed:** 2026-08-03 — Implemented `FaucetEventProcessor` in `@kebun-melon/iot-gateway` (`apps/iot-gateway/src/events/processor.ts`) to subscribe to canonical faucet execution event topics (`agriculture/{environment}/{siteId}/{deviceId}/event/faucet`, QoS 1). Validated topic/payload deviceId matching, resolved external device ID to internal device UUID, and enforced `WATER_TANK_NODE` device type scope. Executed strict `ACKNOWLEDGED` → `IN_PROGRESS` → `COMPLETED` and `ACKNOWLEDGED`/`IN_PROGRESS` → `FAILED` state transitions with `FaucetCommandEvent` audit creation and `actualVolumeMl` / `reasonCode` tracking. Rejects state regressions and terminal state mutations (`COMPLETED`, `FAILED`, `CANCELLED`, `TIMEOUT`, `EXPIRED`), preserves duplicate `messageId` idempotency, and wires into existing `app.ts` / `index.ts` lifecycle. Verified with 100% test coverage (11 unit/integration tests in `faucet-event-processor.test.ts` and 444 total project tests passing).
+**Priority:** `P0`
+**Status:** `BACKLOG`
+**Dependencies:** `TASK-0805`
+**Historical Completion:** 2026-08-03 — Implemented `FaucetEventProcessor` in `@kebun-melon/iot-gateway` (`apps/iot-gateway/src/events/processor.ts`) to subscribe to canonical faucet execution event topics (`agriculture/{environment}/{siteId}/{deviceId}/event/faucet`, QoS 1). Validated topic/payload deviceId matching, resolved external device ID to internal device UUID, and enforced `WATER_TANK_NODE` device type scope. Executed strict `ACKNOWLEDGED` → `IN_PROGRESS` → `COMPLETED` and `ACKNOWLEDGED`/`IN_PROGRESS` → `FAILED` state transitions with `FaucetCommandEvent` audit creation and `actualVolumeMl` / `reasonCode` tracking.
+**Revision Note (2026-08-19):** Status set to `BACKLOG` (pending `TASK-0805`). Requires event processor revision for `OPEN` / `CLOSE` execution events, confirming physical `OPEN` / `CLOSED` / `UNKNOWN` states without premature completion.
 
 ### Work
 
@@ -1842,25 +1852,30 @@ EXPIRED
 - Final states do not regress.
 - Late events follow approved reconciliation.
 - Timeout remains distinct from failure and completion.
+- Physical state confirmation (`OPEN`, `CLOSED`, `UNKNOWN`) tracked accurately.
 - Events are audited.
 
 ---
 
 ## TASK-0807 — Implement Faucet Control UI
 
-**Priority:** `P0`  
-**Status:** `DONE`  
-**Completed:** 2026-08-03 — Built Faucet Control UI (/controls page, FaucetPresetSelector, FaucetConfirmationModal, FaucetStatusCard, FaucetHistoryTable) with Phase 1/2/3 preset volumes (300/1000/1500 mL), explicit confirmation modal, permission/feature flag/offline/active-command disabled state handling, active-only status polling, timeline display, and execution history. Added 13 unit & component regression tests covering UI states, modal submit, and polling loop lifecycle.
+**Priority:** `P0`
+**Status:** `BACKLOG`
 **Dependencies:** `TASK-0803`, `TASK-0806`
+**Historical Completion:** 2026-08-03 — Built Faucet Control UI (/controls page, FaucetPresetSelector, FaucetConfirmationModal, FaucetStatusCard, FaucetHistoryTable) with Phase 1/2/3 preset volumes (300/1000/1500 mL), explicit confirmation modal, permission/feature flag/offline/active-command disabled state handling, active-only status polling, timeline display, and execution history.
+**Revision Note (2026-08-19):** Status set to `BACKLOG` (pending `TASK-0803`, `TASK-0806`). Requires UI revision to display 0.3 L / 1 L / 1.5 L presets, capture `plantCount` input (integer >= 1), display calculation preview, incorporate manual `OPEN` and `CLOSE` controls, enforce confirmation modal requirements, and present accurate physical state (`OPEN` / `CLOSED` / `UNKNOWN`).
 
 ### Acceptance Criteria
 
-- User selects phase only.
-- Target volume is displayed.
-- Confirmation is required.
+- User selects phase and provides `plantCount` (integer >= 1).
+- UI displays volume presets in Liters (`0.3 L`, `1 L`, `1.5 L`).
+- Browser calculates client-side preview, but server strictly validates and computes authoritative target volume.
+- Confirmation modal displays: device, phase, volume per plant (L), plant count, total water (L), and device warnings.
+- Manual `OPEN` and `CLOSE` controls available for authorised users.
 - Device name and status are shown.
 - Permission denied is handled.
 - Offline and busy states are handled.
+- Physical state is displayed as `OPEN`, `CLOSED`, or `UNKNOWN`.
 - Queue, progress, completion, failure, and timeout states exist.
 - Completion is not shown prematurely.
 
@@ -1868,10 +1883,11 @@ EXPIRED
 
 ## TASK-0808 — Implement Duplicate Command Protection
 
-**Priority:** `P0`  
-**Status:** `DONE`  
-**Completed:** 2026-08-04 — Enhanced `createCommand` in `FaucetCommandRepository` (`@kebun-melon/database`) to perform idempotency checks and max-1 active command checks transactionally, re-querying by `idempotencyKey` on Prisma `P2002` unique constraint error to gracefully return the existing command for identical concurrent/replay requests, or raise `FaucetCommandConflictError` (`409 DUPLICATE_COMMAND_CONFLICT`) for conflicting parameter reuses. Preserved single `QUEUED` event and single command creation during race conditions with zero duplicate MQTT publications. Confirmed existing ACK and execution event `messageId` deduplication in `@kebun-melon/iot-gateway`. Added comprehensive unit and integration test coverage (`faucet-command-repository.test.ts`, `route.test.ts`) and verified manually against active PostgreSQL dev DB.
+**Priority:** `P0`
+**Status:** `BACKLOG`
 **Dependencies:** `TASK-0803`, `TASK-0804`, `TASK-0805`
+**Historical Completion:** 2026-08-04 — Enhanced `createCommand` in `FaucetCommandRepository` (`@kebun-melon/database`) to perform idempotency checks and max-1 active command checks transactionally, re-querying by `idempotencyKey` on Prisma `P2002` unique constraint error to gracefully return the existing command for identical concurrent/replay requests, or raise `FaucetCommandConflictError` (`409 DUPLICATE_COMMAND_CONFLICT`) for conflicting parameter reuses. Preserved single `QUEUED` event and single command creation during race conditions with zero duplicate MQTT publications.
+**Revision Note (2026-08-19):** Status set to `BACKLOG` (pending `TASK-0803`, `TASK-0804`, `TASK-0805`). Requires duplicate command protection revalidation for `DISPENSE` with `plantCount` and `OPEN` / `CLOSE` actions.
 
 ### Acceptance Criteria
 
@@ -1885,10 +1901,10 @@ EXPIRED
 
 ## TASK-0809 — Implement Command Timeout Processor
 
-**Priority:** `P0`  
-**Status:** `BLOCKED`  
-**Dependencies:** `TASK-0806`  
-**Blocked Reason:** Blocked by `docs/DECISIONS.md` §3 (Command ACK timeout seconds, completion timeout seconds, and expiry duration seconds TBD).
+**Priority:** `P0`
+**Status:** `BLOCKED`
+**Dependencies:** `TASK-0806`
+**Blocked Reason:** Blocked by `docs/DECISIONS.md` §3 (Command ACK timeout seconds, completion timeout seconds, and expiry duration seconds TBD). Scope updated to include timeout handling for `DISPENSE`, `OPEN`, and `CLOSE`.
 
 ### Acceptance Criteria
 
@@ -1900,38 +1916,47 @@ EXPIRED
 
 ---
 
-## TASK-0810 — Implement Cancel and Stop
+## TASK-0810 — Implement Manual Faucet Open/Close Control
 
-**Priority:** `P2`  
-**Status:** `NOT_APPLICABLE`  
-**Dependencies:** None  
-**Notes:** Explicitly excluded for initial v1 release per `docs/DECISIONS.md` §3 (Default: do not implement cancellation/stop commands in v1).
+**Priority:** `P0`
+**Status:** `BACKLOG`
+**Dependencies:** `TASK-0803`, `TASK-0804`, `TASK-0806`, `TASK-0807`
+**Notes:** Repurposed from former Cancel/Stop feature to Manual Faucet Open/Close Control per `DEC-CTRL-090`. Manual faucet control must support OPEN and CLOSE actions, backend authenticated only, RBAC verification (`device.control`), `ENABLE_FAUCET_CONTROL` feature flag check, device active/ONLINE state checks, idempotency, MQTT publication (QoS 1, retain = false), device ACK and final execution confirmation, audit logging, UI state (`OPEN` / `CLOSED` / `UNKNOWN`; network/timeout uncertainty must NEVER be shown as confirmed OPEN/CLOSED), English/Indonesian i18n & accessibility, and HIL validation readiness. Unresolved: fail-safe behavior for an OPEN faucet after browser/network/gateway/device loss remains an explicit UNRESOLVED/BLOCKING decision (`DEC-CTRL-090`).
 
 ### Acceptance Criteria
 
-- Separate permission.
-- Original command reference.
-- Confirmation.
-- Device acknowledgement.
-- Uncertain state shown when stop cannot be confirmed.
+- Authenticated backend only (`requireSession`, `requireActiveAccount`).
+- RBAC validation (`device.control`).
+- Feature flag guard (`ENABLE_FAUCET_CONTROL`).
+- Device active & ONLINE / controllable checks.
+- Idempotency is enforced.
+- MQTT command published with QoS 1, retain = false.
+- Device acknowledgement and final execution confirmation tracked.
+- Audit trail recorded (`faucet.command.open.created`, `faucet.command.close.created`).
+- UI represents distinct `OPEN`, `CLOSED`, and `UNKNOWN` states.
+- Timeout and network uncertainty are NEVER presented as confirmed `OPEN` or `CLOSED`.
+- English and Indonesian localization and accessibility texts complete.
+- Hardware/HIL validation scenarios defined.
+- Fail-safe behavior upon connection loss documented as blocking decision (`DEC-CTRL-090`).
 
 ---
 
 ## TASK-0811 — Hardware-in-the-Loop Control Validation
 
-**Priority:** `P0`  
-**Status:** `BLOCKED`  
-**Dependencies:** `TASK-0807`, hardware readiness
+**Priority:** `P0`
+**Status:** `BLOCKED`
+**Dependencies:** `TASK-0807`, `TASK-0810`, hardware readiness
 
 ### Work
 
-Test each phase repeatedly with measured output.
+Test each phase repeatedly with measured output, including `plantCount` multiplier dispensing and manual `OPEN`/`CLOSE` operations.
 
 ### Acceptance Criteria
 
 - Device receives one command.
-- Correct phase is reported.
-- Target and actual volume are recorded.
+- Correct phase and `plantCount` are reported.
+- Target and actual volume are recorded in integer mL.
+- Manual `OPEN` and `CLOSE` operations verified on physical hardware.
 - Duplicate command does not repeat dispensing.
 - Timeout and disconnect behaviour are documented.
 - Hardware-team tolerance is met.
@@ -1943,9 +1968,9 @@ Test each phase repeatedly with measured output.
 
 ## TASK-0901 — Implement Security Headers
 
-**Priority:** `P0`  
-**Status:** `DONE`  
-**Dependencies:** `TASK-0204`  
+**Priority:** `P0`
+**Status:** `DONE`
+**Dependencies:** `TASK-0204`
 **Completed:** 2026-08-05 — Configured security HTTP response headers across Next.js web application (`apps/web/next.config.mjs`) and Fastify IoT Gateway (`apps/iot-gateway/src/app.ts`), enforcing Content-Security-Policy (CSP), X-Content-Type-Options (nosniff), Referrer-Policy, Permissions-Policy, X-Frame-Options (DENY) / frame-ancestors ('none'), and conditional Strict-Transport-Security (HSTS, max-age 2 years with preload) strictly for production environments (omitted on localhost/dev). Added comprehensive unit and integration test suites in `apps/web/test/unit/security-headers.test.ts` and `apps/iot-gateway/src/__tests__/security-headers.test.ts`. Updated requirement `SEC-DATA-003` in `docs/TRACEABILITY.md`.
 
 Implement:
@@ -1967,10 +1992,10 @@ Implement:
 
 ## TASK-0902 — Implement Rate Limiting
 
-**Priority:** `P0`  
-**Status:** `DONE`  
-**Dependencies:** `TASK-0204`, `TASK-0002`  
-**Notes:** Sliding window rate limiting designed in `SECURITY.md` §4 with environment-configurable limits.
+**Priority:** `P0`
+**Status:** `DONE`
+**Dependencies:** `TASK-0204`, `TASK-0002`
+**Notes:** Sliding window rate limiting designed in `SECURITY.md` §4 with environment-configurable limits. Note: Revalidation required for `DISPENSE` (with `plantCount`), `OPEN`, and `CLOSE` command actions during Phase 8 API revision.
 
 ### Work
 
@@ -1980,7 +2005,7 @@ Apply to:
 - Registration.
 - Password reset.
 - Approval actions.
-- Faucet commands.
+- Faucet commands (`DISPENSE`, `OPEN`, `CLOSE`).
 - Exports.
 - Expensive history.
 
@@ -1995,10 +2020,11 @@ Apply to:
 
 ## TASK-0903 — Implement Audit Logging
 
-**Priority:** `P0`  
-**Status:** `DONE`  
-**Dependencies:** `TASK-0104`  
+**Priority:** `P0`
+**Status:** `DONE`
+**Dependencies:** `TASK-0104`
 **Completed:** 2026-08-05 — Implemented append-only Audit Logging per `DB-AUDIT-001`, `SEC-LOG-001`, and `API-AUDIT-001`. Created `AuditEventKey` enums, `AuditLogDto` schemas, and `redactSecrets` recursive sanitization helper in `@kebun-melon/contracts`. Created `AuditRepository` in `@kebun-melon/database` supporting atomic `createAuditLog`, paginated `findAuditLogs`, and `findAuditLogById` with strictly zero edit/delete capabilities exposed. Added `recordAuditEvent` and `logAuthorizationDenial` server helpers in `apps/web/lib/audit/audit-service.ts`. Created `GET /api/v1/audit-logs` and `GET /api/v1/audit-logs/{auditId}` API endpoints guarded by active session authentication and `audit.read` permission (`OWNER` role). Added unit and integration test coverage across contracts, database repository, and Web API routes.
+**Revision Note (2026-08-19):** Audit logging framework is complete. Note: Revalidation required for new command action audit events (`faucet.command.dispense.created`, `faucet.command.open.created`, `faucet.command.close.created`) during Phase 8 API revision.
 
 ### Acceptance Criteria
 
@@ -2012,7 +2038,7 @@ Apply to:
 
 ## TASK-0904 — Implement Structured Application Logging
 
-**Priority:** `P1`  
+**Priority:** `P1`
 **Status:** `DONE`
 **Dependencies:** `TASK-0103`
 **Completed:** 2026-08-15 — Implemented centralized structured application logging across monorepo (`packages/contracts`, `apps/web`, `apps/iot-gateway`). Defined `LogLevel`, `LogMeta`, `StructuredLogRecord`, and `formatLogRecord` in `@kebun-melon/contracts`. Configured `LOG_LEVEL` environment variable validation with default `info`. Created `apps/web/lib/observability/logger.ts` and upgraded `apps/iot-gateway/src/observability/logger.ts` with structured JSON output, level threshold filtering, correlation IDs, child context propagation, and recursive secret redaction (`SECURITY.md` §20.2). Replaced unformatted `console.*` calls in Web API error handlers. Added unit test suites with 100% pass rate. Verified passing full pre-commit suite and targeted tests.
@@ -2062,8 +2088,8 @@ Apply to:
 
 ## TASK-0907 — Configure Production MQTT TLS and ACLs
 
-**Priority:** `P0`  
-**Status:** `BLOCKED`  
+**Priority:** `P0`
+**Status:** `BLOCKED`
 **Dependencies:** `TASK-0402`, hosting decision
 
 ### Acceptance Criteria
@@ -2079,7 +2105,7 @@ Apply to:
 
 ## TASK-0908 — Implement Session Revocation
 
-**Priority:** `P0`  
+**Priority:** `P0`
 **Status:** `DONE`
 **Dependencies:** `TASK-0204`, `TASK-0505`
 **Completed:** Implemented session revocation mechanisms across account lifecycle states (SUSPENDED, DEACTIVATED, REJECTED), transactional password updates (`changeUserPassword`), HTTP endpoint `POST /api/v1/auth/change-password`, database helper `verifyStreamSessionActive`, immediate device access revocation on authorization checks (`requireDeviceViewAccess`), and live-stream closing on session expiry/revocation (`GET /api/v1/realtime/stream` SSE route in `TASK-0505`). Added `ACCOUNT_PASSWORD_CHANGED` audit log event key and verified 100% test pass rate across unit test suites (`packages/database/test/session-revocation.unit.test.ts`, `apps/web/test/unit/session-revocation.test.ts`, `apps/web/test/unit/realtime-stream.test.ts`).
@@ -2097,8 +2123,8 @@ Apply to:
 
 ## TASK-0909 — Configure Backup and Restore
 
-**Priority:** `P0`  
-**Status:** `BLOCKED`  
+**Priority:** `P0`
+**Status:** `BLOCKED`
 **Dependencies:** hosting decision
 
 ### Acceptance Criteria
@@ -2164,8 +2190,8 @@ Apply to:
 
 ## TASK-1001 — Complete Unit Test Suite
 
-**Priority:** `P0`  
-**Status:** `BACKLOG`  
+**Priority:** `P0`
+**Status:** `BACKLOG`
 **Dependencies:** Implementation tasks
 
 ### Acceptance Criteria
@@ -2185,10 +2211,11 @@ Critical unit coverage includes:
 
 ## TASK-1002 — Complete API Integration Tests
 
-**Priority:** `P0`  
-**Status:** `DONE`
-**Completed:** `2026-08-07`
-**Dependencies:** API implementation
+**Priority:** `P0`
+**Status:** `BACKLOG`
+**Dependencies:** `TASK-0803`, `TASK-0810`
+**Historical Completion:** `2026-08-07` — Initial API integration test suites completed for authentication, RBAC, devices, telemetry, and initial faucet commands.
+**Revision Note (2026-08-19):** Status set to `BACKLOG` (pending Phase 8 API revisions). Requires test suite updates and revalidation against the new API contract (`plantCount` multiplier, server-side target volume calculation, arbitrary target volume rejection, and manual `OPEN`/`CLOSE` endpoints).
 
 ### Acceptance Criteria
 
@@ -2196,6 +2223,8 @@ Critical unit coverage includes:
 - RBAC matrix passes.
 - Device isolation passes.
 - Monitoring schema passes.
+- Faucet `DISPENSE` with `plantCount` multiplier passes.
+- Manual `OPEN` and `CLOSE` command endpoints pass.
 - Faucet idempotency passes.
 - Error envelopes match specification.
 
@@ -2203,8 +2232,8 @@ Critical unit coverage includes:
 
 ## TASK-1003 — Complete MQTT Contract Tests
 
-**Priority:** `P0`  
-**Status:** `BACKLOG`  
+**Priority:** `P0`
+**Status:** `BACKLOG`
 **Dependencies:** `TASK-0401`, `TASK-0408`, `TASK-0806`
 
 ### Acceptance Criteria
@@ -2221,9 +2250,9 @@ Critical unit coverage includes:
 
 ## TASK-1004 — Complete End-to-End Critical Flows
 
-**Priority:** `P0`  
-**Status:** `IN_PROGRESS`  
-**Dependencies:** Core UI, APIs, and Staging Infrastructure  
+**Priority:** `P0`
+**Status:** `IN_PROGRESS`
+**Dependencies:** Core UI, APIs, and Staging Infrastructure
 **Infrastructure Provisioned:**
 - Staging Web: `https://melon-monitor.up.railway.app`
 - Staging Gateway: `https://iot-gateway-production-7e17.up.railway.app`
@@ -2240,9 +2269,9 @@ Required flows status:
 - [x] Monitoring (Flow 5 — PASS)
 - [x] History (Flow 6 — PASS)
 - [x] Language switch (Flow 7 — PASS under Phase 6 `TASK-0604`)
-- [x] Faucet command (Flow 8 — SAFELY BLOCKED by `ENABLE_FAUCET_CONTROL=false` returning HTTP 403)
-- [x] Command completion (Flow 9 — SAFELY BLOCKED by `ENABLE_FAUCET_CONTROL=false`)
-- [x] Command failure (Flow 10 — SAFELY BLOCKED by `ENABLE_FAUCET_CONTROL=false`)
+- [ ] Faucet command with plantCount multiplier (Flow 8 — SAFELY BLOCKED by `ENABLE_FAUCET_CONTROL=false`; previous tests do not validate new contract)
+- [ ] Manual OPEN/CLOSE command (Flow 9 — SAFELY BLOCKED by `ENABLE_FAUCET_CONTROL=false`; previous tests do not validate new contract)
+- [ ] Command failure & timeout alerts (Flow 10 — SAFELY BLOCKED by `ENABLE_FAUCET_CONTROL=false`)
 - [x] Session expiry (Flow 11 — PASS)
 - [x] Access revocation (Flow 12 — PASS)
 
@@ -2257,8 +2286,8 @@ Required flows status:
 
 ## TASK-1005 — Complete Security Test Suite
 
-**Priority:** `P0`  
-**Status:** `BACKLOG`  
+**Priority:** `P0`
+**Status:** `BACKLOG`
 **Dependencies:** Security implementation
 
 ### Acceptance Criteria
@@ -2276,8 +2305,8 @@ Required flows status:
 
 ## TASK-1006 — Complete Accessibility Review
 
-**Priority:** `P1`  
-**Status:** `BACKLOG`  
+**Priority:** `P1`
+**Status:** `BACKLOG`
 **Dependencies:** Frontend completion
 
 ### Acceptance Criteria
@@ -2294,8 +2323,8 @@ Required flows status:
 
 ## TASK-1007 — Complete Performance and Soak Tests
 
-**Priority:** `P1`  
-**Status:** `BLOCKED`  
+**Priority:** `P1`
+**Status:** `BLOCKED`
 **Dependencies:** capacity targets
 
 ### Acceptance Criteria
@@ -2310,8 +2339,8 @@ Required flows status:
 
 ## TASK-1008 — Complete UAT
 
-**Priority:** `P0`  
-**Status:** `BLOCKED`  
+**Priority:** `P0`
+**Status:** `BLOCKED`
 **Dependencies:** Critical flows complete
 
 ### Participants
@@ -2333,8 +2362,8 @@ Required flows status:
 
 ## TASK-1009 — Production Readiness Review
 
-**Priority:** `P0`  
-**Status:** `BACKLOG`  
+**Priority:** `P0`
+**Status:** `BACKLOG`
 **Dependencies:** All required Phase 10 tasks
 
 ### Checklist
@@ -2354,8 +2383,8 @@ Required flows status:
 
 ## TASK-1010 — Controlled Production Release
 
-**Priority:** `P0`  
-**Status:** `BLOCKED`  
+**Priority:** `P0`
+**Status:** `BLOCKED`
 **Dependencies:** `TASK-1009`
 
 ### Release order
@@ -2385,7 +2414,7 @@ Required flows status:
 
 ## TASK-1101 — Monitoring Export
 
-**Priority:** `P2`  
+**Priority:** `P2`
 **Status:** `DEFERRED`
 
 Implement CSV or approved export after permissions and localisation policy are final.
@@ -2394,14 +2423,14 @@ Implement CSV or approved export after permissions and localisation policy are f
 
 ## TASK-1102 — Audit Export
 
-**Priority:** `P3`  
+**Priority:** `P3`
 **Status:** `DEFERRED`
 
 ---
 
 ## TASK-1103 — Multi-Factor Authentication
 
-**Priority:** `P2`  
+**Priority:** `P2`
 **Status:** `DEFERRED`
 
 Recommended for Owner accounts.
@@ -2410,7 +2439,7 @@ Recommended for Owner accounts.
 
 ## TASK-1104 — Advanced Telemetry Aggregation
 
-**Priority:** `P2`  
+**Priority:** `P2`
 **Status:** `DEFERRED`
 
 Possible:
@@ -2424,7 +2453,7 @@ Possible:
 
 ## TASK-1105 — Advanced Device Provisioning
 
-**Priority:** `P2`  
+**Priority:** `P2`
 **Status:** `DEFERRED`
 
 Possible:
@@ -2438,7 +2467,7 @@ Possible:
 
 ## TASK-1106 — Notifications
 
-**Priority:** `P2`  
+**Priority:** `P2`
 **Status:** `DEFERRED`
 
 Possible:
@@ -2571,6 +2600,8 @@ Every completed feature shall satisfy:
 - `TASK-0807`
 - `TASK-0808`
 - `TASK-0809`
+- `TASK-0810`
+- `TASK-0811`
 
 ## Sprint 8 — Hardening and Release
 
@@ -2617,6 +2648,7 @@ TASK-0805 Acknowledgement processing
 TASK-0806 Command state machine
 TASK-0808 Duplicate command protection
 TASK-0809 Timeout processor
+TASK-0810 Manual faucet open/close control
 TASK-0907 Production MQTT security
 TASK-0908 Session revocation
 TASK-0909 Backup and restore
@@ -2629,22 +2661,12 @@ TASK-1010 Production release
 
 The first production release is blocked until:
 
-- [ ] First Owner provisioning is approved.
-- [ ] Authentication method is selected.
-- [ ] Session revocation works.
-- [ ] Owner/Admin permissions are final.
-- [ ] Device-access rules are implemented.
-- [ ] MQTT security is configured.
-- [ ] Telemetry units are documented.
-- [x] Battery (`BAT`) parameter identity & scope clarified (`DEC-MON-085`).
-- [ ] Stale and offline thresholds are approved.
-- [ ] Faucet permission matrix is approved.
-- [ ] Command concurrency is approved.
-- [ ] Timeout behaviour is approved.
-- [ ] Duplicate execution protection passes.
-- [ ] Security tests pass.
-- [ ] UAT is approved.
-- [ ] Backup and rollback are verified.
+1. Staging infrastructure is provisioned and operational (`TASK-1004`).
+2. UAT scenarios are executed and approved by stakeholders (`TASK-1008`).
+3. Security exception governance process is completed and approved (`TASK-0906`).
+4. Production readiness review is signed off (`TASK-1009`).
+5. Hardware-in-the-loop validation is complete (`TASK-0811`).
+6. Dual-role sign-off for physical faucet control is recorded (`TASK-1010`).
 
 ---
 
@@ -2664,7 +2686,7 @@ The first production release is blocked until:
 10. ~~Admin control permission.~~ **RESOLVED** — device assignment confers control (`DEC-RBAC-015`).
 11. Owner control permission. **TBD.**
 12. ~~Command concurrency.~~ **RESOLVED** — max 1 active command/device (`DEC-CTRL-051`).
-13. Cancellation and stop. **TBD** — see `docs/DECISIONS.md` §3.
+13. ~~Manual Open/Close control.~~ **RESOLVED** — OPEN/CLOSE actions approved per `DEC-CTRL-090`. Open faucet fail-safe behavior upon connection loss remains TBD.
 14. Timeout values (ACK, completion, expiry). **TBD** — see `docs/DECISIONS.md` §3.
 15. Late-event reconciliation. **TBD.**
 16. MQTT broker (production choice). **TBD.**

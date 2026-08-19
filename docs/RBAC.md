@@ -402,8 +402,8 @@ monitoring.export
 
 ```text
 device.control.dispense
-device.control.cancel
-device.control.stop
+device.control
+device.control
 device.control.history.read
 ```
 
@@ -471,8 +471,8 @@ Legend:
 | `monitoring.location.read` | Allow within scope | Allow for assigned devices |
 | `monitoring.export` | Allow within scope | Allow for assigned devices |
 | `device.control.dispense` | Allow within scope | Allow for assigned devices |
-| `device.control.cancel` | Allow within scope | Allow for assigned devices |
-| `device.control.stop` | Allow within scope | Allow for assigned devices |
+| `device.control` | Allow within scope | Allow for assigned devices |
+| `device.control` | Allow within scope | Allow for assigned devices |
 | `device.control.history.read` | Allow within scope | Allow for assigned devices |
 | `alert.read` | Allow within scope | Allow within assigned scope |
 | `alert.acknowledge` | Allow within scope | Allow for assigned devices |

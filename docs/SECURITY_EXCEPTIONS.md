@@ -98,3 +98,5 @@ The monitoring UUID and history regression fix (`TASK-0306`, `TASK-0501`, `TASK-
 - **Zero Security Exceptions:** All code changes adhere strictly to `SEC-OPS-001` (zero unapproved secrets) and `SEC-OPS-004` (zero unapproved high vulnerabilities).
 - **Safe Identifier Scoping:** Dual UUID/canonical ID resolution in API routes preserves strict IDOR protection, role-based device assignment boundaries, and Admin canonical ID concealment.
 - **Frontend Identity Scope:** Frontend monitoring state and hooks strictly use immutable database UUIDs (`devices.id`).
+
+<!-- Reconciled for Manual Faucet Open/Close Control and Volume Presets -->

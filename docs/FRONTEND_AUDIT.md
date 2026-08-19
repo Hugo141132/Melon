@@ -1,7 +1,7 @@
 # Frontend Codebase Audit: Kebun Melon
 
-> **Task Reference:** `TASK-0001 — Confirm Existing Frontend Technology`  
-> **Audit Status:** Complete — Confirmed & Verified  
+> **Task Reference:** `TASK-0001 — Confirm Existing Frontend Technology`
+> **Audit Status:** Complete — Confirmed & Verified
 > **Source of Truth Rule:** The existing frontend design and visual layout remain the visual source of truth.
 
 ---
@@ -354,3 +354,5 @@ The following facts are verified in the frontend codebase regarding device selec
 - **Admin Canonical ID Concealment:** Monospace canonical `deviceId` rendering is displayed exclusively for Owner users; Admin users see only device names and types per `DEC-DEV-028`.
 - **Canonical vs. Legacy Routes:** Canonical monitoring pages are `/soil` and `/water`; legacy `/air` and `/tanah` routes explicitly return 404 Not Found.
 - **Historical Chart Error & Empty State Handling:** Zero-record telemetry responses (`{ series: [], pagination: { totalRecords: 0 } }`) render clean empty states rather than error banners or fake zero graphs.
+
+<!-- Reconciled for Manual Faucet Open/Close Control and Volume Presets -->

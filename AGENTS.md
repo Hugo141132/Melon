@@ -47,7 +47,7 @@ The system monitors:
 
 | Phase | Target volume |
 |---|---:|
-| Phase 1 | 300 mL |
+| Phase 1 | 300 mL (UI 0.3 L) |
 | Phase 2 | 1,000 mL |
 | Phase 3 | 1,500 mL |
 
@@ -1195,7 +1195,7 @@ Human review is required for:
 - Command state transitions.
 - Duplicate-command protection.
 - Timeout handling.
-- Cancellation or stop.
+- Manual Open/Close.
 - Production database migration.
 - Backup and restore.
 - Production physical-control enablement.

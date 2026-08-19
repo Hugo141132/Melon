@@ -1,8 +1,8 @@
 # UI/UX Specification
 
-**Project:** Multi-Device Soil and Water Monitoring System  
-**Document:** `UI_UX.md`  
-**Status:** Draft for implementation  
+**Project:** Multi-Device Soil and Water Monitoring System
+**Document:** `UI_UX.md`
+**Status:** Draft for implementation
 **Primary references:** Existing frontend source code and `FRONTEND_AUDIT.md`
 
 ---
@@ -229,7 +229,7 @@ Monitoring permissions may include:
 Faucet-control permissions may include:
 
 * `device.control`
-* `device.control.stop`
+* `device.control`
 
 The interface shall:
 
@@ -252,7 +252,7 @@ Relevant permissions include:
 * `device.history.read`
 * `device.location.read`
 * `device.control`
-* `device.control.stop`
+* `device.control`
 * `device.manage`
 * `alert.read`
 * `alert.acknowledge`
@@ -572,9 +572,9 @@ The interface shall provide:
 
 | Phase | Target volume |
 |---|---:|
-| Phase 1 | 300 mL |
-| Phase 2 | 1,000 mL |
-| Phase 3 | 1,500 mL |
+| Phase 1 | 0.3 L |
+| Phase 2 | 1 L |
+| Phase 3 | 1.5 L |
 
 The volume shall be displayed more prominently than the phase label.
 
@@ -609,7 +609,7 @@ The dialog shall display:
 
 Recommended confirmation text:
 
-> Confirm dispensing 1,000 mL from the selected device.
+> Confirm dispensing 1 L from the selected device.
 
 Do not use vague confirmation text such as “Are you sure?”
 
@@ -998,7 +998,7 @@ Where enabled by product policy, the application may record:
 - device selection;
 - alert acknowledgement;
 - faucet confirmation;
-- faucet cancellation.
+- faucet manual open/close.
 
 Do not record sensor secrets, credentials, or unnecessary personal information.
 
@@ -1035,12 +1035,12 @@ Control history shall clearly distinguish:
 ### 24.3 Faucet Control
 
 - Only authorised users can access active faucet controls.
-- Phase 1 displays 300 mL.
-- Phase 2 displays 1,000 mL.
-- Phase 3 displays 1,500 mL.
+- Phase 1 displays 0.3 L.
+- Phase 2 displays 1 L.
+- Phase 3 displays 1.5 L.
 - A confirmation step is required.
 - The selected device and target volume are visible before confirmation.
-- Command submission, progress, completion, rejection, failure, cancellation, and timeout have distinct states.
+- Command submission, progress, completion, rejection, failure, manual open/close, and timeout have distinct states.
 - Duplicate submission is prevented while the initial request is being processed.
 - Failed network requests do not automatically repeat physical commands.
 

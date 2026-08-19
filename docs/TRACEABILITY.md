@@ -259,3 +259,5 @@ The following facts are verified in the traceability matrix regarding device sel
 - **Admin Privacy:** Admin canonical `deviceId` concealment remains enforced.
 - **Legacy Routes:** `/air` and `/tanah` are explicitly maintained as legacy 404 routes.
 - **Traceability Verification:** `API-MON-001`, `API-MON-002`, `TEST-API-003`, and `TEST-API-004` statuses are updated to `VERIFIED` reflecting completed route implementation, dual UUID/canonical identifier resolution, and 100% test pass rate across targeted test suites.
+
+<!-- Reconciled for Manual Faucet Open/Close Control and Volume Presets -->

@@ -302,7 +302,7 @@ monitoring.current.read
 monitoring.history.read
 monitoring.location.read
 device.control.dispense
-device.control.cancel
+device.control
 alert.read
 alert.acknowledge
 audit.read

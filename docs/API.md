@@ -367,7 +367,7 @@ INTERNAL_ERROR
 POST /api/v1/auth/register
 ```
 
-**Authentication:** Public  
+**Authentication:** Public
 **Permission:** `account.register`
 
 Request:
@@ -526,7 +526,7 @@ Response:
 POST /api/v1/auth/change-password
 ```
 
-**Authentication:** Required  
+**Authentication:** Required
 **Permission:** `profile.password.update.self`
 
 Request:
@@ -559,7 +559,7 @@ Open decisions & resolved policies:
 POST /api/v1/auth/forgot-password
 ```
 
-**Authentication:** Public  
+**Authentication:** Public
 **Rate Limit:** 3 requests/minute (configurable via `RATE_LIMIT_FORGOT_PASSWORD_MAX`, default: 3)
 
 Request:
@@ -601,7 +601,7 @@ Possible errors:
 POST /api/v1/auth/reset-password
 ```
 
-**Authentication:** Public / Reset Token  
+**Authentication:** Public / Reset Token
 **Rate Limit:** 5 requests/minute (configurable via `RATE_LIMIT_RESET_PASSWORD_MAX`, default: 5)
 
 Request:
@@ -657,7 +657,7 @@ Possible errors:
 POST /api/v1/auth/verify-email
 ```
 
-**Authentication:** Public / Verification Token  
+**Authentication:** Public / Verification Token
 **Rate Limit:** Standard public rate limit
 
 Request:
@@ -717,7 +717,7 @@ Possible errors:
 POST /api/v1/auth/resend-verification
 ```
 
-**Authentication:** Public  
+**Authentication:** Public
 **Rate Limit:** 3 requests/minute (configurable via `RATE_LIMIT_RESEND_VERIFICATION_MAX`, default: 3)
 
 Request:
@@ -759,7 +759,7 @@ Possible errors:
 GET /api/v1/me
 ```
 
-**Authentication:** Required  
+**Authentication:** Required
 **Permission:** `profile.self.read`
 
 Response:
@@ -790,7 +790,7 @@ Response:
 PATCH /api/v1/me
 ```
 
-**Authentication:** Required  
+**Authentication:** Required
 **Permission:** `profile.self.update`
 
 Request:
@@ -832,7 +832,7 @@ Response:
 PATCH /api/v1/me/preferences
 ```
 
-**Authentication:** Required  
+**Authentication:** Required
 **Permission:** `settings.self.update`, `language.self.update`
 
 Request:
@@ -876,7 +876,7 @@ All endpoints in this section are Owner-only unless explicitly stated.
 GET /api/v1/users
 ```
 
-**Authentication:** Required  
+**Authentication:** Required
 **Permission:** `profile.other.read`
 
 Query parameters:
@@ -919,7 +919,7 @@ Response item:
 GET /api/v1/users/{userId}
 ```
 
-**Authentication:** Required  
+**Authentication:** Required
 **Permission:** `profile.other.read`
 
 Response:
@@ -954,7 +954,7 @@ Response:
 PATCH /api/v1/users/{userId}
 ```
 
-**Authentication:** Required  
+**Authentication:** Required
 **Permission:** `profile.other.update`
 
 Request:
@@ -976,7 +976,7 @@ Role and account-status changes shall use dedicated endpoints.
 POST /api/v1/users/{userId}/suspend
 ```
 
-**Authentication:** Required  
+**Authentication:** Required
 **Permission:** `account.suspend`
 
 Request:
@@ -1010,7 +1010,7 @@ The server shall revoke or restrict active sessions.
 POST /api/v1/users/{userId}/activate
 ```
 
-**Authentication:** Required  
+**Authentication:** Required
 **Permission:** `account.activate`
 
 Status: `TBD`, depending on the final `APPROVED` and `ACTIVE` workflow.
@@ -1023,7 +1023,7 @@ Status: `TBD`, depending on the final `APPROVED` and `ACTIVE` workflow.
 DELETE /api/v1/users/{userId}
 ```
 
-**Authentication:** Required  
+**Authentication:** Required
 **Permission:** `account.deactivate` (or `account.delete`)
 
 **Rules:**
@@ -1063,7 +1063,7 @@ Response:
 PATCH /api/v1/users/{userId}/role
 ```
 
-**Authentication:** Required  
+**Authentication:** Required
 **Permission:** `account.role.update`
 
 Request:
@@ -1091,7 +1091,7 @@ Rules:
 GET /api/v1/approvals/pending
 ```
 
-**Authentication:** Required  
+**Authentication:** Required
 **Permission:** `account.approve` or `account.reject`
 
 Query parameters:
@@ -1136,7 +1136,7 @@ Response:
 GET /api/v1/approvals/{userId}
 ```
 
-**Authentication:** Required  
+**Authentication:** Required
 **Permission:** `account.approve` or `account.reject`
 
 ---
@@ -1147,7 +1147,7 @@ GET /api/v1/approvals/{userId}
 POST /api/v1/approvals/{userId}/approve
 ```
 
-**Authentication:** Required  
+**Authentication:** Required
 **Permission:** `account.approve`
 
 Request:
@@ -1211,7 +1211,7 @@ INTERNAL_ERROR
 POST /api/v1/approvals/{userId}/reject
 ```
 
-**Authentication:** Required  
+**Authentication:** Required
 **Permission:** `account.reject`
 
 Request:
@@ -1270,7 +1270,7 @@ Possible errors:
 GET /api/v1/devices
 ```
 
-**Authentication:** Required  
+**Authentication:** Required
 **Permission:** `device.read`
 
 The server shall return only authorised devices.
@@ -1418,7 +1418,7 @@ Rules:
 POST /api/v1/devices/{deviceId}/deactivate
 ```
 
-**Authentication:** Required  
+**Authentication:** Required
 **Permission:** `device.deactivate`
 
 The system shall prevent new faucet commands after deactivation.
@@ -1431,7 +1431,7 @@ The system shall prevent new faucet commands after deactivation.
 GET /api/v1/devices/{deviceId}/capabilities
 ```
 
-**Authentication:** Required  
+**Authentication:** Required
 **Permission:** `device.read`
 
 ---
@@ -1444,7 +1444,7 @@ GET /api/v1/devices/{deviceId}/capabilities
 GET /api/v1/users/{userId}/devices
 ```
 
-**Authentication:** Required  
+**Authentication:** Required
 **Permission:** `device.assign` or `profile.other.read`
 
 ---
@@ -1455,7 +1455,7 @@ GET /api/v1/users/{userId}/devices
 POST /api/v1/users/{userId}/devices
 ```
 
-**Authentication:** Required  
+**Authentication:** Required
 **Permission:** `device.assign`
 
 Request:
@@ -1498,7 +1498,7 @@ Response:
 PATCH /api/v1/users/{userId}/devices/{deviceId}
 ```
 
-**Authentication:** Required  
+**Authentication:** Required
 **Permission:** `device.assign`
 
 Request:
@@ -1520,7 +1520,7 @@ Final control-assignment policy remains `TBD`.
 DELETE /api/v1/users/{userId}/devices/{deviceId}
 ```
 
-**Authentication:** Required  
+**Authentication:** Required
 **Permission:** `device.unassign`
 
 Recommended response:
@@ -1541,7 +1541,7 @@ The database should soft-revoke the assignment.
 GET /api/v1/devices/{deviceId}/monitoring/latest
 ```
 
-**Authentication:** Required  
+**Authentication:** Required
 **Permissions:**
 
 ```text
@@ -1632,7 +1632,7 @@ GET /api/v1/devices/{deviceId}/monitoring/water/latest
 GET /api/v1/devices/{deviceId}/status
 ```
 
-**Authentication:** Required  
+**Authentication:** Required
 **Permission:** `device.read`
 
 Response:
@@ -1669,7 +1669,7 @@ Response:
 GET /api/v1/devices/{deviceId}/monitoring/soil/history
 ```
 
-**Authentication:** Required  
+**Authentication:** Required
 **Permission:** `monitoring.history.read`
 
 Query parameters:
@@ -1743,7 +1743,7 @@ ec
 GET /api/v1/devices/{deviceId}/monitoring/history
 ```
 
-**Status:** Removed / Unused (`DEC-MON-087`).  
+**Status:** Removed / Unused (`DEC-MON-087`).
 Domain telemetry endpoints (`/soil/history` and `/water/history`) are used independently. Combined history endpoint is not provided.
 
 ---
@@ -1754,8 +1754,8 @@ Domain telemetry endpoints (`/soil/history` and `/water/history`) are used indep
 GET /api/v1/devices/{deviceId}/monitoring/export
 ```
 
-**Authentication:** Required  
-**Permission:** `monitoring.export`  
+**Authentication:** Required
+**Permission:** `monitoring.export`
 **Status:** `TBD`
 
 Query:
@@ -1785,8 +1785,8 @@ Exported canonical values and locale policy remain `TBD`.
 POST /api/v1/devices/{deviceId}/faucet-commands
 ```
 
-**Authentication:** Required  
-**Permission:** `device.control.dispense`  
+**Authentication:** Required
+**Permission:** `device.control.dispense`
 **Resource check:** Device access and `canControl`
 
 Required header:
@@ -1868,7 +1868,7 @@ GATEWAY_UNAVAILABLE
 GET /api/v1/devices/{deviceId}/faucet-commands
 ```
 
-**Authentication:** Required  
+**Authentication:** Required
 **Permission:** `device.control.history.read`
 
 Query parameters:
@@ -1890,7 +1890,7 @@ initiatedBy
 GET /api/v1/devices/{deviceId}/faucet-commands/{commandId}
 ```
 
-**Authentication:** Required  
+**Authentication:** Required
 **Permission:** `device.control.history.read`
 
 Response:
@@ -1925,19 +1925,19 @@ Response:
 GET /api/v1/devices/{deviceId}/faucet-commands/{commandId}/events
 ```
 
-**Authentication:** Required  
+**Authentication:** Required
 **Permission:** `device.control.history.read`
 
 ---
 
-## 18.5 Cancel Faucet Command
+## 18.5 Manual OPEN Faucet Command
 
 ```http
 POST /api/v1/devices/{deviceId}/faucet-commands/{commandId}/cancel
 ```
 
-**Authentication:** Required  
-**Permission:** `device.control.cancel`  
+**Authentication:** Required
+**Permission:** `device.control`
 **Status:** `TBD`
 
 Request:
@@ -1952,14 +1952,14 @@ The API shall not report `CANCELLED` until the device or gateway confirms the fi
 
 ---
 
-## 18.6 Stop Faucet Command
+## 18.6 Manual CLOSE Faucet Command
 
 ```http
 POST /api/v1/devices/{deviceId}/faucet-commands/{commandId}/stop
 ```
 
-**Authentication:** Required  
-**Permission:** `device.control.stop`  
+**Authentication:** Required
+**Permission:** `device.control`
 **Status:** `TBD`
 
 This endpoint is reserved for explicit stop or emergency-stop behaviour if supported.
@@ -1974,7 +1974,7 @@ This endpoint is reserved for explicit stop or emergency-stop behaviour if suppo
 GET /api/v1/alerts
 ```
 
-**Authentication:** Required  
+**Authentication:** Required
 **Permission:** `alert.read`
 
 The server shall return only alerts within the user's scope.
@@ -2020,7 +2020,7 @@ The frontend shall translate `titleKey` and `messageKey`.
 GET /api/v1/alerts/{alertId}
 ```
 
-**Authentication:** Required  
+**Authentication:** Required
 **Permission:** `alert.read`
 
 ---
@@ -2031,7 +2031,7 @@ GET /api/v1/alerts/{alertId}
 POST /api/v1/alerts/{alertId}/acknowledge
 ```
 
-**Authentication:** Required  
+**Authentication:** Required
 **Permission:** `alert.acknowledge`
 
 Request:
@@ -2067,7 +2067,7 @@ Admin acknowledgement permission is permitted for assigned devices in accordance
 GET /api/v1/audit-logs
 ```
 
-**Authentication:** Required  
+**Authentication:** Required
 **Permission:** `audit.read`
 
 Query parameters:
@@ -2116,7 +2116,7 @@ Audit logs shall not expose:
 GET /api/v1/audit-logs/{auditId}
 ```
 
-**Authentication:** Required  
+**Authentication:** Required
 **Permission:** `audit.read`
 
 ---
@@ -2127,8 +2127,8 @@ GET /api/v1/audit-logs/{auditId}
 GET /api/v1/audit-logs/export
 ```
 
-**Authentication:** Required  
-**Permission:** `audit.export`  
+**Authentication:** Required
+**Permission:** `audit.export`
 **Status:** `TBD`
 
 ---
@@ -2143,7 +2143,7 @@ Sites are recommended but remain optional for version 1.
 GET /api/v1/sites
 ```
 
-**Authentication:** Required  
+**Authentication:** Required
 **Permission:** `device.read`
 
 ---
@@ -2162,7 +2162,7 @@ GET /api/v1/sites/{siteId}
 POST /api/v1/sites
 ```
 
-**Permission:** `settings.system.update` or dedicated permission  
+**Permission:** `settings.system.update` or dedicated permission
 **Status:** `TBD`
 
 ---
@@ -2244,6 +2244,7 @@ Request:
   "commandId": "cmd-01JXYZ123",
   "deviceId": "water-node-001",
   "action": "DISPENSE",
+  "plantCount": 1,
   "phase": 2,
   "targetVolumeMl": 1000,
   "requestedAt": "2026-07-27T14:30:00+07:00",

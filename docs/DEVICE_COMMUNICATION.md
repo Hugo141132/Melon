@@ -1107,8 +1107,8 @@ Cancellation or emergency stop support is `TBD`.
 If supported, separate command actions shall be used:
 
 ```text
-CANCEL
-STOP
+OPEN
+CLOSE
 ```
 
 A cancel or stop payload shall reference the original command:
@@ -1118,7 +1118,7 @@ A cancel or stop payload shall reference the original command:
   "schemaVersion": "1.0",
   "commandId": "cmd-stop-0001",
   "deviceId": "water-node-001",
-  "action": "STOP",
+  "action": "CLOSE",
   "targetCommandId": "cmd-01JXYZ123",
   "requestedAt": "2026-07-27T13:45:08+07:00",
   "expiresAt": "2026-07-27T13:45:18+07:00"

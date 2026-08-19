@@ -440,3 +440,16 @@ The following facts are supported by the current implementation regarding device
 - **Dual-Lookup Identifier Resolution:** Backend monitoring routes (`/monitoring/latest`, `/monitoring/soil/latest`, `/monitoring/water/latest`, `/monitoring/soil/history`, `/monitoring/water/history`) accept both internal UUID and external canonical `deviceId` string.
 - **Admin Concealment & Scoping:** Admin canonical `deviceId` concealment (`DEC-DEV-028`) and assignment isolation (`revokedAt IS NULL`) remain strictly enforced.
 - **Empty History Integrity:** Telemetry history queries with zero matching records return HTTP 200 with `{ series: [], pagination: { page: 1, pageSize: 20, totalRecords: 0, totalPages: 1 } }`, never HTTP 404 or fabricated data (`DEC-MON-087`).
+
+## DEC-CTRL-090: Faucet Control Re-Architecture
+- **Status:** APPROVED
+- **Context:** Faucet control required updates for OPEN/CLOSE, plantCount, and L units in UI.
+- **Decision:**
+  - Replace Cancel/Stop with Manual OPEN/CLOSE.
+  - UI displays L (e.g., 0.3 L) but canonical is integer mL.
+  - DISPENSE requires plantCount >= 1. targetVolumeMl = baseVolumeMl * plantCount.
+  - Unresolved: fail-safe behavior for OPEN faucet after connection loss. Requires user/hardware approval.
+
+## DEC-CTRL-091: Faucet Control Permissions
+- **Status:** APPROVED
+- **Decision:** Granular permissions (`device.control.open`, `device.control.close`) are NOT invented. Use existing `device.control`. Any further granularity is TBD.

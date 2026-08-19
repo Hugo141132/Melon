@@ -638,9 +638,9 @@ The browser shall submit only the selected phase.
 The server shall map:
 
 ```text
-Phase 1 → 300 mL
-Phase 2 → 1,000 mL
-Phase 3 → 1,500 mL
+Phase 1 → 300 mL (UI 0.3 L)
+Phase 2 → 1,000 mL (UI 1 L)
+Phase 3 → 1,500 mL (UI 1.5 L)
 ```
 
 The browser shall not define the authoritative target volume.
@@ -725,9 +725,9 @@ The concurrent-command policy is `TBD`.
 
 Until approved, the safest default is one active faucet command per device.
 
-### 13.11 Cancel and Stop
+### 13.11 Manual Open/Close
 
-Cancel and stop functions are `TBD`.
+Manual Open/Close functions are `TBD`.
 
 If implemented:
 
@@ -884,7 +884,7 @@ Rate limiting shall apply to:
 - Password reset.
 - Approval decisions.
 - Faucet command creation.
-- Faucet cancel or stop.
+- Faucet manual open/close.
 - Exports.
 - Expensive historical queries.
 
@@ -1482,7 +1482,7 @@ The security implementation is accepted when:
 11. Admin control permission.
 12. ~~Admin alert acknowledgement.~~ **RESOLVED** — Permitted for assigned devices (`alert.acknowledge`) per `RBAC.md`.
 13. Concurrent faucet-command policy.
-14. Cancel and stop support.
+14. Manual Open/Close support.
 15. Command timeout.
 16. Device-side command-ID retention.
 17. Username/password versus mutual TLS for devices.
@@ -1507,7 +1507,7 @@ The security implementation is accepted when:
 1. The authentication and session mechanism is not final.
 2. The Owner account provisioning process is implemented via secure one-time CLI (`DEC-AUTH-006`, `TASK-0106`).
 3. Faucet-control permissions for Owner and Admin are unresolved.
-4. Concurrent command, cancellation, stop, and timeout policies remain unresolved.
+4. Concurrent command, manual open/close, stop, and timeout policies remain unresolved.
 5. Device authentication may use passwords or certificates; the final production approach is not selected.
 6. Hardware fail-safe behaviour requires confirmation from the hardware team.
 7. Audit, backup, and personal-data retention periods are not defined.

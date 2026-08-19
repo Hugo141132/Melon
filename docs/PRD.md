@@ -479,7 +479,7 @@ The system shall provide the following faucet-control presets:
 
 | Phase | Target volume |
 |---|---:|
-| Phase 1 | 300 mL |
+| Phase 1 | 300 mL (UI presents as 0.3 L) |
 | Phase 2 | 1,000 mL |
 | Phase 3 | 1,500 mL |
 
@@ -570,7 +570,7 @@ Each faucet command shall record at least:
 - Acknowledged timestamp, if available.
 - Completed timestamp, if available.
 - Failure reason, if available.
-- Cancellation details, if available.
+- Manual Open/Close details, if available.
 
 ---
 

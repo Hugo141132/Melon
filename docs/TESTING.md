@@ -423,9 +423,9 @@ Include:
 Required phases:
 
 ```text
-1 → 300 mL
-2 → 1,000 mL
-3 → 1,500 mL
+1 → 300 mL (UI 0.3 L)
+2 → 1,000 mL (UI 1 L)
+3 → 1,500 mL (UI 1.5 L)
 ```
 
 Required command states:
@@ -643,7 +643,7 @@ Test each metric:
 - Completed.
 - Failed.
 - Timeout.
-- Cancel or stop, if supported.
+- manual open/close, if supported.
 
 ## 11.6 User Management
 
@@ -1080,9 +1080,9 @@ Verify:
 
 | Phase | Expected target |
 |---|---:|
-| `1` | `300 mL` |
-| `2` | `1,000 mL` |
-| `3` | `1,500 mL` |
+| `1` | `300 mL (UI 0.3 L)` |
+| `2` | `1,000 mL (UI 1 L)` |
+| `3` | `1,500 mL (UI 1.5 L)` |
 
 Test:
 
@@ -1842,7 +1842,7 @@ The testing strategy is satisfied when:
 3. Device online, offline, and stale thresholds are not final.
 4. The final authentication and session mechanism is not selected.
 5. The real-time transport is not final.
-6. Command cancellation, stop, concurrency, retry, and late-event policies remain unresolved.
+6. Command manual open/close, stop, concurrency, retry, and late-event policies remain unresolved.
 7. Exact telemetry units and valid measurement ranges are not final.
 8. Browser and mobile support requirements are not defined.
 9. Performance service-level targets remain provisional.

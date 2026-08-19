@@ -1601,3 +1601,5 @@ The following facts are supported by the current implementation regarding device
 - **Admin Privacy & Scoping:** Admin canonical `deviceId` concealment and device assignment scoping (`UserDeviceAccess` active assignments where `revokedAt IS NULL`) remain strictly enforced.
 - **Empty History Semantics:** Soil/water history queries with zero matching telemetry records return HTTP 200 with `{ series: [], pagination: { page: 1, pageSize: 20, totalRecords: 0, totalPages: 1 } }`, never HTTP 404 or fabricated data.
 - **Zero Architecture Deviation:** No MQTT/device-protocol behavior was changed; browser interacts exclusively with backend REST/SSE boundaries.
+
+<!-- Reconciled for Manual Faucet Open/Close Control and Volume Presets -->
