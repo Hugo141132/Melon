@@ -16,7 +16,7 @@
 | `PRD-FR-004` | Display device connectivity and status | `docs/PRD.md` | `` | `TASK-0407` | `TEST-MQTT-002` | `DECISION_REQUIRED` |
 | `PRD-FR-005` | Store and present historical monitoring data | `docs/PRD.md` | `DEC-MON-087` | `TASK-0503` | `TEST-API-004` | `IMPLEMENTED` |
 | `PRD-FR-006` | Send predefined faucet-control commands | `docs/PRD.md` | `DEC-CTRL-051` | `TASK-0803` | `TEST-CTRL-001` | `DECISION_REQUIRED` |
-| `PRD-FR-007` | Record faucet-control activity and outcomes | `docs/PRD.md` | `DEC-CTRL-051` | `TASK-0802` | `TEST-DB-002` | `READY_FOR_IMPLEMENTATION` |
+| `PRD-FR-007` | Record faucet-control activity and outcomes | `docs/PRD.md` | `DEC-CTRL-051` | `TASK-0802` | `TEST-DB-002` | `IMPLEMENTED` |
 | `PRD-FR-008` | Enforce Owner and Admin RBAC permissions | `docs/PRD.md` | `DEC-RBAC-015` | `TASK-0209` | `TEST-SEC-001` | `READY_FOR_IMPLEMENTATION` |
 | `PRD-FR-009` | Require Owner approval for new Admin registrations | `docs/PRD.md` | `DEC-AUTH-006` | `TASK-0203` | `TEST-E2E-002` | `READY_FOR_IMPLEMENTATION` |
 | `PRD-FR-010` | Provide English and Bahasa Indonesia UI | `docs/PRD.md` | `DEC-I18N-068` | `TASK-0603` | `TEST-E2E-004` | `VERIFIED` |
@@ -38,11 +38,11 @@
 | `PRD-FR-026` | Data freshness and stale data indication | `docs/PRD.md` | `` | `TASK-0407` | `TEST-UNIT-003` | `DECISION_REQUIRED` |
 | `PRD-FR-027` | Dashboard monitoring refresh without full reload | `docs/PRD.md` | `DEC-INF-077` | `TASK-0505` | `TEST-E2E-003` | `DECISION_REQUIRED` |
 | `PRD-FR-028` | Historical data query and chart display | `docs/PRD.md` | `DEC-MON-087` | `TASK-0503` | `TEST-API-004` | `IMPLEMENTED` |
-| `PRD-FR-029` | Faucet control preset phase volumes | `docs/PRD.md` | `DEC-CTRL-051` | `TASK-0802` | `TEST-CTRL-001` | `READY_FOR_IMPLEMENTATION` |
+| `PRD-FR-029` | Faucet control preset phase volumes | `docs/PRD.md` | `DEC-CTRL-051` | `TASK-0802` | `TEST-CTRL-001` | `IMPLEMENTED` |
 | `PRD-FR-030` | Faucet control execution workflow | `docs/PRD.md` | `DEC-CTRL-051` | `TASK-0803` | `TEST-CTRL-002` | `READY_FOR_IMPLEMENTATION` |
 | `PRD-FR-031` | Server-side faucet control authorization check | `docs/PRD.md` | `DEC-RBAC-015` | `TASK-0803` | `TEST-SEC-004` | `READY_FOR_IMPLEMENTATION` |
 | `PRD-FR-032` | Faucet control safety states and prevention rules | `docs/PRD.md` | `DEC-CTRL-051` | `TASK-0801` | `TEST-CTRL-003` | `DECISION_REQUIRED` |
-| `PRD-FR-033` | Faucet command audit record logging | `docs/PRD.md` | `DEC-CTRL-051` | `TASK-0802` | `TEST-DB-002` | `READY_FOR_IMPLEMENTATION` |
+| `PRD-FR-033` | Faucet command audit record logging | `docs/PRD.md` | `DEC-CTRL-051` | `TASK-0802` | `TEST-DB-002` | `IMPLEMENTED` |
 | `PRD-FR-034` | System alerts and scope-filtered alert display | `docs/PRD.md` | - | `TASK-0701, TASK-0703` | `TEST-API-005` | `READY_FOR_IMPLEMENTATION` |
 | `PRD-FR-035` | Exact application roles (OWNER and ADMIN) | `docs/PRD.md` | - | `TASK-0105` | `TEST-UNIT-002` | `READY_FOR_IMPLEMENTATION` |
 | `PRD-FR-036` | User profile management rules and scope | `docs/PRD.md` | - | `TASK-0211` | `TEST-SEC-002` | `READY_FOR_IMPLEMENTATION` |
@@ -58,7 +58,7 @@
 | `PRD-DATA-002` | Water quality telemetry metrics data schema (REST API) | `docs/PRD.md` | `DEC-MON-086` | `TASK-0406` | `TEST-API-003` | `VERIFIED` |
 | `PRD-DATA-005` | Reservoir water telemetry metrics data schema (MQTT) | `docs/PRD.md` | `DEC-MON-036` | `TASK-0408` | `TEST-MQTT-001` | `VERIFIED` |
 | `PRD-DATA-006` | Shared sensor/tool battery telemetry metrics data schema | `docs/PRD.md` | `DEC-MON-036` | `TBD (Proposed Domain)` | `TEST-MQTT-001` | `DECISION_REQUIRED` |
-| `PRD-DATA-003` | Faucet preset target volume mappings | `docs/PRD.md` | `DEC-CTRL-051` | `TASK-0802` | `TEST-CTRL-001` | `READY_FOR_IMPLEMENTATION` |
+| `PRD-DATA-003` | Faucet preset target volume mappings | `docs/PRD.md` | `DEC-CTRL-051` | `TASK-0802` | `TEST-CTRL-001` | `IMPLEMENTED` |
 | `PRD-DATA-004` | User account profile data schema | `docs/PRD.md` | - | `TASK-0201` | `TEST-DB-001` | `IMPLEMENTED` |
 | `RBAC-ROLE-001` | OWNER role permissions and scope | `docs/RBAC.md` | `DEC-RBAC-013` | `TASK-0209` | `TEST-SEC-002` | `READY_FOR_IMPLEMENTATION` |
 | `RBAC-ROLE-002` | ADMIN role permissions and scope | `docs/RBAC.md` | `DEC-RBAC-015` | `TASK-0209` | `TEST-SEC-002` | `READY_FOR_IMPLEMENTATION` |
@@ -157,8 +157,8 @@
 | `DB-TEL-002` | water_telemetry table schema definition | `docs/DATABASE.md` | `DEC-MON-036` | `TASK-0406` | `TEST-DB-001` | `VERIFIED` |
 | `DB-TEL-003` | reservoir_water_telemetry table schema definition | `docs/DATABASE.md` | `DEC-MON-036` | `TASK-0408` | `TEST-DB-001` | `VERIFIED` |
 | `DB-TEL-004` | sensor_battery_telemetry table schema definition | `docs/DATABASE.md` | `DEC-MON-036` | `TBD (Proposed Domain)` | `TEST-DB-001` | `VERIFIED` |
-| `DB-CMD-001` | faucet_commands table schema definition | `docs/DATABASE.md` | `DEC-CTRL-051` | `TASK-0802` | `TEST-DB-002` | `READY_FOR_IMPLEMENTATION` |
-| `DB-CMD-002` | faucet_command_events table schema definition | `docs/DATABASE.md` | `DEC-CTRL-051` | `TASK-0802` | `TEST-DB-002` | `READY_FOR_IMPLEMENTATION` |
+| `DB-CMD-001` | faucet_commands table schema definition | `docs/DATABASE.md` | `DEC-CTRL-051` | `TASK-0802` | `TEST-DB-002` | `IMPLEMENTED` |
+| `DB-CMD-002` | faucet_command_events table schema definition | `docs/DATABASE.md` | `DEC-CTRL-051` | `TASK-0802` | `TEST-DB-002` | `IMPLEMENTED` |
 | `DB-AUDIT-001` | audit_logs table schema definition | `docs/DATABASE.md` | - | `TASK-0903` | `TEST-DB-002` | `READY_FOR_IMPLEMENTATION` |
 | `API-AUTH-001` | POST /api/v1/auth/register endpoint | `docs/API.md` | `DEC-AUTH-006` | `TASK-0203` | `TEST-API-002` | `READY_FOR_IMPLEMENTATION` |
 | `API-AUTH-002` | POST /api/v1/auth/login endpoint | `docs/API.md` | `DEC-AUTH-001` | `TASK-0204` | `TEST-API-001` | `IMPLEMENTED` |
@@ -241,7 +241,7 @@
 | `TEST-SEC-003` | Device isolation and URL manipulation security tests | `docs/TESTING.md` | `DEC-RBAC-016` | `TASK-1005` | `TEST-SEC-003` | `READY_FOR_IMPLEMENTATION` |
 | `TEST-SEC-004` | MQTT broker authentication and TLS security tests | `docs/TESTING.md` | `DEC-DEV-020` | `TASK-1005` | `TEST-SEC-004` | `READY_FOR_IMPLEMENTATION` |
 | `TEST-SEC-005` | Secret redaction and security headers test suite | `docs/TESTING.md` | - | `TASK-1005` | `TEST-SEC-005` | `READY_FOR_IMPLEMENTATION` |
-| `TEST-CTRL-001` | Preset volume mapping contract tests | `docs/TESTING.md` | `DEC-CTRL-051` | `TASK-0802` | `TEST-CTRL-001` | `READY_FOR_IMPLEMENTATION` |
+| `TEST-CTRL-001` | Preset volume mapping contract tests | `docs/TESTING.md` | `DEC-CTRL-051` | `TASK-0802` | `TEST-CTRL-001` | `VERIFIED` |
 | `TEST-CTRL-002` | Faucet command state machine transition tests | `docs/TESTING.md` | `DEC-CTRL-051` | `TASK-0806` | `TEST-CTRL-002` | `READY_FOR_IMPLEMENTATION` |
 | `TEST-CTRL-003` | Faucet command idempotency and duplicate tests | `docs/TESTING.md` | `DEC-CTRL-051` | `TASK-0808` | `TEST-CTRL-003` | `READY_FOR_IMPLEMENTATION` |
 | `TEST-CTRL-004` | Faucet command timeout and expiry handling tests | `docs/TESTING.md` | `DEC-CTRL-051` | `TASK-0809` | `TEST-CTRL-004` | `DECISION_REQUIRED` |
@@ -261,3 +261,5 @@ The following facts are verified in the traceability matrix regarding device sel
 - **Traceability Verification:** `API-MON-001`, `API-MON-002`, `TEST-API-003`, and `TEST-API-004` statuses are updated to `VERIFIED` reflecting completed route implementation, dual UUID/canonical identifier resolution, and 100% test pass rate across targeted test suites.
 
 <!-- Reconciled for Manual Faucet Open/Close Control and Volume Presets -->
+< ! - -   T A S K - 0 8 0 2   R e c o n c i l e d :   2 0 2 6 - 0 8 - 1 9   - - >  
+ 

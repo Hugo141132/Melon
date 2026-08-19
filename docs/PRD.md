@@ -1042,3 +1042,5 @@ The following facts are verified in the product implementation regarding device 
 - **Monitoring API Dual Identifier Support:** Backend endpoints resolve telemetry queries using either internal UUID or external canonical `deviceId` strings.
 - **Admin Concealment & Scoping:** Admin canonical `deviceId` concealment (`DEC-DEV-028`) and assignment isolation (`revokedAt IS NULL`) remain strictly enforced across UI and API layers.
 - **Empty Historical Data Handling:** Historical monitoring queries with zero telemetry records return HTTP 200 with an empty series array and valid pagination metadata, preventing false errors or fabricated values.
+< ! - -   T A S K - 0 8 0 2   R e c o n c i l e d :   2 0 2 6 - 0 8 - 1 9   - - >  
+ 

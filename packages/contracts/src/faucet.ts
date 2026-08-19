@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { FaucetCommandStatus, UserRole } from './enums';
+import { FaucetCommandStatus, UserRole, FaucetCommandAction } from './enums';
 
 /**
  * Approved Faucet Preset Target Volumes (mL)
@@ -33,13 +33,28 @@ export function mapPhaseToVolume(phase: number): number {
   return volume;
 }
 
-export const CreateFaucetCommandInputSchema = z.object({
-  deviceId: z.string().uuid(),
-  phase: z.number().int().min(1).max(3),
-  idempotencyKey: z.string().trim().min(1).max(150),
-  requestedAt: z.string().datetime().optional(),
-  expiresAt: z.string().datetime().optional(),
-});
+export const CreateFaucetCommandInputSchema = z
+  .object({
+    deviceId: z.string().uuid(),
+    action: z.nativeEnum(FaucetCommandAction).default(FaucetCommandAction.DISPENSE),
+    phase: z.number().int().min(1).max(3).optional(),
+    plantCount: z.number().int().min(1).optional(),
+    idempotencyKey: z.string().trim().min(1).max(150),
+    requestedAt: z.string().datetime().optional(),
+    expiresAt: z.string().datetime().optional(),
+  })
+  .refine(
+    (data) => {
+      if (data.action === FaucetCommandAction.DISPENSE) {
+        return data.phase !== undefined && data.plantCount !== undefined;
+      }
+      return data.phase === undefined && data.plantCount === undefined;
+    },
+    {
+      message: 'DISPENSE requires phase and plantCount; OPEN/CLOSE forbid them',
+      path: ['action'],
+    }
+  );
 
 export type CreateFaucetCommandInput = z.infer<typeof CreateFaucetCommandInputSchema>;
 
@@ -64,8 +79,10 @@ export const FaucetCommandDtoSchema = z.object({
   deviceId: z.string().uuid(),
   initiatedByUserId: z.string().uuid(),
   initiatedByRole: z.nativeEnum(UserRole),
-  phase: z.number().int(),
-  targetVolumeMl: z.number().int(),
+  action: z.nativeEnum(FaucetCommandAction),
+  phase: z.number().int().nullable(),
+  plantCount: z.number().int().nullable(),
+  targetVolumeMl: z.number().int().nullable(),
   actualVolumeMl: z.number().nullable(),
   status: z.nativeEnum(FaucetCommandStatus),
   requestedAt: z.date(),

@@ -5,6 +5,7 @@ import {
   FaucetCommandEventDto,
   FaucetCommandQueryInput,
   FaucetCommandStatus,
+  FaucetCommandAction,
   PaginatedFaucetCommandsDto,
   UserRole,
   mapPhaseToVolume,
@@ -118,8 +119,10 @@ export class FaucetCommandRepository {
       deviceId: command.deviceId,
       initiatedByUserId: command.initiatedByUserId,
       initiatedByRole: command.initiatedByRole as UserRole,
-      phase: command.phase,
-      targetVolumeMl: command.targetVolumeMl,
+      action: command.action as FaucetCommandAction,
+      phase: command.phase !== null ? command.phase : null,
+      plantCount: command.plantCount !== null ? command.plantCount : null,
+      targetVolumeMl: command.targetVolumeMl !== null ? command.targetVolumeMl : null,
       actualVolumeMl:
         command.actualVolumeMl !== null && command.actualVolumeMl !== undefined
           ? Number(command.actualVolumeMl)
@@ -153,7 +156,11 @@ export class FaucetCommandRepository {
     actorUserId: string,
     actorRole: UserRole
   ): Promise<FaucetCommandDto> {
-    const targetVolumeMl = mapPhaseToVolume(input.phase);
+    const isDispense = input.action === FaucetCommandAction.DISPENSE;
+    const targetVolumeMl =
+      isDispense && input.phase !== undefined && input.plantCount !== undefined
+        ? mapPhaseToVolume(input.phase) * input.plantCount
+        : null;
 
     const now = input.requestedAt ? new Date(input.requestedAt) : new Date();
     const expiresAt = input.expiresAt
@@ -170,7 +177,12 @@ export class FaucetCommandRepository {
         });
 
         if (existingKey) {
-          if (existingKey.deviceId === input.deviceId && existingKey.phase === input.phase) {
+          if (
+            existingKey.deviceId === input.deviceId &&
+            existingKey.action === input.action &&
+            existingKey.phase === (input.phase ?? null) &&
+            existingKey.plantCount === (input.plantCount ?? null)
+          ) {
             return existingKey;
           }
           throw new FaucetCommandConflictError(
@@ -198,7 +210,9 @@ export class FaucetCommandRepository {
             deviceId: input.deviceId,
             initiatedByUserId: actorUserId,
             initiatedByRole: actorRole,
-            phase: input.phase,
+            action: input.action,
+            phase: isDispense ? input.phase : null,
+            plantCount: isDispense ? input.plantCount : null,
             targetVolumeMl,
             status: FaucetCommandStatus.QUEUED,
             requestedAt: now,
@@ -227,7 +241,9 @@ export class FaucetCommandRepository {
             newValues: {
               commandId: cmd.commandId,
               deviceId: cmd.deviceId,
+              action: cmd.action,
               phase: cmd.phase,
+              plantCount: cmd.plantCount,
               targetVolumeMl: cmd.targetVolumeMl,
               idempotencyKey: cmd.idempotencyKey,
               status: cmd.status,
@@ -254,7 +270,12 @@ export class FaucetCommandRepository {
         });
 
         if (existingKey) {
-          if (existingKey.deviceId === input.deviceId && existingKey.phase === input.phase) {
+          if (
+            existingKey.deviceId === input.deviceId &&
+            existingKey.action === input.action &&
+            existingKey.phase === (input.phase ?? null) &&
+            existingKey.plantCount === (input.plantCount ?? null)
+          ) {
             return this.formatCommandDto(existingKey);
           }
           throw new FaucetCommandConflictError(

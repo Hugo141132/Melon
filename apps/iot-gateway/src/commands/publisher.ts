@@ -10,6 +10,7 @@ import {
   DeviceType,
   DeviceAccountStatus,
   mapPhaseToVolume,
+  FaucetCommandAction,
 } from '@kebun-melon/contracts';
 import { GatewayMqttClient } from '../mqtt/client';
 import { GatewayEnv } from '../config/env';
@@ -113,7 +114,7 @@ export class CommandPublisher {
       commandId,
       deviceId,
       siteId,
-      action: 'DISPENSE',
+      action: commandPayload.action || FaucetCommandAction.DISPENSE,
       ...commandPayload,
     };
 
@@ -236,27 +237,30 @@ export class CommandPublisher {
           continue;
         }
 
-        // 7. Validate Phase & Volume
-        let targetVolumeMl: number;
-        try {
-          targetVolumeMl = mapPhaseToVolume(cmd.phase);
-          if (targetVolumeMl !== cmd.targetVolumeMl) {
-            logger.warn('Queued faucet command phase and targetVolumeMl mismatch', {
+        // 7. Validate Phase & Volume if action is DISPENSE
+        if (cmd.action === FaucetCommandAction.DISPENSE) {
+          let targetVolumeMl: number;
+          try {
+            targetVolumeMl = mapPhaseToVolume(cmd.phase as number) * (cmd.plantCount as number);
+            if (targetVolumeMl !== cmd.targetVolumeMl) {
+              logger.warn('Queued faucet command phase and targetVolumeMl mismatch', {
+                commandId: cmd.commandId,
+                phase: cmd.phase,
+                plantCount: cmd.plantCount,
+                targetVolumeMl: cmd.targetVolumeMl,
+                expectedVolumeMl: targetVolumeMl,
+              });
+              result.skippedCount++;
+              continue;
+            }
+          } catch (valErr) {
+            logger.warn('Invalid faucet command phase', {
               commandId: cmd.commandId,
               phase: cmd.phase,
-              targetVolumeMl: cmd.targetVolumeMl,
-              expectedVolumeMl: targetVolumeMl,
             });
             result.skippedCount++;
             continue;
           }
-        } catch (valErr) {
-          logger.warn('Invalid faucet command phase', {
-            commandId: cmd.commandId,
-            phase: cmd.phase,
-          });
-          result.skippedCount++;
-          continue;
         }
 
         // 8. Check MQTT Client Connection
@@ -288,8 +292,9 @@ export class CommandPublisher {
           commandId: cmd.commandId,
           deviceId: device.deviceId,
           siteId: device.siteId,
-          action: 'DISPENSE',
+          action: cmd.action,
           phase: cmd.phase,
+          plantCount: cmd.plantCount,
           targetVolumeMl: cmd.targetVolumeMl,
           requestedAt: new Date(cmd.requestedAt).toISOString(),
           expiresAt: new Date(cmd.expiresAt).toISOString(),

@@ -1829,3 +1829,5 @@ The monitoring UUID and history regression fix (`TASK-0306`, `TASK-0501`, `TASK-
 - **Zero Device Protocol Impact:** No changes were made to ESP32/NodeMCU firmware contracts, REST telemetry ingestion (`/api/v1/devices/{deviceId}/telemetry/*`), MQTT 5.0 over TLS contracts, topic structures, broker ACLs, or gateway message parsers.
 - **Frontend Device Selection:** Frontend state and page hooks consistently consume immutable database primary key `devices.id` UUIDs.
 - **Dual Identifier Ingestion & Lookup:** The application layer seamlessly resolves immutable UUIDs and canonical `deviceId` strings across monitoring queries without requiring physical hardware reconfiguration.
+< ! - -   T A S K - 0 8 0 2   R e c o n c i l e d :   2 0 2 6 - 0 8 - 1 9   - - >  
+ 

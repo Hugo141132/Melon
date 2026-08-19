@@ -888,8 +888,10 @@ Stores one durable record per logical faucet-control request.
 | `device_id` | UUID | No | Target device |
 | `initiated_by_user_id` | UUID | No | User who confirmed command |
 | `initiated_by_role` | VARCHAR(40) | No | Role snapshot |
-| `phase` | SMALLINT | No | `1`, `2`, or `3` |
-| `target_volume_ml` | INTEGER | No | Server-mapped value |
+| `action` | VARCHAR(20) | No | Canonical action (`DISPENSE`, `OPEN`, `CLOSE`) |
+| `phase` | SMALLINT | Yes | `1`, `2`, or `3` (Required if action = DISPENSE) |
+| `plant_count` | INTEGER | Yes | `>= 1` (Required if action = DISPENSE) |
+| `target_volume_ml` | INTEGER | Yes | Server-mapped: `preset_volume * plant_count` |
 | `actual_volume_ml` | NUMERIC | Yes | Only when supplied |
 | `status` | VARCHAR(40) | No | Canonical command status |
 | `requested_at` | TIMESTAMPTZ | No | |
@@ -923,18 +925,16 @@ EXPIRED
 ### Constraints
 
 ```text
-phase = 1 → target_volume_ml = 300
-phase = 2 → target_volume_ml = 1000
-phase = 3 → target_volume_ml = 1500
+action = 'DISPENSE' → phase IS NOT NULL AND plant_count IS NOT NULL AND target_volume_ml IS NOT NULL
+action IN ('OPEN', 'CLOSE') → phase IS NULL AND plant_count IS NULL AND target_volume_ml IS NULL
 ```
 
 Recommended check:
 
-```text
+```sql
 CHECK (
-  (phase = 1 AND target_volume_ml = 300) OR
-  (phase = 2 AND target_volume_ml = 1000) OR
-  (phase = 3 AND target_volume_ml = 1500)
+  (action = 'DISPENSE' AND phase IN (1, 2, 3) AND plant_count >= 1 AND target_volume_ml IS NOT NULL) OR
+  (action IN ('OPEN', 'CLOSE') AND phase IS NULL AND plant_count IS NULL AND target_volume_ml IS NULL)
 )
 ```
 
@@ -1758,3 +1758,5 @@ The following facts are supported by the current implementation regarding databa
 - **Admin Assignment Verification:** `requireDeviceViewAccess` and RBAC checks verify `user_device_access` records using dual UUID/canonical identifier resolution with case-insensitive matching (`revokedAt IS NULL`).
 - **Empty Query Result Integrity:** Historical telemetry queries with zero records matching date filters return empty arrays with valid pagination (`totalRecords: 0`, `totalPages: 1`), returning HTTP 200 rather than throwing `DEVICE_NOT_FOUND` (404) or synthesizing false zero values.
 - **Frontend Identity Scope:** Frontend monitoring and device selection state consistently use immutable database UUIDs (`devices.id`).
+< ! - -   T A S K - 0 8 0 2   R e c o n c i l e d :   2 0 2 6 - 0 8 - 1 9   - - >  
+ 

@@ -356,3 +356,5 @@ The following facts are verified in the frontend codebase regarding device selec
 - **Historical Chart Error & Empty State Handling:** Zero-record telemetry responses (`{ series: [], pagination: { totalRecords: 0 } }`) render clean empty states rather than error banners or fake zero graphs.
 
 <!-- Reconciled for Manual Faucet Open/Close Control and Volume Presets -->
+< ! - -   T A S K - 0 8 0 2   R e c o n c i l e d :   2 0 2 6 - 0 8 - 1 9   - - >  
+ 

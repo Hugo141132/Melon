@@ -453,3 +453,5 @@ The following facts are supported by the current implementation regarding device
 ## DEC-CTRL-091: Faucet Control Permissions
 - **Status:** APPROVED
 - **Decision:** Granular permissions (`device.control.open`, `device.control.close`) are NOT invented. Use existing `device.control`. Any further granularity is TBD.
+< ! - -   T A S K - 0 8 0 2   R e c o n c i l e d :   2 0 2 6 - 0 8 - 1 9   - - >  
+ 

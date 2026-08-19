@@ -401,8 +401,10 @@ model FaucetCommand {
   deviceId          String              @map("device_id") @db.Uuid
   initiatedByUserId String              @map("initiated_by_user_id") @db.Uuid
   initiatedByRole   UserRole            @map("initiated_by_role")
-  phase             Int                 @db.SmallInt
-  targetVolumeMl    Int                 @map("target_volume_ml")
+  action            String              @default("DISPENSE") @map("action") @db.VarChar(30)
+  phase             Int?                @db.SmallInt
+  plantCount        Int?                @map("plant_count")
+  targetVolumeMl    Int?                @map("target_volume_ml")
   actualVolumeMl    Decimal?            @map("actual_volume_ml") @db.Decimal
   status            FaucetCommandStatus @default(QUEUED)
   requestedAt       DateTime            @default(now()) @map("requested_at") @db.Timestamptz

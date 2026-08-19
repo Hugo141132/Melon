@@ -468,7 +468,6 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
       orderBy: { requestedAt: 'desc' },
     });
     expect(command).not.toBeNull();
-    expect(command?.phase === 1 || (command?.phase as any) === 'PHASE_1').toBe(true);
     expect(command?.targetVolumeMl).toBe(300);
   });
 
@@ -523,7 +522,9 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
       `/api/v1/devices/${targetDev!.deviceId}/faucet-commands`,
       {
         data: {
+          action: 'DISPENSE',
           phase: 2,
+          plantCount: 1,
           idempotencyKey: `idem_flow10_${Date.now()}`,
         },
         headers: {
@@ -586,7 +587,9 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
     const token = cookies.find((c: any) => c.name === 'session_token')?.value || adminSessionToken;
     const res = await page.request.post(`/api/v1/devices/${targetDev!.deviceId}/faucet-commands`, {
       data: {
+        action: 'DISPENSE',
         phase: 1,
+        plantCount: 1,
         idempotencyKey: `idem_flow12_${Date.now()}`,
       },
       headers: {

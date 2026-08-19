@@ -135,7 +135,9 @@ export async function POST(request: Request, props: { params: Promise<{ deviceId
 
     const parseResult = CreateFaucetCommandInputSchema.safeParse({
       deviceId: device.id,
+      action: body.action,
       phase: body.phase,
+      plantCount: body.plantCount,
       idempotencyKey,
     });
 

@@ -128,7 +128,9 @@ export default function FaucetControlPanel() {
             'Idempotency-Key': idempotencyKey,
           },
           body: JSON.stringify({
+            action: 'DISPENSE',
             phase,
+            plantCount: 1,
             idempotencyKey,
           }),
         }

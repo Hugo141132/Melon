@@ -5,6 +5,7 @@ import {
   CreateFaucetCommandInputSchema,
   FaucetCommandDtoSchema,
   FaucetCommandStatus,
+  FaucetCommandAction,
   UserRole,
 } from '../index';
 
@@ -34,7 +35,9 @@ describe('Faucet Contracts & Phase-Volume Mapping', () => {
   it('validates CreateFaucetCommandInputSchema and idempotencyKey constraints', () => {
     const validPayload = {
       deviceId: '123e4567-e89b-12d3-a456-426614174000',
+      action: FaucetCommandAction.DISPENSE,
       phase: 2,
+      plantCount: 3,
       idempotencyKey: 'idem-key-001',
       requestedAt: '2026-08-01T10:00:00.000Z',
       expiresAt: '2026-08-01T10:05:00.000Z',
@@ -68,6 +71,23 @@ describe('Faucet Contracts & Phase-Volume Mapping', () => {
 
     const invalidParsed = CreateFaucetCommandInputSchema.safeParse(invalidPayload);
     expect(invalidParsed.success).toBe(false);
+
+    // OPEN with phase should fail
+    const openPayload = {
+      deviceId: '123e4567-e89b-12d3-a456-426614174000',
+      action: FaucetCommandAction.OPEN,
+      phase: 2,
+      idempotencyKey: 'idem-key-open',
+    };
+    expect(CreateFaucetCommandInputSchema.safeParse(openPayload).success).toBe(false);
+
+    // OPEN without phase should pass
+    const openValid = {
+      deviceId: '123e4567-e89b-12d3-a456-426614174000',
+      action: FaucetCommandAction.OPEN,
+      idempotencyKey: 'idem-key-open',
+    };
+    expect(CreateFaucetCommandInputSchema.safeParse(openValid).success).toBe(true);
   });
 
   it('validates FaucetCommandDtoSchema correctly and verifies all canonical statuses', () => {
@@ -77,7 +97,9 @@ describe('Faucet Contracts & Phase-Volume Mapping', () => {
       deviceId: '123e4567-e89b-12d3-a456-426614174001',
       initiatedByUserId: '123e4567-e89b-12d3-a456-426614174002',
       initiatedByRole: UserRole.ADMIN,
+      action: FaucetCommandAction.DISPENSE,
       phase: 1,
+      plantCount: 1,
       targetVolumeMl: 300,
       actualVolumeMl: null,
       status: FaucetCommandStatus.QUEUED,

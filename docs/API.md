@@ -1799,19 +1799,24 @@ Request:
 
 ```json
 {
-  "phase": 2
+  "action": "DISPENSE",
+  "phase": 2,
+  "plantCount": 1
 }
 ```
 
 The client shall not send arbitrary target volume as authoritative.
 
-Server mapping:
+Server mapping for DISPENSE:
 
 ```text
-1 → 300 mL
-2 → 1,000 mL
-3 → 1,500 mL
+Target Volume = (Phase Preset) × (Plant Count)
+1 → 300 mL * plantCount
+2 → 1,000 mL * plantCount
+3 → 1,500 mL * plantCount
 ```
+
+If `action` is `OPEN` or `CLOSE`, `phase` and `plantCount` must be omitted/null.
 
 Server validation:
 
@@ -1822,7 +1827,7 @@ Server validation:
 5. Device capability `FAUCET_CONTROL`.
 6. Device is active.
 7. Device is online and controllable.
-8. Valid phase.
+8. Valid phase and plantCount for DISPENSE, or strictly null for OPEN/CLOSE (`TASK-0802`).
 9. No prohibited active command.
 10. Valid idempotency key.
 
@@ -1838,7 +1843,9 @@ Successful response:
   "data": {
     "commandId": "cmd-01JXYZ123",
     "deviceId": "water-node-001",
+    "action": "DISPENSE",
     "phase": 2,
+    "plantCount": 1,
     "targetVolumeMl": 1000,
     "status": "QUEUED",
     "requestedAt": "2026-07-27T14:30:00+07:00",
@@ -2244,8 +2251,8 @@ Request:
   "commandId": "cmd-01JXYZ123",
   "deviceId": "water-node-001",
   "action": "DISPENSE",
-  "plantCount": 1,
   "phase": 2,
+  "plantCount": 1,
   "targetVolumeMl": 1000,
   "requestedAt": "2026-07-27T14:30:00+07:00",
   "expiresAt": "2026-07-27T14:30:30+07:00"
@@ -2802,3 +2809,5 @@ The following facts are supported by the current implementation regarding device
 - **Invalid/Revoked IDs:** Clear selection safely to `null` with a notice banner.
 - **Admin Privacy:** Admin canonical `deviceId` concealment remains strictly enforced.
 - **Empty History Semantics:** Historical telemetry queries with zero records matching date filters return HTTP 200 with `{ series: [], pagination: { page: 1, pageSize: 20, totalRecords: 0, totalPages: 1 } }`, never HTTP 404 or fabricated data.
+< ! - -   T A S K - 0 8 0 2   R e c o n c i l e d :   2 0 2 6 - 0 8 - 1 9   - - >  
+ 

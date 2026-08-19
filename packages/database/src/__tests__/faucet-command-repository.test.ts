@@ -5,7 +5,7 @@ import {
   FaucetCommandNotFoundError,
   InvalidCommandStateTransitionError,
 } from '../faucet-command-repository';
-import { FaucetCommandStatus, UserRole } from '@kebun-melon/contracts';
+import { FaucetCommandStatus, UserRole, FaucetCommandAction } from '@kebun-melon/contracts';
 
 describe('FaucetCommandRepository Unit & Integration Tests', () => {
   let mockPrisma: any;
@@ -43,7 +43,9 @@ describe('FaucetCommandRepository Unit & Integration Tests', () => {
     deviceId: mockDeviceId,
     initiatedByUserId: mockUserId,
     initiatedByRole: UserRole.ADMIN,
+    action: 'DISPENSE',
     phase: 1,
+    plantCount: 1,
     targetVolumeMl: 300,
     actualVolumeMl: null,
     status: 'QUEUED',
@@ -86,7 +88,9 @@ describe('FaucetCommandRepository Unit & Integration Tests', () => {
       const result = await repository.createCommand(
         {
           deviceId: mockDeviceId,
+          action: FaucetCommandAction.DISPENSE,
           phase: 1,
+          plantCount: 1,
           idempotencyKey: 'idem-001',
         },
         mockUserId,
@@ -109,7 +113,9 @@ describe('FaucetCommandRepository Unit & Integration Tests', () => {
       const result = await repository.createCommand(
         {
           deviceId: mockDeviceId,
+          action: FaucetCommandAction.DISPENSE,
           phase: 1,
+          plantCount: 1,
           idempotencyKey: 'idem-001',
         },
         mockUserId,
@@ -131,7 +137,9 @@ describe('FaucetCommandRepository Unit & Integration Tests', () => {
       const result = await repository.createCommand(
         {
           deviceId: mockDeviceId,
+          action: FaucetCommandAction.DISPENSE,
           phase: 1,
+          plantCount: 1,
           idempotencyKey: 'idem-001',
         },
         mockUserId,
@@ -153,7 +161,9 @@ describe('FaucetCommandRepository Unit & Integration Tests', () => {
         repository.createCommand(
           {
             deviceId: mockDeviceId,
+            action: FaucetCommandAction.DISPENSE,
             phase: 2, // Conflicting phase
+            plantCount: 1,
             idempotencyKey: 'idem-001',
           },
           mockUserId,
@@ -169,7 +179,9 @@ describe('FaucetCommandRepository Unit & Integration Tests', () => {
         repository.createCommand(
           {
             deviceId: mockDeviceId,
+            action: FaucetCommandAction.DISPENSE,
             phase: 2, // Different phase
+            plantCount: 1,
             idempotencyKey: 'idem-001',
           },
           mockUserId,
@@ -186,7 +198,9 @@ describe('FaucetCommandRepository Unit & Integration Tests', () => {
         repository.createCommand(
           {
             deviceId: mockDeviceId,
+            action: FaucetCommandAction.DISPENSE,
             phase: 2,
+            plantCount: 1,
             idempotencyKey: 'idem-new-key',
           },
           mockUserId,

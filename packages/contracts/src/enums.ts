@@ -52,6 +52,12 @@ export enum AlertType {
   COMMAND_TIMEOUT = 'COMMAND_TIMEOUT',
 }
 
+export enum FaucetCommandAction {
+  DISPENSE = 'DISPENSE',
+  OPEN = 'OPEN',
+  CLOSE = 'CLOSE',
+}
+
 export enum FaucetCommandStatus {
   QUEUED = 'QUEUED',
   SENT = 'SENT',

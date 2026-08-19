@@ -1732,10 +1732,10 @@ Document:
 ## TASK-0802 — Implement Faucet Command Database Model
 
 **Priority:** `P0`
-**Status:** `READY`
+**Status:** `DONE`
 **Dependencies:** `TASK-0104`
 **Historical Completion:** 2026-08-02 — Implemented initial FaucetCommand & FaucetCommandEvent contracts, server-side phase-volume mapping (Phase 1: 300mL, Phase 2: 1000mL, Phase 3: 1500mL), raw SQL migration for partial unique message_id index on faucet_command_events, FaucetCommandRepository with state transition safeguards, idempotency checks, active command concurrency checks, and complete test suite.
-**Revision Note (2026-08-19):** Status set to `READY`. Requires database schema/migration and contract revisions for `plant_count` (integer >= 1) column, `OPEN` and `CLOSE` command actions, and Zod schemas per `DEC-CTRL-090`.
+**Revision Completion (2026-08-19):** Implemented database schema migration `20260819000000_task_0802_faucet_command_action` adding `action` (`DISPENSE`, `OPEN`, `CLOSE`) and `plant_count` (integer >= 1) columns, dropping the obsolete legacy check constraint `faucet_commands_phase_volume_check` to eliminate volume calculation conflicts with multi-plant dispense commands and null manual action fields, backfilling existing records with `action = 'DISPENSE'` and `plant_count = 1`, and establishing the multi-column check constraint `faucet_commands_action_check`. Reconciled server-derived volume calculations (`targetVolumeMl = mapPhaseToVolume(phase) * plantCount` for Phase 1: 300 mL, Phase 2: 1000 mL, Phase 3: 1500 mL) rejecting client-supplied target volume authority. Updated Zod schemas and TypeScript types in `@kebun-melon/contracts`. Updated `FaucetCommandRepository` in `@kebun-melon/database` with transactional state transition safeguards, idempotency deduplication, and active command concurrency protection. Verified with 100% test pass rate across contracts and database test suites, and completed local PostgreSQL 18 performance smoke test.
 
 ### Acceptance Criteria
 
@@ -2744,3 +2744,5 @@ The following facts are supported by the current implementation regarding device
 - **Admin Privacy:** Admin canonical `deviceId` concealment remains strictly enforced.
 - **Empty History Handling:** Historical telemetry queries with zero matching records return HTTP 200 with `{ series: [], pagination: { ... } }`, never HTTP 404.
 - **Operational Dev Server Isolation:** Intermittent Next.js HTML 404 on restarts isolated as Windows zombie process holding port 3000 upon Ctrl+C; resolved via port cleanup before dev server startup.
+< ! - -   T A S K - 0 8 0 2   R e c o n c i l e d :   2 0 2 6 - 0 8 - 1 9   - - >  
+ 

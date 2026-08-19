@@ -8,6 +8,7 @@ import {
   DeviceConnectionStatus,
   FaucetCommandStatus,
   DeviceType,
+  FaucetCommandAction,
 } from '@kebun-melon/contracts';
 import * as dbModule from '@kebun-melon/database';
 import { FaucetCommandConflictError } from '@kebun-melon/database';
@@ -104,7 +105,9 @@ describe('Faucet Command API Endpoints (TASK-0803)', () => {
     deviceId: mockDeviceUuid,
     initiatedByUserId: mockAdminUser.id,
     initiatedByRole: UserRole.ADMIN,
+    action: FaucetCommandAction.DISPENSE,
     phase: 1,
+    plantCount: 1,
     targetVolumeMl: 300,
     actualVolumeMl: null,
     status: FaucetCommandStatus.QUEUED,
@@ -165,7 +168,7 @@ describe('Faucet Command API Endpoints (TASK-0803)', () => {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'idempotency-key': 'idem-001' },
-          body: JSON.stringify({ phase: 1 }),
+          body: JSON.stringify({ action: 'DISPENSE', phase: 1, plantCount: 1 }),
         }
       );
 
@@ -184,7 +187,7 @@ describe('Faucet Command API Endpoints (TASK-0803)', () => {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'idempotency-key': 'idem-001' },
-          body: JSON.stringify({ phase: 1 }),
+          body: JSON.stringify({ action: 'DISPENSE', phase: 1, plantCount: 1 }),
         }
       );
 
@@ -203,7 +206,7 @@ describe('Faucet Command API Endpoints (TASK-0803)', () => {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'idempotency-key': 'idem-001' },
-          body: JSON.stringify({ phase: 1 }),
+          body: JSON.stringify({ action: 'DISPENSE', phase: 1, plantCount: 1 }),
         }
       );
 
@@ -220,7 +223,7 @@ describe('Faucet Command API Endpoints (TASK-0803)', () => {
       const req = new Request(`http://localhost/api/v1/devices/nonexistent-node/faucet-commands`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'idempotency-key': 'idem-001' },
-        body: JSON.stringify({ phase: 1 }),
+        body: JSON.stringify({ action: 'DISPENSE', phase: 1, plantCount: 1 }),
       });
 
       const res = await POST(req, { params: Promise.resolve({ deviceId: 'nonexistent-node' }) });
@@ -238,7 +241,7 @@ describe('Faucet Command API Endpoints (TASK-0803)', () => {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'idempotency-key': 'idem-001' },
-          body: JSON.stringify({ phase: 1 }),
+          body: JSON.stringify({ action: 'DISPENSE', phase: 1, plantCount: 1 }),
         }
       );
 
@@ -260,7 +263,7 @@ describe('Faucet Command API Endpoints (TASK-0803)', () => {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'idempotency-key': 'idem-001' },
-          body: JSON.stringify({ phase: 1 }),
+          body: JSON.stringify({ action: 'DISPENSE', phase: 1, plantCount: 1 }),
         }
       );
 
@@ -282,7 +285,7 @@ describe('Faucet Command API Endpoints (TASK-0803)', () => {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'idempotency-key': 'idem-001' },
-          body: JSON.stringify({ phase: 1 }),
+          body: JSON.stringify({ action: 'DISPENSE', phase: 1, plantCount: 1 }),
         }
       );
 
@@ -304,7 +307,7 @@ describe('Faucet Command API Endpoints (TASK-0803)', () => {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'idempotency-key': 'idem-001' },
-          body: JSON.stringify({ phase: 1 }),
+          body: JSON.stringify({ action: 'DISPENSE', phase: 1, plantCount: 1 }),
         }
       );
 
@@ -321,7 +324,7 @@ describe('Faucet Command API Endpoints (TASK-0803)', () => {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ phase: 1 }),
+          body: JSON.stringify({ action: 'DISPENSE', phase: 1, plantCount: 1 }),
         }
       );
 
@@ -338,7 +341,7 @@ describe('Faucet Command API Endpoints (TASK-0803)', () => {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'idempotency-key': 'idem-001' },
-          body: JSON.stringify({ phase: 4 }),
+          body: JSON.stringify({ action: 'DISPENSE', phase: 4, plantCount: 1 }),
         }
       );
 
@@ -355,7 +358,7 @@ describe('Faucet Command API Endpoints (TASK-0803)', () => {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'idempotency-key': 'idem-001' },
-          body: JSON.stringify({ phase: 1 }),
+          body: JSON.stringify({ action: 'DISPENSE', phase: 1, plantCount: 1 }),
         }
       );
 
@@ -372,7 +375,9 @@ describe('Faucet Command API Endpoints (TASK-0803)', () => {
       expect(mockCreateCommand).toHaveBeenCalledWith(
         {
           deviceId: mockDeviceUuid,
+          action: 'DISPENSE',
           phase: 1,
+          plantCount: 1,
           idempotencyKey: 'idem-001',
         },
         mockAdminUser.id,
@@ -384,7 +389,9 @@ describe('Faucet Command API Endpoints (TASK-0803)', () => {
       mockValidateSession.mockResolvedValue({ user: mockOwnerUser });
       mockCreateCommand.mockResolvedValue({
         ...mockCommandRecord,
+        action: FaucetCommandAction.DISPENSE,
         phase: 2,
+        plantCount: 1,
         targetVolumeMl: 1000,
         initiatedByUserId: mockOwnerUser.id,
         initiatedByRole: UserRole.OWNER,
@@ -395,7 +402,7 @@ describe('Faucet Command API Endpoints (TASK-0803)', () => {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'idempotency-key': 'idem-002' },
-          body: JSON.stringify({ phase: 2 }),
+          body: JSON.stringify({ action: 'DISPENSE', phase: 2, plantCount: 1 }),
         }
       );
 
@@ -408,7 +415,9 @@ describe('Faucet Command API Endpoints (TASK-0803)', () => {
       expect(mockCreateCommand).toHaveBeenCalledWith(
         {
           deviceId: mockDeviceUuid,
+          action: 'DISPENSE',
           phase: 2,
+          plantCount: 1,
           idempotencyKey: 'idem-002',
         },
         mockOwnerUser.id,
@@ -428,7 +437,7 @@ describe('Faucet Command API Endpoints (TASK-0803)', () => {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'idempotency-key': 'idem-003' },
-          body: JSON.stringify({ phase: 3 }),
+          body: JSON.stringify({ action: 'DISPENSE', phase: 3, plantCount: 1 }),
         }
       );
 
@@ -447,7 +456,7 @@ describe('Faucet Command API Endpoints (TASK-0803)', () => {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'idempotency-key': 'idem-001' },
-          body: JSON.stringify({ phase: 1 }),
+          body: JSON.stringify({ action: 'DISPENSE', phase: 1, plantCount: 1 }),
         }
       );
       const res1 = await POST(req1, {
@@ -460,7 +469,7 @@ describe('Faucet Command API Endpoints (TASK-0803)', () => {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'idempotency-key': 'idem-001' },
-          body: JSON.stringify({ phase: 1 }),
+          body: JSON.stringify({ action: 'DISPENSE', phase: 1, plantCount: 1 }),
         }
       );
       const res2 = await POST(req2, {
@@ -486,7 +495,7 @@ describe('Faucet Command API Endpoints (TASK-0803)', () => {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'idempotency-key': 'idem-001' },
-          body: JSON.stringify({ phase: 2 }),
+          body: JSON.stringify({ action: 'DISPENSE', phase: 2, plantCount: 1 }),
         }
       );
 

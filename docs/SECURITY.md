@@ -1545,3 +1545,5 @@ The following security controls are active and verified across monitoring endpoi
 - **Admin Identifier Concealment (`DEC-DEV-028`):** Admin users receive only user-facing device names and metadata; canonical `deviceId` strings are strictly concealed across UI, list, and detail API payloads. Safe immutable UUIDs (`devices.id`) are used for frontend routing.
 - **Strict Query Range Boundaries (`DEC-MON-087`):** Historical telemetry queries enforce maximum date range limits (31 days) and page size limits (max 100), rejecting abusive ranges with HTTP 400 (`DATE_RANGE_EXCEEDED`).
 - **Empty Result Integrity:** Zero-matching telemetry queries safely return HTTP 200 with empty series, preventing data leakage or confusion with missing device 404 errors.
+< ! - -   T A S K - 0 8 0 2   R e c o n c i l e d :   2 0 2 6 - 0 8 - 1 9   - - >  
+ 

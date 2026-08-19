@@ -1076,22 +1076,31 @@ Verify:
 
 # 20. Faucet-Control Testing (TEST-CTRL-001..TEST-CTRL-005)
 
-## 20.1 Preset Mapping
+## 20.1 Preset Mapping & Action Semantics
 
-| Phase | Expected target |
-|---|---:|
-| `1` | `300 mL (UI 0.3 L)` |
-| `2` | `1,000 mL (UI 1 L)` |
-| `3` | `1,500 mL (UI 1.5 L)` |
+| Phase | Preset target volume per plant | Formula |
+|---|---:|:---|
+| `1` | `300 mL (UI 0.3 L)` | `targetVolumeMl = 300 * plantCount` |
+| `2` | `1,000 mL (UI 1 L)` | `targetVolumeMl = 1000 * plantCount` |
+| `3` | `1,500 mL (UI 1.5 L)` | `targetVolumeMl = 1500 * plantCount` |
 
-Test:
+### Action Requirements & Validation
 
-- Correct mapping.
-- Invalid phase.
-- Client-supplied arbitrary volume.
-- Missing phase.
-- String phase.
-- Out-of-range phase.
+- **`DISPENSE`**:
+  - `phase` required (`1`, `2`, or `3`).
+  - `plantCount` required (integer $\ge 1$).
+  - `targetVolumeMl` server-derived (`presetVolumeMl * plantCount`).
+  - Browser/client-supplied arbitrary `targetVolumeMl` authority strictly rejected.
+- **`OPEN` / `CLOSE`**:
+  - `phase`, `plantCount`, and `targetVolumeMl` must be `null`.
+- **Database CHECK Constraint Enforcement**:
+  - `faucet_commands_action_check` multi-column constraint enforces valid attribute combinations.
+- **Contract & Schema Testing**:
+  - Correct preset mapping and multi-plant volume multiplication.
+  - Invalid phase rejection.
+  - Missing/zero/negative `plantCount` rejection.
+  - `OPEN`/`CLOSE` with non-null phase or volume rejection.
+  - Out-of-range phase rejection.
 
 ## 20.2 Permission Tests
 
@@ -1946,3 +1955,5 @@ The following facts are verified in test suites and runtime verification regardi
 - **Legacy Routes:** `/air` and `/tanah` are explicitly maintained as legacy 404 routes.
 - **History Query Integrity:** Soil/water history queries with zero matching telemetry records return HTTP 200 with `{ series: [], pagination: { page: 1, pageSize: 20, totalRecords: 0, totalPages: 1 } }`, never HTTP 404 or fabricated data.
 - **Manual Runtime Verification:** Completed and confirmed operational stability across all monitoring views.
+< ! - -   T A S K - 0 8 0 2   R e c o n c i l e d :   2 0 2 6 - 0 8 - 1 9   - - >  
+ 
