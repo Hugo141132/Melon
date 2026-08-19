@@ -6,10 +6,15 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   quality-test-build:
     name: Build, Test & Security Checks
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     services:
       postgres:
@@ -113,10 +118,14 @@ jobs:
       - name: Verify Production Build
         run: npm run build
 
-      - name: Install Playwright Browsers (Bundled Chromium)
-        run: npx playwright install chromium --with-deps
+      - name: Install Playwright Browsers (Headless Shell with System Dependencies)
+        timeout-minutes: 5
+        run: |
+          npx playwright install --with-deps --only-shell chromium || \
+          (echo "Initial Playwright installation failed; retrying once..." && sleep 5 && npx playwright install --with-deps --only-shell chromium)
 
       - name: Execute Playwright E2E Smoke Tests
+        timeout-minutes: 7
         env:
           APP_ENV: staging
           ENABLE_FAUCET_CONTROL: 'true'
