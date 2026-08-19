@@ -119,8 +119,9 @@ jobs:
         run: npm run build
 
       - name: Install Playwright Browsers (Headless Shell with System Dependencies)
-        timeout-minutes: 5
+        timeout-minutes: 15
         run: |
+          sudo sed -i 's/azure.archive.ubuntu.com/archive.ubuntu.com/g' /etc/apt/sources.list.d/ubuntu.sources /etc/apt/sources.list 2>/dev/null || true
           npx playwright install --with-deps --only-shell chromium || \
           (echo "Initial Playwright installation failed; retrying once..." && sleep 5 && npx playwright install --with-deps --only-shell chromium)
 
