@@ -1158,3 +1158,12 @@ The following facts are verified in the RBAC implementation regarding device acc
 - **Access Revocation Handling:** Revoking or invalidating an Admin's device access safely resets active frontend selection to `null` with a notice banner without leaking unauthorized device data.
 < ! - -   T A S K - 0 8 0 2   R e c o n c i l e d :   2 0 2 6 - 0 8 - 1 9   - - >  
  
+---
+
+## Gateway Command Publishing RBAC Implementation Note (Reconciled 2026-08-20)
+
+The following facts are verified in the authorization architecture regarding `TASK-0804` (`CommandPublisher` in `@kebun-melon/iot-gateway`):
+- **Server RBAC Pre-Check:** User authorization (`device.control` permission and active device assignment) is fully enforced during command creation in `TASK-0803` before commands enter PostgreSQL as `QUEUED`.
+- **Publisher Device State Guard:** The background publisher verifies that the target device is a `WATER_TANK_NODE` with `accountStatus = ACTIVE` and has a non-empty `siteId` before publishing.
+- **Admin Concealment:** The publisher consumes canonical device routing internally without exposing canonical device IDs across user-facing Admin views.
+<!-- TASK-0804 Reconciled: 2026-08-20 -->

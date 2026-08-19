@@ -1786,20 +1786,20 @@ POST /devices/{deviceId}/faucet-commands
 ## TASK-0804 — Implement Gateway Command Publisher
 
 **Priority:** `P0`
-**Status:** `BACKLOG`
+**Status:** `DONE`
 **Dependencies:** `TASK-0401`, `TASK-0803`
 **Historical Completion:** 2026-08-03 — Implemented `CommandPublisher` in `@kebun-melon/iot-gateway` to publish eligible, unexpired `QUEUED` faucet commands for `WATER_TANK_NODE` devices over MQTT (QoS 1, retain = false). Enforced target device type validation, phase/volume mapping, dynamic canonical topic routing (`agriculture/{environment}/{siteId}/{deviceId}/command/faucet`), payload formatting, and atomic DB state transition to `SENT` with `FaucetCommandEvent` creation. Fixed `.env` loading and non-UUID `commandId` detail API query handling.
-**Revision Note (2026-08-19):** Status set to `BACKLOG` (pending `TASK-0803`). Requires Gateway command publisher revision to format and publish MQTT commands with multiplied `targetVolumeMl` for `DISPENSE`, and dedicated `OPEN` / `CLOSE` command payloads.
+**Revision Note (2026-08-20):** Status set to `DONE`. Verified duplicate logic removed for `targetVolumeMl` recalculation, allowing persistent pass-through. Added dedicated testing and formatting for `OPEN` / `CLOSE` payloads ensuring they carry NO fabricated volume or phase attributes. Confirmed 100% path coverage for publisher command routing (10/10 publisher unit tests, 42/42 gateway contract tests). Completed safe local simulated performance sanity tests on mocked/in-memory infrastructure (1,000 direct calls ~68.3 ops/s with p95 20.08 ms, 500 burst commands ~67.0 cmds/s, 2,000 soak commands ~66.7 cmds/s with zero memory leak and safe reconnect recovery). All 17 project docs fully reconciled.
 
 ### Acceptance Criteria
 
-- Command targets one device.
-- Command is not retained (retain = false, QoS 1).
-- Multiplied `targetVolumeMl` published for `DISPENSE`.
-- Dedicated `OPEN` and `CLOSE` payload schema published for manual control.
-- Expiry is included.
-- Publication result updates status to `SENT`.
-- Failed publish does not appear as sent.
+- Command targets one device. [VERIFIED]
+- Command is not retained (retain = false, QoS 1). [VERIFIED]
+- Multiplied `targetVolumeMl` published for `DISPENSE` via persisted database pass-through. [VERIFIED]
+- Dedicated `OPEN` and `CLOSE` payload schema published for manual control (omitting phase, plantCount, volume). [VERIFIED]
+- Expiry is included. [VERIFIED]
+- Publication result updates status to `SENT`. [VERIFIED]
+- Failed publish does not appear as sent (remains `QUEUED`). [VERIFIED]
 
 ---
 

@@ -1831,3 +1831,15 @@ The monitoring UUID and history regression fix (`TASK-0306`, `TASK-0501`, `TASK-
 - **Dual Identifier Ingestion & Lookup:** The application layer seamlessly resolves immutable UUIDs and canonical `deviceId` strings across monitoring queries without requiring physical hardware reconfiguration.
 < ! - -   T A S K - 0 8 0 2   R e c o n c i l e d :   2 0 2 6 - 0 8 - 1 9   - - >  
  
+---
+
+## Gateway Command Publishing Implementation Note (Reconciled 2026-08-20)
+
+The following facts are supported by the verified implementation of `TASK-0804` (`CommandPublisher` in `@kebun-melon/iot-gateway`):
+- **Topic Routing & QoS:** Commands are published to canonical topics `agriculture/{environment}/{siteId}/{deviceId}/command/faucet` with QoS 1 and `retain=false`.
+- **Target Device Scope:** Command publishing is restricted to verified `WATER_TANK_NODE` devices with `accountStatus = ACTIVE` and valid non-empty `siteId`.
+- **Payload Schema Conformance:**
+  - `DISPENSE`: Transmits `schemaVersion: '1.0'`, `commandId`, `deviceId`, `siteId`, `action: 'DISPENSE'`, valid `phase`, `plantCount >= 1`, persisted integer `targetVolumeMl` (no publisher-side recalculation), `requestedAt`, and `expiresAt`.
+  - `OPEN` / `CLOSE`: Transmits clean manual action payload omitting `phase`, `plantCount`, and `targetVolumeMl`.
+- **State Progression:** Atomically transitions database status from `QUEUED` to `SENT` only after broker confirms publication. Expired commands are marked `EXPIRED` without transmission. Disconnected/failed broker states keep commands `QUEUED` with zero false `SENT` marks.
+<!-- TASK-0804 Reconciled: 2026-08-20 -->

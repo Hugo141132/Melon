@@ -455,3 +455,13 @@ The following facts are supported by the current implementation regarding device
 - **Decision:** Granular permissions (`device.control.open`, `device.control.close`) are NOT invented. Use existing `device.control`. Any further granularity is TBD.
 < ! - -   T A S K - 0 8 0 2   R e c o n c i l e d :   2 0 2 6 - 0 8 - 1 9   - - >  
  
+---
+
+## Faucet Command Publisher Decisions Implementation Note (Reconciled 2026-08-20)
+
+The following facts are supported by the verified implementation of `TASK-0804` (`CommandPublisher` in `@kebun-melon/iot-gateway`):
+- **Canonical Volume Passthrough:** Publisher respects `DEC-CTRL-090` by directly publishing the canonical integer `targetVolumeMl` persisted during `TASK-0803` API command creation without recalculating from `phase` or `plantCount`.
+- **Payload Schema Conformance:** `DISPENSE` commands include valid `phase`, `plantCount >= 1`, and `targetVolumeMl`. `OPEN` and `CLOSE` command payloads cleanly omit `phase`, `plantCount`, and `targetVolumeMl` without fabricating placeholder values.
+- **Fail-Safe Policy Deferral:** Preserves the unresolved status of fail-safe policies for open faucets after communication loss without inventing ad-hoc behaviors.
+- **State Transition Integrity:** Only eligible unexpired `QUEUED` commands transition to `SENT` upon confirmed broker publication (QoS 1, `retain=false`). Failed publications remain `QUEUED` and never appear as `SENT`. Expired commands transition to `EXPIRED` without publishing.
+<!-- TASK-0804 Reconciled: 2026-08-20 -->

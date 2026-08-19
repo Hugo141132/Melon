@@ -1760,3 +1760,13 @@ The following facts are supported by the current implementation regarding databa
 - **Frontend Identity Scope:** Frontend monitoring and device selection state consistently use immutable database UUIDs (`devices.id`).
 < ! - -   T A S K - 0 8 0 2   R e c o n c i l e d :   2 0 2 6 - 0 8 - 1 9   - - >  
  
+---
+
+## Faucet Command Publisher Database Implementation Note (Reconciled 2026-08-20)
+
+The following facts are supported by the verified implementation of `TASK-0804` (`CommandPublisher` in `@kebun-melon/iot-gateway`):
+- **Database Status Lifecycle:** Publisher queries unexpired commands where `status = QUEUED` from `faucet_commands`.
+- **Target Volume Persistence:** For `DISPENSE` actions, the publisher consumes the canonical integer `targetVolumeMl` persisted in the database record during `TASK-0803` command creation, with zero in-gateway recalculation.
+- **State Transition Atomicity:** `updateCommandStatus` transitions commands to `SENT` with `messageId` and metadata only after broker confirmation. If publishing fails, status remains `QUEUED`. Expired commands (`now >= expiresAt`) transition atomically to `EXPIRED`.
+- **Relational Integrity:** Preserves device foreign keys, `WATER_TANK_NODE` type constraints, and active status checks without schema alterations.
+<!-- TASK-0804 Reconciled: 2026-08-20 -->

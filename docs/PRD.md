@@ -1044,3 +1044,13 @@ The following facts are verified in the product implementation regarding device 
 - **Empty Historical Data Handling:** Historical monitoring queries with zero telemetry records return HTTP 200 with an empty series array and valid pagination metadata, preventing false errors or fabricated values.
 < ! - -   T A S K - 0 8 0 2   R e c o n c i l e d :   2 0 2 6 - 0 8 - 1 9   - - >  
  
+---
+
+## Faucet Control Requirements Implementation Note (Reconciled 2026-08-20)
+
+The following facts are verified in the product implementation regarding `TASK-0804` (`CommandPublisher` in `@kebun-melon/iot-gateway`):
+- **Server-Mediated Publishing:** The web client creates persisted commands via backend API; the gateway command publisher pulls unexpired `QUEUED` records and transmits them to the MQTT broker without client-direct broker access.
+- **Dispense Volume & Phase:** For `DISPENSE` commands, the publisher passes through the server-calculated canonical `targetVolumeMl` integer persisted in the database (supporting preset volumes multiplied by `plantCount >= 1`), with zero gateway-level volume recomputation.
+- **Manual Control Actions:** For manual `OPEN` and `CLOSE` commands, `phase`, `plantCount`, and `targetVolumeMl` are strictly omitted from payloads.
+- **State Integrity:** Commands transition to `SENT` only after MQTT publication succeeds. Failed or disconnected publishes remain `QUEUED`. Expired commands transition to `EXPIRED` without physical transmission.
+<!-- TASK-0804 Reconciled: 2026-08-20 -->

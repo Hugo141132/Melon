@@ -1604,4 +1604,14 @@ The following facts are supported by the current implementation regarding device
 
 <!-- Reconciled for Manual Faucet Open/Close Control and Volume Presets -->
 < ! - -   T A S K - 0 8 0 2   R e c o n c i l e d :   2 0 2 6 - 0 8 - 1 9   - - >  
- 
+ ---
+
+## Gateway Command Publisher Architecture Implementation Note (Reconciled 2026-08-20)
+
+The following facts are supported by the verified implementation of `TASK-0804` (`CommandPublisher` in `@kebun-melon/iot-gateway`):
+- **Gateway Publisher Role:** Decoupled background publisher safely queries unexpired `QUEUED` faucet commands from PostgreSQL, validates target `WATER_TANK_NODE` active state and presence of non-empty `siteId`, formats per-device canonical topics (`agriculture/{environment}/{siteId}/{deviceId}/command/faucet`), and dispatches over MQTT 5.0 with QoS 1 and `retain=false`.
+- **Target Volume Passthrough:** For `DISPENSE` commands, the publisher passes through the canonical integer `targetVolumeMl` persisted during `TASK-0803` without performing independent recalculations.
+- **Manual Control Payloads:** For `OPEN` and `CLOSE` commands, `phase`, `plantCount`, and `targetVolumeMl` are strictly omitted from MQTT payloads.
+- **State Transition & Failure Boundary:** Atomic progression to `SENT` occurs only after broker publish confirmation. In the event of broker disconnection or failure, commands remain `QUEUED` in the database with zero false `SENT` transitions. Expired commands transition to `EXPIRED` without dispatch.
+- **Decoupling:** Gateway acknowledgement processor (`TASK-0805`) and downstream state machine tasks remain distinct and pending.
+<!-- TASK-0804 Reconciled: 2026-08-20 -->

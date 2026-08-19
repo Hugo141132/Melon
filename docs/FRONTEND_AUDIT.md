@@ -358,3 +358,12 @@ The following facts are verified in the frontend codebase regarding device selec
 <!-- Reconciled for Manual Faucet Open/Close Control and Volume Presets -->
 < ! - -   T A S K - 0 8 0 2   R e c o n c i l e d :   2 0 2 6 - 0 8 - 1 9   - - >  
  
+---
+
+## Gateway Command Publishing Frontend Audit Note (Reconciled 2026-08-20)
+
+The following facts are verified regarding the relationship between the web frontend and `TASK-0804` (`CommandPublisher` in `@kebun-melon/iot-gateway`):
+- **Backend-Mediated Control:** Web frontend never establishes direct connections or publishes commands directly to the MQTT broker. Faucet controls created via `/api/v1/devices/{deviceId}/faucet-commands` enter PostgreSQL as `QUEUED`.
+- **Publisher Passthrough:** The gateway command publisher safely polls `QUEUED` records and transmits canonical `targetVolumeMl` for `DISPENSE` (or clean `OPEN`/`CLOSE` payloads) over MQTT without altering frontend UI presentation or volume input bindings.
+- **Visual Design & Safety:** Frontend preserves existing `Premium Minimal Ops` design tokens and awaits confirmed downstream device execution events before claiming physical outcome completion.
+<!-- TASK-0804 Reconciled: 2026-08-20 -->

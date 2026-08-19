@@ -88,3 +88,14 @@ The following facts are verified in the traceability matrix regarding device sel
 <!-- Reconciled for Manual Faucet Open/Close Control and Volume Presets -->
 < ! - -   T A S K - 0 8 0 2   R e c o n c i l e d :   2 0 2 6 - 0 8 - 1 9   - - >  
  
+---
+
+## Gateway Command Publishing Traceability Implementation Note (Reconciled 2026-08-20)
+
+The following facts are verified in the traceability matrix regarding `TASK-0804` (`CommandPublisher` in `@kebun-melon/iot-gateway`):
+- **Implementation Status:** `TASK-0804` is implemented and verified (`apps/iot-gateway/src/__tests__/command-publisher.test.ts`, 10/10 tests passed; gateway contract suites 42/42 passed).
+- **Target Volume Passthrough:** For `DISPENSE` actions, the publisher consumes the canonical integer `targetVolumeMl` persisted during `TASK-0803` API command creation without recalculating from `phase` or `plantCount`.
+- **Manual Control Schema:** Cleanly formats `OPEN` and `CLOSE` commands by omitting `phase`, `plantCount`, and `targetVolumeMl`.
+- **State Progression:** Atomically transitions database status from `QUEUED` to `SENT` only after broker confirms publication. Expired commands are marked `EXPIRED` without transmission.
+- **Dependency Isolation:** Downstream tasks (`TASK-0805` device acknowledgement processing, `TASK-0806` command state machine, `TASK-1003` MQTT E2E test suites) remain distinct and pending.
+<!-- TASK-0804 Reconciled: 2026-08-20 -->

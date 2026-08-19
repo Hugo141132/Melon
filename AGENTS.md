@@ -1720,3 +1720,16 @@ The following facts are supported by the current implementation regarding device
 - **Operational Dev Server Isolation:** Intermittent Next.js HTML 404 on restarts isolated as Windows zombie process holding port 3000 upon Ctrl+C; resolved via port cleanup before dev server startup.
 < ! - -   T A S K - 0 8 0 2   R e c o n c i l e d :   2 0 2 6 - 0 8 - 1 9   - - >  
  
+---
+
+## TASK-0804 Governance & Implementation Record
+
+`TASK-0804` gateway command publisher implementation record:
+- **Status:** `DONE` (Verified & Reconciled 2026-08-20)
+- **Frontend Impact:** `NONE`
+- **Selected UI Direction:** `N/A`
+- **Existing Color Template:** `UNCHANGED`
+- **Selected Motion Effects:** `None`
+- **21st.dev MCP:** `NOT REQUIRED`
+- **Summary:** Implemented and verified `CommandPublisher` in `@kebun-melon/iot-gateway`. Publishes eligible, unexpired `QUEUED` faucet commands for `WATER_TANK_NODE` devices over MQTT 5.0 (QoS 1, `retain=false`) to canonical topics `agriculture/{environment}/{siteId}/{deviceId}/command/faucet`. For `DISPENSE` actions, directly transmits the database-persisted canonical `targetVolumeMl` integer (from `TASK-0803`) alongside valid `phase` and `plantCount >= 1` without gateway-side recalculation. For `OPEN` and `CLOSE` actions, cleanly omits `phase`, `plantCount`, and `targetVolumeMl`. Enforces strict atomic state progression (`QUEUED` -> `SENT`) only upon broker publish confirmation; failed publishes leave commands `QUEUED` without false `SENT` marks; expired commands transition to `EXPIRED` without dispatch. Verified 100% test pass rate across targeted test suites (10/10 publisher tests, 42/42 gateway contract tests) and clean TypeScript typecheck (0 errors). Completed local simulated performance sanity tests (1,000 direct calls ~68.3 ops/s with p95 20.08 ms, 500 burst commands ~67.0 cmds/s, 2,000 soak commands ~66.7 cmds/s with zero leaks and safe reconnect recovery). Downstream `TASK-0805` (acknowledgement processing) remains pending and decoupled.
+<!-- TASK-0804 Reconciled: 2026-08-20 -->

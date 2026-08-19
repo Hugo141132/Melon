@@ -1279,3 +1279,12 @@ The following facts are verified in the frontend UI/UX implementation regarding 
 - **Historical Chart State Handling:** Zero-record history responses (HTTP 200) cleanly render empty chart states without erroneous 404 alerts or fabricated graph lines.
 < ! - -   T A S K - 0 8 0 2   R e c o n c i l e d :   2 0 2 6 - 0 8 - 1 9   - - >  
  
+---
+
+## Gateway Command Publishing UI/UX Implementation Note (Reconciled 2026-08-20)
+
+The verified implementation of `TASK-0804` (`CommandPublisher` in `@kebun-melon/iot-gateway`) operates strictly in the gateway backend with zero UI changes or visual regressions:
+- **Design Tokens Unchanged:** Retains `Premium Minimal Ops` UI aesthetic and existing color palette without modification.
+- **Client Presentation Decoupling:** Browser displays preset volumes (e.g. 0.3 L) while backend stores integer mL; the gateway publisher faithfully dispatches the stored canonical `targetVolumeMl` integer.
+- **Physical Confirmation Boundary:** The UI continues to await downstream device event processing (`TASK-0805`/`TASK-0806`) before displaying confirmed completion, preventing misleading early completion states.
+<!-- TASK-0804 Reconciled: 2026-08-20 -->

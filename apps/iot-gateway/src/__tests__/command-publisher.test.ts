@@ -283,6 +283,224 @@ describe('TASK-0804: CommandPublisher (Gateway Command Publisher)', () => {
       expect(metricsCollector.getSnapshot().commands.publishedTotal).toBe(1);
     });
 
+    it('publishes eligible unexpired QUEUED OPEN command without fabricating phase/volume', async () => {
+      let publishedTopic = '';
+      let publishedPayloadBuffer: Buffer | null = null;
+      let publishedQos = -1;
+      let publishedRetain = true;
+
+      const mockMqttClient = {
+        isConnected: () => true,
+        publish: async (topic: string, message: Buffer, qos: number, retain: boolean) => {
+          publishedTopic = topic;
+          publishedPayloadBuffer = message;
+          publishedQos = qos;
+          publishedRetain = retain;
+        },
+      } as unknown as GatewayMqttClient;
+
+      const validCommand = {
+        id: 'cmd-db-uuid-open',
+        commandId: 'cmd-open-200',
+        deviceId: 'water-tank-node-ryd0at',
+        initiatedByUserId: 'user-1',
+        initiatedByRole: UserRole.ADMIN,
+        action: FaucetCommandAction.OPEN,
+        phase: null,
+        plantCount: null,
+        targetVolumeMl: null,
+        actualVolumeMl: null,
+        status: FaucetCommandStatus.QUEUED,
+        requestedAt: new Date(),
+        queuedAt: new Date(),
+        sentAt: null,
+        acknowledgedAt: null,
+        startedAt: null,
+        completedAt: null,
+        failedAt: null,
+        cancelledAt: null,
+        expiresAt: new Date(Date.now() + 300000), // Expires in 5 mins
+        failureReasonCode: null,
+        idempotencyKey: 'idemp-valid-open',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const validDevice = {
+        id: 'dev-db-uuid-2',
+        deviceId: 'water-tank-node-ryd0at',
+        siteId: 'site-kebun-01',
+        name: 'Water Tank Node 1',
+        deviceType: DeviceType.WATER_TANK_NODE,
+        accountStatus: DeviceAccountStatus.ACTIVE,
+        connectionStatus: 'ONLINE',
+        firmwareVersion: '1.0.0',
+        hardwareRevision: 'v1',
+        schemaVersion: '1.0',
+        lastSeenAt: new Date(),
+        lastMessageAt: new Date(),
+        latitude: -6.2,
+        longitude: 106.8,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        deactivatedAt: null,
+        capabilities: ['TANK_MONITORING', 'FAUCET_CONTROL'],
+      };
+
+      const mockFaucetCommandRepo = {
+        getCommands: vi.fn().mockResolvedValue({
+          items: [validCommand],
+          pagination: { page: 1, pageSize: 50, totalItems: 1, totalPages: 1 },
+        }),
+        updateCommandStatus: vi.fn().mockResolvedValue({
+          ...validCommand,
+          status: FaucetCommandStatus.SENT,
+        }),
+      } as any;
+
+      const mockDeviceRepo = {
+        getDeviceByCanonicalId: vi.fn().mockResolvedValue(validDevice),
+      } as any;
+
+      const publisher = new CommandPublisher({
+        env,
+        mqttClient: mockMqttClient,
+        faucetCommandRepo: mockFaucetCommandRepo,
+        deviceRepo: mockDeviceRepo,
+      });
+
+      const result = await publisher.processQueuedCommands();
+
+      expect(result.publishedCount).toBe(1);
+      expect(result.expiredCount).toBe(0);
+      expect(result.failedCount).toBe(0);
+      expect(result.skippedCount).toBe(0);
+
+      const parsedPayload = JSON.parse(publishedPayloadBuffer!.toString());
+      expect(parsedPayload).toEqual({
+        schemaVersion: '1.0',
+        commandId: 'cmd-open-200',
+        deviceId: 'water-tank-node-ryd0at',
+        siteId: 'site-kebun-01',
+        action: 'OPEN',
+        requestedAt: validCommand.requestedAt.toISOString(),
+        expiresAt: validCommand.expiresAt.toISOString(),
+      });
+      // Should NOT have phase or targetVolumeMl
+      expect(parsedPayload).not.toHaveProperty('phase');
+      expect(parsedPayload).not.toHaveProperty('targetVolumeMl');
+      expect(parsedPayload).not.toHaveProperty('plantCount');
+    });
+
+    it('publishes eligible unexpired QUEUED CLOSE command without fabricating phase/volume', async () => {
+      let publishedTopic = '';
+      let publishedPayloadBuffer: Buffer | null = null;
+      let publishedQos = -1;
+      let publishedRetain = true;
+
+      const mockMqttClient = {
+        isConnected: () => true,
+        publish: async (topic: string, message: Buffer, qos: number, retain: boolean) => {
+          publishedTopic = topic;
+          publishedPayloadBuffer = message;
+          publishedQos = qos;
+          publishedRetain = retain;
+        },
+      } as unknown as GatewayMqttClient;
+
+      const validCommand = {
+        id: 'cmd-db-uuid-close',
+        commandId: 'cmd-close-200',
+        deviceId: 'water-tank-node-ryd0at',
+        initiatedByUserId: 'user-1',
+        initiatedByRole: UserRole.ADMIN,
+        action: FaucetCommandAction.CLOSE,
+        phase: null,
+        plantCount: null,
+        targetVolumeMl: null,
+        actualVolumeMl: null,
+        status: FaucetCommandStatus.QUEUED,
+        requestedAt: new Date(),
+        queuedAt: new Date(),
+        sentAt: null,
+        acknowledgedAt: null,
+        startedAt: null,
+        completedAt: null,
+        failedAt: null,
+        cancelledAt: null,
+        expiresAt: new Date(Date.now() + 300000), // Expires in 5 mins
+        failureReasonCode: null,
+        idempotencyKey: 'idemp-valid-close',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const validDevice = {
+        id: 'dev-db-uuid-2',
+        deviceId: 'water-tank-node-ryd0at',
+        siteId: 'site-kebun-01',
+        name: 'Water Tank Node 1',
+        deviceType: DeviceType.WATER_TANK_NODE,
+        accountStatus: DeviceAccountStatus.ACTIVE,
+        connectionStatus: 'ONLINE',
+        firmwareVersion: '1.0.0',
+        hardwareRevision: 'v1',
+        schemaVersion: '1.0',
+        lastSeenAt: new Date(),
+        lastMessageAt: new Date(),
+        latitude: -6.2,
+        longitude: 106.8,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        deactivatedAt: null,
+        capabilities: ['TANK_MONITORING', 'FAUCET_CONTROL'],
+      };
+
+      const mockFaucetCommandRepo = {
+        getCommands: vi.fn().mockResolvedValue({
+          items: [validCommand],
+          pagination: { page: 1, pageSize: 50, totalItems: 1, totalPages: 1 },
+        }),
+        updateCommandStatus: vi.fn().mockResolvedValue({
+          ...validCommand,
+          status: FaucetCommandStatus.SENT,
+        }),
+      } as any;
+
+      const mockDeviceRepo = {
+        getDeviceByCanonicalId: vi.fn().mockResolvedValue(validDevice),
+      } as any;
+
+      const publisher = new CommandPublisher({
+        env,
+        mqttClient: mockMqttClient,
+        faucetCommandRepo: mockFaucetCommandRepo,
+        deviceRepo: mockDeviceRepo,
+      });
+
+      const result = await publisher.processQueuedCommands();
+
+      expect(result.publishedCount).toBe(1);
+      expect(result.expiredCount).toBe(0);
+      expect(result.failedCount).toBe(0);
+      expect(result.skippedCount).toBe(0);
+
+      const parsedPayload = JSON.parse(publishedPayloadBuffer!.toString());
+      expect(parsedPayload).toEqual({
+        schemaVersion: '1.0',
+        commandId: 'cmd-close-200',
+        deviceId: 'water-tank-node-ryd0at',
+        siteId: 'site-kebun-01',
+        action: 'CLOSE',
+        requestedAt: validCommand.requestedAt.toISOString(),
+        expiresAt: validCommand.expiresAt.toISOString(),
+      });
+      // Should NOT have phase or targetVolumeMl
+      expect(parsedPayload).not.toHaveProperty('phase');
+      expect(parsedPayload).not.toHaveProperty('targetVolumeMl');
+      expect(parsedPayload).not.toHaveProperty('plantCount');
+    });
+
     it('skips command if target device is non-WATER_TANK_NODE or missing siteId', async () => {
       const mockMqttClient = {
         isConnected: () => true,
@@ -374,6 +592,60 @@ describe('TASK-0804: CommandPublisher (Gateway Command Publisher)', () => {
 
       const mockDeviceRepo = {
         getDeviceByCanonicalId: vi.fn().mockResolvedValue(noSiteDevice),
+      } as any;
+
+      const publisher = new CommandPublisher({
+        env,
+        mqttClient: mockMqttClient,
+        faucetCommandRepo: mockFaucetCommandRepo,
+        deviceRepo: mockDeviceRepo,
+      });
+
+      const result = await publisher.processQueuedCommands();
+
+      expect(result.skippedCount).toBe(1);
+      expect(result.publishedCount).toBe(0);
+      expect(mockMqttClient.publish).not.toHaveBeenCalled();
+      expect(mockFaucetCommandRepo.updateCommandStatus).not.toHaveBeenCalled();
+    });
+
+    it('skips command if plantCount is missing or < 1 for DISPENSE action', async () => {
+      const mockMqttClient = {
+        isConnected: () => true,
+        publish: vi.fn(),
+      } as unknown as GatewayMqttClient;
+
+      const queuedCmd = {
+        id: 'cmd-db-uuid-plantcount',
+        commandId: 'cmd-plant-400',
+        deviceId: 'water-tank-node-ryd0at',
+        action: FaucetCommandAction.DISPENSE,
+        phase: 3,
+        plantCount: 0, // INVALID plantCount
+        targetVolumeMl: 1500,
+        status: FaucetCommandStatus.QUEUED,
+        expiresAt: new Date(Date.now() + 300000),
+        requestedAt: new Date(),
+      };
+
+      const validDevice = {
+        id: 'dev-db-uuid-2',
+        deviceId: 'water-tank-node-ryd0at',
+        siteId: 'site-kebun-01',
+        deviceType: DeviceType.WATER_TANK_NODE,
+        accountStatus: DeviceAccountStatus.ACTIVE,
+      };
+
+      const mockFaucetCommandRepo = {
+        getCommands: vi.fn().mockResolvedValue({
+          items: [queuedCmd],
+          pagination: { page: 1, pageSize: 50, totalItems: 1, totalPages: 1 },
+        }),
+        updateCommandStatus: vi.fn(),
+      } as any;
+
+      const mockDeviceRepo = {
+        getDeviceByCanonicalId: vi.fn().mockResolvedValue(validDevice),
       } as any;
 
       const publisher = new CommandPublisher({

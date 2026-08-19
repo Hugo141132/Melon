@@ -1547,3 +1547,13 @@ The following security controls are active and verified across monitoring endpoi
 - **Empty Result Integrity:** Zero-matching telemetry queries safely return HTTP 200 with empty series, preventing data leakage or confusion with missing device 404 errors.
 < ! - -   T A S K - 0 8 0 2   R e c o n c i l e d :   2 0 2 6 - 0 8 - 1 9   - - >  
  
+---
+
+## Gateway Command Publishing Security Controls Implementation Note (Reconciled 2026-08-20)
+
+The following security controls are active and verified across the gateway command publisher (`TASK-0804`):
+- **Broker Direct Isolation:** Browsers are completely isolated from MQTT brokers; publishing occurs exclusively through the server-side gateway backend via authenticated TLS connection.
+- **Payload Sanitization:** For `OPEN` and `CLOSE` commands, `phase`, `plantCount`, and `targetVolumeMl` are strictly omitted to prevent parameter tampering or unexpected actuator states.
+- **QoS & Retention Safety:** All faucet commands publish with QoS 1 and `retain=false` to prevent stale command replay upon device reconnection.
+- **State Progression Safety:** Commands transition to `SENT` only upon confirmed broker publication. Failed/disconnected publishes remain `QUEUED`. Expired commands transition to `EXPIRED` without transmission.
+<!-- TASK-0804 Reconciled: 2026-08-20 -->

@@ -9,7 +9,6 @@ import {
   FaucetCommandStatus,
   DeviceType,
   DeviceAccountStatus,
-  mapPhaseToVolume,
   FaucetCommandAction,
 } from '@kebun-melon/contracts';
 import { GatewayMqttClient } from '../mqtt/client';
@@ -109,14 +108,22 @@ export class CommandPublisher {
 
     const topic = mqttTopicRouter.buildTopic(envName, siteId, deviceId, 'command', 'faucet');
 
-    const payloadObj = {
+    const action = commandPayload.action || FaucetCommandAction.DISPENSE;
+    const payloadObj: Record<string, any> = {
       schemaVersion: '1.0',
       commandId,
       deviceId,
       siteId,
-      action: commandPayload.action || FaucetCommandAction.DISPENSE,
-      ...commandPayload,
+      action,
+      requestedAt: commandPayload.requestedAt,
+      expiresAt: commandPayload.expiresAt,
     };
+
+    if (action === FaucetCommandAction.DISPENSE) {
+      payloadObj.phase = commandPayload.phase;
+      payloadObj.plantCount = commandPayload.plantCount;
+      payloadObj.targetVolumeMl = commandPayload.targetVolumeMl;
+    }
 
     const payloadBuffer = Buffer.from(JSON.stringify(payloadObj));
 
@@ -239,24 +246,10 @@ export class CommandPublisher {
 
         // 7. Validate Phase & Volume if action is DISPENSE
         if (cmd.action === FaucetCommandAction.DISPENSE) {
-          let targetVolumeMl: number;
-          try {
-            targetVolumeMl = mapPhaseToVolume(cmd.phase as number) * (cmd.plantCount as number);
-            if (targetVolumeMl !== cmd.targetVolumeMl) {
-              logger.warn('Queued faucet command phase and targetVolumeMl mismatch', {
-                commandId: cmd.commandId,
-                phase: cmd.phase,
-                plantCount: cmd.plantCount,
-                targetVolumeMl: cmd.targetVolumeMl,
-                expectedVolumeMl: targetVolumeMl,
-              });
-              result.skippedCount++;
-              continue;
-            }
-          } catch (valErr) {
-            logger.warn('Invalid faucet command phase', {
+          if (cmd.plantCount == null || cmd.plantCount < 1) {
+            logger.warn('Queued faucet command invalid plantCount', {
               commandId: cmd.commandId,
-              phase: cmd.phase,
+              plantCount: cmd.plantCount,
             });
             result.skippedCount++;
             continue;
@@ -287,18 +280,21 @@ export class CommandPublisher {
           'faucet'
         );
 
-        const payloadObj = {
+        const payloadObj: Record<string, any> = {
           schemaVersion: '1.0',
           commandId: cmd.commandId,
           deviceId: device.deviceId,
           siteId: device.siteId,
           action: cmd.action,
-          phase: cmd.phase,
-          plantCount: cmd.plantCount,
-          targetVolumeMl: cmd.targetVolumeMl,
           requestedAt: new Date(cmd.requestedAt).toISOString(),
           expiresAt: new Date(cmd.expiresAt).toISOString(),
         };
+
+        if (cmd.action === FaucetCommandAction.DISPENSE) {
+          payloadObj.phase = cmd.phase;
+          payloadObj.plantCount = cmd.plantCount;
+          payloadObj.targetVolumeMl = cmd.targetVolumeMl;
+        }
 
         const payloadBuffer = Buffer.from(JSON.stringify(payloadObj));
 

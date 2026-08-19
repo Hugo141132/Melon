@@ -1927,3 +1927,13 @@ The following facts are verified in the user flow implementations regarding devi
 - **Empty History Flow:** Querying historical data for a period with zero records displays a clean empty state (HTTP 200) rather than a false 404 error banner.
 < ! - -   T A S K - 0 8 0 2   R e c o n c i l e d :   2 0 2 6 - 0 8 - 1 9   - - >  
  
+---
+
+## Gateway Command Publishing User Flows Implementation Note (Reconciled 2026-08-20)
+
+The following facts are verified in the end-to-end user flow implementations regarding `TASK-0804` (`CommandPublisher` in `@kebun-melon/iot-gateway`):
+- **Command Submission & Queuing:** When an authorized user triggers a `DISPENSE`, `OPEN`, or `CLOSE` action, the web API validates inputs, persists canonical `targetVolumeMl` for dispense commands, and queues the record (`status = QUEUED`).
+- **Gateway Publication Flow:** The gateway command publisher polls `QUEUED` records, validates device eligibility (`WATER_TANK_NODE`, active, valid `siteId`), and dispatches to the per-device MQTT topic.
+- **State Progression:** Upon broker publish confirmation, the command transitions to `SENT`. If publish fails or the broker is disconnected, the command remains `QUEUED` without false `SENT` progress. Expired commands transition to `EXPIRED` without transmission.
+- **Outcome Confirmation Decoupling:** Downstream device execution acknowledgement and UI state transitions (`ACKNOWLEDGED`, `IN_PROGRESS`, `COMPLETED`, `FAILED`) remain decoupled and handled by `TASK-0805` / `TASK-0806`.
+<!-- TASK-0804 Reconciled: 2026-08-20 -->

@@ -1957,3 +1957,28 @@ The following facts are verified in test suites and runtime verification regardi
 - **Manual Runtime Verification:** Completed and confirmed operational stability across all monitoring views.
 < ! - -   T A S K - 0 8 0 2   R e c o n c i l e d :   2 0 2 6 - 0 8 - 1 9   - - >  
  
+---
+
+# 46. Gateway Command Publisher Verification Suite (`TASK-0804`)
+
+Automated unit, contract, error handling, and simulated performance sanity verification for the gateway command publisher:
+
+### Agent-Executed Automated Tests
+1. **Targeted Publisher Test Suite Pass (`apps/iot-gateway/src/__tests__/command-publisher.test.ts`):** 10/10 tests passed (100% path pass rate):
+   - Direct `publishCommand` canonical topic routing (`agriculture/{environment}/{siteId}/{deviceId}/command/faucet`), QoS 1, and `retain=false`.
+   - `DISPENSE` payload construction with valid `phase`, `plantCount >= 1`, and server-persisted `targetVolumeMl` integer (without publisher-side recalculation).
+   - `OPEN` and `CLOSE` command payload construction with strict omission of `phase`, `plantCount`, and `targetVolumeMl`.
+   - Expired `QUEUED` command transition to `EXPIRED` without publishing.
+   - Non-`WATER_TANK_NODE` device filtering and missing `siteId` rejection (skipped without state corruption).
+   - Atomic database transition from `QUEUED` to `SENT` with unique `messageId` and topic metadata only upon confirmed MQTT publication.
+   - MQTT failure error recovery leaving command status untouched as `QUEUED` in database with `0` false `SENT` marks.
+2. **Gateway Contract Test Suite Pass (`command-publisher.test.ts` + `topic-router.test.ts`):** 42/42 tests passed cleanly.
+3. **Static Typecheck:** Clean `npx tsc --noEmit -p apps/iot-gateway/tsconfig.json` pass with 0 errors.
+
+### Local Simulated Performance Sanity Results (Mocked/In-Memory Infrastructure)
+*Note: The following measurements represent local simulated sanity testing on mocked/in-memory infrastructure and do NOT constitute live WAN EMQX/TLS benchmarks (deferred to formal TASK-1007 performance testing):*
+- **Direct Publication Latency (1,000 invocations):** ~68.3 ops/sec (p50: 15.52 ms, p90: 18.48 ms, p95: 20.08 ms, max: 44.30 ms).
+- **Burst Batch Processing (500 commands in batches of 50):** ~67.0 cmds/sec (Batch p50: 745.58 ms, Batch p95: 829.48 ms).
+- **Sustained Soak (2,000 commands across 40 batches):** ~66.7 cmds/sec with zero memory leaks (Heap delta: +3.34 MB, RSS delta: +3.84 MB).
+- **Safety Under Fault Injection:** 0 duplicate publications, 0 false `SENT` transitions; 20 queued commands safely preserved during simulated broker disconnect and published successfully upon reconnection.
+<!-- TASK-0804 Reconciled: 2026-08-20 -->

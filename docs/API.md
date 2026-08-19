@@ -2810,5 +2810,16 @@ The following facts are supported by the current implementation regarding device
 - **Invalid/Revoked IDs:** Clear selection safely to `null` with a notice banner.
 - **Admin Privacy:** Admin canonical `deviceId` concealment remains strictly enforced.
 - **Empty History Semantics:** Historical telemetry queries with zero records matching date filters return HTTP 200 with `{ series: [], pagination: { page: 1, pageSize: 20, totalRecords: 0, totalPages: 1 } }`, never HTTP 404 or fabricated data.
-< ! - -   T A S K - 0 8 0 2   R e c o n c i l e d :   2 0 2 6 - 0 8 - 1 9   - - >  
- 
+<!-- TASK-0802 Reconciled: 2026-08-19 -->
+
+---
+
+## Faucet Command Publishing and API Implementation Note (Reconciled 2026-08-20)
+
+The following facts are supported by the verified implementation of `TASK-0804` (`CommandPublisher` in `@kebun-melon/iot-gateway`):
+- **Status:** `DONE`.
+- **Persisted Volume Passthrough:** For `DISPENSE` actions, the gateway publisher directly transmits the canonical `targetVolumeMl` integer persisted during `TASK-0803` API command creation without recalculating or modifying the value.
+- **Payload Schema Conformance:** `DISPENSE` payloads carry valid `phase`, `plantCount >= 1`, and `targetVolumeMl`. `OPEN` and `CLOSE` command payloads omit `phase`, `plantCount`, and `targetVolumeMl` without fabricating placeholder values.
+- **State Transition Integrity:** Only eligible unexpired `QUEUED` commands transition to `SENT` upon confirmed broker publication (QoS 1, `retain=false`). Failed publications remain `QUEUED` and are never marked `SENT`. Expired commands transition to `EXPIRED` without publishing.
+- **Downstream Decoupling:** `TASK-0805` (acknowledgement processing) and downstream state machine tasks remain untouched.
+<!-- TASK-0804 Reconciled: 2026-08-20 -->
