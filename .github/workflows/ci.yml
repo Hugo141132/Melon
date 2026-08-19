@@ -119,10 +119,17 @@ jobs:
         run: npm run build
 
       - name: Install Playwright Browsers (Headless Shell with System Dependencies)
-        timeout-minutes: 10
+        id: playwright-install-1
+        continue-on-error: true
+        timeout-minutes: 5
+        run: npx playwright install --with-deps --only-shell chromium
+
+      - name: Retry Install Playwright Browsers
+        if: steps.playwright-install-1.outcome == 'failure'
+        timeout-minutes: 5
         run: |
-          timeout 4m npx playwright install --with-deps --only-shell chromium || \
-          (echo "Initial Playwright installation failed; retrying once..." && sleep 5 && npx playwright install --with-deps --only-shell chromium)
+          echo "Initial Playwright installation failed; retrying once..."
+          npx playwright install --with-deps --only-shell chromium
 
       - name: Execute Playwright E2E Smoke Tests
         timeout-minutes: 7
