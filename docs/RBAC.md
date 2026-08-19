@@ -1148,13 +1148,11 @@ Key RBAC & Security Rules for Provisioning:
 
 ---
 
-## TASK-0306 Implementation Note
+## Device Access & Monitoring RBAC Implementation Note (Reconciled 2026-08-19)
 
-The following facts are supported by the current implementation regarding device selection and routing:
-- **Frontend Selection/Context/URL:** Uses immutable `devices.id` UUID.
-- **Bare Routes:** Remain neutral with no auto-selection (`/`, `/sensor`, `/soil`, `/water`).
-- **Rehydration:** Valid `?deviceId=<UUID>` rehydrates after authorization on hard refresh.
-- **Invalid/Revoked IDs:** Clear selection safely to `null` with a notice banner.
-- **Admin Privacy:** Admin canonical `deviceId` concealment remains enforced.
-- **Legacy Routes:** `/air` and `/tanah` are explicitly maintained as legacy 404 routes.
-- **Race Condition:** `/sensor` first-load "No Device Found" race was fixed by correcting the loading state (handling skeleton vs. true empty authorized list).
+The following facts are verified in the RBAC implementation regarding device access, monitoring resolution, and role scoping (`TASK-0306`, `TASK-0501`, `TASK-0503`, `TASK-0504`):
+- **Access Scoping & Validation:** Server-side RBAC guard `requireDeviceViewAccess` enforces that Owners have global system scope, while Admins require an active assignment in `user_device_access` (`revokedAt IS NULL`). Baseline permission `device.read` and active account status are checked before resolving device existence to prevent information leakage.
+- **Dual Identifier Resolution in Authorization:** Device access checks resolve target devices using either immutable database UUID (`devices.id`) or canonical string (`devices.deviceId`) with case-insensitive matching.
+- **Admin Canonical Concealment:** Canonical `deviceId` strings are strictly concealed from Admin users across all device list and detail responses (`DEC-DEV-028`); only the immutable database UUID (`devices.id`) and display metadata are exposed.
+- **Frontend Identity Scope:** Frontend monitoring state and hooks strictly use immutable database UUIDs (`devices.id`).
+- **Access Revocation Handling:** Revoking or invalidating an Admin's device access safely resets active frontend selection to `null` with a notice banner without leaking unauthorized device data.

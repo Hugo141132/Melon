@@ -289,12 +289,14 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
 #### TASK-0504 Governance Record
 
 `TASK-0504` historical monitoring charts & controls implementation record:
+- Status: `DONE` (Reconciled 2026-08-19)
 - Frontend impact: `MINOR`
 - Selected UI direction: `Premium Minimal Ops`
 - Existing color template: `UNCHANGED`
 - Selected motion effects: `Card hover`, `Skeleton loading`, `Chart loading`
 - 21st.dev MCP: `NOT REQUIRED`
-- Summary: Implemented bounded historical telemetry chart components (`NPKChart`, `WaterNutrientChart`, `HistoricalChartControls`) and data fetching hook (`useHistoricalMonitoring`) on canonical `/soil` and `/water` routes (legacy `/tanah` and `/air` return 404 Not Found). Enforced `DEC-MON-087` date-range bounds (default 24h, max 31 days) and raw pagination. Preserved null values as visual gaps (`connectNulls={false}`), supported empty history returns (HTTP 200 with empty series, no fake zero values or 404s), synchronized `DeviceSelector` context across routes, resolved canonical `deviceId` string and database UUID lookups, and formatted timestamps using Indonesian localization (`id-ID`). Verified 100% test pass rate across unit test suite (`apps/web/test/unit/historical-charts.test.tsx`), Playwright OWNER/ADMIN verification, and pre-commit suite.
+- Summary: Implemented bounded historical telemetry chart components (`NPKChart`, `WaterNutrientChart`, `HistoricalChartControls`) and data fetching hook (`useHistoricalMonitoring`) on canonical `/soil` and `/water` routes (legacy `/tanah` and `/air` return 404 Not Found). Enforced `DEC-MON-087` date-range bounds (default 24h, max 31 days) and raw pagination. Preserved null values as visual gaps (`connectNulls={false}`), supported empty history returns (HTTP 200 with empty series, no fake zero values or 404s), synchronized `DeviceSelector` context across routes, resolved canonical `deviceId` string and database UUID lookups, and formatted timestamps using Indonesian localization (`id-ID`).
+- 2026-08-19 Monitoring Reconciliation: Fixed monitoring 404 regression (`GET /api/v1/devices/{deviceId}/monitoring/latest`, `.../soil/history`, `.../water/history`). Ensured frontend consistently transmits immutable database UUID `devices.id` in `activeDeviceId` and `selectedDevice`. Hardened backend route handlers, RBAC checks (`requireDeviceViewAccess`), and database repositories (`DeviceRepository`, `TelemetryRepository`) to seamlessly resolve both UUIDs and canonical `deviceId` strings. Verified zero-record queries return HTTP 200 `{ series: [] }` without false 404s. Preserved strict Admin canonical `deviceId` concealment (`DEC-DEV-028`). Added comprehensive unit tests in `@kebun-melon/database` and `@kebun-melon/web` route suites with 100% pass rate. Diagnosed intermittent dev-server restart Next.js HTML 404 as Windows zombie background process holding port 3000 upon Ctrl+C. Completed authenticated browser manual runtime verification across `/soil`, `/water`, `/sensor`, and `/controls`.
 
 #### TASK-0601 Governance Record
 
@@ -1694,13 +1696,14 @@ Do not invent the answer.
 
 ---
 
-## TASK-0306 Implementation Note
+## Monitoring and Implementation Note (Reconciled 2026-08-19)
 
-The following facts are supported by the current implementation regarding device selection and routing:
-- **Frontend Selection/Context/URL:** Uses immutable `devices.id` UUID.
-- **Bare Routes:** Remain neutral with no auto-selection (`/`, `/sensor`, `/soil`, `/water`).
+The following facts are supported by the current implementation regarding device selection, routing, and monitoring resolution (`TASK-0306`, `TASK-0501`, `TASK-0503`, `TASK-0504`):
+- **Frontend Selection/Context/URL:** Consistently uses immutable `devices.id` UUID.
+- **Bare Routes:** Remain neutral with no auto-selection (`/`, `/sensor`, `/soil`, `/water`). Canonical routes are `/soil` and `/water` (legacy `/air` and `/tanah` routes return 404).
+- **Identifier Resolution:** Monitoring backend routes accept both internal database UUID and external canonical `deviceId` string.
 - **Rehydration:** Valid `?deviceId=<UUID>` rehydrates after authorization on hard refresh.
 - **Invalid/Revoked IDs:** Clear selection safely to `null` with a notice banner.
-- **Admin Privacy:** Admin canonical `deviceId` concealment remains enforced.
-- **Legacy Routes:** `/air` and `/tanah` are explicitly maintained as legacy 404 routes.
-- **Race Condition:** `/sensor` first-load "No Device Found" race was fixed by correcting the loading state (handling skeleton vs. true empty authorized list).
+- **Admin Privacy:** Admin canonical `deviceId` concealment remains strictly enforced.
+- **Empty History Handling:** Historical telemetry queries with zero matching records return HTTP 200 with `{ series: [], pagination: { ... } }`, never HTTP 404.
+- **Operational Dev Server Isolation:** Intermittent Next.js HTML 404 on restarts isolated as Windows zombie process holding port 3000 upon Ctrl+C; resolved via port cleanup before dev server startup.

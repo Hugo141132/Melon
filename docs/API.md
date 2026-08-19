@@ -1549,7 +1549,8 @@ device.read
 monitoring.current.read
 ```
 
-**Resource check:** Device access required
+**Resource check:** Device access required (Owner: global scope; Admin: actively assigned device)
+**Lookup identifier:** Accepts internal database UUID (`devices.id`) or external canonical string (`deviceId`). Role-based device visibility and Admin concealment rules apply (`DEC-DEV-028`).
 
 Response:
 
@@ -1607,8 +1608,9 @@ UNAVAILABLE
 GET /api/v1/devices/{deviceId}/monitoring/soil/latest
 ```
 
-**Authentication:** Required  
+**Authentication:** Required
 **Permission:** `monitoring.current.read`
+**Lookup identifier:** Accepts internal database UUID (`devices.id`) or external canonical string (`deviceId`). Role-based device visibility and Admin concealment rules apply (`DEC-DEV-028`).
 
 ---
 
@@ -1618,8 +1620,9 @@ GET /api/v1/devices/{deviceId}/monitoring/soil/latest
 GET /api/v1/devices/{deviceId}/monitoring/water/latest
 ```
 
-**Authentication:** Required  
+**Authentication:** Required
 **Permission:** `monitoring.current.read`
+**Lookup identifier:** Accepts internal database UUID (`devices.id`) or external canonical string (`deviceId`). Role-based device visibility and Admin concealment rules apply (`DEC-DEV-028`).
 
 ---
 
@@ -2788,13 +2791,13 @@ The API is accepted when:
 
 ---
 
-## TASK-0306 Implementation Note
+## Monitoring and API Implementation Note (Reconciled 2026-08-19)
 
-The following facts are supported by the current implementation regarding device selection and routing:
-- **Frontend Selection/Context/URL:** Uses immutable `devices.id` UUID.
-- **Bare Routes:** Remain neutral with no auto-selection (`/`, `/sensor`, `/soil`, `/water`).
-- **Rehydration:** Valid `?deviceId=<UUID>` rehydrates after authorization on hard refresh.
+The following facts are supported by the current implementation regarding device selection, routing, and monitoring resolution (`TASK-0306`, `TASK-0501`, `TASK-0503`, `TASK-0504`):
+- **Frontend Selection/Context/URL:** Consistently uses immutable `devices.id` UUID in route params (`?deviceId=<UUID>`), navigation state, and monitoring fetch hooks.
+- **Bare Routes:** Remain neutral with no auto-selection (`/`, `/sensor`, `/soil`, `/water`). Canonical routes are `/soil` and `/water` (legacy `/air` and `/tanah` routes return 404).
+- **Identifier Resolution:** Monitoring API endpoints (`/monitoring/latest`, `/monitoring/soil/latest`, `/monitoring/water/latest`, `/monitoring/soil/history`, `/monitoring/water/history`) support transparent lookup by both internal database UUID and external canonical `deviceId` string.
+- **Rehydration:** Valid `?deviceId=<UUID>` rehydrates after server authorization validation on hard refresh.
 - **Invalid/Revoked IDs:** Clear selection safely to `null` with a notice banner.
-- **Admin Privacy:** Admin canonical `deviceId` concealment remains enforced.
-- **Legacy Routes:** `/air` and `/tanah` are explicitly maintained as legacy 404 routes.
-- **Race Condition:** `/sensor` first-load "No Device Found" race was fixed by correcting the loading state (handling skeleton vs. true empty authorized list).
+- **Admin Privacy:** Admin canonical `deviceId` concealment remains strictly enforced.
+- **Empty History Semantics:** Historical telemetry queries with zero records matching date filters return HTTP 200 with `{ series: [], pagination: { page: 1, pageSize: 20, totalRecords: 0, totalPages: 1 } }`, never HTTP 404 or fabricated data.

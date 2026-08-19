@@ -1350,7 +1350,8 @@ Metrics:
 **Priority:** `P0`  
 **Status:** `DONE`  
 **Dependencies:** `TASK-0405`, `TASK-0305`  
-**Notes:** Adapted to serve Soil Telemetry (`TASK-0405`) and Water Tank (`WATER_TANK_NODE`) Telemetry (`TASK-0401`), returning null for uningested water quality metrics per `AGENTS.md` §16.
+**Completed:** 2026-08-05 — Implemented latest monitoring endpoints (`GET /api/v1/devices/[deviceId]/monitoring/latest`, `GET /api/v1/devices/[deviceId]/monitoring/soil/latest`, `GET /api/v1/devices/[deviceId]/monitoring/water/latest`) serving soil, water quality, and reservoir metrics with RBAC access verification and zero/null semantics preserved.
+**Reconciliation & Hardening (2026-08-19):** Reconciled route handlers and data access layers to accept both canonical string `deviceId` and immutable database primary key `devices.id` UUID in route params. Hardened RBAC checks (`requireDeviceViewAccess`) and repository lookup to transparently resolve device identity across both identifier forms. Preserved strict Admin canonical `deviceId` concealment (`DEC-DEV-028`). Added unit test coverage for UUID-based querying with 100% pass rate.
 
 ### Work
 
@@ -1369,6 +1370,7 @@ GET /devices/{deviceId}/monitoring/water/latest
 - Zero and null semantics are preserved.
 - Freshness is included.
 - Raw MQTT details are not exposed.
+- Dual identifier resolution (UUID and canonical `deviceId`) is supported.
 
 ---
 
@@ -1406,6 +1408,7 @@ Display:
 **Status:** `DONE`  
 **Dependencies:** `TASK-0405`  
 **Completed:** 2026-08-11 — Implemented Historical Query API endpoints (`GET /api/v1/devices/[deviceId]/monitoring/soil/history` and `GET /api/v1/devices/[deviceId]/monitoring/water/history`) adhering to `DEC-MON-087` (default range: last 24h, max range: 31 days, default `pageSize`: 20, max `pageSize`: 100). Enforced RBAC and device access authorization, preserved null/missing values without zero-coercion, separated water-quality telemetry from reservoir data, omitted combined-history endpoint, and utilized indexed database queries (`soil_readings_device_received_idx` and `water_readings_device_received_idx`). Updated unit and integration test coverage across contract, database, and API layers.
+**Reconciliation & Hardening (2026-08-19):** Reconciled historical route handlers and `TelemetryRepository` to accept both canonical `deviceId` and immutable database UUID `devices.id`. Verified queries returning zero records return HTTP 200 `{ series: [], pagination: { ... } }`, avoiding false 404 errors per `DEC-MON-087`. Added targeted unit test suites with 100% pass rate.
 
 ### Work
 
@@ -1416,8 +1419,10 @@ Implement bounded history for soil and water.
 - Date range is validated.
 - Device access is enforced.
 - Missing intervals remain missing or null.
+- Zero-record queries return HTTP 200 with empty series, not 404 (`DEC-MON-087`).
 - Pagination or aggregation prevents unbounded queries.
 - Indexes are used.
+- Dual identifier resolution (UUID and canonical `deviceId`) is supported.
 
 ---
 
@@ -1427,6 +1432,7 @@ Implement bounded history for soil and water.
 **Status:** `DONE`  
 **Dependencies:** `TASK-0503`  
 **Completed:** 2026-08-12 — Implemented historical monitoring chart components and data fetching layer (`useHistoricalMonitoring` hook, `HistoricalChartControls`, `NPKChart`, `WaterNutrientChart`) on canonical `/soil` and `/water` routes (legacy `/tanah` and `/air` return 404 Not Found). Enforced `DEC-MON-087` & `DEC-MON-088` date-range validation (default 24h, max 31 days) and raw pagination item concatenation (`pageSize=100`, page 1..N). Preserved `null` values as visual gaps (`connectNulls={false}`), handled empty history with HTTP 200 and no-data UI (no fake zeros or 404s), synchronized `DeviceSelector` context across routes, resolved canonical string `deviceId` and database UUID lookups, converted stored `mS/cm` EC values to `µS/cm` for display, applied Indonesian localization (`id-ID`) for timestamps and UI text, and supported responsive mobile layouts (360px–430px). Verified 100% pass across targeted unit tests (`apps/web/test/unit/historical-charts.test.tsx`), authenticated Playwright OWNER/ADMIN E2E testing, full pre-commit verification suite (`test:coverage`, `test:integration`, `check:quality`, `test`, `test:e2e`), and 17-file specification document reconciliation.
+**Reconciliation Note (2026-08-19):** Reconciled `useHistoricalMonitoring` hook and sensor domain pages (`/soil`, `/water`) to consistently pass immutable database UUID `devices.id` in `activeDeviceId`. Verified clean empty state rendering on HTTP 200 empty responses without erroneous 404 banners.
 
 ### Work
 
@@ -2704,13 +2710,14 @@ The first production release is blocked until:
 
 ---
 
-## TASK-0306 Implementation Note
+## Monitoring and Implementation Note (Reconciled 2026-08-19)
 
-The following facts are supported by the current implementation regarding device selection and routing:
-- **Frontend Selection/Context/URL:** Uses immutable `devices.id` UUID.
-- **Bare Routes:** Remain neutral with no auto-selection (`/`, `/sensor`, `/soil`, `/water`).
+The following facts are supported by the current implementation regarding device selection, routing, and monitoring resolution (`TASK-0306`, `TASK-0501`, `TASK-0503`, `TASK-0504`):
+- **Frontend Selection/Context/URL:** Consistently uses immutable `devices.id` UUID.
+- **Bare Routes:** Remain neutral with no auto-selection (`/`, `/sensor`, `/soil`, `/water`). Canonical routes are `/soil` and `/water` (legacy `/air` and `/tanah` routes return 404).
+- **Identifier Resolution:** Monitoring backend routes accept both internal database UUID and external canonical `deviceId` string.
 - **Rehydration:** Valid `?deviceId=<UUID>` rehydrates after authorization on hard refresh.
 - **Invalid/Revoked IDs:** Clear selection safely to `null` with a notice banner.
-- **Admin Privacy:** Admin canonical `deviceId` concealment remains enforced.
-- **Legacy Routes:** `/air` and `/tanah` are explicitly maintained as legacy 404 routes.
-- **Race Condition:** `/sensor` first-load "No Device Found" race was fixed by correcting the loading state (handling skeleton vs. true empty authorized list).
+- **Admin Privacy:** Admin canonical `deviceId` concealment remains strictly enforced.
+- **Empty History Handling:** Historical telemetry queries with zero matching records return HTTP 200 with `{ series: [], pagination: { ... } }`, never HTTP 404.
+- **Operational Dev Server Isolation:** Intermittent Next.js HTML 404 on restarts isolated as Windows zombie process holding port 3000 upon Ctrl+C; resolved via port cleanup before dev server startup.

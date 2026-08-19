@@ -344,13 +344,13 @@ The following reconciliation reflects the state of frontend integration against 
 
 ---
 
-## TASK-0306 Implementation Note
+## Monitoring and Device Frontend Integration Note (Reconciled 2026-08-19)
 
-The following facts are supported by the current implementation regarding device selection and routing:
-- **Frontend Selection/Context/URL:** Uses immutable `devices.id` UUID.
-- **Bare Routes:** Remain neutral with no auto-selection (`/`, `/sensor`, `/soil`, `/water`).
-- **Rehydration:** Valid `?deviceId=<UUID>` rehydrates after authorization on hard refresh.
-- **Invalid/Revoked IDs:** Clear selection safely to `null` with a notice banner.
-- **Admin Privacy:** Admin canonical `deviceId` concealment remains enforced.
-- **Legacy Routes:** `/air` and `/tanah` are explicitly maintained as legacy 404 routes.
-- **Race Condition:** `/sensor` first-load "No Device Found" race was fixed by correcting the loading state (handling skeleton vs. true empty authorized list).
+The following facts are verified in the frontend codebase regarding device selection, monitoring, and telemetry queries (`TASK-0306`, `TASK-0501`, `TASK-0503`, `TASK-0504`):
+- **Frontend Identity Consumption:** Frontend device state (`DeviceContext`), page hooks (`useHistoricalMonitoring`), and child components consistently use immutable database primary key `devices.id` UUID as the selected device identity (`selectedDevice?.id || selectedDevice?.deviceId || null`).
+- **Bare Route Neutrality:** Bare routes (`/`, `/sensor`, `/soil`, `/water`) initialize in a neutral state (`selectedDevice = null`) without auto-selecting the first device.
+- **Route-Scoped Selection & Rehydration:** Active device selection syncs with URL parameters (`?deviceId=<UUID>`). On hard refresh, the selection safely rehydrates after revalidating against the server-authorized device list (`GET /api/v1/devices`).
+- **Safety on Access Revocation:** If access to the currently selected device is revoked or nonexistent, the selection is cleared to `null` with a visible user banner.
+- **Admin Canonical ID Concealment:** Monospace canonical `deviceId` rendering is displayed exclusively for Owner users; Admin users see only device names and types per `DEC-DEV-028`.
+- **Canonical vs. Legacy Routes:** Canonical monitoring pages are `/soil` and `/water`; legacy `/air` and `/tanah` routes explicitly return 404 Not Found.
+- **Historical Chart Error & Empty State Handling:** Zero-record telemetry responses (`{ series: [], pagination: { totalRecords: 0 } }`) render clean empty states rather than error banners or fake zero graphs.

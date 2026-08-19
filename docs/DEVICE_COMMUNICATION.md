@@ -1823,13 +1823,9 @@ This specification is satisfied when:
 
 ---
 
-## TASK-0306 Implementation Note
+## Monitoring Reconciliation & Device Protocol Independence (Reconciled 2026-08-19)
 
-The following facts are supported by the current implementation regarding device selection and routing:
-- **Frontend Selection/Context/URL:** Uses immutable `devices.id` UUID.
-- **Bare Routes:** Remain neutral with no auto-selection (`/`, `/sensor`, `/soil`, `/water`).
-- **Rehydration:** Valid `?deviceId=<UUID>` rehydrates after authorization on hard refresh.
-- **Invalid/Revoked IDs:** Clear selection safely to `null` with a notice banner.
-- **Admin Privacy:** Admin canonical `deviceId` concealment remains enforced.
-- **Legacy Routes:** `/air` and `/tanah` are explicitly maintained as legacy 404 routes.
-- **Race Condition:** `/sensor` first-load "No Device Found" race was fixed by correcting the loading state (handling skeleton vs. true empty authorized list).
+The monitoring UUID and history regression fix (`TASK-0306`, `TASK-0501`, `TASK-0503`, `TASK-0504`) operates strictly within application API routing, frontend state hooks, and database telemetry repository lookups.
+- **Zero Device Protocol Impact:** No changes were made to ESP32/NodeMCU firmware contracts, REST telemetry ingestion (`/api/v1/devices/{deviceId}/telemetry/*`), MQTT 5.0 over TLS contracts, topic structures, broker ACLs, or gateway message parsers.
+- **Frontend Device Selection:** Frontend state and page hooks consistently consume immutable database primary key `devices.id` UUIDs.
+- **Dual Identifier Ingestion & Lookup:** The application layer seamlessly resolves immutable UUIDs and canonical `deviceId` strings across monitoring queries without requiring physical hardware reconfiguration.

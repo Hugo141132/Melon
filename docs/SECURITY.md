@@ -1538,13 +1538,10 @@ Frontend presentation translation (`TASK-0603`) operates strictly in the present
 
 ---
 
-## TASK-0306 Implementation Note
+## Monitoring and Device Security Controls Implementation Note (Reconciled 2026-08-19)
 
-The following facts are supported by the current implementation regarding device selection and routing:
-- **Frontend Selection/Context/URL:** Uses immutable `devices.id` UUID.
-- **Bare Routes:** Remain neutral with no auto-selection (`/`, `/sensor`, `/soil`, `/water`).
-- **Rehydration:** Valid `?deviceId=<UUID>` rehydrates after authorization on hard refresh.
-- **Invalid/Revoked IDs:** Clear selection safely to `null` with a notice banner.
-- **Admin Privacy:** Admin canonical `deviceId` concealment remains enforced.
-- **Legacy Routes:** `/air` and `/tanah` are explicitly maintained as legacy 404 routes.
-- **Race Condition:** `/sensor` first-load "No Device Found" race was fixed by correcting the loading state (handling skeleton vs. true empty authorized list).
+The following security controls are active and verified across monitoring endpoints and device selection (`TASK-0306`, `TASK-0501`, `TASK-0503`, `TASK-0504`):
+- **Server-Side Authorization & Anti-Enumeration:** Monitoring endpoints (`/monitoring/latest`, `/monitoring/soil/latest`, `/monitoring/water/latest`, `/monitoring/soil/history`, `/monitoring/water/history`) execute authentication and `device.read` / `monitoring.history.read` permission checks before attempting database lookups. Unauthenticated requests return 401; unassigned Admin device requests return 403, preventing device existence probing or IDOR/BOLA exploitation.
+- **Admin Identifier Concealment (`DEC-DEV-028`):** Admin users receive only user-facing device names and metadata; canonical `deviceId` strings are strictly concealed across UI, list, and detail API payloads. Safe immutable UUIDs (`devices.id`) are used for frontend routing.
+- **Strict Query Range Boundaries (`DEC-MON-087`):** Historical telemetry queries enforce maximum date range limits (31 days) and page size limits (max 100), rejecting abusive ranges with HTTP 400 (`DATE_RANGE_EXCEEDED`).
+- **Empty Result Integrity:** Zero-matching telemetry queries safely return HTTP 200 with empty series, preventing data leakage or confusion with missing device 404 errors.

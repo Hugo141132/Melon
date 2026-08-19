@@ -1,31 +1,72 @@
+# Build & Compilation Artifacts
 .next
 out
 dist
 build
 .turbo
 .swc
-node_modules
-package-lock.json
-*.log
-*.html
+.vite
 *.tsbuildinfo
 .eslintcache
-docs/
-TASKS.md
-AGENTS.md
+
+# Dependencies & Lockfiles
+node_modules
+package-lock.json
+
+# Environment Files
+.env
+.env.*
+.env.local
+.env.*.local
+apps/*/.env
+apps/*/.env.*
+packages/*/.env
+packages/*/.env.*
+
+# Logs
+*.log
+
+# Generated Types & Reports
 next-env.d.ts
 apps/web/next-env.d.ts
+*.html
+*.lcov
+
+# Testing & Coverage Outputs
 coverage/
 test-results/
 playwright-report/
 blob-report/
 .playwright-mcp/
 .nyc_output/
-.agents/
 .vitest/
 .vitest-cache/
+
+# Caches & Temporary Files
 .tmp/
 .cache/
+
+# OS, IDE & Tool Artifacts
+.vscode/
+.idea/
+.fleet/
+.agents/
+.gemini/
+.cursor/
+.claude/
+
+# Python Caches & Environments
+__pycache__/
+.pytest_cache/
+.venv/
+venv/
+
+# Project Specifications & Workflows (Authoritative documentation)
+docs/
+TASKS.md
+AGENTS.md
+
+# Database Runtime & Generated Artifacts
 docker/mosquitto/config/pwfile
 packages/database/prisma/migrations/migration_lock.toml
 

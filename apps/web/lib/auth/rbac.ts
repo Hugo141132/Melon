@@ -198,14 +198,51 @@ export async function requireDeviceViewAccess(
       );
     }
 
-    if (session.assignedDeviceIds && session.assignedDeviceIds.includes(targetDeviceId)) {
+    if (session.assignedDeviceIds) {
+      if (session.assignedDeviceIds.includes(targetDeviceId)) {
+        return session;
+      }
+      throw new AuthorizationError(
+        403,
+        'DEVICE_NOT_ASSIGNED',
+        `Access denied: Device '${targetDeviceId}' is not assigned to user.`
+      );
+    }
+
+    // Default fallback to DB lookup if isDeviceAssignedToUser was not passed and assignedDeviceIds is undefined
+    const cleanDevId = targetDeviceId.trim();
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      cleanDevId
+    );
+    const assignment = await prisma.userDeviceAccess.findFirst({
+      where: {
+        userId: session.id,
+        revokedAt: null,
+        device: isUuid
+          ? {
+              OR: [
+                { id: cleanDevId },
+                { deviceId: cleanDevId },
+                { deviceId: { equals: cleanDevId, mode: 'insensitive' } },
+              ],
+            }
+          : {
+              OR: [
+                { deviceId: cleanDevId },
+                { deviceId: { equals: cleanDevId, mode: 'insensitive' } },
+              ],
+            },
+      },
+    });
+
+    if (assignment) {
       return session;
     }
 
     throw new AuthorizationError(
       403,
       'DEVICE_NOT_ASSIGNED',
-      `Access denied: Device '${targetDeviceId}' is not assigned to user.`
+      `Access denied: Device '${targetDeviceId}' is not assigned to user or access has been revoked.`
     );
   }
 

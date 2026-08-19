@@ -83,6 +83,46 @@ describe('DeviceRepository Unit Tests (TASK-0302)', () => {
     });
   });
 
+  describe('getDeviceByCanonicalId (Regression for UUID fallback)', () => {
+    it('queries using case-insensitive canonical deviceId when passed a standard string', async () => {
+      mockPrisma.device.findFirst.mockResolvedValue({ id: 'uuid-1', deviceId: 'canonical-1' });
+
+      await repo.getDeviceByCanonicalId('canonical-1');
+
+      expect(mockPrisma.device.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            OR: [
+              { deviceId: 'canonical-1' },
+              { deviceId: { equals: 'canonical-1', mode: 'insensitive' } },
+            ],
+          },
+        })
+      );
+    });
+
+    it('queries using both id and canonical deviceId when passed a valid UUID string', async () => {
+      mockPrisma.device.findFirst.mockResolvedValue({
+        id: '11111111-1111-1111-1111-111111111111',
+        deviceId: 'canonical-1',
+      });
+
+      await repo.getDeviceByCanonicalId('11111111-1111-1111-1111-111111111111');
+
+      expect(mockPrisma.device.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            OR: [
+              { id: '11111111-1111-1111-1111-111111111111' },
+              { deviceId: '11111111-1111-1111-1111-111111111111' },
+              { deviceId: { equals: '11111111-1111-1111-1111-111111111111', mode: 'insensitive' } },
+            ],
+          },
+        })
+      );
+    });
+  });
+
   describe('updateDevice (TASK-0302 / DEC-DEV-028)', () => {
     it('updates canonical deviceId and name, preserving immutable database UUID id and logging audit', async () => {
       const existingDevice = {

@@ -74,7 +74,9 @@ export default function WaterPage() {
   const isSoilNode = deviceType === 'SOIL_NODE';
   const isQualityNode = !isTankNode && !isSoilNode;
 
-  const activeDeviceId = isQualityNode ? selectedDevice?.deviceId || selectedDevice?.id : null;
+  const activeDeviceId = isQualityNode
+    ? selectedDevice?.id || selectedDevice?.deviceId || null
+    : null;
 
   const {
     preset,

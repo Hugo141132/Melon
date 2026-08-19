@@ -1033,13 +1033,12 @@ The following decisions must be resolved before their related implementation is 
 
 ---
 
-## TASK-0306 Implementation Note
+## Monitoring and Device Requirements Implementation Note (Reconciled 2026-08-19)
 
-The following facts are supported by the current implementation regarding device selection and routing:
-- **Frontend Selection/Context/URL:** Uses immutable `devices.id` UUID.
-- **Bare Routes:** Remain neutral with no auto-selection (`/`, `/sensor`, `/soil`, `/water`).
-- **Rehydration:** Valid `?deviceId=<UUID>` rehydrates after authorization on hard refresh.
-- **Invalid/Revoked IDs:** Clear selection safely to `null` with a notice banner.
-- **Admin Privacy:** Admin canonical `deviceId` concealment remains enforced.
-- **Legacy Routes:** `/air` and `/tanah` are explicitly maintained as legacy 404 routes.
-- **Race Condition:** `/sensor` first-load "No Device Found" race was fixed by correcting the loading state (handling skeleton vs. true empty authorized list).
+The following facts are verified in the product implementation regarding device selection, routing, and monitoring resolution (`TASK-0306`, `TASK-0501`, `TASK-0503`, `TASK-0504`):
+- **Frontend Device Selection Identity:** Selected device identity is anchored strictly to immutable database primary key `devices.id` UUIDs across all monitoring surfaces.
+- **Bare Route Neutrality & Canonical Paths:** Bare monitoring views (`/`, `/sensor`, `/soil`, `/water`) start in a neutral state with no automatic first-device selection. Canonical monitoring pages are `/soil` and `/water`; legacy `/tanah` and `/air` routes return 404.
+- **Dynamic Rehydration & Access Revocation:** Hard page refreshes with `?deviceId=<UUID>` safely rehydrate only after validating server authorization. Revoked or invalid device identifiers reset selection to `null` with a clear user alert.
+- **Monitoring API Dual Identifier Support:** Backend endpoints resolve telemetry queries using either internal UUID or external canonical `deviceId` strings.
+- **Admin Concealment & Scoping:** Admin canonical `deviceId` concealment (`DEC-DEV-028`) and assignment isolation (`revokedAt IS NULL`) remain strictly enforced across UI and API layers.
+- **Empty Historical Data Handling:** Historical monitoring queries with zero telemetry records return HTTP 200 with an empty series array and valid pagination metadata, preventing false errors or fabricated values.

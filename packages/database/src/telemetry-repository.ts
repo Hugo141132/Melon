@@ -49,8 +49,19 @@ export class TelemetryRepository {
 
     const device = await this.prisma.device.findFirst({
       where: isUuid
-        ? { OR: [{ id: canonicalDeviceId }, { deviceId: canonicalDeviceId }] }
-        : { deviceId: canonicalDeviceId },
+        ? {
+            OR: [
+              { id: canonicalDeviceId },
+              { deviceId: canonicalDeviceId },
+              { deviceId: { equals: canonicalDeviceId, mode: 'insensitive' } },
+            ],
+          }
+        : {
+            OR: [
+              { deviceId: canonicalDeviceId },
+              { deviceId: { equals: canonicalDeviceId, mode: 'insensitive' } },
+            ],
+          },
       select: { id: true, deviceId: true, accountStatus: true },
     });
 
@@ -163,8 +174,19 @@ export class TelemetryRepository {
 
     const device = await this.prisma.device.findFirst({
       where: isUuid
-        ? { OR: [{ id: canonicalDeviceId }, { deviceId: canonicalDeviceId }] }
-        : { deviceId: canonicalDeviceId },
+        ? {
+            OR: [
+              { id: canonicalDeviceId },
+              { deviceId: canonicalDeviceId },
+              { deviceId: { equals: canonicalDeviceId, mode: 'insensitive' } },
+            ],
+          }
+        : {
+            OR: [
+              { deviceId: canonicalDeviceId },
+              { deviceId: { equals: canonicalDeviceId, mode: 'insensitive' } },
+            ],
+          },
       select: { id: true, deviceId: true, accountStatus: true },
     });
 
@@ -272,8 +294,19 @@ export class TelemetryRepository {
 
     const device = await this.prisma.device.findFirst({
       where: isUuid
-        ? { OR: [{ id: canonicalDeviceId }, { deviceId: canonicalDeviceId }] }
-        : { deviceId: canonicalDeviceId },
+        ? {
+            OR: [
+              { id: canonicalDeviceId },
+              { deviceId: canonicalDeviceId },
+              { deviceId: { equals: canonicalDeviceId, mode: 'insensitive' } },
+            ],
+          }
+        : {
+            OR: [
+              { deviceId: canonicalDeviceId },
+              { deviceId: { equals: canonicalDeviceId, mode: 'insensitive' } },
+            ],
+          },
       select: { id: true, deviceId: true, accountStatus: true },
     });
 
@@ -371,13 +404,22 @@ export class TelemetryRepository {
    * Fetches the latest SoilReading for a given device internal UUID or canonical deviceId.
    */
   async getLatestSoilReading(deviceIdentifier: string) {
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-      deviceIdentifier
-    );
+    const cleanId = deviceIdentifier.trim();
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanId);
     return this.prisma.soilReading.findFirst({
       where: isUuid
-        ? { OR: [{ deviceId: deviceIdentifier }, { device: { deviceId: deviceIdentifier } }] }
-        : { device: { deviceId: deviceIdentifier } },
+        ? {
+            OR: [
+              { deviceId: cleanId },
+              { device: { deviceId: cleanId } },
+              { device: { deviceId: { equals: cleanId, mode: 'insensitive' } } },
+            ],
+          }
+        : {
+            device: {
+              OR: [{ deviceId: cleanId }, { deviceId: { equals: cleanId, mode: 'insensitive' } }],
+            },
+          },
       orderBy: { receivedAt: 'desc' },
     });
   }
@@ -386,13 +428,22 @@ export class TelemetryRepository {
    * Fetches the latest WaterReading for a given device internal UUID or canonical deviceId.
    */
   async getLatestWaterReading(deviceIdentifier: string) {
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-      deviceIdentifier
-    );
+    const cleanId = deviceIdentifier.trim();
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanId);
     return this.prisma.waterReading.findFirst({
       where: isUuid
-        ? { OR: [{ deviceId: deviceIdentifier }, { device: { deviceId: deviceIdentifier } }] }
-        : { device: { deviceId: deviceIdentifier } },
+        ? {
+            OR: [
+              { deviceId: cleanId },
+              { device: { deviceId: cleanId } },
+              { device: { deviceId: { equals: cleanId, mode: 'insensitive' } } },
+            ],
+          }
+        : {
+            device: {
+              OR: [{ deviceId: cleanId }, { deviceId: { equals: cleanId, mode: 'insensitive' } }],
+            },
+          },
       orderBy: { receivedAt: 'desc' },
     });
   }
@@ -400,17 +451,23 @@ export class TelemetryRepository {
   /**
    * Fetches the latest ReservoirWaterReading (water tank) for a given device internal UUID or canonical deviceId.
    */
-  /**
-   * Fetches the latest ReservoirWaterReading (water tank) for a given device internal UUID or canonical deviceId.
-   */
   async getLatestWaterTankReading(deviceIdentifier: string) {
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-      deviceIdentifier
-    );
+    const cleanId = deviceIdentifier.trim();
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanId);
     return this.prisma.reservoirWaterReading.findFirst({
       where: isUuid
-        ? { OR: [{ deviceId: deviceIdentifier }, { device: { deviceId: deviceIdentifier } }] }
-        : { device: { deviceId: deviceIdentifier } },
+        ? {
+            OR: [
+              { deviceId: cleanId },
+              { device: { deviceId: cleanId } },
+              { device: { deviceId: { equals: cleanId, mode: 'insensitive' } } },
+            ],
+          }
+        : {
+            device: {
+              OR: [{ deviceId: cleanId }, { deviceId: { equals: cleanId, mode: 'insensitive' } }],
+            },
+          },
       orderBy: { receivedAt: 'desc' },
     });
   }
@@ -434,8 +491,19 @@ export class TelemetryRepository {
 
     const device = await this.prisma.device.findFirst({
       where: isUuid
-        ? { OR: [{ id: canonicalDeviceId }, { deviceId: canonicalDeviceId }] }
-        : { deviceId: canonicalDeviceId },
+        ? {
+            OR: [
+              { id: canonicalDeviceId },
+              { deviceId: canonicalDeviceId },
+              { deviceId: { equals: canonicalDeviceId, mode: 'insensitive' } },
+            ],
+          }
+        : {
+            OR: [
+              { deviceId: canonicalDeviceId },
+              { deviceId: { equals: canonicalDeviceId, mode: 'insensitive' } },
+            ],
+          },
       select: { id: true, deviceId: true },
     });
 
@@ -517,8 +585,19 @@ export class TelemetryRepository {
 
     const device = await this.prisma.device.findFirst({
       where: isUuid
-        ? { OR: [{ id: canonicalDeviceId }, { deviceId: canonicalDeviceId }] }
-        : { deviceId: canonicalDeviceId },
+        ? {
+            OR: [
+              { id: canonicalDeviceId },
+              { deviceId: canonicalDeviceId },
+              { deviceId: { equals: canonicalDeviceId, mode: 'insensitive' } },
+            ],
+          }
+        : {
+            OR: [
+              { deviceId: canonicalDeviceId },
+              { deviceId: { equals: canonicalDeviceId, mode: 'insensitive' } },
+            ],
+          },
       select: { id: true, deviceId: true },
     });
 

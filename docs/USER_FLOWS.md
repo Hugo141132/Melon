@@ -1916,13 +1916,12 @@ Each audit event shall include relevant actor, target, timestamp, result, and sa
 
 ---
 
-## TASK-0306 Implementation Note
+## Monitoring and Device User Flows Implementation Note (Reconciled 2026-08-19)
 
-The following facts are supported by the current implementation regarding device selection and routing:
-- **Frontend Selection/Context/URL:** Uses immutable `devices.id` UUID.
-- **Bare Routes:** Remain neutral with no auto-selection (`/`, `/sensor`, `/soil`, `/water`).
-- **Rehydration:** Valid `?deviceId=<UUID>` rehydrates after authorization on hard refresh.
-- **Invalid/Revoked IDs:** Clear selection safely to `null` with a notice banner.
-- **Admin Privacy:** Admin canonical `deviceId` concealment remains enforced.
-- **Legacy Routes:** `/air` and `/tanah` are explicitly maintained as legacy 404 routes.
-- **Race Condition:** `/sensor` first-load "No Device Found" race was fixed by correcting the loading state (handling skeleton vs. true empty authorized list).
+The following facts are verified in the user flow implementations regarding device selection, routing, and monitoring resolution (`TASK-0306`, `TASK-0501`, `TASK-0503`, `TASK-0504`):
+- **Frontend Selection Identity:** Consistently uses immutable database primary key `devices.id` UUID across URL query strings (`?deviceId=<UUID>`), navigation state, and monitoring fetch hooks.
+- **Neutral Initial State:** Bare routes (`/`, `/sensor`, `/soil`, `/water`) start in a neutral state (`selectedDevice = null`) without auto-selecting the first device.
+- **Route-Scoped Rehydration & Access Revocation:** Hard refresh (Ctrl+Shift+R) with `?deviceId=<UUID>` safely rehydrates selection only after verifying server-side access; revoked or nonexistent IDs reset selection to `null` with a user notice.
+- **Admin Canonical Concealment:** Monospace canonical `deviceId` string rendering is displayed exclusively for Owner users; Admin users see only device names and types per `DEC-DEV-028`.
+- **Canonical Routing:** Canonical monitoring routes are `/soil` and `/water`; legacy `/air` and `/tanah` routes return 404 Not Found.
+- **Empty History Flow:** Querying historical data for a period with zero records displays a clean empty state (HTTP 200) rather than a false 404 error banner.

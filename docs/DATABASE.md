@@ -1750,13 +1750,11 @@ To prevent race conditions during initial system bootstrap across concurrent CLI
 
 ---
 
-## TASK-0306 Implementation Note
+## Monitoring and Device Identity Implementation Note (Reconciled 2026-08-19)
 
-The following facts are supported by the current implementation regarding device selection and routing:
-- **Frontend Selection/Context/URL:** Uses immutable `devices.id` UUID.
-- **Bare Routes:** Remain neutral with no auto-selection (`/`, `/sensor`, `/soil`, `/water`).
-- **Rehydration:** Valid `?deviceId=<UUID>` rehydrates after authorization on hard refresh.
-- **Invalid/Revoked IDs:** Clear selection safely to `null` with a notice banner.
-- **Admin Privacy:** Admin canonical `deviceId` concealment remains enforced.
-- **Legacy Routes:** `/air` and `/tanah` are explicitly maintained as legacy 404 routes.
-- **Race Condition:** `/sensor` first-load "No Device Found" race was fixed by correcting the loading state (handling skeleton vs. true empty authorized list).
+The following facts are supported by the current implementation regarding database models, queries, and repositories (`TASK-0306`, `TASK-0501`, `TASK-0503`, `TASK-0504`):
+- **Database Identity Governance:** `devices.id` (UUID) is strictly immutable and acts as the relational foreign key target for all telemetry (`soil_readings.device_id`, `water_readings.device_id`).
+- **Telemetry Query Identifier Resolution:** `TelemetryRepository` (`getSoilHistory`, `getWaterHistory`, `getLatestSoilReading`, `getLatestWaterReading`, `getLatestSnapshot`) supports lookup via either internal database UUID `id` or external canonical `deviceId` string through `DeviceRepository.getDeviceByCanonicalId`.
+- **Admin Assignment Verification:** `requireDeviceViewAccess` and RBAC checks verify `user_device_access` records using dual UUID/canonical identifier resolution with case-insensitive matching (`revokedAt IS NULL`).
+- **Empty Query Result Integrity:** Historical telemetry queries with zero records matching date filters return empty arrays with valid pagination (`totalRecords: 0`, `totalPages: 1`), returning HTTP 200 rather than throwing `DEVICE_NOT_FOUND` (404) or synthesizing false zero values.
+- **Frontend Identity Scope:** Frontend monitoring and device selection state consistently use immutable database UUIDs (`devices.id`).

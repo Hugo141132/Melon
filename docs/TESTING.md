@@ -1911,13 +1911,38 @@ The user independently executed and confirmed 100% pass across all five reserved
 
 ---
 
-## TASK-0306 Implementation Note
+# 45. Monitoring UUID & History Regression Verification Suite (`TASK-0306` / `TASK-0501` / `TASK-0503` / `TASK-0504`)
 
-The following facts are supported by the current implementation regarding device selection and routing:
+Automated unit, integration, HTTP route-level, and manual runtime verification for the dual-lookup identifier resolution, zero-record HTTP 200 history handling, and frontend UUID selection:
+
+### Agent-Executed Automated Tests
+1. **Targeted Test Suites Pass:**
+   - `apps/web/app/api/v1/devices/[deviceId]/monitoring/test/history.test.ts` (18/18 tests passed): Soil and water historical telemetry queries, query bounds (24h default, 31-day max), internal UUID vs. canonical deviceId lookup, 200 OK empty series handling (`{ series: [], pagination: { totalRecords: 0 } }`), and 404 DEVICE_NOT_FOUND on missing devices.
+   - `apps/web/app/api/v1/devices/[deviceId]/monitoring/test/latest.test.ts` (14/14 tests passed): Latest monitoring snapshot, soil latest, and water latest with dual UUID/canonical identifier resolution and 404 handling.
+   - `packages/database/test/device-repository.test.ts` (12/12 tests passed): `getDeviceByCanonicalId` regression tests verifying lookup by internal database UUID and external canonical string.
+   - `packages/database/test/telemetry-repository.test.ts` (14/14 tests passed): Bounded query range verification and telemetry mapping.
+2. **Direct HTTP Route-Level Registration Verification:**
+   - Direct HTTP request to `GET /api/v1/devices/3216f033-4c21-4b19-adc6-365854c31704/monitoring/soil/history` returns `HTTP/1.1 401 Unauthorized` with `Content-Type: application/json` and structured API error payload (`UNAUTHENTICATED`), confirming that the App Router resolves dynamic route segments directly to the API boundary without falling back to Next.js HTML 404.
+3. **Dev-Server Restart Diagnostic & Operational Isolation:**
+   - The intermittent Next.js HTML `_not-found` 404 encountered during restart cycles was diagnosed as a development-runtime/startup issue (Windows PowerShell `Ctrl+C` leaving a background zombie Node process holding port 3000, causing subsequent `next dev` processes to bind to port 3001 while browser requests hit the stale 3000 process).
+   - Confirmed deterministic route registration across hot and cold `.next` cycles with port cleanup (`Stop-Process -Id (Get-NetTCPConnection -LocalPort 3000).OwningProcess -Force`).
+4. **Manual Runtime Verification Completed:**
+   - Authenticated browser monitoring runtime verification completed across `/soil`, `/water`, `/sensor`, and `/controls`.
+   - Verified telemetry correctly loads for selected authorized devices using immutable UUIDs (`devices.id`).
+   - Verified valid date ranges with zero historical telemetry return HTTP 200 with empty series (`{ series: [] }`) and render clean empty-state charts without false 404 alerts or graph distortions.
+   - Verified historical telemetry data remains strictly isolated to the authorized device.
+   - Verified Admin canonical `deviceId` concealment remains intact across UI cards and selector dropdowns.
+
+---
+
+## Monitoring and Device Testing Implementation Note (Reconciled 2026-08-19)
+
+The following facts are verified in test suites and runtime verification regarding device selection, routing, and monitoring resolution (`TASK-0306`, `TASK-0501`, `TASK-0503`, `TASK-0504`):
 - **Frontend Selection/Context/URL:** Uses immutable `devices.id` UUID.
 - **Bare Routes:** Remain neutral with no auto-selection (`/`, `/sensor`, `/soil`, `/water`).
 - **Rehydration:** Valid `?deviceId=<UUID>` rehydrates after authorization on hard refresh.
 - **Invalid/Revoked IDs:** Clear selection safely to `null` with a notice banner.
 - **Admin Privacy:** Admin canonical `deviceId` concealment remains enforced.
 - **Legacy Routes:** `/air` and `/tanah` are explicitly maintained as legacy 404 routes.
-- **Race Condition:** `/sensor` first-load "No Device Found" race was fixed by correcting the loading state (handling skeleton vs. true empty authorized list).
+- **History Query Integrity:** Soil/water history queries with zero matching telemetry records return HTTP 200 with `{ series: [], pagination: { page: 1, pageSize: 20, totalRecords: 0, totalPages: 1 } }`, never HTTP 404 or fabricated data.
+- **Manual Runtime Verification:** Completed and confirmed operational stability across all monitoring views.

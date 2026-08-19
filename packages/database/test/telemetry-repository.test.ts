@@ -360,7 +360,14 @@ describe('TelemetryRepository Unit Tests (TASK-0405)', () => {
       const res = await repo.getLatestWaterTankReading('water-tank-node-3uufzi');
 
       expect(mockPrisma.reservoirWaterReading.findFirst).toHaveBeenCalledWith({
-        where: { device: { deviceId: 'water-tank-node-3uufzi' } },
+        where: {
+          device: {
+            OR: [
+              { deviceId: 'water-tank-node-3uufzi' },
+              { deviceId: { equals: 'water-tank-node-3uufzi', mode: 'insensitive' } },
+            ],
+          },
+        },
         orderBy: { receivedAt: 'desc' },
       });
       expect(res?.id).toBe('reading-tank-1');

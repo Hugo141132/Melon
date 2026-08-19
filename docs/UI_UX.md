@@ -1267,13 +1267,13 @@ New monitoring, multi-device, RBAC, language-switching, alert, and faucet-contro
 
 ---
 
-## TASK-0306 Implementation Note
+## Monitoring and Device UI/UX Implementation Note (Reconciled 2026-08-19)
 
-The following facts are supported by the current implementation regarding device selection and routing:
-- **Frontend Selection/Context/URL:** Uses immutable `devices.id` UUID.
-- **Bare Routes:** Remain neutral with no auto-selection (`/`, `/sensor`, `/soil`, `/water`).
-- **Rehydration:** Valid `?deviceId=<UUID>` rehydrates after authorization on hard refresh.
-- **Invalid/Revoked IDs:** Clear selection safely to `null` with a notice banner.
-- **Admin Privacy:** Admin canonical `deviceId` concealment remains enforced.
-- **Legacy Routes:** `/air` and `/tanah` are explicitly maintained as legacy 404 routes.
-- **Race Condition:** `/sensor` first-load "No Device Found" race was fixed by correcting the loading state (handling skeleton vs. true empty authorized list).
+The following facts are verified in the frontend UI/UX implementation regarding device selection, routing, and telemetry charts (`TASK-0306`, `TASK-0501`, `TASK-0503`, `TASK-0504`):
+- **Frontend Device Selection Identity:** Consistently uses immutable database primary key `devices.id` UUID across URL parameters (`?deviceId=<UUID>`), Context state, and API data fetching hooks.
+- **Bare Route Neutrality:** Bare routes (`/`, `/sensor`, `/soil`, `/water`) render in a neutral state with no auto-selection of the first device.
+- **Dynamic Rehydration & Access Revocation:** Hard refresh (Ctrl+Shift+R) with `?deviceId=<UUID>` safely rehydrates selection after server validation; revoked device IDs trigger a safe selection reset to `null` with a user notice.
+- **Admin Canonical Concealment:** Monospace canonical `deviceId` string rendering is displayed exclusively for Owner users; Admin users see only device names and types per `DEC-DEV-028`.
+- **Canonical Routing:** Canonical monitoring routes are `/soil` and `/water`; legacy `/air` and `/tanah` routes return 404 Not Found.
+- **Zero UI Redesign:** No new visual styles or UI redesigns were introduced; existing color palette (`globals.css`) and `Premium Minimal Ops` direction remain authoritative.
+- **Historical Chart State Handling:** Zero-record history responses (HTTP 200) cleanly render empty chart states without erroneous 404 alerts or fabricated graph lines.

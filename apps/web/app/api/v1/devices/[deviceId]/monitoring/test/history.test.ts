@@ -387,5 +387,72 @@ describe('Historical Monitoring API Endpoints (TASK-0503 & TASK-0504 Repairs)', 
       expect(body.data.series[0].tankVolume).toBeUndefined();
       expect(body.data.series[0].flowRate).toBeUndefined();
     });
+
+    it('returns 200 OK with empty series when no telemetry records exist in range', async () => {
+      mockOwnerSession();
+      mockGetDeviceByCanonicalId.mockResolvedValue(dummyWaterDevice);
+      mockGetWaterHistory.mockResolvedValue({
+        deviceId: 'DEV-WATER-001',
+        from: '2026-08-01T00:00:00.000Z',
+        to: '2026-08-02T00:00:00.000Z',
+        series: [],
+        pagination: {
+          page: 1,
+          pageSize: 20,
+          totalRecords: 0,
+          totalPages: 1,
+        },
+      });
+
+      const request = new Request(
+        'http://localhost/api/v1/devices/DEV-WATER-001/monitoring/water/history?from=2026-08-01T00:00:00Z&to=2026-08-02T00:00:00Z',
+        AUTH_HEADERS
+      );
+      const response = await GET_WATER_HISTORY(request, {
+        params: Promise.resolve({ deviceId: 'DEV-WATER-001' }),
+      });
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body.success).toBe(true);
+      expect(body.data.series).toEqual([]);
+      expect(body.data.pagination.totalRecords).toBe(0);
+    });
+
+    it('returns 200 OK when querying water history with internal UUID', async () => {
+      mockOwnerSession();
+      mockGetDeviceByCanonicalId.mockResolvedValue(dummyWaterDevice);
+
+      const request = new Request(
+        'http://localhost/api/v1/devices/dev-uuid-2/monitoring/water/history?from=2026-08-01T00:00:00Z&to=2026-08-02T00:00:00Z',
+        AUTH_HEADERS
+      );
+      const response = await GET_WATER_HISTORY(request, {
+        params: Promise.resolve({ deviceId: 'dev-uuid-2' }),
+      });
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body.success).toBe(true);
+      expect(body.data.deviceId).toBe('DEV-WATER-001');
+    });
+
+    it('returns 404 when device is not found by repository in history endpoint', async () => {
+      mockOwnerSession();
+      mockGetDeviceByCanonicalId.mockResolvedValue(null);
+
+      const request = new Request(
+        'http://localhost/api/v1/devices/nonexistent-dev/monitoring/water/history?from=2026-08-01T00:00:00Z&to=2026-08-02T00:00:00Z',
+        AUTH_HEADERS
+      );
+      const response = await GET_WATER_HISTORY(request, {
+        params: Promise.resolve({ deviceId: 'nonexistent-dev' }),
+      });
+      const body = await response.json();
+
+      expect(response.status).toBe(404);
+      expect(body.success).toBe(false);
+      expect(body.error.code).toBe('DEVICE_NOT_FOUND');
+    });
   });
 });

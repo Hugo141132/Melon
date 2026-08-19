@@ -31,6 +31,7 @@ dist/
 build/
 .turbo/
 .swc/
+.vite/
 *.tsbuildinfo
 .eslintcache
 
@@ -53,6 +54,9 @@ desktop.ini
 .idea/
 .fleet/
 .agents/
+.gemini/
+.cursor/
+.claude/
 *.swp
 *.swo
 *~
@@ -62,8 +66,10 @@ coverage/
 test-results/
 playwright-report/
 blob-report/
+playwright/.cache/
 .playwright-mcp/
 .nyc_output/
+*.lcov
 kebun Melon-1.html
 
 # Python Runtime & Bytecode (scripts/validate-requirements.py)
@@ -71,10 +77,14 @@ __pycache__/
 *.py[cod]
 *$py.class
 .pytest_cache/
+.venv/
+venv/
+env/
 
 # Database Runtime Files (do NOT ignore prisma migrations or schema)
 *.sqlite
 *.sqlite3
+*.sqlite-journal
 *.db-journal
 
 # MQTT Broker — Generated Runtime & Credentials (do NOT track)

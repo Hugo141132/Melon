@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server';
-import { prisma, DeviceRepository, TelemetryRepository } from '@kebun-melon/database';
+import {
+  prisma,
+  DeviceRepository,
+  TelemetryRepository,
+  DeviceNotFoundError,
+} from '@kebun-melon/database';
 import {
   DeviceType,
   DeviceConnectionStatus,
@@ -171,6 +176,20 @@ export async function GET(request: Request, props: { params: Promise<{ deviceId:
           meta: { requestId },
         },
         { status: error.statusCode }
+      );
+    }
+
+    if (error instanceof DeviceNotFoundError || error?.name === 'DeviceNotFoundError') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'DEVICE_NOT_FOUND',
+            message: error.message,
+          },
+          meta: { requestId },
+        },
+        { status: 404 }
       );
     }
 

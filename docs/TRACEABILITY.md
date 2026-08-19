@@ -176,9 +176,8 @@
 | `API-DEV-002` | GET /api/v1/devices/{deviceId} detail endpoint | `docs/API.md` | `DEC-RBAC-016`, `DEC-DEV-028` | `TASK-0305` | `TEST-API-003` | `VERIFIED` |
 | `API-DEV-003` | POST /api/v1/devices creation endpoint (REMOVED) | `docs/API.md` | `DEC-DEV-027` | `TASK-0302` | `TEST-API-003` | `SUPERSEDED` |
 | `API-DEV-004` | POST /api/v1/user-devices assignment endpoint | `docs/API.md` | `DEC-RBAC-016` | `TASK-0304` | `TEST-API-003` | `READY_FOR_IMPLEMENTATION` |
-| `API-DEV-005` | PATCH /api/v1/devices/{deviceId} update endpoint | `docs/API.md` | `DEC-DEV-028` | `TASK-0302` | `TEST-API-003` | `VERIFIED` |
-| `API-MON-001` | GET /api/v1/devices/{deviceId}/monitoring/latest endpoint | `docs/API.md` | `DEC-MON-036` | `TASK-0501` | `TEST-API-003` | `READY_FOR_IMPLEMENTATION` |
-| `API-MON-002` | Historical query API endpoints (soil & water history) | `docs/API.md` | `DEC-MON-087` | `TASK-0503` | `TEST-API-004` | `IMPLEMENTED` |
+| `API-DEV-005` | PATCH /api/v1/devices/{deviceId} update endpoint | `docs/API.md` | `DEC-DEV-028` | `TASK-0302` | `TEST-API-003` | `VERIFIED`| `API-MON-001` | GET /api/v1/devices/{deviceId}/monitoring/latest endpoint | `docs/API.md` | `DEC-MON-036` | `TASK-0501` | `TEST-API-003` | `VERIFIED` |
+| `API-MON-002` | Historical query API endpoints (soil & water history) | `docs/API.md` | `DEC-MON-087` | `TASK-0503` | `TEST-API-004` | `VERIFIED` |
 | `API-MON-003` | GET /api/v1/devices/{deviceId}/monitoring/stream endpoint | `docs/API.md` | `DEC-INF-077` | `TASK-0505` | `TEST-API-003` | `DECISION_REQUIRED` |
 | `API-CTRL-001` | POST /api/v1/devices/{deviceId}/faucet-commands endpoint | `docs/API.md` | `DEC-CTRL-051` | `TASK-0803` | `TEST-CTRL-002` | `DECISION_REQUIRED` |
 | `API-CTRL-002` | GET /api/v1/faucet-commands/{commandId} status endpoint | `docs/API.md` | `DEC-CTRL-051` | `TASK-0803` | `TEST-CTRL-002` | `READY_FOR_IMPLEMENTATION` |
@@ -193,7 +192,6 @@
 | `SEC-AUTH-003` | Public registration forbidden from creating Owner | `docs/SECURITY.md` | `DEC-AUTH-006` | `TASK-0203` | `TEST-SEC-001` | `READY_FOR_IMPLEMENTATION` |
 | `SEC-AUTH-004` | CLI seed method for first Owner account creation | `docs/SECURITY.md` | `DEC-AUTH-006` | `TASK-0106` | `TEST-SEC-001` | `IMPLEMENTED` |
 | `SEC-AUTH-005` | Session lifetime and idle timeout enforcement | `docs/SECURITY.md` | `DEC-AUTH-001` | `TASK-0204` | `TEST-SEC-001` | `IMPLEMENTED` |
-
 | `SEC-RBAC-001` | Server-side authorization for all protected routes | `docs/SECURITY.md` | - | `TASK-0210` | `TEST-SEC-002` | `READY_FOR_IMPLEMENTATION` |
 | `SEC-RBAC-002` | Device-level isolation and access boundary | `docs/SECURITY.md` | `DEC-RBAC-016` | `TASK-0304` | `TEST-SEC-003` | `READY_FOR_IMPLEMENTATION` |
 | `SEC-RBAC-003` | Admin self-promotion and role edit restriction | `docs/SECURITY.md` | - | `TASK-0209` | `TEST-SEC-002` | `READY_FOR_IMPLEMENTATION` |
@@ -223,8 +221,8 @@
 | `TEST-UNIT-005` | Utility and format helper unit tests | `docs/TESTING.md` | - | `TASK-0102` | `TEST-UNIT-005` | `READY_FOR_IMPLEMENTATION` |
 | `TEST-API-001` | Authentication API endpoint integration tests | `docs/TESTING.md` | `DEC-AUTH-001` | `TASK-0204` | `TEST-API-001` | `READY_FOR_IMPLEMENTATION` |
 | `TEST-API-002` | User and approval API integration tests | `docs/TESTING.md` | `DEC-AUTH-006` | `TASK-0207` | `TEST-API-002` | `READY_FOR_IMPLEMENTATION` |
-| `TEST-API-003` | Device and monitoring API integration tests | `docs/TESTING.md` | `DEC-MON-036` | `TASK-0501` | `TEST-API-003` | `READY_FOR_IMPLEMENTATION` |
-| `TEST-API-004` | Historical query API integration tests | `docs/TESTING.md` | `DEC-MON-087` | `TASK-0503` | `TEST-API-004` | `IMPLEMENTED` |
+| `TEST-API-003` | Device and monitoring API integration tests | `docs/TESTING.md` | `DEC-MON-036` | `TASK-0501` | `TEST-API-003` | `VERIFIED` |
+| `TEST-API-004` | Historical query API integration tests | `docs/TESTING.md` | `DEC-MON-087` | `TASK-0503` | `TEST-API-004` | `VERIFIED` |
 | `TEST-API-005` | Alerts and audit log API integration tests | `docs/TESTING.md` | - | `TASK-0701` | `TEST-API-005` | `READY_FOR_IMPLEMENTATION` |
 | `TEST-DB-001` | Database migration and schema constraint tests | `docs/TESTING.md` | `DEC-INF-075` | `TASK-0104` | `TEST-DB-001` | `DEFINED` |
 | `TEST-DB-002` | Audit log and command history append-only tests | `docs/TESTING.md` | - | `TASK-0903` | `TEST-DB-002` | `READY_FOR_IMPLEMENTATION` |
@@ -251,13 +249,13 @@
 
 ---
 
-## TASK-0306 Implementation Note
+## Monitoring and Traceability Implementation Note (Reconciled 2026-08-19)
 
-The following facts are supported by the current implementation regarding device selection and routing:
-- **Frontend Selection/Context/URL:** Uses immutable `devices.id` UUID.
+The following facts are verified in the traceability matrix regarding device selection, routing, and monitoring resolution (`TASK-0306`, `TASK-0501`, `TASK-0503`, `TASK-0504`):
+- **Frontend Selection/Context/URL:** Consistently uses immutable `devices.id` UUID.
 - **Bare Routes:** Remain neutral with no auto-selection (`/`, `/sensor`, `/soil`, `/water`).
 - **Rehydration:** Valid `?deviceId=<UUID>` rehydrates after authorization on hard refresh.
 - **Invalid/Revoked IDs:** Clear selection safely to `null` with a notice banner.
 - **Admin Privacy:** Admin canonical `deviceId` concealment remains enforced.
 - **Legacy Routes:** `/air` and `/tanah` are explicitly maintained as legacy 404 routes.
-- **Race Condition:** `/sensor` first-load "No Device Found" race was fixed by correcting the loading state (handling skeleton vs. true empty authorized list).
+- **Traceability Verification:** `API-MON-001`, `API-MON-002`, `TEST-API-003`, and `TEST-API-004` statuses are updated to `VERIFIED` reflecting completed route implementation, dual UUID/canonical identifier resolution, and 100% test pass rate across targeted test suites.

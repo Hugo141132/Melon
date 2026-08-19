@@ -88,17 +88,13 @@ All exceptions must be recorded in `scripts/security-exceptions.json` using the 
 - **TASK-0213 Audit:** Confirmed zero secret exceptions and zero dependency exceptions introduced; Resend API key and password reset tokens adhere strictly to zero-plaintext policy with environment validation and SHA-256 token hashing.
 - **TASK-0214 Audit:** Confirmed zero secret exceptions and zero dependency exceptions introduced; email verification tokens adhere strictly to zero-plaintext policy with 256-bit CSPRNG generation, SHA-256 token hashing in `email_verification_tokens`, and secure transactional deletion upon consumption.
 - **TASK-0305 Audit:** Confirmed zero secret exceptions and zero dependency exceptions introduced; authorised device endpoints enforce role-based projection concealing `deviceId` from Admins, active-assignment database scoping, and IDOR prevention with zero security exceptions.
-
+- **TASK-0504 / Monitoring Reconciliation Audit (2026-08-19):** Confirmed zero secret exceptions and zero dependency exceptions introduced; monitoring history and latest endpoints enforce server-side authentication, RBAC authorization, and Admin canonical ID concealment with zero security exceptions.
 
 ---
 
-## TASK-0306 Implementation Note
+## Monitoring and Device Security Exceptions Audit Note (Reconciled 2026-08-19)
 
-The following facts are supported by the current implementation regarding device selection and routing:
-- **Frontend Selection/Context/URL:** Uses immutable `devices.id` UUID.
-- **Bare Routes:** Remain neutral with no auto-selection (`/`, `/sensor`, `/soil`, `/water`).
-- **Rehydration:** Valid `?deviceId=<UUID>` rehydrates after authorization on hard refresh.
-- **Invalid/Revoked IDs:** Clear selection safely to `null` with a notice banner.
-- **Admin Privacy:** Admin canonical `deviceId` concealment remains enforced.
-- **Legacy Routes:** `/air` and `/tanah` are explicitly maintained as legacy 404 routes.
-- **Race Condition:** `/sensor` first-load "No Device Found" race was fixed by correcting the loading state (handling skeleton vs. true empty authorized list).
+The monitoring UUID and history regression fix (`TASK-0306`, `TASK-0501`, `TASK-0503`, `TASK-0504`) introduced zero new security exceptions, zero new secrets, and zero new dependencies:
+- **Zero Security Exceptions:** All code changes adhere strictly to `SEC-OPS-001` (zero unapproved secrets) and `SEC-OPS-004` (zero unapproved high vulnerabilities).
+- **Safe Identifier Scoping:** Dual UUID/canonical ID resolution in API routes preserves strict IDOR protection, role-based device assignment boundaries, and Admin canonical ID concealment.
+- **Frontend Identity Scope:** Frontend monitoring state and hooks strictly use immutable database UUIDs (`devices.id`).

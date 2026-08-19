@@ -385,5 +385,22 @@ describe('Latest Monitoring API Endpoints (TASK-0501 & TASK-0504 Repairs)', () =
       expect(json.success).toBe(true);
       expect(json.data.deviceId).toBe('DEV-SOIL-001');
     });
+
+    it('returns 404 when device is not found by repository in latest endpoint', async () => {
+      mockOwnerSession();
+      mockGetDeviceByCanonicalId.mockResolvedValue(null);
+
+      const res = await GET_LATEST(
+        new Request(
+          'http://localhost/api/v1/devices/nonexistent-id/monitoring/latest',
+          AUTH_HEADERS
+        ),
+        { params: Promise.resolve({ deviceId: 'nonexistent-id' }) }
+      );
+      expect(res.status).toBe(404);
+      const json = await res.json();
+      expect(json.success).toBe(false);
+      expect(json.error.code).toBe('DEVICE_NOT_FOUND');
+    });
   });
 });
