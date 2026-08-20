@@ -437,9 +437,11 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
 
     await expect(page.locator('body')).toContainText(/Preset|Dosis|Penyiraman|Faucet|Fase/i);
 
-    // Select Phase 1 preset (300 mL)
+    // Select Phase 1 preset (0.3 L / 300 mL)
     const phase1Button = page
-      .locator('button:has-text("Phase 1"), button:has-text("300 mL"), button:has-text("Tahap 1")')
+      .locator(
+        'button[data-testid="btn-select-phase-1"], [data-testid="preset-card-phase-1"] button, button:has-text("0.3 L"), button:has-text("Siram 0.3 L"), button:has-text("Dispense 0.3 L"), button:has-text("Phase 1")'
+      )
       .first();
     await expect(phase1Button).toBeEnabled({ timeout: 10000 });
     await phase1Button.click();

@@ -2,13 +2,45 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useDeviceContext } from '@/context/DeviceContext';
-import FaucetPresetSelector from './FaucetPresetSelector';
+import FaucetPresetSelector, {
+  AuthoritativePhysicalState,
+  formatLitersDisplay,
+} from './FaucetPresetSelector';
 import FaucetConfirmationModal from './FaucetConfirmationModal';
 import FaucetStatusCard, { FaucetCommandDto, ACTIVE_COMMAND_STATUSES } from './FaucetStatusCard';
 import FaucetHistoryTable from './FaucetHistoryTable';
 import { Cpu } from 'lucide-react';
-
 import { useTranslations } from 'next-intl';
+
+export function deriveAuthoritativePhysicalState(
+  recentCommands: FaucetCommandDto[],
+  activeCommand: FaucetCommandDto | null
+): AuthoritativePhysicalState {
+  // If an active command is currently in flight, physical state is transitioning/unknown
+  if (activeCommand && ACTIVE_COMMAND_STATUSES.includes(activeCommand.status)) {
+    return 'UNKNOWN';
+  }
+
+  if (!recentCommands || recentCommands.length === 0) {
+    return 'UNKNOWN';
+  }
+
+  // Look for the most recent completed command
+  const latestCompleted = recentCommands.find((c) => c.status === 'COMPLETED');
+  if (!latestCompleted) {
+    return 'UNKNOWN';
+  }
+
+  if (latestCompleted.action === 'OPEN') {
+    return 'OPEN';
+  }
+  if (latestCompleted.action === 'CLOSE') {
+    return 'CLOSED';
+  }
+
+  // Completed DISPENSE does NOT confirm closed valve without sensor confirmation
+  return 'UNKNOWN';
+}
 
 export default function FaucetControlPanel() {
   const tFaucet = useTranslations('faucet');
@@ -20,13 +52,19 @@ export default function FaucetControlPanel() {
   const [hasControlPermission, setHasControlPermission] = useState<boolean>(true);
   const isFeatureEnabled = true;
 
+  // Plant count state (default 1)
+  const [plantCount, setPlantCount] = useState<number>(1);
+
   // Active modal selection state
   const [modalOpen, setModalOpen] = useState<boolean>(false);
+  const [modalAction, setModalAction] = useState<'DISPENSE' | 'OPEN' | 'CLOSE'>('DISPENSE');
   const [selectedPhase, setSelectedPhase] = useState<1 | 2 | 3 | null>(null);
-  const [selectedVolumeMl, setSelectedVolumeMl] = useState<number | null>(null);
+  const [selectedVolumeL, setSelectedVolumeL] = useState<number | null>(null);
+  const [selectedTotalVolumeL, setSelectedTotalVolumeL] = useState<number | null>(null);
 
   // Active command & API state
   const [activeCommand, setActiveCommand] = useState<FaucetCommandDto | null>(null);
+  const [recentCommands, setRecentCommands] = useState<FaucetCommandDto[]>([]);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -57,24 +95,28 @@ export default function FaucetControlPanel() {
     };
   }, []);
 
-  // Stable active command fetcher parameterized by device ID
-  const fetchActiveCommand = useCallback(async (targetDeviceId: string) => {
+  // Stable recent command fetcher parameterized by device ID
+  const fetchRecentCommands = useCallback(async (targetDeviceId: string) => {
     if (!targetDeviceId) {
       setActiveCommand(null);
+      setRecentCommands([]);
       return;
     }
 
     try {
       const res = await fetch(
-        `/api/v1/devices/${targetDeviceId}/faucet-commands?pageSize=5&sort=requestedAt:desc`
+        `/api/v1/devices/${targetDeviceId}/faucet-commands?pageSize=10&sort=requestedAt:desc`
       );
       const json = await res.json();
       if (json.success && json.data?.items) {
-        const active = json.data.items.find((c: any) => ACTIVE_COMMAND_STATUSES.includes(c.status));
+        const items: FaucetCommandDto[] = json.data.items;
+        setRecentCommands(items);
+
+        const active = items.find((c) => ACTIVE_COMMAND_STATUSES.includes(c.status));
         if (active) {
           setActiveCommand(active);
-        } else if (json.data.items.length > 0) {
-          setActiveCommand(json.data.items[0]);
+        } else if (items.length > 0) {
+          setActiveCommand(items[0]);
         } else {
           setActiveCommand(null);
         }
@@ -88,37 +130,89 @@ export default function FaucetControlPanel() {
   useEffect(() => {
     const devId = selectedDevice?.deviceId || selectedDevice?.id;
     if (devId) {
-      fetchActiveCommand(devId);
+      fetchRecentCommands(devId);
     } else {
       setActiveCommand(null);
+      setRecentCommands([]);
     }
-  }, [selectedDevice?.deviceId, selectedDevice?.id, fetchActiveCommand]);
+  }, [selectedDevice?.deviceId, selectedDevice?.id, fetchRecentCommands]);
 
   // Stable callback for status updates from card
   const handleCommandUpdated = useCallback((updated: FaucetCommandDto) => {
     setActiveCommand(updated);
+    setRecentCommands((prev) => {
+      const index = prev.findIndex((c) => c.commandId === updated.commandId || c.id === updated.id);
+      if (index >= 0) {
+        const updatedList = [...prev];
+        updatedList[index] = updated;
+        return updatedList;
+      }
+      return [updated, ...prev];
+    });
   }, []);
 
-  // Open modal handler (pure state update, NO API calls or polling)
-  const handleSelectPreset = useCallback((phase: 1 | 2 | 3, volumeMl: number) => {
+  // Open modal for DISPENSE preset
+  const handleSelectPreset = useCallback(
+    (phase: 1 | 2 | 3, volumeL: number, count: number, totalL: number) => {
+      setErrorMsg(null);
+      setSuccessMsg(null);
+      setModalAction('DISPENSE');
+      setSelectedPhase(phase);
+      setSelectedVolumeL(volumeL);
+      setSelectedTotalVolumeL(totalL);
+      setPlantCount(count);
+      setModalOpen(true);
+    },
+    []
+  );
+
+  // Open modal for manual OPEN / CLOSE action
+  const handleSelectManualAction = useCallback((action: 'OPEN' | 'CLOSE') => {
     setErrorMsg(null);
     setSuccessMsg(null);
-    setSelectedPhase(phase);
-    setSelectedVolumeMl(volumeMl);
+    setModalAction(action);
+    setSelectedPhase(null);
+    setSelectedVolumeL(null);
+    setSelectedTotalVolumeL(null);
     setModalOpen(true);
   }, []);
 
-  // Submit dispense command
-  const handleConfirmDispense = async (phase: 1 | 2 | 3, idempotencyKey: string) => {
+  // Submit faucet command (DISPENSE, OPEN, or CLOSE)
+  const handleConfirmCommand = async (
+    actionOrPhase: 'DISPENSE' | 'OPEN' | 'CLOSE' | 1 | 2 | 3,
+    idempotencyKey: string,
+    plantCountParam?: number
+  ) => {
     if (!selectedDevice) return;
     const targetDevId = selectedDevice.deviceId || selectedDevice.id;
     if (!targetDevId) return;
+
+    const action =
+      typeof actionOrPhase === 'number'
+        ? 'DISPENSE'
+        : actionOrPhase === 'DISPENSE'
+          ? 'DISPENSE'
+          : actionOrPhase === 'OPEN'
+            ? 'OPEN'
+            : 'CLOSE';
+
+    const effectivePhase = typeof actionOrPhase === 'number' ? actionOrPhase : selectedPhase;
+    const effectivePlantCount = plantCountParam ?? plantCount;
 
     setSubmitting(true);
     setErrorMsg(null);
     setSuccessMsg(null);
 
     try {
+      const payloadBody: any = {
+        action,
+      };
+
+      if (action === 'DISPENSE') {
+        payloadBody.phase = effectivePhase;
+        payloadBody.plantCount = effectivePlantCount;
+      }
+
       const res = await fetch(
         `/api/v1/devices/${encodeURIComponent(targetDevId)}/faucet-commands`,
         {
@@ -127,20 +221,21 @@ export default function FaucetControlPanel() {
             'Content-Type': 'application/json',
             'Idempotency-Key': idempotencyKey,
           },
-          body: JSON.stringify({
-            action: 'DISPENSE',
-            phase,
-            plantCount: 1,
-            idempotencyKey,
-          }),
+          body: JSON.stringify(payloadBody),
         }
       );
 
       const json = await res.json();
 
       if (json.success && json.data) {
-        setSuccessMsg(tFaucet('commandSentSuccess', { volume: json.data.targetVolumeMl }));
+        if (action === 'DISPENSE' && json.data.targetVolumeMl) {
+          const totalL = formatLitersDisplay(json.data.targetVolumeMl / 1000);
+          setSuccessMsg(tFaucet('commandSentSuccess', { volume: `${totalL} L` }));
+        } else {
+          setSuccessMsg(tFaucet('commandSentSuccessGeneric', { action }));
+        }
         setActiveCommand(json.data);
+        setRecentCommands((prev) => [json.data, ...prev]);
         setModalOpen(false);
       } else {
         setErrorMsg(json.error?.message || tFaucet('commandCreateFailed'));
@@ -151,6 +246,8 @@ export default function FaucetControlPanel() {
       setSubmitting(false);
     }
   };
+
+  const physicalState = deriveAuthoritativePhysicalState(recentCommands, activeCommand);
 
   return (
     <div className="space-y-6" data-testid="faucet-control-panel">
@@ -180,7 +277,11 @@ export default function FaucetControlPanel() {
           hasControlPermission={hasControlPermission}
           isFeatureEnabled={isFeatureEnabled}
           activeCommand={activeCommand}
+          physicalState={physicalState}
+          plantCount={plantCount}
+          onPlantCountChange={setPlantCount}
           onSelectPreset={handleSelectPreset}
+          onSelectManualAction={handleSelectManualAction}
         />
       </section>
 
@@ -208,14 +309,17 @@ export default function FaucetControlPanel() {
         </section>
       )}
 
-      {/* Dispense Confirmation Modal */}
+      {/* Confirmation Modal (DISPENSE, OPEN, or CLOSE) */}
       <FaucetConfirmationModal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
         selectedDevice={selectedDevice}
+        action={modalAction}
         phase={selectedPhase}
-        volumeMl={selectedVolumeMl}
-        onConfirm={handleConfirmDispense}
+        volumeL={selectedVolumeL}
+        plantCount={plantCount}
+        totalVolumeL={selectedTotalVolumeL}
+        onConfirm={handleConfirmCommand}
         isSubmitting={submitting}
         errorMsg={errorMsg}
       />

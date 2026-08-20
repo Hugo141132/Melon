@@ -281,6 +281,18 @@
   5. Mandatory `idempotencyKey` on command creation; duplicate command IDs must NEVER trigger repeated physical dispensing.
   6. Command timeout durations (ACK timeout, completion timeout, expiry duration): **TBD** — specific numeric values have not received explicit user approval. Do not hardcode until approved. Timeout events must NEVER be treated as completion regardless of the final values.
 
+#### DEC-CTRL-089: Faucet Control UI Component Architecture, Liters Preset Presentation & Polling Lifecycle
+* **Related Task IDs**: `TASK-0807`
+* **Related Documentation**: `docs/PRD.md` §11, `docs/UI_UX.md` §12, `docs/ARCHITECTURE.md` §8.5, `docs/TESTING.md` §20.9
+* **Status**: **APPROVED BY USER (2026-08-20)**
+* **Approved Decision**:
+  1. **Liters Unit Presentation**: Faucet control presets are presented prominently in Liters (Phase 1: 0.3 L, Phase 2: 1.0 L, Phase 3: 1.5 L) with secondary phase labels.
+  2. **Plant Count Multiplier**: Integer `plantCount >= 1` stepper dynamically multiplies the preset volume with live preview (`0.3 L × 3 tanaman = 0.9 L total air`).
+  3. **Manual Valve Control**: Supported discrete `OPEN` and `CLOSE` actions with action-aware confirmation modals and safety warnings.
+  4. **Client Idempotency Header**: The client dispatches unique `cmd-<uuid>` identifiers exclusively via HTTP header `Idempotency-Key` without arbitrary JSON body payload fields.
+  5. **Active Status Polling**: `FaucetStatusCard` polls `GET /api/v1/devices/{deviceId}/faucet-commands/{commandId}` every 2,500ms strictly while status is active (`QUEUED`, `SENT`, `ACKNOWLEDGED`, `IN_PROGRESS`), terminating immediately on terminal states.
+  6. **Authoritative Physical Valve State**: The UI badge maps physical valve state strictly: `COMPLETED OPEN` $\rightarrow$ `OPEN`, `COMPLETED CLOSE` $\rightarrow$ `CLOSED`, `COMPLETED DISPENSE` $\rightarrow$ `UNKNOWN` (uninstrumented valve), active commands and failures $\rightarrow$ `UNKNOWN`.
+
 ---
 
 ### 2.5 Infrastructure and Operations

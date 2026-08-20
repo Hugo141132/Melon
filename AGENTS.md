@@ -360,6 +360,29 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
 - 21st.dev MCP: `NOT REQUIRED`
 - Summary: Implemented alert acknowledgement data contracts (`AcknowledgeAlertInputSchema`, `AlertAcknowledgementDto`), database transactional acknowledgement in `AlertRepository` (`acknowledgeAlert`) persisting acknowledgement records to `alert_acknowledgements` and emitting `alert.acknowledged` audit logs, `POST /api/v1/alerts/{alertId}/acknowledge` API route handler with RBAC enforcement (`alert.acknowledge` for OWNER global scope, ADMIN assigned-device scope), and `/notifikasi` frontend page wiring with `Premium Minimal Ops` modal for optional operator notes. Preserved alerts without deletion, handled duplicate acknowledgements safely and idempotently, and ensured 100% key parity and placeholder alignment for English and Indonesian translations. Reconciled documentation in `API.md`, `USER_FLOWS.md`, and `TRACEABILITY.md` to remove stale Admin acknowledgement TBD wording.
 
+#### TASK-0807 Governance Record
+
+`TASK-0807` faucet control UI implementation record:
+- Status: `DONE` (Completed 2026-08-20)
+- Frontend impact: `MINOR`
+- Selected UI direction: `Premium Minimal Ops`
+- Existing color template: `UNCHANGED`
+- Selected motion effects: `Card hover`, `Modal`, `Skeleton loading`, `KPI refresh`
+- 21st.dev MCP: `NOT REQUIRED`
+- Summary: Implemented and verified complete Faucet Control UI revision on `/controls` adhering to `Premium Minimal Ops` UI standards:
+  - Preset volume display in Liters: Phase 1 = `0.3 L / tanaman`, Phase 2 = `1 L / tanaman`, Phase 3 = `1.5 L / tanaman`.
+  - `plantCount` integer input with stepper buttons (minimum 1, default 1) and live dynamic calculation preview (`preset.volumeL × plantCount = totalVolumeL`).
+  - Browser-side calculation preview while strictly preserving server-side authority for final validation and execution.
+  - Confirmation modal with action-aware layouts: for `DISPENSE` displaying device name, site location, phase, water per plant (L), plant count, total water (L), and safety warnings; for manual `OPEN` and `CLOSE` displaying device name, site, action title, safety description, and status.
+  - Manual `OPEN` and `CLOSE` valve controls wired to `POST /api/v1/devices/{deviceId}/faucet-commands` with action `OPEN` | `CLOSE` without fabricating volume or phase parameters.
+  - Idempotency integration: client dispatches unique `cmd-<uuid>` via HTTP header `Idempotency-Key` without arbitrary JSON body field injection.
+  - Authoritative physical faucet state presentation (`OPEN`, `CLOSED`, `UNKNOWN`) strictly mapped from the TASK-0806 state machine: `COMPLETED OPEN` → `OPEN`, `COMPLETED CLOSE` → `CLOSED`, `COMPLETED DISPENSE` → `UNKNOWN`, active/failed/timeout/uncertain → `UNKNOWN`. Never inferred physical state from API submission, publication, or ACK.
+  - Status Polling: `FaucetStatusCard` executes 2,500ms status polling strictly during active states (`QUEUED`, `SENT`, `ACKNOWLEDGED`, `IN_PROGRESS`) and terminates immediately upon terminal states or unmount with zero blind retries.
+  - Full disabled and warning state handling for null device, unauthenticated/unauthorized users (`device.control.dispense`), disabled feature flag (`ENABLE_FAUCET_CONTROL=false`), offline devices (`OFFLINE`/`INACTIVE`), and active command in progress.
+  - 100% Indonesian and English translation key parity with matching ICU placeholders.
+  - Performance & Viewport Benchmarks: Mount latency $31\text{ ms} < 50\text{ ms}$, stepper latency $1.2\text{ ms}$, 50 modal cycles memory-safe, zero horizontal overflow across Mobile ($390\times 844$), Tablet ($768\times 1024$), and Desktop ($1280\times 800$).
+  - Verified 100% test pass rate across 24 unit tests (`apps/web/test/unit/faucet-control-ui.test.tsx`), workspace TypeScript typecheck (0 errors), Semgrep scan (0 findings), and Next.js production build.
+
 #### TASK-0904 Governance Record
 
 `TASK-0904` structured application logging implementation record:

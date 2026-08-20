@@ -1,16 +1,27 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { History, RefreshCw, ChevronLeft, ChevronRight, Droplets } from 'lucide-react';
+import {
+  History,
+  RefreshCw,
+  ChevronLeft,
+  ChevronRight,
+  Droplets,
+  Power,
+  PowerOff,
+} from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
+import { formatLitersDisplay } from './FaucetPresetSelector';
 
 export interface FaucetHistoryItem {
   id: string;
   commandId: string;
   deviceId: string;
-  phase: number;
-  targetVolumeMl: number;
+  action?: 'DISPENSE' | 'OPEN' | 'CLOSE' | string;
+  phase?: number | null;
+  plantCount?: number | null;
+  targetVolumeMl?: number | null;
   actualVolumeMl?: number | null;
   status: string;
   reasonCode?: string | null;
@@ -169,7 +180,9 @@ export default function FaucetHistoryTable({ deviceId, className }: FaucetHistor
         <table className="w-full text-left border-collapse text-xs">
           <thead>
             <tr className="bg-app-surface-container-low/60 border-b border-app-outline-variant/20 text-app-on-surface-variant">
-              <th className="p-3 font-semibold">{tFaucet('phaseTargetHeader')}</th>
+              <th className="p-3 font-semibold">
+                {tFaucet('actionHeader')} / {tFaucet('phaseTargetHeader')}
+              </th>
               <th className="p-3 font-semibold">{tFaucet('actualVolumeHeader')}</th>
               <th className="p-3 font-semibold">{tCommon('status')}</th>
               <th className="p-3 font-semibold">{tFaucet('requestedAtHeader')}</th>
@@ -206,44 +219,77 @@ export default function FaucetHistoryTable({ deviceId, className }: FaucetHistor
                 </td>
               </tr>
             ) : (
-              history.map((item) => (
-                <tr
-                  key={item.id}
-                  className="hover:bg-app-surface-container-low/30 transition-colors"
-                >
-                  <td className="p-3">
-                    <span className="font-bold text-app-on-surface">
-                      {item.targetVolumeMl.toLocaleString('id-ID')} mL
-                    </span>
-                    <span className="text-[10px] text-app-on-surface-variant block font-mono">
-                      {tFaucet('phaseBadge', { phase: item.phase })}
-                    </span>
-                  </td>
+              history.map((item) => {
+                const action = item.action || 'DISPENSE';
+                const isDispense = action === 'DISPENSE';
+                const targetVolL = item.targetVolumeMl ? item.targetVolumeMl / 1000 : null;
+                const actualVolL =
+                  item.actualVolumeMl !== null && item.actualVolumeMl !== undefined
+                    ? item.actualVolumeMl / 1000
+                    : null;
 
-                  <td className="p-3 font-semibold">
-                    {item.actualVolumeMl !== null && item.actualVolumeMl !== undefined
-                      ? `${item.actualVolumeMl.toLocaleString('id-ID')} mL`
-                      : '—'}
-                  </td>
-
-                  <td className="p-3">
-                    <span
-                      className={cn(
-                        'px-2.5 py-1 rounded-full text-[10px] font-bold border inline-block',
-                        getStatusBadgeStyle(item.status)
+                return (
+                  <tr
+                    key={item.id}
+                    className="hover:bg-app-surface-container-low/30 transition-colors"
+                  >
+                    <td className="p-3">
+                      {isDispense ? (
+                        <>
+                          <span className="font-bold text-app-on-surface font-mono">
+                            {targetVolL !== null
+                              ? `${formatLitersDisplay(targetVolL)} L`
+                              : `${item.targetVolumeMl?.toLocaleString('id-ID')} mL`}
+                          </span>
+                          <span className="text-[10px] text-app-on-surface-variant block font-mono">
+                            {item.phase
+                              ? item.plantCount
+                                ? `(Fase ${item.phase} × ${item.plantCount})`
+                                : tFaucet('phaseBadge', { phase: item.phase })
+                              : '(DISPENSE)'}
+                          </span>
+                        </>
+                      ) : (
+                        <div className="flex items-center gap-1.5">
+                          {action === 'OPEN' ? (
+                            <Power size={13} className="text-emerald-600" />
+                          ) : (
+                            <PowerOff size={13} className="text-slate-700" />
+                          )}
+                          <span className="font-bold text-app-on-surface">
+                            {action === 'OPEN'
+                              ? tFaucet('commandActionOpen')
+                              : tFaucet('commandActionClose')}
+                          </span>
+                        </div>
                       )}
-                    >
-                      {item.status}
-                    </span>
-                  </td>
+                    </td>
 
-                  <td className="p-3 font-mono text-[11px] text-app-on-surface-variant">
-                    {new Date(item.requestedAt).toLocaleString('id-ID')}
-                  </td>
+                    <td className="p-3 font-semibold font-mono">
+                      {isDispense && actualVolL !== null
+                        ? `${formatLitersDisplay(actualVolL)} L`
+                        : '—'}
+                    </td>
 
-                  <td className="p-3 font-medium">{item.initiatedByRole || tCommon('user')}</td>
-                </tr>
-              ))
+                    <td className="p-3">
+                      <span
+                        className={cn(
+                          'px-2.5 py-1 rounded-full text-[10px] font-bold border inline-block',
+                          getStatusBadgeStyle(item.status)
+                        )}
+                      >
+                        {item.status}
+                      </span>
+                    </td>
+
+                    <td className="p-3 font-mono text-[11px] text-app-on-surface-variant">
+                      {new Date(item.requestedAt).toLocaleString('id-ID')}
+                    </td>
+
+                    <td className="p-3 font-medium">{item.initiatedByRole || tCommon('user')}</td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>

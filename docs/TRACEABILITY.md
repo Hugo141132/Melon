@@ -129,3 +129,19 @@ The following facts are verified in the traceability matrix regarding `TASK-0806
 - **Testing Boundary:** Live local faucet MQTT E2E was not completed because the local Mosquitto test fixture lacks a matching `WATER_TANK_NODE` credential/ACL identity; live MQTT TLS and physical HIL verification remain credential/manual dependent.
 - **Downstream Decoupling:** Downstream duplicate command protection (`TASK-0808`) and timeout processing (`TASK-0809`) remain distinct and decoupled.
 <!-- TASK-0806 Reconciled: 2026-08-20 -->
+
+---
+
+## Faucet Control UI Traceability Implementation Note (Reconciled 2026-08-20)
+
+The following facts are verified in the traceability matrix regarding `TASK-0807` (Faucet Control UI on `/controls` in `@kebun-melon/web`):
+- **Implementation Status:** `TASK-0807` is implemented and verified (`apps/web/test/unit/faucet-control-ui.test.tsx`, 24/24 tests passed).
+- **Preset Volume & Plant Calculations:** Presents Phase 1 (0.3 L), Phase 2 (1.0 L), Phase 3 (1.5 L) with `plantCount` stepper ($\ge 1$) and live dynamic volume calculation preview (`0.3 L × 3 tanaman = 0.9 L`).
+- **Action Compatibility:** Provides action-aware modal confirmation for `DISPENSE` and manual `OPEN`/`CLOSE` with safety warnings.
+- **Idempotency Integration:** Dispatches unique `cmd-<uuid>` via standard HTTP header `Idempotency-Key` without arbitrary JSON body payload injection.
+- **Polling Lifecycle:** Actively polls `GET /api/v1/devices/{deviceId}/faucet-commands/{commandId}` every 2,500ms strictly during active states (`QUEUED`, `SENT`, `ACKNOWLEDGED`, `IN_PROGRESS`) and terminates immediately upon terminal states.
+- **Authoritative Physical State:** Badges authoritative physical valve state as `OPEN` (completed open), `CLOSED` (completed close), or `UNKNOWN` (active commands, failures, and dispense completions).
+- **Performance Benchmarks:** UI mount latency ($31\text{ ms} < 50\text{ ms}$), stepper interaction latency ($1.2\text{ ms}$), preset switch ($1.8\text{ ms}$), 50 modal open/close cycles memory clean, 0 horizontal overflow across Mobile/Tablet/Desktop viewports.
+- **Scope Demarcation:** `TASK-0808` (Idempotency duplicate revalidation), `TASK-0809` (command timeout), `TASK-0810` (active command cancel), and `TASK-0811` (physical HIL testing) remain pending downstream tasks.
+<!-- TASK-0807 Reconciled: 2026-08-20 -->
+

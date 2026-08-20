@@ -649,13 +649,13 @@ The browser shall not define the authoritative target volume.
 
 The frontend shall require explicit confirmation before command submission.
 
-The confirmation shall display:
+The confirmation modal shall display:
 
-- Device.
-- Phase.
-- Target volume.
-- Current device status.
-- Any applicable warning.
+- Device name.
+- Action (`DISPENSE`, `OPEN`, or `CLOSE`).
+- Phase & Volume per plant (for `DISPENSE`).
+- Plant count & total calculated Liters (for `DISPENSE`).
+- Explicit warning messages for manual valve operations (`OPEN` / `CLOSE`).
 
 ### 13.4 Command Preconditions
 
@@ -663,79 +663,77 @@ Before creating a command, the server shall verify:
 
 - Active session.
 - Active account.
-- Control permission.
+- Control permission (`device.control.dispense`).
 - Device assignment.
-- Device control capability.
+- Device control capability (`WATER_TANK_NODE`).
 - Device active status.
-- Device online or controllable status.
-- Valid phase.
-- No prohibited conflicting command.
+- Feature flag status (`ENABLE_FAUCET_CONTROL=true`).
+- Device online status.
+- Valid phase and integer `plantCount >= 1` (for `DISPENSE`).
+- No conflicting active command (maximum 1 active command per device).
 - Valid idempotency key.
-- Gateway availability, according to policy.
 
 ### 13.5 Durable Command Record
 
-A command shall be persisted before publication to the IoT gateway.
+A command shall be persisted in PostgreSQL as `QUEUED` with an audit log before publication to the IoT gateway.
 
 If a durable record cannot be created, the command shall not be published.
 
-### 13.6 Idempotency
+### 13.6 Idempotency (TASK-0807)
 
-Every command shall use:
+Every command dispatched from the UI shall transmit a unique idempotency key via the standard HTTP header:
 
 ```text
-commandId
-idempotencyKey
+Idempotency-Key: cmd-<uuid>
 ```
 
-The same logical request shall not create more than one physical execution.
+The frontend does not inject arbitrary body fields for idempotency. The backend enforces unique idempotency keys within transactional boundaries, returning the existing command record on identical retries and HTTP 409 `IDEMPOTENCY_CONFLICT` on mismatched payloads.
 
 ### 13.7 Replay Protection
 
 Controls shall include:
 
 - Unique command ID.
-- Expiry timestamp.
-- TLS.
-- Device identity.
-- Device-side duplicate memory.
-- Valid state transitions.
-- Non-retained MQTT command messages.
+- Strict 5-minute expiry timestamp (`expiresAt = requestedAt + 5m`).
+- TLS for MQTT and REST.
+- Per-device topic authorization ACLs.
+- Non-retained MQTT command messages (`retain = false`, QoS 1).
 
-### 13.8 Completion Integrity
+### 13.8 Completion & Physical State Integrity (TASK-0807)
 
-The UI shall not display `COMPLETED` merely because:
+The UI shall not display `COMPLETED` or assume valve state closure merely because:
 
 - The API accepted the request.
 - The gateway published the message.
-- MQTT delivered the message.
 - The device acknowledged receipt.
 
-Completion requires a valid final device event or approved equivalent.
+**Authoritative Physical State Rules:**
+- Active commands (`QUEUED`, `SENT`, `ACKNOWLEDGED`, `IN_PROGRESS`) strictly present `UNKNOWN`.
+- `DISPENSE` completion strictly presents `UNKNOWN` (the system cannot authoritatively confirm whether the physical valve mechanically closed without dedicated limit switches).
+- Only terminal `COMPLETED` manual `OPEN` transitions to `OPEN`.
+- Only terminal `COMPLETED` manual `CLOSE` transitions to `CLOSED`.
+- Terminal `FAILED` or `TIMEOUT` strictly preserves `UNKNOWN`.
 
 ### 13.9 Timeout Safety
 
-A timeout shall not be displayed as confirmed completion or confirmed closure.
-
-When final physical state is uncertain, the UI shall say so explicitly.
+A timeout shall record `physicalOutcome = 'UNKNOWN'` without claiming known physical completion.
 
 ### 13.10 Concurrent Commands
 
-The concurrent-command policy is `TBD`.
+Enforced as exactly one active faucet command (`QUEUED`, `SENT`, `ACKNOWLEDGED`, `IN_PROGRESS`) per device via partial unique index `faucet_commands_one_active_per_device`.
 
-Until approved, the safest default is one active faucet command per device.
+### 13.11 Manual Open/Close Actions (TASK-0807)
 
-### 13.11 Manual Open/Close
+Manual `OPEN` and `CLOSE` controls are implemented on `/controls`:
 
-Manual Open/Close functions are `TBD`.
+- Require `device.control.dispense` and `ENABLE_FAUCET_CONTROL=true`.
+- Require explicit confirmation in dedicated modal dialogs with safety warnings.
+- Omit phase, plantCount, and volume parameters.
+- Dispatched through standard `Idempotency-Key` header flow.
 
-If implemented:
+### 13.12 No Blind Retries (TASK-0807)
 
-- They require separate permission.
-- They reference the original command.
-- They require confirmation.
-- They remain unconfirmed until device acknowledgement.
-- Failure to confirm shall produce an uncertain-state warning.
+The UI performs zero automatic resubmissions or blind retry loops when commands fail or time out. All command retries require explicit, conscious user re-confirmation. Status polling occurs strictly via read-only `GET` requests during active states.
 
 ---
 

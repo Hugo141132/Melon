@@ -1,17 +1,35 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, Droplets, AlertTriangle, Loader2, CheckCircle2, ShieldCheck } from 'lucide-react';
+import {
+  X,
+  Droplets,
+  AlertTriangle,
+  Loader2,
+  CheckCircle2,
+  ShieldCheck,
+  Power,
+  PowerOff,
+} from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { AuthorisedDevice } from '@/context/DeviceContext';
+import { formatLitersDisplay } from './FaucetPresetSelector';
 
 export interface FaucetConfirmationModalProps {
   isOpen: boolean;
   onClose: () => void;
   selectedDevice: AuthorisedDevice | null;
-  phase: 1 | 2 | 3 | null;
-  volumeMl: number | null;
-  onConfirm: (phase: 1 | 2 | 3, idempotencyKey: string) => Promise<void>;
+  action?: 'DISPENSE' | 'OPEN' | 'CLOSE';
+  phase?: 1 | 2 | 3 | null;
+  volumeL?: number | null;
+  volumeMl?: number | null;
+  plantCount?: number;
+  totalVolumeL?: number | null;
+  onConfirm: (
+    actionOrPhase: 'DISPENSE' | 'OPEN' | 'CLOSE' | 1 | 2 | 3,
+    idempotencyKey: string,
+    plantCount?: number
+  ) => Promise<void>;
   isSubmitting?: boolean;
   errorMsg?: string | null;
 }
@@ -20,8 +38,12 @@ export default function FaucetConfirmationModal({
   isOpen,
   onClose,
   selectedDevice,
-  phase,
-  volumeMl,
+  action = 'DISPENSE',
+  phase = null,
+  volumeL = null,
+  volumeMl = null,
+  plantCount = 1,
+  totalVolumeL = null,
   onConfirm,
   isSubmitting = false,
   errorMsg = null,
@@ -39,15 +61,31 @@ export default function FaucetConfirmationModal({
     }
   }, [isOpen]);
 
-  if (!isOpen || !selectedDevice || !phase || !volumeMl) {
+  if (!isOpen || !selectedDevice) {
     return null;
   }
+
+  // Calculate volume figures if action is DISPENSE
+  const effectiveVolumeL =
+    volumeL ??
+    (volumeMl ? volumeMl / 1000 : phase === 1 ? 0.3 : phase === 2 ? 1.0 : phase === 3 ? 1.5 : 0.3);
+  const effectiveTotalL = totalVolumeL ?? effectiveVolumeL * plantCount;
+  const formattedTotalL = formatLitersDisplay(effectiveTotalL);
+  const formattedVolumeL = formatLitersDisplay(effectiveVolumeL);
 
   const handleConfirmSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const finalKey = customKey.trim() || `cmd-${Date.now()}`;
-    await onConfirm(phase, finalKey);
+    if (action === 'DISPENSE' && phase) {
+      await onConfirm(phase, finalKey, plantCount);
+    } else {
+      await onConfirm(action, finalKey);
+    }
   };
+
+  const isDispense = action === 'DISPENSE';
+  const isOpenAction = action === 'OPEN';
+  const isCloseAction = action === 'CLOSE';
 
   return (
     <div
@@ -58,11 +96,31 @@ export default function FaucetConfirmationModal({
         {/* Header */}
         <div className="flex items-center justify-between border-b border-app-outline-variant/20 pb-3">
           <div className="flex items-center gap-2 text-app-primary">
-            <div className="w-9 h-9 rounded-xl bg-app-primary/10 flex items-center justify-center">
-              <Droplets size={20} />
+            <div
+              className={`w-9 h-9 rounded-xl flex items-center justify-center ${
+                isOpenAction
+                  ? 'bg-emerald-500/10 text-emerald-600'
+                  : isCloseAction
+                    ? 'bg-slate-500/10 text-slate-700'
+                    : 'bg-app-primary/10 text-app-primary'
+              }`}
+            >
+              {isOpenAction ? (
+                <Power size={20} />
+              ) : isCloseAction ? (
+                <PowerOff size={20} />
+              ) : (
+                <Droplets size={20} />
+              )}
             </div>
             <div>
-              <h3 className="text-[17px] font-bold text-app-primary">{tFaucet('confirmTitle')}</h3>
+              <h3 className="text-[17px] font-bold text-app-on-surface">
+                {isOpenAction
+                  ? tFaucet('confirmOpenTitle')
+                  : isCloseAction
+                    ? tFaucet('confirmCloseTitle')
+                    : tFaucet('confirmDispenseTitle')}
+              </h3>
               <p className="text-[11px] text-app-on-surface-variant">
                 {tFaucet('physicalActionNote')}
               </p>
@@ -91,15 +149,29 @@ export default function FaucetConfirmationModal({
         )}
 
         {/* Primary Confirmation Prompt */}
-        <div className="p-4 bg-app-primary/5 rounded-xl border border-app-primary/20 space-y-3">
-          <p className="text-[14px] font-bold text-app-on-surface leading-snug">
-            {tFaucet('confirmPrompt', {
-              volume: volumeMl.toLocaleString('id-ID'),
-              deviceName: selectedDevice.deviceName,
-            })}
+        <div
+          className={`p-4 rounded-xl border space-y-3 ${
+            isOpenAction
+              ? 'bg-emerald-50/50 border-emerald-200 text-emerald-950'
+              : isCloseAction
+                ? 'bg-slate-50/70 border-slate-200 text-slate-950'
+                : 'bg-app-primary/5 border-app-primary/20 text-app-on-surface'
+          }`}
+        >
+          <p className="text-[14px] font-bold leading-snug">
+            {isOpenAction
+              ? tFaucet('confirmOpenPrompt', { deviceName: selectedDevice.deviceName })
+              : isCloseAction
+                ? tFaucet('confirmClosePrompt', { deviceName: selectedDevice.deviceName })
+                : tFaucet('confirmDispensePrompt', {
+                    total: formattedTotalL,
+                    perPlant: formattedVolumeL,
+                    count: plantCount,
+                    deviceName: selectedDevice.deviceName,
+                  })}
           </p>
 
-          <div className="grid grid-cols-2 gap-2 pt-2 border-t border-app-primary/10 text-xs">
+          <div className="grid grid-cols-2 gap-2 pt-2 border-t border-app-outline-variant/15 text-xs">
             <div>
               <span className="text-app-on-surface-variant block text-[10px] uppercase font-bold">
                 {tDevices('deviceName')}:
@@ -118,35 +190,84 @@ export default function FaucetConfirmationModal({
               </span>
             </div>
 
-            <div>
-              <span className="text-app-on-surface-variant block text-[10px] uppercase font-bold">
-                {tFaucet('preset')}:
-              </span>
-              <span className="font-bold text-app-primary">
-                {tFaucet('phaseVolumeLabel', { phase, volume: volumeMl })}
-              </span>
-            </div>
+            {isDispense && phase ? (
+              <>
+                <div>
+                  <span className="text-app-on-surface-variant block text-[10px] uppercase font-bold">
+                    {tFaucet('preset')}:
+                  </span>
+                  <span className="font-bold text-app-primary">
+                    Fase {phase} ({formattedVolumeL} L / {tFaucet('plantCountUnit')})
+                  </span>
+                </div>
 
-            <div>
-              <span className="text-app-on-surface-variant block text-[10px] uppercase font-bold">
+                <div>
+                  <span className="text-app-on-surface-variant block text-[10px] uppercase font-bold">
+                    {tFaucet('plantCount')}:
+                  </span>
+                  <span className="font-bold text-app-on-surface">
+                    {plantCount} {tFaucet('plantCountUnit')}
+                  </span>
+                </div>
+
+                <div className="col-span-2 pt-1 border-t border-app-outline-variant/10 flex items-center justify-between">
+                  <span className="text-app-on-surface-variant text-[11px] font-bold uppercase">
+                    {tFaucet('totalWater')}:
+                  </span>
+                  <span className="text-[16px] font-extrabold text-app-primary font-mono">
+                    {formattedTotalL} L
+                  </span>
+                </div>
+              </>
+            ) : (
+              <div className="col-span-2">
+                <span className="text-app-on-surface-variant block text-[10px] uppercase font-bold">
+                  {tFaucet('actionHeader')}:
+                </span>
+                <span className="font-bold text-app-on-surface">
+                  {isOpenAction ? tFaucet('commandActionOpen') : tFaucet('commandActionClose')}
+                </span>
+              </div>
+            )}
+
+            <div className="col-span-2 pt-1 flex items-center gap-1.5 text-[11px]">
+              <span className="text-app-on-surface-variant font-bold">
                 {tDevices('connectionStatus')}:
               </span>
-              <span className="inline-flex items-center gap-1 font-semibold text-emerald-600">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span
+                className={`inline-flex items-center gap-1 font-semibold ${
+                  selectedDevice.connectionStatus === 'ONLINE'
+                    ? 'text-emerald-600'
+                    : 'text-amber-600'
+                }`}
+              >
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${
+                    selectedDevice.connectionStatus === 'ONLINE'
+                      ? 'bg-emerald-500 animate-pulse'
+                      : 'bg-amber-500'
+                  }`}
+                />
                 {selectedDevice.connectionStatus}
               </span>
             </div>
           </div>
         </div>
 
-        {/* Safety Note & Idempotency Key */}
+        {/* Safety Note & Submit Form */}
         <form onSubmit={handleConfirmSubmit} className="space-y-4">
           <div className="p-3 bg-app-surface-container rounded-xl text-[11px] text-app-on-surface-variant space-y-1">
             <div className="flex items-center gap-1.5 font-bold text-app-on-surface">
               <ShieldCheck size={14} className="text-app-primary" />
               <span>{tFaucet('automaticSafetyTitle')}</span>
             </div>
-            <p>{tFaucet('automaticSafetyDesc')}</p>
+            <p>
+              {isOpenAction
+                ? tFaucet('manualOpenDesc')
+                : isCloseAction
+                  ? tFaucet('manualCloseDesc')
+                  : tFaucet('automaticSafetyDesc')}
+            </p>
           </div>
 
           {/* Form Actions */}
@@ -162,7 +283,13 @@ export default function FaucetConfirmationModal({
             <button
               type="submit"
               disabled={isSubmitting}
-              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-app-primary text-white hover:bg-app-primary-container disabled:opacity-50 transition-all shadow-sm cursor-pointer active:scale-95"
+              className={`inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold text-white transition-all shadow-sm cursor-pointer active:scale-95 disabled:opacity-50 ${
+                isOpenAction
+                  ? 'bg-emerald-600 hover:bg-emerald-700'
+                  : isCloseAction
+                    ? 'bg-slate-700 hover:bg-slate-800'
+                    : 'bg-app-primary hover:bg-app-primary-container'
+              }`}
               data-testid="btn-confirm-dispense"
             >
               {isSubmitting ? (
@@ -173,7 +300,13 @@ export default function FaucetConfirmationModal({
               ) : (
                 <>
                   <CheckCircle2 size={16} />
-                  <span>{tFaucet('sendBatchCommand', { volume: volumeMl })}</span>
+                  <span>
+                    {isOpenAction
+                      ? tFaucet('sendOpenCommand')
+                      : isCloseAction
+                        ? tFaucet('sendCloseCommand')
+                        : tFaucet('sendDispenseCommand', { total: formattedTotalL })}
+                  </span>
                 </>
               )}
             </button>

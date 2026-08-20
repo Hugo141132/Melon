@@ -849,7 +849,7 @@ Translated status text shall not be sent through MQTT.
 
 ---
 
-## 18. Faucet Command Contract
+## 18. Faucet Command Contract (UI/API Compatibility / TASK-0807)
 
 Topic:
 
@@ -857,17 +857,19 @@ Topic:
 agriculture/{environment}/{siteId}/{deviceId}/command/faucet
 ```
 
-The server shall map phase to volume.
+The server maps phase and plant count to volume for dispensing, or passes discrete manual valve commands.
 
-Approved presets:
+Approved presets and actions:
 
-| Phase | Target volume |
-|---|---:|
-| `1` | `300 mL` |
-| `2` | `1,000 mL` |
-| `3` | `1,500 mL` |
+| Action | Phase | Volume per Plant | Target Volume Calculation |
+|---|---|---|---|
+| `DISPENSE` | `1` | `300 mL` (UI 0.3 L) | $300\text{ mL} \times \text{plantCount}$ |
+| `DISPENSE` | `2` | `1,000 mL` (UI 1.0 L) | $1,000\text{ mL} \times \text{plantCount}$ |
+| `DISPENSE` | `3` | `1,500 mL` (UI 1.5 L) | $1,500\text{ mL} \times \text{plantCount}$ |
+| `OPEN` | `null` | `null` | `null` (Manual continuous open) |
+| `CLOSE` | `null` | `null` | `null` (Manual continuous close) |
 
-Recommended command payload:
+Example `DISPENSE` payload (3 plants @ Phase 1 = 900 mL):
 
 ```json
 {
@@ -876,10 +878,25 @@ Recommended command payload:
   "deviceId": "water-node-001",
   "siteId": "site-01",
   "action": "DISPENSE",
-  "phase": 2,
-  "targetVolumeMl": 1000,
+  "phase": 1,
+  "plantCount": 3,
+  "targetVolumeMl": 900,
   "requestedAt": "2026-07-27T13:45:00+07:00",
-  "expiresAt": "2026-07-27T13:45:30+07:00"
+  "expiresAt": "2026-07-27T13:50:00+07:00"
+}
+```
+
+Example manual `OPEN` payload:
+
+```json
+{
+  "schemaVersion": "1.0",
+  "commandId": "cmd-01JXYZ124",
+  "deviceId": "water-node-001",
+  "siteId": "site-01",
+  "action": "OPEN",
+  "requestedAt": "2026-07-27T13:45:00+07:00",
+  "expiresAt": "2026-07-27T13:50:00+07:00"
 }
 ```
 
@@ -887,28 +904,23 @@ Recommended command payload:
 
 | Field | Type | Required | Description |
 |---|---|---:|---|
-| `schemaVersion` | String | Yes | Contract version |
-| `commandId` | String | Yes | Globally unique command identifier |
-| `deviceId` | String | Yes | Target device |
-| `siteId` | String | Recommended | Target site |
-| `action` | Enum | Yes | `DISPENSE` |
-| `phase` | Integer | Yes | `1`, `2`, or `3` |
-| `targetVolumeMl` | Integer | Yes | Server-mapped volume |
-| `requestedAt` | ISO 8601 | Yes | Backend request time |
-| `expiresAt` | ISO 8601 | Yes | Latest acceptable start time |
+| `schemaVersion` | String | Yes | Contract version (`1.0`) |
+| `commandId` | String | Yes | Globally unique command identifier (`cmd-<uuid>`) |
+| `deviceId` | String | Yes | Target canonical device ID |
+| `siteId` | String | Recommended | Target site identifier |
+| `action` | Enum | Yes | `DISPENSE`, `OPEN`, or `CLOSE` |
+| `phase` | Integer | Conditional | Required for `DISPENSE` (`1`, `2`, `3`); `null` for `OPEN`/`CLOSE` |
+| `plantCount` | Integer | Conditional | Required for `DISPENSE` ($\ge 1$); `null` for `OPEN`/`CLOSE` |
+| `targetVolumeMl` | Integer | Conditional | Server-calculated integer volume for `DISPENSE`; `null` for `OPEN`/`CLOSE` |
+| `requestedAt` | ISO 8601 | Yes | Backend request timestamp |
+| `expiresAt` | ISO 8601 | Yes | 5-minute expiration deadline |
 
-### 18.2 Command Rules
+### 18.2 Command & UI Integration Rules
 
-- The browser shall not choose an arbitrary volume.
-- The backend shall map the phase to the target volume.
-- The command shall target exactly one device.
-- The command shall not be retained.
-- The command shall expire.
-- The device shall reject unsupported phases.
-- The device shall reject an expired command.
-- The device shall not execute the same `commandId` twice.
-- User identity and role shall be stored in the backend audit record and need not be exposed to the device.
-- A new retry that may trigger physical action shall use an explicitly managed retry policy.
+- The UI dispatches commands to the backend via `POST /api/v1/devices/{deviceId}/faucet-commands` using pure HTTP `Idempotency-Key` header.
+- The server maintains exclusive volume authority: `targetVolumeMl` is calculated on the server and verified against `faucet_commands_action_check`.
+- Physical MQTT publication and ACK/event processing are handled asynchronously by `CommandPublisher`, `AcknowledgementProcessor`, and `FaucetEventProcessor` in `apps/iot-gateway`.
+- `TASK-0807` establishes and verifies UI/API compatibility only; end-to-end physical hardware validation remains under `TASK-0811`.
 
 ---
 

@@ -1353,32 +1353,31 @@ flowchart TD
 
 # 12. Faucet-Control Flows
 
-## Flow 38 — User Opens Faucet Control
+## Flow 38 — User Opens Faucet Control (TASK-0807)
 
 **Primary actor:** Owner or Admin
 **Preconditions:** Active session; device selected.
-**Trigger:** User opens control panel.
+**Trigger:** User opens `/controls` panel.
 
 **Main success flow:**
 
 1. The server verifies device access.
-2. The server verifies whether the role/user has `device.control.dispense`.
-3. The system loads device control availability.
-4. If permitted and controllable, preset controls are enabled.
-5. If monitoring-only, controls remain hidden or disabled with an explanation.
+2. The server verifies whether the role/user has `device.control.dispense` and `ENABLE_FAUCET_CONTROL=true`.
+3. The system loads device control availability and authoritative physical state (`OPEN`, `CLOSED`, `UNKNOWN`).
+4. If permitted and controllable, preset controls (Phase 1, 2, 3), `plantCount` stepper, and manual `OPEN`/`CLOSE` buttons are enabled.
+5. If monitoring-only or feature flag is disabled, controls remain disabled with a clear notice banner.
 
-**Alternative flows:** Device offline or status unknown.
+**Alternative flows:** Device offline or status unknown; banner renders specific offline/state reason.
 **Error flows:** Direct access without permission returns `403`.
-**Postconditions:** Control UI reflects current permission and device state.
+**Postconditions:** Control UI reflects current permission, device state, and authoritative physical badge.
 **Required permissions:** `device.control.dispense` for actionable access.
 **Relevant account statuses:** `ACTIVE`.
-**UI states:** Available, permission denied, offline, loading.
+**UI states:** Available, disabled banner, offline, loading.
 **Audit events:** Normally none.
-**Open decisions:** Role control matrix.
 
 ---
 
-## Flow 39 — User Selects Phase 1
+## Flow 39 — User Selects Phase 1 (TASK-0807)
 
 **Primary actor:** Authorised control user
 **Preconditions:** Control panel available.
@@ -1386,66 +1385,79 @@ flowchart TD
 
 **Main success flow:**
 
-1. The UI selects Phase 1.
-2. User enters plantCount (>= 1). UI displays calculated volume (e.g., 0.3 L).
+1. The UI highlights Phase 1 (0.3 L per plant).
+2. User adjusts `plantCount` stepper ($\ge 1$). UI displays live calculation ($0.3\text{ L} \times \text{count} = \text{Total L}$).
 3. The UI does not allow arbitrary target substitution.
-4. The system prepares confirmation context.
+4. The system opens the confirmation modal displaying device name, phase, plant count, and calculated Liters.
 
 **Alternative flows:** User changes to another phase before confirming.
 **Error flows:** Preset configuration missing; action is unavailable.
-**Postconditions:** No command exists until confirmation.
+**Postconditions:** No command exists in the backend until modal confirmation.
 **Required permissions:** `device.control.dispense`.
 **Relevant account statuses:** `ACTIVE`.
-**UI states:** Selected preset.
+**UI states:** Selected preset, live volume calculation preview.
 **Audit events:** None.
-**Open decisions:** None for target volume.
 
 ---
 
-## Flow 40 — User Selects Phase 2
+## Flow 40 — User Selects Phase 2 (TASK-0807)
 
 Same requirements as Flow 39, with:
 
-- Phase: `2`
-- User enters plantCount (>= 1). UI displays calculated volume (e.g., 1 L).
+- Phase: `2` (1.0 L per plant)
+- Live calculation: $1.0\text{ L} \times \text{plantCount} = \text{Total L}$
 
-No command is created until explicit confirmation.
+No command is created until explicit modal confirmation.
 
 ---
 
-## Flow 41 — User Selects Phase 3
+## Flow 41 — User Selects Phase 3 (TASK-0807)
 
 Same requirements as Flow 39, with:
 
-- Phase: `3`
-- User enters plantCount (>= 1). UI displays calculated volume (e.g., 1.5 L).
+- Phase: `3` (1.5 L per plant)
+- Live calculation: $1.5\text{ L} \times \text{plantCount} = \text{Total L}$
 
-No command is created until explicit confirmation.
+No command is created until explicit modal confirmation.
 
 ---
 
-## Flow 42 — User Confirms a Faucet Command
+## Flow 41b — User Selects Manual OPEN / CLOSE Action (TASK-0807)
 
 **Primary actor:** Authorised control user
-**Preconditions:** Valid preset selected; device selected.
-**Trigger:** User selects confirm.
+**Preconditions:** Control panel available; device online.
+**Trigger:** User clicks "Buka Keran (OPEN)" or "Tutup Keran (CLOSE)".
 
 **Main success flow:**
 
-1. The frontend sends the selected device and phase.
-2. The server validates session and account status.
-3. The server verifies `device.control.dispense`.
-4. The server verifies access to the selected device.
-5. The server verifies device state and conflict policy.
-6. The server maps phase to the approved server-side target volume.
-7. The server creates a unique command ID.
-8. The server stores the command as `QUEUED`.
-9. The integration layer receives the command.
-10. The frontend displays queued status.
+1. The UI opens a dedicated confirmation modal with explicit valve operation warnings.
+2. For manual actions, `phase`, `plantCount`, and volume targets are omitted.
+3. User confirms action in the modal.
+4. The frontend dispatches `POST /api/v1/devices/{deviceId}/faucet-commands` with `{ action: 'OPEN' | 'CLOSE' }` and HTTP `Idempotency-Key` header.
+5. Active command status card renders `OPEN` or `CLOSE` action, displays `UNKNOWN` physical state, and begins 2.5s polling.
 
-**Alternative flows:** User cancels confirmation; no command is created.
-**Error flows:** Permission missing, device offline, active command conflict, invalid phase.
-**Postconditions:** A traceable command exists.
+---
+
+## Flow 42 — User Confirms a Faucet Command (TASK-0807)
+
+**Primary actor:** Authorised control user
+**Preconditions:** Valid preset or manual action selected; device selected.
+**Trigger:** User selects confirm in modal.
+
+**Main success flow:**
+
+1. The frontend dispatches `POST /api/v1/devices/{deviceId}/faucet-commands` with payload and HTTP `Idempotency-Key` header.
+2. The server validates session and active account status.
+3. The server verifies `device.control.dispense` and `ENABLE_FAUCET_CONTROL=true`.
+4. The server verifies access to the selected device and ensures max 1 active command per device.
+5. For `DISPENSE`, the server computes canonical `targetVolumeMl = volumePerPlant * plantCount`.
+6. The server persists the command as `QUEUED` and records audit log.
+7. The frontend displays active status card with live indicator and polls `/api/v1/devices/{deviceId}/faucet-commands/{commandId}` every 2.5s.
+8. Status polling automatically terminates when command reaches `COMPLETED`, `FAILED`, `CANCELLED`, `TIMEOUT`, or `EXPIRED`.
+
+**Alternative flows:** User cancels confirmation; modal closes with zero network calls.
+**Error flows:** Permission missing, device offline, active command conflict (409), invalid phase.
+**Postconditions:** A traceable command exists in `QUEUED` state.
 **Required permissions:** `device.control.dispense`.
 **Relevant account statuses:** `ACTIVE`.
 **UI states:** Confirming, submitting, queued, denied.

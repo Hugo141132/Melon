@@ -398,13 +398,13 @@ monitoring.location.read
 monitoring.export
 ```
 
-### 9.5 Faucet-Control Permissions
+### 9.5 Faucet-Control Permissions (TASK-0807)
 
 ```text
-device.control.dispense
-device.control
-device.control
-device.control.history.read
+device.control.dispense (Owner: global; Admin: assigned devices; requires active account + ENABLE_FAUCET_CONTROL=true)
+device.control.open (Owner: global; Admin: assigned devices; requires active account + ENABLE_FAUCET_CONTROL=true)
+device.control.close (Owner: global; Admin: assigned devices; requires active account + ENABLE_FAUCET_CONTROL=true)
+device.control.history.read (Owner: global; Admin: assigned devices)
 ```
 
 ### 9.6 Alert Permissions
@@ -470,9 +470,9 @@ Legend:
 | `monitoring.history.read` | Allow within scope | Allow for assigned devices |
 | `monitoring.location.read` | Allow within scope | Allow for assigned devices |
 | `monitoring.export` | Allow within scope | Allow for assigned devices |
-| `device.control.dispense` | Allow within scope | Allow for assigned devices |
-| `device.control` | Allow within scope | Allow for assigned devices |
-| `device.control` | Allow within scope | Allow for assigned devices |
+| `device.control.dispense` | Allow within scope | Allow for assigned devices (requires ENABLE_FAUCET_CONTROL=true) |
+| `device.control.open` | Allow within scope | Allow for assigned devices (requires ENABLE_FAUCET_CONTROL=true) |
+| `device.control.close` | Allow within scope | Allow for assigned devices (requires ENABLE_FAUCET_CONTROL=true) |
 | `device.control.history.read` | Allow within scope | Allow for assigned devices |
 | `alert.read` | Allow within scope | Allow within assigned scope |
 | `alert.acknowledge` | Allow within scope | Allow for assigned devices |

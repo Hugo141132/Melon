@@ -1805,6 +1805,11 @@ Request:
 }
 ```
 
+Header:
+```http
+Idempotency-Key: cmd-9c8f50c6-835d-4a54-b876-b481658a50c6
+```
+
 The client shall not send arbitrary target volume as authoritative.
 
 Server mapping for DISPENSE:
@@ -1822,14 +1827,15 @@ Server validation:
 
 1. Active session.
 2. Active account.
-3. Control permission.
-4. Device assignment.
-5. Device capability `FAUCET_CONTROL`.
-6. Device is active.
-7. Device is online and controllable.
-8. Valid phase and plantCount for DISPENSE, or strictly null for OPEN/CLOSE (`TASK-0802`).
-9. No prohibited active command.
-10. Valid idempotency key.
+3. Control permission (`device.control.dispense`).
+4. Feature flag enabled (`ENABLE_FAUCET_CONTROL=true`).
+5. Device assignment.
+6. Device capability `FAUCET_CONTROL`.
+7. Device is active.
+8. Device is online and controllable.
+9. Valid phase and plantCount for DISPENSE, or strictly null for OPEN/CLOSE (`TASK-0802`).
+10. No prohibited active command.
+11. Valid `Idempotency-Key` header.
 
 Successful response:
 

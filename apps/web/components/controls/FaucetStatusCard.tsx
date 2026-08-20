@@ -11,18 +11,24 @@ import {
   Droplets,
   ArrowRight,
   ShieldCheck,
+  Power,
+  PowerOff,
+  Activity,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
+import { formatLitersDisplay } from './FaucetPresetSelector';
 
 export interface FaucetCommandEventDto {
   id: string;
-  eventType: string;
+  eventType?: string;
+  eventStatus?: string;
   previousStatus?: string | null;
-  newStatus: string;
+  newStatus?: string;
   messageId?: string | null;
   reasonCode?: string | null;
   payload?: any;
+  metadata?: any;
   createdAt: string;
 }
 
@@ -31,11 +37,14 @@ export interface FaucetCommandDto {
   commandId: string;
   idempotencyKey: string;
   deviceId: string;
-  phase: number;
-  targetVolumeMl: number;
+  action?: 'DISPENSE' | 'OPEN' | 'CLOSE' | string;
+  phase?: number | null;
+  plantCount?: number | null;
+  targetVolumeMl?: number | null;
   actualVolumeMl?: number | null;
   status: string;
   reasonCode?: string | null;
+  failureReasonCode?: string | null;
   requestedAt: string;
   sentAt?: string | null;
   acknowledgedAt?: string | null;
@@ -57,6 +66,31 @@ export interface FaucetStatusCardProps {
 export const ACTIVE_COMMAND_STATUSES = ['QUEUED', 'SENT', 'ACKNOWLEDGED', 'IN_PROGRESS'];
 export const TERMINAL_COMMAND_STATUSES = ['COMPLETED', 'FAILED', 'CANCELLED', 'TIMEOUT', 'EXPIRED'];
 
+export function getAuthoritativePhysicalStateFromCommand(
+  cmd: FaucetCommandDto | null | undefined
+): 'OPEN' | 'CLOSED' | 'UNKNOWN' {
+  if (!cmd) return 'UNKNOWN';
+
+  // Never infer OPEN/CLOSED if command is still active
+  if (ACTIVE_COMMAND_STATUSES.includes(cmd.status)) {
+    return 'UNKNOWN';
+  }
+
+  // Only terminal COMPLETED commands establish physical state
+  if (cmd.status === 'COMPLETED') {
+    if (cmd.action === 'OPEN') {
+      return 'OPEN';
+    }
+    if (cmd.action === 'CLOSE') {
+      return 'CLOSED';
+    }
+    // Completed DISPENSE does NOT infer closed valve
+    return 'UNKNOWN';
+  }
+
+  return 'UNKNOWN';
+}
+
 export default function FaucetStatusCard({
   deviceId,
   command,
@@ -77,6 +111,9 @@ export default function FaucetStatusCard({
   const targetCommandId = command.commandId || command.id;
   const status = currentCommand.status;
   const isActiveState = ACTIVE_COMMAND_STATUSES.includes(status);
+  const action = currentCommand.action || 'DISPENSE';
+  const isDispense = action === 'DISPENSE';
+  const physicalState = getAuthoritativePhysicalStateFromCommand(currentCommand);
 
   // Sync prop command changes (e.g. when a new command is created)
   useEffect(() => {
@@ -142,8 +179,8 @@ export default function FaucetStatusCard({
   }, [deviceId, targetCommandId, isActiveState]);
 
   // Status Badge Helper
-  const getStatusBadge = (status: string) => {
-    switch (status) {
+  const getStatusBadge = (commandStatus: string) => {
+    switch (commandStatus) {
       case 'QUEUED':
         return {
           bg: 'bg-blue-50 text-blue-800 border-blue-200',
@@ -204,7 +241,7 @@ export default function FaucetStatusCard({
         return {
           bg: 'bg-gray-100 text-gray-800 border-gray-300',
           icon: Clock,
-          label: status,
+          label: commandStatus,
           animate: false,
         };
     }
@@ -212,6 +249,12 @@ export default function FaucetStatusCard({
 
   const badge = getStatusBadge(currentCommand.status);
   const StatusIcon = badge.icon;
+
+  const targetVolL = currentCommand.targetVolumeMl ? currentCommand.targetVolumeMl / 1000 : null;
+  const actualVolL =
+    currentCommand.actualVolumeMl !== null && currentCommand.actualVolumeMl !== undefined
+      ? currentCommand.actualVolumeMl / 1000
+      : null;
 
   return (
     <div
@@ -227,7 +270,13 @@ export default function FaucetStatusCard({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Droplets className="text-app-primary" size={20} />
+          {action === 'OPEN' ? (
+            <Power className="text-emerald-600" size={20} />
+          ) : action === 'CLOSE' ? (
+            <PowerOff className="text-slate-700" size={20} />
+          ) : (
+            <Droplets className="text-app-primary" size={20} />
+          )}
           <h3 className="text-[16px] font-bold text-app-on-surface">
             {tFaucet('statusCardTitle')}
           </h3>
@@ -261,19 +310,31 @@ export default function FaucetStatusCard({
           <StatusIcon size={22} className={badge.animate ? 'animate-spin' : ''} />
           <div>
             <p className="text-[14px] font-bold leading-tight">{badge.label}</p>
+            <span className="text-[11px] font-medium opacity-90 block mt-0.5">
+              {action === 'OPEN'
+                ? tFaucet('commandActionOpen')
+                : action === 'CLOSE'
+                  ? tFaucet('commandActionClose')
+                  : tFaucet('commandActionDispense')}
+            </span>
           </div>
         </div>
 
         <div className="text-right">
-          <span className="text-[20px] font-extrabold block leading-tight">
-            {(currentCommand.actualVolumeMl ?? currentCommand.targetVolumeMl).toLocaleString(
-              'id-ID'
-            )}{' '}
-            mL
-          </span>
-          <span className="text-[10px] uppercase font-bold opacity-80">
-            {tFaucet('phaseTargetSubtitle', { phase: currentCommand.phase })}
-          </span>
+          {isDispense && targetVolL !== null ? (
+            <>
+              <span className="text-[20px] font-extrabold block leading-tight font-mono">
+                {formatLitersDisplay(actualVolL ?? targetVolL)} L
+              </span>
+              <span className="text-[10px] uppercase font-bold opacity-80">
+                {currentCommand.phase
+                  ? tFaucet('phaseTargetSubtitle', { phase: currentCommand.phase })
+                  : tFaucet('totalWater')}
+              </span>
+            </>
+          ) : (
+            <span className="text-[14px] font-extrabold block font-mono">{action}</span>
+          )}
         </div>
       </div>
 
@@ -288,34 +349,76 @@ export default function FaucetStatusCard({
           </span>
         </div>
 
-        <div>
-          <span className="text-app-on-surface-variant text-[10px] font-bold uppercase block">
-            {tFaucet('targetVolumeHeader')}
-          </span>
-          <span className="font-bold text-app-primary">
-            {currentCommand.targetVolumeMl.toLocaleString('id-ID')} mL
-          </span>
-        </div>
+        {isDispense ? (
+          <>
+            <div>
+              <span className="text-app-on-surface-variant text-[10px] font-bold uppercase block">
+                {tFaucet('totalWater')} (Target):
+              </span>
+              <span className="font-bold text-app-primary font-mono">
+                {targetVolL !== null ? `${formatLitersDisplay(targetVolL)} L` : '—'}
+              </span>
+            </div>
 
-        <div>
-          <span className="text-app-on-surface-variant text-[10px] font-bold uppercase block">
-            {tFaucet('actualVolumeHeader')}:
-          </span>
-          <span className="font-bold text-app-on-surface">
-            {currentCommand.actualVolumeMl !== null && currentCommand.actualVolumeMl !== undefined
-              ? `${currentCommand.actualVolumeMl.toLocaleString('id-ID')} mL`
-              : tCommon('waiting')}
+            <div>
+              <span className="text-app-on-surface-variant text-[10px] font-bold uppercase block">
+                {tFaucet('actualVolumeHeader')}:
+              </span>
+              <span className="font-bold text-app-on-surface font-mono">
+                {actualVolL !== null ? `${formatLitersDisplay(actualVolL)} L` : tCommon('waiting')}
+              </span>
+            </div>
+          </>
+        ) : (
+          <div className="col-span-2">
+            <span className="text-app-on-surface-variant text-[10px] font-bold uppercase block">
+              {tFaucet('actionHeader')}:
+            </span>
+            <span className="font-bold text-app-on-surface">
+              {action === 'OPEN' ? tFaucet('commandActionOpen') : tFaucet('commandActionClose')}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Authoritative Physical State Indication */}
+      <div
+        className={cn(
+          'p-3 rounded-xl border text-xs flex items-center justify-between gap-2',
+          physicalState === 'OPEN' && 'bg-emerald-50/70 border-emerald-200 text-emerald-900',
+          physicalState === 'CLOSED' && 'bg-slate-50 border-slate-200 text-slate-900',
+          physicalState === 'UNKNOWN' && 'bg-amber-50/70 border-amber-200 text-amber-900'
+        )}
+        data-testid="status-card-physical-state"
+      >
+        <div className="flex items-center gap-2 font-medium">
+          <Activity size={15} />
+          <span>{tFaucet('physicalStateTitle')}:</span>
+          <span className="font-bold">
+            {physicalState === 'OPEN'
+              ? tFaucet('physicalStateOpen')
+              : physicalState === 'CLOSED'
+                ? tFaucet('physicalStateClosed')
+                : tFaucet('physicalStateUnknown')}
           </span>
         </div>
+        <span className="text-[10px] opacity-80 hidden sm:inline">
+          {physicalState === 'OPEN'
+            ? tFaucet('physicalStateOpenDesc')
+            : physicalState === 'CLOSED'
+              ? tFaucet('physicalStateClosedDesc')
+              : tFaucet('physicalStateUnknownDesc')}
+        </span>
       </div>
 
       {/* Reason / Failure Banner if FAILED */}
-      {currentCommand.status === 'FAILED' && currentCommand.reasonCode && (
-        <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800">
-          <span className="font-bold">{tFaucet('failureReasonLabel')}</span>
-          <span>{currentCommand.reasonCode}</span>
-        </div>
-      )}
+      {currentCommand.status === 'FAILED' &&
+        (currentCommand.reasonCode || currentCommand.failureReasonCode) && (
+          <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800">
+            <span className="font-bold">{tFaucet('failureReasonLabel')}</span>
+            <span>{currentCommand.reasonCode || currentCommand.failureReasonCode}</span>
+          </div>
+        )}
 
       {/* State Transitions Timeline */}
       {currentCommand.events && currentCommand.events.length > 0 && (
@@ -325,26 +428,29 @@ export default function FaucetStatusCard({
           </span>
 
           <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
-            {currentCommand.events.map((evt) => (
-              <div
-                key={evt.id}
-                className="flex items-center justify-between text-[11px] p-2 bg-app-surface-container-lowest rounded-lg border border-app-outline-variant/20"
-              >
-                <div className="flex items-center gap-1.5 font-mono">
-                  {evt.previousStatus && (
-                    <>
-                      <span className="text-app-on-surface-variant">{evt.previousStatus}</span>
-                      <ArrowRight size={12} className="text-app-outline" />
-                    </>
-                  )}
-                  <span className="font-bold text-app-primary">{evt.newStatus}</span>
-                </div>
+            {currentCommand.events.map((evt) => {
+              const statusName = evt.newStatus || evt.eventStatus || 'UNKNOWN';
+              return (
+                <div
+                  key={evt.id}
+                  className="flex items-center justify-between text-[11px] p-2 bg-app-surface-container-lowest rounded-lg border border-app-outline-variant/20"
+                >
+                  <div className="flex items-center gap-1.5 font-mono">
+                    {evt.previousStatus && (
+                      <>
+                        <span className="text-app-on-surface-variant">{evt.previousStatus}</span>
+                        <ArrowRight size={12} className="text-app-outline" />
+                      </>
+                    )}
+                    <span className="font-bold text-app-primary">{statusName}</span>
+                  </div>
 
-                <span className="text-app-on-surface-variant font-mono">
-                  {new Date(evt.createdAt).toLocaleTimeString('id-ID')}
-                </span>
-              </div>
-            ))}
+                  <span className="text-app-on-surface-variant font-mono">
+                    {new Date(evt.createdAt).toLocaleTimeString('id-ID')}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

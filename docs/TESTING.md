@@ -1172,7 +1172,9 @@ Verify:
 - Late event is handled according to policy.
 - Audit event exists.
 
-## 20.8 Hardware-in-the-Loop Volume Test
+## 20.8 Hardware-in-the-Loop Volume Test (TASK-0811 / Scope Demarcation)
+
+*Note:* Physical hardware and flow accuracy validation remain under `TASK-0811`. Software and UI tests under `TASK-0807` verify client/API contracts, state handling, and rendering only.
 
 When hardware is ready:
 
@@ -1189,6 +1191,26 @@ When hardware is ready:
 Tolerance remains `TBD`.
 
 Software testing shall not define the acceptable physical accuracy without hardware-team approval.
+
+## 20.9 Faucet Control UI & Performance Verification (TASK-0807)
+
+Comprehensive software, UI, and performance verification completed under `TASK-0807`:
+
+### A. Component & Unit Test Coverage (`faucet-control-ui.test.tsx`)
+- **Coverage**: 24/24 unit test cases passing (100%).
+- **Presets & Liters Rendering**: Verified 0.3 L, 1.0 L, 1.5 L formatting.
+- **Plant Count Calculations**: Verified live multiplier ($0.3\text{ L} \times \text{count} = \text{Total L}$) and minimum clamp ($\ge 1$).
+- **Manual Actions**: Verified distinct modal dialogs and payload dispatch for `OPEN` and `CLOSE`.
+- **Physical State Derivation**: Verified strict mapping to `OPEN` (completed open), `CLOSED` (completed close), and `UNKNOWN` (active commands, failures, and dispense completions).
+- **Safety Gating**: Verified disablement banners when offline, lacking permission, or when `ENABLE_FAUCET_CONTROL=false`.
+- **History Table**: Verified action-aware rendering and pagination controls.
+
+### B. UI Responsiveness & Performance Benchmarks
+- **Initial Mount Latency**: `FaucetControlPanel` mounts in $31\text{ ms}$ ($< 50\text{ ms}$ threshold), DOM tree size 119 elements.
+- **Interaction Latency**: Rapid `plantCount` stepper average $1.2\text{ ms/click}$, preset switching $1.8\text{ ms}$, manual triggers $1.1\text{ ms}$.
+- **Modal Lifecycle & Memory Safety**: 50 consecutive open/close cycles completed in $570\text{ ms}$ with 0 lingering dialog nodes.
+- **Polling Resource Safety**: Verified 2,500ms status polling strictly during active states (`QUEUED`, `SENT`, `ACKNOWLEDGED`, `IN_PROGRESS`) and immediate timer destruction (`clearInterval`) upon terminal states with zero blind retries.
+- **Responsive Layout Verification**: Playwright verified $390\times 844$ (mobile), $768\times 1024$ (tablet), and $1280\times 800$ (desktop) with 0 horizontal overflow and 0 console errors.
 
 ---
 

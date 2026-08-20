@@ -473,6 +473,24 @@ State categories shall remain separate:
 
 Server data shall not be copied into global client state unless necessary.
 
+### 8.5 Faucet Control UI Subsystem (`/controls` / TASK-0807)
+
+The actuator control interface is structured into modular, single-responsibility components:
+
+```text
+/controls (Server Page Guard)
+└── FaucetControlPanel (Client Root Container)
+    ├── FaucetPresetSelector (Presets, Plant Count Stepper, Manual Actions, Physical Badge)
+    ├── FaucetConfirmationModal (Action-aware Dialog with Warning & Volume Summary)
+    ├── FaucetStatusCard (Active Command Display, 2.5s Polling Loop, Physical State Derivation)
+    └── FaucetHistoryTable (Paginated History, Filter, Status Badges)
+```
+
+**Architecture Contracts:**
+1. **Idempotency**: Client generates `cmd-<uuid>` and transmits it exclusively via HTTP header `Idempotency-Key`.
+2. **Polling Lifecycle**: `FaucetStatusCard` polls `GET /api/v1/devices/{deviceId}/faucet-commands/{commandId}` every 2,500ms strictly while status is `QUEUED`, `SENT`, `ACKNOWLEDGED`, or `IN_PROGRESS`. Polling immediately terminates upon reaching any terminal state (`COMPLETED`, `FAILED`, `CANCELLED`, `TIMEOUT`, `EXPIRED`) or upon component unmount.
+3. **Physical State Derivation**: Authoritative physical valve state (`OPEN`, `CLOSED`, `UNKNOWN`) is derived strictly from verified terminal command outcomes (`COMPLETED OPEN` $\rightarrow$ `OPEN`, `COMPLETED CLOSE` $\rightarrow$ `CLOSED`; active commands, failures, and `DISPENSE` completions strictly present `UNKNOWN`).
+
 ---
 
 ## 9. Authentication Architecture

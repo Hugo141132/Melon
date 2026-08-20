@@ -1862,24 +1862,35 @@ EXPIRED
 ## TASK-0807 — Implement Faucet Control UI
 
 **Priority:** `P0`
-**Status:** `BACKLOG`
+**Status:** `DONE`
 **Dependencies:** `TASK-0803`, `TASK-0806`
 **Historical Completion:** 2026-08-03 — Built Faucet Control UI (/controls page, FaucetPresetSelector, FaucetConfirmationModal, FaucetStatusCard, FaucetHistoryTable) with Phase 1/2/3 preset volumes (300/1000/1500 mL), explicit confirmation modal, permission/feature flag/offline/active-command disabled state handling, active-only status polling, timeline display, and execution history.
-**Revision Note (2026-08-19):** Status set to `BACKLOG` (pending `TASK-0803`, `TASK-0806`). Requires UI revision to display 0.3 L / 1 L / 1.5 L presets, capture `plantCount` input (integer >= 1), display calculation preview, incorporate manual `OPEN` and `CLOSE` controls, enforce confirmation modal requirements, and present accurate physical state (`OPEN` / `CLOSED` / `UNKNOWN`).
+**Revision Completion (2026-08-20):** Implemented and verified complete Faucet Control UI revision on `/controls` adhering to `Premium Minimal Ops` UI standards:
+- Preset volume display in Liters: Phase 1 = `0.3 L / tanaman`, Phase 2 = `1 L / tanaman`, Phase 3 = `1.5 L / tanaman`.
+- `plantCount` integer input with stepper buttons (minimum 1, default 1) and live calculation preview (`preset.volumeL × plantCount = totalVolumeL`).
+- Browser-side total calculation preview while strictly preserving server-side authority for final validation and execution.
+- Confirmation modal with action-aware layouts: for `DISPENSE` displaying device name, site location, phase, water per plant (L), plant count, total water (L), and safety warnings; for manual `OPEN` and `CLOSE` displaying device name, site, action title, safety description, and status.
+- Manual `OPEN` and `CLOSE` valve controls wired to `POST /api/v1/devices/{deviceId}/faucet-commands` with action `OPEN` | `CLOSE` without fabricating volume or phase parameters.
+- Idempotency integration: client dispatches unique `cmd-<uuid>` via HTTP header `Idempotency-Key` without arbitrary JSON body injection.
+- Authoritative physical faucet state presentation (`OPEN`, `CLOSED`, `UNKNOWN`) strictly mapped from the TASK-0806 state machine: `COMPLETED OPEN` → `OPEN`, `COMPLETED CLOSE` → `CLOSED`, `COMPLETED DISPENSE` → `UNKNOWN`, active/failed/timeout/uncertain → `UNKNOWN`. Never inferred physical state from API submission, publication, or ACK.
+- Status Polling: `FaucetStatusCard` executes 2,500ms status polling strictly during active states (`QUEUED`, `SENT`, `ACKNOWLEDGED`, `IN_PROGRESS`) and terminates immediately upon terminal states or unmount with zero blind retries.
+- Full disabled and warning state handling for null device, unauthenticated/unauthorized users (`device.control.dispense`), disabled feature flag (`ENABLE_FAUCET_CONTROL=false`), offline devices (`OFFLINE`/`INACTIVE`), and active command in progress.
+- 100% Indonesian and English translation key parity with matching ICU placeholders.
+- Verified 100% test pass rate across 24 unit tests (`apps/web/test/unit/faucet-control-ui.test.tsx`), workspace TypeScript typecheck (0 errors), Semgrep scan (0 findings), and Next.js production build.
 
 ### Acceptance Criteria
 
-- User selects phase and provides `plantCount` (integer >= 1).
-- UI displays volume presets in Liters (`0.3 L`, `1 L`, `1.5 L`).
-- Browser calculates client-side preview, but server strictly validates and computes authoritative target volume.
-- Confirmation modal displays: device, phase, volume per plant (L), plant count, total water (L), and device warnings.
-- Manual `OPEN` and `CLOSE` controls available for authorised users.
-- Device name and status are shown.
-- Permission denied is handled.
-- Offline and busy states are handled.
-- Physical state is displayed as `OPEN`, `CLOSED`, or `UNKNOWN`.
-- Queue, progress, completion, failure, and timeout states exist.
-- Completion is not shown prematurely.
+- [x] User selects phase and provides `plantCount` (integer >= 1).
+- [x] UI displays volume presets in Liters (`0.3 L`, `1 L`, `1.5 L`).
+- [x] Browser calculates client-side preview, but server strictly validates and computes authoritative target volume.
+- [x] Confirmation modal displays: device, phase, volume per plant (L), plant count, total water (L), and device warnings.
+- [x] Manual `OPEN` and `CLOSE` controls available for authorised users.
+- [x] Device name and status are shown.
+- [x] Permission denied is handled.
+- [x] Offline and busy states are handled.
+- [x] Physical state is displayed as `OPEN`, `CLOSED`, or `UNKNOWN`.
+- [x] Queue, progress, completion, failure, and timeout states exist.
+- [x] Completion is not shown prematurely.
 
 ---
 

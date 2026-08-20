@@ -922,28 +922,36 @@ TIMEOUT
 EXPIRED
 ```
 
-### Constraints
-
-```text
-action = 'DISPENSE' → phase IS NOT NULL AND plant_count IS NOT NULL AND target_volume_ml IS NOT NULL
-action IN ('OPEN', 'CLOSE') → phase IS NULL AND plant_count IS NULL AND target_volume_ml IS NULL
-```
-
-Recommended check:
+### Constraints (TASK-0802 / TASK-0807)
 
 ```sql
+ALTER TABLE "faucet_commands" ADD CONSTRAINT "faucet_commands_action_check" 
 CHECK (
-  (action = 'DISPENSE' AND phase IN (1, 2, 3) AND plant_count >= 1 AND target_volume_ml IS NOT NULL) OR
-  (action IN ('OPEN', 'CLOSE') AND phase IS NULL AND plant_count IS NULL AND target_volume_ml IS NULL)
-)
+  (
+    action = 'DISPENSE' 
+    AND phase IS NOT NULL 
+    AND plant_count IS NOT NULL 
+    AND plant_count >= 1 
+    AND target_volume_ml IS NOT NULL 
+    AND target_volume_ml = (CASE phase WHEN 1 THEN 300 WHEN 2 THEN 1000 WHEN 3 THEN 1500 ELSE -1 END) * plant_count
+  )
+  OR
+  (
+    action IN ('OPEN', 'CLOSE') 
+    AND phase IS NULL 
+    AND plant_count IS NULL 
+    AND target_volume_ml IS NULL
+  )
+);
 ```
 
-Additional constraints:
-
-- `command_id` unique.
-- `idempotency_key` unique within an appropriate scope.
-- Final states shall not be changed back to non-final states without reconciliation logic.
-- Commands shall not be hard-deleted through normal UI actions.
+Rules:
+- Legacy `faucet_commands_phase_volume_check` dropped.
+- `target_volume_ml` dynamically validated on insertion against `(preset_volume_ml) * plant_count`.
+- `OPEN` and `CLOSE` commands strictly enforce `NULL` for `phase`, `plant_count`, and `target_volume_ml`.
+- `command_id` globally unique.
+- `idempotency_key` unique across records.
+- Partial unique index `faucet_commands_one_active_per_device` enforces maximum 1 active command in status `('QUEUED', 'SENT', 'ACKNOWLEDGED', 'IN_PROGRESS')` per device.
 
 ### Indexes
 

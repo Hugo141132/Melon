@@ -562,106 +562,58 @@ Historical charts render on domain detail pages (`/soil` and `/water`; legacy `/
 
 ---
 
-## 12. Faucet Control
+## 12. Faucet Control (`/controls` / TASK-0807)
 
-Faucet control has physical consequences and shall be presented as a deliberate workflow rather than an instantaneous decorative button.
+Faucet control has physical consequences and is presented as a deliberate, safety-first workflow adhering to `Premium Minimal Ops`.
 
-### 12.1 Presets
+### 12.1 Presets & Plant Count Stepper
 
-The interface shall provide:
+The interface provides three prominent Liter preset cards with secondary phase badges:
 
-| Phase | Target volume |
-|---|---:|
-| Phase 1 | 0.3 L |
-| Phase 2 | 1 L |
-| Phase 3 | 1.5 L |
+| Phase | Volume per Plant | Default Display (1 plant) | Formula |
+|---|---|---|---|
+| Phase 1 | 0.3 L / plant | 0.3 L | $0.3\text{ L} \times \text{plantCount}$ |
+| Phase 2 | 1.0 L / plant | 1.0 L | $1.0\text{ L} \times \text{plantCount}$ |
+| Phase 3 | 1.5 L / plant | 1.5 L | $1.5\text{ L} \times \text{plantCount}$ |
 
-The volume shall be displayed more prominently than the phase label.
+- **Plant Count Stepper**: Dedicated numerical input and minus/plus buttons ($\text{integer} \ge 1$) with live calculation preview (`0.3 L × 3 tanaman = 0.9 L total air`).
+- **Manual Actions**: Dedicated "Buka Keran (OPEN)" and "Tutup Keran (CLOSE)" buttons.
 
-### 12.2 Control Availability
+### 12.2 Authoritative Physical State Badge
 
-Controls shall be disabled when:
+Displays the authoritative physical valve status at the header:
+- **`OPEN`** (Emerald badge, pulsing dot): Valve confirmed open from completed `OPEN` action.
+- **`CLOSED`** (Slate badge): Valve confirmed closed from completed `CLOSE` action.
+- **`UNKNOWN`** (Amber badge): Active command in progress, completed `DISPENSE` (uninstrumented valve), or failed/timeout state.
 
-- the user lacks `device.control`;
+### 12.3 Control Availability & Safety Gating
+
+Controls are disabled with a clear notice banner when:
+- user lacks `device.control.dispense`;
+- feature flag `ENABLE_FAUCET_CONTROL` is `false`;
 - no device is selected;
-- the selected device is offline;
-- device data is too stale under the approved policy;
-- another incompatible command is active;
-- the backend reports that control is unavailable;
-- the session is invalid;
-- a required safety condition is not satisfied.
+- selected device is offline or not a `WATER_TANK_NODE`;
+- an active command (`QUEUED`, `SENT`, `ACKNOWLEDGED`, `IN_PROGRESS`) is in progress.
 
-The disabled state shall explain why the action is unavailable.
+### 12.4 Confirmation Dialogs
 
-### 12.3 Confirmation Dialog
+Clicking a preset or manual action opens a dedicated modal dialog:
+- **Dispense Confirmation**: Displays device name, phase, plant count, volume per plant, and calculated total Liters.
+- **Manual Open/Close Confirmation**: Displays explicit valve operation safety warnings.
+- Dispatches pure HTTP header `Idempotency-Key` upon user confirmation.
 
-Selecting a phase shall open a confirmation dialog.
+### 12.5 Command Lifecycle & Status Polling
 
-The dialog shall display:
+- Active commands display in `FaucetStatusCard` with live polling indicator.
+- Polling occurs every 2,500ms strictly during active states (`QUEUED`, `SENT`, `ACKNOWLEDGED`, `IN_PROGRESS`).
+- Polling terminates immediately upon reaching any terminal state (`COMPLETED`, `FAILED`, `CANCELLED`, `TIMEOUT`, `EXPIRED`).
+- Zero blind retries: Failed or timed-out commands require conscious user re-confirmation.
 
-- selected device;
-- site or location;
-- selected phase;
-- target volume;
-- current device status;
-- available tank volume when supplied;
-- clear Cancel and Confirm actions.
+### 12.6 Responsive Layout
 
-Recommended confirmation text:
-
-> Confirm dispensing 1 L from the selected device.
-
-Do not use vague confirmation text such as “Are you sure?”
-
-### 12.4 Command Lifecycle
-
-Supported internal command statuses:
-
-- `QUEUED`
-- `SENT`
-- `ACKNOWLEDGED`
-- `IN_PROGRESS`
-- `COMPLETED`
-- `FAILED`
-- `CANCEL_REQUESTED`
-- `CANCELLED`
-- `TIMEOUT`
-- `REJECTED`
-
-The UI shall translate labels without changing internal values.
-
-### 12.5 Progress Presentation
-
-When progress data is available, show:
-
-- actual dispensed volume;
-- target volume;
-- progress percentage;
-- elapsed time;
-- Stop action for authorised users.
-
-When progress data is unavailable, show a state-based progress indicator rather than fabricating a percentage.
-
-### 12.6 Completion State
-
-For a completed command, display:
-
-- target volume;
-- actual volume;
-- start time;
-- completion time;
-- initiating user where authorised;
-- command ID in detailed or audit views.
-
-### 12.7 Failure State
-
-For failed, rejected, or timed-out commands, display:
-
-- clear status;
-- user-safe reason;
-- recommended next action where known;
-- retry option only when the backend permits it;
-- no automatic repeat execution.
+- **Mobile (390px)**: Single-column stack, touch targets $\ge 40\text{px}$, zero horizontal overflow.
+- **Tablet (768px)**: 2-column layout balancing preset grid and status card.
+- **Desktop (1280px+)**: Full responsive grid with paginated history table.
 
 ---
 

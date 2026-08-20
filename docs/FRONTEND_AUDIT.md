@@ -240,8 +240,13 @@ Standard Next.js App Router workspace with `app/`, `components/`, `lib/`, `docs/
 ### 22. Existing Device-Selection Components
 None. Current UI assumes a single farm view without device picker, multi-device list, or `deviceId` context.
 
-### 23. Existing Faucet-Control Components
-3-phase preset volume selector (Phase 1: 300mL, Phase 2: 1,000mL, Phase 3: 1,500mL) and valve toggle button in `app/air/page.tsx`. Operates strictly with local mock state; physical control is disabled.
+### 23. Faucet-Control Components (`/controls` / TASK-0807)
+Completed and verified under `TASK-0807`. Dedicated `/controls` page hosting modular components:
+* `FaucetControlPanel`: Root controller coordinating context, modal states, and HTTP `Idempotency-Key` header dispatch.
+* `FaucetPresetSelector`: 3-phase Liter presets (0.3 L, 1.0 L, 1.5 L), `plantCount` stepper ($\ge 1$) with live total volume calculation preview (`0.3 L × 3 tanaman = 0.9 L`), manual `OPEN`/`CLOSE` buttons, and authoritative physical state badge (`OPEN`, `CLOSED`, `UNKNOWN`).
+* `FaucetConfirmationModal`: Action-aware modal dialog for `DISPENSE` and manual `OPEN`/`CLOSE` with device details and operation warnings.
+* `FaucetStatusCard`: Active command tracker executing 2,500ms status polling strictly during active states (`QUEUED`, `SENT`, `ACKNOWLEDGED`, `IN_PROGRESS`) and immediate termination upon terminal states.
+* `FaucetHistoryTable`: Paginated execution history table with status badges and action-aware details.
 
 ### 24. Existing User-Management or Approval Components
 `/pengaturan` settings page has Owner summary card, `/register` has a 2-step registration form for sign-up input. No Owner approval dashboard, pending queue, user list, or account status controls exist.

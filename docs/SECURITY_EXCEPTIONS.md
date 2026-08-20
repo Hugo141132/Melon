@@ -91,6 +91,7 @@ All exceptions must be recorded in `scripts/security-exceptions.json` using the 
 - **TASK-0504 / Monitoring Reconciliation Audit (2026-08-19):** Confirmed zero secret exceptions and zero dependency exceptions introduced; monitoring history and latest endpoints enforce server-side authentication, RBAC authorization, and Admin canonical ID concealment with zero security exceptions.
 - **TASK-0805 Audit (2026-08-20):** Confirmed zero secret exceptions and zero dependency exceptions introduced; device acknowledgement processing enforces strict QoS 1 schema validation, stored action assertions, and idempotent duplicate handling without security exceptions.
 - **TASK-0806 Audit (2026-08-20):** Confirmed zero secret exceptions and zero dependency exceptions introduced; command event state machine enforces strict QoS 1 schema validation, stored action assertions, physical state mapping, and idempotent duplicate handling without security exceptions.
+- **TASK-0807 Audit (2026-08-20):** Confirmed zero secret exceptions and zero dependency exceptions introduced; Faucet Control UI dispatches commands using pure HTTP `Idempotency-Key` header, enforces server-derived volumes, restricts manual actions to modal confirmation, and executes 2.5s status polling strictly during active states with zero blind retries.
 
 ---
 
@@ -134,3 +135,15 @@ The verified implementation of `TASK-0806` (`FaucetEventProcessor` in `@kebun-me
 - **Physical State Integrity:** Prevents false claims of closed valve positions following dispense cycles by mapping `COMPLETED DISPENSE` to `physicalState: 'UNKNOWN'`.
 - **Terminal Immutability & Idempotency:** Commands in terminal statuses ignore incoming events without modification; duplicate `messageId` events are ignored without invoking redundant writes.
 <!-- TASK-0806 Reconciled: 2026-08-20 -->
+
+---
+
+## Faucet Control UI Security Exceptions Audit Note (Reconciled 2026-08-20)
+
+The verified implementation of `TASK-0807` (Faucet Control UI on `/controls` in `@kebun-melon/web`) introduced zero new security exceptions, zero new secrets, and zero new dependencies:
+- **Zero Security Exceptions:** Adheres strictly to `SEC-OPS-001` (zero unapproved secrets) and `SEC-OPS-004` (zero unapproved high vulnerabilities).
+- **Idempotency & Header Isolation:** `Idempotency-Key` is transmitted purely via standard HTTP request headers without polluting request payload bodies.
+- **Volume Authority:** UI respects server-derived volume calculations, sending only `phase` and integer `plantCount >= 1`.
+- **Physical State Safety:** Physical valve state strictly mapped to `OPEN`, `CLOSED`, or `UNKNOWN` without false claims of closed positions after dispensing.
+- **Zero Blind Retries:** Polling is read-only `GET` status polling without automatic retries upon failure or timeout.
+<!-- TASK-0807 Reconciled: 2026-08-20 -->

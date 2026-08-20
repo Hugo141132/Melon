@@ -473,32 +473,44 @@ Historical data shall remain isolated by device.
 
 ## 11. Faucet-Control Requirements
 
-### 11.1 Presets (PRD-FR-029 / PRD-DATA-003)
+### 11.1 Presets & Actions (PRD-FR-029 / PRD-DATA-003 / TASK-0807)
 
-The system shall provide the following faucet-control presets:
+The system shall provide the following faucet-control actions and presets on `/controls`:
 
-| Phase | Target volume |
-|---|---:|
-| Phase 1 | 300 mL (UI presents as 0.3 L) |
-| Phase 2 | 1,000 mL |
-| Phase 3 | 1,500 mL |
+#### A. Predefined Dispensing Presets (`DISPENSE`)
 
-These values are product-level command targets. Physical measurement and execution accuracy are managed by the hardware system and integration contract.
+| Phase | Volume per Plant | Default Total (1 plant) | Calculation Formula |
+|---|---|---|---|
+| Phase 1 | 300 mL (UI 0.3 L) | 0.3 L | $300\text{ mL} \times \text{plantCount}$ |
+| Phase 2 | 1,000 mL (UI 1.0 L) | 1.0 L | $1,000\text{ mL} \times \text{plantCount}$ |
+| Phase 3 | 1,500 mL (UI 1.5 L) | 1.5 L | $1,500\text{ mL} \times \text{plantCount}$ |
 
-### 11.2 Control Workflow (PRD-FR-030)
+- **Plant Count Multiplier**: The UI provides an interactive stepper ($\text{integer} \ge 1$, default 1) with live preview calculation ($\text{Volume/plant} \times \text{Count} = \text{Total Liters}$).
+- **Server Authority**: The backend computes canonical integer `targetVolumeMl` directly from `phase` and `plantCount`; client-supplied volume authority is rejected.
+
+#### B. Manual Valve Actions (`OPEN` / `CLOSE`)
+
+- Direct manual valve actuation (`OPEN` / `CLOSE`) without phase or volume parameters.
+- Protected by distinct action-aware confirmation modals.
+
+#### C. Authoritative Physical State Indication
+
+- Displays authoritative valve physical state: `OPEN` (emerald), `CLOSED` (slate), or `UNKNOWN` (amber).
+- Derived exclusively from terminal completed commands: `COMPLETED OPEN` $\rightarrow$ `OPEN`, `COMPLETED CLOSE` $\rightarrow$ `CLOSED`, while active commands, failures, and `DISPENSE` completions strictly present `UNKNOWN`.
+
+### 11.2 Control Workflow (PRD-FR-030 / TASK-0807)
 
 The faucet-control workflow shall:
 
-1. Require an authenticated and authorised user.
-2. Require selection of a specific device.
-3. Verify that the device is available for control.
-4. Present the selected phase and target volume.
-5. Require explicit user confirmation.
-6. Create a unique command identifier.
-7. Submit the command through the backend integration layer.
-8. Display command status.
-9. Display acknowledgement, completion, failure, cancellation, or timeout.
-10. Record the command in the activity and audit history.
+1. Require an authenticated and authorised user session with `device.control.dispense` permission and `ENABLE_FAUCET_CONTROL=true`.
+2. Require selection of a specific, online `WATER_TANK_NODE` device.
+3. Present the selected action, phase, plant count, and calculated total volume in Liters.
+4. Require explicit user confirmation in a dedicated action-aware modal.
+5. Submit the command to `POST /api/v1/devices/{deviceId}/faucet-commands` transmitting a unique `Idempotency-Key` HTTP header.
+6. Display active command status card with dynamic Liters/action formatting and live polling indicator.
+7. Poll command status every 2.5 seconds strictly during active lifecycle states (`QUEUED`, `SENT`, `ACKNOWLEDGED`, `IN_PROGRESS`).
+8. Terminate polling immediately upon reaching any terminal state (`COMPLETED`, `FAILED`, `CANCELLED`, `TIMEOUT`, `EXPIRED`) with zero blind retries.
+9. Record all command activity in the paginated faucet history table and audit log.
 
 Suggested internal command statuses include:
 
