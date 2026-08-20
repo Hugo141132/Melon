@@ -1640,7 +1640,7 @@ integration_errors
 - Invalid coordinate rejected.
 - Invalid faucet phase rejected.
 - Phase-volume mismatch rejected.
-- Duplicate idempotency key returns existing command.
+- Duplicate idempotency key with identical semantic parameters (device, action, phase, plant count) returns existing command. Conflicting parameters yield 409 Conflict.
 - Audit records remain append-only.
 
 ## 28.2 Transaction Tests

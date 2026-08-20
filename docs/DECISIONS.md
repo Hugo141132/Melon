@@ -81,8 +81,8 @@
 | `TASK-0302` | Implement Device Registry | `BACKLOG` | Depends on `TASK-0104` (BLOCKED). |
 | `TASK-0304` | Implement User-Device Assignments | `BACKLOG` | Depends on `TASK-0302` and `TASK-0209` (both blocked/backlog). |
 | `TASK-0401` | Create IoT Gateway Service | `BACKLOG` | Depends on `TASK-0101` (BACKLOG) and `TASK-0002` (DONE). Awaits `TASK-0101`. |
-| `TASK-0801` | Finalise Faucet Permission Matrix | `BLOCKED` | Depends on `TASK-0002` (DONE). Remains BLOCKED: cancellation/stop, timeout values, and Owner control scope still TBD. |
-| `TASK-0802` | Implement Faucet Command Database Model | `BACKLOG` | Depends on `TASK-0104` (BLOCKED). |
+| `TASK-0801` | Finalise Faucet Permission Matrix | `IMPLEMENTED` | Completed. |
+| `TASK-0802` | Implement Faucet Command Database Model | `IMPLEMENTED` | Completed. |
 | `TASK-0803` | Implement Faucet Command API | `IMPLEMENTED` | Completed. |
 | `TASK-1010` | Controlled Production Release | `BLOCKED` | Blocked until dual written sign-off (Owner + Hardware Lead) for `ENABLE_FAUCET_CONTROL=true`. This is a production-activation block, not an implementation block. |
 
@@ -415,11 +415,11 @@ The following decisions remain TBD and must be resolved before the listed tasks 
 |---|---|---|
 | ORM selection (Prisma vs Drizzle) | `TASK-0104` | Approved: Prisma (`DEC-INF-076`). |
 | `SameSite` cookie policy exact value | `TASK-0204` | `SameSite=Strict` not yet approved. |
-| Device offline threshold (minutes) | `TASK-0407` | No numeric value approved. |
-| Device stale threshold (minutes) | `TASK-0407` | No numeric value approved. |
-| Command ACK timeout (seconds) | `TASK-0809` | No numeric value approved. |
-| Command completion timeout (seconds) | `TASK-0809` | No numeric value approved. |
-| Command expiry duration (seconds) | `TASK-0809` | No numeric value approved. |
+| Device offline threshold (minutes) | `TASK-0407` (DEFERRED) | No numeric value available (`DEC-DEV-030`). |
+| Device stale threshold (minutes) | `TASK-0407` (DEFERRED) | No numeric value available (`DEC-DEV-030`). |
+| Command ACK timeout (seconds) | `TASK-0809` (DEFERRED) | No numeric value available (`DEC-CTRL-092`). |
+| Command completion timeout (seconds) | `TASK-0809` (DEFERRED) | No numeric value available (`DEC-CTRL-092`). |
+| Command expiry duration (seconds) | `TASK-0809` (DEFERRED) | No numeric value available (`DEC-CTRL-092`). |
 | Cancellation and stop support (yes/no) | `TASK-0810` | Unresolved. Default: do not implement. |
 | Sensor Battery (`BAT`) parameter identity & scope | `TASK-0405`, `TASK-0406` | Resolved per `DEC-MON-086`: `BAT` parameter is completely removed from soil and water quality monitoring. |
 | Reservoir-Water Volume and Flow Rate units | `TASK-0408` | Reservoir-water monitoring is a distinct domain from general water quality. Units TBD. |
@@ -427,7 +427,7 @@ The following decisions remain TBD and must be resolved before the listed tasks 
 | API performance targets (p95) | `TASK-1007` | No numeric values approved. |
 | Physical test run count per faucet phase | `TASK-0811` | No numeric value approved. |
 | Telemetry publish interval | `TASK-0405`, `TASK-0406` | Not defined. |
-| Heartbeat interval | `TASK-0407` | Not defined. |
+| Heartbeat interval | `TASK-0407` (DEFERRED) | Not defined (`DEC-DEV-030`). |
 | Backup schedule, retention, RPO, RTO | `TASK-0909` | Not yet explicitly approved. |
 | Physical device firmware & EMQX credentials/ACLs rename reconciliation | Post-Phase 3 device rename automation | Unresolved operational/hardware workflow (`DEC-DEV-028`). Manual/TBD. |
 
@@ -453,6 +453,11 @@ The following facts are supported by the current implementation regarding device
 - **Admin Concealment & Scoping:** Admin canonical `deviceId` concealment (`DEC-DEV-028`) and assignment isolation (`revokedAt IS NULL`) remain strictly enforced.
 - **Empty History Integrity:** Telemetry history queries with zero matching records return HTTP 200 with `{ series: [], pagination: { page: 1, pageSize: 20, totalRecords: 0, totalPages: 1 } }`, never HTTP 404 or fabricated data (`DEC-MON-087`).
 
+## DEC-DEV-030: Device Offline and Stale Thresholds Deferral
+- **Status:** APPROVED
+- **Context:** Hardware operational parameters for device connection limits remain unknown.
+- **Decision:** Due to pending hardware operational parameters, the implementation of heartbeat tracking, offline status, and stale data alerts (`TASK-0407`, `TASK-0702`) is deferred from the initial release.
+
 ## DEC-CTRL-090: Faucet Control Re-Architecture
 - **Status:** APPROVED
 - **Context:** Faucet control required updates for OPEN/CLOSE, plantCount, and L units in UI.
@@ -474,7 +479,12 @@ The following facts are supported by the current implementation regarding device
 The following facts are supported by the verified implementation of `TASK-0804` (`CommandPublisher` in `@kebun-melon/iot-gateway`):
 - **Canonical Volume Passthrough:** Publisher respects `DEC-CTRL-090` by directly publishing the canonical integer `targetVolumeMl` persisted during `TASK-0803` API command creation without recalculating from `phase` or `plantCount`.
 - **Payload Schema Conformance:** `DISPENSE` commands include valid `phase`, `plantCount >= 1`, and `targetVolumeMl`. `OPEN` and `CLOSE` command payloads cleanly omit `phase`, `plantCount`, and `targetVolumeMl` without fabricating placeholder values.
-- **Fail-Safe Policy Deferral:** Preserves the unresolved status of fail-safe policies for open faucets after communication loss without inventing ad-hoc behaviors.
+- **Fail-Safe Policy Deferral:** Connections loss policies remain unresolved.
+
+## DEC-CTRL-092: Command Timeout Processor Deferral
+- **Status:** APPROVED
+- **Context:** Command timeouts durations (ACK, completion, expiry) cannot be safely defined yet.
+- **Decision:** Due to pending hardware operational parameters, the implementation of an automated command timeout processor (`TASK-0809`) is deferred. The application will continue to represent uncertain physical states as `UNKNOWN` without an automated fail-timeout.
 - **State Transition Integrity:** Only eligible unexpired `QUEUED` commands transition to `SENT` upon confirmed broker publication (QoS 1, `retain=false`). Failed publications remain `QUEUED` and never appear as `SENT`. Expired commands transition to `EXPIRED` without publishing.
 <!-- TASK-0804 Reconciled: 2026-08-20 -->
 
@@ -504,3 +514,29 @@ The following facts are supported by the verified decisions governance of `TASK-
 - **Contract-Consistent Volume Governance:** Volume measurement applies to `DISPENSE` operations; for `OPEN` and `CLOSE` commands, volume measurement is non-applicable and stored as `null`/`undefined` on the command record without fabricating rejection rules.
 - **Zero Invented Decisions:** No arbitrary timeout constants, retry limits, granular permissions, or fail-safe policies were invented. Command timeout handling remains `TBD` under `TASK-0809` (DECISIONS.md §3).
 <!-- TASK-0806 Reconciled: 2026-08-20 -->
+
+---
+
+## DEC-CTRL-093: Semantic Duplicate Command Protection
+- **Status:** APPROVED
+- **Context:** To prevent duplicate parameter reuse that doesn't share the exact physical intent on the same device.
+- **Decision:** The FaucetCommandRepository transactional idempotency key check compares `deviceId`, `action`, `phase ?? null`, and `plantCount ?? null` for the same `idempotencyKey` to reject parameter-reusing duplicates with a 409 Conflict. This ensures safe multi-action concurrency protection for `DISPENSE`, `OPEN`, and `CLOSE`.
+
+---
+
+## Faucet Control UI Decisions Implementation Note (Reconciled 2026-08-20)
+
+The following facts are supported by the verified decisions governance of `TASK-0807` (Faucet Control UI):
+- **Decision Compliance:** Complies with `DEC-CTRL-089` (Faucet Control UI Component Architecture).
+- **Physical State Display:** UI displays authoritative physical faucet state mapped strictly from the TASK-0806 state machine.
+- **Polling:** `FaucetStatusCard` executes 2,500ms status polling strictly during active states and terminates immediately upon terminal states with zero blind retries.
+<!-- TASK-0807 Reconciled: 2026-08-20 -->
+
+---
+
+## Duplicate Command Protection Decisions Implementation Note (Reconciled 2026-08-20)
+
+The following facts are supported by the verified decisions governance of `TASK-0808` (`FaucetCommandRepository` idempotency in `@kebun-melon/database`):
+- **Decision Compliance:** Complies with `DEC-CTRL-051` (Faucet Command Concurrency) and `DEC-CTRL-093` (Semantic Duplicate Command Protection).
+- **Idempotency Protection:** Transactional execution compares `deviceId`, `action`, `phase`, and `plantCount` to ensure exact intent matching. Duplicates differing in parameters yield 409 Conflict.
+<!-- TASK-0808 Reconciled: 2026-08-20 -->

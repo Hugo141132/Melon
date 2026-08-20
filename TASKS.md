@@ -1258,9 +1258,9 @@ status
 ## TASK-0407 — Implement Heartbeat and Device Status
 
 **Priority:** `P0`
-**Status:** `BLOCKED`
+**Status:** `DEFERRED`
 **Dependencies:** `TASK-0404`
-**Blocked Reason:** Blocked by `docs/DECISIONS.md` §3 (Device offline threshold minutes and stale threshold minutes TBD).
+**Blocked Reason:** Deferred from the current release. Operational parameters (offline/stale threshold minutes) are not available yet (`DEC-DEV-030`).
 
 ### Work
 
@@ -1659,9 +1659,9 @@ Implement:
 ## TASK-0702 — Implement Device Offline and Stale Alerts
 
 **Priority:** `P1`
-**Status:** `BLOCKED`
+**Status:** `DEFERRED`
 **Dependencies:** `TASK-0407`
-**Blocked Reason:** Blocked by `TASK-0407` (Device offline and stale threshold minutes TBD).
+**Blocked Reason:** Deferred from the current release along with TASK-0407.
 
 ### Acceptance Criteria
 
@@ -1918,9 +1918,9 @@ EXPIRED
 ## TASK-0809 — Implement Command Timeout Processor
 
 **Priority:** `P0`
-**Status:** `BLOCKED`
+**Status:** `DEFERRED`
 **Dependencies:** `TASK-0806`
-**Blocked Reason:** Blocked by `docs/DECISIONS.md` §3 (Command ACK timeout seconds, completion timeout seconds, and expiry duration seconds TBD). Scope updated to include timeout handling for `DISPENSE`, `OPEN`, and `CLOSE`.
+**Blocked Reason:** Deferred from the current release. Command timeout durations are not available yet (`DEC-CTRL-092`). The system currently handles uncertain physical states securely as `UNKNOWN`.
 
 ### Acceptance Criteria
 

@@ -13,7 +13,7 @@
 | `PRD-FR-001` | Authenticated access to monitoring system | `docs/PRD.md` | `DEC-AUTH-001` | `TASK-0204` | `TEST-API-001` | `READY_FOR_IMPLEMENTATION` |
 | `PRD-FR-002` | Multi-device ESP32/NodeMCU support | `docs/PRD.md` | `DEC-DEV-020` | `TASK-0302` | `TEST-API-003` | `VERIFIED` |
 | `PRD-FR-003` | Display latest soil and water monitoring data | `docs/PRD.md` | `DEC-MON-036` | `TASK-0502` | `TEST-E2E-003` | `READY_FOR_IMPLEMENTATION` |
-| `PRD-FR-004` | Display device connectivity and status | `docs/PRD.md` | `` | `TASK-0407` | `TEST-MQTT-002` | `DECISION_REQUIRED` |
+| `PRD-FR-004` | Display device connectivity and status | `docs/PRD.md` | `` | `TASK-0407` | `TEST-MQTT-002` | `DEFERRED` |
 | `PRD-FR-005` | Store and present historical monitoring data | `docs/PRD.md` | `DEC-MON-087` | `TASK-0503` | `TEST-API-004` | `IMPLEMENTED` |
 | `PRD-FR-006` | Send predefined faucet-control commands | `docs/PRD.md` | `DEC-CTRL-051` | `TASK-0803` | `TEST-CTRL-001` | `IMPLEMENTED` |
 | `PRD-FR-007` | Record faucet-control activity and outcomes | `docs/PRD.md` | `DEC-CTRL-051` | `TASK-0802` | `TEST-DB-002` | `IMPLEMENTED` |
@@ -41,7 +41,7 @@
 | `SEC-OPS-004` | Automated vulnerability scanning of dependencies | `docs/SECURITY.md` | - | `TASK-0906` | `TEST-SEC-005` | `IMPLEMENTED` |
 | `TEST-UNIT-001` | Environment variable validation unit tests | `docs/TESTING.md` | - | `TASK-0103` | `TEST-UNIT-001` | `READY_FOR_IMPLEMENTATION` |
 | `TEST-UNIT-002` | Role and permission matrix unit tests | `docs/TESTING.md` | - | `TASK-0105` | `TEST-UNIT-002` | `READY_FOR_IMPLEMENTATION` |
-| `TEST-UNIT-003` | Telemetry data freshness and status unit tests | `docs/TESTING.md` | `` | `TASK-0407` | `TEST-UNIT-003` | `DECISION_REQUIRED` |
+| `TEST-UNIT-003` | Telemetry data freshness and status unit tests | `docs/TESTING.md` | `` | `TASK-0407` | `TEST-UNIT-003` | `DEFERRED` |
 | `TEST-UNIT-004` | I18N locale key and translation unit tests | `docs/TESTING.md` | `DEC-I18N-068` | `TASK-0601` | `TEST-UNIT-004` | `VERIFIED` |
 | `TEST-UNIT-005` | Utility and format helper unit tests | `docs/TESTING.md` | - | `TASK-0102` | `TEST-UNIT-005` | `READY_FOR_IMPLEMENTATION` |
 | `TEST-API-001` | Authentication API endpoint integration tests | `docs/TESTING.md` | `DEC-AUTH-001` | `TASK-0204` | `TEST-API-001` | `READY_FOR_IMPLEMENTATION` |
@@ -69,7 +69,7 @@
 | `TEST-CTRL-001` | Preset volume mapping contract tests | `docs/TESTING.md` | `DEC-CTRL-051` | `TASK-0802` | `TEST-CTRL-001` | `VERIFIED` |
 | `TEST-CTRL-002` | Faucet command state machine transition tests | `docs/TESTING.md` | `DEC-CTRL-051` | `TASK-0806` | `TEST-CTRL-002` | `VERIFIED` |
 | `TEST-CTRL-003` | Faucet command idempotency and duplicate tests | `docs/TESTING.md` | `DEC-CTRL-051` | `TASK-0808` | `TEST-CTRL-003` | `IMPLEMENTED` |
-| `TEST-CTRL-004` | Faucet command timeout and expiry handling tests | `docs/TESTING.md` | `DEC-CTRL-051` | `TASK-0809` | `TEST-CTRL-004` | `DECISION_REQUIRED` |
+| `TEST-CTRL-004` | Faucet command timeout and expiry handling tests | `docs/TESTING.md` | `DEC-CTRL-051` | `TASK-0809` | `TEST-CTRL-004` | `DEFERRED` |
 | `TEST-CTRL-005` | Faucet control feature flag and dual sign-off tests | `docs/TESTING.md` | `DEC-CTRL-067` | `TASK-0801` | `TEST-CTRL-005` | `READY_FOR_IMPLEMENTATION` |
 
 ---
@@ -144,4 +144,9 @@ The following facts are verified in the traceability matrix regarding `TASK-0807
 - **Performance Benchmarks:** UI mount latency ($31\text{ ms} < 50\text{ ms}$), stepper interaction latency ($1.2\text{ ms}$), preset switch ($1.8\text{ ms}$), 50 modal open/close cycles memory clean, 0 horizontal overflow across Mobile/Tablet/Desktop viewports.
 - **Scope Demarcation:** `TASK-0808` (Idempotency duplicate revalidation) is implemented and verified. `TASK-0809` (command timeout), `TASK-0810` (active command cancel), and `TASK-0811` (physical HIL testing) remain pending downstream tasks.
 <!-- TASK-0807 Reconciled: 2026-08-20 -->
+
+The following facts are verified in the traceability matrix regarding `TASK-0808` (Duplicate Command Protection in `@kebun-melon/database`):
+- **Implementation Status:** `TASK-0808` is implemented and verified (`packages/database/src/__tests__/faucet-command-repository.test.ts`, 21/21 tests passed; full API route suites 31/31 passed).
+- **Scope Demarcation:** Duplicate command protection semantic checks are implemented and decouple execution state (`TASK-0806`) and timeout tasks (`TASK-0809`).
+<!-- TASK-0808 Reconciled: 2026-08-20 -->
 
