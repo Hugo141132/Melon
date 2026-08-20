@@ -78,6 +78,29 @@ describe('FaucetCommandRepository Unit & Integration Tests', () => {
     ],
   };
 
+  // TASK-0808: Mock records for OPEN and CLOSE actions
+  const mockOpenCommandRecord = {
+    ...mockCommandRecord,
+    id: '44444444-4444-4444-4444-444444444444',
+    commandId: 'cmd-test-open-001',
+    action: 'OPEN',
+    phase: null,
+    plantCount: null,
+    targetVolumeMl: null,
+    idempotencyKey: 'idem-open-001',
+  };
+
+  const mockCloseCommandRecord = {
+    ...mockCommandRecord,
+    id: '55555555-5555-5555-5555-555555555555',
+    commandId: 'cmd-test-close-001',
+    action: 'CLOSE',
+    phase: null,
+    plantCount: null,
+    targetVolumeMl: null,
+    idempotencyKey: 'idem-close-001',
+  };
+
   describe('createCommand', () => {
     it('creates a command with phase 1 (300 mL) and records QUEUED event in a transaction', async () => {
       mockPrisma.faucetCommand.findUnique.mockResolvedValue(null);
@@ -207,6 +230,166 @@ describe('FaucetCommandRepository Unit & Integration Tests', () => {
           UserRole.ADMIN
         )
       ).rejects.toThrow(FaucetCommandConflictError);
+    });
+
+    // TASK-0808: Revalidation for DISPENSE with plantCount multiplier
+    it('throws FaucetCommandConflictError when DISPENSE idempotencyKey is reused with a different plantCount', async () => {
+      // Existing command has plantCount=1; replay with plantCount=2 must conflict
+      mockPrisma.faucetCommand.findUnique.mockResolvedValue(mockCommandRecord); // plantCount: 1
+
+      await expect(
+        repository.createCommand(
+          {
+            deviceId: mockDeviceId,
+            action: FaucetCommandAction.DISPENSE,
+            phase: 1,
+            plantCount: 2, // Different plantCount
+            idempotencyKey: 'idem-001',
+          },
+          mockUserId,
+          UserRole.ADMIN
+        )
+      ).rejects.toThrow(FaucetCommandConflictError);
+    });
+
+    it('returns existing DISPENSE command when idempotencyKey and identical plantCount are re-submitted (network retry)', async () => {
+      // Simulates a network retry where the client resends the exact same DISPENSE request
+      const multiPlantRecord = { ...mockCommandRecord, plantCount: 3, targetVolumeMl: 900 };
+      mockPrisma.faucetCommand.findUnique.mockResolvedValue(multiPlantRecord); // plantCount: 3
+
+      const result = await repository.createCommand(
+        {
+          deviceId: mockDeviceId,
+          action: FaucetCommandAction.DISPENSE,
+          phase: 1,
+          plantCount: 3, // Same plantCount
+          idempotencyKey: 'idem-001',
+        },
+        mockUserId,
+        UserRole.ADMIN
+      );
+
+      expect(result.commandId).toBe(multiPlantRecord.commandId);
+      expect(result.plantCount).toBe(3);
+      expect(mockPrisma.faucetCommand.create).not.toHaveBeenCalled();
+    });
+
+    // TASK-0808: Revalidation for OPEN action idempotency
+    it('returns existing OPEN command when idempotencyKey and identical OPEN action are re-submitted', async () => {
+      mockPrisma.faucetCommand.findUnique.mockResolvedValue(mockOpenCommandRecord);
+
+      const result = await repository.createCommand(
+        {
+          deviceId: mockDeviceId,
+          action: FaucetCommandAction.OPEN,
+          phase: undefined,
+          plantCount: undefined,
+          idempotencyKey: 'idem-open-001',
+        },
+        mockUserId,
+        UserRole.ADMIN
+      );
+
+      expect(result.commandId).toBe(mockOpenCommandRecord.commandId);
+      expect(result.action).toBe(FaucetCommandAction.OPEN);
+      expect(result.phase).toBeNull();
+      expect(result.plantCount).toBeNull();
+      expect(result.targetVolumeMl).toBeNull();
+      expect(mockPrisma.faucetCommand.create).not.toHaveBeenCalled();
+    });
+
+    it('throws FaucetCommandConflictError when OPEN idempotencyKey is reused for a different action (CLOSE)', async () => {
+      // OPEN command stored; client sends CLOSE with same key → conflict
+      mockPrisma.faucetCommand.findUnique.mockResolvedValue(mockOpenCommandRecord);
+
+      await expect(
+        repository.createCommand(
+          {
+            deviceId: mockDeviceId,
+            action: FaucetCommandAction.CLOSE, // Different action
+            phase: undefined,
+            plantCount: undefined,
+            idempotencyKey: 'idem-open-001',
+          },
+          mockUserId,
+          UserRole.ADMIN
+        )
+      ).rejects.toThrow(FaucetCommandConflictError);
+    });
+
+    // TASK-0808: Revalidation for CLOSE action idempotency
+    it('returns existing CLOSE command when idempotencyKey and identical CLOSE action are re-submitted', async () => {
+      mockPrisma.faucetCommand.findUnique.mockResolvedValue(mockCloseCommandRecord);
+
+      const result = await repository.createCommand(
+        {
+          deviceId: mockDeviceId,
+          action: FaucetCommandAction.CLOSE,
+          phase: undefined,
+          plantCount: undefined,
+          idempotencyKey: 'idem-close-001',
+        },
+        mockUserId,
+        UserRole.ADMIN
+      );
+
+      expect(result.commandId).toBe(mockCloseCommandRecord.commandId);
+      expect(result.action).toBe(FaucetCommandAction.CLOSE);
+      expect(result.phase).toBeNull();
+      expect(result.plantCount).toBeNull();
+      expect(result.targetVolumeMl).toBeNull();
+      expect(mockPrisma.faucetCommand.create).not.toHaveBeenCalled();
+    });
+
+    // TASK-0808: P2002 network retry path for OPEN action
+    it('returns existing OPEN command when concurrent P2002 collision resolves to identical OPEN parameters', async () => {
+      // Simulate race: $transaction fails with P2002, outer re-fetch finds the OPEN record
+      mockPrisma.faucetCommand.findUnique.mockResolvedValue(mockOpenCommandRecord);
+      mockPrisma.faucetCommand.findFirst.mockResolvedValue(null);
+      const p2002Error = new (class extends Error {
+        code = 'P2002';
+      })('Unique constraint failed');
+      mockPrisma.$transaction.mockRejectedValueOnce(p2002Error);
+
+      const result = await repository.createCommand(
+        {
+          deviceId: mockDeviceId,
+          action: FaucetCommandAction.OPEN,
+          phase: undefined,
+          plantCount: undefined,
+          idempotencyKey: 'idem-open-001',
+        },
+        mockUserId,
+        UserRole.ADMIN
+      );
+
+      expect(result.commandId).toBe(mockOpenCommandRecord.commandId);
+      expect(result.action).toBe(FaucetCommandAction.OPEN);
+    });
+
+    // TASK-0808: P2002 network retry path for CLOSE action
+    it('returns existing CLOSE command when concurrent P2002 collision resolves to identical CLOSE parameters', async () => {
+      mockPrisma.faucetCommand.findUnique.mockResolvedValue(mockCloseCommandRecord);
+      mockPrisma.faucetCommand.findFirst.mockResolvedValue(null);
+      const p2002Error = new (class extends Error {
+        code = 'P2002';
+      })('Unique constraint failed');
+      mockPrisma.$transaction.mockRejectedValueOnce(p2002Error);
+
+      const result = await repository.createCommand(
+        {
+          deviceId: mockDeviceId,
+          action: FaucetCommandAction.CLOSE,
+          phase: undefined,
+          plantCount: undefined,
+          idempotencyKey: 'idem-close-001',
+        },
+        mockUserId,
+        UserRole.ADMIN
+      );
+
+      expect(result.commandId).toBe(mockCloseCommandRecord.commandId);
+      expect(result.action).toBe(FaucetCommandAction.CLOSE);
     });
   });
 

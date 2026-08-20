@@ -1778,3 +1778,18 @@ The following facts are supported by the current implementation regarding device
 - **21st.dev MCP:** `NOT REQUIRED`
 - **Summary:** Implemented and verified `CommandPublisher` in `@kebun-melon/iot-gateway`. Publishes eligible, unexpired `QUEUED` faucet commands for `WATER_TANK_NODE` devices over MQTT 5.0 (QoS 1, `retain=false`) to canonical topics `agriculture/{environment}/{siteId}/{deviceId}/command/faucet`. For `DISPENSE` actions, directly transmits the database-persisted canonical `targetVolumeMl` integer (from `TASK-0803`) alongside valid `phase` and `plantCount >= 1` without gateway-side recalculation. For `OPEN` and `CLOSE` actions, cleanly omits `phase`, `plantCount`, and `targetVolumeMl`. Enforces strict atomic state progression (`QUEUED` -> `SENT`) only upon broker publish confirmation; failed publishes leave commands `QUEUED` without false `SENT` marks; expired commands transition to `EXPIRED` without dispatch. Verified 100% test pass rate across targeted test suites (10/10 publisher tests, 42/42 gateway contract tests) and clean TypeScript typecheck (0 errors). Completed local simulated performance sanity tests (1,000 direct calls ~68.3 ops/s with p95 20.08 ms, 500 burst commands ~67.0 cmds/s, 2,000 soak commands ~66.7 cmds/s with zero leaks and safe reconnect recovery). Downstream `TASK-0805` (acknowledgement processing) remains pending and decoupled.
 <!-- TASK-0804 Reconciled: 2026-08-20 -->
+
+---
+
+## TASK-0808 Governance & Implementation Record
+
+`TASK-0808` duplicate command protection implementation record:
+- **Status:** `DONE` (Completed 2026-08-20)
+- **Frontend impact:** `NONE`
+- **Selected UI direction:** `N/A`
+- **Existing color template:** `UNCHANGED`
+- **Selected motion effects:** `None`
+- **21st.dev MCP:** `NOT REQUIRED`
+- **Summary:** Revalidated duplicate command protection for all three faucet command action types (`DISPENSE`, `OPEN`, `CLOSE`) including the `plantCount` multiplier contract introduced in `TASK-0802`/`TASK-0803`. Confirmed that the existing `createCommand` implementation in `FaucetCommandRepository` (`packages/database/src/faucet-command-repository.ts`) is already correct for all three actions: the transactional idempotency key check compares `deviceId`, `action`, `phase ?? null`, and `plantCount ?? null`, which correctly produces `null` for both `OPEN` and `CLOSE` (which carry no phase/plantCount) and detects `plantCount` mismatches for `DISPENSE` network retries. No production code changes were required. Added 7 targeted unit tests to `packages/database/src/__tests__/faucet-command-repository.test.ts`: (1) DISPENSE + different `plantCount` → conflict, (2) DISPENSE + identical `plantCount` network retry → returns existing, (3) OPEN idempotent re-submission → returns existing, (4) OPEN key reused for CLOSE action → conflict, (5) CLOSE idempotent re-submission → returns existing, (6) P2002 race recovery for OPEN → returns existing, (7) P2002 race recovery for CLOSE → returns existing. Verified 21/21 tests pass (14 original + 7 new) with zero regressions across full workspace test suite. No database migrations, API changes, or frontend changes required.
+
+<!-- TASK-0808 Completed: 2026-08-20 -->

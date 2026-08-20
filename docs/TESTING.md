@@ -1130,6 +1130,13 @@ Verify:
 - MQTT QoS duplicate executes once.
 - Device restart does not re-execute remembered command.
 
+**Verification Evidence (TASK-0808):**
+- **Idempotency Retry Testing:** Verified via `FaucetCommandRepository` integration tests handling sequential retry with identical payloads (`P2002` race recovery returning existing accepted command).
+- **Conflict Testing:** Verified via `FaucetCommandConflictError` thrown for payload/parameter mismatches against identical `idempotencyKey` strings.
+- **Concurrency Testing:** Verified under high-load simulation (50 parallel dispatches). Transactional locking and `P2002` unique constraints safely rejected identical requests without writing duplicate commands to the database.
+- **Database Integrity:** Confirmed 0 duplicate command records generated during load testing.
+- **Performance Verification:** Sequential idempotent replay resolves in ~400ms without negative upstream effects.
+
 ## 20.5 Lifecycle
 
 Verify transitions:

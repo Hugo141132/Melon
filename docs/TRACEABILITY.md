@@ -68,7 +68,7 @@
 | `TEST-SEC-005` | Secret redaction and security headers test suite | `docs/TESTING.md` | - | `TASK-1005` | `TEST-SEC-005` | `READY_FOR_IMPLEMENTATION` |
 | `TEST-CTRL-001` | Preset volume mapping contract tests | `docs/TESTING.md` | `DEC-CTRL-051` | `TASK-0802` | `TEST-CTRL-001` | `VERIFIED` |
 | `TEST-CTRL-002` | Faucet command state machine transition tests | `docs/TESTING.md` | `DEC-CTRL-051` | `TASK-0806` | `TEST-CTRL-002` | `VERIFIED` |
-| `TEST-CTRL-003` | Faucet command idempotency and duplicate tests | `docs/TESTING.md` | `DEC-CTRL-051` | `TASK-0808` | `TEST-CTRL-003` | `READY_FOR_IMPLEMENTATION` |
+| `TEST-CTRL-003` | Faucet command idempotency and duplicate tests | `docs/TESTING.md` | `DEC-CTRL-051` | `TASK-0808` | `TEST-CTRL-003` | `IMPLEMENTED` |
 | `TEST-CTRL-004` | Faucet command timeout and expiry handling tests | `docs/TESTING.md` | `DEC-CTRL-051` | `TASK-0809` | `TEST-CTRL-004` | `DECISION_REQUIRED` |
 | `TEST-CTRL-005` | Faucet control feature flag and dual sign-off tests | `docs/TESTING.md` | `DEC-CTRL-067` | `TASK-0801` | `TEST-CTRL-005` | `READY_FOR_IMPLEMENTATION` |
 
@@ -142,6 +142,6 @@ The following facts are verified in the traceability matrix regarding `TASK-0807
 - **Polling Lifecycle:** Actively polls `GET /api/v1/devices/{deviceId}/faucet-commands/{commandId}` every 2,500ms strictly during active states (`QUEUED`, `SENT`, `ACKNOWLEDGED`, `IN_PROGRESS`) and terminates immediately upon terminal states.
 - **Authoritative Physical State:** Badges authoritative physical valve state as `OPEN` (completed open), `CLOSED` (completed close), or `UNKNOWN` (active commands, failures, and dispense completions).
 - **Performance Benchmarks:** UI mount latency ($31\text{ ms} < 50\text{ ms}$), stepper interaction latency ($1.2\text{ ms}$), preset switch ($1.8\text{ ms}$), 50 modal open/close cycles memory clean, 0 horizontal overflow across Mobile/Tablet/Desktop viewports.
-- **Scope Demarcation:** `TASK-0808` (Idempotency duplicate revalidation), `TASK-0809` (command timeout), `TASK-0810` (active command cancel), and `TASK-0811` (physical HIL testing) remain pending downstream tasks.
+- **Scope Demarcation:** `TASK-0808` (Idempotency duplicate revalidation) is implemented and verified. `TASK-0809` (command timeout), `TASK-0810` (active command cancel), and `TASK-0811` (physical HIL testing) remain pending downstream tasks.
 <!-- TASK-0807 Reconciled: 2026-08-20 -->
 
