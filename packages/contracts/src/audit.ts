@@ -25,6 +25,8 @@ export enum AuditEventKey {
   AUTH_PASSWORD_RESET_COMPLETED = 'auth.password_reset.completed',
   AUTH_PASSWORD_RESET_FAILED = 'auth.password_reset.failed',
   FAUCET_COMMAND_CREATED = 'faucet.command.created',
+  FAUCET_COMMAND_OPEN_CREATED = 'faucet.command.open.created',
+  FAUCET_COMMAND_CLOSE_CREATED = 'faucet.command.close.created',
   FAUCET_COMMAND_COMPLETED = 'faucet.command.completed',
   FAUCET_COMMAND_FAILED = 'faucet.command.failed',
   FAUCET_COMMAND_TIMEOUT = 'faucet.command.timeout',

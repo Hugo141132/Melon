@@ -383,6 +383,17 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
   - Performance & Viewport Benchmarks: Mount latency $31\text{ ms} < 50\text{ ms}$, stepper latency $1.2\text{ ms}$, 50 modal cycles memory-safe, zero horizontal overflow across Mobile ($390\times 844$), Tablet ($768\times 1024$), and Desktop ($1280\times 800$).
   - Verified 100% test pass rate across 24 unit tests (`apps/web/test/unit/faucet-control-ui.test.tsx`), workspace TypeScript typecheck (0 errors), Semgrep scan (0 findings), and Next.js production build.
 
+#### TASK-0810 Governance Record
+
+`TASK-0810` manual faucet open/close control implementation record:
+- Status: `DONE` (Completed 2026-08-21)
+- Frontend impact: `MINOR`
+- Selected UI direction: `Premium Minimal Ops`
+- Existing color template: `UNCHANGED`
+- Selected motion effects: `Card hover`, `Modal`
+- 21st.dev MCP: `NOT REQUIRED`
+- Summary: Implemented and verified discrete manual faucet `OPEN` and `CLOSE` valve control across Web backend API (`POST /api/v1/devices/{deviceId}/faucet-commands`), `@kebun-melon/contracts` (Zod schemas, action DTOs, and specific `AuditEventKey` enums `faucet.command.open.created` / `faucet.command.close.created`), `@kebun-melon/database` (`FaucetCommandRepository` transactional creation with audit trail and duplicate protection), IoT Gateway (`CommandPublisher` MQTT QoS 1 publish omitting fabricated volume/phase attributes; `AcknowledgementProcessor` and `FaucetEventProcessor` mapping physical state `COMPLETED OPEN` → `OPEN`, `COMPLETED CLOSE` → `CLOSED`, `COMPLETED DISPENSE` → `UNKNOWN`), and Web UI (`/controls` with action-aware `FaucetConfirmationModal`, disabled states for offline/busy/unauthorized, and authoritative physical badge presentation in `FaucetStatusCard`). Preserved `ENABLE_FAUCET_CONTROL=false` safety default. Verified 100% test pass rate across targeted test suites (32/32 tests), full faucet suites (114/114 tests), workspace test suite (102 test files, 955/955 tests), workspace typecheck (`tsc --noEmit` 0 errors), linting (0 errors), and security scanning (0 hardcoded secrets, 0 unapproved advisories). Documented hardware fail-safe valve behavior upon connection loss as an explicit UNRESOLVED/BLOCKING decision (`DEC-CTRL-090`).
+
 #### TASK-0904 Governance Record
 
 `TASK-0904` structured application logging implementation record:

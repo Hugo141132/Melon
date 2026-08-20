@@ -2080,3 +2080,32 @@ Automated unit, contract, error recovery, and simulated performance sanity verif
 ### Staging & Credential Boundary
 - Live local faucet MQTT E2E was not completed because the local Mosquitto test fixture lacks a matching `WATER_TANK_NODE` credential/ACL identity; live MQTT TLS and physical HIL verification remain credential/manual dependent.
 <!-- TASK-0806 Reconciled: 2026-08-20 -->
+
+---
+
+# 49. Manual Faucet Open/Close Control Verification Suite (`TASK-0810`)
+
+Automated unit, contract, UI component, state mapping, and security verification for manual faucet Open/Close control:
+
+### Agent-Executed Automated Tests
+1. **Targeted Contracts & Database Verification:**
+   - `packages/contracts/src/__tests__/audit.test.ts`: **9/9 tests passed (100%)** validating canonical enum keys `faucet.command.open.created` and `faucet.command.close.created`.
+   - `packages/database/src/__tests__/faucet-command-repository.test.ts`: **23/23 tests passed (100%)** validating transactional command creation, idempotency, and audit log generation for `OPEN` and `CLOSE` actions.
+2. **Faucet Control Component & Integration Suites Pass:**
+   - 5 test suites (`faucet-control-ui.test.tsx`, `faucet-commands/route.test.ts`, `faucet-command-repository.test.ts`, `faucet-event-processor.test.ts`, `faucet.test.ts`): **114/114 tests passed (100%)**.
+3. **Full Workspace Monorepo Regression Suite Pass:**
+   - **102 test files, 955/955 tests passed (100%)** across all workspaces.
+4. **Monorepo Static Typecheck:**
+   - Clean `npm run typecheck` pass across all 4 monorepo workspaces with 0 errors.
+5. **Linting & Code Quality:**
+   - Clean `npm run lint` across all workspaces with 0 errors and 0 warnings.
+6. **Security Scanning:**
+   - `npm run scan:secrets`: 0 hardcoded secrets detected.
+   - `npm run scan:deps`: 0 unapproved vulnerabilities.
+
+### Quality & Operational Safety Constraints
+- Discrete manual `OPEN` and `CLOSE` actions do not fabricate or transmit volume/phase values.
+- Authoritative physical faucet state is deterministically badges as `OPEN`, `CLOSED`, or `UNKNOWN` (with `COMPLETED DISPENSE` mapping to `UNKNOWN` to avoid false assumptions of closed valves).
+- Fail-safe hardware auto-close behavior during connection loss remains an explicit `UNRESOLVED / TBD` item (`DEC-CTRL-090`), safely protected by `ENABLE_FAUCET_CONTROL=false` default configuration.
+<!-- TASK-0810 Reconciled: 2026-08-21 -->
+

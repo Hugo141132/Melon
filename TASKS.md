@@ -1935,25 +1935,26 @@ EXPIRED
 ## TASK-0810 — Implement Manual Faucet Open/Close Control
 
 **Priority:** `P0`
-**Status:** `BACKLOG`
+**Status:** `DONE`
 **Dependencies:** `TASK-0803`, `TASK-0804`, `TASK-0806`, `TASK-0807`
-**Notes:** Repurposed from former Cancel/Stop feature to Manual Faucet Open/Close Control per `DEC-CTRL-090`. Manual faucet control must support OPEN and CLOSE actions, backend authenticated only, RBAC verification (`device.control`), `ENABLE_FAUCET_CONTROL` feature flag check, device active/ONLINE state checks, idempotency, MQTT publication (QoS 1, retain = false), device ACK and final execution confirmation, audit logging, UI state (`OPEN` / `CLOSED` / `UNKNOWN`; network/timeout uncertainty must NEVER be shown as confirmed OPEN/CLOSED), English/Indonesian i18n & accessibility, and HIL validation readiness. Unresolved: fail-safe behavior for an OPEN faucet after browser/network/gateway/device loss remains an explicit UNRESOLVED/BLOCKING decision (`DEC-CTRL-090`).
+**Completed:** 2026-08-21 — Implemented and verified discrete manual faucet `OPEN` and `CLOSE` valve control across Web backend API (`POST /api/v1/devices/{deviceId}/faucet-commands`), `@kebun-melon/contracts` (Zod schemas, action DTOs, and specific `AuditEventKey` enums `faucet.command.open.created` / `faucet.command.close.created`), `@kebun-melon/database` (`FaucetCommandRepository` transactional creation with audit trail and duplicate protection), IoT Gateway (`CommandPublisher` MQTT QoS 1 publish omitting fabricated volume/phase attributes; `AcknowledgementProcessor` and `FaucetEventProcessor` mapping physical state `COMPLETED OPEN` → `OPEN`, `COMPLETED CLOSE` → `CLOSED`, `COMPLETED DISPENSE` → `UNKNOWN`), and Web UI (`/controls` with action-aware `FaucetConfirmationModal`, disabled states for offline/busy/unauthorized, and authoritative physical badge presentation in `FaucetStatusCard`). Preserved `ENABLE_FAUCET_CONTROL=false` safety default. Verified 100% test pass rate across targeted test suites (32/32 tests), full faucet suites (114/114 tests), workspace test suite (102 test files, 955/955 tests), workspace typecheck (`tsc --noEmit` 0 errors), linting (0 errors), and security scanning (0 hardcoded secrets, 0 unapproved advisories).
+**Remaining Blocked Policy:** Fail-safe behavior for an OPEN faucet after browser/network/gateway/device loss remains an explicit UNRESOLVED/BLOCKING decision (`DEC-CTRL-090`) for physical production activation; software safely isolates this uncertainty by mapping all uncertain/active states to `UNKNOWN`.
 
 ### Acceptance Criteria
 
-- Authenticated backend only (`requireSession`, `requireActiveAccount`).
-- RBAC validation (`device.control`).
-- Feature flag guard (`ENABLE_FAUCET_CONTROL`).
-- Device active & ONLINE / controllable checks.
-- Idempotency is enforced.
-- MQTT command published with QoS 1, retain = false.
-- Device acknowledgement and final execution confirmation tracked.
-- Audit trail recorded (`faucet.command.open.created`, `faucet.command.close.created`).
-- UI represents distinct `OPEN`, `CLOSED`, and `UNKNOWN` states.
-- Timeout and network uncertainty are NEVER presented as confirmed `OPEN` or `CLOSED`.
-- English and Indonesian localization and accessibility texts complete.
-- Hardware/HIL validation scenarios defined.
-- Fail-safe behavior upon connection loss documented as blocking decision (`DEC-CTRL-090`).
+- [x] Authenticated backend only (`requireSession`, `requireActiveAccount`).
+- [x] RBAC validation (`device.control`).
+- [x] Feature flag guard (`ENABLE_FAUCET_CONTROL`).
+- [x] Device active & ONLINE / controllable checks.
+- [x] Idempotency is enforced.
+- [x] MQTT command published with QoS 1, retain = false.
+- [x] Device acknowledgement and final execution confirmation tracked.
+- [x] Audit trail recorded (`faucet.command.open.created`, `faucet.command.close.created`).
+- [x] UI represents distinct `OPEN`, `CLOSED`, and `UNKNOWN` states.
+- [x] Timeout and network uncertainty are NEVER presented as confirmed `OPEN` or `CLOSED`.
+- [x] English and Indonesian localization and accessibility texts complete.
+- [x] Hardware/HIL validation scenarios defined.
+- [x] Fail-safe behavior upon connection loss documented as blocking decision (`DEC-CTRL-090`).
 
 ---
 

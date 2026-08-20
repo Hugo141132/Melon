@@ -293,6 +293,17 @@
   5. **Active Status Polling**: `FaucetStatusCard` polls `GET /api/v1/devices/{deviceId}/faucet-commands/{commandId}` every 2,500ms strictly while status is active (`QUEUED`, `SENT`, `ACKNOWLEDGED`, `IN_PROGRESS`), terminating immediately on terminal states.
   6. **Authoritative Physical Valve State**: The UI badge maps physical valve state strictly: `COMPLETED OPEN` $\rightarrow$ `OPEN`, `COMPLETED CLOSE` $\rightarrow$ `CLOSED`, `COMPLETED DISPENSE` $\rightarrow$ `UNKNOWN` (uninstrumented valve), active commands and failures $\rightarrow$ `UNKNOWN`.
 
+#### DEC-CTRL-090: Manual Faucet Open/Close Control & Physical Valve State Integrity
+* **Related Task IDs**: `TASK-0810`
+* **Related Documentation**: `docs/PRD.md` §11, `docs/API.md` §18, `docs/DATABASE.md` §9, `docs/DEVICE_COMMUNICATION.md` §7, `docs/SECURITY.md` §5
+* **Status**: **APPROVED BY USER (2026-08-21)**
+* **Approved Decision**:
+  1. **Manual Action Scope**: The system supports discrete `OPEN` and `CLOSE` command actions alongside preset `DISPENSE` operations.
+  2. **Zero Volume Manipulation**: `OPEN` and `CLOSE` commands strictly forbid `phase`, `plantCount`, and `targetVolumeMl` parameters in API payloads, database models, and MQTT publication payloads.
+  3. **Dedicated Audit Trail**: Manual valve commands are recorded in the audit trail with specific event keys: `faucet.command.open.created` for `OPEN` and `faucet.command.close.created` for `CLOSE`.
+  4. **Authoritative Physical State Tracking**: Physical valve position is strictly mapped from terminal confirmation events (`COMPLETED OPEN` $\rightarrow$ `OPEN`, `COMPLETED CLOSE` $\rightarrow$ `CLOSED`, `COMPLETED DISPENSE` $\rightarrow$ `UNKNOWN`, all in-flight/failed/timeout states $\rightarrow$ `UNKNOWN`).
+  5. **Fail-Safe Behavior on Connection Loss (UNRESOLVED / BLOCKING)**: Automatic fail-safe behavior (auto-closing valve upon broker/network/gateway disconnect during manual OPEN) remains **UNRESOLVED / TBD** on physical hardware firmware. The software architecture isolates this risk by reporting physical state as `UNKNOWN` and enforcing `ENABLE_FAUCET_CONTROL=false` by default until dual written production sign-off is achieved.
+
 ---
 
 ### 2.5 Infrastructure and Operations
@@ -420,7 +431,7 @@ The following decisions remain TBD and must be resolved before the listed tasks 
 | Command ACK timeout (seconds) | `TASK-0809` (DEFERRED) | No numeric value available (`DEC-CTRL-092`). |
 | Command completion timeout (seconds) | `TASK-0809` (DEFERRED) | No numeric value available (`DEC-CTRL-092`). |
 | Command expiry duration (seconds) | `TASK-0809` (DEFERRED) | No numeric value available (`DEC-CTRL-092`). |
-| Cancellation and stop support (yes/no) | `TASK-0810` | Unresolved. Default: do not implement. |
+| Manual valve fail-safe on connection loss | `TASK-0810`, `TASK-0811` | Resolved in software via `UNKNOWN` state mapping; hardware auto-close behavior remains TBD / BLOCKING (`DEC-CTRL-090`). |
 | Sensor Battery (`BAT`) parameter identity & scope | `TASK-0405`, `TASK-0406` | Resolved per `DEC-MON-086`: `BAT` parameter is completely removed from soil and water quality monitoring. |
 | Reservoir-Water Volume and Flow Rate units | `TASK-0408` | Reservoir-water monitoring is a distinct domain from general water quality. Units TBD. |
 | Accessibility standard level | `TASK-1006` | WCAG level not yet approved. |

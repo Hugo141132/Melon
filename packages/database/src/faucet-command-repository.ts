@@ -8,6 +8,7 @@ import {
   FaucetCommandAction,
   PaginatedFaucetCommandsDto,
   UserRole,
+  AuditEventKey,
   mapPhaseToVolume,
 } from '@kebun-melon/contracts';
 import crypto from 'crypto';
@@ -243,9 +244,16 @@ export class FaucetCommandRepository {
           },
         });
 
+        const auditEventKey =
+          input.action === FaucetCommandAction.OPEN
+            ? AuditEventKey.FAUCET_COMMAND_OPEN_CREATED
+            : input.action === FaucetCommandAction.CLOSE
+              ? AuditEventKey.FAUCET_COMMAND_CLOSE_CREATED
+              : AuditEventKey.FAUCET_COMMAND_CREATED;
+
         await tx.auditLog.create({
           data: {
-            eventKey: 'faucet.command.created',
+            eventKey: auditEventKey,
             actorUserId,
             actorRole,
             targetType: 'faucet_command',

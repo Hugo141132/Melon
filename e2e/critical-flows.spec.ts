@@ -99,6 +99,16 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
           },
         });
       }
+      // Clean up any dangling active/previous commands on this test device so E2E starts in a clean state
+      const danglingCmds = await prisma.faucetCommand.findMany({
+        where: { deviceId: targetDeviceId },
+        select: { id: true },
+      });
+      if (danglingCmds.length > 0) {
+        const cmdIds = danglingCmds.map((c) => c.id);
+        await prisma.faucetCommandEvent.deleteMany({ where: { faucetCommandId: { in: cmdIds } } });
+        await prisma.faucetCommand.deleteMany({ where: { id: { in: cmdIds } } });
+      }
     } else {
       const newDev = await prisma.device.create({
         data: {

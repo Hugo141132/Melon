@@ -391,6 +391,66 @@ describe('FaucetCommandRepository Unit & Integration Tests', () => {
       expect(result.commandId).toBe(mockCloseCommandRecord.commandId);
       expect(result.action).toBe(FaucetCommandAction.CLOSE);
     });
+
+    it('creates AuditLog with faucet.command.open.created when new OPEN command is created', async () => {
+      mockPrisma.faucetCommand.findUnique.mockResolvedValue(null);
+      mockPrisma.faucetCommand.findFirst.mockResolvedValue(null);
+      mockPrisma.faucetCommand.create.mockResolvedValue(mockOpenCommandRecord);
+      mockPrisma.faucetCommandEvent.create.mockResolvedValue(mockOpenCommandRecord.events[0]);
+
+      await repository.createCommand(
+        {
+          deviceId: mockDeviceId,
+          action: FaucetCommandAction.OPEN,
+          phase: undefined,
+          plantCount: undefined,
+          idempotencyKey: 'idem-new-open-001',
+        },
+        mockUserId,
+        UserRole.OWNER
+      );
+
+      expect(mockPrisma.auditLog.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          eventKey: 'faucet.command.open.created',
+          actorUserId: mockUserId,
+          actorRole: UserRole.OWNER,
+          targetType: 'faucet_command',
+          targetId: mockOpenCommandRecord.id,
+          result: 'SUCCESS',
+        }),
+      });
+    });
+
+    it('creates AuditLog with faucet.command.close.created when new CLOSE command is created', async () => {
+      mockPrisma.faucetCommand.findUnique.mockResolvedValue(null);
+      mockPrisma.faucetCommand.findFirst.mockResolvedValue(null);
+      mockPrisma.faucetCommand.create.mockResolvedValue(mockCloseCommandRecord);
+      mockPrisma.faucetCommandEvent.create.mockResolvedValue(mockCloseCommandRecord.events[0]);
+
+      await repository.createCommand(
+        {
+          deviceId: mockDeviceId,
+          action: FaucetCommandAction.CLOSE,
+          phase: undefined,
+          plantCount: undefined,
+          idempotencyKey: 'idem-new-close-001',
+        },
+        mockUserId,
+        UserRole.ADMIN
+      );
+
+      expect(mockPrisma.auditLog.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          eventKey: 'faucet.command.close.created',
+          actorUserId: mockUserId,
+          actorRole: UserRole.ADMIN,
+          targetType: 'faucet_command',
+          targetId: mockCloseCommandRecord.id,
+          result: 'SUCCESS',
+        }),
+      });
+    });
   });
 
   describe('updateCommandStatus', () => {

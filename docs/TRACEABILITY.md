@@ -150,3 +150,15 @@ The following facts are verified in the traceability matrix regarding `TASK-0808
 - **Scope Demarcation:** Duplicate command protection semantic checks are implemented and decouple execution state (`TASK-0806`) and timeout tasks (`TASK-0809`).
 <!-- TASK-0808 Reconciled: 2026-08-20 -->
 
+---
+
+## Manual Faucet Open/Close Control Traceability Implementation Note (Reconciled 2026-08-21)
+
+The following facts are verified in the traceability matrix regarding `TASK-0810` (Manual Faucet Open/Close Control across Monorepo):
+- **Implementation Status:** `TASK-0810` is implemented and verified (`packages/contracts/src/__tests__/audit.test.ts` 9/9 passed, `packages/database/src/__tests__/faucet-command-repository.test.ts` 23/23 passed, full faucet suite 114/114 passed, full monorepo suite 955/955 passed, typecheck 0 errors, lint 0 errors).
+- **Requirements & Decoupling:** Fulfills `DEC-CTRL-090` by supporting discrete `OPEN` and `CLOSE` actions, enforcing strict absence of volume/phase parameters, and recording dedicated audit events (`faucet.command.open.created`, `faucet.command.close.created`).
+- **Physical Valve State Integrity:** Physical state confirmation is deterministically bounded (`COMPLETED OPEN` → `OPEN`, `COMPLETED CLOSE` → `CLOSED`, `COMPLETED DISPENSE` → `UNKNOWN`, in-flight/failed → `UNKNOWN`), preventing false claims of closed valves after dispensing.
+- **Fail-Safe Policy Demarcation:** Hardware fail-safe valve behavior upon connection loss remains an explicit `UNRESOLVED / TBD` item (`DEC-CTRL-090`), isolated safely by software state mapping and `ENABLE_FAUCET_CONTROL=false` environment gating.
+<!-- TASK-0810 Reconciled: 2026-08-21 -->
+
+

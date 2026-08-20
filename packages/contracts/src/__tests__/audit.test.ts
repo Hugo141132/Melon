@@ -142,4 +142,12 @@ describe('Audit Contracts & Utilities', () => {
       expect(parsed.eventKey).toBe('account.approved');
     });
   });
+
+  describe('AuditEventKey enum', () => {
+    it('defines canonical faucet command open and close audit event keys', () => {
+      expect(AuditEventKey.FAUCET_COMMAND_OPEN_CREATED).toBe('faucet.command.open.created');
+      expect(AuditEventKey.FAUCET_COMMAND_CLOSE_CREATED).toBe('faucet.command.close.created');
+      expect(AuditEventKey.FAUCET_COMMAND_CREATED).toBe('faucet.command.created');
+    });
+  });
 });

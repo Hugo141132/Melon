@@ -1186,6 +1186,8 @@ device.access.removed
 auth.login.success
 auth.login.failed
 faucet.command.created
+faucet.command.open.created
+faucet.command.close.created
 faucet.command.completed
 faucet.command.failed
 faucet.command.timeout
