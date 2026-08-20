@@ -199,6 +199,19 @@ export class FaucetCommandRepository {
         });
 
         if (activeCommand) {
+          // Check for semantic duplicate
+          const isSemanticDuplicate =
+            activeCommand.action === input.action &&
+            (input.action !== FaucetCommandAction.DISPENSE ||
+              (activeCommand.phase === (input.phase ?? null) &&
+                activeCommand.plantCount === (input.plantCount ?? null)));
+
+          if (isSemanticDuplicate) {
+            throw new FaucetCommandConflictError(
+              `Duplicate command: Device '${input.deviceId}' already has an active '${input.action}' command in progress.`
+            );
+          }
+
           throw new FaucetCommandConflictError(
             `Device '${input.deviceId}' already has an active faucet command in progress (commandId: ${activeCommand.commandId}, status: ${activeCommand.status}).`
           );

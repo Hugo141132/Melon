@@ -461,6 +461,17 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
 - 21st.dev MCP: `NOT REQUIRED`
 - Summary: Implemented and hardened `FaucetEventProcessor` in `@kebun-melon/iot-gateway` (`apps/iot-gateway/src/events/processor.ts`) to handle execution events across all supported faucet command actions (`DISPENSE`, `OPEN`, and `CLOSE`). Implemented authoritative physical state determination: `COMPLETED OPEN` → `OPEN`, `COMPLETED CLOSE` → `CLOSED`, `COMPLETED DISPENSE` → `UNKNOWN` (strictly avoiding assuming closed valve), and failed/uncertain/in-progress → `UNKNOWN`. Ensured physical state is NEVER inferred from API acceptance, publication, or ACK. Enforced persisted command action validation against `[DISPENSE, OPEN, CLOSE]`. Enforced contract-consistent volume handling: `DISPENSE` validates non-negative `actualVolumeMl` and target volume match if provided; `OPEN` and `CLOSE` treat volume as non-applicable and store `null`/`undefined` on the command record. Guaranteed terminal-state immutability (`COMPLETED`, `FAILED`, `CANCELLED`, `TIMEOUT`, `EXPIRED`), duplicate `messageId` idempotency, progress event appending, and `CommandFailureAlert` dispatching on `FAILED` events. Verified 100% test pass rate across 32 unit tests (`apps/iot-gateway/src/__tests__/faucet-event-processor.test.ts`), full 212-test IoT Gateway test suite, 934-test workspace suite, Semgrep security scan (0 findings), and TypeScript typecheck (0 errors).
 
+#### TASK-0808 Governance Record
+
+`TASK-0808` duplicate command protection implementation record:
+- Status: `DONE` (Completed 2026-08-20)
+- Frontend impact: `NONE`
+- Selected UI direction: `N/A`
+- Existing color template: `UNCHANGED`
+- Selected motion effects: `None`
+- 21st.dev MCP: `NOT REQUIRED`
+- Summary: Implemented semantic duplicate command protection in `FaucetCommandRepository` (`@kebun-melon/database`) without relying on desired state comparisons or tracking external physical states. Maintained the strict "max 1 active command per device" concurrency constraint (`DEC-CTRL-051`), while throwing a specific `FaucetCommandConflictError` mapped to HTTP 409 Conflict with descriptive messages for duplicate physical intent scenarios. For `DISPENSE`, duplicate intent is verified by matching the `action`, `phase`, and `plantCount`. For `OPEN` and `CLOSE`, intent is verified strictly by matching the `action`. Non-semantic concurrent commands (e.g., trying to `OPEN` while `CLOSE` is active) continue to hit the generic concurrency rejection. Verified 100% test pass rate across 21 database unit tests and 31 API route tests. A known millisecond-level race condition due to absent strict database locking remains out-of-scope for this iteration.
+
 ---
 
 ## 5. Task Selection Rules

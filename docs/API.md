@@ -2884,3 +2884,13 @@ The following facts are supported by the verified implementation of `TASK-0806` 
   - Performance targets remain TBD; results serve solely as an in-memory logic benchmark.
 - **Testing Boundaries:** Live local faucet MQTT E2E was not completed because the local Mosquitto test fixture lacks a matching `WATER_TANK_NODE` credential/ACL identity; live MQTT TLS and HIL validation remain reserved for manual execution with staging credentials.
 <!-- TASK-0806 Reconciled: 2026-08-20 -->
+
+### `TASK-0808` Duplicate Command Protection Implementation Summary
+
+- **Semantic Duplicate Detection:** Added explicit logic to `createCommand` to detect duplicate physical intent (e.g. issuing two `DISPENSE` commands with the same parameters on the same device, or two `OPEN` commands).
+- **Concurrency Rejection:** Retains strict "max 1 active command per device" check. Concurrent commands with identical intent correctly yield an HTTP 409 Conflict with a specific `Duplicate command` message, instead of the generic concurrency rejection.
+- **Idempotency Adherence:** Strict idempotency checks retained. Exact identical keys and payloads return the existing command; same key but different payloads yield 409 Conflict.
+- **Scope Limit:** Fixing the underlying millisecond-level race condition by changing database isolation or adding unique indices remains out of scope, per the decoupled nature of these checks.
+- **Verification:** Supported by robust test suites covering `FaucetCommandRepository` (21 unit tests) and API routing logic (31 unit tests), ensuring the correct status codes and conflict behavior across all actions.
+
+<!-- TASK-0808 Reconciled: 2026-08-20 -->
