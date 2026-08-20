@@ -1806,19 +1806,19 @@ POST /devices/{deviceId}/faucet-commands
 ## TASK-0805 — Implement Device Acknowledgement Processing
 
 **Priority:** `P0`
-**Status:** `BACKLOG`
+**Status:** `DONE`
 **Dependencies:** `TASK-0804`
 **Historical Completion:** 2026-08-03 — Implemented `AcknowledgementProcessor` in `@kebun-melon/iot-gateway` to subscribe to canonical faucet ACK topics (`agriculture/{environment}/{siteId}/{deviceId}/ack/faucet`, QoS 1). Validated topic/payload deviceId matching, resolved external device ID to internal device UUID, and enforced `WATER_TANK_NODE` device type scope. Executed strict `SENT` → `ACKNOWLEDGED` (for accepted ACKs) and `SENT` → `FAILED` (for rejected ACKs with canonical reasonCode) state transitions with `FaucetCommandEvent` audit creation.
-**Revision Note (2026-08-19):** Status set to `BACKLOG` (pending `TASK-0804`). Requires device acknowledgement processing revalidation and handler updates for `OPEN` and `CLOSE` command ACKs.
+**Revision Completion (2026-08-20):** Revalidated and hardened `AcknowledgementProcessor` in `@kebun-melon/iot-gateway` (`apps/iot-gateway/src/acknowledgements/processor.ts`) to handle command ACKs across all supported faucet command actions (`DISPENSE`, `OPEN`, and `CLOSE`). Maintained strict adherence to the authoritative ACK contract identifying commands via `commandId` and `deviceId` without fabricating an action field in the MQTT ACK payload. Enforced persisted command action validation against `[DISPENSE, OPEN, CLOSE]`, rejecting unsupported/unknown actions (`success: false`). Enforced strict state transitions where accepted ACKs only transition `SENT` → `ACKNOWLEDGED` (guaranteeing status never transitions to `COMPLETED` and never infers physical state), and rejected ACKs transition `SENT` → `FAILED` with canonical `reasonCode` and `CommandFailureAlert` generation. Handled duplicate `messageId` idempotently and safely ignored non-`SENT` / out-of-order ACKs without state regression. Verified 100% test pass rate across 25 unit tests (`apps/iot-gateway/src/__tests__/acknowledgement-processor.test.ts`), 195/195 IoT Gateway tests, Semgrep security scan (0 findings), and workspace typecheck (0 errors).
 
 ### Acceptance Criteria
 
-- Acknowledgement links to command and device.
-- Unknown command is rejected or logged.
-- Duplicate acknowledgement is idempotent.
-- Rejection reason is canonical.
-- `ACKNOWLEDGED` does not become `COMPLETED`.
-- Covers `DISPENSE`, `OPEN`, and `CLOSE` command acknowledgements.
+- [x] Acknowledgement links to command and device.
+- [x] Unknown command is rejected or logged.
+- [x] Duplicate acknowledgement is idempotent.
+- [x] Rejection reason is canonical.
+- [x] `ACKNOWLEDGED` does not become `COMPLETED`.
+- [x] Covers `DISPENSE`, `OPEN`, and `CLOSE` command acknowledgements.
 
 ---
 
@@ -1828,7 +1828,7 @@ POST /devices/{deviceId}/faucet-commands
 **Status:** `BACKLOG`
 **Dependencies:** `TASK-0805`
 **Historical Completion:** 2026-08-03 — Implemented `FaucetEventProcessor` in `@kebun-melon/iot-gateway` (`apps/iot-gateway/src/events/processor.ts`) to subscribe to canonical faucet execution event topics (`agriculture/{environment}/{siteId}/{deviceId}/event/faucet`, QoS 1). Validated topic/payload deviceId matching, resolved external device ID to internal device UUID, and enforced `WATER_TANK_NODE` device type scope. Executed strict `ACKNOWLEDGED` → `IN_PROGRESS` → `COMPLETED` and `ACKNOWLEDGED`/`IN_PROGRESS` → `FAILED` state transitions with `FaucetCommandEvent` audit creation and `actualVolumeMl` / `reasonCode` tracking.
-**Revision Note (2026-08-19):** Status set to `BACKLOG` (pending `TASK-0805`). Requires event processor revision for `OPEN` / `CLOSE` execution events, confirming physical `OPEN` / `CLOSED` / `UNKNOWN` states without premature completion.
+**Revision Note (2026-08-20):** Status remains `BACKLOG` (unblocked following `TASK-0805` completion). Requires event processor revision for `OPEN` / `CLOSE` execution events, confirming physical `OPEN` / `CLOSED` / `UNKNOWN` states without premature completion.
 
 ### Work
 
@@ -1887,7 +1887,7 @@ EXPIRED
 **Status:** `BACKLOG`
 **Dependencies:** `TASK-0803`, `TASK-0804`, `TASK-0805`
 **Historical Completion:** 2026-08-04 — Enhanced `createCommand` in `FaucetCommandRepository` (`@kebun-melon/database`) to perform idempotency checks and max-1 active command checks transactionally, re-querying by `idempotencyKey` on Prisma `P2002` unique constraint error to gracefully return the existing command for identical concurrent/replay requests, or raise `FaucetCommandConflictError` (`409 DUPLICATE_COMMAND_CONFLICT`) for conflicting parameter reuses. Preserved single `QUEUED` event and single command creation during race conditions with zero duplicate MQTT publications.
-**Revision Note (2026-08-19):** Status set to `BACKLOG` (pending `TASK-0803`, `TASK-0804`, `TASK-0805`). Requires duplicate command protection revalidation for `DISPENSE` with `plantCount` and `OPEN` / `CLOSE` actions.
+**Revision Note (2026-08-20):** Status remains `BACKLOG` (unblocked following `TASK-0803`, `TASK-0804`, and `TASK-0805` completion). Requires duplicate command protection revalidation for `DISPENSE` with `plantCount` and `OPEN` / `CLOSE` actions.
 
 ### Acceptance Criteria
 

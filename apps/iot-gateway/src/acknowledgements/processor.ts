@@ -7,6 +7,7 @@ import {
 } from '@kebun-melon/database';
 import {
   FaucetCommandStatus,
+  FaucetCommandAction,
   DeviceType,
   FaucetAcknowledgementPayloadSchema,
   FaucetAcknowledgementPayload,
@@ -220,7 +221,25 @@ export class AcknowledgementProcessor {
       return { success: false, reason: 'Command target deviceId mismatch' };
     }
 
-    // 8. Duplicate messageId check (Idempotency)
+    // 8. Validate persisted command action (must be DISPENSE, OPEN, or CLOSE)
+    const validActions: FaucetCommandAction[] = [
+      FaucetCommandAction.DISPENSE,
+      FaucetCommandAction.OPEN,
+      FaucetCommandAction.CLOSE,
+    ];
+    if (!validActions.includes(command.action)) {
+      logger.warn('Received faucet ACK for command with unsupported or invalid action', {
+        commandId: command.commandId,
+        action: command.action,
+        deviceId: payload.deviceId,
+      });
+      return {
+        success: false,
+        reason: `Unsupported or invalid command action '${command.action}'`,
+      };
+    }
+
+    // 9. Duplicate messageId check (Idempotency)
     if (payload.messageId && command.events) {
       const existingEvent = command.events.find((e) => e.messageId === payload.messageId);
       if (existingEvent) {
@@ -232,7 +251,7 @@ export class AcknowledgementProcessor {
       }
     }
 
-    // 9. Execute state transition and event persistence
+    // 10. Execute state transition and event persistence
     const recordedAt = payload.recordedAt ? new Date(payload.recordedAt) : undefined;
     const isAccepted = payload.data.accepted && payload.data.status === 'ACKNOWLEDGED';
 

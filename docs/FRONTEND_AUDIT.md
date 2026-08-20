@@ -306,7 +306,7 @@ None. No `Dockerfile`, `docker-compose.yml`, or CI/CD deployment files exist.
 
 ### 36. Tasks That Must Remain `BLOCKED`
 * `TASK-0002` — Resolve Release-Blocking Product Decisions (BLOCKED by pending product decisions listed in `TASK-0002`).
-* All downstream tasks dependent on `TASK-0002` or unresolved backend/auth/physical control decisions (e.g. `TASK-0201`, `TASK-0801` to `TASK-0806`, etc.).
+* All downstream tasks dependent on `TASK-0002` or unresolved backend/auth/physical control decisions (e.g. `TASK-0201`, `TASK-0801`, `TASK-0806`, `TASK-0809`, etc.).
 
 ---
 
@@ -367,3 +367,13 @@ The following facts are verified regarding the relationship between the web fron
 - **Publisher Passthrough:** The gateway command publisher safely polls `QUEUED` records and transmits canonical `targetVolumeMl` for `DISPENSE` (or clean `OPEN`/`CLOSE` payloads) over MQTT without altering frontend UI presentation or volume input bindings.
 - **Visual Design & Safety:** Frontend preserves existing `Premium Minimal Ops` design tokens and awaits confirmed downstream device execution events before claiming physical outcome completion.
 <!-- TASK-0804 Reconciled: 2026-08-20 -->
+
+---
+
+## Device Acknowledgement Processing Frontend Audit Note (Reconciled 2026-08-20)
+
+The following facts are verified regarding the frontend boundary for `TASK-0805` (`AcknowledgementProcessor` in `@kebun-melon/iot-gateway`):
+- **Zero Frontend Changes:** `TASK-0805` is entirely implemented within the backend IoT Gateway with zero UI modifications, zero design changes, and zero component updates (`Frontend impact: NONE`).
+- **State Integrity:** Command status in the frontend UI reflects `ACKNOWLEDGED` (or `FAILED`) based on verified backend transitions, without prematurely displaying completion or inferring physical valve state.
+- **Design Token & Aesthetic Preservation:** All frontend components retain approved `Premium Minimal Ops` visual tokens and color palettes unchanged.
+<!-- TASK-0805 Reconciled: 2026-08-20 -->

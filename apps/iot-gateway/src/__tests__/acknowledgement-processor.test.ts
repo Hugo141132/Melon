@@ -3,7 +3,13 @@ import { AcknowledgementProcessor } from '../acknowledgements/processor';
 import { GatewayMqttClient } from '../mqtt/client';
 import { validateGatewayEnv } from '../config/env';
 import { metricsCollector } from '../observability/metrics';
-import { FaucetCommandStatus, DeviceType, DeviceAccountStatus } from '@kebun-melon/contracts';
+import {
+  FaucetCommandStatus,
+  FaucetCommandAction,
+  DeviceType,
+  DeviceAccountStatus,
+  FAUCET_ACK_REASON_CODES,
+} from '@kebun-melon/contracts';
 
 describe('TASK-0805: AcknowledgementProcessor (Device Acknowledgement Processing)', () => {
   const env = validateGatewayEnv({
@@ -54,17 +60,39 @@ describe('TASK-0805: AcknowledgementProcessor (Device Acknowledgement Processing
       expect(subscribedTopic).toBe('agriculture/development/+/+/ack/faucet');
       expect(listenerRegistered).toBe(true);
     });
+
+    it('handles stop and unsubscription gracefully', async () => {
+      let unsubscribeCalled = false;
+      const mockMqttClient = {
+        subscribe: async () => {},
+        onMessage: () => {
+          return () => {
+            unsubscribeCalled = true;
+          };
+        },
+      } as unknown as GatewayMqttClient;
+
+      const processor = new AcknowledgementProcessor({ env, mqttClient: mockMqttClient });
+      await processor.subscribeToAcknowledgements();
+      processor.stop();
+
+      expect(unsubscribeCalled).toBe(true);
+    });
   });
 
   describe('Accepted ACK Processing (SENT -> ACKNOWLEDGED only)', () => {
-    it('processes accepted ACK and transitions command from SENT to ACKNOWLEDGED', async () => {
+    it('processes accepted ACK for DISPENSE action and transitions command from SENT to ACKNOWLEDGED', async () => {
       let updatedStatus: FaucetCommandStatus | null = null;
       let updateEventData: any = null;
 
       const mockCommand = {
-        id: 'cmd-uuid-1',
+        id: 'cmd-uuid-dispense-1',
         commandId: 'cmd-01JXYZ123',
         deviceId: 'water-tank-001',
+        action: FaucetCommandAction.DISPENSE,
+        phase: 1,
+        plantCount: 5,
+        targetVolumeMl: 1500,
         status: FaucetCommandStatus.SENT,
         events: [],
       };
@@ -94,7 +122,7 @@ describe('TASK-0805: AcknowledgementProcessor (Device Acknowledgement Processing
       const ackPayload = Buffer.from(
         JSON.stringify({
           schemaVersion: '1.0',
-          messageId: 'ack-msg-001',
+          messageId: 'ack-msg-dispense-001',
           commandId: 'cmd-01JXYZ123',
           deviceId: 'water-tank-001',
           recordedAt: '2026-08-03T10:00:00.000Z',
@@ -110,7 +138,7 @@ describe('TASK-0805: AcknowledgementProcessor (Device Acknowledgement Processing
       expect(result.success).toBe(true);
       expect(updatedStatus).toBe(FaucetCommandStatus.ACKNOWLEDGED);
       expect(updateEventData).toMatchObject({
-        messageId: 'ack-msg-001',
+        messageId: 'ack-msg-dispense-001',
         metadata: {
           ackData: {
             status: 'ACKNOWLEDGED',
@@ -122,6 +150,138 @@ describe('TASK-0805: AcknowledgementProcessor (Device Acknowledgement Processing
       expect(updatedStatus).not.toBe(FaucetCommandStatus.COMPLETED);
     });
 
+    it('processes accepted ACK for OPEN action and transitions command from SENT to ACKNOWLEDGED', async () => {
+      let updatedStatus: FaucetCommandStatus | null = null;
+      let updateEventData: any = null;
+
+      const mockCommand = {
+        id: 'cmd-uuid-open-1',
+        commandId: 'cmd-01JOPEN123',
+        deviceId: 'water-tank-001',
+        action: FaucetCommandAction.OPEN,
+        status: FaucetCommandStatus.SENT,
+        events: [],
+      };
+
+      const mockFaucetCommandRepo = {
+        getCommandById: async (id: string) =>
+          id === 'cmd-01JOPEN123' ? (mockCommand as any) : null,
+        updateCommandStatus: async (_id: string, status: FaucetCommandStatus, eventData: any) => {
+          updatedStatus = status;
+          updateEventData = eventData;
+          return { ...mockCommand, status };
+        },
+      };
+
+      const mockDeviceRepo = {
+        getDeviceByCanonicalId: async (id: string) =>
+          id === 'water-tank-001' ? (mockWaterNodeDevice as any) : null,
+      };
+
+      const processor = new AcknowledgementProcessor({
+        env,
+        faucetCommandRepo: mockFaucetCommandRepo as any,
+        deviceRepo: mockDeviceRepo as any,
+      });
+
+      const topic = 'agriculture/development/site-01/water-tank-001/ack/faucet';
+      const ackPayload = Buffer.from(
+        JSON.stringify({
+          schemaVersion: '1.0',
+          messageId: 'ack-msg-open-001',
+          commandId: 'cmd-01JOPEN123',
+          deviceId: 'water-tank-001',
+          recordedAt: '2026-08-03T10:00:00.000Z',
+          data: {
+            status: 'ACKNOWLEDGED',
+            accepted: true,
+          },
+        })
+      );
+
+      const result = await processor.processAcknowledgementMessage(topic, ackPayload);
+
+      expect(result.success).toBe(true);
+      expect(updatedStatus).toBe(FaucetCommandStatus.ACKNOWLEDGED);
+      expect(updateEventData).toMatchObject({
+        messageId: 'ack-msg-open-001',
+        metadata: {
+          ackData: {
+            status: 'ACKNOWLEDGED',
+            accepted: true,
+          },
+        },
+      });
+      // Verification: Never transitions to COMPLETED or infers physical state
+      expect(updatedStatus).not.toBe(FaucetCommandStatus.COMPLETED);
+    });
+
+    it('processes accepted ACK for CLOSE action and transitions command from SENT to ACKNOWLEDGED', async () => {
+      let updatedStatus: FaucetCommandStatus | null = null;
+      let updateEventData: any = null;
+
+      const mockCommand = {
+        id: 'cmd-uuid-close-1',
+        commandId: 'cmd-01JCLOSE123',
+        deviceId: 'water-tank-001',
+        action: FaucetCommandAction.CLOSE,
+        status: FaucetCommandStatus.SENT,
+        events: [],
+      };
+
+      const mockFaucetCommandRepo = {
+        getCommandById: async (id: string) =>
+          id === 'cmd-01JCLOSE123' ? (mockCommand as any) : null,
+        updateCommandStatus: async (_id: string, status: FaucetCommandStatus, eventData: any) => {
+          updatedStatus = status;
+          updateEventData = eventData;
+          return { ...mockCommand, status };
+        },
+      };
+
+      const mockDeviceRepo = {
+        getDeviceByCanonicalId: async (id: string) =>
+          id === 'water-tank-001' ? (mockWaterNodeDevice as any) : null,
+      };
+
+      const processor = new AcknowledgementProcessor({
+        env,
+        faucetCommandRepo: mockFaucetCommandRepo as any,
+        deviceRepo: mockDeviceRepo as any,
+      });
+
+      const topic = 'agriculture/development/site-01/water-tank-001/ack/faucet';
+      const ackPayload = Buffer.from(
+        JSON.stringify({
+          schemaVersion: '1.0',
+          messageId: 'ack-msg-close-001',
+          commandId: 'cmd-01JCLOSE123',
+          deviceId: 'water-tank-001',
+          recordedAt: '2026-08-03T10:00:00.000Z',
+          data: {
+            status: 'ACKNOWLEDGED',
+            accepted: true,
+          },
+        })
+      );
+
+      const result = await processor.processAcknowledgementMessage(topic, ackPayload);
+
+      expect(result.success).toBe(true);
+      expect(updatedStatus).toBe(FaucetCommandStatus.ACKNOWLEDGED);
+      expect(updateEventData).toMatchObject({
+        messageId: 'ack-msg-close-001',
+        metadata: {
+          ackData: {
+            status: 'ACKNOWLEDGED',
+            accepted: true,
+          },
+        },
+      });
+      // Verification: Never transitions to COMPLETED or infers physical state
+      expect(updatedStatus).not.toBe(FaucetCommandStatus.COMPLETED);
+    });
+
     it('resolves external deviceId to internal Device.id UUID for command device matching', async () => {
       let updatedStatus: FaucetCommandStatus | null = null;
 
@@ -130,6 +290,7 @@ describe('TASK-0805: AcknowledgementProcessor (Device Acknowledgement Processing
         id: 'cmd-uuid-uuid-test',
         commandId: 'cmd-uuid-match-001',
         deviceId: 'device-uuid-001', // Internal UUID stored in DB
+        action: FaucetCommandAction.DISPENSE,
         status: FaucetCommandStatus.SENT,
         events: [],
       };
@@ -179,6 +340,7 @@ describe('TASK-0805: AcknowledgementProcessor (Device Acknowledgement Processing
         id: 'cmd-uuid-mismatch',
         commandId: 'cmd-mismatch-001',
         deviceId: 'device-uuid-DIFFERENT-999', // Mismatched DB UUID
+        action: FaucetCommandAction.DISPENSE,
         status: FaucetCommandStatus.SENT,
         events: [],
       };
@@ -212,60 +374,72 @@ describe('TASK-0805: AcknowledgementProcessor (Device Acknowledgement Processing
       expect(updateCommandStatusMock).not.toHaveBeenCalled();
     });
 
-    it('ignores accepted ACK if command status is QUEUED, ACKNOWLEDGED, IN_PROGRESS, or COMPLETED', async () => {
-      const statusesToTest = [
+    it('ignores accepted ACK if command status is QUEUED, ACKNOWLEDGED, IN_PROGRESS, or final states without regression', async () => {
+      const nonSentStatuses = [
         FaucetCommandStatus.QUEUED,
         FaucetCommandStatus.ACKNOWLEDGED,
         FaucetCommandStatus.IN_PROGRESS,
         FaucetCommandStatus.COMPLETED,
         FaucetCommandStatus.FAILED,
+        FaucetCommandStatus.CANCELLED,
+        FaucetCommandStatus.TIMEOUT,
+        FaucetCommandStatus.EXPIRED,
       ];
 
-      for (const status of statusesToTest) {
-        const updateCommandStatusMock = vi.fn();
-        const mockCommand = {
-          id: 'cmd-uuid-test',
-          commandId: 'cmd-test',
-          deviceId: 'water-tank-001',
-          status,
-          events: [],
-        };
+      const actionsToTest = [
+        FaucetCommandAction.DISPENSE,
+        FaucetCommandAction.OPEN,
+        FaucetCommandAction.CLOSE,
+      ];
 
-        const processor = new AcknowledgementProcessor({
-          env,
-          faucetCommandRepo: {
-            getCommandById: async () => mockCommand as any,
-            updateCommandStatus: updateCommandStatusMock,
-          } as any,
-          deviceRepo: {
-            getDeviceByCanonicalId: async () => mockWaterNodeDevice as any,
-          } as any,
-        });
-
-        const topic = 'agriculture/development/site-01/water-tank-001/ack/faucet';
-        const ackPayload = Buffer.from(
-          JSON.stringify({
-            schemaVersion: '1.0',
-            messageId: `ack-msg-${status}`,
-            commandId: 'cmd-test',
+      for (const action of actionsToTest) {
+        for (const status of nonSentStatuses) {
+          const updateCommandStatusMock = vi.fn();
+          const mockCommand = {
+            id: `cmd-uuid-${action}-${status}`,
+            commandId: `cmd-${action}-${status}`,
             deviceId: 'water-tank-001',
-            data: { status: 'ACKNOWLEDGED', accepted: true },
-          })
-        );
+            action,
+            status,
+            events: [],
+          };
 
-        const result = await processor.processAcknowledgementMessage(topic, ackPayload);
+          const processor = new AcknowledgementProcessor({
+            env,
+            faucetCommandRepo: {
+              getCommandById: async () => mockCommand as any,
+              updateCommandStatus: updateCommandStatusMock,
+            } as any,
+            deviceRepo: {
+              getDeviceByCanonicalId: async () => mockWaterNodeDevice as any,
+            } as any,
+          });
 
-        expect(result.success).toBe(true);
-        expect(result.reason).toContain(
-          `Accepted ACK ignored because command status is '${status}'`
-        );
-        expect(updateCommandStatusMock).not.toHaveBeenCalled();
+          const topic = 'agriculture/development/site-01/water-tank-001/ack/faucet';
+          const ackPayload = Buffer.from(
+            JSON.stringify({
+              schemaVersion: '1.0',
+              messageId: `ack-msg-${action}-${status}`,
+              commandId: `cmd-${action}-${status}`,
+              deviceId: 'water-tank-001',
+              data: { status: 'ACKNOWLEDGED', accepted: true },
+            })
+          );
+
+          const result = await processor.processAcknowledgementMessage(topic, ackPayload);
+
+          expect(result.success).toBe(true);
+          expect(result.reason).toContain(
+            `Accepted ACK ignored because command status is '${status}'`
+          );
+          expect(updateCommandStatusMock).not.toHaveBeenCalled();
+        }
       }
     });
   });
 
   describe('Rejected ACK Processing (SENT -> FAILED only)', () => {
-    it('processes rejected ACK and transitions command from SENT to FAILED with reasonCode', async () => {
+    it('processes rejected ACK for DISPENSE action and transitions command from SENT to FAILED with reasonCode', async () => {
       let updatedStatus: FaucetCommandStatus | null = null;
       let updateEventData: any = null;
 
@@ -273,6 +447,7 @@ describe('TASK-0805: AcknowledgementProcessor (Device Acknowledgement Processing
         id: 'cmd-uuid-2',
         commandId: 'cmd-01JXYZ456',
         deviceId: 'water-tank-001',
+        action: FaucetCommandAction.DISPENSE,
         status: FaucetCommandStatus.SENT,
         events: [],
       };
@@ -338,21 +513,224 @@ describe('TASK-0805: AcknowledgementProcessor (Device Acknowledgement Processing
       });
     });
 
-    it('ignores rejected ACK if command status is QUEUED, ACKNOWLEDGED, IN_PROGRESS, or FAILED', async () => {
-      const statusesToTest = [
+    it('processes rejected ACK for OPEN action and transitions command from SENT to FAILED with reasonCode', async () => {
+      let updatedStatus: FaucetCommandStatus | null = null;
+      let updateEventData: any = null;
+
+      const mockCommand = {
+        id: 'cmd-uuid-open-rej',
+        commandId: 'cmd-01JOPENREJ',
+        deviceId: 'water-tank-001',
+        action: FaucetCommandAction.OPEN,
+        status: FaucetCommandStatus.SENT,
+        events: [],
+      };
+
+      const mockFaucetCommandRepo = {
+        getCommandById: async (id: string) =>
+          id === 'cmd-01JOPENREJ' ? (mockCommand as any) : null,
+        updateCommandStatus: async (_id: string, status: FaucetCommandStatus, eventData: any) => {
+          updatedStatus = status;
+          updateEventData = eventData;
+          return { ...mockCommand, status };
+        },
+      };
+
+      const mockDeviceRepo = {
+        getDeviceByCanonicalId: async (id: string) =>
+          id === 'water-tank-001' ? (mockWaterNodeDevice as any) : null,
+      };
+
+      let createdAlertInput: any = null;
+      const mockAlertRepo = {
+        createCommandFailureAlert: async (input: any) => {
+          createdAlertInput = input;
+          return { id: 'alert-fail-open-001', ...input };
+        },
+      };
+
+      const processor = new AcknowledgementProcessor({
+        env,
+        faucetCommandRepo: mockFaucetCommandRepo as any,
+        deviceRepo: mockDeviceRepo as any,
+        alertRepo: mockAlertRepo as any,
+      });
+
+      const topic = 'agriculture/development/site-01/water-tank-001/ack/faucet';
+      const rejectionPayload = Buffer.from(
+        JSON.stringify({
+          schemaVersion: '1.0',
+          messageId: 'ack-msg-open-rej-001',
+          commandId: 'cmd-01JOPENREJ',
+          deviceId: 'water-tank-001',
+          recordedAt: '2026-08-03T10:00:00.000Z',
+          data: {
+            status: 'REJECTED',
+            accepted: false,
+            reasonCode: 'DEVICE_NOT_READY',
+          },
+        })
+      );
+
+      const result = await processor.processAcknowledgementMessage(topic, rejectionPayload);
+
+      expect(result.success).toBe(true);
+      expect(updatedStatus).toBe(FaucetCommandStatus.FAILED);
+      expect(updateEventData).toMatchObject({
+        messageId: 'ack-msg-open-rej-001',
+        reasonCode: 'DEVICE_NOT_READY',
+      });
+      expect(createdAlertInput).toMatchObject({
+        deviceId: mockWaterNodeDevice.id,
+        commandId: mockCommand.id,
+        reasonCode: 'DEVICE_NOT_READY',
+      });
+    });
+
+    it('processes rejected ACK for CLOSE action and transitions command from SENT to FAILED with reasonCode', async () => {
+      let updatedStatus: FaucetCommandStatus | null = null;
+      let updateEventData: any = null;
+
+      const mockCommand = {
+        id: 'cmd-uuid-close-rej',
+        commandId: 'cmd-01JCLOSEREJ',
+        deviceId: 'water-tank-001',
+        action: FaucetCommandAction.CLOSE,
+        status: FaucetCommandStatus.SENT,
+        events: [],
+      };
+
+      const mockFaucetCommandRepo = {
+        getCommandById: async (id: string) =>
+          id === 'cmd-01JCLOSEREJ' ? (mockCommand as any) : null,
+        updateCommandStatus: async (_id: string, status: FaucetCommandStatus, eventData: any) => {
+          updatedStatus = status;
+          updateEventData = eventData;
+          return { ...mockCommand, status };
+        },
+      };
+
+      const mockDeviceRepo = {
+        getDeviceByCanonicalId: async (id: string) =>
+          id === 'water-tank-001' ? (mockWaterNodeDevice as any) : null,
+      };
+
+      let createdAlertInput: any = null;
+      const mockAlertRepo = {
+        createCommandFailureAlert: async (input: any) => {
+          createdAlertInput = input;
+          return { id: 'alert-fail-close-001', ...input };
+        },
+      };
+
+      const processor = new AcknowledgementProcessor({
+        env,
+        faucetCommandRepo: mockFaucetCommandRepo as any,
+        deviceRepo: mockDeviceRepo as any,
+        alertRepo: mockAlertRepo as any,
+      });
+
+      const topic = 'agriculture/development/site-01/water-tank-001/ack/faucet';
+      const rejectionPayload = Buffer.from(
+        JSON.stringify({
+          schemaVersion: '1.0',
+          messageId: 'ack-msg-close-rej-001',
+          commandId: 'cmd-01JCLOSEREJ',
+          deviceId: 'water-tank-001',
+          recordedAt: '2026-08-03T10:00:00.000Z',
+          data: {
+            status: 'REJECTED',
+            accepted: false,
+            reasonCode: 'INTERNAL_ERROR',
+          },
+        })
+      );
+
+      const result = await processor.processAcknowledgementMessage(topic, rejectionPayload);
+
+      expect(result.success).toBe(true);
+      expect(updatedStatus).toBe(FaucetCommandStatus.FAILED);
+      expect(updateEventData).toMatchObject({
+        messageId: 'ack-msg-close-rej-001',
+        reasonCode: 'INTERNAL_ERROR',
+      });
+      expect(createdAlertInput).toMatchObject({
+        deviceId: mockWaterNodeDevice.id,
+        commandId: mockCommand.id,
+        reasonCode: 'INTERNAL_ERROR',
+      });
+    });
+
+    it('correctly maps all canonical FAUCET_ACK_REASON_CODES upon rejection', async () => {
+      for (const reasonCode of FAUCET_ACK_REASON_CODES) {
+        let recordedReason: string | null = null;
+        const mockCommand = {
+          id: `cmd-uuid-reason-${reasonCode}`,
+          commandId: `cmd-reason-${reasonCode}`,
+          deviceId: 'water-tank-001',
+          action: FaucetCommandAction.DISPENSE,
+          status: FaucetCommandStatus.SENT,
+          events: [],
+        };
+
+        const processor = new AcknowledgementProcessor({
+          env,
+          faucetCommandRepo: {
+            getCommandById: async () => mockCommand as any,
+            updateCommandStatus: async (
+              _id: string,
+              _status: FaucetCommandStatus,
+              eventData: any
+            ) => {
+              recordedReason = eventData.reasonCode;
+              return { ...mockCommand, status: FaucetCommandStatus.FAILED };
+            },
+          } as any,
+          deviceRepo: {
+            getDeviceByCanonicalId: async () => mockWaterNodeDevice as any,
+          } as any,
+          alertRepo: {
+            createCommandFailureAlert: async () => ({ id: 'alert-1' }),
+          } as any,
+        });
+
+        const topic = 'agriculture/development/site-01/water-tank-001/ack/faucet';
+        const rejectionPayload = Buffer.from(
+          JSON.stringify({
+            schemaVersion: '1.0',
+            messageId: `ack-msg-reason-${reasonCode}`,
+            commandId: `cmd-reason-${reasonCode}`,
+            deviceId: 'water-tank-001',
+            data: { status: 'REJECTED', accepted: false, reasonCode },
+          })
+        );
+
+        const result = await processor.processAcknowledgementMessage(topic, rejectionPayload);
+
+        expect(result.success).toBe(true);
+        expect(recordedReason).toBe(reasonCode);
+      }
+    });
+
+    it('ignores rejected ACK if command status is QUEUED, ACKNOWLEDGED, IN_PROGRESS, or final states without regression', async () => {
+      const nonSentStatuses = [
         FaucetCommandStatus.QUEUED,
         FaucetCommandStatus.ACKNOWLEDGED,
         FaucetCommandStatus.IN_PROGRESS,
         FaucetCommandStatus.FAILED,
         FaucetCommandStatus.COMPLETED,
+        FaucetCommandStatus.CANCELLED,
+        FaucetCommandStatus.TIMEOUT,
+        FaucetCommandStatus.EXPIRED,
       ];
 
-      for (const status of statusesToTest) {
+      for (const status of nonSentStatuses) {
         const updateCommandStatusMock = vi.fn();
         const mockCommand = {
           id: 'cmd-uuid-test-rej',
           commandId: 'cmd-test-rej',
           deviceId: 'water-tank-001',
+          action: FaucetCommandAction.DISPENSE,
           status,
           events: [],
         };
@@ -388,6 +766,97 @@ describe('TASK-0805: AcknowledgementProcessor (Device Acknowledgement Processing
         expect(updateCommandStatusMock).not.toHaveBeenCalled();
       }
     });
+
+    it('handles alert repository failure during rejected ACK without crashing processor', async () => {
+      const mockCommand = {
+        id: 'cmd-uuid-alert-fail',
+        commandId: 'cmd-01JALERTFAIL',
+        deviceId: 'water-tank-001',
+        action: FaucetCommandAction.DISPENSE,
+        status: FaucetCommandStatus.SENT,
+        events: [],
+      };
+
+      const processor = new AcknowledgementProcessor({
+        env,
+        faucetCommandRepo: {
+          getCommandById: async () => mockCommand as any,
+          updateCommandStatus: async () => ({
+            ...mockCommand,
+            status: FaucetCommandStatus.FAILED,
+          }),
+        } as any,
+        deviceRepo: {
+          getDeviceByCanonicalId: async () => mockWaterNodeDevice as any,
+        } as any,
+        alertRepo: {
+          createCommandFailureAlert: async () => {
+            throw new Error('Database connection failed');
+          },
+        } as any,
+      });
+
+      const topic = 'agriculture/development/site-01/water-tank-001/ack/faucet';
+      const rejectionPayload = Buffer.from(
+        JSON.stringify({
+          schemaVersion: '1.0',
+          messageId: 'ack-msg-alert-fail-001',
+          commandId: 'cmd-01JALERTFAIL',
+          deviceId: 'water-tank-001',
+          data: {
+            status: 'REJECTED',
+            accepted: false,
+            reasonCode: 'DEVICE_BUSY',
+          },
+        })
+      );
+
+      const result = await processor.processAcknowledgementMessage(topic, rejectionPayload);
+
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe('Persisted Command Action Validation', () => {
+    it('rejects ACK when persisted command action is unknown or unsupported', async () => {
+      const updateCommandStatusMock = vi.fn();
+      const mockCommand = {
+        id: 'cmd-uuid-unsupported-act',
+        commandId: 'cmd-unsupported-001',
+        deviceId: 'water-tank-001',
+        action: 'PURGE_SYSTEM' as any, // Invalid/unsupported action
+        status: FaucetCommandStatus.SENT,
+        events: [],
+      };
+
+      const processor = new AcknowledgementProcessor({
+        env,
+        faucetCommandRepo: {
+          getCommandById: async () => mockCommand as any,
+          updateCommandStatus: updateCommandStatusMock,
+        } as any,
+        deviceRepo: {
+          getDeviceByCanonicalId: async () => mockWaterNodeDevice as any,
+        } as any,
+      });
+
+      const topic = 'agriculture/development/site-01/water-tank-001/ack/faucet';
+      const ackPayload = Buffer.from(
+        JSON.stringify({
+          schemaVersion: '1.0',
+          messageId: 'ack-msg-unsupported-001',
+          commandId: 'cmd-unsupported-001',
+          deviceId: 'water-tank-001',
+          data: { status: 'ACKNOWLEDGED', accepted: true },
+        })
+      );
+
+      const result = await processor.processAcknowledgementMessage(topic, ackPayload);
+
+      expect(result.success).toBe(false);
+      expect(result.reason).toContain("Unsupported or invalid command action 'PURGE_SYSTEM'");
+      expect(updateCommandStatusMock).not.toHaveBeenCalled();
+    });
   });
 
   describe('Duplicate messageId Idempotency', () => {
@@ -398,6 +867,7 @@ describe('TASK-0805: AcknowledgementProcessor (Device Acknowledgement Processing
         id: 'cmd-uuid-3',
         commandId: 'cmd-01JXYZ789',
         deviceId: 'water-tank-001',
+        action: FaucetCommandAction.DISPENSE,
         status: FaucetCommandStatus.ACKNOWLEDGED,
         events: [
           {
@@ -467,6 +937,92 @@ describe('TASK-0805: AcknowledgementProcessor (Device Acknowledgement Processing
       expect(result.reason).toContain('Topic and payload deviceId mismatch');
     });
 
+    it('rejects invalid topic string', async () => {
+      const processor = new AcknowledgementProcessor({ env });
+      const invalidTopic = 'invalid/topic/format';
+      const payload = Buffer.from(
+        JSON.stringify({
+          schemaVersion: '1.0',
+          messageId: 'ack-msg-001',
+          commandId: 'cmd-1',
+          deviceId: 'water-tank-001',
+          data: { status: 'ACKNOWLEDGED', accepted: true },
+        })
+      );
+
+      const result = await processor.processAcknowledgementMessage(invalidTopic, payload);
+      expect(result.success).toBe(false);
+      expect(result.reason).toContain('Invalid topic');
+    });
+
+    it('rejects topic when category/subtype is not ack/faucet', async () => {
+      const processor = new AcknowledgementProcessor({ env });
+      const wrongCategoryTopic =
+        'agriculture/development/site-01/water-tank-001/telemetry/reservoir';
+      const payload = Buffer.from(
+        JSON.stringify({
+          schemaVersion: '1.0',
+          messageId: 'ack-msg-001',
+          commandId: 'cmd-1',
+          deviceId: 'water-tank-001',
+          data: { status: 'ACKNOWLEDGED', accepted: true },
+        })
+      );
+
+      const result = await processor.processAcknowledgementMessage(wrongCategoryTopic, payload);
+      expect(result.success).toBe(false);
+      expect(result.reason).toContain('Topic is not a faucet acknowledgement topic');
+    });
+
+    it('rejects invalid JSON payload gracefully', async () => {
+      const processor = new AcknowledgementProcessor({ env });
+      const topic = 'agriculture/development/site-01/water-tank-001/ack/faucet';
+      const invalidJson = Buffer.from('NOT_VALID_JSON{');
+
+      const result = await processor.processAcknowledgementMessage(topic, invalidJson);
+      expect(result.success).toBe(false);
+      expect(result.reason).toBe('Invalid JSON payload');
+    });
+
+    it('rejects payload that fails schema validation', async () => {
+      const processor = new AcknowledgementProcessor({ env });
+      const topic = 'agriculture/development/site-01/water-tank-001/ack/faucet';
+      const invalidSchemaPayload = Buffer.from(
+        JSON.stringify({
+          schemaVersion: '1.0',
+          // missing messageId, commandId, deviceId
+          data: { status: 'UNKNOWN_STATUS' },
+        })
+      );
+
+      const result = await processor.processAcknowledgementMessage(topic, invalidSchemaPayload);
+      expect(result.success).toBe(false);
+      expect(result.reason).toBe('Payload schema validation failed');
+    });
+
+    it('rejects unknown device without crashing', async () => {
+      const processor = new AcknowledgementProcessor({
+        env,
+        faucetCommandRepo: { getCommandById: async () => null } as any,
+        deviceRepo: { getDeviceByCanonicalId: async () => null } as any,
+      });
+
+      const topic = 'agriculture/development/site-01/unknown-device/ack/faucet';
+      const payload = Buffer.from(
+        JSON.stringify({
+          schemaVersion: '1.0',
+          messageId: 'ack-msg-unknown-dev',
+          commandId: 'cmd-1',
+          deviceId: 'unknown-device',
+          data: { status: 'ACKNOWLEDGED', accepted: true },
+        })
+      );
+
+      const result = await processor.processAcknowledgementMessage(topic, payload);
+      expect(result.success).toBe(false);
+      expect(result.reason).toBe('Device not found');
+    });
+
     it('rejects unknown commandId gracefully without crashing', async () => {
       const mockFaucetCommandRepo = {
         getCommandById: async () => null,
@@ -502,6 +1058,7 @@ describe('TASK-0805: AcknowledgementProcessor (Device Acknowledgement Processing
         id: 'cmd-uuid-6',
         commandId: 'cmd-soil-123',
         deviceId: 'soil-node-001',
+        action: FaucetCommandAction.DISPENSE,
         status: FaucetCommandStatus.SENT,
         events: [],
       };
@@ -535,6 +1092,13 @@ describe('TASK-0805: AcknowledgementProcessor (Device Acknowledgement Processing
 
       expect(result.success).toBe(false);
       expect(result.reason).toContain('Device is not a WATER_TANK_NODE');
+    });
+
+    it('executes legacy processAcknowledgement method safely', async () => {
+      const processor = new AcknowledgementProcessor({ env });
+      await expect(
+        processor.processAcknowledgement('water-tank-001', 'cmd-1', 'ACKNOWLEDGED', { test: true })
+      ).resolves.not.toThrow();
     });
   });
 });

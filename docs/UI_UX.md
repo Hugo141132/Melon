@@ -1286,5 +1286,15 @@ The following facts are verified in the frontend UI/UX implementation regarding 
 The verified implementation of `TASK-0804` (`CommandPublisher` in `@kebun-melon/iot-gateway`) operates strictly in the gateway backend with zero UI changes or visual regressions:
 - **Design Tokens Unchanged:** Retains `Premium Minimal Ops` UI aesthetic and existing color palette without modification.
 - **Client Presentation Decoupling:** Browser displays preset volumes (e.g. 0.3 L) while backend stores integer mL; the gateway publisher faithfully dispatches the stored canonical `targetVolumeMl` integer.
-- **Physical Confirmation Boundary:** The UI continues to await downstream device event processing (`TASK-0805`/`TASK-0806`) before displaying confirmed completion, preventing misleading early completion states.
+- **Physical Confirmation Boundary:** The UI continues to await downstream device event processing (`TASK-0806`) before displaying confirmed completion, preventing misleading early completion states.
 <!-- TASK-0804 Reconciled: 2026-08-20 -->
+
+---
+
+## Device Acknowledgement Processing UI/UX Implementation Note (Reconciled 2026-08-20)
+
+The verified implementation of `TASK-0805` (`AcknowledgementProcessor` in `@kebun-melon/iot-gateway`) operates strictly in the gateway backend with zero UI changes or visual regressions:
+- **Zero Frontend Changes:** Frontend impact is strictly `NONE`. All UI layouts, components, and interactions remain untouched.
+- **Design Tokens Unchanged:** Reuses approved `Premium Minimal Ops` tokens and color palette without alterations.
+- **State Visualization Safety:** Device ACKs transition command status to `ACKNOWLEDGED` (or `FAILED`). The UI does not display `COMPLETED` or claim confirmed valve closure until physical completion events are received (`TASK-0806`).
+<!-- TASK-0805 Reconciled: 2026-08-20 -->

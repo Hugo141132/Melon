@@ -1770,3 +1770,17 @@ The following facts are supported by the verified implementation of `TASK-0804` 
 - **State Transition Atomicity:** `updateCommandStatus` transitions commands to `SENT` with `messageId` and metadata only after broker confirmation. If publishing fails, status remains `QUEUED`. Expired commands (`now >= expiresAt`) transition atomically to `EXPIRED`.
 - **Relational Integrity:** Preserves device foreign keys, `WATER_TANK_NODE` type constraints, and active status checks without schema alterations.
 <!-- TASK-0804 Reconciled: 2026-08-20 -->
+
+---
+
+## Faucet Command Acknowledgement Database Implementation Note (Reconciled 2026-08-20)
+
+The following facts are supported by the verified database interactions of `TASK-0805` (`AcknowledgementProcessor` in `@kebun-melon/iot-gateway`):
+- **Zero Schema Migrations:** Implemented strictly using existing database tables (`faucet_commands`, `faucet_command_events`, `alerts`, `devices`) with zero schema alterations or migrations.
+- **Transactional State Transitions:** `FaucetCommandRepository.updateCommandStatus` handles atomic transitions:
+  - Accepted ACKs: Transitions `SENT` → `ACKNOWLEDGED` and creates a `FaucetCommandEvent` with payload metadata and unique `messageId`.
+  - Rejected ACKs: Transitions `SENT` → `FAILED` with canonical `failureReasonCode` and triggers `AlertRepository.createCommandFailureAlert` linking command and device.
+- **Idempotency & Race Handling:** Replayed `messageId` occurrences are detected against persisted command event history, bypassing database updates. Database uniqueness is backed by the partial unique index `faucet_command_events_message_id_key` on `faucet_command_events(message_id)` where Prisma `P2002` errors are handled gracefully.
+- **Non-`SENT` State Protection:** Late, out-of-order, or non-`SENT` ACKs are ignored without writing redundant events or regressing database status.
+- **Decoupled Lifecycle:** Physical execution states (`IN_PROGRESS`, `COMPLETED`) remain strictly managed by `TASK-0806`.
+<!-- TASK-0805 Reconciled: 2026-08-20 -->

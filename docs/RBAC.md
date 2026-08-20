@@ -1167,3 +1167,13 @@ The following facts are verified in the authorization architecture regarding `TA
 - **Publisher Device State Guard:** The background publisher verifies that the target device is a `WATER_TANK_NODE` with `accountStatus = ACTIVE` and has a non-empty `siteId` before publishing.
 - **Admin Concealment:** The publisher consumes canonical device routing internally without exposing canonical device IDs across user-facing Admin views.
 <!-- TASK-0804 Reconciled: 2026-08-20 -->
+
+---
+
+## Device Acknowledgement Processing RBAC Implementation Note (Reconciled 2026-08-20)
+
+The following facts are verified in the authorization architecture regarding `TASK-0805` (`AcknowledgementProcessor` in `@kebun-melon/iot-gateway`):
+- **Permission Boundaries Preserved:** Zero new permissions or role modifications were introduced. No granular action permissions (`device.control.open`, `device.control.close`) were invented (`DEC-CTRL-091`).
+- **Authorization Context Linking:** The processor acts upon persisted `FaucetCommand` records previously authorized under `device.control` and active device assignments, maintaining audit traceability (`actorUserId`).
+- **Privacy & Concealment:** Admin canonical `deviceId` concealment (`DEC-DEV-028`) remains strictly intact across all user-facing monitoring and control surfaces.
+<!-- TASK-0805 Reconciled: 2026-08-20 -->

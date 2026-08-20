@@ -1982,3 +1982,35 @@ Automated unit, contract, error handling, and simulated performance sanity verif
 - **Sustained Soak (2,000 commands across 40 batches):** ~66.7 cmds/sec with zero memory leaks (Heap delta: +3.34 MB, RSS delta: +3.84 MB).
 - **Safety Under Fault Injection:** 0 duplicate publications, 0 false `SENT` transitions; 20 queued commands safely preserved during simulated broker disconnect and published successfully upon reconnection.
 <!-- TASK-0804 Reconciled: 2026-08-20 -->
+
+---
+
+# 47. Device Acknowledgement Processing Verification Suite (`TASK-0805`)
+
+Automated unit, contract, error recovery, and simulated performance sanity verification for device acknowledgement processing:
+
+### Agent-Executed Automated Tests
+1. **Targeted ACK Processor Test Suite Pass (`apps/iot-gateway/src/__tests__/acknowledgement-processor.test.ts`):** **25/25 tests passed (100% path pass rate)**:
+   - QoS 1 canonical topic validation (`agriculture/{environment}/{siteId}/{deviceId}/ack/faucet`) and non-faucet subpath rejection.
+   - Authoritative contract adherence identifying commands through `commandId` and `deviceId` (without requiring a payload action field).
+   - Stored command action retrieval and assertion against `[DISPENSE, OPEN, CLOSE]`, safely rejecting unsupported actions (`success: false`).
+   - Strict state progression: accepted ACKs transition `SENT` → `ACKNOWLEDGED` (guaranteeing status never becomes `COMPLETED` and never infers physical state).
+   - Rejected ACKs transition `SENT` → `FAILED` with canonical reason codes (`DEVICE_BUSY`, `UNSUPPORTED_ACTION`, `DEVICE_NOT_READY`, `INVALID_PAYLOAD`, `INTERNAL_ERROR`) and trigger `CommandFailureAlert` creation.
+   - Idempotent handling of duplicate `messageId` occurrences without duplicate database event writes.
+   - Non-`SENT` / late / out-of-order ACKs safely ignored without database writes or state regression.
+   - Device scoping enforcement for `WATER_TANK_NODE` device types.
+2. **IoT Gateway Test Suites Pass:** **16 test files, 195/195 tests passed (100%)**.
+3. **Contracts & Database Test Suites Pass:** **26 test files, 228/228 tests passed (100%)**.
+4. **Static Typecheck:** Clean `npm run typecheck` pass across all 4 monorepo workspaces with 0 errors.
+5. **Security Scanning:** Semgrep SAST scan with 0 findings, 0 errors.
+
+### Local In-Memory Performance Sanity Microbenchmark Results
+*Note: The following measurements represent local in-memory microbenchmarks of processor logic with mock repositories and do NOT constitute end-to-end network, broker, or database system capacity benchmarks:*
+- **Sequential 1,000 Unique ACKs:** 3,979.0 ACKs/sec (Duration: 251.32 ms, p50: 0.087 ms, p95: 0.297 ms, p99: 2.151 ms, Min: 0.045 ms, Max: 45.068 ms, Errors: 0, State Regressions: 0, Heap Delta: +2.00 MB).
+- **Burst 500 Concurrent ACKs (`Promise.all`):** 7,579.7 ACKs/sec (Duration: 65.97 ms, p50: 56.555 ms, p95: 63.893 ms, p99: 64.786 ms, Errors: 0, State Regressions: 0, Heap Delta: -0.33 MB).
+- **Repeated Duplicate `messageId` (1,000 ACKs):** 5,887.7 ACKs/sec (Duration: 169.85 ms, p50: 0.048 ms, p95: 0.360 ms, p99: 2.970 ms, Errors: 0, Redundant DB Writes: 0, Heap Delta: +1.20 MB).
+- **Short Soak (2,000 ACKs across 4 batches of 500):** 4,453.1 ACKs/sec (Duration: 449.13 ms, p50: 0.047 ms, p95: 0.848 ms, p99: 3.018 ms, Errors: 0, State Regressions: 0, Heap Delta: +1.10 MB).
+
+### Staging & Credential Boundary
+- Physical ESP32 hardware and live staging EMQX Cloud Serverless broker TLS end-to-end ACK verification remain credential/manual dependent and are not claimed complete.
+<!-- TASK-0805 Reconciled: 2026-08-20 -->

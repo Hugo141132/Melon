@@ -465,3 +465,14 @@ The following facts are supported by the verified implementation of `TASK-0804` 
 - **Fail-Safe Policy Deferral:** Preserves the unresolved status of fail-safe policies for open faucets after communication loss without inventing ad-hoc behaviors.
 - **State Transition Integrity:** Only eligible unexpired `QUEUED` commands transition to `SENT` upon confirmed broker publication (QoS 1, `retain=false`). Failed publications remain `QUEUED` and never appear as `SENT`. Expired commands transition to `EXPIRED` without publishing.
 <!-- TASK-0804 Reconciled: 2026-08-20 -->
+
+---
+
+## Faucet Command Acknowledgement Decisions Implementation Note (Reconciled 2026-08-20)
+
+The following facts are supported by the verified decisions governance of `TASK-0805` (`AcknowledgementProcessor` in `@kebun-melon/iot-gateway`):
+- **Decision Compliance:** Complies with `DEC-CTRL-051` (faucet command lifecycle), `DEC-CTRL-090` (manual `OPEN`/`CLOSE` and volume preset model), and `DEC-CTRL-091` (existing permission boundaries).
+- **Authoritative Contract Compliance:** MQTT ACK payloads identify commands strictly via `commandId` and `deviceId` without fabricating an action field. Supported command actions (`DISPENSE`, `OPEN`, `CLOSE`) are validated against stored database records.
+- **Zero Invented Decisions:** No arbitrary timeout constants, retry limits, granular permissions (`device.control.open`/`device.control.close`), or connection-loss fail-safe policies were invented during ACK processing. Command ACK timeout duration remains unresolved and tracked as `TBD` in §3 (`TASK-0809`).
+- **State Transition Separation:** Accepted ACKs transition `SENT` → `ACKNOWLEDGED` only. Commands never transition to `COMPLETED` and never infer physical `OPEN`/`CLOSED` state during ACK processing (`TASK-0806`). Rejected ACKs transition `SENT` → `FAILED` with canonical reason codes.
+<!-- TASK-0805 Reconciled: 2026-08-20 -->

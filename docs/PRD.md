@@ -1054,3 +1054,15 @@ The following facts are verified in the product implementation regarding `TASK-0
 - **Manual Control Actions:** For manual `OPEN` and `CLOSE` commands, `phase`, `plantCount`, and `targetVolumeMl` are strictly omitted from payloads.
 - **State Integrity:** Commands transition to `SENT` only after MQTT publication succeeds. Failed or disconnected publishes remain `QUEUED`. Expired commands transition to `EXPIRED` without physical transmission.
 <!-- TASK-0804 Reconciled: 2026-08-20 -->
+
+---
+
+## Faucet Command Acknowledgement Requirements Implementation Note (Reconciled 2026-08-20)
+
+The following facts are verified in the product implementation regarding `TASK-0805` (`AcknowledgementProcessor` in `@kebun-melon/iot-gateway`):
+- **Requirement Fulfillment (PRD-FR-006 / PRD-FR-007):** Revalidates and processes device ACKs for `DISPENSE`, `OPEN`, and `CLOSE` commands over QoS 1 MQTT topics (`agriculture/{environment}/{siteId}/{deviceId}/ack/faucet`).
+- **Command Linking & Validation:** Correctly links incoming ACKs to persisted commands via `commandId` and device identity, asserting stored action validity.
+- **State Progression:** Accepted ACKs transition `SENT` → `ACKNOWLEDGED` without premature completion. Rejected ACKs transition `SENT` → `FAILED` with canonical reason codes and generate audit failure alerts.
+- **Idempotency:** Repeated duplicate `messageId` occurrences are handled idempotently with zero duplicate database writes or state regression.
+- **Downstream Boundaries:** Execution event state machine transitions (`TASK-0806`), physical outcome verification, and timeout handling (`TASK-0809`) remain decoupled.
+<!-- TASK-0805 Reconciled: 2026-08-20 -->

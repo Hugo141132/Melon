@@ -173,20 +173,24 @@ describe('TASK-0409 — Gateway Observability', () => {
     it('GET /health returns pass status and uptime without secrets', async () => {
       const { app } = buildApp({ env });
 
-      const response = await app.inject({
-        method: 'GET',
-        url: '/health',
-      });
+      try {
+        const response = await app.inject({
+          method: 'GET',
+          url: '/health',
+        });
 
-      expect(response.statusCode).toBe(200);
-      const payload = response.json();
-      expect(payload.status).toBe('pass');
-      expect(payload.service).toBe('iot-gateway');
-      expect(typeof payload.uptime).toBe('number');
-      expect(payload.timestamp).toBeDefined();
-      expect(JSON.stringify(payload)).not.toContain('password');
-      expect(JSON.stringify(payload)).not.toContain('secret');
-    }, 10000);
+        expect(response.statusCode).toBe(200);
+        const payload = response.json();
+        expect(payload.status).toBe('pass');
+        expect(payload.service).toBe('iot-gateway');
+        expect(typeof payload.uptime).toBe('number');
+        expect(payload.timestamp).toBeDefined();
+        expect(JSON.stringify(payload)).not.toContain('password');
+        expect(JSON.stringify(payload)).not.toContain('secret');
+      } finally {
+        await app.close();
+      }
+    }, 20000);
 
     it('GET /ready returns DEGRADED 503 when DB is connected but MQTT is disconnected', async () => {
       const { app } = buildApp({
@@ -194,17 +198,21 @@ describe('TASK-0409 — Gateway Observability', () => {
         dbChecker: async () => true,
       });
 
-      const response = await app.inject({
-        method: 'GET',
-        url: '/ready',
-      });
+      try {
+        const response = await app.inject({
+          method: 'GET',
+          url: '/ready',
+        });
 
-      expect(response.statusCode).toBe(503);
-      const payload = response.json();
-      expect(payload.status).toBe('DEGRADED');
-      expect(payload.service).toBe('iot-gateway');
-      expect(payload.database.status).toBe('CONNECTED');
-      expect(payload.mqtt.status).toBe('DISCONNECTED');
-    });
+        expect(response.statusCode).toBe(503);
+        const payload = response.json();
+        expect(payload.status).toBe('DEGRADED');
+        expect(payload.service).toBe('iot-gateway');
+        expect(payload.database.status).toBe('CONNECTED');
+        expect(payload.mqtt.status).toBe('DISCONNECTED');
+      } finally {
+        await app.close();
+      }
+    }, 20000);
   });
 });

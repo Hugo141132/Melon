@@ -1843,3 +1843,16 @@ The following facts are supported by the verified implementation of `TASK-0804` 
   - `OPEN` / `CLOSE`: Transmits clean manual action payload omitting `phase`, `plantCount`, and `targetVolumeMl`.
 - **State Progression:** Atomically transitions database status from `QUEUED` to `SENT` only after broker confirms publication. Expired commands are marked `EXPIRED` without transmission. Disconnected/failed broker states keep commands `QUEUED` with zero false `SENT` marks.
 <!-- TASK-0804 Reconciled: 2026-08-20 -->
+
+---
+
+## Device Acknowledgement Processing Protocol Implementation Note (Reconciled 2026-08-20)
+
+The following facts are supported by the verified device communication implementation of `TASK-0805` (`AcknowledgementProcessor` in `@kebun-melon/iot-gateway`):
+- **Canonical Topic Routing & QoS:** Subscribes to `agriculture/{environment}/{siteId}/{deviceId}/ack/faucet` with QoS 1.
+- **Payload Schema Conformance:** Validates payloads against `FaucetAcknowledgementPayloadSchema`: `schemaVersion: '1.0'`, `messageId`, `commandId`, `deviceId`, optional `recordedAt`, and `data: { status: 'ACKNOWLEDGED' | 'REJECTED', accepted: boolean, reasonCode?: string }`.
+- **Command Action Resolution:** Identifies target commands strictly via `commandId` and `deviceId` without embedding or requiring an action field in the MQTT ACK payload. Verifies stored action is one of `DISPENSE`, `OPEN`, or `CLOSE`.
+- **Device & Topic Isolation:** Enforces `WATER_TANK_NODE` device type scoping, ensuring topic `deviceId` matches payload `deviceId` and resolved internal device UUID.
+- **State Progression & Failure Handling:** Accepted ACKs transition `SENT` → `ACKNOWLEDGED` (never `COMPLETED`). Rejected ACKs transition `SENT` → `FAILED` with canonical reason codes (`DEVICE_BUSY`, `UNSUPPORTED_ACTION`, `DEVICE_NOT_READY`, `INVALID_PAYLOAD`, `INTERNAL_ERROR`) and generate failure alerts.
+- **Idempotency & Late Event Safety:** Duplicate `messageId` occurrences are handled idempotently; late, non-`SENT`, or out-of-order ACKs are ignored without state regression.
+<!-- TASK-0805 Reconciled: 2026-08-20 -->

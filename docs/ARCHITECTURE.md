@@ -1613,5 +1613,17 @@ The following facts are supported by the verified implementation of `TASK-0804` 
 - **Target Volume Passthrough:** For `DISPENSE` commands, the publisher passes through the canonical integer `targetVolumeMl` persisted during `TASK-0803` without performing independent recalculations.
 - **Manual Control Payloads:** For `OPEN` and `CLOSE` commands, `phase`, `plantCount`, and `targetVolumeMl` are strictly omitted from MQTT payloads.
 - **State Transition & Failure Boundary:** Atomic progression to `SENT` occurs only after broker publish confirmation. In the event of broker disconnection or failure, commands remain `QUEUED` in the database with zero false `SENT` transitions. Expired commands transition to `EXPIRED` without dispatch.
-- **Decoupling:** Gateway acknowledgement processor (`TASK-0805`) and downstream state machine tasks remain distinct and pending.
+- **Decoupling:** Gateway command publisher (`TASK-0804`) operates independently of acknowledgement processing (`TASK-0805`), which in turn decouples from downstream state machine tasks (`TASK-0806`).
 <!-- TASK-0804 Reconciled: 2026-08-20 -->
+
+---
+
+## Device Acknowledgement Processing Architecture Implementation Note (Reconciled 2026-08-20)
+
+The following facts are supported by the verified architecture of `TASK-0805` (`AcknowledgementProcessor` in `@kebun-melon/iot-gateway`):
+- **Gateway ACK Processing Role:** Dedicated background processor subscribes to canonical MQTT topics (`agriculture/{environment}/{siteId}/{deviceId}/ack/faucet`, QoS 1). Normalizes incoming payloads, validates `WATER_TANK_NODE` device scope and database identity, and asserts persisted command action eligibility (`DISPENSE`, `OPEN`, `CLOSE`).
+- **Contract & Topic Decoupling:** Faucet ACK MQTT payloads identify commands strictly through `commandId` and `deviceId` without embedding an action field. Command action is resolved from stored database state.
+- **State Progression Boundary:** Accepted ACKs transition `SENT` → `ACKNOWLEDGED` only. The processor never transitions commands to `COMPLETED` and never infers confirmed physical `OPEN`/`CLOSED` state (reserved for `TASK-0806`). Rejected ACKs transition `SENT` → `FAILED` with canonical reason codes and trigger `CommandFailureAlert` generation.
+- **Idempotency & Isolation:** In-memory event checking and database partial unique indexing prevent duplicate processing of replayed `messageId` occurrences. Late, non-`SENT`, or out-of-order ACKs are ignored without regressing state.
+- **System Decoupling:** Downstream command event execution state machine (`TASK-0806`) and timeout processing (`TASK-0809`) remain decoupled.
+<!-- TASK-0805 Reconciled: 2026-08-20 -->

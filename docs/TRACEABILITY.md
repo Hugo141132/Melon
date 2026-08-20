@@ -97,5 +97,19 @@ The following facts are verified in the traceability matrix regarding `TASK-0804
 - **Target Volume Passthrough:** For `DISPENSE` actions, the publisher consumes the canonical integer `targetVolumeMl` persisted during `TASK-0803` API command creation without recalculating from `phase` or `plantCount`.
 - **Manual Control Schema:** Cleanly formats `OPEN` and `CLOSE` commands by omitting `phase`, `plantCount`, and `targetVolumeMl`.
 - **State Progression:** Atomically transitions database status from `QUEUED` to `SENT` only after broker confirms publication. Expired commands are marked `EXPIRED` without transmission.
-- **Dependency Isolation:** Downstream tasks (`TASK-0805` device acknowledgement processing, `TASK-0806` command state machine, `TASK-1003` MQTT E2E test suites) remain distinct and pending.
+- **Dependency Isolation:** Downstream tasks (`TASK-0806` command state machine, `TASK-1003` MQTT E2E test suites) remain distinct and pending.
 <!-- TASK-0804 Reconciled: 2026-08-20 -->
+
+---
+
+## Device Acknowledgement Processing Traceability Implementation Note (Reconciled 2026-08-20)
+
+The following facts are verified in the traceability matrix regarding `TASK-0805` (`AcknowledgementProcessor` in `@kebun-melon/iot-gateway`):
+- **Implementation Status:** `TASK-0805` is implemented and verified (`apps/iot-gateway/src/__tests__/acknowledgement-processor.test.ts`, 25/25 tests passed; gateway test suites 195/195 passed; contracts/database 228/228 passed).
+- **Contract Integrity:** Authoritative ACK contract strictly identifies target commands via `commandId` and device identity (`deviceId`) on QoS 1 topic `agriculture/{environment}/{siteId}/{deviceId}/ack/faucet` without fabricating an action in the MQTT ACK payload.
+- **Persisted Action Validation:** Persisted command action is retrieved and validated against `[DISPENSE, OPEN, CLOSE]`, rejecting unsupported actions with `{ success: false }`.
+- **State Transition Integrity:** Accepted ACKs transition `SENT` → `ACKNOWLEDGED` only (never transitioning to `COMPLETED` or inferring physical state). Rejected ACKs transition `SENT` → `FAILED` with canonical `reasonCode` and generate `CommandFailureAlert`.
+- **Idempotency & Non-Regression:** Duplicate `messageId` handling is verified idempotent against stored event history; non-`SENT` / late / out-of-order ACKs are safely ignored without state regression; and `WATER_TANK_NODE` device type scoping is enforced.
+- **Verification & Microbenchmark Summary:** Clean typecheck, 0 Semgrep findings, and 0 errors/regressions across in-memory performance sanity scenarios (sequential: 3,979 ACKs/sec, burst: 7,579 ACKs/sec, duplicate: 5,887 ACKs/sec, soak: 4,453 ACKs/sec; clearly labeled as in-memory microbenchmarks). Live staging MQTT/hardware verification remains credential/manual dependent.
+- **Downstream Decoupling:** Downstream execution state machine events (`TASK-0806`), duplicate command protection (`TASK-0808`), and timeout processing (`TASK-0809`) remain distinct and decoupled.
+<!-- TASK-0805 Reconciled: 2026-08-20 -->

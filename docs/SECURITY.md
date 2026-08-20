@@ -1557,3 +1557,16 @@ The following security controls are active and verified across the gateway comma
 - **QoS & Retention Safety:** All faucet commands publish with QoS 1 and `retain=false` to prevent stale command replay upon device reconnection.
 - **State Progression Safety:** Commands transition to `SENT` only upon confirmed broker publication. Failed/disconnected publishes remain `QUEUED`. Expired commands transition to `EXPIRED` without transmission.
 <!-- TASK-0804 Reconciled: 2026-08-20 -->
+
+---
+
+## Device Acknowledgement Processing Security Controls Implementation Note (Reconciled 2026-08-20)
+
+The following security controls are active and verified across the device acknowledgement processor (`TASK-0805`):
+- **Zero Security Exceptions:** No security bypasses, exceptions, or hardcoded secrets were introduced.
+- **Topic & Payload Validation:** Validates incoming messages on canonical QoS 1 topics `agriculture/{environment}/{siteId}/{deviceId}/ack/faucet`. Validates schema structure and enforces identity matching between topic `deviceId` and payload `deviceId`.
+- **Persisted Command Action Assertion:** Retrieves the persisted `FaucetCommand` and strictly asserts its action is one of `DISPENSE`, `OPEN`, `CLOSE` before updating state, safely rejecting unsupported actions.
+- **Replay & Idempotency Protection:** Replayed `messageId` occurrences are detected against event history without executing redundant database updates or regressing command state.
+- **Out-of-Order Safety:** Late or non-`SENT` ACKs are ignored safely without altering command status.
+- **Outcome Separation:** Status is never transitioned to `COMPLETED` during ACK processing; physical state is never inferred until verified downstream execution events arrive (`TASK-0806`).
+<!-- TASK-0805 Reconciled: 2026-08-20 -->

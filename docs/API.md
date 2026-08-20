@@ -2821,5 +2821,32 @@ The following facts are supported by the verified implementation of `TASK-0804` 
 - **Persisted Volume Passthrough:** For `DISPENSE` actions, the gateway publisher directly transmits the canonical `targetVolumeMl` integer persisted during `TASK-0803` API command creation without recalculating or modifying the value.
 - **Payload Schema Conformance:** `DISPENSE` payloads carry valid `phase`, `plantCount >= 1`, and `targetVolumeMl`. `OPEN` and `CLOSE` command payloads omit `phase`, `plantCount`, and `targetVolumeMl` without fabricating placeholder values.
 - **State Transition Integrity:** Only eligible unexpired `QUEUED` commands transition to `SENT` upon confirmed broker publication (QoS 1, `retain=false`). Failed publications remain `QUEUED` and are never marked `SENT`. Expired commands transition to `EXPIRED` without publishing.
-- **Downstream Decoupling:** `TASK-0805` (acknowledgement processing) and downstream state machine tasks remain untouched.
+- **Downstream Decoupling:** Downstream state machine tasks (`TASK-0806`) remain untouched.
 <!-- TASK-0804 Reconciled: 2026-08-20 -->
+
+---
+
+## Device Acknowledgement Processing Implementation Note (Reconciled 2026-08-20)
+
+The following facts are supported by the verified implementation of `TASK-0805` (`AcknowledgementProcessor` in `@kebun-melon/iot-gateway`):
+- **Status:** `DONE`.
+- **Authoritative Contract Compliance:** MQTT ACK payloads (`agriculture/{environment}/{siteId}/{deviceId}/ack/faucet`, QoS 1) identify commands strictly through `commandId` and device identity (`deviceId`) without fabricating an action field in the payload.
+- **Persisted Command Action Validation:** Before applying state changes, the processor retrieves the persisted command and verifies its stored action is one of `DISPENSE`, `OPEN`, or `CLOSE`, safely rejecting unsupported actions.
+- **State Transition Guard:** Accepted ACKs transition `SENT` → `ACKNOWLEDGED` only. Status is never transitioned to `COMPLETED` and physical state is never inferred during ACK processing. Rejected ACKs transition `SENT` → `FAILED` with canonical `reasonCode` and generate `CommandFailureAlert`.
+- **Idempotency & Isolation:** Duplicate `messageId` occurrences are handled idempotently against stored event history; non-`SENT` / late / out-of-order ACKs are ignored without state regression; and `WATER_TANK_NODE` device type scoping is enforced.
+- **Boundaries & Governance:** No schema migration, permission changes, UI redesign, or new security exceptions were introduced.
+- **Targeted Automated Verification:**
+  - ACK processor targeted unit tests (`apps/iot-gateway/src/__tests__/acknowledgement-processor.test.ts`): **25/25 tests passed (100%)**.
+  - Full IoT Gateway test suites: **16 files, 195/195 tests passed (100%)**.
+  - Contracts and database suites: **26 files, 228/228 tests passed (100%)**.
+  - Monorepo static typecheck (`npm run typecheck`): **0 errors**.
+  - Semgrep SAST security scan: **0 findings, 0 errors**.
+- **Local In-Memory Performance Microbenchmark:**
+  - Sequential (1,000 unique ACKs): 3,979.0 ACKs/sec, p50: 0.087 ms, p95: 0.297 ms, p99: 2.151 ms, 0 errors, 0 state regressions.
+  - Burst (500 concurrent ACKs): 7,579.7 ACKs/sec, p50: 56.555 ms, p95: 63.893 ms, p99: 64.786 ms, 0 errors.
+  - Repeated Duplicate (1,000 duplicate `messageId` ACKs): 5,887.7 ACKs/sec, p50: 0.048 ms, 0 redundant DB writes.
+  - Short Soak (2,000 ACKs across 4 batches): 4,453.1 ACKs/sec, p50: 0.047 ms, stable heap (+1.10 MB).
+  - *Note: These figures represent in-memory microbenchmarks of processor logic and do not measure full broker/database network system capacity.*
+- **Staging / Credential Boundary:** Live MQTT over TLS and physical hardware end-to-end verification remains credential/manual dependent and is not claimed complete.
+- **Downstream Decoupling:** Downstream command event state machine transitions (`TASK-0806`), duplicate command protection (`TASK-0808`), and timeout processing (`TASK-0809`) remain decoupled.
+<!-- TASK-0805 Reconciled: 2026-08-20 -->

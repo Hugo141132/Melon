@@ -140,20 +140,24 @@ describe('TASK-0401 — IoT Gateway Service', () => {
     it('GET /health returns pass status and uptime without secrets', async () => {
       const { app } = buildApp({ env });
 
-      const response = await app.inject({
-        method: 'GET',
-        url: '/health',
-      });
+      try {
+        const response = await app.inject({
+          method: 'GET',
+          url: '/health',
+        });
 
-      expect(response.statusCode).toBe(200);
-      const payload = response.json();
-      expect(payload.status).toBe('pass');
-      expect(payload.service).toBe('iot-gateway');
-      expect(typeof payload.uptime).toBe('number');
-      expect(payload.timestamp).toBeDefined();
-      expect(JSON.stringify(payload)).not.toContain('password');
-      expect(JSON.stringify(payload)).not.toContain('secret');
-    }, 10000);
+        expect(response.statusCode).toBe(200);
+        const payload = response.json();
+        expect(payload.status).toBe('pass');
+        expect(payload.service).toBe('iot-gateway');
+        expect(typeof payload.uptime).toBe('number');
+        expect(payload.timestamp).toBeDefined();
+        expect(JSON.stringify(payload)).not.toContain('password');
+        expect(JSON.stringify(payload)).not.toContain('secret');
+      } finally {
+        await app.close();
+      }
+    }, 20000);
 
     it('GET /ready reflects DEGRADED with 503 when DB is connected but MQTT is disconnected', async () => {
       const { app } = buildApp({
@@ -161,20 +165,24 @@ describe('TASK-0401 — IoT Gateway Service', () => {
         dbChecker: async () => true, // DB connected
       });
 
-      const response = await app.inject({
-        method: 'GET',
-        url: '/ready',
-      });
+      try {
+        const response = await app.inject({
+          method: 'GET',
+          url: '/ready',
+        });
 
-      expect(response.statusCode).toBe(503);
-      const payload = response.json();
-      expect(payload.status).toBe('DEGRADED');
-      expect(payload.service).toBe('iot-gateway');
-      expect(payload.database.status).toBe('CONNECTED');
-      expect(payload.database.connected).toBe(true);
-      expect(payload.mqtt.status).toBe('DISCONNECTED');
-      expect(payload.mqtt.connected).toBe(false);
-    });
+        expect(response.statusCode).toBe(503);
+        const payload = response.json();
+        expect(payload.status).toBe('DEGRADED');
+        expect(payload.service).toBe('iot-gateway');
+        expect(payload.database.status).toBe('CONNECTED');
+        expect(payload.database.connected).toBe(true);
+        expect(payload.mqtt.status).toBe('DISCONNECTED');
+        expect(payload.mqtt.connected).toBe(false);
+      } finally {
+        await app.close();
+      }
+    }, 20000);
 
     it('GET /ready reflects DOWN with 503 when DB is unreachable', async () => {
       const { app } = buildApp({
@@ -182,17 +190,21 @@ describe('TASK-0401 — IoT Gateway Service', () => {
         dbChecker: async () => false, // DB unreachable
       });
 
-      const response = await app.inject({
-        method: 'GET',
-        url: '/ready',
-      });
+      try {
+        const response = await app.inject({
+          method: 'GET',
+          url: '/ready',
+        });
 
-      expect(response.statusCode).toBe(503);
-      const payload = response.json();
-      expect(payload.status).toBe('DOWN');
-      expect(payload.database.status).toBe('DISCONNECTED');
-      expect(payload.database.connected).toBe(false);
-    });
+        expect(response.statusCode).toBe(503);
+        const payload = response.json();
+        expect(payload.status).toBe('DOWN');
+        expect(payload.database.status).toBe('DISCONNECTED');
+        expect(payload.database.connected).toBe(false);
+      } finally {
+        await app.close();
+      }
+    }, 20000);
 
     it('GET /ready reflects UP with 200 when both DB and MQTT are connected', async () => {
       const mockEventEmitter = new MockMqttClient();
@@ -204,24 +216,29 @@ describe('TASK-0401 — IoT Gateway Service', () => {
         dbChecker: async () => true, // DB connected
       });
 
-      const connectPromise = mockClient.connect();
-      mockEventEmitter.connected = true;
-      mockEventEmitter.emit('connect');
-      await connectPromise;
+      try {
+        const connectPromise = mockClient.connect();
+        mockEventEmitter.connected = true;
+        mockEventEmitter.emit('connect');
+        await connectPromise;
 
-      const response = await app.inject({
-        method: 'GET',
-        url: '/ready',
-      });
+        const response = await app.inject({
+          method: 'GET',
+          url: '/ready',
+        });
 
-      expect(response.statusCode).toBe(200);
-      const payload = response.json();
-      expect(payload.status).toBe('UP');
-      expect(payload.database.status).toBe('CONNECTED');
-      expect(payload.database.connected).toBe(true);
-      expect(payload.mqtt.status).toBe('CONNECTED');
-      expect(payload.mqtt.connected).toBe(true);
-    });
+        expect(response.statusCode).toBe(200);
+        const payload = response.json();
+        expect(payload.status).toBe('UP');
+        expect(payload.database.status).toBe('CONNECTED');
+        expect(payload.database.connected).toBe(true);
+        expect(payload.mqtt.status).toBe('CONNECTED');
+        expect(payload.mqtt.connected).toBe(true);
+      } finally {
+        await app.close();
+        await mockClient.disconnect();
+      }
+    }, 20000);
   });
 
   describe('MQTT Client Lifecycle (Connect, Disconnect, Reconnect)', () => {
