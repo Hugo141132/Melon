@@ -1825,10 +1825,10 @@ POST /devices/{deviceId}/faucet-commands
 ## TASK-0806 — Implement Command Event State Machine
 
 **Priority:** `P0`
-**Status:** `BACKLOG`
+**Status:** `DONE`
 **Dependencies:** `TASK-0805`
 **Historical Completion:** 2026-08-03 — Implemented `FaucetEventProcessor` in `@kebun-melon/iot-gateway` (`apps/iot-gateway/src/events/processor.ts`) to subscribe to canonical faucet execution event topics (`agriculture/{environment}/{siteId}/{deviceId}/event/faucet`, QoS 1). Validated topic/payload deviceId matching, resolved external device ID to internal device UUID, and enforced `WATER_TANK_NODE` device type scope. Executed strict `ACKNOWLEDGED` → `IN_PROGRESS` → `COMPLETED` and `ACKNOWLEDGED`/`IN_PROGRESS` → `FAILED` state transitions with `FaucetCommandEvent` audit creation and `actualVolumeMl` / `reasonCode` tracking.
-**Revision Note (2026-08-20):** Status remains `BACKLOG` (unblocked following `TASK-0805` completion). Requires event processor revision for `OPEN` / `CLOSE` execution events, confirming physical `OPEN` / `CLOSED` / `UNKNOWN` states without premature completion.
+**Revision Completion (2026-08-20):** Updated `FaucetEventProcessor` in `@kebun-melon/iot-gateway` (`apps/iot-gateway/src/events/processor.ts`) to handle execution events across all supported faucet command actions (`DISPENSE`, `OPEN`, and `CLOSE`). Implemented authoritative physical state determination: `COMPLETED OPEN` → `OPEN`, `COMPLETED CLOSE` → `CLOSED`, `COMPLETED DISPENSE` → `UNKNOWN` (strictly avoiding assuming closed valve), and failed/uncertain/in-progress → `UNKNOWN`. Enforced persisted command action validation against `[DISPENSE, OPEN, CLOSE]`. Enforced contract-consistent volume rules: `DISPENSE` validates non-negative `actualVolumeMl` and target volume match if provided; `OPEN` and `CLOSE` treat volume measurement as non-applicable and store `null`/`undefined` in the command record without failing execution confirmations. Guaranteed terminal-state immutability (`COMPLETED`, `FAILED`, `CANCELLED`, `TIMEOUT`, `EXPIRED`), duplicate `messageId` idempotency, progress event appending, and `CommandFailureAlert` dispatching on `FAILED` events. Verified 100% test pass rate across 32 unit tests (`apps/iot-gateway/src/__tests__/faucet-event-processor.test.ts`), full 212-test IoT Gateway test suite, 934-test workspace suite, Semgrep security scan (0 findings), and TypeScript typecheck (0 errors).
 
 ### Work
 
@@ -1848,12 +1848,14 @@ EXPIRED
 
 ### Acceptance Criteria
 
-- Invalid transitions are rejected or flagged.
-- Final states do not regress.
-- Late events follow approved reconciliation.
-- Timeout remains distinct from failure and completion.
-- Physical state confirmation (`OPEN`, `CLOSED`, `UNKNOWN`) tracked accurately.
-- Events are audited.
+- [x] Invalid transitions are rejected or flagged.
+- [x] Final states do not regress.
+- [x] Late events follow approved reconciliation.
+- [x] Timeout remains distinct from failure and completion.
+- [x] Physical state confirmation (`OPEN`, `CLOSED`, `UNKNOWN`) tracked accurately.
+- [x] Events are audited.
+- [x] Covers `DISPENSE`, `OPEN`, and `CLOSE` execution events.
+- [x] Volume handling conforms to action type (`DISPENSE` stores measured volume; `OPEN`/`CLOSE` do not store command volume).
 
 ---
 

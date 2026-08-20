@@ -1066,3 +1066,21 @@ The following facts are verified in the product implementation regarding `TASK-0
 - **Idempotency:** Repeated duplicate `messageId` occurrences are handled idempotently with zero duplicate database writes or state regression.
 - **Downstream Boundaries:** Execution event state machine transitions (`TASK-0806`), physical outcome verification, and timeout handling (`TASK-0809`) remain decoupled.
 <!-- TASK-0805 Reconciled: 2026-08-20 -->
+
+---
+
+## Faucet Command Execution State Machine Requirements Implementation Note (Reconciled 2026-08-20)
+
+The following facts are verified in the product implementation regarding `TASK-0806` (`FaucetEventProcessor` in `@kebun-melon/iot-gateway`):
+- **Requirement Fulfillment (PRD-FR-030 / PRD-FR-033):** Subscribes to device execution events (`agriculture/{environment}/{siteId}/{deviceId}/event/faucet`, QoS 1) and enforces the full command lifecycle (`ACKNOWLEDGED` → `IN_PROGRESS` → `COMPLETED` / `FAILED`).
+- **Supported Actions:** Handles execution events for `DISPENSE`, `OPEN`, and `CLOSE` commands.
+- **Authoritative Physical State:**
+  - `COMPLETED OPEN` → `OPEN` (valve physically confirmed open)
+  - `COMPLETED CLOSE` → `CLOSED` (valve physically confirmed closed)
+  - `COMPLETED DISPENSE` → `UNKNOWN` (dispense completed; valve closure is not assumed without direct physical confirmation)
+  - `FAILED` / `IN_PROGRESS` / timeout / uncertain → `UNKNOWN`
+  - Physical state is NEVER inferred from API creation, MQTT publication, or command ACKs.
+- **Volume Handling Rules:** `DISPENSE` validates target volume parity if provided and tracks non-negative `actualVolumeMl`. `OPEN` and `CLOSE` treat volume measurement as non-applicable and store `null`/`undefined` in the command record.
+- **Idempotency & Terminal Immutability:** Duplicate `messageId` occurrences are handled idempotently without redundant writes; terminal commands (`COMPLETED`, `FAILED`, `CANCELLED`, `TIMEOUT`, `EXPIRED`) ignore late events without state regression.
+- **Alert Dispatching:** Dispatches `CommandFailureAlert` for `FAILED` execution events linking device, command, and `physicalOutcome: 'UNKNOWN'`.
+<!-- TASK-0806 Reconciled: 2026-08-20 -->

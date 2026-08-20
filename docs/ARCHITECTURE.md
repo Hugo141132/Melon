@@ -1627,3 +1627,17 @@ The following facts are supported by the verified architecture of `TASK-0805` (`
 - **Idempotency & Isolation:** In-memory event checking and database partial unique indexing prevent duplicate processing of replayed `messageId` occurrences. Late, non-`SENT`, or out-of-order ACKs are ignored without regressing state.
 - **System Decoupling:** Downstream command event execution state machine (`TASK-0806`) and timeout processing (`TASK-0809`) remain decoupled.
 <!-- TASK-0805 Reconciled: 2026-08-20 -->
+
+---
+
+## Command Event State Machine Architecture Implementation Note (Reconciled 2026-08-20)
+
+The following facts are supported by the verified architecture of `TASK-0806` (`FaucetEventProcessor` in `@kebun-melon/iot-gateway`):
+- **Gateway Event Processor Role:** Long-running background processor subscribes to canonical MQTT topics (`agriculture/{environment}/{siteId}/{deviceId}/event/faucet`, QoS 1). Validates payload schema, device identity, topic site matching, and verifies the persisted command action is one of `DISPENSE`, `OPEN`, or `CLOSE`.
+- **Command Lifecycle State Machine:** Executes strict state transitions (`ACKNOWLEDGED` → `IN_PROGRESS` → `COMPLETED`, `ACKNOWLEDGED`/`IN_PROGRESS` → `FAILED`). Terminal states (`COMPLETED`, `FAILED`, `CANCELLED`, `TIMEOUT`, `EXPIRED`) are immutable; late execution events are ignored without regressing state or mutating terminal records.
+- **Physical Faucet State Architecture:** Physical valve state is authoritatively confirmed ONLY from physical device execution events (`COMPLETED OPEN` → `OPEN`, `COMPLETED CLOSE` → `CLOSED`, `COMPLETED DISPENSE` → `UNKNOWN`, failed/uncertain/in-progress → `UNKNOWN`). Physical state is never inferred from API creation, MQTT publication, or command ACKs.
+- **Audit & Persistence Model:** Appends immutable audit records to `faucet_command_events` while updating mutable lifecycle status in `faucet_commands` within transactional boundaries. Does not introduce event sourcing or CQRS infrastructure.
+- **Idempotency & Redundancy Prevention:** Duplicate `messageId` occurrences are matched against stored event history and ignored without invoking redundant database writes.
+- **Alert Integration:** Automatically generates `CommandFailureAlert` for `FAILED` execution events linking device, command, and `physicalOutcome: 'UNKNOWN'`.
+- **Decoupling & Downstream Isolation:** Downstream timeout processing (`TASK-0809`) and duplicate command protection (`TASK-0808`) remain decoupled.
+<!-- TASK-0806 Reconciled: 2026-08-20 -->

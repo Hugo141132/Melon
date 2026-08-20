@@ -9,6 +9,7 @@ import {
   ReservoirTelemetryData,
   FaucetAckReasonCode,
   FAUCET_ACK_REASON_CODES,
+  FAUCET_PRESET_VOLUMES,
 } from '@kebun-melon/contracts';
 
 export interface DeviceSimulatorConfig {

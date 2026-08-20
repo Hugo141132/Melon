@@ -1000,7 +1000,7 @@ agriculture/{environment}/{siteId}/{deviceId}/event/faucet
 }
 ```
 
-`actualVolumeMl` is optional and shall be sent only when the hardware contract supports it.
+`actualVolumeMl` is optional and applies to `DISPENSE` operations when supported by hardware flow measurement. For `OPEN` and `CLOSE` commands, volume measurement is not applicable to valve state tracking and is not recorded in the command record.
 
 ### 20.2 Completed Event
 
@@ -1018,6 +1018,9 @@ agriculture/{environment}/{siteId}/{deviceId}/event/faucet
   }
 }
 ```
+
+- For `DISPENSE`: `targetVolumeMl` matches the command volume if provided; `actualVolumeMl` is an optional non-negative integer representing measured dispensed volume.
+- For `OPEN` and `CLOSE`: Volume fields are not applicable to valve positioning and are not stored in the command record (stored as `null` / `undefined`).
 
 ### 20.3 Failed Event
 
@@ -1048,6 +1051,21 @@ STOPPED
 The final reason-code list shall be agreed with the hardware team.
 
 The web application shall not report `COMPLETED` solely because the command was sent or acknowledged.
+
+### 20.4 Authoritative Physical Faucet State Determination
+
+Physical faucet state shall be derived strictly from verified execution event outcomes according to the command's persisted action:
+
+| Command Action | Event Status | Authoritative Physical State | Rationale |
+|---|---|---|---|
+| `OPEN` | `COMPLETED` | `OPEN` | Valve confirmed opened by device execution event. |
+| `CLOSE` | `COMPLETED` | `CLOSED` | Valve confirmed closed by device execution event. |
+| `DISPENSE` | `COMPLETED` | `UNKNOWN` | Dispensing volume completed; valve closure shall NOT be assumed without direct physical confirmation. |
+| *Any* | `FAILED` / `IN_PROGRESS` / timeout / uncertain | `UNKNOWN` | Physical outcome cannot be authoritatively guaranteed. |
+
+Rules:
+- Physical state is NEVER inferred from API creation/acceptance, MQTT command publication, or command acknowledgement (ACK).
+- Only verified final execution events from the physical device determine authoritative physical state.
 
 ---
 
@@ -1856,3 +1874,22 @@ The following facts are supported by the verified device communication implement
 - **State Progression & Failure Handling:** Accepted ACKs transition `SENT` → `ACKNOWLEDGED` (never `COMPLETED`). Rejected ACKs transition `SENT` → `FAILED` with canonical reason codes (`DEVICE_BUSY`, `UNSUPPORTED_ACTION`, `DEVICE_NOT_READY`, `INVALID_PAYLOAD`, `INTERNAL_ERROR`) and generate failure alerts.
 - **Idempotency & Late Event Safety:** Duplicate `messageId` occurrences are handled idempotently; late, non-`SENT`, or out-of-order ACKs are ignored without state regression.
 <!-- TASK-0805 Reconciled: 2026-08-20 -->
+
+---
+
+## Device Execution Event State Machine Protocol Implementation Note (Reconciled 2026-08-20)
+
+The following facts are supported by the verified device communication implementation of `TASK-0806` (`FaucetEventProcessor` in `@kebun-melon/iot-gateway`):
+- **Canonical Topic Routing & QoS:** Subscribes to `agriculture/{environment}/{siteId}/{deviceId}/event/faucet` with QoS 1.
+- **Payload Schema Conformance:** Validates payloads against `FaucetEventPayloadSchema`: `schemaVersion: '1.0'`, `messageId`, `commandId`, `deviceId`, optional `recordedAt`, and `data: { status: 'IN_PROGRESS' | 'COMPLETED' | 'FAILED', targetVolumeMl?: number, actualVolumeMl?: number, reasonCode?: string }`.
+- **Command Action & Device Isolation:** Identifies target commands strictly via `commandId` and `deviceId` without requiring an action field in the payload. Validates the persisted action against `[DISPENSE, OPEN, CLOSE]` and enforces `WATER_TANK_NODE` device type scoping and topic `siteId` matching.
+- **Authoritative Physical Faucet State Mapping:**
+  - `COMPLETED OPEN` → `OPEN`
+  - `COMPLETED CLOSE` → `CLOSED`
+  - `COMPLETED DISPENSE` → `UNKNOWN` (valve closure is never assumed without direct physical confirmation)
+  - `FAILED` / `IN_PROGRESS` / timeout / uncertain → `UNKNOWN`
+  - Physical state is NEVER inferred from API creation, MQTT publication, or command ACKs.
+- **Volume Handling Rules:** `DISPENSE` validates target volume parity if provided and tracks non-negative `actualVolumeMl`. `OPEN` and `CLOSE` treat volume measurement as non-applicable and store `null`/`undefined` on the command record.
+- **Lifecycle Progression & Guarding:** Enforces `ACKNOWLEDGED` → `IN_PROGRESS` → `COMPLETED` and `ACKNOWLEDGED`/`IN_PROGRESS` → `FAILED`. Terminal states (`COMPLETED`, `FAILED`, `CANCELLED`, `TIMEOUT`, `EXPIRED`) are immutable and ignore late events. Duplicate `messageId` occurrences are handled idempotently without redundant writes.
+- **Alert Dispatching:** Dispatches `CommandFailureAlert` for `FAILED` execution events linking device, command, and `physicalOutcome: 'UNKNOWN'`.
+<!-- TASK-0806 Reconciled: 2026-08-20 -->

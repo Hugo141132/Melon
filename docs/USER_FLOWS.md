@@ -1948,3 +1948,19 @@ The following facts are verified in the end-to-end user flow implementations reg
 - **Rejected ACK Flow:** Transitions status to `FAILED` with canonical `failureReasonCode` and generates a `CommandFailureAlert`, immediately notifying the user that the command was rejected by the device.
 - **Idempotency & Late ACK Flow:** Replayed duplicate ACKs are handled idempotently without duplicate status events; late or out-of-order ACKs for non-`SENT` commands are safely ignored without altering the flow.
 <!-- TASK-0805 Reconciled: 2026-08-20 -->
+
+---
+
+## Device Execution Event State Machine User Flows Implementation Note (Reconciled 2026-08-20)
+
+The following facts are verified in the end-to-end user flow implementations regarding `TASK-0806` (`FaucetEventProcessor` in `@kebun-melon/iot-gateway`):
+- **Command Execution Progression:** Following command acknowledgement (`ACKNOWLEDGED`), the device streams physical execution events (`agriculture/{environment}/{siteId}/{deviceId}/event/faucet`, QoS 1).
+- **In-Progress Flow:** Device reports execution start (`status: IN_PROGRESS`), transitioning command status to `IN_PROGRESS` and appending audit progress events.
+- **Completion Flow & Physical State Confirmation:**
+  - `COMPLETED OPEN` → Command transitions to `COMPLETED`, setting physical valve state to `OPEN`.
+  - `COMPLETED CLOSE` → Command transitions to `COMPLETED`, setting physical valve state to `CLOSED`.
+  - `COMPLETED DISPENSE` → Command transitions to `COMPLETED`, recording `actualVolumeMl` if supplied, and leaving physical valve state as `UNKNOWN` (valve closure is not assumed without direct physical confirmation).
+  - Physical state is NEVER inferred from API acceptance, publication, or ACK.
+- **Execution Failure Flow:** When an execution event reports `FAILED`, command transitions to `FAILED`, physical state remains `UNKNOWN`, and a `CommandFailureAlert` is dispatched.
+- **Terminal State & Late Event Flow:** Commands in terminal statuses (`COMPLETED`, `FAILED`, `CANCELLED`, `TIMEOUT`, `EXPIRED`) safely ignore subsequent events, preventing state corruption or regressions.
+<!-- TASK-0806 Reconciled: 2026-08-20 -->

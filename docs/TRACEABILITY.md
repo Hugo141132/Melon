@@ -67,7 +67,7 @@
 | `TEST-SEC-004` | MQTT broker authentication and TLS security tests | `docs/TESTING.md` | `DEC-DEV-020` | `TASK-1005` | `TEST-SEC-004` | `READY_FOR_IMPLEMENTATION` |
 | `TEST-SEC-005` | Secret redaction and security headers test suite | `docs/TESTING.md` | - | `TASK-1005` | `TEST-SEC-005` | `READY_FOR_IMPLEMENTATION` |
 | `TEST-CTRL-001` | Preset volume mapping contract tests | `docs/TESTING.md` | `DEC-CTRL-051` | `TASK-0802` | `TEST-CTRL-001` | `VERIFIED` |
-| `TEST-CTRL-002` | Faucet command state machine transition tests | `docs/TESTING.md` | `DEC-CTRL-051` | `TASK-0806` | `TEST-CTRL-002` | `READY_FOR_IMPLEMENTATION` |
+| `TEST-CTRL-002` | Faucet command state machine transition tests | `docs/TESTING.md` | `DEC-CTRL-051` | `TASK-0806` | `TEST-CTRL-002` | `VERIFIED` |
 | `TEST-CTRL-003` | Faucet command idempotency and duplicate tests | `docs/TESTING.md` | `DEC-CTRL-051` | `TASK-0808` | `TEST-CTRL-003` | `READY_FOR_IMPLEMENTATION` |
 | `TEST-CTRL-004` | Faucet command timeout and expiry handling tests | `docs/TESTING.md` | `DEC-CTRL-051` | `TASK-0809` | `TEST-CTRL-004` | `DECISION_REQUIRED` |
 | `TEST-CTRL-005` | Faucet control feature flag and dual sign-off tests | `docs/TESTING.md` | `DEC-CTRL-067` | `TASK-0801` | `TEST-CTRL-005` | `READY_FOR_IMPLEMENTATION` |
@@ -86,8 +86,8 @@ The following facts are verified in the traceability matrix regarding device sel
 - **Traceability Verification:** `API-MON-001`, `API-MON-002`, `TEST-API-003`, and `TEST-API-004` statuses are updated to `VERIFIED` reflecting completed route implementation, dual UUID/canonical identifier resolution, and 100% test pass rate across targeted test suites.
 
 <!-- Reconciled for Manual Faucet Open/Close Control and Volume Presets -->
-< ! - -   T A S K - 0 8 0 2   R e c o n c i l e d :   2 0 2 6 - 0 8 - 1 9   - - >  
- 
+< ! - -   T A S K - 0 8 0 2   R e c o n c i l e d :   2 0 2 6 - 0 8 - 1 9   - - >
+
 ---
 
 ## Gateway Command Publishing Traceability Implementation Note (Reconciled 2026-08-20)
@@ -113,3 +113,19 @@ The following facts are verified in the traceability matrix regarding `TASK-0805
 - **Verification & Microbenchmark Summary:** Clean typecheck, 0 Semgrep findings, and 0 errors/regressions across in-memory performance sanity scenarios (sequential: 3,979 ACKs/sec, burst: 7,579 ACKs/sec, duplicate: 5,887 ACKs/sec, soak: 4,453 ACKs/sec; clearly labeled as in-memory microbenchmarks). Live staging MQTT/hardware verification remains credential/manual dependent.
 - **Downstream Decoupling:** Downstream execution state machine events (`TASK-0806`), duplicate command protection (`TASK-0808`), and timeout processing (`TASK-0809`) remain distinct and decoupled.
 <!-- TASK-0805 Reconciled: 2026-08-20 -->
+
+---
+
+## Command Event State Machine Traceability Implementation Note (Reconciled 2026-08-20)
+
+The following facts are verified in the traceability matrix regarding `TASK-0806` (`FaucetEventProcessor` in `@kebun-melon/iot-gateway`):
+- **Implementation Status:** `TASK-0806` is implemented and verified (`apps/iot-gateway/src/__tests__/faucet-event-processor.test.ts`, 30/30 tests passed; device simulator suite 25/25 passed; full gateway test suites 210/210 passed; full workspace test suites 934/934 passed; typecheck 0 errors).
+- **Authoritative Physical State:** Physical faucet state confirmation is strictly mapped: `COMPLETED OPEN` → `OPEN`, `COMPLETED CLOSE` → `CLOSED`, `COMPLETED DISPENSE` → `UNKNOWN` (strictly avoiding inferring closed valve without direct physical sensor confirmation), `FAILED` / `IN_PROGRESS` / timeout / uncertain → `UNKNOWN`. Physical state is NEVER inferred from API acceptance, publication, or ACK.
+- **Persisted Action Validation:** Commands are resolved via `commandId` + `deviceId` and validated against persisted action (`DISPENSE`, `OPEN`, `CLOSE`).
+- **Volume Handling Rules:** `DISPENSE` validates non-negative `actualVolumeMl` and target volume match if provided; `OPEN` and `CLOSE` treat volume measurement as non-applicable and store `null`/`undefined` on the command record.
+- **State Machine Safeguards:** Enforces `ACKNOWLEDGED` → `IN_PROGRESS` → `COMPLETED`, `ACKNOWLEDGED`/`IN_PROGRESS` → `FAILED`, terminal-state immutability (`COMPLETED`, `FAILED`, `CANCELLED`, `TIMEOUT`, `EXPIRED`), duplicate `messageId` idempotency, progress event appending, and `CommandFailureAlert` dispatching on `FAILED` execution events.
+- **Audit & Persistence:** Appends immutable audit records to `faucet_command_events` alongside mutable `faucet_commands` status with zero CQRS/event-sourcing claim.
+- **Local In-Memory Benchmark:** Evaluated 7,500 events (sequential: 4,609 ops/s, burst: 4,178 ops/s, duplicate: 7,334 ops/s, soak: 3,422 ops/s) with 0 regressions, 0 terminal mutations, 0 duplicate redundant writes, 0 unexpected errors (targets TBD).
+- **Testing Boundary:** Live local faucet MQTT E2E was not completed because the local Mosquitto test fixture lacks a matching `WATER_TANK_NODE` credential/ACL identity; live MQTT TLS and physical HIL verification remain credential/manual dependent.
+- **Downstream Decoupling:** Downstream duplicate command protection (`TASK-0808`) and timeout processing (`TASK-0809`) remain distinct and decoupled.
+<!-- TASK-0806 Reconciled: 2026-08-20 -->

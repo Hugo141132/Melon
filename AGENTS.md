@@ -427,6 +427,17 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
 - 21st.dev MCP: `NOT REQUIRED`
 - Summary: Revalidated and hardened `AcknowledgementProcessor` in `@kebun-melon/iot-gateway` (`apps/iot-gateway/src/acknowledgements/processor.ts`) to handle command ACKs across all supported faucet command actions (`DISPENSE`, `OPEN`, and `CLOSE`). Enforced authoritative ACK payload contract identifying commands via `commandId` and `deviceId` without fabricating an action field in the MQTT ACK payload. Enforced persisted command action validation against `[DISPENSE, OPEN, CLOSE]`, rejecting unsupported or unknown actions (`success: false`). Enforced strict state transitions where accepted ACKs only transition `SENT` → `ACKNOWLEDGED` (guaranteeing status never transitions to `COMPLETED` and never infers physical state), and rejected ACKs transition `SENT` → `FAILED` with canonical `reasonCode` and `CommandFailureAlert` generation. Handled duplicate `messageId` idempotently and safely ignored non-`SENT` / late / out-of-order ACKs without state regression. Verified 100% test pass rate across 25 unit tests (`apps/iot-gateway/src/__tests__/acknowledgement-processor.test.ts`), 195/195 IoT Gateway tests, 228/228 contracts/database tests, Semgrep security scan (0 findings), and workspace typecheck (0 errors). Executed local in-memory performance sanity microbenchmarks (1,000 sequential ACKs: 3,979 ACKs/sec, p50: 0.087 ms; 500 concurrent burst ACKs: 7,579 ACKs/sec, p50: 56.55 ms; 1,000 duplicate ACKs: 5,887 ACKs/sec, 0 redundant DB writes; 2,000 soak ACKs: 4,453 ACKs/sec, stable heap; clearly labeled as in-memory microbenchmarks). Live staging MQTT/hardware verification remains credential/manual dependent.
 
+#### TASK-0806 Governance Record
+
+`TASK-0806` command event state machine implementation record:
+- Status: `DONE` (Completed 2026-08-20)
+- Frontend impact: `NONE`
+- Selected UI direction: `N/A`
+- Existing color template: `UNCHANGED`
+- Selected motion effects: `None`
+- 21st.dev MCP: `NOT REQUIRED`
+- Summary: Implemented and hardened `FaucetEventProcessor` in `@kebun-melon/iot-gateway` (`apps/iot-gateway/src/events/processor.ts`) to handle execution events across all supported faucet command actions (`DISPENSE`, `OPEN`, and `CLOSE`). Implemented authoritative physical state determination: `COMPLETED OPEN` → `OPEN`, `COMPLETED CLOSE` → `CLOSED`, `COMPLETED DISPENSE` → `UNKNOWN` (strictly avoiding assuming closed valve), and failed/uncertain/in-progress → `UNKNOWN`. Ensured physical state is NEVER inferred from API acceptance, publication, or ACK. Enforced persisted command action validation against `[DISPENSE, OPEN, CLOSE]`. Enforced contract-consistent volume handling: `DISPENSE` validates non-negative `actualVolumeMl` and target volume match if provided; `OPEN` and `CLOSE` treat volume as non-applicable and store `null`/`undefined` on the command record. Guaranteed terminal-state immutability (`COMPLETED`, `FAILED`, `CANCELLED`, `TIMEOUT`, `EXPIRED`), duplicate `messageId` idempotency, progress event appending, and `CommandFailureAlert` dispatching on `FAILED` events. Verified 100% test pass rate across 32 unit tests (`apps/iot-gateway/src/__tests__/faucet-event-processor.test.ts`), full 212-test IoT Gateway test suite, 934-test workspace suite, Semgrep security scan (0 findings), and TypeScript typecheck (0 errors).
+
 ---
 
 ## 5. Task Selection Rules

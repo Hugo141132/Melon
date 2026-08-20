@@ -1298,3 +1298,13 @@ The verified implementation of `TASK-0805` (`AcknowledgementProcessor` in `@kebu
 - **Design Tokens Unchanged:** Reuses approved `Premium Minimal Ops` tokens and color palette without alterations.
 - **State Visualization Safety:** Device ACKs transition command status to `ACKNOWLEDGED` (or `FAILED`). The UI does not display `COMPLETED` or claim confirmed valve closure until physical completion events are received (`TASK-0806`).
 <!-- TASK-0805 Reconciled: 2026-08-20 -->
+
+---
+
+## Device Execution Event State Machine UI/UX Implementation Note (Reconciled 2026-08-20)
+
+The verified implementation of `TASK-0806` (`FaucetEventProcessor` in `@kebun-melon/iot-gateway`) operates strictly in the gateway backend with zero UI changes or visual regressions:
+- **Zero Frontend Changes:** Frontend impact is strictly `NONE`. All UI layouts, components, and interactions remain untouched.
+- **Design Tokens Unchanged:** Reuses approved `Premium Minimal Ops` tokens and color palette without alterations.
+- **Physical State Visualization Safety:** The UI reflects verified physical valve state only from confirmed execution events (`COMPLETED OPEN` → `OPEN`, `COMPLETED CLOSE` → `CLOSED`, `COMPLETED DISPENSE` → `UNKNOWN`). No valve closed state is fabricated upon dispense completion.
+<!-- TASK-0806 Reconciled: 2026-08-20 -->

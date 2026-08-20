@@ -2850,3 +2850,31 @@ The following facts are supported by the verified implementation of `TASK-0805` 
 - **Staging / Credential Boundary:** Live MQTT over TLS and physical hardware end-to-end verification remains credential/manual dependent and is not claimed complete.
 - **Downstream Decoupling:** Downstream command event state machine transitions (`TASK-0806`), duplicate command protection (`TASK-0808`), and timeout processing (`TASK-0809`) remain decoupled.
 <!-- TASK-0805 Reconciled: 2026-08-20 -->
+
+---
+
+## Command Event State Machine Implementation Note (Reconciled 2026-08-20)
+
+The following facts are supported by the verified implementation of `TASK-0806` (`FaucetEventProcessor` in `@kebun-melon/iot-gateway`):
+- **Status:** `DONE`.
+- **Command Event Processing:** Subscribes to canonical faucet execution event topics (`agriculture/{environment}/{siteId}/{deviceId}/event/faucet`, QoS 1). Resolves commands via `commandId` and `deviceId` and validates the persisted action is one of `DISPENSE`, `OPEN`, or `CLOSE`.
+- **State Machine Transitions:** Enforces `ACKNOWLEDGED` → `IN_PROGRESS` → `COMPLETED`, and `ACKNOWLEDGED`/`IN_PROGRESS` → `FAILED`. Terminal states (`COMPLETED`, `FAILED`, `CANCELLED`, `TIMEOUT`, `EXPIRED`) are strictly immutable and ignore late events without regression.
+- **Authoritative Physical Faucet State:** Derived strictly from verified final execution events:
+  - `COMPLETED OPEN` → `OPEN`
+  - `COMPLETED CLOSE` → `CLOSED`
+  - `COMPLETED DISPENSE` → `UNKNOWN` (valve closure is never assumed without direct physical confirmation)
+  - `FAILED` / `IN_PROGRESS` / timeout / uncertain → `UNKNOWN`
+  - Physical state is NEVER inferred from API acceptance, publication, or ACK.
+- **Volume Handling Rules:** `DISPENSE` validates target volume parity if provided and tracks non-negative `actualVolumeMl`. `OPEN` and `CLOSE` treat volume measurement as non-applicable and store `null`/`undefined` in the command record.
+- **Duplicate Idempotency:** Duplicate `messageId` events are matched against stored event history and safely ignored without invoking database writes.
+- **Alert Dispatching:** Generates `CommandFailureAlert` on `FAILED` execution events linking device, command, and `physicalOutcome: 'UNKNOWN'`.
+- **Targeted Automated Verification:**
+  - Targeted unit tests (`apps/iot-gateway/src/__tests__/faucet-event-processor.test.ts`, `apps/iot-gateway/src/__tests__/device-simulator.test.ts`): **55/55 tests passed (100%)**.
+  - Full IoT Gateway test suites: **16 files, 210/210 tests passed (100%)**.
+  - Monorepo static typecheck (`npm run typecheck`): **0 errors**.
+- **Local In-Memory Performance Sanity Benchmark:**
+  - Evaluated 7,500 events across 4 scenarios (1,000 sequential: 4,609 ops/s, 500 burst: 4,178 ops/s, 1,000 duplicate: 7,334 ops/s, 5,000 soak: 3,422 ops/s).
+  - Safety invariants verified: 0 state regressions, 0 terminal mutations, 0 duplicate redundant writes, 0 unexpected errors, heap delta +7.02 MB.
+  - Performance targets remain TBD; results serve solely as an in-memory logic benchmark.
+- **Testing Boundaries:** Live local faucet MQTT E2E was not completed because the local Mosquitto test fixture lacks a matching `WATER_TANK_NODE` credential/ACL identity; live MQTT TLS and HIL validation remain reserved for manual execution with staging credentials.
+<!-- TASK-0806 Reconciled: 2026-08-20 -->

@@ -2014,3 +2014,40 @@ Automated unit, contract, error recovery, and simulated performance sanity verif
 ### Staging & Credential Boundary
 - Physical ESP32 hardware and live staging EMQX Cloud Serverless broker TLS end-to-end ACK verification remain credential/manual dependent and are not claimed complete.
 <!-- TASK-0805 Reconciled: 2026-08-20 -->
+
+---
+
+# 48. Device Execution Event State Machine Verification Suite (`TASK-0806`)
+
+Automated unit, contract, error recovery, and simulated performance sanity verification for the command execution event state machine:
+
+### Agent-Executed Automated Tests
+1. **Targeted Event Processor Test Suite Pass (`apps/iot-gateway/src/__tests__/faucet-event-processor.test.ts`):** **30/30 tests passed (100%)**:
+   - QoS 1 canonical topic validation (`agriculture/{environment}/{siteId}/{deviceId}/event/faucet`) and non-faucet subpath rejection.
+   - Authoritative contract adherence resolving commands via `commandId` and `deviceId` and validating persisted actions (`DISPENSE`, `OPEN`, `CLOSE`).
+   - Strict lifecycle transitions (`ACKNOWLEDGED` → `IN_PROGRESS` → `COMPLETED`, `ACKNOWLEDGED`/`IN_PROGRESS` → `FAILED`).
+   - Authoritative physical faucet state determination:
+     - `COMPLETED OPEN` → `OPEN`
+     - `COMPLETED CLOSE` → `CLOSED`
+     - `COMPLETED DISPENSE` → `UNKNOWN` (strictly does not assume closed valve)
+     - `FAILED` / `IN_PROGRESS` / timeout / uncertain → `UNKNOWN`
+     - Physical state is NEVER inferred from API creation, MQTT publication, or command ACKs.
+   - Action-specific volume handling: `DISPENSE` validates target volume parity and non-negative `actualVolumeMl`; `OPEN` and `CLOSE` treat volume measurement as non-applicable and store `null`/`undefined` in the command record.
+   - Terminal state immutability: terminal commands (`COMPLETED`, `FAILED`, `CANCELLED`, `TIMEOUT`, `EXPIRED`) ignore late events without state regression.
+   - Idempotent handling of duplicate `messageId` occurrences with zero redundant database writes.
+   - `CommandFailureAlert` dispatching on `FAILED` execution events.
+2. **Device Simulator Test Suite Pass (`apps/iot-gateway/src/__tests__/device-simulator.test.ts`):** **25/25 tests passed (100%)** including canonical `FAUCET_PRESET_VOLUMES` import fix.
+3. **Full IoT Gateway Test Suites Pass:** **16 test files, 210/210 tests passed (100%)**.
+4. **Monorepo Static Typecheck:** Clean `npm run typecheck` pass across all 4 monorepo workspaces with 0 errors.
+
+### Local In-Memory Performance Sanity Microbenchmark Results
+*Note: The following measurements represent local in-memory microbenchmarks of processor logic with mock repositories and do NOT constitute live broker or production database capacity benchmarks:*
+- **Sequential 1,000 Valid Events:** 4,609 events/sec (Duration: 216.95 ms, p50: 0.105 ms, p95: 0.349 ms, p99: 1.351 ms, Errors: 0, State Regressions: 0, Heap Delta: +0.47 MB).
+- **Burst 500 Concurrent Events (`Promise.all`):** 4,178 events/sec (Duration: 119.66 ms, p50: 55.524 ms, p95: 61.312 ms, p99: 62.331 ms, Errors: 0, State Regressions: 0, Heap Delta: -1.87 MB).
+- **Repeated Duplicate `messageId` (1,000 Events):** 7,334 events/sec (Duration: 136.35 ms, p50: 0.050 ms, p95: 0.437 ms, p99: 2.051 ms, Errors: 0, Redundant DB Writes: 0, Heap Delta: +2.09 MB).
+- **Short Soak (5,000 Events across 10 batches of 500):** 3,422 events/sec (Duration: 1,461.27 ms, p50: 0.044 ms, p95: 1.347 ms, p99: 4.350 ms, Errors: 0, State Regressions: 0, Heap Delta: +7.02 MB).
+- **Safety Invariant Totals (7,500 events):** 0 state regressions, 0 terminal mutations, 0 duplicate redundant writes, 0 unexpected errors.
+
+### Staging & Credential Boundary
+- Live local faucet MQTT E2E was not completed because the local Mosquitto test fixture lacks a matching `WATER_TANK_NODE` credential/ACL identity; live MQTT TLS and physical HIL verification remain credential/manual dependent.
+<!-- TASK-0806 Reconciled: 2026-08-20 -->

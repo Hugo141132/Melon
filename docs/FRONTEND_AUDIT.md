@@ -377,3 +377,13 @@ The following facts are verified regarding the frontend boundary for `TASK-0805`
 - **State Integrity:** Command status in the frontend UI reflects `ACKNOWLEDGED` (or `FAILED`) based on verified backend transitions, without prematurely displaying completion or inferring physical valve state.
 - **Design Token & Aesthetic Preservation:** All frontend components retain approved `Premium Minimal Ops` visual tokens and color palettes unchanged.
 <!-- TASK-0805 Reconciled: 2026-08-20 -->
+
+---
+
+## Device Execution Event State Machine Frontend Audit Note (Reconciled 2026-08-20)
+
+The following facts are verified regarding the frontend boundary for `TASK-0806` (`FaucetEventProcessor` in `@kebun-melon/iot-gateway`):
+- **Zero Frontend Changes:** `TASK-0806` is implemented entirely within the backend IoT Gateway (`Frontend impact: NONE`). Zero UI modifications, redesigns, or component changes were introduced.
+- **Physical State Integrity:** The frontend does not infer physical valve state from command creation or acknowledgement; physical state confirmation (`OPEN`, `CLOSED`, `UNKNOWN`) is derived strictly from confirmed device execution events processed on the backend.
+- **Design Token & Aesthetic Preservation:** All dashboard, sensor, and control pages continue to adhere strictly to `Premium Minimal Ops` with established color tokens and motion standards.
+<!-- TASK-0806 Reconciled: 2026-08-20 -->

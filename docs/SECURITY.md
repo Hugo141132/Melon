@@ -1570,3 +1570,22 @@ The following security controls are active and verified across the device acknow
 - **Out-of-Order Safety:** Late or non-`SENT` ACKs are ignored safely without altering command status.
 - **Outcome Separation:** Status is never transitioned to `COMPLETED` during ACK processing; physical state is never inferred until verified downstream execution events arrive (`TASK-0806`).
 <!-- TASK-0805 Reconciled: 2026-08-20 -->
+
+---
+
+## Device Execution Event State Machine Security Controls Implementation Note (Reconciled 2026-08-20)
+
+The following security controls are active and verified across the device execution event processor (`TASK-0806`):
+- **Zero Security Exceptions:** No security bypasses, unauthenticated endpoints, or hardcoded credentials were introduced.
+- **Topic & Device Isolation:** Subscribes to canonical QoS 1 topics `agriculture/{environment}/{siteId}/{deviceId}/event/faucet`. Validates schema structure, topic-payload device identifier consistency, and topic `siteId` matching.
+- **Authoritative Physical State Safeguard:**
+  - `COMPLETED OPEN` → `physicalState: 'OPEN'`
+  - `COMPLETED CLOSE` → `physicalState: 'CLOSED'`
+  - `COMPLETED DISPENSE` → `physicalState: 'UNKNOWN'` (valve closure is NEVER assumed without direct physical confirmation)
+  - `FAILED` / `IN_PROGRESS` / timeout / uncertain → `physicalState: 'UNKNOWN'`
+  - Prevents false claims of closed valve positions following dispense cycles.
+  - Physical state is NEVER inferred from API creation, MQTT publication, or command ACKs.
+- **Terminal State Immutability & Replay Defense:** Commands in terminal statuses (`COMPLETED`, `FAILED`, `CANCELLED`, `TIMEOUT`, `EXPIRED`) ignore incoming events without state mutation or redundant writes.
+- **Duplicate Idempotency:** Duplicate `messageId` occurrences are matched against stored event history and ignored without invoking database writes.
+- **Failure Alert Dispatching:** Generates `CommandFailureAlert` for `FAILED` execution events linking device, command, and `physicalOutcome: 'UNKNOWN'`.
+<!-- TASK-0806 Reconciled: 2026-08-20 -->

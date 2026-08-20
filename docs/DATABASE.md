@@ -1784,3 +1784,19 @@ The following facts are supported by the verified database interactions of `TASK
 - **Non-`SENT` State Protection:** Late, out-of-order, or non-`SENT` ACKs are ignored without writing redundant events or regressing database status.
 - **Decoupled Lifecycle:** Physical execution states (`IN_PROGRESS`, `COMPLETED`) remain strictly managed by `TASK-0806`.
 <!-- TASK-0805 Reconciled: 2026-08-20 -->
+
+---
+
+## Faucet Command Event State Machine Database Implementation Note (Reconciled 2026-08-20)
+
+The following facts are supported by the verified database interactions of `TASK-0806` (`FaucetEventProcessor` in `@kebun-melon/iot-gateway`):
+- **Zero Schema Migrations:** Implemented strictly using existing database tables (`faucet_commands`, `faucet_command_events`, `alerts`, `devices`) with zero schema alterations or migrations.
+- **Append-Only Command Event Audit:** Inbound execution events append records to `faucet_command_events` via `FaucetCommandRepository.addCommandEvent` or atomic `updateCommandStatus` while preserving mutable current command state in `faucet_commands`. Does not introduce CQRS or event-sourcing infrastructure.
+- **Transactional State Transitions:**
+  - `ACKNOWLEDGED` → `IN_PROGRESS`: Updates status, records `actualVolumeMl` (for `DISPENSE`), records `physicalState: 'UNKNOWN'`, and appends `IN_PROGRESS` event record. If already `IN_PROGRESS`, appends progress event idempotently without failing or regressing state.
+  - `IN_PROGRESS` → `COMPLETED`: Updates status to `COMPLETED`, records `actualVolumeMl` (for `DISPENSE`), records determined `physicalState` (`OPEN` for `OPEN`, `CLOSED` for `CLOSE`, `UNKNOWN` for `DISPENSE`), and appends `COMPLETED` event record.
+  - `ACKNOWLEDGED`/`IN_PROGRESS` → `FAILED`: Updates status to `FAILED`, records `reasonCode`, records `physicalState: 'UNKNOWN'`, appends `FAILED` event, and triggers `AlertRepository.createCommandFailureAlert` linking command, device, and `physicalOutcome: 'UNKNOWN'`.
+- **Terminal State Immutability:** Terminal commands (`COMPLETED`, `FAILED`, `CANCELLED`, `TIMEOUT`, `EXPIRED`) ignore incoming events without writing redundant event rows or modifying database records.
+- **Volume Handling Persistence:** `DISPENSE` commands persist non-negative measured volume in `actualVolumeMl`. `OPEN` and `CLOSE` commands set `actualVolumeMl = null` (`undefined`) in `faucet_commands` while preserving the raw event payload in `faucet_command_events.metadata.eventData`.
+- **Idempotency & Partial Unique Index:** Duplicate `messageId` occurrences are detected against persisted event history and safely ignored without invoking database writes.
+<!-- TASK-0806 Reconciled: 2026-08-20 -->

@@ -7,6 +7,7 @@ import {
 } from '@kebun-melon/database';
 import {
   FaucetCommandStatus,
+  FaucetCommandAction,
   DeviceType,
   FaucetEventPayloadSchema,
   FaucetEventPayload,
@@ -16,6 +17,33 @@ import { GatewayEnv } from '../config/env';
 import { mqttTopicRouter } from '../mqtt/router';
 import { logger } from '../observability/logger';
 import { metricsCollector } from '../observability/metrics';
+
+export type AuthoritativePhysicalFaucetState = 'OPEN' | 'CLOSED' | 'UNKNOWN';
+
+/**
+ * Determines authoritative physical faucet state per TASK-0806:
+ * - COMPLETED OPEN -> 'OPEN'
+ * - COMPLETED CLOSE -> 'CLOSED'
+ * - COMPLETED DISPENSE -> 'UNKNOWN' (unless approved device contract explicitly confirms physical state)
+ * - failed/uncertain execution -> 'UNKNOWN'
+ * - Never infer physical state from API acceptance, MQTT publication, or ACK.
+ */
+export function determinePhysicalFaucetState(
+  action: string,
+  eventStatus: string
+): AuthoritativePhysicalFaucetState {
+  if (eventStatus === 'COMPLETED') {
+    if (action === FaucetCommandAction.OPEN || action === 'OPEN') {
+      return 'OPEN';
+    }
+    if (action === FaucetCommandAction.CLOSE || action === 'CLOSE') {
+      return 'CLOSED';
+    }
+    // DISPENSE completion does NOT infer CLOSED or OPEN per TASK-0806 correction
+    return 'UNKNOWN';
+  }
+  return 'UNKNOWN';
+}
 
 export interface FaucetEventProcessorOptions {
   env?: GatewayEnv;
@@ -214,6 +242,20 @@ export class FaucetEventProcessor {
       return { success: false, reason: 'Command target deviceId mismatch' };
     }
 
+    // Validate persisted action
+    const validActions: string[] = [
+      FaucetCommandAction.DISPENSE,
+      FaucetCommandAction.OPEN,
+      FaucetCommandAction.CLOSE,
+    ];
+    if (!validActions.includes(command.action)) {
+      logger.warn('Command has invalid or unsupported action', {
+        commandId: command.commandId,
+        action: command.action,
+      });
+      return { success: false, reason: 'Invalid or unsupported command action' };
+    }
+
     // 9. Duplicate messageId check (Idempotency)
     if (payload.messageId && command.events) {
       const existingEvent = command.events.find((e) => e.messageId === payload.messageId);
@@ -253,6 +295,9 @@ export class FaucetEventProcessor {
     }
 
     if (eventStatusStr === 'IN_PROGRESS') {
+      const isDispense = command.action === FaucetCommandAction.DISPENSE;
+      const actualVolumeMl = isDispense ? payload.data.actualVolumeMl : undefined;
+
       if (command.status === FaucetCommandStatus.ACKNOWLEDGED) {
         await this.faucetCommandRepo.updateCommandStatus(
           command.commandId,
@@ -260,13 +305,18 @@ export class FaucetEventProcessor {
           {
             messageId: payload.messageId,
             recordedAt,
-            actualVolumeMl: payload.data.actualVolumeMl,
-            metadata: { eventData: payload.data },
+            actualVolumeMl,
+            metadata: {
+              eventData: payload.data,
+              physicalState: 'UNKNOWN',
+              action: command.action,
+            },
           }
         );
         logger.info('Faucet command state updated to IN_PROGRESS', {
           commandId: command.commandId,
           deviceId: command.deviceId,
+          action: command.action,
           messageId: payload.messageId,
         });
         return { success: true };
@@ -275,12 +325,17 @@ export class FaucetEventProcessor {
         await this.faucetCommandRepo.addCommandEvent(command.commandId, {
           eventStatus: FaucetCommandStatus.IN_PROGRESS,
           messageId: payload.messageId,
-          actualVolumeMl: payload.data.actualVolumeMl,
+          actualVolumeMl,
           recordedAt,
-          metadata: { eventData: payload.data },
+          metadata: {
+            eventData: payload.data,
+            physicalState: 'UNKNOWN',
+            action: command.action,
+          },
         });
         logger.info('Appended progress event for command already IN_PROGRESS', {
           commandId: command.commandId,
+          action: command.action,
           messageId: payload.messageId,
         });
         return { success: true };
@@ -295,52 +350,64 @@ export class FaucetEventProcessor {
         };
       }
     } else if (eventStatusStr === 'COMPLETED') {
-      // Validate COMPLETED volume fields against DEVICE_COMMUNICATION.md
-      if (
-        payload.data.actualVolumeMl === undefined ||
-        payload.data.actualVolumeMl === null ||
-        payload.data.actualVolumeMl < 0
-      ) {
-        logger.warn('COMPLETED event missing or negative actualVolumeMl', {
-          commandId: command.commandId,
-          actualVolumeMl: payload.data.actualVolumeMl,
-        });
-        return {
-          success: false,
-          reason: 'COMPLETED event requires valid non-negative actualVolumeMl',
-        };
-      }
+      // Action-specific volume validation
+      if (command.action === FaucetCommandAction.DISPENSE) {
+        if (
+          payload.data.targetVolumeMl !== undefined &&
+          payload.data.targetVolumeMl !== command.targetVolumeMl
+        ) {
+          logger.warn('COMPLETED event targetVolumeMl mismatch', {
+            commandId: command.commandId,
+            eventTargetVolumeMl: payload.data.targetVolumeMl,
+            commandTargetVolumeMl: command.targetVolumeMl,
+          });
+          return {
+            success: false,
+            reason: 'Target volume mismatch in COMPLETED event',
+          };
+        }
 
-      if (
-        payload.data.targetVolumeMl !== undefined &&
-        payload.data.targetVolumeMl !== command.targetVolumeMl
-      ) {
-        logger.warn('COMPLETED event targetVolumeMl mismatch', {
-          commandId: command.commandId,
-          eventTargetVolumeMl: payload.data.targetVolumeMl,
-          commandTargetVolumeMl: command.targetVolumeMl,
-        });
-        return {
-          success: false,
-          reason: 'Target volume mismatch in COMPLETED event',
-        };
+        if (
+          payload.data.actualVolumeMl !== undefined &&
+          payload.data.actualVolumeMl !== null &&
+          payload.data.actualVolumeMl < 0
+        ) {
+          logger.warn('COMPLETED event negative actualVolumeMl', {
+            commandId: command.commandId,
+            actualVolumeMl: payload.data.actualVolumeMl,
+          });
+          return {
+            success: false,
+            reason: 'COMPLETED event requires valid non-negative actualVolumeMl',
+          };
+        }
       }
 
       if (command.status === FaucetCommandStatus.IN_PROGRESS) {
+        const physicalState = determinePhysicalFaucetState(command.action, 'COMPLETED');
+        const isDispense = command.action === FaucetCommandAction.DISPENSE;
+        const actualVolumeMl = isDispense ? payload.data.actualVolumeMl : undefined;
+
         await this.faucetCommandRepo.updateCommandStatus(
           command.commandId,
           FaucetCommandStatus.COMPLETED,
           {
             messageId: payload.messageId,
             recordedAt,
-            actualVolumeMl: payload.data.actualVolumeMl,
-            metadata: { eventData: payload.data },
+            actualVolumeMl,
+            metadata: {
+              eventData: payload.data,
+              physicalState,
+              action: command.action,
+            },
           }
         );
         logger.info('Faucet command successfully COMPLETED', {
           commandId: command.commandId,
           deviceId: command.deviceId,
-          actualVolumeMl: payload.data.actualVolumeMl,
+          action: command.action,
+          physicalState,
+          actualVolumeMl,
           messageId: payload.messageId,
         });
         return { success: true };
@@ -356,6 +423,9 @@ export class FaucetEventProcessor {
       }
     } else if (eventStatusStr === 'FAILED') {
       const reasonCode = payload.data.reasonCode || 'EXECUTION_FAILED';
+      const isDispense = command.action === FaucetCommandAction.DISPENSE;
+      const actualVolumeMl = isDispense ? payload.data.actualVolumeMl : undefined;
+
       if (
         command.status === FaucetCommandStatus.ACKNOWLEDGED ||
         command.status === FaucetCommandStatus.IN_PROGRESS
@@ -367,14 +437,19 @@ export class FaucetEventProcessor {
             messageId: payload.messageId,
             reasonCode,
             recordedAt,
-            actualVolumeMl: payload.data.actualVolumeMl,
-            metadata: { eventData: payload.data },
+            actualVolumeMl,
+            metadata: {
+              eventData: payload.data,
+              physicalState: 'UNKNOWN',
+              action: command.action,
+            },
           }
         );
         metricsCollector.incrementCommandFailures();
         logger.warn('Faucet command execution FAILED', {
           commandId: command.commandId,
           deviceId: command.deviceId,
+          action: command.action,
           reasonCode,
           messageId: payload.messageId,
         });
@@ -390,6 +465,8 @@ export class FaucetEventProcessor {
                 source: 'EXECUTION_EVENT_FAILURE',
                 messageId: payload.messageId,
                 eventData: payload.data,
+                physicalOutcome: 'UNKNOWN',
+                action: command.action,
               },
             });
           } catch (alertErr) {

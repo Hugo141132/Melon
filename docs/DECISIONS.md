@@ -476,3 +476,19 @@ The following facts are supported by the verified decisions governance of `TASK-
 - **Zero Invented Decisions:** No arbitrary timeout constants, retry limits, granular permissions (`device.control.open`/`device.control.close`), or connection-loss fail-safe policies were invented during ACK processing. Command ACK timeout duration remains unresolved and tracked as `TBD` in §3 (`TASK-0809`).
 - **State Transition Separation:** Accepted ACKs transition `SENT` → `ACKNOWLEDGED` only. Commands never transition to `COMPLETED` and never infer physical `OPEN`/`CLOSED` state during ACK processing (`TASK-0806`). Rejected ACKs transition `SENT` → `FAILED` with canonical reason codes.
 <!-- TASK-0805 Reconciled: 2026-08-20 -->
+
+---
+
+## Faucet Command Event State Machine Decisions Implementation Note (Reconciled 2026-08-20)
+
+The following facts are supported by the verified decisions governance of `TASK-0806` (`FaucetEventProcessor` in `@kebun-melon/iot-gateway`):
+- **Decision Compliance:** Complies with `DEC-CTRL-051` (faucet command lifecycle), `DEC-CTRL-090` (manual `OPEN`/`CLOSE` and volume preset model), and `DEC-CTRL-091` (existing permission boundaries).
+- **Authoritative Physical Faucet State Mapping:**
+  - `COMPLETED OPEN` → `OPEN` (valve physically confirmed open).
+  - `COMPLETED CLOSE` → `CLOSED` (valve physically confirmed closed).
+  - `COMPLETED DISPENSE` → `UNKNOWN` (dispense cycle finished; valve closed state is not assumed without direct physical sensor confirmation).
+  - `FAILED` / `IN_PROGRESS` / timeout / uncertain → `UNKNOWN`.
+  - Physical state is NEVER inferred from API creation/acceptance, MQTT publication, or command ACKs.
+- **Contract-Consistent Volume Governance:** Volume measurement applies to `DISPENSE` operations; for `OPEN` and `CLOSE` commands, volume measurement is non-applicable and stored as `null`/`undefined` on the command record without fabricating rejection rules.
+- **Zero Invented Decisions:** No arbitrary timeout constants, retry limits, granular permissions, or fail-safe policies were invented. Command timeout handling remains `TBD` under `TASK-0809` (DECISIONS.md §3).
+<!-- TASK-0806 Reconciled: 2026-08-20 -->

@@ -1177,3 +1177,13 @@ The following facts are verified in the authorization architecture regarding `TA
 - **Authorization Context Linking:** The processor acts upon persisted `FaucetCommand` records previously authorized under `device.control` and active device assignments, maintaining audit traceability (`actorUserId`).
 - **Privacy & Concealment:** Admin canonical `deviceId` concealment (`DEC-DEV-028`) remains strictly intact across all user-facing monitoring and control surfaces.
 <!-- TASK-0805 Reconciled: 2026-08-20 -->
+
+---
+
+## Device Execution Event State Machine RBAC Implementation Note (Reconciled 2026-08-20)
+
+The following facts are verified in the authorization architecture regarding `TASK-0806` (`FaucetEventProcessor` in `@kebun-melon/iot-gateway`):
+- **Permission Boundaries Preserved:** Zero new permissions or role modifications were introduced. Granular permissions were not invented (`DEC-CTRL-091`).
+- **Authorization Traceability:** The event processor operates on persisted commands previously authorized under `device.control` and active device assignments, linking lifecycle transitions and failure alerts to the original command context.
+- **Admin Privacy Protection:** Admin canonical `deviceId` concealment (`DEC-DEV-028`) remains fully intact.
+<!-- TASK-0806 Reconciled: 2026-08-20 -->
