@@ -565,6 +565,26 @@ Test:
 - Translation key generation.
 - Duplicate acknowledgement handling.
 
+## 10.7 TASK-1001 Monorepo Unit Test Suite Verification (Reconciled 2026-08-21)
+
+The complete monorepo unit test suite (`TASK-1001`) was audited, hardened, and verified with 100% test pass rate across all four workspaces:
+- **Test Results:** **102 test files, 958/958 unit tests passed (100%)**.
+- **Line Coverage in Contracts:** >99.6% line coverage in `@kebun-melon/contracts`.
+- **Branch Hardening:**
+  - `packages/contracts/src/__tests__/device-capabilities.test.ts`: Added test case verifying `getCanonicalCapabilitiesForDeviceType` returns `[]` for unknown/unrecognized device types.
+  - `packages/contracts/src/__tests__/logging.test.ts`: Added test case verifying `isLogLevelEnabled` falls back to `info` priority for unrecognized log levels.
+  - `packages/contracts/src/__tests__/user.test.ts`: Added test case verifying `toPublicSafeUserDto` handles `userRoles: undefined` and deduplicates duplicate active role assignments.
+- **Coverage Domain Verification:** Verified full coverage across all 8 mandatory acceptance domains in `TASKS.md` §18:
+  1. *Account-Status Decisions:* State transitions (`PENDING_APPROVAL`, `APPROVED`, `ACTIVE`, `REJECTED`, `SUSPENDED`, `DEACTIVATED`), email verification gates, and session revocation.
+  2. *Permission Checks:* Full RBAC matrix across Owner global scope and Admin assigned-device scope.
+  3. *Device Access Isolation:* Admin canonical `deviceId` concealment (`DEC-DEV-028`), unassigned device blocking (403), and immutable UUID integrity.
+  4. *Telemetry Validation:* Range bounds, zero vs null semantics, gap preservation, and complete omission of `BAT` (`DEC-MON-086`).
+  5. *Phase & Volume Mapping:* Phase 1 (300 mL), Phase 2 (1,000 mL), Phase 3 (1,500 mL) calculations with `plantCount` multipliers, and manual `OPEN`/`CLOSE` volume omission.
+  6. *Command State Machine:* Strict transitions (`QUEUED` → `SENT` → `ACKNOWLEDGED` → `IN_PROGRESS` → `COMPLETED`/`FAILED`), terminal state immutability, and physical state mapping (`OPEN`, `CLOSED`, `UNKNOWN`).
+  7. *Idempotency & Concurrency:* Header deduplication, database race recovery (`P2002`), and max 1 active command concurrency.
+  8. *Locale Validation:* Default `id` / fallback `en` (`DEC-I18N-068`), 17 namespace key & placeholder parity, and technical unit preservation.
+- **Pre-commit Quality Gate:** Verified `npm run check:quality` passing with 0 TypeScript errors, 0 lint errors, clean formatting, 100% translation parity (`i18n:check`), 0 hardcoded secrets, 0 unapproved dependency vulnerabilities, and clean Next.js production build.
+
 ---
 
 # 11. Component Testing

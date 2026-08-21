@@ -48,6 +48,11 @@ describe('Logging Contracts & Utilities', () => {
       expect(isLogLevelEnabled('error', 'info')).toBe(false);
       expect(isLogLevelEnabled('error', 'warn')).toBe(false);
       expect(isLogLevelEnabled('error', 'error')).toBe(true);
+
+      // Unrecognized level falls back to info priority
+      expect(isLogLevelEnabled('unknown' as any, 'debug')).toBe(false);
+      expect(isLogLevelEnabled('unknown' as any, 'info')).toBe(true);
+      expect(isLogLevelEnabled('info', 'unknown' as any)).toBe(true);
     });
   });
 

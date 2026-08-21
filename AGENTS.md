@@ -483,6 +483,17 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
 - 21st.dev MCP: `NOT REQUIRED`
 - Summary: Implemented semantic duplicate command protection in `FaucetCommandRepository` (`@kebun-melon/database`) without relying on desired state comparisons or tracking external physical states. Maintained the strict "max 1 active command per device" concurrency constraint (`DEC-CTRL-051`), while throwing a specific `FaucetCommandConflictError` mapped to HTTP 409 Conflict with descriptive messages for duplicate physical intent scenarios. For `DISPENSE`, duplicate intent is verified by matching the `action`, `phase`, and `plantCount`. For `OPEN` and `CLOSE`, intent is verified strictly by matching the `action`. Non-semantic concurrent commands (e.g., trying to `OPEN` while `CLOSE` is active) continue to hit the generic concurrency rejection. Verified 100% test pass rate across 21 database unit tests and 31 API route tests. A known millisecond-level race condition due to absent strict database locking remains out-of-scope for this iteration.
 
+#### TASK-1001 Governance Record
+
+`TASK-1001` complete unit test suite implementation record:
+- Status: `DONE` (Completed 2026-08-21)
+- Frontend impact: `NONE`
+- Selected UI direction: `N/A`
+- Existing color template: `UNCHANGED`
+- Selected motion effects: `None`
+- 21st.dev MCP: `NOT REQUIRED`
+- Summary: Audited, hardened, and verified full monorepo unit test coverage across all 8 mandatory acceptance domains: account-status decisions, RBAC permission checks, device access isolation, telemetry validation (`BAT` parameter omitted per `DEC-MON-086`), phase/volume mapping calculations, command state machine transitions, idempotency deduplication, and bilingual locale validation. Hardened branch coverage in `@kebun-melon/contracts` for unrecognized device types, log level fallbacks, and user role deduplication. Verified 100% test pass rate across 102 test files (958/958 tests passed) and >99.6% line coverage in contracts. Maintained `ENABLE_FAUCET_CONTROL=false` safety default and asserted uncertain/timeout states strictly as `UNKNOWN`. Passed pre-commit quality suite (`npm run check:quality`): 0 TypeScript errors, 0 lint errors, clean Prettier formatting, 100% translation parity (`i18n:check`), 0 hardcoded secrets, 0 unapproved vulnerabilities, and successful 37-route Next.js production build.
+
 ---
 
 ## 5. Task Selection Rules

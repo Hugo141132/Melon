@@ -39,11 +39,11 @@
 | `SEC-OPS-002` | API rate limiting on authentication and control endpoints | `docs/SECURITY.md` | - | `TASK-0902` | `TEST-SEC-005` | `DECISION_REQUIRED` |
 | `SEC-OPS-003` | Database backup encryption and offsite storage | `docs/SECURITY.md` | - | `TASK-0909` | `TEST-SEC-005` | `DECISION_REQUIRED` |
 | `SEC-OPS-004` | Automated vulnerability scanning of dependencies | `docs/SECURITY.md` | - | `TASK-0906` | `TEST-SEC-005` | `IMPLEMENTED` |
-| `TEST-UNIT-001` | Environment variable validation unit tests | `docs/TESTING.md` | - | `TASK-0103` | `TEST-UNIT-001` | `READY_FOR_IMPLEMENTATION` |
-| `TEST-UNIT-002` | Role and permission matrix unit tests | `docs/TESTING.md` | - | `TASK-0105` | `TEST-UNIT-002` | `READY_FOR_IMPLEMENTATION` |
+| `TEST-UNIT-001` | Environment variable validation unit tests | `docs/TESTING.md` | - | `TASK-0103` | `TEST-UNIT-001` | `VERIFIED` |
+| `TEST-UNIT-002` | Role and permission matrix unit tests | `docs/TESTING.md` | - | `TASK-0105` | `TEST-UNIT-002` | `VERIFIED` |
 | `TEST-UNIT-003` | Telemetry data freshness and status unit tests | `docs/TESTING.md` | `` | `TASK-0407` | `TEST-UNIT-003` | `DEFERRED` |
 | `TEST-UNIT-004` | I18N locale key and translation unit tests | `docs/TESTING.md` | `DEC-I18N-068` | `TASK-0601` | `TEST-UNIT-004` | `VERIFIED` |
-| `TEST-UNIT-005` | Utility and format helper unit tests | `docs/TESTING.md` | - | `TASK-0102` | `TEST-UNIT-005` | `READY_FOR_IMPLEMENTATION` |
+| `TEST-UNIT-005` | Utility and format helper unit tests | `docs/TESTING.md` | - | `TASK-0102` | `TEST-UNIT-005` | `VERIFIED` |
 | `TEST-API-001` | Authentication API endpoint integration tests | `docs/TESTING.md` | `DEC-AUTH-001` | `TASK-0204` | `TEST-API-001` | `READY_FOR_IMPLEMENTATION` |
 | `TEST-API-002` | User and approval API integration tests | `docs/TESTING.md` | `DEC-AUTH-006` | `TASK-0207` | `TEST-API-002` | `READY_FOR_IMPLEMENTATION` |
 | `TEST-API-003` | Device and monitoring API integration tests | `docs/TESTING.md` | `DEC-MON-036` | `TASK-0501` | `TEST-API-003` | `VERIFIED` |
@@ -160,5 +160,15 @@ The following facts are verified in the traceability matrix regarding `TASK-0810
 - **Physical Valve State Integrity:** Physical state confirmation is deterministically bounded (`COMPLETED OPEN` → `OPEN`, `COMPLETED CLOSE` → `CLOSED`, `COMPLETED DISPENSE` → `UNKNOWN`, in-flight/failed → `UNKNOWN`), preventing false claims of closed valves after dispensing.
 - **Fail-Safe Policy Demarcation:** Hardware fail-safe valve behavior upon connection loss remains an explicit `UNRESOLVED / TBD` item (`DEC-CTRL-090`), isolated safely by software state mapping and `ENABLE_FAUCET_CONTROL=false` environment gating.
 <!-- TASK-0810 Reconciled: 2026-08-21 -->
+
+---
+
+## Complete Unit Test Suite Traceability Implementation Note (Reconciled 2026-08-21)
+
+The following facts are verified in the traceability matrix regarding `TASK-1001` (Complete Unit Test Suite across Monorepo):
+- **Implementation Status:** `TASK-1001` is implemented and verified (`102` test files passed, `958/958` tests passed, >99.6% line coverage in `@kebun-melon/contracts`, clean pre-commit quality gate `npm run check:quality`).
+- **Domain Coverage Verified:** Covers all 8 mandatory acceptance domains: account status decisions, RBAC permission checks, device access isolation, telemetry validation (`BAT` parameter omitted per `DEC-MON-086`), phase/volume calculations, command state machine deterministic transitions, idempotency deduplication, and bilingual locale parity (`DEC-I18N-068`).
+- **Safety Flags & Decisions:** `ENABLE_FAUCET_CONTROL=false` safety default is maintained, and uncertain/timeout states are strictly asserted as `UNKNOWN` without inventing timeout thresholds (`DEC-CTRL-092`).
+<!-- TASK-1001 Reconciled: 2026-08-21 -->
 
 

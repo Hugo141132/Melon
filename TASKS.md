@@ -2208,21 +2208,22 @@ Apply to:
 ## TASK-1001 — Complete Unit Test Suite
 
 **Priority:** `P0`
-**Status:** `BACKLOG`
+**Status:** `DONE`
 **Dependencies:** Implementation tasks
+**Completed:** 2026-08-21 — Verified and completed monorepo unit test coverage across all 8 mandatory acceptance domains. Hardened branch coverage in `@kebun-melon/contracts` (`device-capabilities.test.ts` for unknown device types, `logging.test.ts` for unrecognized log levels falling back to `info`, and `user.test.ts` for `toPublicSafeUserDto` handling `userRoles: undefined` and deduplicating active role assignments). Executed full Vitest suite (`npm run test`) achieving 100% pass rate across 102 test files (958/958 tests passed) and >99.6% line coverage in `@kebun-melon/contracts`. Validated zero regressions across `packages/database`, `apps/iot-gateway`, and `apps/web`. Passed pre-commit quality gate (`npm run check:quality`: TypeScript `typecheck`, ESLint, Prettier format, `i18n:check`, secret scanner, dependency scanner, and Next.js production build).
 
 ### Acceptance Criteria
 
 Critical unit coverage includes:
 
-- Account-status decision.
-- Permission checks.
-- Device access.
-- Telemetry validation.
-- Phase mapping.
-- Command transition.
-- Idempotency.
-- Locale validation.
+- [x] Account-status decision.
+- [x] Permission checks.
+- [x] Device access.
+- [x] Telemetry validation.
+- [x] Phase mapping.
+- [x] Command transition.
+- [x] Idempotency.
+- [x] Locale validation.
 
 ---
 

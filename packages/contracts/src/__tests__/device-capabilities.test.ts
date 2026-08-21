@@ -77,4 +77,8 @@ describe('Device Capabilities Contracts', () => {
     expect(supportsCapability(device, 'FAUCET_CONTROL')).toBe(false);
     expect(supportsCapability(device, 'SOIL_PH')).toBe(false);
   });
+
+  it('returns empty array for unknown or unrecognised device type', () => {
+    expect(getCanonicalCapabilitiesForDeviceType('UNKNOWN_DEVICE_TYPE' as any)).toEqual([]);
+  });
 });

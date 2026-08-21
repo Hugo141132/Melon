@@ -134,6 +134,67 @@ describe('TASK-0201 Contracts & DTO Verification', () => {
     expect(publicDto.activeRoles).not.toContain(UserRole.OWNER);
   });
 
+  it('handles user record with undefined or missing userRoles gracefully', () => {
+    const rawDbUser: any = {
+      id: '11111111-1111-1111-1111-111111111111',
+      fullName: 'Test User',
+      email: 'user@example.com',
+      username: null,
+      passwordHash: 'hash',
+      accountStatus: AccountStatus.ACTIVE,
+      emailVerifiedAt: null,
+      lastLoginAt: null,
+      suspendedAt: null,
+      deactivatedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      userRoles: undefined,
+    };
+
+    const publicDto = toPublicSafeUserDto(rawDbUser);
+    expect(publicDto.activeRoles).toEqual([]);
+  });
+
+  it('deduplicates multiple active role assignments of the same role', () => {
+    const rawDbUser: RawDbUserWithRoles = {
+      id: '11111111-1111-1111-1111-111111111111',
+      fullName: 'Test User',
+      email: 'user@example.com',
+      username: null,
+      passwordHash: 'hash',
+      accountStatus: AccountStatus.ACTIVE,
+      emailVerifiedAt: null,
+      lastLoginAt: null,
+      suspendedAt: null,
+      deactivatedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      userRoles: [
+        {
+          id: 'r1',
+          userId: '11111111-1111-1111-1111-111111111111',
+          roleId: 'role-admin-1',
+          assignedByUserId: null,
+          assignedAt: new Date('2026-07-01'),
+          revokedAt: null,
+          role: { code: UserRole.ADMIN },
+        },
+        {
+          id: 'r2',
+          userId: '11111111-1111-1111-1111-111111111111',
+          roleId: 'role-admin-2',
+          assignedByUserId: null,
+          assignedAt: new Date('2026-07-15'),
+          revokedAt: null,
+          role: { code: UserRole.ADMIN },
+        },
+      ],
+    };
+
+    const publicDto = toPublicSafeUserDto(rawDbUser);
+    expect(publicDto.activeRoles).toEqual([UserRole.ADMIN]);
+  });
+
   it('prevents profile update input from specifying forbidden privileged/secret fields', () => {
     const forbiddenFields = [
       'role',
