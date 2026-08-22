@@ -171,4 +171,16 @@ The following facts are verified in the traceability matrix regarding `TASK-1001
 - **Safety Flags & Decisions:** `ENABLE_FAUCET_CONTROL=false` safety default is maintained, and uncertain/timeout states are strictly asserted as `UNKNOWN` without inventing timeout thresholds (`DEC-CTRL-092`).
 <!-- TASK-1001 Reconciled: 2026-08-21 -->
 
+---
+
+## Email Verification Code & Resend Reliability Traceability Implementation Note (Reconciled 2026-08-22)
+
+The following facts are verified in the traceability matrix regarding `TASK-0213` and `TASK-0214` (Password Recovery & 6-Digit Email Verification Code Flow):
+- **Implementation Status:** `TASK-0213` and `TASK-0214` are implemented and verified (`31` unit test suites, `255/255` tests passed in web/database; `12` test suites, `106/106` tests passed in contracts; typecheck 0 errors).
+- **Code Security & Hashing:** Verification codes are generated via CSPRNG (`crypto.randomInt(100000, 1000000)`), stored exclusively as scoped SHA-256 hashes `sha256(userId:code)` in `email_verification_tokens.token_hash` to eliminate token collisions across users, and expire after 15 minutes.
+- **Resend Reliability & Retry:** Resend email delivery includes `sendWithRetry` with bounded exponential backoff and jitter (up to 3 attempts) handling HTTP 429 rate limits, 5xx server errors, and network timeouts while keeping credentials redacted from logs.
+- **Auth UI Conformance:** Decorative illustration frame removed from `/reset-password` conforming to `Premium Minimal Ops` and `UI_UX.md`.
+- **Status & Session Integrity:** Verifying email decouples `emailVerifiedAt` from `accountStatus` (`ADMIN` remains `PENDING_APPROVAL`, `OWNER` remains `ACTIVE`), blocks unverified Owner login, blocks unverified Admin approval/rejection, and avoids issuing authentication sessions from verification endpoints.
+<!-- TASK-0214 Reconciled: 2026-08-22 -->
+
 

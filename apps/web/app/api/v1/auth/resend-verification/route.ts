@@ -55,6 +55,7 @@ export async function POST(request: Request) {
         await sendVerificationEmail({
           toEmail: user.email,
           recipientName: user.fullName,
+          code: tokenResult.code,
           rawToken: tokenResult.rawToken,
           requestId,
         });
@@ -64,7 +65,7 @@ export async function POST(request: Request) {
     const response = NextResponse.json(
       {
         success: true,
-        message: 'If the email is registered and unverified, a verification link has been sent.',
+        message: 'If the email is registered and unverified, a verification code has been sent.',
         meta: {
           requestId,
         },

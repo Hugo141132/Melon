@@ -269,8 +269,8 @@ flowchart TD
 
 **Alternative flows:**
 
-- The applicant verifies email via `/verify-email?token=...`; account remains `PENDING_APPROVAL` until Owner approval.
-- The applicant requests a new verification link via `/verify-email` (rate-limited to 3/min).
+- The applicant verifies email via 6-digit verification code on `/verify-email` (or legacy `/verify-email?token=...`); account remains `PENDING_APPROVAL` until Owner approval.
+- The applicant requests a new verification code via `/verify-email` (rate-limited to 3/min with 60s UI cooldown).
 
 **Error flows:**
 
@@ -293,53 +293,54 @@ flowchart TD
 
 **Primary actor:** Prospective Admin or Initial Owner
 **Preconditions:** Account exists with unverified email (`emailVerifiedAt IS NULL`). User is not currently authenticated (authenticated users navigating to `/verify-email` are redirected to `/` via server guest guard `DEC-AUTH-103`).
-**Trigger:** User clicks verification link in email or opens `/verify-email?token=...`.
+**Trigger:** User enters the 6-digit verification code received via email on `/verify-email` or opens legacy `/verify-email?token=...`.
 
 **Main success flow:**
 
-1. The frontend extracts the verification token from query parameters.
-2. The frontend passes the token to the in-flight deduplicated verification fetcher.
-3. If React Strict Mode or a concurrent remount triggers while the request is in flight, the pending Promise is shared (exactly 1 POST is sent).
-4. The server receives `POST /api/v1/auth/verify-email` with `{ token }`.
-5. The server looks up the token by SHA-256 hash in `email_verification_tokens`.
-6. The server validates token expiration (24 hours) and single-use status.
-7. The server updates `emailVerifiedAt = NOW()`, transactionally deletes the token, handles any Prisma `P2034` write conflicts with bounded retries, and logs `auth.email_verified`.
-8. The server returns HTTP 200 OK with `{ verified: true, accountStatus }` without creating an authenticated session.
-9. Upon promise settlement, the token is evicted from the in-flight cache map (`finally`).
-10. The active mounted view receives the response:
+1. The applicant receives a 6-digit time-limited verification code via Resend.
+2. The applicant enters the 6-digit code on the `/verify-email` page and submits.
+3. The frontend passes `{ email, code }` to the in-flight deduplicated verification fetcher.
+4. If React Strict Mode or a concurrent remount triggers while the request is in flight, the pending Promise is shared (exactly 1 POST is sent).
+5. The server receives `POST /api/v1/auth/verify-email` with `{ email, code }` (or `{ token }`).
+6. The server looks up the token by SHA-256 hash `sha256(userId:code)` in `email_verification_tokens`.
+7. The server validates code expiration (15 minutes) and single-use status.
+8. The server updates `emailVerifiedAt = NOW()`, transactionally deletes the code, handles any Prisma `P2034` write conflicts with bounded retries, and logs `account.email.verified`.
+9. The server returns HTTP 200 OK with `{ user }` without creating an authenticated session.
+10. Upon promise settlement, the key is evicted from the in-flight cache map (`finally`).
+11. The active mounted view receives the response:
     - If `accountStatus === 'PENDING_APPROVAL'` (Admin), the frontend automatically redirects to `/status?status=PENDING_APPROVAL`.
     - If `accountStatus === 'ACTIVE'` (Owner), the frontend displays the verified success view with a button directing to `/login`.
 
 **Error flows:**
 
-- Invalid or missing token: display clear error with option to request a new link.
-- Expired token: display expiration notice with link to resend verification.
-- Already used token (P2025 / duplicate): server returns HTTP 400 `TOKEN_ALREADY_USED`; frontend displays clear used-token message.
+- Invalid or missing code/token: display clear error with option to resend code.
+- Expired code: display expiration notice (15 minutes) with option to resend.
+- Already used code/email (P2025 / duplicate): server returns HTTP 400 `TOKEN_ALREADY_USED`; frontend displays clear already-verified message.
 - Reopening consumed link: cache is clear, server returns HTTP 400 `TOKEN_ALREADY_USED`.
 - Concurrency conflict exhaustion: server returns HTTP 409 `CONCURRENCY_CONFLICT`.
 
 **Postconditions:** `emailVerifiedAt` is set; account status is preserved (`ADMIN` remains `PENDING_APPROVAL`, `OWNER` remains `ACTIVE`).
 **Required permissions:** None (public verification endpoint; guest-only page).
 **Relevant account statuses:** Any.
-**UI states:** Verifying spinner, verification success, token invalid/expired error, resend cooldown.
-**Audit events:** `auth.email_verified`.
+**UI states:** Verifying spinner, verification success, code invalid/expired error, resend cooldown timer.
+**Audit events:** `account.email.verified`.
 
 ---
 
 ## Flow 2c — Resend Verification Email (DEC-AUTH-104 / TASK-0214)
 
 **Primary actor:** Unverified User (Admin or Owner)
-**Preconditions:** User has registered but needs a new verification link.
+**Preconditions:** User has registered but needs a new verification code.
 **Trigger:** User enters email and submits resend request on `/verify-email`.
 
 **Main success flow:**
 
-1. The user enters their email address.
+1. The user enters or confirms their email address.
 2. The server validates rate limits (max 3 req/min).
 3. The server checks if an account exists and is unverified.
-4. If eligible, the server generates a new 256-bit token, invalidates prior tokens, and dispatches email via Resend.
+4. If eligible, the server generates a new 6-digit CSPRNG code, invalidates prior codes, and dispatches email via Resend with exponential backoff retry.
 5. The server returns generic HTTP 200 OK with anti-enumeration guarantee.
-6. The frontend begins a resend cooldown timer and displays confirmation toast.
+6. The frontend begins a 60-second resend cooldown timer and displays confirmation toast.
 
 **Error flows:**
 

@@ -36,6 +36,8 @@ export async function POST(request: Request) {
 
     const userRepository = new UserRepository(prisma);
     const result = await userRepository.verifyEmailWithToken({
+      email: body.email,
+      code: body.code,
       token: body.token,
       requestId,
       ipAddress,

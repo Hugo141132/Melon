@@ -464,22 +464,22 @@ Test:
   - Reset token validation, 15-minute expiry, and single-use enforcement.
   - Transactional user session revocation upon reset.
   - Account status preservation across resets (never auto-approves pending accounts).
-  - Validation contracts for forgot/reset schemas (`packages/contracts/src/__tests__/user.test.ts`, 10 tests).
-  - Resend email delivery service and simulated fallback (`apps/web/test/unit/resend-email.test.ts`, 5 tests).
+  - Validation contracts for forgot/reset schemas (`packages/contracts/src/__tests__/user.test.ts`, 12 tests).
+  - Resend email delivery service with bounded exponential backoff retry and simulated fallback (`apps/web/test/unit/resend-email.test.ts`, 7 tests).
   - Anti-enumeration generic 200 responses and rate limits on forgot-password (`apps/web/test/unit/forgot-password-route.test.ts`, 6 tests).
   - Reset-password route validation and rate limits (`apps/web/test/unit/reset-password-route.test.ts`, 8 tests).
   - Forgot-password UI with 15:00 countdown, `sessionStorage` persistence, and 5s auto-dismiss toast (`apps/web/test/unit/forgot-password-ui.test.tsx`, 6 tests).
   - Reset-password UI form and invalid token banner (`apps/web/test/unit/reset-password-ui.test.tsx`, 4 tests).
   - Server-side guest route guard (`apps/web/test/unit/server-guest-guard.test.ts`, 7 tests) enforcing instant HTTP 307 redirect to `/` for active sessions with zero UI flash (`DEC-AUTH-103`).
 - Registration email verification unit test suite (`TASK-0214` / `DEC-AUTH-104`):
-  - Token creation, SHA-256 hashing, 24-hour expiry, bounded `P2034` concurrency retries, and `P2025` mapping to `TOKEN_ALREADY_USED` (`packages/database/test/user-repository.test.ts`, 15 tests).
+  - 6-digit numeric CSPRNG code generation, `sha256(userId:code)` hashing, 15-minute expiry, bounded `P2034` concurrency retries, and `P2025` mapping to `TOKEN_ALREADY_USED` (`packages/database/test/user-repository.test.ts`, 17 tests).
   - Decoupled `emailVerifiedAt` verification state and status preservation (`ADMIN` remains `PENDING_APPROVAL`, `OWNER` remains `ACTIVE`).
   - Owner authentication gate blocking login with HTTP 403 `EMAIL_NOT_VERIFIED` for unverified Owners (`packages/database/test/session-service.test.ts`).
   - Server-side Owner approval and rejection gates requiring `emailVerifiedAt IS NOT NULL` (returning HTTP 409 `INVALID_STATUS` if unverified).
-  - Route validation, generic anti-enumeration responses, and rate limits on verify/resend endpoints (`apps/web/test/unit/verify-email-routes.test.ts`, 8 tests).
-  - `/verify-email` UI view (`apps/web/test/unit/verify-email-ui.test.tsx`, 11 tests) verifying StrictMode-safe in-flight deduplication, settlement cache eviction (`finally`), Admin automatic redirect to `/status?status=PENDING_APPROVAL`, and Owner login prompts.
+  - Route validation, generic anti-enumeration responses, and rate limits on verify/resend endpoints (`apps/web/test/unit/verify-email-routes.test.ts`, 9 tests).
+  - `/verify-email` UI view (`apps/web/test/unit/verify-email-ui.test.tsx`, 11 tests) verifying 6-digit code input, target email switcher, 60s cooldown timer persisted in `sessionStorage`, legacy token auto-verification, StrictMode-safe in-flight deduplication, settlement cache eviction (`finally`), Admin automatic redirect to `/status?status=PENDING_APPROVAL`, and Owner login prompts.
   - Server-side guest route guard on `/verify-email` (`apps/web/test/unit/server-guest-guard.test.ts`) redirecting active sessions to `/`.
-  - *Delivery & Testing Status Note*: Verification has been manually exercised using Resend test mode/test recipients and the Resend-provided verification link. We have not yet tested delivery to arbitrary real email recipients using a verified custom sending domain, because no such domain is currently configured. Real-mailbox deliverability is treated as pending deployment/infrastructure acceptance, not an application logic failure.
+  - *Delivery & Testing Status Note*: Verification has been manually exercised using Resend test mode/test recipients and 6-digit code dispatch. We have not yet tested delivery to arbitrary real email recipients using a verified custom sending domain, because no such domain is currently configured. Real-mailbox deliverability is treated as pending deployment/infrastructure acceptance, not an application logic failure.
 - Account-status access decision.
 - Session-expiry calculation.
 - Session-revocation check.

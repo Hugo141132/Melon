@@ -433,22 +433,22 @@ INDEX password_reset_tokens_token_hash_idx ON password_reset_tokens (token_hash)
 
 ## 6.8 `email_verification_tokens` (DB-AUTH-006 / DEC-AUTH-104)
 
-Stores cryptographic hashes for registration email ownership verification tokens.
+Stores cryptographic hashes for registration email ownership verification codes and tokens.
 
 | Column | Type | Nullable | Notes |
 |---|---|---:|---|
 | `id` | UUID | No | Primary key |
 | `user_id` | UUID | No | Foreign key referencing `users(id) ON DELETE CASCADE` |
-| `token_hash` | VARCHAR(64) | No | Unique cryptographic SHA-256 hex digest of raw 256-bit token |
-| `expires_at` | TIMESTAMPTZ | No | Expiration timestamp (configurable, default 24 hours) |
-| `created_at` | TIMESTAMPTZ | No | Token generation timestamp (`DEFAULT NOW()`) |
+| `token_hash` | VARCHAR(64) | No | Unique cryptographic SHA-256 hex digest of `userId:code` (or legacy raw token) |
+| `expires_at` | TIMESTAMPTZ | No | Expiration timestamp (default 15 minutes) |
+| `created_at` | TIMESTAMPTZ | No | Code generation timestamp (`DEFAULT NOW()`) |
 
 ### Constraints & Security Rules
 
-- **Raw Token Storage Forbidden**: Raw token is never stored in plaintext; only the SHA-256 hash is persisted.
-- **Single Use**: Upon successful verification (`verifyEmailWithToken`), the token is consumed/deleted and `users.email_verified_at` is stamped with `NOW()`.
+- **Raw Code Storage Forbidden**: The raw 6-digit numeric CSPRNG code is never stored in plaintext; only the SHA-256 hash scoped to user ID (`sha256(userId:code)`) is persisted in `token_hash`. Scoping prevents unique constraint collisions when different users receive the same 6-digit random code.
+- **Single Use**: Upon successful verification (`verifyEmailWithToken`), the token record is consumed/deleted and `users.email_verified_at` is stamped with `NOW()`.
 - **Status Decoupling**: Verification updates `email_verified_at` independently and strictly preserves `account_status` (`ADMIN` remains `PENDING_APPROVAL`, `OWNER` remains `ACTIVE`).
-- **Transactional Invalidation**: Creating a new verification token transactionally invalidates/replaces prior unused tokens for the user.
+- **Transactional Invalidation**: Creating a new verification code transactionally deletes/invalidates prior unused codes for the user.
 - **Concurrency & Conflict Handling**: `verifyEmailWithToken` wraps transactions in bounded exponential backoff retries (3 attempts) on Prisma `P2034` write conflicts. If retries are exhausted, it raises `CONCURRENCY_CONFLICT`. If the token is already deleted/consumed (`P2025`), it returns `TOKEN_ALREADY_USED`.
 - **Approval & Rejection Integrity**: `approvePendingAdmin` and `rejectPendingAdmin` select `emailVerifiedAt` in their transactional projections and strictly require `emailVerifiedAt IS NOT NULL`, rejecting unverified accounts with `INVALID_STATUS`.
 

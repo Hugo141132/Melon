@@ -3,7 +3,15 @@
 import Link from 'next/link';
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Loader2, CheckCircle, AlertCircle, Mail } from 'lucide-react';
+import {
+  ArrowLeft,
+  Loader2,
+  CheckCircle,
+  AlertCircle,
+  Mail,
+  KeyRound,
+  RefreshCw,
+} from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
 interface VerificationResponse {
@@ -13,22 +21,27 @@ interface VerificationResponse {
   error?: { code?: string; message?: string };
 }
 
-// Module-level map of in-flight verification promises keyed by token (strictly in-flight only)
+// Module-level map of in-flight verification promises keyed by token/code
 const inFlightVerifications = new Map<string, Promise<VerificationResponse>>();
 
 export function _clearInFlightVerificationsForTesting() {
   inFlightVerifications.clear();
 }
 
-function verifyTokenWithDeduplication(token: string): Promise<VerificationResponse> {
-  let existingPromise = inFlightVerifications.get(token);
+function verifyWithDeduplication(payload: {
+  email?: string;
+  code?: string;
+  token?: string;
+}): Promise<VerificationResponse> {
+  const key = payload.token || `${payload.email}:${payload.code}`;
+  let existingPromise = inFlightVerifications.get(key);
   if (!existingPromise) {
     existingPromise = (async () => {
       try {
         const res = await fetch('/api/v1/auth/verify-email', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token }),
+          body: JSON.stringify(payload),
         });
         const json = await res.json().catch(() => ({}));
         return {
@@ -44,10 +57,10 @@ function verifyTokenWithDeduplication(token: string): Promise<VerificationRespon
           error: { message: err?.message || 'Network error' },
         };
       } finally {
-        inFlightVerifications.delete(token);
+        inFlightVerifications.delete(key);
       }
     })();
-    inFlightVerifications.set(token, existingPromise);
+    inFlightVerifications.set(key, existingPromise);
   }
   return existingPromise;
 }
@@ -59,240 +72,152 @@ function VerifyEmailContent() {
   const tValidation = useTranslations('validation');
   const tErrors = useTranslations('errors');
   const searchParams = useSearchParams();
-  const token = searchParams.get('token');
-  const emailParam = searchParams.get('email');
 
-  const [state, setState] = useState<
-    'idle' | 'loading' | 'success' | 'error' | 'instruction' | 'form'
-  >('idle');
-  const [activeEmail, setActiveEmail] = useState<string>(emailParam || '');
-  const [inputEmail, setInputEmail] = useState<string>(emailParam || '');
+  const tokenParam = searchParams.get('token');
+  const emailParam = searchParams.get('email') || '';
+
+  const [email, setEmail] = useState<string>(emailParam);
+  const [isEditingEmail, setIsEditingEmail] = useState<boolean>(!emailParam && !tokenParam);
+  const [code, setCode] = useState<string>('');
+
+  const [state, setState] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [formError, setFormError] = useState<string | null>(null);
+  const [successInfo, setSuccessInfo] = useState<{ accountStatus?: string } | null>(null);
+
+  // Resend state & 60s cooldown timer
   const [resendStatus, setResendStatus] = useState<'idle' | 'loading' | 'success' | 'error'>(
     'idle'
   );
-  const [submittingForm, setSubmittingForm] = useState(false);
+  const [resendMessage, setResendMessage] = useState<string | null>(null);
+  const [cooldownSeconds, setCooldownSeconds] = useState<number>(0);
+
+  // Initialize and tick cooldown timer
+  useEffect(() => {
+    const savedCooldown = sessionStorage.getItem('verify_email_cooldown');
+    if (savedCooldown) {
+      const remaining = Math.max(0, Math.ceil((parseInt(savedCooldown, 10) - Date.now()) / 1000));
+      if (remaining > 0) {
+        setCooldownSeconds(remaining);
+      } else {
+        sessionStorage.removeItem('verify_email_cooldown');
+      }
+    }
+  }, []);
 
   useEffect(() => {
-    if (!token) {
-      if (emailParam) {
-        setActiveEmail(emailParam);
-        setInputEmail(emailParam);
-        setState('instruction');
-      } else {
-        setState('form');
-      }
-      return;
-    }
+    if (cooldownSeconds <= 0) return;
+    const timer = setInterval(() => {
+      setCooldownSeconds((prev) => {
+        if (prev <= 1) {
+          sessionStorage.removeItem('verify_email_cooldown');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [cooldownSeconds]);
+
+  // Backward compatibility: Auto-verify if legacy token is in URL
+  useEffect(() => {
+    if (!tokenParam) return;
 
     let isCurrentMount = true;
     setState('loading');
 
-    verifyTokenWithDeduplication(token).then((result) => {
-      if (!isCurrentMount) {
-        // Component unmounted (e.g. StrictMode initial unmount or navigation away)
-        return;
-      }
+    verifyWithDeduplication({ token: tokenParam }).then((result) => {
+      if (!isCurrentMount) return;
 
       if (result.ok && result.data) {
         if (result.data.user?.accountStatus === 'PENDING_APPROVAL') {
           router.replace('/status?status=PENDING_APPROVAL');
           return;
         }
+        setSuccessInfo({ accountStatus: result.data.user?.accountStatus });
         setState('success');
       } else {
         setState('error');
-        setErrorMessage(result.error?.message || tAuth('verifyEmailFailed'));
+        setErrorMessage(result.error?.message || tAuth('invalidOrExpiredCode'));
       }
     });
 
     return () => {
       isCurrentMount = false;
     };
-  }, [token, emailParam]);
+  }, [tokenParam]);
 
-  const handleResend = async () => {
-    if (!activeEmail) return;
-    setResendStatus('loading');
-    try {
-      const res = await fetch('/api/v1/auth/resend-verification', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: activeEmail.trim() }),
-      });
-      if (res.ok) {
-        setResendStatus('success');
-      } else {
-        setResendStatus('error');
-      }
-    } catch {
-      setResendStatus('error');
-    }
-  };
-
-  const handleFormSubmit = async (e: React.FormEvent) => {
+  const handleVerifyCode = async (e: React.FormEvent) => {
     e.preventDefault();
-    setFormError(null);
+    setErrorMessage(null);
 
-    const trimmed = inputEmail.trim();
-    if (!trimmed) {
-      setFormError(tValidation('required', { fallback: 'This field is required' }));
+    const cleanEmail = email.trim();
+    const cleanCode = code.trim();
+
+    if (!cleanEmail) {
+      setErrorMessage(tValidation('required', { fallback: 'Email is required' }));
+      setIsEditingEmail(true);
       return;
     }
 
-    try {
-      setSubmittingForm(true);
-      const res = await fetch('/api/v1/auth/resend-verification', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: trimmed }),
-      });
+    if (!cleanCode || cleanCode.length < 4) {
+      setErrorMessage(
+        tValidation('required', { fallback: 'Please enter a valid verification code.' })
+      );
+      return;
+    }
 
-      if (res.ok) {
-        setActiveEmail(trimmed);
-        setResendStatus('idle');
-        setState('instruction');
-      } else {
-        setFormError(
-          tAuth('resendFailed', {
-            fallback: 'Failed to send verification email. Please try again.',
-          })
-        );
+    setState('loading');
+
+    const result = await verifyWithDeduplication({
+      email: cleanEmail,
+      code: cleanCode,
+    });
+
+    if (result.ok && result.data) {
+      if (result.data.user?.accountStatus === 'PENDING_APPROVAL') {
+        router.replace('/status?status=PENDING_APPROVAL');
+        return;
       }
-    } catch {
-      setFormError(tErrors('networkError', { fallback: 'Network error. Please try again.' }));
-    } finally {
-      setSubmittingForm(false);
+      setSuccessInfo({ accountStatus: result.data.user?.accountStatus });
+      setState('success');
+    } else {
+      setState('error');
+      setErrorMessage(result.error?.message || tAuth('invalidOrExpiredCode'));
     }
   };
 
-  // State: Form (direct email input)
-  if (state === 'form') {
-    return (
-      <div className="flex flex-col items-center">
-        <header className="mb-6 text-center">
-          <h2 className="text-[24px] leading-[32px] font-bold text-primary mb-2">
-            {tAuth('verifyEmailHeading', { fallback: 'Email Verification' })}
-          </h2>
-          <p className="text-[16px] leading-[24px] text-on-surface-variant">
-            {tAuth('verifyEmailPrompt', {
-              fallback: 'Enter your email address to receive a verification link.',
-            })}
-          </p>
-        </header>
+  const handleResendCode = async () => {
+    const cleanEmail = email.trim();
+    if (!cleanEmail || cooldownSeconds > 0 || resendStatus === 'loading') return;
 
-        {formError && (
-          <div className="w-full mb-6 p-3.5 bg-error-container/20 border border-error/30 rounded-xl text-error text-[14px] leading-[20px] flex items-start gap-2.5">
-            <AlertCircle size={18} className="mt-0.5 shrink-0" />
-            <span>{formError}</span>
-          </div>
-        )}
+    setResendStatus('loading');
+    setResendMessage(null);
 
-        <form className="w-full space-y-6" onSubmit={handleFormSubmit}>
-          <div className="space-y-2">
-            <label
-              className="text-[14px] leading-[20px] font-semibold tracking-[0.05em] text-on-surface-variant uppercase block"
-              htmlFor="verify-email-input"
-            >
-              {tAuth('email')}
-            </label>
-            <div className="relative group">
-              <Mail
-                size={20}
-                className="absolute left-4 top-1/2 -translate-y-1/2 text-outline group-focus-within:text-secondary transition-colors"
-              />
-              <input
-                className="w-full h-[56px] pl-12 pr-4 bg-surface border border-outline rounded-xl text-[18px] leading-[28px] text-on-surface focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/10 transition-all"
-                id="verify-email-input"
-                placeholder={tAuth('emailPlaceholder', { fallback: 'Enter your email address' })}
-                type="email"
-                value={inputEmail}
-                onChange={(e) => setInputEmail(e.target.value)}
-                autoFocus
-              />
-            </div>
-          </div>
+    try {
+      const res = await fetch('/api/v1/auth/resend-verification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: cleanEmail }),
+      });
 
-          <button
-            className="w-full h-[56px] bg-primary text-on-primary rounded-xl text-[18px] leading-[24px] font-semibold hover:bg-primary-container hover:text-on-primary-container transition-all active:scale-[0.98] duration-100 shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
-            type="submit"
-            disabled={submittingForm}
-          >
-            {submittingForm ? (
-              <>
-                <Loader2 size={20} className="animate-spin" />
-                <span>{tCommon('processing')}</span>
-              </>
-            ) : (
-              tAuth('sendVerificationLink', { fallback: 'Send Verification Link' })
-            )}
-          </button>
-        </form>
+      if (res.ok) {
+        setResendStatus('success');
+        setResendMessage(tAuth('resendCodeSuccess'));
+        const expiresAt = Date.now() + 60 * 1000;
+        sessionStorage.setItem('verify_email_cooldown', expiresAt.toString());
+        setCooldownSeconds(60);
+      } else {
+        setResendStatus('error');
+        setResendMessage(tAuth('resendCodeFailed'));
+      }
+    } catch {
+      setResendStatus('error');
+      setResendMessage(tErrors('networkError', { fallback: 'Network error. Please try again.' }));
+    }
+  };
 
-        <div className="mt-6 text-center">
-          <Link href="/login" className="text-primary hover:underline text-sm font-semibold">
-            {tAuth('backToLogin')}
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  // State: Instruction (check email & resend button)
-  if (state === 'instruction') {
-    return (
-      <div className="flex flex-col items-center text-center">
-        <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-primary mb-4">
-          <CheckCircle size={32} />
-        </div>
-        <h2 className="text-[22px] font-bold text-on-surface mb-2">
-          {tAuth('checkYourEmail', { fallback: 'Check your email' })}
-        </h2>
-        <p className="text-[16px] text-on-surface-variant mb-6">
-          {tAuth('verifyEmailInstruction', {
-            fallback: 'We sent a verification link to',
-          })}{' '}
-          <span className="font-semibold text-on-surface">{activeEmail}</span>
-        </p>
-
-        <button
-          onClick={handleResend}
-          disabled={resendStatus === 'loading'}
-          className="h-[48px] px-8 bg-surface-container border border-outline-variant text-on-surface rounded-xl font-semibold flex items-center justify-center transition-all hover:bg-surface-container-high shadow-sm w-full disabled:opacity-60 disabled:cursor-not-allowed mb-3 cursor-pointer"
-        >
-          {resendStatus === 'loading' ? <Loader2 className="animate-spin mr-2" size={20} /> : null}
-          {resendStatus === 'success'
-            ? tAuth('resendSuccess', { fallback: 'Email sent!' })
-            : tAuth('resendEmail', { fallback: 'Resend Verification Email' })}
-        </button>
-
-        {resendStatus === 'error' && (
-          <p className="text-error text-sm mb-3">
-            {tAuth('resendFailed', { fallback: 'Failed to resend. Please try again.' })}
-          </p>
-        )}
-
-        <button
-          type="button"
-          onClick={() => {
-            setFormError(null);
-            setState('form');
-          }}
-          className="text-on-surface-variant hover:text-primary text-sm font-medium mb-4 underline cursor-pointer"
-        >
-          {tAuth('useDifferentEmail', { fallback: 'Use a different email address' })}
-        </button>
-
-        <Link href="/login" className="text-primary hover:underline text-sm font-semibold">
-          {tAuth('backToLogin')}
-        </Link>
-      </div>
-    );
-  }
-
-  // State: Loading (token verification in progress)
-  if (state === 'loading' || state === 'idle') {
+  // State: Token Auto-Verification Loading
+  if (tokenParam && (state === 'loading' || state === 'idle')) {
     return (
       <div className="flex flex-col items-center justify-center p-8 gap-4 text-center">
         <Loader2 className="animate-spin text-primary" size={48} />
@@ -304,7 +229,42 @@ function VerifyEmailContent() {
     );
   }
 
-  // State: Success
+  // State: Token Auto-Verification Error
+  if (tokenParam && state === 'error') {
+    return (
+      <div className="flex flex-col items-center text-center">
+        <div className="w-16 h-16 rounded-full bg-error/10 flex items-center justify-center text-error mb-4">
+          <AlertCircle size={32} />
+        </div>
+        <h2 className="text-[20px] font-bold text-on-surface mb-2">
+          {errorMessage || tAuth('verifyEmailFailed')}
+        </h2>
+        <p className="text-[16px] text-on-surface-variant mb-6">
+          {tAuth('verifyEmailFailedDesc', {
+            fallback: 'The link might have expired or is invalid.',
+          })}
+        </p>
+
+        <button
+          type="button"
+          onClick={() => {
+            setErrorMessage(null);
+            setState('idle');
+            router.replace('/verify-email');
+          }}
+          className="h-[48px] px-8 bg-surface-container border border-outline-variant text-on-surface rounded-xl font-semibold flex items-center justify-center transition-all hover:bg-surface-container-high shadow-sm w-full mb-3 cursor-pointer"
+        >
+          {tAuth('requestNewLink', { fallback: 'Request New Link' })}
+        </button>
+
+        <Link href="/login" className="text-primary hover:underline text-sm font-semibold">
+          {tAuth('backToLogin')}
+        </Link>
+      </div>
+    );
+  }
+
+  // State: Success (both token and code flow)
   if (state === 'success') {
     return (
       <div className="flex flex-col items-center text-center">
@@ -312,52 +272,180 @@ function VerifyEmailContent() {
           <CheckCircle size={32} />
         </div>
         <h2 className="text-[22px] font-bold text-on-surface mb-2">
-          {tAuth('verifyEmailSuccess', { fallback: 'Email verified successfully!' })}
+          {tAuth('verifyEmailSuccess', { fallback: tAuth('verificationSuccess') })}
         </h2>
         <p className="text-[16px] text-on-surface-variant mb-6">
-          {tAuth('verifyEmailSuccessDesc', {
-            fallback:
-              'Your email address is now verified. You can now login or continue to the application.',
-          })}
+          {successInfo?.accountStatus === 'PENDING_APPROVAL'
+            ? tAuth('pendingApprovalMessage')
+            : tAuth('verifyEmailSuccessDesc', { fallback: tAuth('verificationSuccessSubtitle') })}
         </p>
-        <Link
-          href="/login"
-          className="h-[48px] px-8 bg-primary text-on-primary rounded-xl font-semibold flex items-center justify-center transition-all hover:brightness-110 shadow-md w-full"
-        >
-          {tAuth('goToLogin')}
-        </Link>
+
+        {successInfo?.accountStatus === 'PENDING_APPROVAL' ? (
+          <Link
+            href="/status?status=PENDING_APPROVAL"
+            className="h-[48px] px-8 bg-primary text-on-primary rounded-xl font-semibold flex items-center justify-center transition-all hover:brightness-110 shadow-md w-full"
+          >
+            {tAuth('goToStatusPage')}
+          </Link>
+        ) : (
+          <Link
+            href="/login"
+            className="h-[48px] px-8 bg-primary text-on-primary rounded-xl font-semibold flex items-center justify-center transition-all hover:brightness-110 shadow-md w-full"
+          >
+            {tAuth('goToLogin')}
+          </Link>
+        )}
       </div>
     );
   }
 
-  // State: Error (token verification failed)
   return (
-    <div className="flex flex-col items-center text-center">
-      <div className="w-16 h-16 rounded-full bg-error/10 flex items-center justify-center text-error mb-4">
-        <AlertCircle size={32} />
+    <>
+      {/* Heading */}
+      <div className="mb-[24px]">
+        <h1 className="text-[24px] leading-[32px] font-bold text-on-surface mb-[8px]">
+          {tAuth('enterVerificationCode')}
+        </h1>
+        <p className="text-[16px] leading-[24px] text-on-surface-variant">
+          {tAuth('verificationCodeSubtitle')}
+        </p>
       </div>
-      <h2 className="text-[20px] font-bold text-on-surface mb-2">
-        {errorMessage || tAuth('verifyEmailFailed')}
-      </h2>
-      <p className="text-[16px] text-on-surface-variant mb-6">
-        {tAuth('verifyEmailFailedDesc', { fallback: 'The link might have expired or is invalid.' })}
-      </p>
 
-      <button
-        type="button"
-        onClick={() => {
-          setFormError(null);
-          setState('form');
-        }}
-        className="h-[48px] px-8 bg-surface-container border border-outline-variant text-on-surface rounded-xl font-semibold flex items-center justify-center transition-all hover:bg-surface-container-high shadow-sm w-full mb-3 cursor-pointer"
-      >
-        {tAuth('requestNewLink', { fallback: 'Request New Link' })}
-      </button>
+      {/* Target Email Banner / Switcher */}
+      <div className="mb-6 p-4 rounded-xl bg-surface-container-low border border-outline-variant flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-on-surface-variant text-[14px]">
+            <Mail size={16} className="text-primary shrink-0" />
+            <span className="font-medium text-on-surface truncate max-w-[220px]">
+              {email || tAuth('email')}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsEditingEmail(!isEditingEmail)}
+            className="text-[13px] font-semibold text-primary hover:underline cursor-pointer"
+          >
+            {isEditingEmail ? tCommon('cancel') : tAuth('useDifferentEmail')}
+          </button>
+        </div>
 
-      <Link href="/login" className="text-primary hover:underline text-sm font-semibold">
-        {tAuth('backToLogin')}
-      </Link>
-    </div>
+        {isEditingEmail && (
+          <div className="mt-2 pt-2 border-t border-outline-variant">
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder={tAuth('emailPlaceholder')}
+              className="w-full h-[44px] px-3 bg-white border border-outline-variant rounded-lg text-[15px] text-on-surface focus:outline-none focus:border-primary"
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Error Message */}
+      {errorMessage && (
+        <div
+          role="alert"
+          className="mb-6 p-4 rounded-xl bg-error/10 border border-error/20 text-error text-[14px] leading-[20px] flex items-start gap-2.5"
+        >
+          <AlertCircle size={18} className="mt-0.5 shrink-0" />
+          <span>{errorMessage}</span>
+        </div>
+      )}
+
+      {/* Resend Status Banner */}
+      {resendMessage && (
+        <div
+          role="status"
+          className={`mb-6 p-4 rounded-xl text-[14px] leading-[20px] flex items-start gap-2.5 ${
+            resendStatus === 'success'
+              ? 'bg-primary/10 border border-primary/20 text-primary'
+              : 'bg-error/10 border border-error/20 text-error'
+          }`}
+        >
+          {resendStatus === 'success' ? (
+            <CheckCircle size={18} className="mt-0.5 shrink-0" />
+          ) : (
+            <AlertCircle size={18} className="mt-0.5 shrink-0" />
+          )}
+          <span>{resendMessage}</span>
+        </div>
+      )}
+
+      {/* 6-Digit Code Form */}
+      <form className="flex flex-col gap-[20px]" onSubmit={handleVerifyCode}>
+        <div className="flex flex-col gap-2">
+          <label
+            className="text-[14px] leading-[20px] font-semibold tracking-[0.05em] text-primary uppercase"
+            htmlFor="verification-code-input"
+          >
+            {tAuth('verificationCode')}
+          </label>
+          <div className="relative group">
+            <KeyRound
+              size={20}
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-outline group-focus-within:text-primary transition-colors"
+            />
+            <input
+              id="verification-code-input"
+              name="code"
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              pattern="[0-9]*"
+              maxLength={8}
+              required
+              autoFocus
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, ''))}
+              placeholder="000000"
+              className="w-full h-[56px] pl-12 pr-4 bg-white border border-outline-variant rounded-xl text-[22px] tracking-[6px] font-mono text-on-surface transition-all focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+            />
+          </div>
+          <p className="text-[13px] text-on-surface-variant mt-1">{tAuth('codeExpiryNotice')}</p>
+        </div>
+
+        <button
+          className="h-[56px] w-full bg-primary text-on-primary rounded-xl text-[18px] leading-[24px] font-semibold shadow-md hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70 mt-2"
+          type="submit"
+          disabled={state === 'loading' || !code.trim()}
+        >
+          {state === 'loading' ? (
+            <>
+              <Loader2 size={20} className="animate-spin" />
+              <span className="text-[16px]">{tCommon('processing')}</span>
+            </>
+          ) : (
+            <span>{tAuth('verifyCodeButton')}</span>
+          )}
+        </button>
+      </form>
+
+      {/* Resend Action with Cooldown */}
+      <div className="mt-6 flex flex-col items-center gap-3">
+        <button
+          type="button"
+          onClick={handleResendCode}
+          disabled={cooldownSeconds > 0 || resendStatus === 'loading' || !email.trim()}
+          className="h-[44px] px-6 bg-surface-container border border-outline-variant text-on-surface rounded-xl text-[14px] font-semibold flex items-center justify-center gap-2 transition-all hover:bg-surface-container-high w-full disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+        >
+          {resendStatus === 'loading' ? (
+            <Loader2 size={16} className="animate-spin" />
+          ) : (
+            <RefreshCw size={16} className={cooldownSeconds > 0 ? '' : 'text-primary'} />
+          )}
+          <span>
+            {cooldownSeconds > 0
+              ? tAuth('resendCodeWithTimer', { time: `${cooldownSeconds}s` })
+              : tAuth('resendCode')}
+          </span>
+        </button>
+
+        <Link href="/login" className="text-primary hover:underline text-sm font-semibold mt-2">
+          {tAuth('backToLogin')}
+        </Link>
+      </div>
+    </>
   );
 }
 

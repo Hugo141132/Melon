@@ -74,7 +74,6 @@ function requireConfigEnv(name: string): string {
         ` 2. Set valid local development values for:\n` +
         `    - MQTT_GATEWAY_USERNAME & MQTT_GATEWAY_PASSWORD\n` +
         `    - MQTT_DEV1_USERNAME & MQTT_DEV1_PASSWORD\n` +
-        `    - MQTT_DEV2_USERNAME & MQTT_DEV2_PASSWORD\n` +
         `    - MQTT_UNAUTH_USERNAME & MQTT_UNAUTH_PASSWORD\n` +
         ` 3. Refer to .env.example for required variable names.\n` +
         `============================================================\n`
@@ -89,8 +88,8 @@ export function getMqttTestCredentials(): MqttTestCredentials {
     gatewayPassword: requireConfigEnv('MQTT_GATEWAY_PASSWORD'),
     device1Username: requireConfigEnv('MQTT_DEV1_USERNAME'),
     device1Password: requireConfigEnv('MQTT_DEV1_PASSWORD'),
-    device2Username: requireConfigEnv('MQTT_DEV2_USERNAME'),
-    device2Password: requireConfigEnv('MQTT_DEV2_PASSWORD'),
+    device2Username: process.env.MQTT_DEV2_USERNAME || 'device_node_002',
+    device2Password: process.env.MQTT_DEV2_PASSWORD || 'local_dev2_password_12345',
     unauthUsername: requireConfigEnv('MQTT_UNAUTH_USERNAME'),
     unauthPassword: requireConfigEnv('MQTT_UNAUTH_PASSWORD'),
     brokerUrl: process.env.MQTT_BROKER_URL || 'mqtt://localhost:1883',

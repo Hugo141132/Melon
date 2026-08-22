@@ -50,6 +50,7 @@ export async function POST(request: Request) {
         await sendVerificationEmail({
           toEmail: result.user.email,
           recipientName: result.user.fullName,
+          code: tokenResult.code,
           rawToken: tokenResult.rawToken,
           requestId,
         });

@@ -657,10 +657,19 @@ Possible errors:
 POST /api/v1/auth/verify-email
 ```
 
-**Authentication:** Public / Verification Token
+**Authentication:** Public / Verification Code or Token
 **Rate Limit:** Standard public rate limit
 
-Request:
+Request (6-digit code flow - primary):
+
+```json
+{
+  "email": "admin@example.com",
+  "code": "849201"
+}
+```
+
+Request (Legacy token flow - backward compatible):
 
 ```json
 {
@@ -673,11 +682,15 @@ Response (HTTP 200 OK):
 ```json
 {
   "success": true,
-  "message": "Email ownership verified successfully.",
+  "message": "Email address has been successfully verified.",
   "data": {
-    "verified": true,
-    "email": "admin@example.com",
-    "accountStatus": "PENDING_APPROVAL"
+    "user": {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "email": "admin@example.com",
+      "fullName": "Admin User",
+      "accountStatus": "PENDING_APPROVAL",
+      "emailVerifiedAt": "2026-08-22T08:00:00.000Z"
+    }
   },
   "meta": {
     "requestId": "req-1718000000002"
@@ -686,23 +699,23 @@ Response (HTTP 200 OK):
 ```
 
 Server rules:
-- Verifies token by SHA-256 hash in `email_verification_tokens`.
-- Asserts token is unexpired (24-hour validity) and unconsumed.
+- Verifies code by SHA-256 hash `sha256(userId:code)` in `email_verification_tokens` (or token directly).
+- Asserts code is unexpired (15-minute validity) and unconsumed.
 - Sets `users.email_verified_at = NOW()` for the associated user account.
 - Strictly preserves existing `accountStatus` (`ADMIN` accounts remain `PENDING_APPROVAL`, `OWNER` accounts remain `ACTIVE`).
 - Strictly does NOT issue, create, or return an authentication session. Verification confirms ownership only; normal login remains a separate step.
-- Deletes the token upon successful verification.
+- Deletes the token/code record upon successful verification.
 - Handles Prisma `P2034` transaction write conflicts with bounded retries (3 attempts), returning `CONCURRENCY_CONFLICT` (HTTP 409) upon exhaustion.
-- Returns `TOKEN_ALREADY_USED` (HTTP 400) if token was already deleted (`P2025`).
-- Emits structured audit log `auth.email_verified`.
+- Returns `TOKEN_ALREADY_USED` (HTTP 400) if code was already used (`P2025` or user already verified).
+- Emits structured audit log `account.email.verified`.
 
 Frontend rules:
-- Employs token-keyed in-flight Promise map deduplication with immediate cache eviction on settlement (`finally`) to ensure exactly 1 network POST in React Strict Mode / remounts while delivering navigation triggers to the active mount.
+- Employs in-flight Promise map deduplication with immediate cache eviction on settlement (`finally`) to ensure exactly 1 network POST in React Strict Mode / remounts while delivering navigation triggers to the active mount.
 - If `accountStatus === 'PENDING_APPROVAL'`, redirects to `/status?status=PENDING_APPROVAL`.
 - Enforces server-side guest guard (`DEC-AUTH-103`), redirecting authenticated sessions on `/verify-email` to `/`.
 
 Testing status:
-- *Delivery & Testing Status*: Verification has been manually exercised using Resend test mode/test recipients and the Resend-provided verification link. We have not yet tested delivery to arbitrary real email recipients using a verified custom sending domain, because no such domain is currently configured. Real-mailbox deliverability is treated as pending deployment/infrastructure acceptance, not an application logic failure.
+- *Delivery & Testing Status*: Verification has been manually exercised using Resend test mode/test recipients and 6-digit code dispatch. We have not yet tested delivery to arbitrary real email recipients using a verified custom sending domain, because no such domain is currently configured. Real-mailbox deliverability is treated as pending deployment/infrastructure acceptance, not an application logic failure.
 
 Possible errors:
 - `400 Bad Request`: `VALIDATION_ERROR`, `INVALID_TOKEN`, `TOKEN_EXPIRED`, `TOKEN_ALREADY_USED`

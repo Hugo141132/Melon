@@ -111,6 +111,7 @@ export type CreateEmailVerificationTokenResult =
   | {
       success: true;
       rawToken: string;
+      code: string;
       user: PublicSafeUserDto;
       expiresAt: Date;
     }
@@ -120,7 +121,9 @@ export type CreateEmailVerificationTokenResult =
     };
 
 export interface VerifyEmailWithTokenInput {
-  token: string;
+  email?: string;
+  code?: string;
+  token?: string;
   requestId?: string;
   ipAddress?: string;
   userAgent?: string;
@@ -2133,9 +2136,9 @@ export class UserRepository {
   }
 
   /**
-   * Generates a secure, single-use email verification token.
+   * Generates a secure, time-limited 6-digit email verification code.
    * Invalidates any existing unused tokens for the user.
-   * Never stores the raw token, only the SHA-256 hash.
+   * Never stores the raw code, only the SHA-256 hash scoped to the user ID.
    */
   async createEmailVerificationToken(
     input: CreateEmailVerificationTokenInput
@@ -2173,9 +2176,10 @@ export class UserRepository {
       return { success: false, userExists: false };
     }
 
-    const rawToken = crypto.randomBytes(32).toString('hex');
-    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
-    const expiryMinutes = input.expiryMinutes ?? 1440; // Default 24 hours
+    // Generate 6-digit numeric CSPRNG code (100000 - 999999)
+    const code = String(crypto.randomInt(100000, 1000000));
+    const tokenHash = crypto.createHash('sha256').update(`${user.id}:${code}`).digest('hex');
+    const expiryMinutes = input.expiryMinutes ?? 15; // Default 15 minutes
     const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000);
 
     await this.prisma.$transaction(async (tx) => {
@@ -2196,22 +2200,62 @@ export class UserRepository {
 
     return {
       success: true,
-      rawToken,
+      rawToken: code,
+      code,
       user: safeUser,
       expiresAt,
     };
   }
 
   /**
-   * Verifies an email ownership token.
-   * Validates token existence and expiry.
+   * Verifies an email ownership code or token.
+   * Validates code existence and expiry.
    * Updates emailVerifiedAt on the User model.
    * Deletes the token after use.
    */
   async verifyEmailWithToken(
     input: VerifyEmailWithTokenInput
   ): Promise<VerifyEmailWithTokenResult> {
-    const tokenHash = crypto.createHash('sha256').update(input.token).digest('hex');
+    let tokenHash: string;
+
+    if (input.email && input.code) {
+      const normalisedEmail = normaliseEmail(input.email);
+      const user = await this.prisma.user.findUnique({
+        where: { email: normalisedEmail },
+        select: { id: true, emailVerifiedAt: true },
+      });
+
+      if (!user) {
+        return {
+          success: false,
+          error: 'INVALID_TOKEN',
+          message: 'Invalid or missing email verification code.',
+        };
+      }
+
+      if (user.emailVerifiedAt) {
+        return {
+          success: false,
+          error: 'TOKEN_ALREADY_USED',
+          message: 'Email address has already been verified.',
+        };
+      }
+
+      tokenHash = crypto
+        .createHash('sha256')
+        .update(`${user.id}:${input.code.trim()}`)
+        .digest('hex');
+    } else if (input.token) {
+      // Legacy token or direct hash lookup support
+      tokenHash = crypto.createHash('sha256').update(input.token.trim()).digest('hex');
+    } else {
+      return {
+        success: false,
+        error: 'INVALID_TOKEN',
+        message: 'Invalid or missing email verification code.',
+      };
+    }
+
     const MAX_RETRIES = 3;
     let attempt = 0;
 
@@ -2219,7 +2263,7 @@ export class UserRepository {
       try {
         const result = await this.prisma.$transaction(
           async (tx) => {
-            const tokenRecord = await tx.emailVerificationToken.findUnique({
+            let tokenRecord = await tx.emailVerificationToken.findUnique({
               where: { tokenHash },
               include: {
                 user: {
@@ -2233,11 +2277,39 @@ export class UserRepository {
               },
             });
 
+            // If not found by raw hash and a token was provided, try looking up user-scoped hash
+            if (!tokenRecord && input.token) {
+              const allMatchingTokens = await tx.emailVerificationToken.findMany({
+                where: { expiresAt: { gt: new Date() } },
+                include: {
+                  user: {
+                    include: {
+                      userRoles: {
+                        where: { revokedAt: null },
+                        include: { role: true },
+                      },
+                    },
+                  },
+                },
+              });
+
+              for (const record of allMatchingTokens) {
+                const computedHash = crypto
+                  .createHash('sha256')
+                  .update(`${record.userId}:${input.token.trim()}`)
+                  .digest('hex');
+                if (computedHash === record.tokenHash) {
+                  tokenRecord = record;
+                  break;
+                }
+              }
+            }
+
             if (!tokenRecord) {
               return {
                 success: false as const,
                 error: 'INVALID_TOKEN' as const,
-                message: 'Invalid or missing email verification token.',
+                message: 'Invalid or missing email verification code.',
               };
             }
 
@@ -2248,7 +2320,7 @@ export class UserRepository {
               return {
                 success: false as const,
                 error: 'TOKEN_EXPIRED' as const,
-                message: 'Email verification token has expired.',
+                message: 'Email verification code has expired.',
               };
             }
 
@@ -2330,12 +2402,18 @@ export class UserRepository {
       }
     }
 
-    // Fallback if loop exits (should not happen due to returns/continues)
     return {
       success: false,
       error: 'INTERNAL_ERROR',
       message: 'Failed to verify email after maximum retries.',
     };
+  }
+
+  /**
+   * Alias for verifyEmailWithToken to support code-based naming.
+   */
+  async verifyEmailWithCode(input: VerifyEmailWithTokenInput): Promise<VerifyEmailWithTokenResult> {
+    return this.verifyEmailWithToken(input);
   }
 
   /**

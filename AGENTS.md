@@ -217,6 +217,17 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
 
 21st.dev MCP is **NOT REQUIRED** for minor API wiring, data binding, text changes, small state indicators, small additions using existing components, or bug fixes that preserve the established layout.
 
+#### TASK-0214 Governance Record
+
+`TASK-0214` email verification code redesign and reliability audit record:
+- Status: `DONE` (Completed 2026-08-22)
+- Frontend impact: `MINOR`
+- Selected UI direction: `Premium Minimal Ops`
+- Existing color template: `UNCHANGED`
+- Selected motion effects: `Skeleton loading`, `Modal`
+- 21st.dev MCP: `NOT REQUIRED`
+- Summary: Redesigned email verification into a secure 6-digit numeric verification code flow (`{ email, code }` with 15-minute expiry and `sha256(userId:code)` database token hashing). Audited Resend email service and added exponential backoff retry with jitter (up to 3 attempts) for HTTP 429 rate limits, 5xx server errors, and network timeouts while keeping tokens redacted from logs. Updated verification email HTML/plain text templates with prominent monospace code box and security instructions. Implemented `/verify-email` UI with 6-digit code input, target email display and switcher, and 60-second resend cooldown timer persisted via `sessionStorage`. Removed decorative illustration frame and unused `Image` import from `/reset-password` conforming strictly to `Premium Minimal Ops`. Preserved backward-compatible legacy token auto-verification. Verified 100% test pass rate across 31 unit test suites (255/255 tests) and TypeScript typecheck (0 errors across 4 monorepo workspaces).
+
 #### TASK-0302 Governance Record
 
 `TASK-0302` device registry reconciliation record:

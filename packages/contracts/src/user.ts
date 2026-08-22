@@ -281,12 +281,19 @@ export type ResetPasswordInput = z.infer<typeof ResetPasswordInputSchema>;
 
 /**
  * Public input schema for verifying email ownership.
+ * Supports email + 6-digit verification code as primary flow, while retaining token fallback.
  */
 export const VerifyEmailInputSchema = z
   .object({
-    token: z.string().min(1, 'Verification token is required.'),
+    email: z.string().trim().email('Invalid email address format.').optional(),
+    code: z.string().trim().min(1, 'Verification code is required.').optional(),
+    token: z.string().trim().min(1, 'Verification token is required.').optional(),
   })
-  .strict();
+  .strict()
+  .refine((data) => (Boolean(data.email) && Boolean(data.code)) || Boolean(data.token), {
+    message: 'Either email and verification code or a verification token is required.',
+    path: ['code'],
+  });
 
 export type VerifyEmailInput = z.infer<typeof VerifyEmailInputSchema>;
 

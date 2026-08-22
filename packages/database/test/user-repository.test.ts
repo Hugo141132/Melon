@@ -606,6 +606,122 @@ describe('UserRepository Unit Tests', () => {
           expect(result.error).toBe('TOKEN_ALREADY_USED');
         }
       });
+
+      it('createEmailVerificationToken generates 6-digit numeric code with 15-minute expiry', async () => {
+        const dummyUser = {
+          id: '550e8400-e29b-41d4-a716-446655440000',
+          fullName: 'Test Code User',
+          email: 'codeuser@example.com',
+          username: 'codeuser',
+          accountStatus: 'PENDING_APPROVAL',
+          emailVerifiedAt: null,
+          lastLoginAt: null,
+          suspendedAt: null,
+          deactivatedAt: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          userRoles: [],
+        };
+
+        const mockTx = {
+          emailVerificationToken: {
+            deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
+            create: vi.fn().mockResolvedValue({ id: 'token-id-123' }),
+          },
+        };
+
+        const mockPrismaClient: any = {
+          user: {
+            findUnique: vi.fn().mockResolvedValue(dummyUser),
+          },
+          $transaction: vi.fn().mockImplementation((cb) => cb(mockTx)),
+        };
+
+        const repo = new UserRepository(mockPrismaClient);
+        const result = await repo.createEmailVerificationToken({
+          userId: dummyUser.id,
+        });
+
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.code).toMatch(/^\d{6}$/);
+          expect(result.rawToken).toBe(result.code);
+          expect(result.expiresAt.getTime()).toBeGreaterThan(Date.now() + 14 * 60 * 1000);
+          expect(mockTx.emailVerificationToken.deleteMany).toHaveBeenCalledWith({
+            where: { userId: dummyUser.id },
+          });
+          expect(mockTx.emailVerificationToken.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+              data: expect.objectContaining({
+                userId: dummyUser.id,
+              }),
+            })
+          );
+        }
+      });
+
+      it('verifyEmailWithCode successfully verifies matching code and email', async () => {
+        const userId = '550e8400-e29b-41d4-a716-446655440000';
+        const dummyUser = {
+          id: userId,
+          email: 'codeuser@example.com',
+          emailVerifiedAt: null,
+        };
+
+        const mockTx = {
+          emailVerificationToken: {
+            findUnique: vi.fn().mockResolvedValue({
+              id: 'tok-1',
+              userId,
+              expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+            }),
+            delete: vi.fn().mockResolvedValue({ id: 'tok-1' }),
+          },
+          user: {
+            update: vi.fn().mockResolvedValue({
+              id: userId,
+              fullName: 'Code User',
+              email: 'codeuser@example.com',
+              username: 'codeuser',
+              accountStatus: 'PENDING_APPROVAL',
+              emailVerifiedAt: new Date(),
+              lastLoginAt: null,
+              suspendedAt: null,
+              deactivatedAt: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              userRoles: [],
+            }),
+          },
+          auditLog: {
+            create: vi.fn().mockResolvedValue({ id: 'audit-1' }),
+          },
+        };
+
+        const mockPrismaClient: any = {
+          user: {
+            findUnique: vi.fn().mockResolvedValue(dummyUser),
+          },
+          $transaction: vi.fn().mockImplementation((cb) => cb(mockTx)),
+        };
+
+        const repo = new UserRepository(mockPrismaClient);
+        const result = await repo.verifyEmailWithCode({
+          email: 'codeuser@example.com',
+          code: '849201',
+        });
+
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.user.email).toBe('codeuser@example.com');
+          expect(mockTx.user.update).toHaveBeenCalledWith(
+            expect.objectContaining({
+              where: { id: userId },
+              data: { emailVerifiedAt: expect.any(Date) },
+            })
+          );
+        }
+      });
     });
   });
 });

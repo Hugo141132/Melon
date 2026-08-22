@@ -18,6 +18,7 @@ vi.mock('next/navigation', () => ({
 describe('TASK-0214 Verify Email UI Component', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    sessionStorage.clear();
     _clearInFlightVerificationsForTesting();
     mockSearchParams = new URLSearchParams();
     mockRouter.push.mockClear();
@@ -88,7 +89,7 @@ describe('TASK-0214 Verify Email UI Component', () => {
     });
   });
 
-  it('2. Token invalid/expired: shows error message with button to request a new link', async () => {
+  it('2. Token invalid/expired: shows error message with link to login or re-request', async () => {
     mockSearchParams = new URLSearchParams({ token: 'expired-token' });
 
     global.fetch = vi.fn().mockResolvedValue({
@@ -106,33 +107,21 @@ describe('TASK-0214 Verify Email UI Component', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText(/Email verification token has expired|Verifikasi email gagal/i)
-      ).toBeInTheDocument();
-    });
-
-    const requestNewBtn = screen.getByRole('button', {
-      name: /Request New Link|Minta Tautan Baru/i,
-    });
-    expect(requestNewBtn).toBeInTheDocument();
-
-    // Clicking request new link switches to the email input form
-    fireEvent.click(requestNewBtn);
-
-    await waitFor(() => {
-      expect(
-        screen.getByRole('button', { name: /Send Verification Link|Kirim Tautan Verifikasi/i })
+        screen.getByText(
+          /Email verification token has expired|Kode verifikasi tidak valid atau telah kedaluwarsa|Invalid or expired verification code/i
+        )
       ).toBeInTheDocument();
     });
   });
 
-  it('3. Email param present (from login redirect or register): shows check email instruction and functional resend button', async () => {
+  it('3. Email param present: shows email, code input, and functional resend button', async () => {
     mockSearchParams = new URLSearchParams({ email: 'owner@kebunmelon.local' });
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
         success: true,
-        message: 'If the email is registered and unverified, a verification link has been sent.',
+        message: 'If the email is registered and unverified, a verification code has been sent.',
       }),
     });
 
@@ -141,7 +130,7 @@ describe('TASK-0214 Verify Email UI Component', () => {
     expect(screen.getByText('owner@kebunmelon.local')).toBeInTheDocument();
 
     const resendBtn = screen.getByRole('button', {
-      name: /Resend Verification Email|Kirim Ulang Email Verifikasi|Resend Email/i,
+      name: /Resend Code|Kirim Ulang Kode/i,
     });
     expect(resendBtn).toBeEnabled();
 
@@ -158,36 +147,47 @@ describe('TASK-0214 Verify Email UI Component', () => {
     });
   });
 
-  it('4. No query param: renders direct email form, submits to resend endpoint, transitions to instruction view', async () => {
-    mockSearchParams = new URLSearchParams();
+  it('4. User enters 6-digit verification code and successfully verifies email', async () => {
+    mockSearchParams = new URLSearchParams({ email: 'farmer@example.com' });
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
         success: true,
-        message: 'If the email is registered and unverified, a verification link has been sent.',
+        message: 'Email address has been successfully verified.',
+        data: {
+          user: {
+            id: '999',
+            email: 'farmer@example.com',
+            fullName: 'Pak Tani',
+            accountStatus: 'ACTIVE',
+            emailVerifiedAt: new Date().toISOString(),
+          },
+        },
       }),
     });
 
     render(<VerifyEmailView />);
 
-    const emailInput = screen.getByLabelText(/Alamat Email|Email Address/i);
+    const codeInput = screen.getByLabelText(/Kode Verifikasi|Verification Code/i);
     const submitBtn = screen.getByRole('button', {
-      name: /Send Verification Link|Kirim Tautan Verifikasi/i,
+      name: /Verifikasi Kode|Verify Code/i,
     });
 
-    fireEvent.change(emailInput, { target: { value: 'custom.owner@example.com' } });
+    fireEvent.change(codeInput, { target: { value: '849201' } });
     fireEvent.click(submitBtn);
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
-        '/api/v1/auth/resend-verification',
+        '/api/v1/auth/verify-email',
         expect.objectContaining({
           method: 'POST',
-          body: JSON.stringify({ email: 'custom.owner@example.com' }),
+          body: JSON.stringify({ email: 'farmer@example.com', code: '849201' }),
         })
       );
-      expect(screen.getByText('custom.owner@example.com')).toBeInTheDocument();
+      expect(
+        screen.getByText(/Email Successfully Verified|Email Berhasil Diverifikasi/i)
+      ).toBeInTheDocument();
     });
   });
 
@@ -306,7 +306,9 @@ describe('TASK-0214 Verify Email UI Component', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText(/Email verification token has expired|Verifikasi email gagal/i)
+        screen.getByText(
+          /Email verification token has expired|Kode verifikasi tidak valid atau telah kedaluwarsa|Invalid or expired verification code/i
+        )
       ).toBeInTheDocument();
     });
 

@@ -4,6 +4,28 @@ import { afterEach, vi } from 'vitest';
 import idMessages from '../messages/id.json';
 import enMessages from '../messages/en.json';
 
+// In-memory Storage mock for jsdom test stability
+if (typeof window !== 'undefined') {
+  if (!window.localStorage || typeof window.localStorage.clear !== 'function') {
+    const localStore = new Map<string, string>();
+    (window as any).localStorage = {
+      getItem: (k: string) => localStore.get(k) ?? null,
+      setItem: (k: string, v: string) => localStore.set(k, String(v)),
+      removeItem: (k: string) => localStore.delete(k),
+      clear: () => localStore.clear(),
+    };
+  }
+  if (!window.sessionStorage || typeof window.sessionStorage.clear !== 'function') {
+    const sessionStore = new Map<string, string>();
+    (window as any).sessionStorage = {
+      getItem: (k: string) => sessionStore.get(k) ?? null,
+      setItem: (k: string, v: string) => sessionStore.set(k, String(v)),
+      removeItem: (k: string) => sessionStore.delete(k),
+      clear: () => sessionStore.clear(),
+    };
+  }
+}
+
 function getActiveTestLocale(): 'id' | 'en' {
   if (typeof document !== 'undefined') {
     const match = document.cookie.match(/(?:^|;\s*)locale=([^;]+)/);

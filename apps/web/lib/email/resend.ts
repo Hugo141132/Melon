@@ -23,7 +23,8 @@ export interface SendPasswordResetEmailResult {
 export interface SendVerificationEmailInput {
   toEmail: string;
   recipientName?: string;
-  rawToken: string;
+  rawToken?: string;
+  code?: string;
   locale?: string;
   requestId?: string;
 }
@@ -34,6 +35,69 @@ export interface SendVerificationEmailResult {
   simulated?: boolean;
   id?: string;
   error?: string;
+}
+
+/**
+ * Helper to determine if a Resend error is retryable (rate limit, 5xx server error, network timeout).
+ */
+function isRetryableError(error: any): boolean {
+  if (!error) return false;
+  const msg = typeof error === 'string' ? error : error?.message || String(error);
+  const status = error?.statusCode || error?.status;
+  if (status === 429 || (typeof status === 'number' && status >= 500 && status <= 599)) {
+    return true;
+  }
+  return /rate_limit|rate limit|too many requests|429|timeout|fetch failed|econnreset|etimedout|internal_server_error|500|502|503|504|network/i.test(
+    msg
+  );
+}
+
+/**
+ * Dispatches an email via Resend with bounded exponential backoff retries for transient errors.
+ */
+async function sendWithRetry(
+  resend: Resend,
+  payload: { from: string; to: string[]; subject: string; html: string; text: string },
+  reqLogger: any,
+  maxAttempts = 3
+): Promise<{ success: boolean; id?: string; error?: string }> {
+  let lastError: string | undefined;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const result = await resend.emails.send(payload);
+
+      if (result.error) {
+        lastError = result.error.message;
+        reqLogger.warn(
+          `Resend delivery attempt ${attempt}/${maxAttempts} error: ${result.error.message}`
+        );
+
+        if (attempt < maxAttempts && isRetryableError(result.error)) {
+          const delayMs = Math.min(2000, 300 * Math.pow(2, attempt - 1) + Math.random() * 100);
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
+          continue;
+        }
+
+        return { success: false, error: result.error.message };
+      }
+
+      return { success: true, id: result.data?.id };
+    } catch (err: any) {
+      lastError = err?.message || String(err);
+      reqLogger.warn(`Resend exception on attempt ${attempt}/${maxAttempts}: ${lastError}`);
+
+      if (attempt < maxAttempts && isRetryableError(err)) {
+        const delayMs = Math.min(2000, 300 * Math.pow(2, attempt - 1) + Math.random() * 100);
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        continue;
+      }
+
+      return { success: false, error: lastError };
+    }
+  }
+
+  return { success: false, error: lastError || 'Email delivery failed after retries' };
 }
 
 /**
@@ -195,20 +259,24 @@ export async function sendPasswordResetEmail(
 
   try {
     const resend = new Resend(apiKey);
-    const result = await resend.emails.send({
-      from: fromEmail,
-      to: [input.toEmail],
-      subject,
-      html,
-      text,
-    });
+    const result = await sendWithRetry(
+      resend,
+      {
+        from: fromEmail,
+        to: [input.toEmail],
+        subject,
+        html,
+        text,
+      },
+      reqLogger
+    );
 
-    if (result.error) {
-      reqLogger.error('Resend delivery reported error: ' + result.error.message);
+    if (!result.success) {
+      reqLogger.error('Resend delivery reported error: ' + (result.error || 'Unknown error'));
       return {
         success: false,
         emailSent: false,
-        error: result.error.message,
+        error: result.error,
       };
     }
 
@@ -216,7 +284,7 @@ export async function sendPasswordResetEmail(
     return {
       success: true,
       emailSent: true,
-      id: result.data?.id,
+      id: result.id,
     };
   } catch (err: any) {
     reqLogger.error(
@@ -231,33 +299,32 @@ export async function sendPasswordResetEmail(
 }
 
 /**
- * Generates bilingual HTML content for email verification email.
+ * Generates bilingual HTML content for 6-digit email verification email.
  */
-function getVerificationEmailHtml(
+function getVerificationCodeEmailHtml(
   name: string,
-  verifyUrl: string,
+  code: string,
   locale: string
 ): { subject: string; html: string; text: string } {
   const isId = locale === 'id';
 
   const subject = isId
-    ? 'Verifikasi Alamat Email Anda — Kebun Melon'
-    : 'Verify Your Email Address — Kebun Melon';
+    ? `Kode Verifikasi: ${code} — Kebun Melon`
+    : `Verification Code: ${code} — Kebun Melon`;
 
   const greeting = isId ? `Halo ${name || 'Pengguna'},` : `Hello ${name || 'User'},`;
   const intro = isId
-    ? 'Terima kasih telah mendaftar di Kebun Melon. Untuk menyelesaikan pendaftaran dan mengamankan akun Anda, silakan verifikasi alamat email Anda dengan mengklik tombol di bawah ini:'
-    : 'Thank you for registering at Kebun Melon. To complete your registration and secure your account, please verify your email address by clicking the button below:';
-  const buttonText = isId ? 'Verifikasi Email' : 'Verify Email';
+    ? 'Terima kasih telah mendaftar di Kebun Melon. Masukkan 6 digit kode verifikasi berikut pada halaman verifikasi email Anda untuk mengonfirmasi kepemilikan akun:'
+    : 'Thank you for registering at Kebun Melon. Enter the following 6-digit verification code on the email verification page to confirm your account ownership:';
   const expiryNotice = isId
-    ? 'Tautan ini hanya berlaku sekali dan akan kadaluwarsa dalam 24 jam.'
-    : 'This link is single-use and will expire in 24 hours.';
+    ? 'Kode verifikasi ini berlaku selama 15 menit dan hanya dapat digunakan sekali.'
+    : 'This verification code is valid for 15 minutes and can only be used once.';
+  const securityNotice = isId
+    ? 'Jangan bagikan kode ini kepada siapa pun. Tim Kebun Melon tidak akan pernah meminta kode verifikasi Anda.'
+    : 'Do not share this code with anyone. Kebun Melon team will never ask for your verification code.';
   const ignoreNotice = isId
-    ? 'Jika Anda tidak mendaftar di Kebun Melon, abaikan email ini.'
+    ? 'Jika Anda tidak mendaftar di Kebun Melon, silakan abaikan email ini.'
     : 'If you did not register at Kebun Melon, please ignore this email.';
-  const linkFallback = isId
-    ? 'Jika tombol di atas tidak berfungsi, salin dan tempel tautan berikut ke peramban Anda:'
-    : 'If the button above does not work, copy and paste the following link into your browser:';
 
   const html = `
 <!DOCTYPE html>
@@ -272,10 +339,10 @@ function getVerificationEmailHtml(
     .header { text-align: center; margin-bottom: 24px; }
     .header h1 { color: #166534; font-size: 24px; margin: 0; font-weight: 700; }
     .content { font-size: 16px; line-height: 1.6; }
-    .btn-container { text-align: center; margin: 28px 0; }
-    .btn { display: inline-block; background-color: #16a34a; color: #ffffff !important; padding: 14px 28px; font-size: 16px; font-weight: 600; text-decoration: none; border-radius: 8px; }
+    .code-box { text-align: center; margin: 28px 0; }
+    .code-card { display: inline-block; background-color: #f0fdf4; border: 2px dashed #16a34a; border-radius: 12px; padding: 18px 36px; }
+    .code-text { font-size: 38px; font-weight: 800; letter-spacing: 8px; color: #166534; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace; margin: 0; }
     .footer { margin-top: 32px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-size: 13px; color: #64748b; text-align: center; }
-    .fallback { word-break: break-all; font-size: 13px; color: #64748b; background-color: #f8fafc; padding: 12px; border-radius: 6px; margin-top: 16px; }
   </style>
 </head>
 <body>
@@ -286,15 +353,14 @@ function getVerificationEmailHtml(
     <div class="content">
       <p><strong>${greeting}</strong></p>
       <p>${intro}</p>
-      <div class="btn-container">
-        <a href="${verifyUrl}" class="btn" target="_blank" rel="noopener noreferrer">${buttonText}</a>
+      <div class="code-box">
+        <div class="code-card">
+          <p class="code-text">${code}</p>
+        </div>
       </div>
-      <p style="color: #64748b; font-size: 14px;">${expiryNotice}</p>
+      <p style="color: #166534; font-weight: 600; font-size: 14px; text-align: center;">${expiryNotice}</p>
+      <p style="color: #64748b; font-size: 14px; margin-top: 20px;">${securityNotice}</p>
       <p style="color: #64748b; font-size: 14px;">${ignoreNotice}</p>
-      <div class="fallback">
-        <p style="margin: 0 0 6px 0;">${linkFallback}</p>
-        <a href="${verifyUrl}" style="color: #16a34a;">${verifyUrl}</a>
-      </div>
     </div>
     <div class="footer">
       <p>© ${new Date().getFullYear()} Kebun Melon Monitoring System. All rights reserved.</p>
@@ -312,9 +378,13 @@ ${greeting}
 
 ${intro}
 
-${verifyUrl}
+KODE VERIFIKASI / VERIFICATION CODE:
+------------------------------------
+${code}
+------------------------------------
 
 ${expiryNotice}
+${securityNotice}
 ${ignoreNotice}
 
 © ${new Date().getFullYear()} Kebun Melon Monitoring System.
@@ -324,7 +394,8 @@ ${ignoreNotice}
 }
 
 /**
- * Sends an email verification email via the approved Resend provider.
+ * Sends an email verification email with 6-digit code via the approved Resend provider.
+ * Implements bounded retry handling for transient errors.
  */
 export async function sendVerificationEmail(
   input: SendVerificationEmailInput
@@ -334,11 +405,11 @@ export async function sendVerificationEmail(
   });
 
   const env = validateServerEnv();
-  const verifyUrl = buildTrustedVerifyEmailUrl(input.rawToken);
+  const code = input.code || input.rawToken || '';
   const locale = input.locale || env.DEFAULT_LOCALE || 'id';
   const name = input.recipientName || '';
 
-  const { subject, html, text } = getVerificationEmailHtml(name, verifyUrl, locale);
+  const { subject, html, text } = getVerificationCodeEmailHtml(name, code, locale);
 
   const apiKey = env.RESEND_API_KEY || process.env.RESEND_API_KEY;
   const fromEmail =
@@ -358,28 +429,32 @@ export async function sendVerificationEmail(
 
   try {
     const resend = new Resend(apiKey);
-    const result = await resend.emails.send({
-      from: fromEmail,
-      to: [input.toEmail],
-      subject,
-      html,
-      text,
-    });
+    const result = await sendWithRetry(
+      resend,
+      {
+        from: fromEmail,
+        to: [input.toEmail],
+        subject,
+        html,
+        text,
+      },
+      reqLogger
+    );
 
-    if (result.error) {
-      reqLogger.error('Resend delivery reported error: ' + result.error.message);
+    if (!result.success) {
+      reqLogger.error('Resend delivery reported error: ' + (result.error || 'Unknown error'));
       return {
         success: false,
         emailSent: false,
-        error: result.error.message,
+        error: result.error,
       };
     }
 
-    reqLogger.info('Email verification email dispatched successfully via Resend');
+    reqLogger.info('Email verification code dispatched successfully via Resend');
     return {
       success: true,
       emailSent: true,
-      id: result.data?.id,
+      id: result.id,
     };
   } catch (err: any) {
     reqLogger.error(

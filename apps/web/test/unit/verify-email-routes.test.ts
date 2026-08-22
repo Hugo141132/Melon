@@ -100,7 +100,8 @@ describe('TASK-0214 Email Verification Routes Unit Tests', () => {
         .spyOn(UserRepository.prototype, 'createEmailVerificationToken')
         .mockResolvedValue({
           success: true,
-          rawToken: 'mock-verification-token-raw-cprng-32bytes',
+          rawToken: '123456',
+          code: '123456',
           user: {
             id: '22222222-2222-2222-2222-222222222222',
             fullName: 'Unverified Owner',
@@ -148,7 +149,7 @@ describe('TASK-0214 Email Verification Routes Unit Tests', () => {
         expect.objectContaining({
           toEmail: 'owner@example.com',
           recipientName: 'Unverified Owner',
-          rawToken: 'mock-verification-token-raw-cprng-32bytes',
+          code: '123456',
         })
       );
     });
@@ -278,6 +279,43 @@ describe('TASK-0214 Email Verification Routes Unit Tests', () => {
       const json = await res.json();
       expect(json.success).toBe(false);
       expect(json.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('successfully consumes 6-digit code with email, marks email verified, returns 200', async () => {
+      vi.spyOn(UserRepository.prototype, 'verifyEmailWithToken').mockResolvedValue({
+        success: true,
+        user: {
+          id: '22222222-2222-2222-2222-222222222222',
+          fullName: 'Code Verified User',
+          email: 'user@example.com',
+          username: null,
+          accountStatus: 'ACTIVE' as any,
+          emailVerifiedAt: new Date(),
+          lastLoginAt: null,
+          suspendedAt: null,
+          deactivatedAt: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          activeRoles: ['OWNER' as any],
+        },
+      });
+
+      const req = new Request('http://localhost/api/v1/auth/verify-email', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-forwarded-for': '198.51.100.23',
+        },
+        body: JSON.stringify({ email: 'user@example.com', code: '654321' }),
+      });
+
+      const res = await verifyEmailPost(req);
+      expect(res.status).toBe(200);
+
+      const json = await res.json();
+      expect(json.success).toBe(true);
+      expect(json.data.user.email).toBe('user@example.com');
+      expect(json.data.user.emailVerifiedAt).toBeDefined();
     });
   });
 });

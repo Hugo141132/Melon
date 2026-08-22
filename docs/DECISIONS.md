@@ -551,3 +551,16 @@ The following facts are supported by the verified decisions governance of `TASK-
 - **Decision Compliance:** Complies with `DEC-CTRL-051` (Faucet Command Concurrency) and `DEC-CTRL-093` (Semantic Duplicate Command Protection).
 - **Idempotency Protection:** Transactional execution compares `deviceId`, `action`, `phase`, and `plantCount` to ensure exact intent matching. Duplicates differing in parameters yield 409 Conflict.
 <!-- TASK-0808 Reconciled: 2026-08-20 -->
+
+---
+
+## DEC-AUTH-104: 6-Digit Email Verification Code Flow & Resend Reliability
+- **Status:** APPROVED
+- **Context:** Email verification is required to confirm applicant and initial Owner email ownership without relying exclusively on long URL tokens. Resend delivery requires resilient retry handling for rate limits and transient errors.
+- **Decision:**
+  1. **Verification Mechanism:** Primary verification uses 6-digit numeric CSPRNG codes (`100000`–`999999`) with 15-minute expiry. Legacy token links remain supported for backward compatibility.
+  2. **Hash Security & Storage:** Codes are persisted as user-scoped SHA-256 hashes `sha256(userId:code)` in `email_verification_tokens.token_hash` to prevent token collisions across users. Raw codes are never stored in plaintext or logged.
+  3. **Resend Reliability:** Email dispatch applies bounded exponential backoff retries with randomized jitter (up to 3 attempts) for HTTP 429 rate limits, 5xx server errors, and network timeouts.
+  4. **Status & Session Decoupling:** Verification updates `emailVerifiedAt` independently and strictly preserves `accountStatus` (`ADMIN` remains `PENDING_APPROVAL`, `OWNER` remains `ACTIVE`). Verification endpoints never issue or return authentication sessions.
+  5. **Auth UI Compliance:** `/verify-email` features 6-digit code input, target email switcher, and 60-second cooldown timer. `/reset-password` has decorative illustration frames removed, strictly conforming to `Premium Minimal Ops`.
+<!-- TASK-0214 Reconciled: 2026-08-22 -->

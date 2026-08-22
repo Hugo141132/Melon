@@ -10,6 +10,7 @@ describe('TASK-0213 Resend Email Service Unit Tests', () => {
   const origApiKey = process.env.RESEND_API_KEY;
   const origFrom = process.env.RESEND_FROM_EMAIL;
   const origNodeEnv = process.env.NODE_ENV;
+  const origAppEnv = process.env.APP_ENV;
 
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -27,6 +28,9 @@ describe('TASK-0213 Resend Email Service Unit Tests', () => {
 
     if (origFrom !== undefined) process.env.RESEND_FROM_EMAIL = origFrom;
     else delete process.env.RESEND_FROM_EMAIL;
+
+    if (origAppEnv !== undefined) process.env.APP_ENV = origAppEnv;
+    else delete process.env.APP_ENV;
 
     (process.env as Record<string, string | undefined>).NODE_ENV = origNodeEnv;
   });
@@ -128,5 +132,76 @@ describe('TASK-0213 Resend Email Service Unit Tests', () => {
         rawToken: 'token',
       })
     ).rejects.toThrow(/Production requirement failed/i);
+  });
+
+  it('sendVerificationEmail dispatches 6-digit code via Resend client', async () => {
+    process.env.RESEND_API_KEY = 're_test_key_12345';
+    process.env.RESEND_FROM_EMAIL = 'Kebun Melon <noreply@kebunmelon.id>';
+    (process.env as Record<string, string | undefined>).NODE_ENV = 'development';
+
+    const sendMock = vi.fn().mockResolvedValue({
+      data: { id: 'email_msg_verif_123' },
+      error: null,
+    });
+
+    (Resend as unknown as any).mockImplementation(function (this: any) {
+      this.emails = { send: sendMock };
+    });
+
+    const { sendVerificationEmail } = await import('../../lib/email/resend');
+    const result = await sendVerificationEmail({
+      toEmail: 'farmer@example.com',
+      recipientName: 'Pak Wahyu',
+      code: '849201',
+      locale: 'id',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.emailSent).toBe(true);
+    expect(result.id).toBe('email_msg_verif_123');
+
+    expect(sendMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        from: 'Kebun Melon <noreply@kebunmelon.id>',
+        to: ['farmer@example.com'],
+        subject: 'Kode Verifikasi: 849201 — Kebun Melon',
+      })
+    );
+  });
+
+  it('retries on rate limit (429) and succeeds on subsequent attempt', async () => {
+    process.env.RESEND_API_KEY = 're_test_key_12345';
+    process.env.RESEND_FROM_EMAIL = 'Kebun Melon <noreply@kebunmelon.id>';
+    (process.env as Record<string, string | undefined>).NODE_ENV = 'development';
+
+    let attemptCount = 0;
+    const sendMock = vi.fn().mockImplementation(async () => {
+      attemptCount++;
+      if (attemptCount === 1) {
+        return {
+          data: null,
+          error: { message: 'Too many requests, rate limit exceeded', statusCode: 429 },
+        };
+      }
+      return {
+        data: { id: 'email_retry_success_456' },
+        error: null,
+      };
+    });
+
+    (Resend as unknown as any).mockImplementation(function (this: any) {
+      this.emails = { send: sendMock };
+    });
+
+    const { sendVerificationEmail } = await import('../../lib/email/resend');
+    const result = await sendVerificationEmail({
+      toEmail: 'farmer@example.com',
+      code: '123456',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.emailSent).toBe(true);
+    expect(result.id).toBe('email_retry_success_456');
+    expect(sendMock).toHaveBeenCalledTimes(2);
   });
 });

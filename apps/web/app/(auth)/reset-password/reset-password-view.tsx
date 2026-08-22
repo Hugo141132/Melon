@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
 import { useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ArrowLeft, Lock, Eye, EyeOff, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
@@ -232,19 +231,6 @@ export default function ResetPasswordView() {
 
       {/* Main */}
       <main className="w-full max-w-md px-[24px] flex flex-col pt-[32px] flex-grow">
-        {/* Illustration */}
-        <div className="relative w-full aspect-square rounded-xl overflow-hidden mb-[32px] border border-outline-variant bg-surface-container-low shadow-sm">
-          <div className="absolute inset-0 flex items-center justify-center p-[16px]">
-            <Image
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuBuTgEOmVPEaPavbBtNEp8HNzQEuR2hjd1umTRpIlQtLxD2MRieg4Sa--NuZIxZeZQf1kxw3XXQCqXsN9dEOo5fZ1NZUEYHS7BvQrPjNaAlr8fH8mZJEsnayCBYovaN4VD5F2fLeiqUzhFF0Z4ZE4-IIs1WAcMS_AzdCQEoFSbd-Si_N3b4ZGv89ibHZ_MMYS_s6igqVdZXlGn0xBj4LkT9igVsq2F5ZpUdkv7KSggrZRcc76_9PiRU1w"
-              alt="Melon illustration"
-              width={192}
-              height={192}
-              className="w-48 h-48 object-contain drop-shadow-xl"
-            />
-          </div>
-        </div>
-
         <Suspense
           fallback={
             <div className="flex justify-center p-8">
