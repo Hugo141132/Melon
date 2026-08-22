@@ -228,7 +228,19 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
 - 21st.dev MCP: `NOT REQUIRED`
 - Summary: Redesigned email verification into a secure 6-digit numeric verification code flow (`{ email, code }` with 15-minute expiry and `sha256(userId:code)` database token hashing). Audited Resend email service and added exponential backoff retry with jitter (up to 3 attempts) for HTTP 429 rate limits, 5xx server errors, and network timeouts while keeping tokens redacted from logs. Updated verification email HTML/plain text templates with prominent monospace code box and security instructions. Implemented `/verify-email` UI with 6-digit code input, target email display and switcher, and 60-second resend cooldown timer persisted via `sessionStorage`. Removed decorative illustration frame and unused `Image` import from `/reset-password` conforming strictly to `Premium Minimal Ops`. Preserved backward-compatible legacy token auto-verification. Verified 100% test pass rate across 31 unit test suites (255/255 tests) and TypeScript typecheck (0 errors across 4 monorepo workspaces).
 
+#### TASK-0215 Governance Record
+
+`TASK-0215` centralized authentication state hydration record:
+- Status: `DONE` (Completed 2026-08-22)
+- Frontend impact: `MINOR`
+- Selected UI direction: `Premium Minimal Ops`
+- Existing color template: `UNCHANGED`
+- Selected motion effects: `None`
+- 21st.dev MCP: `NOT REQUIRED`
+- Summary: Implemented centralized authentication state hydration to eliminate delayed UI rendering and layout shifts across navigation and protected pages. Added React `AuthContext` (`AuthProvider` / `useAuth()`) in `@kebun-melon/web`, providing unified access to `{ user, role, isAuthenticated }`. Implemented `getSessionOrNull()` server helper in `lib/auth/rbac.ts` for safe, non-throwing session retrieval in the root layout (`RootLayout`) during SSR. Eliminated redundant client-side `useEffect` and `fetch('/api/v1/auth/session')` calls from `/`, `/pengaturan`, `/profil`, `TopAppBar`, and `Sidebar`. Refactored `Sidebar` and `TopAppBar` to consume `useAuth()` directly, removing unnecessary prop drilling. Refactored `/pengaturan` and `/profil` to instantaneously render user profile identity and role-conditional menu items (`/users` and `/approvals` for `OWNER`) without loading spinners. Maintained strict server-side RBAC and route protection. Verified 100% test pass rate across 35 unit test suites (260/260 tests) and 14 E2E critical flows.
+
 #### TASK-0302 Governance Record
+
 
 `TASK-0302` device registry reconciliation record:
 - Status: `DONE` (Completed 2026-08-18)

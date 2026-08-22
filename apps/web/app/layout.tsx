@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { DeviceProvider } from '@/context/DeviceContext';
+import { AuthProvider } from '@/context/AuthContext';
 import { cookies } from 'next/headers';
 import { NextIntlClientProvider } from 'next-intl';
 import {
@@ -11,6 +12,7 @@ import {
 } from '@/lib/i18n/config';
 import idMessages from '@/messages/id.json';
 import enMessages from '@/messages/en.json';
+import { getSessionOrNull } from '@/lib/auth/rbac';
 
 const MESSAGES = {
   id: idMessages,
@@ -48,12 +50,15 @@ export const viewport: Viewport = {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const { locale, messages } = await getLayoutLocaleAndMessages();
+  const session = await getSessionOrNull();
 
   return (
     <html lang={locale}>
       <body className="min-h-dvh font-sans antialiased">
         <NextIntlClientProvider locale={locale} messages={messages}>
-          <DeviceProvider>{children}</DeviceProvider>
+          <AuthProvider initialSession={session}>
+            <DeviceProvider>{children}</DeviceProvider>
+          </AuthProvider>
         </NextIntlClientProvider>
       </body>
     </html>

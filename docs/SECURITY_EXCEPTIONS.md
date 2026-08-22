@@ -147,3 +147,14 @@ The verified implementation of `TASK-0807` (Faucet Control UI on `/controls` in 
 - **Physical State Safety:** Physical valve state strictly mapped to `OPEN`, `CLOSED`, or `UNKNOWN` without false claims of closed positions after dispensing.
 - **Zero Blind Retries:** Polling is read-only `GET` status polling without automatic retries upon failure or timeout.
 <!-- TASK-0807 Reconciled: 2026-08-20 -->
+
+---
+
+## Centralized Authentication State Hydration Security Exceptions Audit Note (Reconciled 2026-08-22)
+
+The verified implementation of `TASK-0215` (`AuthContext` and RootLayout SSR Hydration) introduced zero new security exceptions, zero new secrets, and zero new dependencies:
+- **Zero Security Exceptions:** Adheres strictly to `SEC-OPS-001` (zero unapproved secrets) and `SEC-OPS-004` (zero unapproved high vulnerabilities).
+- **Session Data Minimization:** Context state carries only safe, non-sensitive session metadata (`id`, `fullName`, `email`, `accountStatus`, `activeRoles`). No session tokens or credentials are held in client context or stored in `localStorage`/`sessionStorage`.
+- **Server Authorization Primacy:** Hydrated client state is strictly for UI rendering; server-side RBAC guards remain authoritative on all routes and actions.
+<!-- TASK-0215 Reconciled: 2026-08-22 -->
+

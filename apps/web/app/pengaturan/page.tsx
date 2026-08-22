@@ -1,6 +1,5 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import TopAppBar from '@/components/navigation/TopAppBar';
@@ -14,9 +13,9 @@ import {
   Settings2,
   HelpCircle,
   ShieldCheck,
-  Loader2,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { useAuth } from '@/context/AuthContext';
 
 interface SettingItemProps {
   icon: React.ReactNode;
@@ -49,33 +48,8 @@ function SettingItem({ icon, iconBg, title, subtitle, href }: SettingItemProps) 
 
 export default function PengaturanPage() {
   const tSettings = useTranslations('settings');
-  const tProfile = useTranslations('profile');
   const tAuth = useTranslations('auth');
-
-  const [user, setUser] = useState<{
-    fullName: string;
-    email: string;
-    role: string;
-    accountStatus: string;
-  } | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchSession = async () => {
-      try {
-        const res = await fetch('/api/v1/auth/session');
-        const json = await res.json();
-        if (json.success && json.data.authenticated && json.data.user) {
-          setUser(json.data.user);
-        }
-      } catch {
-        setUser(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchSession();
-  }, []);
+  const { user, role } = useAuth();
 
   return (
     <div className="bg-app-surface text-app-on-surface min-h-dvh pb-24">
@@ -94,25 +68,16 @@ export default function PengaturanPage() {
             />
           </div>
           <div>
-            {loading ? (
-              <div className="flex items-center gap-2 text-app-on-surface-variant">
-                <Loader2 size={18} className="animate-spin" />
-                <span className="text-[14px]">{tProfile('loading')}</span>
-              </div>
-            ) : (
-              <>
-                <h2 className="text-[24px] leading-8 font-bold text-app-primary">
-                  {user?.fullName || USER_PROFILE.name}
-                </h2>
-                <p className="text-[14px] font-semibold text-app-on-surface-variant">
-                  {user?.role === 'OWNER'
-                    ? tAuth('roleOwner')
-                    : user?.role === 'ADMIN'
-                      ? tAuth('roleAdmin')
-                      : USER_PROFILE.role}
-                </p>
-              </>
-            )}
+            <h2 className="text-[24px] leading-8 font-bold text-app-primary">
+              {user?.fullName || USER_PROFILE.name}
+            </h2>
+            <p className="text-[14px] font-semibold text-app-on-surface-variant">
+              {role === 'OWNER'
+                ? tAuth('roleOwner')
+                : role === 'ADMIN'
+                  ? tAuth('roleAdmin')
+                  : USER_PROFILE.role}
+            </p>
           </div>
         </section>
 
@@ -127,7 +92,7 @@ export default function PengaturanPage() {
           />
 
           {/* Owner-only navigation items */}
-          {user?.role === 'OWNER' && (
+          {role === 'OWNER' && (
             <>
               <SettingItem
                 icon={<UsersIcon size={22} className="text-blue-700" />}

@@ -1810,3 +1810,14 @@ The following facts are supported by the verified database interactions of `TASK
 - **Volume Handling Persistence:** `DISPENSE` commands persist non-negative measured volume in `actualVolumeMl`. `OPEN` and `CLOSE` commands set `actualVolumeMl = null` (`undefined`) in `faucet_commands` while preserving the raw event payload in `faucet_command_events.metadata.eventData`.
 - **Idempotency & Partial Unique Index:** Duplicate `messageId` occurrences are detected against persisted event history and safely ignored without invoking database writes.
 <!-- TASK-0806 Reconciled: 2026-08-20 -->
+
+---
+
+## Centralized Authentication State Hydration Database Implementation Note (Reconciled 2026-08-22)
+
+The following facts are supported by the verified database interactions of `TASK-0215` (Centralized Authentication State Hydration):
+- **Single SSR Session Query:** During initial server rendering of `RootLayout`, `getSessionOrNull()` executes a single session lookup via `validateSession` (`packages/database/src/session-service.ts`), validating user account status and active roles.
+- **Database Query Reduction:** Eliminates repeated client-side database hits to the `sessions`, `users`, and `user_roles` tables triggered on component mounts (e.g. from `/` and `/pengaturan`).
+- **Zero Schema Migrations:** No alterations to database tables, indexes, or relations were introduced.
+<!-- TASK-0215 Reconciled: 2026-08-22 -->
+

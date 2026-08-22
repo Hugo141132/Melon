@@ -1659,3 +1659,15 @@ The following facts are supported by the verified architecture of `TASK-0806` (`
 - **Alert Integration:** Automatically generates `CommandFailureAlert` for `FAILED` execution events linking device, command, and `physicalOutcome: 'UNKNOWN'`.
 - **Decoupling & Downstream Isolation:** Downstream timeout processing (`TASK-0809`) and duplicate command protection (`TASK-0808`) remain decoupled.
 <!-- TASK-0806 Reconciled: 2026-08-20 -->
+
+---
+
+## Centralized Authentication State Hydration Architecture Note (Reconciled 2026-08-22)
+
+The following facts are supported by the verified architecture of `TASK-0215` (`AuthContext` and RootLayout SSR Hydration):
+- **Server-to-Client State Hydration:** `RootLayout` (`apps/web/app/layout.tsx`) retrieves session metadata during initial server-side rendering via `getSessionOrNull()` (`apps/web/lib/auth/rbac.ts`). This session data is passed to `AuthProvider` (`apps/web/context/AuthContext.tsx`), rendering authenticated state synchronously across client trees.
+- **Client State Unification:** Eliminates redundant client-side `useEffect` and `fetch('/api/v1/auth/session')` requests on page mount (e.g. on `/` and `/pengaturan`).
+- **Clean Component Interfaces:** Eliminates prop-drilling of `user` and `role` down through `TopAppBar` into `Sidebar`. Components independently access `{ user, role, isAuthenticated }` using the `useAuth()` hook.
+- **Security & Authorization Boundaries:** Client-side `AuthContext` is restricted to UI presentation and route navigation. Server-side route handlers (`/api/v1/*`) and Server Actions maintain authoritative security checks via `requireSession()`, `requireRole()`, and `requirePermission()`. No secrets or raw tokens are stored in browser storage.
+<!-- TASK-0215 Reconciled: 2026-08-22 -->
+

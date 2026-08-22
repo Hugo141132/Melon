@@ -1977,3 +1977,15 @@ The following facts are verified in the end-to-end user flow implementations reg
 - **Execution Failure Flow:** When an execution event reports `FAILED`, command transitions to `FAILED`, physical state remains `UNKNOWN`, and a `CommandFailureAlert` is dispatched.
 - **Terminal State & Late Event Flow:** Commands in terminal statuses (`COMPLETED`, `FAILED`, `CANCELLED`, `TIMEOUT`, `EXPIRED`) safely ignore subsequent events, preventing state corruption or regressions.
 <!-- TASK-0806 Reconciled: 2026-08-20 -->
+
+---
+
+## Centralized Authentication State Hydration User Flows Implementation Note (Reconciled 2026-08-22)
+
+The following facts are verified in the user flow implementations regarding `TASK-0215` (Centralized Authentication State Hydration):
+- **Immediate Navigation & Seamless Protected Access:** Upon successful login and on subsequent page navigations, the root server layout immediately hydrates authentication and role state into `AuthContext`.
+- **Flicker-Free Role-Based Views:** Users navigating to `/pengaturan`, the dashboard (`/`), or using the `Sidebar` experience instantaneous rendering of their identity, avatar, and role-restricted menus (`/users`, `/approvals` for `OWNER`) with zero loading spinners, skeleton flashes, or layout shifts.
+- **Client Fetch Elimination:** Pages no longer initiate independent client-side `GET /api/v1/auth/session` calls during component mount, eliminating UI race conditions and redundant network requests.
+- **Unauthenticated Flow:** Unauthenticated users accessing protected routes continue to be redirected cleanly by server route guards.
+<!-- TASK-0215 Reconciled: 2026-08-22 -->
+

@@ -2907,3 +2907,13 @@ The following facts are supported by the verified implementation of `TASK-0806` 
 - **Verification:** Supported by robust test suites covering `FaucetCommandRepository` (21 unit tests) and API routing logic (31 unit tests), ensuring the correct status codes and conflict behavior across all actions.
 
 <!-- TASK-0808 Reconciled: 2026-08-20 -->
+
+---
+
+## Centralized Authentication State Hydration API Note (Reconciled 2026-08-22)
+
+The following facts are supported by the verified implementation of `TASK-0215` (Centralized Authentication State Hydration):
+- **Server Component Session Helper:** Created `getSessionOrNull()` in `apps/web/lib/auth/rbac.ts` allowing Server Components (specifically `RootLayout`) to retrieve the authenticated session (`AuthenticatedUserSession`) during SSR without throwing 401 exceptions.
+- **Client Session Endpoint Optimization:** Redundant client-side calls to `GET /api/v1/auth/session` on page component mounts have been eliminated, as the root layout hydrates session state directly via `AuthContext`.
+- **API Security Unchanged:** The `GET /api/v1/auth/session` endpoint remains available and functional for client-initiated session verification if needed. All protected REST endpoints continue to enforce strict server-side authentication and authorization.
+<!-- TASK-0215 Reconciled: 2026-08-22 -->

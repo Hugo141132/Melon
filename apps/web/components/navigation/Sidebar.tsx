@@ -18,14 +18,13 @@ import {
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/context/AuthContext';
 
 export interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
-  userRole?: string | null;
-  userName?: string | null;
 }
 
 export const SIDEBAR_NAV_ITEMS = [
@@ -39,18 +38,13 @@ export const SIDEBAR_NAV_ITEMS = [
   { href: '/profil', key: 'profile', icon: User },
 ];
 
-export default function Sidebar({
-  isOpen,
-  onClose,
-  onMouseEnter,
-  onMouseLeave,
-  userRole,
-  userName,
-}: SidebarProps) {
+export default function Sidebar({ isOpen, onClose, onMouseEnter, onMouseLeave }: SidebarProps) {
   const pathname = usePathname();
   const tNav = useTranslations('navigation');
   const tCommon = useTranslations('common');
+  const { user, role } = useAuth();
 
+  const userName = user?.fullName || user?.email || '';
   const displayName = userName ? userName.trim().replace(/^pak\s+/i, '') : '';
   const headerTitle = displayName || tCommon('user');
 
@@ -97,52 +91,52 @@ export default function Sidebar({
 
         {/* Navigation Menu List */}
         <nav className="p-3 space-y-1 overflow-y-auto flex-1">
-          {SIDEBAR_NAV_ITEMS.filter(
-            (item) => !item.roleRequired || item.roleRequired === userRole
-          ).map((item) => {
-            const Icon = item.icon;
-            const isActive =
-              pathname === item.href ||
-              (item.href !== '/' && pathname.startsWith(item.href)) ||
-              (item.href === '/sensor' &&
-                ['/sensor', '/soil', '/water', '/controls'].includes(pathname));
+          {SIDEBAR_NAV_ITEMS.filter((item) => !item.roleRequired || item.roleRequired === role).map(
+            (item) => {
+              const Icon = item.icon;
+              const isActive =
+                pathname === item.href ||
+                (item.href !== '/' && pathname.startsWith(item.href)) ||
+                (item.href === '/sensor' &&
+                  ['/sensor', '/soil', '/water', '/controls'].includes(pathname));
 
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={onClose}
-                className={cn(
-                  'flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer group',
-                  isActive
-                    ? 'bg-app-primary text-white shadow-sm'
-                    : 'text-app-on-surface-variant hover:bg-app-surface-container-low hover:text-app-primary'
-                )}
-                aria-current={isActive ? 'page' : undefined}
-                data-testid={`sidebar-item-${item.href.replace('/', '') || 'home'}`}
-              >
-                <div className="flex items-center gap-3">
-                  <Icon
-                    size={18}
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={onClose}
+                  className={cn(
+                    'flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer group',
+                    isActive
+                      ? 'bg-app-primary text-white shadow-sm'
+                      : 'text-app-on-surface-variant hover:bg-app-surface-container-low hover:text-app-primary'
+                  )}
+                  aria-current={isActive ? 'page' : undefined}
+                  data-testid={`sidebar-item-${item.href.replace('/', '') || 'home'}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Icon
+                      size={18}
+                      className={cn(
+                        'transition-transform group-hover:scale-110',
+                        isActive
+                          ? 'text-white'
+                          : 'text-app-on-surface-variant group-hover:text-app-primary'
+                      )}
+                    />
+                    <span>{tNav(item.key as any)}</span>
+                  </div>
+                  <ChevronRight
+                    size={14}
                     className={cn(
-                      'transition-transform group-hover:scale-110',
-                      isActive
-                        ? 'text-white'
-                        : 'text-app-on-surface-variant group-hover:text-app-primary'
+                      'opacity-0 transition-opacity',
+                      isActive ? 'opacity-100 text-white' : 'group-hover:opacity-60'
                     )}
                   />
-                  <span>{tNav(item.key as any)}</span>
-                </div>
-                <ChevronRight
-                  size={14}
-                  className={cn(
-                    'opacity-0 transition-opacity',
-                    isActive ? 'opacity-100 text-white' : 'group-hover:opacity-60'
-                  )}
-                />
-              </Link>
-            );
-          })}
+                </Link>
+              );
+            }
+          )}
         </nav>
       </div>
     </aside>

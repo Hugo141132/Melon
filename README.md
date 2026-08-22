@@ -168,9 +168,10 @@ The final technology stack depends on the existing frontend audit.
 Recommended when compatible with the existing codebase:
 
 ```text
-Next.js
+Next.js (App Router)
 React
 TypeScript
+AuthContext (SSR Hydration via RootLayout)
 Tailwind CSS
 Existing UI components
 Zod

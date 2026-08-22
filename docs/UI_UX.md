@@ -1260,3 +1260,14 @@ The verified implementation of `TASK-0806` (`FaucetEventProcessor` in `@kebun-me
 - **Design Tokens Unchanged:** Reuses approved `Premium Minimal Ops` tokens and color palette without alterations.
 - **Physical State Visualization Safety:** The UI reflects verified physical valve state only from confirmed execution events (`COMPLETED OPEN` → `OPEN`, `COMPLETED CLOSE` → `CLOSED`, `COMPLETED DISPENSE` → `UNKNOWN`). No valve closed state is fabricated upon dispense completion.
 <!-- TASK-0806 Reconciled: 2026-08-20 -->
+
+---
+
+## Centralized Authentication State Hydration UI/UX Implementation Note (Reconciled 2026-08-22)
+
+The verified implementation of `TASK-0215` (Centralized Authentication State Hydration) enhances the user interface experience while strictly respecting design governance:
+- **Design Tokens Unchanged:** Reuses approved `Premium Minimal Ops` tokens, layout hierarchy, and color palette without modifications.
+- **Elimination of Layout Shifts & Flashes:** Initial authentication and role state are available immediately upon server-render hydration, eliminating client-side delays, role-checking layout shifts, and loading spinners on `/pengaturan`, the dashboard (`/`), `TopAppBar`, and `Sidebar`.
+- **Instant Role-Gated Rendering:** `OWNER`-specific navigation and settings items (`/users` and `/approvals`) render instantly without progressive popping or delayed entry.
+<!-- TASK-0215 Reconciled: 2026-08-22 -->
+

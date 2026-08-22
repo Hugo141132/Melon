@@ -19,6 +19,18 @@ vi.mock('next/navigation', () => ({
   }),
 }));
 
+let mockUser: any = null;
+let mockRole: any = null;
+
+vi.mock('@/context/AuthContext', () => ({
+  useAuth: () => ({
+    user: mockUser,
+    role: mockRole,
+    isAuthenticated: !!mockUser,
+  }),
+  AuthProvider: ({ children }: any) => <>{children}</>,
+}));
+
 const mockDevices: AuthorisedDevice[] = [
   {
     id: '1',
@@ -66,33 +78,39 @@ describe('Sidebar Navigation Header Display Name & Fallback', () => {
     mockPathname = '/sensor';
     sessionStorage.clear();
     localStorage.clear();
+    mockUser = null;
+    mockRole = null;
   });
 
   it('renders authenticated account display name without Pak prefix', () => {
-    render(
-      <Sidebar isOpen={true} onClose={mockClose} userRole="ADMIN" userName="Pak Wahyu Prasetyo" />
-    );
+    mockUser = { fullName: 'Pak Wahyu Prasetyo' };
+    mockRole = 'ADMIN';
+    render(<Sidebar isOpen={true} onClose={mockClose} />);
 
     expect(screen.getByTestId('sidebar-display-name')).toHaveTextContent('Wahyu Prasetyo');
   });
 
   it('renders neutral account placeholder "Pengguna" during loading or expired session (never Kebun Melon)', () => {
-    const { rerender } = render(
-      <Sidebar isOpen={true} onClose={mockClose} userRole={null} userName={null} />
-    );
+    mockUser = null;
+    mockRole = null;
+    const { rerender } = render(<Sidebar isOpen={true} onClose={mockClose} />);
 
     // Null user / unauthenticated / loading
     expect(screen.getByTestId('sidebar-display-name')).toHaveTextContent('Pengguna');
     expect(screen.getByTestId('sidebar-display-name')).not.toHaveTextContent('Kebun Melon');
 
     // Empty string user name
-    rerender(<Sidebar isOpen={true} onClose={mockClose} userRole="ADMIN" userName="" />);
+    mockUser = { fullName: '' };
+    mockRole = 'ADMIN';
+    rerender(<Sidebar isOpen={true} onClose={mockClose} />);
     expect(screen.getByTestId('sidebar-display-name')).toHaveTextContent('Pengguna');
     expect(screen.getByTestId('sidebar-display-name')).not.toHaveTextContent('Kebun Melon');
   });
 
   it('renders Sensor menu item and excludes removed sub-links (Sensor Tanah, Kualitas Air, Kontrol Kran)', () => {
-    render(<Sidebar isOpen={true} onClose={mockClose} userRole="ADMIN" userName="Wahyu" />);
+    mockUser = { fullName: 'Wahyu' };
+    mockRole = 'ADMIN';
+    render(<Sidebar isOpen={true} onClose={mockClose} />);
 
     expect(screen.getByTestId('sidebar-drawer')).toHaveClass('translate-x-0');
     expect(screen.getByText('Beranda')).toBeInTheDocument();

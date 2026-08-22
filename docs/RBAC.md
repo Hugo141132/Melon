@@ -1187,3 +1187,15 @@ The following facts are verified in the authorization architecture regarding `TA
 - **Authorization Traceability:** The event processor operates on persisted commands previously authorized under `device.control` and active device assignments, linking lifecycle transitions and failure alerts to the original command context.
 - **Admin Privacy Protection:** Admin canonical `deviceId` concealment (`DEC-DEV-028`) remains fully intact.
 <!-- TASK-0806 Reconciled: 2026-08-20 -->
+
+---
+
+## Centralized Authentication & Client RBAC Hydration Implementation Note (Reconciled 2026-08-22)
+
+The following facts are verified in the authorization architecture regarding `TASK-0215` (Centralized Authentication State Hydration):
+- **Client-Side RBAC State:** User role (`OWNER`, `ADMIN`) and identity metadata are hydrated server-side in `RootLayout` via `getSessionOrNull()` and made available to all client components through `AuthContext` (`useAuth()`).
+- **Instant Role-Gated UI:** Role-gated interface elements (e.g. `/users` and `/approvals` links in `Sidebar` and `/pengaturan`) render immediately on page load according to the hydrated role, preventing UI pop-in and layout shift.
+- **Server Authorization Primacy:** Hydrated client state is strictly for UI presentation. All API routes and mutations independently enforce session and RBAC checks (`requireSession`, `requireRole`, `requirePermission`, `requireDeviceViewAccess`).
+- **Security Invariants:** No sensitive token or secret is ever exposed to the client context or stored in browser storage (`localStorage` / `sessionStorage`).
+<!-- TASK-0215 Reconciled: 2026-08-22 -->
+

@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import TopAppBar from '@/components/navigation/TopAppBar';
 import { DASHBOARD_DATA, ALERTS } from '@/lib/constants';
 import { Sun } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { useAuth } from '@/context/AuthContext';
 
 // ─── Health Score Half Gauge ────────────────────────────
 function HealthScoreGauge({ score }: { score: number }) {
@@ -32,32 +33,14 @@ function HealthScoreGauge({ score }: { score: number }) {
 export default function DashboardPage() {
   const tDash = useTranslations('dashboard');
   const criticalCount = ALERTS.filter((a) => a.severity === 'error').length;
-  const [userName, setUserName] = useState<string>('');
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const { user } = useAuth();
 
-  useEffect(() => {
-    async function loadUserSession() {
-      try {
-        const res = await fetch('/api/v1/auth/session');
-        if (res.ok) {
-          const json = await res.json();
-          if (json.success && json.data?.authenticated && json.data?.user) {
-            setCurrentUser(json.data.user);
-            const rawName = json.data.user.fullName || json.data.user.email || '';
-            const cleanName = rawName.replace(/^pak\s+/i, '');
-            setUserName(cleanName);
-          }
-        }
-      } catch {
-        // Leave userName empty if unauthenticated or error
-      }
-    }
-    loadUserSession();
-  }, []);
+  const rawName = user?.fullName || user?.email || '';
+  const userName = rawName.replace(/^pak\s+/i, '');
 
   return (
     <div className="bg-app-surface text-app-on-surface min-h-dvh pb-10">
-      <TopAppBar showNotification notificationCount={criticalCount} user={currentUser} />
+      <TopAppBar showNotification notificationCount={criticalCount} />
 
       <main className="pt-20 px-[1rem] space-y-5">
         {/* ── Hero Greeting Section ─── */}

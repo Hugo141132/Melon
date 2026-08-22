@@ -1905,3 +1905,11 @@ The following facts are supported by the verified device communication implement
 - **Lifecycle Progression & Guarding:** Enforces `ACKNOWLEDGED` → `IN_PROGRESS` → `COMPLETED` and `ACKNOWLEDGED`/`IN_PROGRESS` → `FAILED`. Terminal states (`COMPLETED`, `FAILED`, `CANCELLED`, `TIMEOUT`, `EXPIRED`) are immutable and ignore late events. Duplicate `messageId` occurrences are handled idempotently without redundant writes.
 - **Alert Dispatching:** Dispatches `CommandFailureAlert` for `FAILED` execution events linking device, command, and `physicalOutcome: 'UNKNOWN'`.
 <!-- TASK-0806 Reconciled: 2026-08-20 -->
+
+---
+
+## 46. Centralized Authentication State Hydration & Device Protocol Independence
+
+`TASK-0215` (Centralized Authentication State Hydration) operates exclusively within the Next.js frontend presentation layer and server-side layout session hydration. It does not modify ESP32, NodeMCU, REST telemetry ingestion, MQTT 5.0 over TLS, broker topic ACLs, or device-gateway communication contracts. Device selection and telemetry streams remain completely decoupled from root authentication hydration.
+<!-- TASK-0215 Reconciled: 2026-08-22 -->
+

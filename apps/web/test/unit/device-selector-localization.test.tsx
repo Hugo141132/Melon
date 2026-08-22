@@ -23,6 +23,15 @@ vi.mock('next/navigation', () => ({
   usePathname: () => mockPathname,
 }));
 
+vi.mock('@/context/AuthContext', () => ({
+  useAuth: () => ({
+    user: { id: 'mock-user-1', fullName: 'Test User', email: 'test@example.com' },
+    role: 'ADMIN',
+    isAuthenticated: true,
+  }),
+  AuthProvider: ({ children }: any) => <>{children}</>,
+}));
+
 // Mock devices: default names, raw ID names, and custom names
 const mockDevices: AuthorisedDevice[] = [
   {

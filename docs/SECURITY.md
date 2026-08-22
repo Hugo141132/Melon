@@ -1587,3 +1587,15 @@ The following security controls are active and verified across the device execut
 - **Duplicate Idempotency:** Duplicate `messageId` occurrences are matched against stored event history and ignored without invoking database writes.
 - **Failure Alert Dispatching:** Generates `CommandFailureAlert` for `FAILED` execution events linking device, command, and `physicalOutcome: 'UNKNOWN'`.
 <!-- TASK-0806 Reconciled: 2026-08-20 -->
+
+---
+
+## Centralized Authentication State Hydration Security Controls Implementation Note (Reconciled 2026-08-22)
+
+The following security controls are active and verified for `TASK-0215` (Centralized Authentication State Hydration):
+- **Server Authorization Independence:** Hydrated auth state in React `AuthContext` is strictly for presentation and UX responsiveness. Every API route and Server Action independently executes full, authoritative server-side session and RBAC authorization (`requireSession`, `requireRole`, `requirePermission`).
+- **Data Minimization:** `AuthContext` and `getSessionOrNull()` expose only non-sensitive user and role metadata (`id`, `fullName`, `email`, `accountStatus`, `activeRoles`). No session tokens, secret keys, or database credentials are included in context.
+- **Zero Client Token Storage:** Session tokens remain stored solely in `HttpOnly`, `Secure`, `SameSite` cookies; tokens are never mirrored to `localStorage` or `sessionStorage`.
+- **Safe Non-Throwing Retrieval:** `getSessionOrNull()` safely catches and neutralizes unauthenticated session errors during SSR without leaking stack traces or unhandled exceptions.
+<!-- TASK-0215 Reconciled: 2026-08-22 -->
+

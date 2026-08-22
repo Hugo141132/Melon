@@ -2129,3 +2129,20 @@ Automated unit, contract, UI component, state mapping, and security verification
 - Fail-safe hardware auto-close behavior during connection loss remains an explicit `UNRESOLVED / TBD` item (`DEC-CTRL-090`), safely protected by `ENABLE_FAUCET_CONTROL=false` default configuration.
 <!-- TASK-0810 Reconciled: 2026-08-21 -->
 
+---
+
+# 50. Centralized Authentication State Hydration Verification Suite (`TASK-0215`)
+
+Automated unit, context mock, component rendering, and RBAC verification for centralized authentication state hydration:
+
+### Agent-Executed Automated Tests
+1. **Targeted Web App Test Suites Pass:**
+   - `apps/web/test/unit/pengaturan-page.test.tsx`: **3/3 tests passed (100%)** verifying immediate hydration on `/pengaturan` and role-based conditional rendering (`OWNER` vs `ADMIN`).
+   - `apps/web/test/unit/sidebar-navigation.test.tsx`: **6/6 tests passed (100%)** verifying `Sidebar` role filtering with mocked `AuthContext`.
+   - `apps/web/test/unit/device-selector-localization.test.tsx`: **6/6 tests passed (100%)** verifying `TopAppBar` with mocked `AuthContext`.
+2. **Full Web Test Suite Pass:** **34 test files, 258/258 tests passed (100%)**.
+3. **Monorepo Static Typecheck:** Clean `npm run typecheck` pass across all 4 monorepo workspaces with 0 errors.
+4. **Security & Quality Compliance:** Zero regressions in existing security headers, rate limiting, and server-side RBAC guards.
+<!-- TASK-0215 Reconciled: 2026-08-22 -->
+
+

@@ -901,6 +901,39 @@ Implemented complete Owner User Management:
 
 ---
 
+## TASK-0215 — Centralized Authentication State Hydration
+
+**Priority:** `P1`
+**Status:** `DONE`
+**Dependencies:** `TASK-0204`, `TASK-0208`, `DEC-AUTH-105`
+**Completed:** 2026-08-22 — Implemented centralized authentication state hydration to eliminate delayed UI rendering and layout shifts across navigation and protected pages. Added React `AuthContext` (`AuthProvider` / `useAuth()`) in `@kebun-melon/web`, providing unified access to `{ user, role, isAuthenticated }`. Implemented `getSessionOrNull()` server helper in `lib/auth/rbac.ts` for safe, non-throwing session retrieval in `RootLayout` during SSR. Eliminated redundant client-side `useEffect` and `fetch('/api/v1/auth/session')` calls from `/`, `/pengaturan`, `/profil`, `TopAppBar`, and `Sidebar`. Refactored `Sidebar` and `TopAppBar` to consume `useAuth()` directly, removing unnecessary prop drilling. Refactored `/pengaturan` and `/profil` to instantaneously render user profile identity and role-conditional menu items (`/users` and `/approvals` for `OWNER`) without loading spinners. Maintained strict server-side RBAC and route protection. Verified 100% test pass rate across 35 unit test suites (260/260 tests) and 14 E2E critical flows.
+
+### Work
+
+- Created `apps/web/context/AuthContext.tsx` providing `AuthProvider` and `useAuth()` hook for managing hydrated `{ user, role, isAuthenticated }` state.
+- Implemented `getSessionOrNull()` in `apps/web/lib/auth/rbac.ts` to safely retrieve and validate the active session token without throwing exceptions on unauthenticated/missing sessions.
+- Updated `apps/web/app/layout.tsx` to retrieve the session during server rendering and wrap the application tree with `AuthProvider`.
+- Refactored `apps/web/app/page.tsx` to consume `useAuth()` for user greeting and removed client-side fetch logic.
+- Refactored `apps/web/components/navigation/TopAppBar.tsx` to consume `useAuth()` for avatar rendering and removed `user` prop drilling into `Sidebar`.
+- Refactored `apps/web/components/navigation/Sidebar.tsx` to consume `useAuth()` directly for username formatting and role-based menu filtering (`/users` and `/approvals`).
+- Refactored `apps/web/app/pengaturan/page.tsx` to consume `useAuth()`, removing client-side session fetching, spinners, and latency.
+- Refactored `apps/web/app/profil/page.tsx` to consume `useAuth()`, eliminating blocking full-page loading spinners.
+- Updated unit test suites `sidebar-navigation.test.tsx` and `device-selector-localization.test.tsx` with `AuthContext` mocks.
+- Created `apps/web/test/unit/pengaturan-page.test.tsx` to verify immediate hydration and role-based menu display on `/pengaturan`.
+- Created `apps/web/test/unit/profil-page.test.tsx` to verify immediate hydration and I18N display on `/profil`.
+
+### Acceptance Criteria
+
+- [x] Initial session is hydrated server-side in `RootLayout` with lightweight user/role metadata.
+- [x] Zero UI flashing or delayed role recognition on initial page load across protected routes.
+- [x] Redundant client-side calls to `/api/v1/auth/session` on mount removed from `/`, `/pengaturan`, and `/profil`.
+- [x] `TopAppBar` and `Sidebar` consume `useAuth()` without prop-drilling.
+- [x] `OWNER`-only menu items (`/users`, `/approvals`) on `/pengaturan` and `Sidebar` render immediately based on hydrated role state.
+- [x] Security architecture and server-side RBAC enforcement remain unaffected.
+- [x] All unit tests pass (100% pass rate).
+
+---
+
 # 11. Phase 3 — Device Registry and Access
 
 ## TASK-0301 — Implement Site Model

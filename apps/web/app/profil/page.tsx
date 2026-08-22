@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { USER_PROFILE } from '@/lib/constants';
 import { useTranslations } from 'next-intl';
+import { useAuth } from '@/context/AuthContext';
 
 interface UserProfileState {
   id: string;
@@ -29,30 +30,70 @@ interface UserProfileState {
 export default function ProfilPage() {
   const tProfile = useTranslations('profile');
   const tCommon = useTranslations('common');
+  const tAuth = useTranslations('auth');
+  const { user, isAuthenticated } = useAuth();
 
-  const [profile, setProfile] = useState<UserProfileState | null>(null);
-  const [fullName, setFullName] = useState('');
+  const [profile, setProfile] = useState<UserProfileState | null>(
+    user
+      ? {
+          id: user.id,
+          fullName: user.fullName,
+          email: user.email,
+          username: null,
+          accountStatus: user.accountStatus,
+          activeRoles: user.activeRoles,
+        }
+      : null
+  );
+  const [fullName, setFullName] = useState(user?.fullName || '');
   const [username, setUsername] = useState('');
 
   // UI states
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!user);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [unauthenticated, setUnauthenticated] = useState(false);
+  const [unauthenticated, setUnauthenticated] = useState(!isAuthenticated && !user);
   const [loggingOut, setLoggingOut] = useState(false);
 
-  // Fetch real profile from backend GET /api/v1/me
+  // Sync state if user changes from auth context
+  useEffect(() => {
+    if (user) {
+      setFullName((prev) => prev || user.fullName || '');
+      setProfile((prev) =>
+        prev
+          ? {
+              ...prev,
+              id: user.id,
+              fullName: prev.fullName || user.fullName,
+              email: user.email,
+              accountStatus: user.accountStatus,
+              activeRoles: user.activeRoles,
+            }
+          : {
+              id: user.id,
+              fullName: user.fullName,
+              email: user.email,
+              username: null,
+              accountStatus: user.accountStatus,
+              activeRoles: user.activeRoles,
+            }
+      );
+      setLoading(false);
+      setUnauthenticated(false);
+    }
+  }, [user]);
+
+  // Fetch real profile from backend GET /api/v1/me in background
   useEffect(() => {
     let isMounted = true;
     async function loadProfile() {
       try {
-        setLoading(true);
         setErrorMsg(null);
         const res = await fetch('/api/v1/me');
 
         if (res.status === 401 || res.status === 403) {
-          if (isMounted) {
+          if (isMounted && !user) {
             setUnauthenticated(true);
             setLoading(false);
           }
@@ -67,12 +108,12 @@ export default function ProfilPage() {
             setUsername(json.data.username || '');
           }
         } else {
-          if (isMounted) {
+          if (isMounted && !user) {
             setErrorMsg(json.error?.message || 'Gagal memuat profil pengguna.');
           }
         }
       } catch {
-        if (isMounted) {
+        if (isMounted && !user) {
           setErrorMsg('Terjadi kesalahan koneksi saat memuat profil.');
         }
       } finally {
@@ -86,7 +127,7 @@ export default function ProfilPage() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [user]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -142,7 +183,7 @@ export default function ProfilPage() {
   };
 
   // 1. Unauthenticated state
-  if (unauthenticated) {
+  if (unauthenticated && !user) {
     return (
       <div className="bg-app-surface text-app-on-surface min-h-dvh flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl p-6 max-w-sm w-full text-center space-y-4 soft-elevation">
@@ -162,23 +203,23 @@ export default function ProfilPage() {
     );
   }
 
-  // 2. Loading state
-  if (loading) {
+  // 2. Loading state only when no cached/hydrated user is available
+  if (loading && !profile && !user) {
     return (
       <div className="bg-app-surface text-app-on-surface min-h-dvh flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="w-8 h-8 text-app-primary animate-spin" />
           <span className="text-sm font-medium text-app-on-surface-variant">
-            Memuat data profil...
+            {tProfile('loading')}
           </span>
         </div>
       </div>
     );
   }
 
-  const roleDisplay = profile?.activeRoles?.includes('OWNER')
-    ? 'Pemilik Lahan (OWNER)'
-    : 'Pengelola (ADMIN)';
+  const roleDisplay = (profile?.activeRoles || user?.activeRoles || []).includes('OWNER')
+    ? tAuth('roleOwner')
+    : tAuth('roleAdmin');
 
   return (
     <div className="bg-app-surface text-app-on-surface min-h-dvh pb-32 font-sans">
@@ -217,7 +258,7 @@ export default function ProfilPage() {
               <div className="w-28 h-28 rounded-full border-4 border-white soft-elevation overflow-hidden bg-app-surface-container">
                 <Image
                   src={USER_PROFILE.avatar}
-                  alt={fullName || USER_PROFILE.name}
+                  alt={fullName || user?.fullName || USER_PROFILE.name}
                   width={112}
                   height={112}
                   className="w-full h-full object-cover"
@@ -230,7 +271,7 @@ export default function ProfilPage() {
             <div className="flex items-center gap-2 px-4 py-1.5 bg-app-on-primary-container text-app-primary rounded-full">
               <CheckCircle size={16} fill="currentColor" />
               <span className="text-[14px] font-semibold">
-                {roleDisplay} - {profile?.accountStatus || 'ACTIVE'}
+                {roleDisplay} - {profile?.accountStatus || user?.accountStatus || 'ACTIVE'}
               </span>
             </div>
           </div>
@@ -259,7 +300,7 @@ export default function ProfilPage() {
               <input
                 className="w-full h-[56px] px-4 bg-app-surface-container-low border-[1.5px] border-app-outline-variant rounded-xl text-app-on-surface-variant outline-none cursor-not-allowed text-[16px]"
                 type="email"
-                value={profile?.email || ''}
+                value={profile?.email || user?.email || ''}
                 disabled
               />
             </div>
@@ -339,7 +380,7 @@ export default function ProfilPage() {
             className="w-full flex items-center gap-3 p-4 text-app-error font-semibold active:bg-app-error-container/10 transition-colors rounded-xl cursor-pointer disabled:opacity-60"
           >
             <LogOut size={20} />
-            <span>{loggingOut ? 'Keluar...' : tProfile('logout')}</span>
+            <span>{loggingOut ? tCommon('loading') : tProfile('logout')}</span>
           </button>
         </section>
       </main>
@@ -360,7 +401,7 @@ export default function ProfilPage() {
             ) : saved ? (
               <>
                 <CheckCircle size={20} fill="white" />
-                Tersimpan!
+                {tProfile('savedToast')}
               </>
             ) : (
               tCommon('save')
@@ -372,7 +413,7 @@ export default function ProfilPage() {
       {/* Toast */}
       {saved && (
         <div className="fixed bottom-28 left-1/2 -translate-x-1/2 bg-app-on-surface text-app-surface px-6 py-3 rounded-full shadow-2xl text-[14px] z-[100] animate-slide-up">
-          Perubahan berhasil disimpan
+          {tProfile('savedToast')}
         </div>
       )}
     </div>

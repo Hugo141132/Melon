@@ -1096,3 +1096,15 @@ The following facts are verified in the product implementation regarding `TASK-0
 - **Idempotency & Terminal Immutability:** Duplicate `messageId` occurrences are handled idempotently without redundant writes; terminal commands (`COMPLETED`, `FAILED`, `CANCELLED`, `TIMEOUT`, `EXPIRED`) ignore late events without state regression.
 - **Alert Dispatching:** Dispatches `CommandFailureAlert` for `FAILED` execution events linking device, command, and `physicalOutcome: 'UNKNOWN'`.
 <!-- TASK-0806 Reconciled: 2026-08-20 -->
+
+---
+
+## Centralized Authentication State Hydration Implementation Note (Reconciled 2026-08-22)
+
+The following facts are verified in the product implementation regarding `TASK-0215` (Centralized Authentication State Hydration):
+- **Requirement Fulfillment (PRD-FR-015):** The root server layout hydrates authentication and user metadata (`user`, `role`, `isAuthenticated`) via `AuthContext` on initial render.
+- **Immediate Role-Based UI Rendering:** UI elements requiring role awareness (`Sidebar` navigation, `/pengaturan` owner menus, top bar greeting and profile) render immediately upon page mount without layout shift or loading spinners.
+- **Client-Side Request Optimization:** Redundant client-side API requests to `/api/v1/auth/session` on page mount have been removed from the dashboard and settings pages.
+- **Security & Authorization Baseline:** All protected backend endpoints (`/api/v1/*`) and server actions remain strictly guarded with server-side authorization (`requireSession`, `requireRole`, `requirePermission`).
+<!-- TASK-0215 Reconciled: 2026-08-22 -->
+

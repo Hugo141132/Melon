@@ -392,3 +392,19 @@ The following facts are verified regarding the frontend boundary for `TASK-0806`
 - **Physical State Integrity:** The frontend does not infer physical valve state from command creation or acknowledgement; physical state confirmation (`OPEN`, `CLOSED`, `UNKNOWN`) is derived strictly from confirmed device execution events processed on the backend.
 - **Design Token & Aesthetic Preservation:** All dashboard, sensor, and control pages continue to adhere strictly to `Premium Minimal Ops` with established color tokens and motion standards.
 <!-- TASK-0806 Reconciled: 2026-08-20 -->
+
+---
+
+## Centralized Authentication State Hydration Frontend Audit Note (Reconciled 2026-08-22)
+
+The following facts are verified regarding the frontend architecture of `TASK-0215` (Centralized Authentication State Hydration):
+- **React Context Hydration:** Added `apps/web/context/AuthContext.tsx` providing `{ user, role, isAuthenticated }` to all client components via `useAuth()`.
+- **RootLayout SSR Hydration:** `RootLayout` (`apps/web/app/layout.tsx`) retrieves session metadata during initial server-side rendering via `getSessionOrNull()` and passes it to `AuthProvider`, eliminating layout shifts and role-checking delays.
+- **Component Refactoring:**
+  - `apps/web/app/page.tsx` (Dashboard): Removed client-side `useEffect` and `fetch('/api/v1/auth/session')`, consuming `useAuth()` directly.
+  - `apps/web/app/pengaturan/page.tsx` (Settings): Removed client-side `useEffect` session fetch and loading spinner, using `useAuth()` for instant profile display and role-gated menu rendering (`/users` and `/approvals` for `OWNER`).
+  - `apps/web/components/navigation/TopAppBar.tsx`: Removed `user` prop drilling; consumes `useAuth()` directly.
+  - `apps/web/components/navigation/Sidebar.tsx`: Removed `userRole` and `userName` props; consumes `useAuth()` directly for role-based navigation filtering.
+- **Design Governance:** Preserves `Premium Minimal Ops` aesthetic and established color palette with zero visual regression.
+<!-- TASK-0215 Reconciled: 2026-08-22 -->
+

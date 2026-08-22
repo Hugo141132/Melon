@@ -86,6 +86,28 @@ export async function requireSession(request?: Request): Promise<AuthenticatedUs
   };
 }
 
+export async function getSessionOrNull(
+  request?: Request
+): Promise<AuthenticatedUserSession | null> {
+  try {
+    const token = await extractSessionTokenFromRequest(request);
+    if (!token) return null;
+
+    const session = await validateSession(prisma, token);
+    if (!session) return null;
+
+    return {
+      id: session.user.id,
+      fullName: session.user.fullName,
+      email: session.user.email,
+      accountStatus: session.user.accountStatus as AccountStatus,
+      activeRoles: session.user.activeRoles as UserRole[],
+    };
+  } catch {
+    return null;
+  }
+}
+
 export function requireActiveAccount(session: AuthenticatedUserSession): AuthenticatedUserSession {
   if (session.accountStatus !== AccountStatus.ACTIVE) {
     throw new AuthorizationError(

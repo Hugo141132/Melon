@@ -9,19 +9,18 @@ import { useTranslations } from 'next-intl';
 import { USER_PROFILE } from '@/lib/constants';
 import DeviceSelector from './DeviceSelector';
 import Sidebar from './Sidebar';
+import { useAuth } from '@/context/AuthContext';
 
 interface TopAppBarProps {
   showNotification?: boolean;
   notificationCount?: number;
   showDeviceSelector?: boolean;
-  user?: { fullName?: string; email?: string; role?: string } | null;
 }
 
 export default function TopAppBar({
   showNotification = false,
   notificationCount = 0,
   showDeviceSelector = true,
-  user,
 }: TopAppBarProps) {
   const tAccessibility = useTranslations('accessibility');
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -32,6 +31,7 @@ export default function TopAppBar({
   const isSelectorAllowedPage = ['/soil', '/water', '/controls'].includes(pathname);
   const shouldShowDeviceSelector = showDeviceSelector && isSelectorAllowedPage;
 
+  const { user } = useAuth();
   const userDisplayName = user?.fullName || user?.email || '';
   const initial = userDisplayName ? userDisplayName.charAt(0).toUpperCase() : null;
 
@@ -174,8 +174,6 @@ export default function TopAppBar({
         onClose={() => setSidebarOpen(false)}
         onMouseEnter={handleSidebarMouseEnter}
         onMouseLeave={handleSidebarMouseLeave}
-        userRole={user?.role}
-        userName={userDisplayName}
       />
     </>
   );

@@ -564,3 +564,17 @@ The following facts are supported by the verified decisions governance of `TASK-
   4. **Status & Session Decoupling:** Verification updates `emailVerifiedAt` independently and strictly preserves `accountStatus` (`ADMIN` remains `PENDING_APPROVAL`, `OWNER` remains `ACTIVE`). Verification endpoints never issue or return authentication sessions.
   5. **Auth UI Compliance:** `/verify-email` features 6-digit code input, target email switcher, and 60-second cooldown timer. `/reset-password` has decorative illustration frames removed, strictly conforming to `Premium Minimal Ops`.
 <!-- TASK-0214 Reconciled: 2026-08-22 -->
+
+---
+
+## DEC-AUTH-105: Centralized Authentication State Hydration via Server RootLayout and Client AuthContext
+- **Status:** APPROVED
+- **Context:** Individual pages and components (Dashboard, Settings, TopAppBar, Sidebar) previously made separate client-side API requests to `GET /api/v1/auth/session` on mount. This caused visible loading flickers, delayed role recognition, and layout shifts when determining whether the user was an `OWNER` or `ADMIN`.
+- **Decision:**
+  1. **Server-Side Session Hydration:** The Next.js root layout (`apps/web/app/layout.tsx`) performs a lightweight session retrieval during initial server rendering using a non-throwing helper (`getSessionOrNull()` in `apps/web/lib/auth/rbac.ts`).
+  2. **Client-Side Auth Context:** An `AuthProvider` component (`apps/web/context/AuthContext.tsx`) provides the initial session state (`user`, `role`, and `isAuthenticated`) globally via React Context and the `useAuth()` hook.
+  3. **Elimination of Redundant Client Fetches:** Client components (`TopAppBar`, `Sidebar`, `/`, `/pengaturan`) consume `useAuth()` directly rather than firing duplicate `useEffect` `GET /api/v1/auth/session` requests.
+  4. **Data Minimization & Security:** Only non-sensitive session metadata (`id`, `fullName`, `email`, `accountStatus`, `activeRoles`) is provided in context. No secrets or tokens are exposed or stored in `localStorage`/`sessionStorage`. Server-side route handlers and actions maintain full, independent RBAC enforcement.
+  5. **UI Rendering Stability:** Eliminates loading spinners and delays on `/pengaturan` and navigation items (`/users` and `/approvals` for `OWNER`), ensuring instant, flicker-free rendering conforming to `Premium Minimal Ops`.
+<!-- TASK-0215 Reconciled: 2026-08-22 -->
+
