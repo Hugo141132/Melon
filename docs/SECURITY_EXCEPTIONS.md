@@ -92,6 +92,7 @@ All exceptions must be recorded in `scripts/security-exceptions.json` using the 
 - **TASK-0805 Audit (2026-08-20):** Confirmed zero secret exceptions and zero dependency exceptions introduced; device acknowledgement processing enforces strict QoS 1 schema validation, stored action assertions, and idempotent duplicate handling without security exceptions.
 - **TASK-0806 Audit (2026-08-20):** Confirmed zero secret exceptions and zero dependency exceptions introduced; command event state machine enforces strict QoS 1 schema validation, stored action assertions, physical state mapping, and idempotent duplicate handling without security exceptions.
 - **TASK-0807 Audit (2026-08-20):** Confirmed zero secret exceptions and zero dependency exceptions introduced; Faucet Control UI dispatches commands using pure HTTP `Idempotency-Key` header, enforces server-derived volumes, restricts manual actions to modal confirmation, and executes 2.5s status polling strictly during active states with zero blind retries.
+- **TASK-0302 / Device Lifecycle Audit (2026-08-23):** Confirmed zero secret exceptions and zero dependency exceptions introduced; device activation and deactivation endpoints enforce strict Owner RBAC authorization (`device.activate` / `device.deactivate`), eliminate hard deletion, and log audit events with zero security exceptions.
 
 ---
 

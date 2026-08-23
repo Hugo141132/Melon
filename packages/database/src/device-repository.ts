@@ -391,94 +391,50 @@ export class DeviceRepository {
   }
 
   /**
-   * Permanently deletes a device from the database (Owner-only operation).
-   * Transactionally deletes/reconciles dependent foreign keys in proper order before removing the device row.
-   * Audits action using device.deleted event.
+   * Activates a device in the registry (Owner-only operation).
+   * Sets accountStatus = ACTIVE, connectionStatus = UNKNOWN, deactivatedAt = null.
    */
-  async deleteDevicePermanently(
-    deviceIdOrId: string,
-    actorUserId: string
-  ): Promise<PublicSafeDeviceDto> {
+  async activateDevice(deviceIdOrId: string, actorUserId: string): Promise<PublicSafeDeviceDto> {
     const target = await this.getDeviceByCanonicalId(deviceIdOrId);
     if (!target) {
       throw new DeviceNotFoundError(`Device '${deviceIdOrId}' not found.`);
     }
 
-    const deletedDto = { ...target };
-
-    await this.prisma.$transaction(async (tx) => {
-      // 1. Delete capabilities (Cascade in schema, explicitly ensured)
-      await tx.deviceCapability.deleteMany({ where: { deviceId: target.id } });
-
-      // 2. Delete user device access assignments
-      await tx.userDeviceAccess.deleteMany({ where: { deviceId: target.id } });
-
-      // 3. Delete device status events
-      await tx.deviceStatusEvent.deleteMany({ where: { deviceId: target.id } });
-
-      // 4. Delete telemetry readings
-      await tx.soilReading.deleteMany({ where: { deviceId: target.id } });
-      await tx.waterReading.deleteMany({ where: { deviceId: target.id } });
-      await tx.reservoirWaterReading.deleteMany({ where: { deviceId: target.id } });
-      await tx.sensorBatteryReading.deleteMany({ where: { deviceId: target.id } });
-
-      // 5. Delete faucet command events and faucet commands
-      const commandIds = (
-        await tx.faucetCommand.findMany({
-          where: { deviceId: target.id },
-          select: { id: true },
-        })
-      ).map((c) => c.id);
-
-      if (commandIds.length > 0) {
-        await tx.faucetCommandEvent.deleteMany({
-          where: { faucetCommandId: { in: commandIds } },
-        });
-        await tx.faucetCommand.deleteMany({ where: { deviceId: target.id } });
-      }
-
-      // 6. Delete alert acknowledgements and alerts
-      const alertIds = (
-        await tx.alert.findMany({
-          where: { deviceId: target.id },
-          select: { id: true },
-        })
-      ).map((a) => a.id);
-
-      if (alertIds.length > 0) {
-        await tx.alertAcknowledgement.deleteMany({
-          where: { alertId: { in: alertIds } },
-        });
-        await tx.alert.deleteMany({ where: { deviceId: target.id } });
-      }
-
-      // 7. Clear user preferences referencing this device as default
-      await tx.userPreference.updateMany({
-        where: { defaultDeviceId: target.id },
-        data: { defaultDeviceId: null },
+    const activated = await this.prisma.$transaction(async (tx) => {
+      const dev = await tx.device.update({
+        where: { id: target.id },
+        data: {
+          accountStatus: DeviceAccountStatus.ACTIVE,
+          connectionStatus: DeviceConnectionStatus.UNKNOWN,
+          deactivatedAt: null,
+        },
+        include: { capabilities: true },
       });
 
-      // 8. Delete the device row itself
-      await tx.device.delete({ where: { id: target.id } });
-
-      // 9. Record minimal audit event (no secrets/credentials)
       const isUuidActor =
         actorUserId && typeof actorUserId === 'string' && actorUserId.trim().length > 0;
       await tx.auditLog.create({
         data: {
-          eventKey: 'device.deleted',
+          eventKey: 'device.activated',
           actorUserId: isUuidActor ? actorUserId : null,
           targetType: 'Device',
-          targetId: target.id,
+          targetId: dev.id,
           result: 'SUCCESS',
           previousValues: {
-            deviceType: target.deviceType,
             accountStatus: target.accountStatus,
+            connectionStatus: target.connectionStatus,
+          },
+          newValues: {
+            accountStatus: dev.accountStatus,
+            connectionStatus: dev.connectionStatus,
+            deactivatedAt: null,
           },
         },
       });
+
+      return dev;
     });
 
-    return deletedDto;
+    return this.formatPublicSafeDto(activated);
   }
 }

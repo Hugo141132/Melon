@@ -531,6 +531,7 @@ For device resources:
 - `GET /api/v1/devices/{deviceId}` strictly enforces active-account and `device.read` permission checks before querying the database, eliminating device-existence leakage and timing attacks on non-active accounts (`TASK-0305`).
 - IDOR/BOLA attacks attempting to query unassigned or revoked devices return HTTP 403 `DEVICE_NOT_ASSIGNED`.
 - In-app device creation is forbidden; device endpoints do not accept client-side creation requests (`DEC-DEV-027`).
+- **Data-Loss Prevention via Zero Hard Deletion (`DEC-DEV-030`)**: Device hard deletion (`DELETE /api/v1/devices/{deviceId}`) is strictly forbidden and removed across all layers. Device lifecycle is controlled via `POST /deactivate` and `POST /activate`, preserving all historical telemetry, command, alert, and audit logs. Deactivation immediately revokes faucet control capabilities.
 
 ### 10.6 Mass Assignment
 
@@ -1079,6 +1080,9 @@ account.suspended
 account.deactivated
 profilee.self.updated
 profilee.other.updated
+device.updated
+device.activated
+device.deactivated
 device.access.assigned
 device.access.removed
 auth.login.success

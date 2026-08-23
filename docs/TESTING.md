@@ -497,7 +497,7 @@ Test:
 - View versus control.
 - Self-profilee versus other-profilee access.
 - Deny-by-default behaviour.
-- Authorised device list and detail test suite (`TASK-0305` / `DEC-DEV-028`):
+- Authorised device list and detail test suite (`TASK-0305` / `DEC-DEV-028` / `DEC-DEV-030`):
   - `apps/web/app/api/v1/devices/test/route.test.ts` (24/24 tests):
     - Owner global scope with canonical `deviceId` returned in safe DTO.
     - Admin scoped strictly to active assignments (`revokedAt IS NULL`) with canonical `deviceId` concealed.
@@ -506,10 +506,13 @@ Test:
     - Identifier resolution supporting both immutable database UUID `id` and canonical `deviceId` string.
     - Query pagination validation returning HTTP 422 `VALIDATION_ERROR`.
     - Owner-only device update (`PATCH /api/v1/devices/{deviceId}`) with duplicate rejection (HTTP 409 `DUPLICATE_DEVICE_ID`).
-  - `packages/database/test/device-repository.test.ts` (10/10 tests): Repository querying, partial index assignment filtering, and immutable UUID integrity.
+    - Device deactivation (`POST /api/v1/devices/{deviceId}/deactivate`) setting `accountStatus = 'DEACTIVATED'` and `connectionStatus = 'INACTIVE'`.
+    - Device activation (`POST /api/v1/devices/{deviceId}/activate`) setting `accountStatus = 'ACTIVE'`, `connectionStatus = 'UNKNOWN'`, and rejecting Admin calls with HTTP 403 `INSUFFICIENT_PERMISSION`.
+    - Removal of hard deletion (`DELETE /api/v1/devices/{deviceId}` removed).
+  - `packages/database/test/device-repository.test.ts` (12/12 tests): Repository querying, partial index assignment filtering, immutable UUID integrity, `activateDevice` and `deactivateDevice` lifecycle mutations with `audit_logs` persistence.
   - `packages/contracts/src/__tests__/device.test.ts` (7/7 tests): Safe DTO contract validation and schema stripping.
-  - `apps/web/app/devices/test/page.test.ts` (6/6 tests) & `apps/web/app/devices/test/selector.test.ts` (11/11 tests): UI presentation and role-based badge rendering.
-  - Combined device test pass rate: **58/58 tests passed (100%)**.
+  - `apps/web/app/devices/test/page.test.ts` & `apps/web/app/devices/test/selector.test.ts`: UI presentation, Reactivate modal action, and role-based badge rendering.
+  - Combined device test pass rate: **100% passed**.
 
 ## 10.3 Locale Units
 

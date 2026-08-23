@@ -195,5 +195,13 @@ The following facts are verified in the traceability matrix regarding `TASK-0215
 - **Security & Authorization:** Non-sensitive session metadata only; server-side RBAC validation remains authoritative across all routes and API endpoints.
 <!-- TASK-0215 Reconciled: 2026-08-22 -->
 
+---
 
+## Device Lifecycle & Deletion Removal Traceability Implementation Note (Reconciled 2026-08-23)
 
+The following facts are verified in the traceability matrix regarding `TASK-0302` and `TASK-0303` (Device Lifecycle, Activation, and Deletion Removal):
+- **Implementation Status:** `TASK-0302` and `TASK-0303` lifecycle enhancements are implemented and verified (`packages/database/test/device-repository.test.ts` 12/12 passed, `apps/web/app/api/v1/devices/test/route.test.ts` 24/24 passed, full pre-commit quality check `npm run check:quality` clean exit code 0).
+- **Zero Hard Deletion:** Hard deletion (`DELETE /api/v1/devices/{deviceId}`) is eliminated across UI and API layers per `DEC-DEV-030`, preserving all relational history across telemetry, commands, alerts, and audit logs.
+- **Activation & Deactivation Lifecycle:** Implemented `POST /api/v1/devices/{deviceId}/activate` (`device.activate` permission) and `POST /api/v1/devices/{deviceId}/deactivate` (`device.deactivate` permission) restricted strictly to the `OWNER` role.
+- **Audit Logging & Safety:** Deactivation and reactivation operations generate `device.deactivated` and `device.activated` audit logs, while deactivated devices automatically have faucet control capabilities blocked.
+<!-- TASK-0302 Reconciled: 2026-08-23 -->

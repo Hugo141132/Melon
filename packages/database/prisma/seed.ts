@@ -1,4 +1,4 @@
-import { PrismaClient, UserRole } from '@prisma/client';
+import { PrismaClient, UserRole, DeviceType } from '@prisma/client';
 
 export interface SeedPermissionDef {
   code: string;
@@ -111,8 +111,8 @@ export const CANONICAL_PERMISSIONS: SeedPermissionDef[] = [
     adminAccess: false,
   },
   {
-    code: 'device.delete',
-    description: 'Permanently delete device',
+    code: 'device.activate',
+    description: 'Reactivate device',
     ownerAccess: true,
     adminAccess: false,
   },
@@ -338,6 +338,61 @@ export async function seedRBAC(prisma: PrismaClient) {
   };
 }
 
+export async function seedCanonicalDevices(prisma: PrismaClient) {
+  const devices = [
+    {
+      deviceId: 'soil-node-001',
+      deviceType: DeviceType.SOIL_NODE,
+      name: 'Soil Monitoring Node',
+      capabilities: ['SOIL_TELEMETRY'],
+    },
+    {
+      deviceId: 'water-quality-node-001',
+      deviceType: DeviceType.WATER_QUALITY_NODE,
+      name: 'Water Quality Node',
+      capabilities: ['WATER_TELEMETRY'],
+    },
+    {
+      deviceId: 'water-tank-node-zi37gz',
+      deviceType: DeviceType.WATER_TANK_NODE,
+      name: 'Water Tank',
+      capabilities: ['WATER_TANK_VOLUME', 'WATER_FLOW_RATE', 'FAUCET_CONTROL'],
+    },
+  ];
+
+  for (const d of devices) {
+    const device = await prisma.device.upsert({
+      where: { deviceId: d.deviceId },
+      update: {
+        name: d.name,
+        deviceType: d.deviceType,
+      },
+      create: {
+        deviceId: d.deviceId,
+        name: d.name,
+        deviceType: d.deviceType,
+      },
+    });
+
+    for (const cap of d.capabilities) {
+      await prisma.deviceCapability.upsert({
+        where: {
+          deviceId_capability: {
+            deviceId: device.id,
+            capability: cap,
+          },
+        },
+        update: { enabled: true },
+        create: {
+          deviceId: device.id,
+          capability: cap,
+          enabled: true,
+        },
+      });
+    }
+  }
+}
+
 async function main() {
   const dbUrl = process.env.DATABASE_URL;
   if (!dbUrl) {
@@ -357,6 +412,10 @@ async function main() {
     console.log(
       `Successfully seeded ${result.rolesCount} roles and ${result.permissionsCount} permissions.`
     );
+
+    console.log('Seeding canonical system devices...');
+    await seedCanonicalDevices(prisma);
+    console.log('Successfully seeded 3 canonical devices.');
   } catch (error) {
     console.error('Error seeding RBAC data:', error);
     process.exitCode = 1;

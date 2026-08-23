@@ -296,6 +296,9 @@ profilee.self.update
 profilee.other.read
 profilee.other.update
 device.read
+device.update
+device.deactivate
+device.activate
 device.assign
 device.unassign
 monitoring.current.read
@@ -540,6 +543,9 @@ INACTIVE
 - `device_id` shall be unique across active and inactive records.
 - `device_id` is editable only by Owner users. Admin users cannot view or edit canonical `device_id` (`DEC-DEV-028`).
 - In-app device creation is removed; new device records are provisioned via administrative seeds (`DEC-DEV-027`).
+- **No Hard Delete for Devices (`DEC-DEV-030`)**: Devices are never deleted from the database. Deleting devices would destroy foreign-key relationships and erase telemetry, alert, command, and audit histories. Device lifecycle is controlled strictly via deactivation and reactivation:
+  - **Deactivation**: `account_status = 'DEACTIVATED'`, `connection_status = 'INACTIVE'`, and `deactivated_at = NOW()`. Faucet control is blocked.
+  - **Reactivation**: `account_status = 'ACTIVE'`, `connection_status = 'UNKNOWN'`, and `deactivated_at = NULL`. Full operational monitoring is resumed.
 - Previously/last-accessed device history is not stored or persisted (`DEC-DEV-029`). All historical telemetry, command, assignment/revocation, status, and audit data are fully preserved.
 - Device coordinates shall remain within valid latitude and longitude ranges.
 - A deactivated device shall not receive new faucet commands.

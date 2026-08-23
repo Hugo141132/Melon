@@ -965,6 +965,65 @@ flowchart TD
 
 ---
 
+## Flow 22A — Owner Deactivates a Device
+
+**Primary actor:** Owner  
+**Preconditions:** Owner is `ACTIVE`; target device is currently `ACTIVE`.  
+**Trigger:** Owner clicks "Deactivate Device" and confirms in modal on `/devices`.  
+
+**Main success flow:**
+
+1. The Owner views the device list on `/devices` (canonical pre-provisioned devices `soil-node-001`, `water-quality-node-001`, and `water-tank-node-zi37gz` visible by default).
+2. The Owner selects an active device and clicks "Deactivate".
+3. The system presents a confirmation modal detailing the deactivation impact.
+4. The Owner confirms deactivation.
+5. The frontend calls `POST /api/v1/devices/{deviceId}/deactivate`.
+6. The server validates the Owner session and verifies `device.deactivate` permission.
+7. The database updates `accountStatus = DEACTIVATED`, `connectionStatus = INACTIVE`, and records `deactivatedAt = NOW()`.
+8. Any active or pending faucet control capability on the device is immediately blocked.
+9. A `device.deactivated` audit log event is recorded with actor ID and timestamp.
+10. The UI updates device status badge to `DEACTIVATED` (inactive) and presents a "Reactivate" action. All historical telemetry, readings, and logs remain completely preserved.
+
+**Alternative flows:** Device is already deactivated; system returns current status.  
+**Error flows:** Unauthenticated request (401), non-Owner request (403), device not found (404).  
+**Postconditions:** Device is deactivated and prevented from taking commands. Historical data is preserved.  
+**Required permissions:** `device.deactivate` (Owner only).  
+**Audit events:** `device.deactivated`.  
+
+---
+
+## Flow 22B — Owner Reactivates a Device
+
+**Primary actor:** Owner  
+**Preconditions:** Owner is `ACTIVE`; target device is currently `DEACTIVATED`.  
+**Trigger:** Owner clicks "Reactivate" and confirms in modal on `/devices`.  
+
+**Main success flow:**
+
+1. The Owner views deactivated devices on `/devices`.
+2. The Owner clicks "Reactivate" on a deactivated device card.
+3. The system presents an activation confirmation modal.
+4. The Owner confirms reactivation.
+5. The frontend calls `POST /api/v1/devices/{deviceId}/activate`.
+6. The server validates the Owner session and verifies `device.activate` permission (`DEC-DEV-030`).
+7. The database updates `accountStatus = ACTIVE`, resets `connectionStatus = UNKNOWN`, and clears `deactivatedAt = NULL`.
+8. A `device.activated` audit log event is recorded with actor ID and timestamp.
+9. The UI updates the device status badge to `ACTIVE` and restores standard operational views.
+
+**Alternative flows:** Device is already active; system returns current status.  
+**Error flows:** Unauthenticated request (401), non-Owner request (403), device not found (404).  
+**Postconditions:** Device account status is restored to `ACTIVE`.  
+**Required permissions:** `device.activate` (Owner only).  
+**Audit events:** `device.activated`.  
+
+---
+
+## Note on Device Deletion Removal (`DEC-DEV-030`)
+
+The application does NOT provide a "Delete Device" flow. Device removal from the database is permanently disabled across the UI and REST API (`DELETE /api/v1/devices/{deviceId}` removed) to prevent catastrophic data loss across telemetry, audit logs, commands, and access histories.
+
+---
+
 # 9. Monitoring Flows
 
 ## Flow 23 — User Opens the Monitoring Dashboard

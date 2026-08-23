@@ -32,7 +32,7 @@
 |---|---|---|---|
 | **Authentication** | `DEC-AUTH-001` to `DEC-AUTH-012` | **APPROVED** | HTTP-only secure cookies, PostgreSQL session table, 30m idle / 12h max timeouts, CLI Owner seed, no public Owner creation. `SameSite` cookie value: **TBD** — pending explicit user approval. |
 | **RBAC** | `DEC-RBAC-013` to `DEC-RBAC-019` | **APPROVED** | Owner has global device visibility. Admins have mandatory per-device assignments; device assignment automatically grants both monitoring and faucet control. Owners manage assignments. No separate per-user-device `canControl` permission in v1. |
-| **Devices** | `DEC-DEV-020` to `DEC-DEV-029` | **APPROVED** | Multi-protocol architecture: Soil & Water quality monitoring telemetry via REST API over Wi-Fi (no MQTT broker). Water Tank monitoring (tank volume & flow rate) via MQTT through an EMQX broker (MQTT 5.0 over TLS via IoT Gateway). Shared INA219 electrical monitoring via REST/Wi-Fi. Per-device credentials/ACLs, no anonymous access, no direct browser-to-MQTT. Offline threshold: **TBD**. Stale threshold: **TBD**. In-app device creation / Add Device removed (`DEC-DEV-027`). External `deviceId` editable by OWNER only; internal DB UUID immutable; canonical `deviceId` strictly hidden from ADMIN in UI & API (`DEC-DEV-028`). Previously/last-accessed device history & persistent restoration removed while preserving all telemetry/command/assignment/audit history (`DEC-DEV-029`). |
+| **Devices** | `DEC-DEV-020` to `DEC-DEV-030` | **APPROVED** | Multi-protocol architecture: Soil & Water quality monitoring telemetry via REST API over Wi-Fi (no MQTT broker). Water Tank monitoring (tank volume & flow rate) via MQTT through an EMQX broker (MQTT 5.0 over TLS via IoT Gateway). Shared INA219 electrical monitoring via REST/Wi-Fi. Per-device credentials/ACLs, no anonymous access, no direct browser-to-MQTT. Offline threshold: **TBD**. Stale threshold: **TBD**. In-app device creation / Add Device removed (`DEC-DEV-027`). External `deviceId` editable by OWNER only; internal DB UUID immutable; canonical `deviceId` strictly hidden from ADMIN in UI & API (`DEC-DEV-028`). Previously/last-accessed device history & persistent restoration removed while preserving all telemetry/command/assignment/audit history (`DEC-DEV-029`). Hard delete of devices permanently removed in favor of `DEACTIVATED` / `ACTIVE` lifecycle (`DEC-DEV-030`). |
 | **Monitoring** | `DEC-MON-036` to `DEC-MON-050` | **APPROVED** | Three distinct monitoring domains: 1) Soil monitoring (NPK, Temp, Moisture, pH, EC in `µS/cm`, status), 2) Water Quality monitoring (pH, TDS in ppm, EC in `µS/cm`, status), 3) Water Tank monitoring (Tank Vol in `L`, Flow in `m³/h`, status). Canonical display unit for EC is `µS/cm` (values in `mS/cm` converted at presentation boundary via `×1000`). Control capabilities (Solenoid Valve, Relay) are actuators, not monitoring sensors. INA219 electrical monitoring tracks system electrical consumption (voltage, current, power) as device health/power telemetry, not as a battery percentage or primary agronomic measurement. Sensor precision and valid ranges: **TBD**. |
 | **Faucet Control** | `DEC-CTRL-051` to `DEC-CTRL-067` | **APPROVED** | Max 1 active command/device, no auto retries, `ENABLE_FAUCET_CONTROL=false` default, dual written sign-off (Owner + Hardware Lead) required before production activation. Duplicate command IDs never re-dispense. Timeout ≠ completion. ACK timeout, completion timeout, expiry duration: **TBD**. Cancellation/stop support: **TBD**. |
 | **I18N** | `DEC-I18N-068` to `DEC-I18N-074` | **APPROVED** | Default `id` (Bahasa Indonesia), `en` fallback, mandatory centered language-selection gate for unauthenticated visitors without valid locale (`English` -> `en`, `Bahasa Indonesia` -> `id`), cookie-based non-prefixed routing (no URL path pollution), subsequent language changes strictly in Settings (`/settings`), UTC storage with `Asia/Jakarta` (WIB) presentation. |
@@ -240,6 +240,25 @@
      - User-device assignment and revocation history (`user_device_access` with `revokedAt`);
      - Device connectivity and status history (`device_status_events`);
      - Security, authentication, and audit history (`audit_logs`).
+
+#### DEC-DEV-030: Removal of Device Hard Deletion and Transition to Activation / Deactivation Lifecycle
+* **Related Task IDs**: `TASK-0302`, `TASK-0303`
+* **Related Documentation**: `docs/PRD.md` §8.1, `docs/RBAC.md` §6.1, §9.3, §10, `docs/USER_FLOWS.md` §8 (Flow 22A, 22B), `docs/API.md` §14.5, §14.6, §14.8, `docs/DATABASE.md` §3.5, §7.2, `docs/SECURITY.md` §10.5, `docs/UI_UX.md` §6, §7.1
+* **Status**: **APPROVED BY USER (2026-08-23)**
+* **Implementation Status**: **IMPLEMENTED & VERIFIED (2026-08-23 / TASK-0302)**
+* **Approved Decision**:
+  1. **Zero Hard Delete for Devices**: Hard deletion of devices (`DELETE /api/v1/devices/{deviceId}`) is permanently removed from the application UI and REST API. Deleting devices causes catastrophic data loss across telemetry, audit logs, commands, and access histories.
+  2. **Device Activation & Deactivation Lifecycle**: Device lifecycle is managed strictly via `DEACTIVATED` and `ACTIVE` states:
+     - **Deactivation**: Owners can deactivate devices (`POST /api/v1/devices/{deviceId}/deactivate`, `device.deactivate` permission). Sets `accountStatus = 'DEACTIVATED'`, `connectionStatus = 'INACTIVE'`, populates `deactivatedAt = NOW()`, immediately revokes faucet control capabilities, and logs `device.deactivated` in audit logs.
+     - **Reactivation**: Owners can reactivate deactivated devices (`POST /api/v1/devices/{deviceId}/activate`, `device.activate` permission). Sets `accountStatus = 'ACTIVE'`, resets `connectionStatus = 'UNKNOWN'`, clears `deactivatedAt = NULL`, and logs `device.activated` in audit logs.
+  3. **Pre-Provisioned Default Devices**: Standard canonical devices (`soil-node-001`, `water-quality-node-001`, and `water-tank-node-zi37gz`) are seeded and immediately visible to the Owner upon system initialization.
+* **Implementation Evidence**:
+  - Removed `DELETE /api/v1/devices/[deviceId]` route handler and created `POST /api/v1/devices/[deviceId]/activate`.
+  - Implemented `activateDevice` and removed `deleteDevicePermanently` in `DeviceRepository`.
+  - Replaced `device.delete` with `device.activate` permission in seed definitions and database RBAC.
+  - Replaced Delete UI with Activate/Reactivate modal and action buttons in `/devices` page.
+  - Updated English (`en.json`) and Indonesian (`id.json`) translation namespaces.
+  - Updated unit test suites across `packages/database` (12/12 passing) and `apps/web` (24/24 passing).
 
 #### DEC-MON-087: Historical Query API Range Bounds, Pagination Limits & Aggregation Policy
 * **Related Task IDs**: `TASK-0503`

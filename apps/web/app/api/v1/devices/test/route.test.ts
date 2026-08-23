@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { GET } from '../route';
-import { GET as GET_DETAIL, PATCH, DELETE } from '../[deviceId]/route';
+import { GET as GET_DETAIL, PATCH } from '../[deviceId]/route';
 import { POST as DEACTIVATE } from '../[deviceId]/deactivate/route';
+import { POST as ACTIVATE } from '../[deviceId]/activate/route';
 import { AccountStatus, UserRole, DeviceType } from '@kebun-melon/contracts';
 import * as dbModule from '@kebun-melon/database';
 
@@ -19,7 +20,7 @@ const mockGetDevices = vi.fn();
 const mockGetDeviceByCanonicalId = vi.fn();
 const mockUpdateDevice = vi.fn();
 const mockDeactivateDevice = vi.fn();
-const mockDeleteDevicePermanently = vi.fn();
+const mockActivateDevice = vi.fn();
 const mockFindManyUserDeviceAccess = vi.fn().mockResolvedValue([]);
 const mockFindFirstUserDeviceAccess = vi.fn().mockResolvedValue(null);
 
@@ -49,8 +50,8 @@ vi.mock('@kebun-melon/database', async (importOriginal) => {
       deactivateDevice(...args: any[]) {
         return mockDeactivateDevice(...args);
       }
-      deleteDevicePermanently(...args: any[]) {
-        return mockDeleteDevicePermanently(...args);
+      activateDevice(...args: any[]) {
+        return mockActivateDevice(...args);
       }
     },
   };
@@ -577,36 +578,37 @@ describe('Device Registry API Endpoints (TASK-0302 & TASK-0305)', () => {
     });
   });
 
-  describe('DELETE /api/v1/devices/[deviceId]', () => {
-    it('permanently deletes device when requested by Owner', async () => {
+  describe('POST /api/v1/devices/[deviceId]/activate', () => {
+    it('activates device when called by Owner', async () => {
       mockOwnerSession();
 
-      mockDeleteDevicePermanently.mockResolvedValueOnce({
+      mockActivateDevice.mockResolvedValueOnce({
         id: 'dev-1',
         deviceId: 'water-node-001',
-        name: 'Water Node 1',
+        accountStatus: 'ACTIVE',
+        connectionStatus: 'UNKNOWN',
       });
 
-      const req = new Request('http://localhost/api/v1/devices/water-node-001', {
-        method: 'DELETE',
+      const req = new Request('http://localhost/api/v1/devices/water-node-001/activate', {
+        method: 'POST',
       });
 
-      const res = await DELETE(req, { params: Promise.resolve({ deviceId: 'water-node-001' }) });
+      const res = await ACTIVATE(req, { params: Promise.resolve({ deviceId: 'water-node-001' }) });
       const json = await res.json();
 
       expect(res.status).toBe(200);
-      expect(json.success).toBe(true);
-      expect(json.data.deviceId).toBe('water-node-001');
+      expect(json.data.accountStatus).toBe('ACTIVE');
+      expect(json.data.connectionStatus).toBe('UNKNOWN');
     });
 
-    it('rejects delete request by Admin with 403 INSUFFICIENT_PERMISSION', async () => {
+    it('rejects activate request by Admin with 403 INSUFFICIENT_PERMISSION', async () => {
       mockAdminSession();
 
-      const req = new Request('http://localhost/api/v1/devices/water-node-001', {
-        method: 'DELETE',
+      const req = new Request('http://localhost/api/v1/devices/water-node-001/activate', {
+        method: 'POST',
       });
 
-      const res = await DELETE(req, { params: Promise.resolve({ deviceId: 'water-node-001' }) });
+      const res = await ACTIVATE(req, { params: Promise.resolve({ deviceId: 'water-node-001' }) });
       const json = await res.json();
 
       expect(res.status).toBe(403);
@@ -616,15 +618,15 @@ describe('Device Registry API Endpoints (TASK-0302 & TASK-0305)', () => {
     it('returns 404 DEVICE_NOT_FOUND when device does not exist', async () => {
       mockOwnerSession();
 
-      mockDeleteDevicePermanently.mockRejectedValueOnce(
+      mockActivateDevice.mockRejectedValueOnce(
         new dbModule.DeviceNotFoundError("Device 'non-existent' not found.")
       );
 
-      const req = new Request('http://localhost/api/v1/devices/non-existent', {
-        method: 'DELETE',
+      const req = new Request('http://localhost/api/v1/devices/non-existent/activate', {
+        method: 'POST',
       });
 
-      const res = await DELETE(req, { params: Promise.resolve({ deviceId: 'non-existent' }) });
+      const res = await ACTIVATE(req, { params: Promise.resolve({ deviceId: 'non-existent' }) });
       const json = await res.json();
 
       expect(res.status).toBe(404);

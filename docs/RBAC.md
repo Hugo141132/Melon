@@ -202,6 +202,7 @@ The Owner shall be able to:
 - Suspend Admin accounts.
 - Deactivate Admin accounts.
 - Assign or remove device access for Admin users.
+- Activate or deactivate devices (`device.activate`, `device.deactivate`). Hard delete is eliminated per `DEC-DEV-030`.
 - Edit external canonical `deviceId` and device `name` (`DEC-DEV-028`). Note: in-app device creation is removed per `DEC-DEV-027`.
 - View account and control audit records.
 - Manage access-related settings permitted by the final system policy.
@@ -385,6 +386,7 @@ device.read (Owner: global with canonical deviceId; Admin: active assignments wi
 device.create (REMOVED per DEC-DEV-027)
 device.update (Owner-only: can edit canonical deviceId & name per DEC-DEV-028)
 device.deactivate (Owner-only)
+device.activate (Owner-only per DEC-DEV-030)
 device.assign (Owner-only)
 device.unassign (Owner-only)
 ```
@@ -464,6 +466,7 @@ Legend:
 | `device.create` | Removed per `DEC-DEV-027` | Deny / Removed |
 | `device.update` | Allow (can edit canonical `deviceId` & `name` per `DEC-DEV-028`) | Deny |
 | `device.deactivate` | Allow | Deny |
+| `device.activate` | Allow | Deny |
 | `device.assign` | Allow | Deny |
 | `device.unassign` | Allow | Deny |
 | `monitoring.current.read` | Allow within scope | Allow for assigned devices |

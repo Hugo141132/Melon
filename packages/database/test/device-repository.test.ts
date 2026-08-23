@@ -273,49 +273,37 @@ describe('DeviceRepository Unit Tests (TASK-0302)', () => {
     });
   });
 
-  describe('deleteDevicePermanently', () => {
-    it('transactionally deletes all dependent records and device row with audit', async () => {
+  describe('activateDevice', () => {
+    it('sets accountStatus = ACTIVE and connectionStatus = UNKNOWN', async () => {
       const existing = {
         id: '44444444-4444-4444-4444-444444444444',
         deviceId: 'soil-node-003',
         name: 'Soil Node 3',
         deviceType: 'SOIL_NODE',
-        accountStatus: 'ACTIVE',
-        connectionStatus: 'ONLINE',
+        accountStatus: 'DEACTIVATED',
+        connectionStatus: 'INACTIVE',
         capabilities: [],
       };
 
       mockPrisma.device.findFirst.mockResolvedValue(existing);
-      mockPrisma.deviceCapability = { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) };
-      mockPrisma.userDeviceAccess = { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) };
-      mockPrisma.deviceStatusEvent = { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) };
-      mockPrisma.soilReading = { deleteMany: vi.fn().mockResolvedValue({ count: 5 }) };
-      mockPrisma.waterReading = { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) };
-      mockPrisma.reservoirWaterReading = { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) };
-      mockPrisma.sensorBatteryReading = { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) };
-      mockPrisma.faucetCommand = {
-        findMany: vi.fn().mockResolvedValue([]),
-        deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
-      };
-      mockPrisma.faucetCommandEvent = { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) };
-      mockPrisma.alert = {
-        findMany: vi.fn().mockResolvedValue([]),
-        deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
-      };
-      mockPrisma.alertAcknowledgement = { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) };
-      mockPrisma.userPreference = { updateMany: vi.fn().mockResolvedValue({ count: 0 }) };
-      mockPrisma.device.delete = vi.fn().mockResolvedValue(existing);
 
-      const result = await repo.deleteDevicePermanently('soil-node-003', 'owner-id');
+      const activatedRaw = {
+        ...existing,
+        accountStatus: 'ACTIVE',
+        connectionStatus: 'UNKNOWN',
+        deactivatedAt: null,
+      };
 
-      expect(result.deviceId).toBe('soil-node-003');
-      expect(mockPrisma.device.delete).toHaveBeenCalledWith({
-        where: { id: existing.id },
-      });
+      mockPrisma.device.update.mockResolvedValue(activatedRaw);
+
+      const result = await repo.activateDevice('soil-node-003', 'owner-id');
+
+      expect(result.accountStatus).toBe(DeviceAccountStatus.ACTIVE);
+      expect(result.connectionStatus).toBe(DeviceConnectionStatus.UNKNOWN);
       expect(mockPrisma.auditLog.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            eventKey: 'device.deleted',
+            eventKey: 'device.activated',
             actorUserId: 'owner-id',
           }),
         })
@@ -325,7 +313,7 @@ describe('DeviceRepository Unit Tests (TASK-0302)', () => {
     it('throws DeviceNotFoundError if target device does not exist', async () => {
       mockPrisma.device.findFirst.mockResolvedValue(null);
 
-      await expect(repo.deleteDevicePermanently('unknown-id', 'owner-id')).rejects.toThrow(
+      await expect(repo.activateDevice('unknown-id', 'owner-id')).rejects.toThrow(
         DeviceNotFoundError
       );
     });

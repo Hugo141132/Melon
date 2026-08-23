@@ -367,6 +367,14 @@ The selector and `/devices` card list shall support:
 - an empty state when no device is assigned;
 - role-appropriate presentation (`TASK-0305`): Owner users see canonical `deviceId` string badges alongside custom names; Admin users see only custom device names or localized default type labels (`Soil Sensor Node` / `Node Sensor Tanah`) with canonical `deviceId` strictly concealed.
 
+### 7.1.1 Device Management Actions on `/devices` (`DEC-DEV-030`)
+
+The `/devices` view governs device lifecycle operations strictly restricted to the `OWNER` role:
+- **No In-App Device Creation**: The "Add Device" button and creation modal are removed (`DEC-DEV-027`).
+- **No Device Deletion**: The "Delete Device" button and delete confirmation modal are removed (`DEC-DEV-030`) to prevent permanent data loss.
+- **Deactivate Action**: Active devices display a "Deactivate" action. Clicking it opens a confirmation modal explaining that deactivation sets connection state to `INACTIVE` and blocks faucet control commands.
+- **Reactivate Action**: Deactivated devices display an amber status badge and a prominent "Reactivate" button. Clicking it triggers an activation confirmation modal that restores the device to `ACTIVE` operational status via `POST /api/v1/devices/{deviceId}/activate`.
+
 ### 7.2 Device Context Persistence & Neutral Initial State
 
 The selected device is retained in-memory during active application navigation.

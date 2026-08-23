@@ -315,7 +315,11 @@ Each device record shall support:
 
 Device provisioning and identity rules:
 
+- **Pre-Provisioned Canonical Devices**: Devices are pre-provisioned in the database (including `soil-node-001`, `water-quality-node-001`, and `water-tank-node-zi37gz`) and are immediately visible to the Owner upon system setup.
 - **No In-App Device Creation**: Devices cannot be created from `/devices` or through the application UI/API. The Add Device requirement is removed (`DEC-DEV-027`). Existing devices remain provisioned in the database.
+- **Device Lifecycle & Removal of Hard Deletion (`DEC-DEV-030`)**: Hard deletion of devices is permanently removed to prevent irreversible data loss across telemetry, audit, command, and alert records. Device lifecycle is managed strictly via `DEACTIVATED` and `ACTIVE` transitions.
+  - **Deactivation**: Owners can deactivate devices (`POST /api/v1/devices/{deviceId}/deactivate`). Deactivation sets `accountStatus = DEACTIVATED`, `connectionStatus = INACTIVE`, populates `deactivatedAt = NOW()`, revokes faucet control capabilities, and logs a `device.deactivated` audit event.
+  - **Reactivation**: Owners can reactivate deactivated devices (`POST /api/v1/devices/{deviceId}/activate`). Reactivation sets `accountStatus = ACTIVE`, resets `connectionStatus = UNKNOWN`, clears `deactivatedAt = NULL`, and logs a `device.activated` audit event.
 - **Owner-Only Canonical `deviceId` Edit**: The Owner may update the external canonical `deviceId` string and `name`. The internal database UUID remains immutable to safeguard relational integrity (`DEC-DEV-028`).
 - **Strict Admin `deviceId` Concealment**: Admin users MUST NOT view or edit the external canonical `deviceId` in any UI component or API response. Admins only see the user-facing device name (`name`) or localized system default name (`DEC-DEV-028`).
 - **Hardware/Broker Rename Reconciliation**: Physical ESP32/NodeMCU firmware reconfiguration and EMQX broker credential/ACL synchronization following a `deviceId` rename are operational workflows marked as **TBD / BLOCKING** automation (`DEC-DEV-028`).

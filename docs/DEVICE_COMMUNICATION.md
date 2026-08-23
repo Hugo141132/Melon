@@ -289,6 +289,7 @@ Rules:
 - A device shall not publish as another device.
 - Device credentials shall be bound to the permitted `deviceId`.
 - Topic authorisation shall prevent cross-device access.
+- Deactivated devices (`accountStatus = 'DEACTIVATED'`) transition `connectionStatus` to `INACTIVE` and are rejected from executing new faucet commands. Reactivation resets `connectionStatus` to `UNKNOWN` until new communication is established (`DEC-DEV-030`).
 - Operational and hardware procedures for reconciling physical ESP32/NodeMCU firmware configurations and EMQX broker credentials/ACLs following a `deviceId` rename are **TBD / BLOCKING** automation (`DEC-DEV-028`).
 
 ---

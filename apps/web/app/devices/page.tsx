@@ -16,6 +16,7 @@ import {
   Clock,
   Radio,
   Sliders,
+  RotateCcw,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
@@ -84,11 +85,10 @@ export default function DeviceRegistryPage() {
   const [deactivateModalOpen, setDeactivateModalOpen] = useState(false);
   const [deactivateSubmitting, setDeactivateSubmitting] = useState(false);
 
-  // Hard Delete Modal State
-  const [deleteDevice, setDeleteDevice] = useState<PublicSafeDeviceDto | null>(null);
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const [deleteConfirmedChecked, setDeleteConfirmedChecked] = useState(false);
-  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+  // Activate Modal State
+  const [activateDevice, setActivateDevice] = useState<PublicSafeDeviceDto | null>(null);
+  const [activateModalOpen, setActivateModalOpen] = useState(false);
+  const [activateSubmitting, setActivateSubmitting] = useState(false);
 
   // Check auth session
   useEffect(() => {
@@ -217,35 +217,32 @@ export default function DeviceRegistryPage() {
     }
   };
 
-  // Handle Permanent Delete Device
-  const handleDeletePermanently = async () => {
-    if (!deleteDevice || !deleteConfirmedChecked) return;
+  // Handle Activate Device
+  const handleActivate = async () => {
+    if (!activateDevice) return;
 
-    setDeleteSubmitting(true);
+    setActivateSubmitting(true);
     setErrorMsg(null);
 
     try {
-      const targetIdentifier = deleteDevice.deviceId || deleteDevice.id;
-      const res = await fetch(`/api/v1/devices/${targetIdentifier}`, {
-        method: 'DELETE',
+      const targetIdentifier = activateDevice.deviceId || activateDevice.id;
+      const res = await fetch(`/api/v1/devices/${targetIdentifier}/activate`, {
+        method: 'POST',
       });
 
       const json = await res.json();
       if (json.success) {
-        setSuccessMsg(
-          `Perangkat '${deleteDevice.name}' telah dihapus secara permanen dari database.`
-        );
-        setDeleteModalOpen(false);
-        setDeleteDevice(null);
-        setDeleteConfirmedChecked(false);
+        setSuccessMsg(`Perangkat '${activateDevice.name}' telah diaktifkan kembali.`);
+        setActivateModalOpen(false);
+        setActivateDevice(null);
         fetchDevices(pagination.page);
       } else {
-        setErrorMsg(json.error?.message || 'Gagal menghapus perangkat.');
+        setErrorMsg(json.error?.message || 'Gagal mengaktifkan perangkat.');
       }
     } catch {
-      setErrorMsg('Terjadi kesalahan jaringan saat menghapus perangkat.');
+      setErrorMsg('Terjadi kesalahan jaringan saat mengaktifkan perangkat.');
     } finally {
-      setDeleteSubmitting(false);
+      setActivateSubmitting(false);
     }
   };
 
@@ -456,17 +453,18 @@ export default function DeviceRegistryPage() {
                             <PowerOff size={16} />
                           </button>
                         )}
-                        <button
-                          onClick={() => {
-                            setDeleteDevice(device);
-                            setDeleteConfirmedChecked(false);
-                            setDeleteModalOpen(true);
-                          }}
-                          className="p-1.5 rounded-lg hover:bg-rose-50 text-rose-600 transition-colors active:scale-95"
-                          title={tDevices('deleteConfirmTitle')}
-                        >
-                          <X size={16} />
-                        </button>
+                        {isDeactivated && (
+                          <button
+                            onClick={() => {
+                              setActivateDevice(device);
+                              setActivateModalOpen(true);
+                            }}
+                            className="p-1.5 rounded-lg hover:bg-emerald-50 text-emerald-600 transition-colors active:scale-95"
+                            title={tDevices('activateConfirmTitle')}
+                          >
+                            <RotateCcw size={16} />
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -699,58 +697,40 @@ export default function DeviceRegistryPage() {
         </div>
       )}
 
-      {/* Permanent Hard Delete Confirmation Modal */}
-      {deleteModalOpen && deleteDevice && (
+      {/* Activate Confirm Modal */}
+      {activateModalOpen && activateDevice && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-app-surface-container-lowest rounded-2xl max-w-md w-full p-6 space-y-5 soft-elevation-lg animate-scale-up border border-rose-200">
-            <div className="flex items-center gap-3 text-rose-600">
-              <AlertTriangle size={24} />
-              <h3 className="text-[18px] font-bold text-rose-700">
-                {tDevices('deleteConfirmTitle')}
-              </h3>
+          <div className="bg-app-surface-container-lowest rounded-2xl max-w-md w-full p-6 space-y-5 soft-elevation-lg animate-scale-up border border-emerald-200">
+            <div className="flex items-center gap-3 text-emerald-600">
+              <CheckCircle2 size={24} />
+              <h3 className="text-[18px] font-bold">{tDevices('activateConfirmTitle')}</h3>
             </div>
 
             <p className="text-[14px] text-app-on-surface-variant leading-relaxed">
-              <strong className="text-app-on-surface">{deleteDevice.name}</strong>
+              <strong className="text-app-on-surface">{activateDevice.name}</strong>
               <br />
               <br />
-              <span className="text-rose-700 font-medium block bg-rose-50 p-3 rounded-xl border border-rose-200">
-                {tDevices('deleteWarning')}
+              <span className="text-emerald-700 font-medium block bg-emerald-50 p-3 rounded-xl border border-emerald-200">
+                {tDevices('activateWarning')}
               </span>
             </p>
-
-            <div className="pt-2">
-              <label className="flex items-center gap-2.5 cursor-pointer text-[13px] font-semibold text-rose-900 select-none">
-                <input
-                  type="checkbox"
-                  checked={deleteConfirmedChecked}
-                  onChange={(e) => setDeleteConfirmedChecked(e.target.checked)}
-                  className="w-4 h-4 text-rose-600 rounded focus:ring-rose-500 border-rose-300"
-                />
-                <span>{tDevices('deleteAgreeCheckbox')}</span>
-              </label>
-            </div>
 
             <div className="flex items-center justify-end gap-3 pt-3 border-t border-app-outline-variant/20">
               <button
                 type="button"
-                onClick={() => {
-                  setDeleteModalOpen(false);
-                  setDeleteDevice(null);
-                  setDeleteConfirmedChecked(false);
-                }}
+                onClick={() => setActivateModalOpen(false)}
                 className="px-4 py-2 text-[14px] font-semibold text-app-on-surface-variant hover:bg-app-surface-container rounded-xl"
               >
                 {tCommon('cancel')}
               </button>
               <button
                 type="button"
-                onClick={handleDeletePermanently}
-                disabled={!deleteConfirmedChecked || deleteSubmitting}
-                className="inline-flex items-center gap-2 px-5 py-2 text-[14px] font-semibold bg-rose-600 text-white rounded-xl hover:bg-rose-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                onClick={handleActivate}
+                disabled={activateSubmitting}
+                className="inline-flex items-center gap-2 px-5 py-2 text-[14px] font-semibold bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                {deleteSubmitting && <Loader2 size={16} className="animate-spin" />}
-                <span>{tDevices('deleteConfirmBtn')}</span>
+                {activateSubmitting && <Loader2 size={16} className="animate-spin" />}
+                <span>{tDevices('activateConfirmBtn')}</span>
               </button>
             </div>
           </div>

@@ -960,14 +960,17 @@ Implement sites if required for version 1.
 **Priority:** `P0`
 **Status:** `DONE`
 **Dependencies:** `TASK-0104`
-**Completed:** 2026-08-18 — Reconciled and implemented Device Registry per `DEC-DEV-027` and `DEC-DEV-028`:
+**Completed:** 2026-08-23 — Reconciled and implemented Device Registry per `DEC-DEV-027`, `DEC-DEV-028`, and `DEC-DEV-030`:
 - Removed all in-app/API device creation (`POST /api/v1/devices`, "Add Device" button/modal, creation DTOs/types, and `device.create` permission from `seed.ts` and `device-repository.ts` per `DEC-DEV-027`); existing pre-provisioned devices remain preserved in PostgreSQL database.
+- Permanently eliminated hard device deletion (`DELETE /api/v1/devices/{deviceId}` and delete UI modal removed per `DEC-DEV-030`), preserving all historical relational telemetry, alerts, and audit logs.
+- Implemented `POST /api/v1/devices/{deviceId}/activate` and `POST /api/v1/devices/{deviceId}/deactivate` backed by `activateDevice` and `deactivateDevice` in `DeviceRepository` with `device.activate` and `device.deactivate` Owner permissions.
+- Pre-seeded canonical devices (`soil-node-001`, `water-quality-node-001`, and `water-tank-node-zi37gz`) immediately visible to Owner by default.
 - Enforced internal database primary key UUID (`devices.id`) immutability, preserving all relational references (`user_device_access`, telemetry, commands, alerts) across external renames.
 - Allowed Owner to update external canonical `deviceId` and `name` via `PATCH /api/v1/devices/{deviceId}` with canonical uniqueness enforcement (`DeviceConflictError` -> HTTP 409 `DUPLICATE_DEVICE_ID`).
 - Enforced strict Admin canonical `deviceId` concealment across `GET /api/v1/devices`, `GET /api/v1/devices/{deviceId}`, and `/devices` UI cards via role-based projection (`DEC-DEV-028`).
 - Strictly protected device secrets and credentials, preventing client overrides of server-controlled status/telemetry fields via `.strict()` schema stripping.
 - Documented physical ESP32/NodeMCU firmware reconfiguration and EMQX broker credential/ACL synchronization following a rename as **TBD / BLOCKING** operational automation (`DEC-DEV-028`).
-- Verified 100% test pass rate across all 4 unit test suites (42/42 tests), Semgrep scan (0 findings), TypeScript typecheck (0 errors), Next.js production build (37/37 routes), and Playwright runtime verification.
+- Verified 100% test pass rate across unit test suites (`device-repository.test.ts` 12/12, `route.test.ts` 24/24), TypeScript typecheck (0 errors), Next.js production build (37/37 routes), and pre-commit quality gate (`npm run check:quality`).
 
 ### Work
 

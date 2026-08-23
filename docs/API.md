@@ -1431,21 +1431,73 @@ Rules:
 POST /api/v1/devices/{deviceId}/deactivate
 ```
 
-**Authentication:** Required
-**Permission:** `device.deactivate`
+**Authentication:** Required  
+**Permission:** `device.deactivate` (Owner only)  
+**Description:** Deactivates an active device, setting `accountStatus = 'DEACTIVATED'`, `connectionStatus = 'INACTIVE'`, populating `deactivatedAt = NOW()`, and preventing faucet commands.
 
-The system shall prevent new faucet commands after deactivation.
+Response:
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "11111111-1111-1111-1111-111111111111",
+    "deviceId": "water-node-001",
+    "accountStatus": "DEACTIVATED",
+    "connectionStatus": "INACTIVE"
+  },
+  "meta": { "requestId": "req-1724400000000" }
+}
+```
 
 ---
 
-## 14.6 List Device Capabilities
+## 14.6 Activate Device
+
+```http
+POST /api/v1/devices/{deviceId}/activate
+```
+
+**Authentication:** Required  
+**Permission:** `device.activate` (Owner only; `DEC-DEV-030`)  
+**Description:** Reactivates a deactivated device, restoring `accountStatus = 'ACTIVE'`, resetting `connectionStatus = 'UNKNOWN'`, and clearing `deactivatedAt = NULL`.
+
+Response:
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "11111111-1111-1111-1111-111111111111",
+    "deviceId": "water-node-001",
+    "accountStatus": "ACTIVE",
+    "connectionStatus": "UNKNOWN"
+  },
+  "meta": { "requestId": "req-1724400000000" }
+}
+```
+
+---
+
+## 14.7 List Device Capabilities
 
 ```http
 GET /api/v1/devices/{deviceId}/capabilities
 ```
 
-**Authentication:** Required
+**Authentication:** Required  
 **Permission:** `device.read`
+
+---
+
+## 14.8 Delete Device
+
+```http
+DELETE /api/v1/devices/{deviceId}
+```
+
+**Status:** `REMOVED / FORBIDDEN` per `DEC-DEV-030`  
+**Description:** Hard deletion of devices is permanently removed to prevent catastrophic relational data loss across telemetry, audit trails, commands, and access assignments. Device lifecycle must be managed exclusively via Deactivation and Reactivation.
 
 ---
 

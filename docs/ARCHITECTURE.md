@@ -85,6 +85,8 @@ Every device-specific operation shall be scoped by a canonical `deviceId`. Servi
 
 Authorised device endpoints (`GET /api/v1/devices`, `GET /api/v1/devices/{deviceId}`) enforce role-based projection and scoping (`DEC-DEV-028` / `TASK-0305`): Owner receives global visibility with canonical `deviceId`, while Admin visibility is strictly limited to active assignments (`revokedAt IS NULL`) with canonical `deviceId` strictly concealed. Safe internal database UUID `id` is retained.
 
+**Device Lifecycle & Zero Hard Deletion (`DEC-DEV-030`)**: Devices are pre-provisioned via database seeds (including canonical devices `soil-node-001`, `water-quality-node-001`, and `water-tank-node-zi37gz`) and visible to Owner by default. In-app device creation and hard deletion are eliminated to safeguard historical telemetry and audit trails. Device state transitions between `ACTIVE` and `DEACTIVATED` via dedicated `POST /activate` and `POST /deactivate` endpoints guarded by Owner RBAC permissions.
+
 No service shall assume that only one device exists. Domain routes use canonical `/soil` and `/water` paths; legacy `/tanah` and `/air` paths return 404 Not Found.
 
 ### 3.5 Secure by Default
