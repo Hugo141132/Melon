@@ -13,7 +13,6 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { useTranslations } from 'next-intl';
-import { NPK_TREND_DATA } from '@/lib/constants';
 import { BaseSeriesItem } from '@/hooks/useHistoricalMonitoring';
 
 const NPK_COLORS = {
@@ -30,7 +29,7 @@ export interface NPKChartProps {
 }
 
 export default function NPKChart({
-  data = NPK_TREND_DATA as any[],
+  data = [],
   selectedMetric = 'npk',
   loading = false,
   error = null,

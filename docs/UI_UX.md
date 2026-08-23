@@ -1287,3 +1287,16 @@ The verified implementation of `TASK-0215` (Centralized Authentication State Hyd
 - **Instant Role-Gated Rendering:** `OWNER`-specific navigation and settings items (`/users` and `/approvals`) render instantly without progressive popping or delayed entry.
 <!-- TASK-0215 Reconciled: 2026-08-22 -->
 
+---
+
+## Live Soil and Water Monitoring UI/UX Implementation Note (Reconciled 2026-08-23)
+
+The verified implementation of `TASK-0502` (Live Soil and Water Monitoring UI Data Binding & Telemetry Freshness) reconciles live sensor presentation with strict UI/UX governance:
+- **Design Tokens & Visual Pattern Preserved:** Adheres strictly to `Premium Minimal Ops`. All 7 soil metrics (Nitrogen, Phosphorus, Potassium, Temperature, Moisture, pH, EC) use the unified `SoilMetricMeter` card pattern with matching typography, padding, color tokens, and gauge styling.
+- **Zero Mock Telemetry / Zero Invented Values:** Removed all mock fallback datasets (`NPK_TREND_DATA`, `EC_TREND_DATA`) from charts (`NPKChart`, `WaterNutrientChart`). Empty historical responses render localized empty notices (`Tidak ada data riwayat untuk rentang waktu ini.`) without fake graph lines.
+- **Stale Telemetry Suppression:** When data is marked stale (`isStale: true` or `connectionStatus: STALE`), numerical sensor values are suppressed and rendered as `'-'` with `0%` gauge fills. Active status quotes are hidden, and a prominent amber Stale Alert Banner (`Update: Real-Time: Kedaluwarsa`) is displayed while preserving `lastSeenAt`/`recordedAt` timestamps.
+- **Clean Parameter Naming:** Soil parameter labels in Indonesian and English dictionaries use clean, non-redundant titles without "Soil" / "Tanah" prefixes (`Nitrogen`, `Fosfor` / `Phosphorus`, `Kalium` / `Potassium`, `Suhu` / `Temperature`, `Kelembapan` / `Moisture`, `pH`, `EC`).
+- **Agreed Units:** NPK (`mg/kg`), pH (*no unit*), Moisture (`%RH`), Temperature (`°C`), EC (`µS/cm`), TDS (`ppm`).
+<!-- TASK-0502 Reconciled: 2026-08-23 -->
+
+

@@ -11,7 +11,6 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { useTranslations } from 'next-intl';
-import { EC_TREND_DATA } from '@/lib/constants';
 import { BaseSeriesItem } from '@/hooks/useHistoricalMonitoring';
 
 export interface WaterNutrientChartProps {
@@ -22,7 +21,7 @@ export interface WaterNutrientChartProps {
 }
 
 export default function WaterNutrientChart({
-  data = EC_TREND_DATA as any[],
+  data = [],
   selectedMetric = 'ec',
   loading = false,
   error = null,

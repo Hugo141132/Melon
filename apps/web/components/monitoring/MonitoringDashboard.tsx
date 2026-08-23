@@ -207,7 +207,11 @@ function SoilMonitoringSection({ data, recordedAt }: SoilSectionProps) {
         />
         <MetricItem
           label={`${tSoil('ec')} (${tSoil('status')})`}
-          value={data.ec !== null && data.ec !== undefined ? formatMetricValue(Math.round(data.ec * 1000), 0) : '-'}
+          value={
+            data.ec !== null && data.ec !== undefined
+              ? formatMetricValue(Math.round(data.ec * 1000), 0)
+              : '-'
+          }
           unit="µS/cm"
           icon={<Gauge size={16} />}
         />
@@ -270,7 +274,11 @@ function WaterQualitySection({ data, recordedAt }: WaterQualitySectionProps) {
         />
         <MetricItem
           label={tWater('ec')}
-          value={data.ec !== null && data.ec !== undefined ? formatMetricValue(Math.round(data.ec * 1000), 0) : '-'}
+          value={
+            data.ec !== null && data.ec !== undefined
+              ? formatMetricValue(Math.round(data.ec * 1000), 0)
+              : '-'
+          }
           unit="µS/cm"
           icon={<Gauge size={16} />}
         />

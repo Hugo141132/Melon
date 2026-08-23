@@ -54,10 +54,14 @@ function ECGauge({ value }: { value: number | null | undefined }) {
           <span className="text-[12px] leading-4 text-app-on-surface-variant">µS/cm</span>
         </div>
       </div>
-      <div className="flex items-center gap-2 bg-app-primary/10 px-4 py-1.5 rounded-full mt-2">
-        <CheckCircle size={16} className="text-app-primary" />
-        <span className="text-[14px] font-semibold text-app-primary">{tWater('statusStable')}</span>
-      </div>
+      {hasValue && (
+        <div className="flex items-center gap-2 bg-app-primary/10 px-4 py-1.5 rounded-full mt-2">
+          <CheckCircle size={16} className="text-app-primary" />
+          <span className="text-[14px] font-semibold text-app-primary">
+            {tWater('statusStable')}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
@@ -124,9 +128,19 @@ export default function WaterPage() {
 
   const waterData = snapshot?.water?.data;
   const recordedAt = snapshot?.water?.recordedAt;
-  const phVal = waterData?.ph ?? null;
-  const tdsVal = waterData?.tds ?? null;
-  const ecVal = waterData?.ec ?? null;
+  const lastSeenAt = snapshot?.lastSeenAt || selectedDevice?.lastSeenAt;
+
+  // Stale evaluation: top-level hook isStale, top-level connectionStatus === 'STALE', or domain isStale
+  const isTelemetryStale = Boolean(
+    isStale || snapshot?.water?.isStale || snapshot?.connectionStatus === 'STALE'
+  );
+
+  const phVal = !isTelemetryStale ? (waterData?.ph ?? null) : null;
+  const tdsVal = !isTelemetryStale ? (waterData?.tds ?? null) : null;
+  const ecVal = !isTelemetryStale ? (waterData?.ec ?? null) : null;
+  const hasTelemetry = Boolean(
+    !isTelemetryStale && waterData && (phVal !== null || tdsVal !== null || ecVal !== null)
+  );
   const statusLabel = waterData?.status || tCommon('optimal');
 
   return (
@@ -160,33 +174,51 @@ export default function WaterPage() {
                 <div className="flex items-center gap-2">
                   <div
                     className={`w-2 h-2 rounded-full ${
-                      isStale ? 'bg-amber-500' : 'bg-app-primary animate-pulse'
+                      isTelemetryStale
+                        ? 'bg-amber-500'
+                        : hasTelemetry
+                          ? 'bg-app-primary animate-pulse'
+                          : 'bg-gray-400'
                     }`}
                   />
                   <span
                     className={`text-[14px] font-semibold ${
-                      isStale ? 'text-amber-700 dark:text-amber-400' : 'text-app-primary'
+                      isTelemetryStale
+                        ? 'text-amber-700 dark:text-amber-400'
+                        : hasTelemetry
+                          ? 'text-app-primary'
+                          : 'text-app-on-surface-variant'
                     }`}
                   >
-                    {isStale
+                    {isTelemetryStale
                       ? tCommon('stale')
-                      : tWater('statusLabel', { status: statusLabel })}
+                      : hasTelemetry
+                        ? tWater('statusLabel', { status: statusLabel })
+                        : tCommon('noDataAvailable')}
                   </span>
                 </div>
                 <span className="text-[12px] text-app-on-surface-variant flex items-center gap-1">
                   <Clock size={12} />
                   {tCommon('recordedAt', {
-                    time: formatTimestamp(recordedAt, tCommon('noDataAvailable')),
+                    time: formatTimestamp(recordedAt || lastSeenAt, tCommon('noDataAvailable')),
                   })}
                 </span>
               </div>
-              <p className="text-[18px] leading-7 font-semibold text-app-on-surface">
-                {tWater('qualityQuote')}
-              </p>
+              {hasTelemetry ? (
+                <p className="text-[18px] leading-7 font-semibold text-app-on-surface">
+                  {tWater('qualityQuote')}
+                </p>
+              ) : (
+                <p className="text-[14px] text-app-on-surface-variant">
+                  {isTelemetryStale
+                    ? `${tSoil('realtimeUpdate')}: ${tCommon('stale')}`
+                    : tSoil('noDataNotice')}
+                </p>
+              )}
             </section>
 
             {/* Stale Alert Banner */}
-            {isStale && (
+            {isTelemetryStale && (
               <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-center gap-3 animate-fade-in">
                 <AlertTriangle size={20} className="text-amber-600 flex-shrink-0" />
                 <p className="text-[13px] leading-5 text-amber-800 dark:text-amber-300 font-medium">
@@ -238,10 +270,12 @@ export default function WaterPage() {
                     <span className="text-[12px] text-app-on-surface-variant">ppm</span>
                   </div>
                 </div>
-                <div className="mt-4 flex items-center gap-1 text-app-primary">
-                  <TrendingUp size={14} />
-                  <span className="text-[12px] font-semibold">{tWater('statusOptimal')}</span>
-                </div>
+                {tdsVal !== null && (
+                  <div className="mt-4 flex items-center gap-1 text-app-primary">
+                    <TrendingUp size={14} />
+                    <span className="text-[12px] font-semibold">{tWater('statusOptimal')}</span>
+                  </div>
+                )}
               </div>
             </div>
 

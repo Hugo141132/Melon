@@ -1209,18 +1209,18 @@ The application does NOT provide a "Delete Device" flow. Device removal from the
 
 **Main success flow:**
 
-1. The system compares the latest timestamp with the configured stale threshold.
-2. The UI labels the data as stale.
-3. The last update time remains visible.
-4. The system avoids representing stale data as current.
+1. The system compares the latest timestamp with the configured stale threshold or reads `isStale: true` from API response.
+2. The UI displays the amber Stale Alert Banner (`Update: Real-Time: Kedaluwarsa`) and suppresses live numeric sensor values into `'-'` placeholders with `0%` gauge fills.
+3. The last update time (`recordedAt` / `lastSeenAt`) remains clearly visible.
+4. The system avoids representing stale telemetry as current live data.
 5. Faucet control evaluates device and state rules independently.
 
-**Alternative flows:** Device remains online but readings are stale.
+**Alternative flows:** Device remains online or in unknown state but readings are stale.
 **Error flows:** Missing timestamp is treated as unknown or invalid, not current.
-**Postconditions:** User sees last-known values with a warning.
+**Postconditions:** Stale status and last seen timestamp are shown with sensor values safely suppressed.
 **Required permissions:** Relevant monitoring read permission.
 **Relevant account statuses:** `ACTIVE`.
-**UI states:** Stale warning.
+**UI states:** Stale alert banner, placeholder '-' metrics, preserved timestamp.
 **Audit events:** Optional stale-data alert.
 **Open decisions:** Exact stale threshold.
 

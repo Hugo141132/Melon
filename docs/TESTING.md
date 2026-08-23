@@ -2148,4 +2148,27 @@ Automated unit, context mock, component rendering, and RBAC verification for cen
 4. **Security & Quality Compliance:** Zero regressions in existing security headers, rate limiting, and server-side RBAC guards.
 <!-- TASK-0215 Reconciled: 2026-08-22 -->
 
+---
+
+# 51. Live Soil and Water Monitoring & Telemetry Freshness Verification Suite (`TASK-0502`)
+
+Automated unit, context, empty state, and telemetry freshness verification for live soil and water monitoring UI:
+
+### Agent-Executed Automated Tests
+1. **Targeted Monitoring & Soil Telemetry Test Suites Pass:**
+   - `apps/web/test/unit/soil-telemetry-ui.test.tsx`: **7/7 tests passed (100%)**:
+     - Verified all 7 soil telemetry parameters (Nitrogen, Phosphorus, Potassium, Temperature, Moisture, pH, EC) render live values with unified visual meters and agreed units (`mg/kg`, `°C`, `%RH`, `µS/cm`, `ppm`, no unit on pH).
+     - Verified clean parameter titles without "Soil" / "Tanah" prefixes.
+     - Verified stale telemetry suppression: when telemetry is stale (`isStale: true` or `connectionStatus: STALE`), numerical sensor values are suppressed and replaced with `'-'` placeholders, `0%` gauge fills, and an amber Stale Alert Banner (`Update: Real-Time: Kedaluwarsa`) while preserving `lastSeenAt`/`recordedAt` timestamps.
+     - Verified safe empty states when telemetry is null.
+     - Verified `/water` live rendering and stale suppression.
+     - Verified homepage (`/`) isolation with zero embedded `MonitoringDashboard`.
+     - Verified historical charts (`NPKChart`, `WaterNutrientChart`) default to empty state (`Tidak ada data riwayat untuk rentang waktu ini.`) without mock fallbacks.
+   - `apps/web/test/unit/monitoring-dashboard.test.tsx`: **7/7 tests passed (100%)**.
+2. **Full Web Test Suite Pass:** **33 test files, 251/251 tests passed (100%)**.
+3. **Monorepo Static Typecheck:** Clean `tsc --noEmit` pass across `@kebun-melon/web` with 0 errors.
+4. **Zero Mock Telemetry:** Complete removal of `NPK_TREND_DATA` and `EC_TREND_DATA` fallback dependencies in UI charts.
+<!-- TASK-0502 Reconciled: 2026-08-23 -->
+
+
 
