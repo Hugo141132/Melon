@@ -18,7 +18,7 @@ import {
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
-import { ALERTS } from '@/lib/constants';
+import { useAlertBadge } from '@/hooks/useAlertBadge';
 
 export interface SidebarProps {
   isOpen: boolean;
@@ -42,7 +42,7 @@ export default function Sidebar({ isOpen, onClose, onMouseEnter, onMouseLeave }:
   const tNav = useTranslations('navigation');
   const tCommon = useTranslations('common');
   const { user, role } = useAuth();
-  const criticalCount = ALERTS.filter((a) => a.severity === 'error').length;
+  const { count: criticalCount } = useAlertBadge();
 
   const userName = user?.fullName || user?.email || '';
   const displayName = userName ? userName.trim().replace(/^pak\s+/i, '') : '';

@@ -383,6 +383,17 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
 - 21st.dev MCP: `NOT REQUIRED`
 - Summary: Implemented alert acknowledgement data contracts (`AcknowledgeAlertInputSchema`, `AlertAcknowledgementDto`), database transactional acknowledgement in `AlertRepository` (`acknowledgeAlert`) persisting acknowledgement records to `alert_acknowledgements` and emitting `alert.acknowledged` audit logs, `POST /api/v1/alerts/{alertId}/acknowledge` API route handler with RBAC enforcement (`alert.acknowledge` for OWNER global scope, ADMIN assigned-device scope), and `/notifikasi` frontend page wiring with `Premium Minimal Ops` modal for optional operator notes. Preserved alerts without deletion, handled duplicate acknowledgements safely and idempotently, and ensured 100% key parity and placeholder alignment for English and Indonesian translations. Reconciled documentation in `API.md`, `USER_FLOWS.md`, and `TRACEABILITY.md` to remove stale Admin acknowledgement TBD wording.
 
+#### TASK-0705 Governance Record
+
+`TASK-0705` live sidebar notification badge integration record:
+- Status: `DONE` (Completed 2026-08-23)
+- Frontend impact: `MINOR`
+- Selected UI direction: `Premium Minimal Ops`
+- Existing color template: `UNCHANGED`
+- Selected motion effects: `None`
+- 21st.dev MCP: `NOT REQUIRED`
+- Summary: Replaced static mock `ALERTS` evaluation in `Sidebar.tsx` with dynamic live backend alert data using lightweight client hook `useAlertBadge`. Hook queries canonical `GET /api/v1/alerts?status=OPEN&severity=CRITICAL` when authenticated. Subscribed to custom event `melon:alert-updated` emitted upon successful alert acknowledgement on `/notifikasi` page (`page.tsx`) to guarantee instant badge count updates without full page reloads. Preserved `Premium Minimal Ops` layout, badge positioning, and `bg-app-error` styling tokens. Added unit test coverage in `apps/web/test/unit/sidebar-navigation.test.tsx` (10/10 tests passed) and verified 100% test pass rate across full web unit suite (246/246 tests) and TypeScript typecheck (0 errors across 4 workspaces).
+
 #### TASK-0807 Governance Record
 
 `TASK-0807` faucet control UI implementation record:

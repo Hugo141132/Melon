@@ -6,6 +6,7 @@ import { AlertDto, AlertSeverity, AlertStatus } from '@kebun-melon/contracts';
 import { LucideIcon, AlertTriangle, AlertCircle, Info, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTranslations } from 'next-intl';
+import { ALERT_UPDATED_EVENT } from '@/hooks/useAlertBadge';
 
 const severityConfig: Record<
   AlertSeverity,
@@ -236,6 +237,9 @@ export default function NotifikasiPage() {
           )
         );
         setAckModalOpen(false);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent(ALERT_UPDATED_EVENT));
+        }
       } else {
         setErrorMsg(json.error?.message || tAlerts('acknowledgeError'));
       }

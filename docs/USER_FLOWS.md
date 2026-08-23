@@ -1366,18 +1366,20 @@ The application does NOT provide a "Delete Device" flow. Device removal from the
 
 **Primary actor:** Owner or Admin
 **Preconditions:** Active session and alert permission.
-**Trigger:** User opens alerts.
+**Trigger:** User opens alerts (or views notification indicator in navigation).
 
 **Main success flow:**
 
-1. The server verifies `alert.read`.
-2. The server scopes alerts to authorised devices and user role.
-3. The frontend displays alert type, severity, device, timestamp, and status.
-4. The user may filter alerts where supported.
+1. The navigation sidebar fetches open critical alert count via `useAlertBadge` (`GET /api/v1/alerts?status=OPEN&severity=CRITICAL`) and renders the red counter badge when count > 0.
+2. The user navigates to `/notifikasi`.
+3. The server verifies `alert.read`.
+4. The server scopes alerts to authorised devices and user role.
+5. The frontend displays alert type, severity, device, timestamp, and status.
+6. The user may filter alerts where supported.
 
-**Alternative flows:** No alerts; show empty state.
+**Alternative flows:** No alerts; show empty state (sidebar badge is hidden).
 **Error flows:** Unauthorised device alerts are excluded.
-**Postconditions:** User sees only authorised alerts.
+**Postconditions:** User sees only authorised alerts; sidebar badge reflects current open critical count.
 **Required permissions:** `alert.read`.
 **Relevant account statuses:** `ACTIVE`.
 **UI states:** Loading, list, empty, error.
@@ -1398,11 +1400,12 @@ The application does NOT provide a "Delete Device" flow. Device removal from the
 2. The server verifies device scope.
 3. The server verifies alert is still acknowledgeable.
 4. The system records acknowledgement user and timestamp.
-5. The frontend updates alert state.
+5. The frontend updates alert state and dispatches `melon:alert-updated` event.
+6. The sidebar notification badge receives the event and decrements its live counter immediately without full page reload.
 
 **Alternative flows:** Alert already acknowledged; show current state.
 **Error flows:** Admin lacks permission; alert belongs to unauthorised device.
-**Postconditions:** Alert is acknowledged, not deleted.
+**Postconditions:** Alert is acknowledged, not deleted; sidebar badge count updates immediately.
 **Required permissions:** `alert.acknowledge`.
 **Relevant account statuses:** `ACTIVE`.
 **UI states:** Confirming, acknowledged, conflict.

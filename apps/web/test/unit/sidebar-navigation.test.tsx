@@ -1,4 +1,3 @@
-// @vitest-environment jsdom
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -80,6 +79,12 @@ describe('Sidebar Navigation Header Display Name & Fallback', () => {
     localStorage.clear();
     mockUser = null;
     mockRole = null;
+    global.fetch = vi.fn().mockImplementation(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ success: true, data: [] }),
+      })
+    );
   });
 
   it('renders authenticated account display name without Pak prefix', () => {
@@ -228,5 +233,102 @@ describe('TopAppBar Route-based DeviceSelector Visibility & Centering', () => {
       </DeviceProvider>
     );
     expect(screen.queryByTestId('device-selector-multiple')).not.toBeInTheDocument();
+  });
+});
+
+describe('Sidebar Alerts Notification Badge (Live Backend State)', () => {
+  const mockClose = vi.fn();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPathname = '/';
+    mockUser = { fullName: 'Wahyu Prasetyo' };
+    mockRole = 'ADMIN';
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (typeof url === 'string' && url.includes('/api/v1/alerts')) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              success: true,
+              data: [
+                { id: '1', severity: 'CRITICAL', status: 'OPEN' },
+                { id: '2', severity: 'CRITICAL', status: 'OPEN' },
+              ],
+              meta: { pagination: { totalItems: 2 } },
+            }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ success: true, data: [] }),
+      });
+    });
+  });
+
+  it('renders dynamic critical alert badge count when open critical alerts exist', async () => {
+    render(<Sidebar isOpen={true} onClose={mockClose} />);
+
+    const badge = await screen.findByText('2');
+    expect(badge).toBeInTheDocument();
+    expect(badge).toHaveClass('bg-app-error');
+  });
+
+  it('hides alert badge when count is zero', async () => {
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (typeof url === 'string' && url.includes('/api/v1/alerts')) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              success: true,
+              data: [],
+              meta: { pagination: { totalItems: 0 } },
+            }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ success: true }) });
+    });
+
+    render(<Sidebar isOpen={true} onClose={mockClose} />);
+
+    expect(screen.queryByText('2')).not.toBeInTheDocument();
+    expect(screen.queryByText('0')).not.toBeInTheDocument();
+  });
+
+  it('hides alert badge when unauthenticated', async () => {
+    mockUser = null;
+    mockRole = null;
+
+    render(<Sidebar isOpen={true} onClose={mockClose} />);
+
+    expect(screen.queryByText('2')).not.toBeInTheDocument();
+  });
+
+  it('updates alert badge dynamically when alert updated event is dispatched', async () => {
+    let alertCount = 3;
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (typeof url === 'string' && url.includes('/api/v1/alerts')) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              success: true,
+              data: [],
+              meta: { pagination: { totalItems: alertCount } },
+            }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ success: true }) });
+    });
+
+    render(<Sidebar isOpen={true} onClose={mockClose} />);
+
+    expect(await screen.findByText('3')).toBeInTheDocument();
+
+    alertCount = 1;
+    window.dispatchEvent(new CustomEvent('melon:alert-updated'));
+
+    expect(await screen.findByText('1')).toBeInTheDocument();
   });
 });

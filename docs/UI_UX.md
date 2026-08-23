@@ -660,6 +660,14 @@ Use transient toasts for:
 
 Do not use a toast as the only record of a faucet command. Control activity shall also appear in persistent history.
 
+### 13.3 Navigation Notification Badge (TASK-0705)
+
+The sidebar navigation item for Alerts (`/notifikasi`) renders a dynamic status badge:
+- **Badge Content**: Displays the live integer count of unacknowledged critical alerts (`status === 'OPEN'` and `severity === 'CRITICAL'`).
+- **Visual Presentation**: Styled using the design system's red error token (`bg-app-error text-white text-[9px] font-bold`) positioned top-right on the Bell icon.
+- **Suppression Rules**: The badge is completely hidden when the open critical alert count is zero or when the session is unauthenticated.
+- **Immediate Synchronization**: When an alert is acknowledged in `/notifikasi`, a browser event (`melon:alert-updated`) triggers an instant refetch so the sidebar badge decrements immediately without requiring a page reload.
+
 ---
 
 ## 14. Historical Data and Charts

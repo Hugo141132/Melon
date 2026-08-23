@@ -205,3 +205,15 @@ The following facts are verified in the traceability matrix regarding `TASK-0302
 - **Activation & Deactivation Lifecycle:** Implemented `POST /api/v1/devices/{deviceId}/activate` (`device.activate` permission) and `POST /api/v1/devices/{deviceId}/deactivate` (`device.deactivate` permission) restricted strictly to the `OWNER` role.
 - **Audit Logging & Safety:** Deactivation and reactivation operations generate `device.deactivated` and `device.activated` audit logs, while deactivated devices automatically have faucet control capabilities blocked.
 <!-- TASK-0302 Reconciled: 2026-08-23 -->
+
+---
+
+## Live Sidebar Notification Badge Traceability Implementation Note (Reconciled 2026-08-23)
+
+The following facts are verified in the traceability matrix regarding `TASK-0705` (Live Sidebar Notification Badge Integration):
+- **Implementation Status:** `TASK-0705` is implemented and verified (`apps/web/test/unit/sidebar-navigation.test.tsx` 10/10 tests passed, full web unit test suite 246/246 tests passed, workspace typecheck 0 errors).
+- **Dynamic API Binding:** Replaced legacy static mock `ALERTS` constant filter with lightweight client hook `useAlertBadge`, querying canonical backend `GET /api/v1/alerts?status=OPEN&severity=CRITICAL`.
+- **Event-Driven Reactivity:** Subscribes to custom browser event `melon:alert-updated` emitted on alert acknowledgement in `/notifikasi` page, guaranteeing immediate badge count synchronization without requiring a page reload.
+- **Visual Design Integrity:** Preserves `Premium Minimal Ops` layout, badge placement, and design tokens (`bg-app-error text-white text-[9px] font-bold`) with automatic zero-count suppression.
+<!-- TASK-0705 Reconciled: 2026-08-23 -->
+

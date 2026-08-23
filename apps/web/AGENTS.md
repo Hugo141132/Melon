@@ -73,6 +73,12 @@ This document specifies operational guidelines and system boundaries for coding 
   - Palette: `UNCHANGED` (Kebun Melon standard design tokens)
   - Motion: `Card hover`, `Skeleton loading`
   - 21st.dev MCP: `NOT REQUIRED`
+- **TASK-0705 UI Governance**:
+  - Impact: `MINOR`
+  - Direction: `Premium Minimal Ops`
+  - Palette: `UNCHANGED`
+  - Motion: `None`
+  - 21st.dev MCP: `NOT REQUIRED`
 - **TASK-0807 UI Governance**:
   - Impact: `MINOR`
   - Direction: `Premium Minimal Ops`

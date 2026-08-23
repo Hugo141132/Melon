@@ -1743,6 +1743,24 @@ Implement:
 
 ---
 
+## TASK-0705 — Connect Sidebar Notification Badge to Live Alert API
+
+**Priority:** `P1`
+**Status:** `DONE`
+**Dependencies:** `TASK-0701`, `TASK-0704`
+**Completed:** 2026-08-23 — Replaced static mock `ALERTS` filter in `Sidebar.tsx` with dynamic live backend alert data using lightweight client hook `useAlertBadge`. Hook queries canonical `GET /api/v1/alerts?status=OPEN&severity=CRITICAL` when authenticated. Subscribed to custom event `melon:alert-updated` emitted on successful alert acknowledgement in `/notifikasi` page (`page.tsx`) to guarantee instant badge count updates without full page reloads. Preserved `Premium Minimal Ops` layout, badge positioning, and `bg-app-error` styling tokens. Added comprehensive unit test suite in `apps/web/test/unit/sidebar-navigation.test.tsx` verifying dynamic count rendering, zero-count badge suppression, unauthenticated handling, and reactive event synchronization.
+
+### Acceptance Criteria
+
+- [x] Sidebar notification badge uses live backend alert data (`GET /api/v1/alerts`).
+- [x] Canonical `AlertSeverity.CRITICAL` and `AlertStatus.OPEN` are used for critical error badge count.
+- [x] Zero critical alerts or unauthenticated sessions hide badge.
+- [x] Acknowledging alerts on `/notifikasi` immediately updates the sidebar badge count.
+- [x] Existing UI design, tokens, and navigation layout are preserved unchanged.
+- [x] Unit tests added and passing.
+
+---
+
 ## 16. Phase 8 — Faucet Control
 
 ## TASK-0801 — Finalise Faucet Permission Matrix
