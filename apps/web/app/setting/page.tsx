@@ -5,15 +5,7 @@ import Image from 'next/image';
 import TopAppBar from '@/components/navigation/TopAppBar';
 import { SettingsLocaleSwitcher } from '@/components/settings/locale-switcher';
 import { USER_PROFILE } from '@/lib/constants';
-import {
-  User as UserIcon,
-  Users as UsersIcon,
-  ChevronRight,
-  Bell,
-  Settings2,
-  HelpCircle,
-  ShieldCheck,
-} from 'lucide-react';
+import { User as UserIcon, ChevronRight, HelpCircle } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useAuth } from '@/context/AuthContext';
 
@@ -46,7 +38,7 @@ function SettingItem({ icon, iconBg, title, subtitle, href }: SettingItemProps) 
   );
 }
 
-export default function PengaturanPage() {
+export default function SettingPage() {
   const tSettings = useTranslations('settings');
   const tAuth = useTranslations('auth');
   const { user, role } = useAuth();
@@ -88,45 +80,11 @@ export default function PengaturanPage() {
             iconBg="bg-app-secondary-fixed"
             title={tSettings('profileAndAccount')}
             subtitle={tSettings('profileSubtitle')}
-            href="/profil"
+            href="/profile"
           />
-
-          {/* Owner-only navigation items */}
-          {role === 'OWNER' && (
-            <>
-              <SettingItem
-                icon={<UsersIcon size={22} className="text-blue-700" />}
-                iconBg="bg-blue-100"
-                title={tSettings('userManagement')}
-                subtitle={tSettings('userManagementSubtitle')}
-                href="/users"
-              />
-              <SettingItem
-                icon={<ShieldCheck size={22} className="text-emerald-700" />}
-                iconBg="bg-emerald-100"
-                title={tSettings('adminApprovals')}
-                subtitle={tSettings('adminApprovalsSubtitle')}
-                href="/approvals"
-              />
-            </>
-          )}
 
           <SettingsLocaleSwitcher />
 
-          <SettingItem
-            icon={<Bell size={22} className="text-app-primary" />}
-            iconBg="bg-app-primary/10"
-            title={tSettings('notificationsTitle')}
-            subtitle={tSettings('notificationsSubtitle')}
-            href="/notifikasi"
-          />
-          <SettingItem
-            icon={<Settings2 size={22} className="text-app-tertiary" />}
-            iconBg="bg-app-tertiary-fixed/30"
-            title={tSettings('deviceRegistry')}
-            subtitle={tSettings('deviceRegistrySubtitle')}
-            href="/devices"
-          />
           <SettingItem
             icon={<HelpCircle size={22} className="text-app-on-surface-variant" />}
             iconBg="bg-app-surface-container"

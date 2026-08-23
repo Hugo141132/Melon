@@ -237,7 +237,7 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
 - Existing color template: `UNCHANGED`
 - Selected motion effects: `None`
 - 21st.dev MCP: `NOT REQUIRED`
-- Summary: Implemented centralized authentication state hydration to eliminate delayed UI rendering and layout shifts across navigation and protected pages. Added React `AuthContext` (`AuthProvider` / `useAuth()`) in `@kebun-melon/web`, providing unified access to `{ user, role, isAuthenticated }`. Implemented `getSessionOrNull()` server helper in `lib/auth/rbac.ts` for safe, non-throwing session retrieval in the root layout (`RootLayout`) during SSR. Eliminated redundant client-side `useEffect` and `fetch('/api/v1/auth/session')` calls from `/`, `/pengaturan`, `/profil`, `TopAppBar`, and `Sidebar`. Refactored `Sidebar` and `TopAppBar` to consume `useAuth()` directly, removing unnecessary prop drilling. Refactored `/pengaturan` and `/profil` to instantaneously render user profile identity and role-conditional menu items (`/users` and `/approvals` for `OWNER`) without loading spinners. Maintained strict server-side RBAC and route protection. Verified 100% test pass rate across 35 unit test suites (260/260 tests) and 14 E2E critical flows.
+- Summary: Implemented centralized authentication state hydration to eliminate delayed UI rendering and layout shifts across navigation and protected pages. Added React `AuthContext` (`AuthProvider` / `useAuth()`) in `@kebun-melon/web`, providing unified access to `{ user, role, isAuthenticated }`. Implemented `getSessionOrNull()` server helper in `lib/auth/rbac.ts` for safe, non-throwing session retrieval in the root layout (`RootLayout`) during SSR. Eliminated redundant client-side `useEffect` and `fetch('/api/v1/auth/session')` calls from `/`, `/setting`, `/profileee`, `TopAppBar`, and `Sidebar`. Refactored `Sidebar` and `TopAppBar` to consume `useAuth()` directly, removing unnecessary prop drilling. Refactored `/setting` and `/profileee` to instantaneously render user profileee identity and role-conditional menu items (`/users` and `/approvals` for `OWNER`) without loading spinners. Maintained strict server-side RBAC and route protection. Verified 100% test pass rate across 35 unit test suites (260/260 tests) and 14 E2E critical flows.
 
 #### TASK-0302 Governance Record
 
@@ -280,7 +280,7 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
 - Existing color template: `UNCHANGED`
 - Selected motion effects: `Dropdown`, `Modal`
 - 21st.dev MCP: `NOT REQUIRED`
-- Summary: Reconciled device selector and context state per `DEC-DEV-028` and `DEC-DEV-029`. Enforced neutral initial state (`selectedDevice = null`) on fresh login and bare routes (`/`, `/sensor`, `/soil` without `?deviceId=`), eliminating all automatic first-device fallbacks. Removed persistent restoration from `localStorage`, `sessionStorage`, cookies, and profile preferences (`DEC-DEV-029`). Restricted device selection strictly to explicit user action in the `/sensor` device cards or header `DeviceSelector`. Preserved active in-memory selection during client navigation and synchronized selection with route URL (`?deviceId=...`). Supported route-scoped rehydration on hard refresh (Ctrl+Shift+R) after validating against the fresh `GET /api/v1/devices` server-authorized list. Handled loading skeleton states vs true empty lists on `/sensor`. Cleared selection to `null` with a notice banner if access to the selected device is revoked, unassigned, or invalid without silent fallback. Preserved canonical `deviceId` monospace rendering for Owner users and strict concealment for Admin users (`DEC-DEV-028`). Verified 100% test pass rate across 31 test suites (239/239 tests), TypeScript typecheck (0 errors), and Semgrep scan (0 findings).
+- Summary: Reconciled device selector and context state per `DEC-DEV-028` and `DEC-DEV-029`. Enforced neutral initial state (`selectedDevice = null`) on fresh login and bare routes (`/`, `/sensor`, `/soil` without `?deviceId=`), eliminating all automatic first-device fallbacks. Removed persistent restoration from `localStorage`, `sessionStorage`, cookies, and profileee preferences (`DEC-DEV-029`). Restricted device selection strictly to explicit user action in the `/sensor` device cards or header `DeviceSelector`. Preserved active in-memory selection during client navigation and synchronized selection with route URL (`?deviceId=...`). Supported route-scoped rehydration on hard refresh (Ctrl+Shift+R) after validating against the fresh `GET /api/v1/devices` server-authorized list. Handled loading skeleton states vs true empty lists on `/sensor`. Cleared selection to `null` with a notice banner if access to the selected device is revoked, unassigned, or invalid without silent fallback. Preserved canonical `deviceId` monospace rendering for Owner users and strict concealment for Admin users (`DEC-DEV-028`). Verified 100% test pass rate across 31 test suites (239/239 tests), TypeScript typecheck (0 errors), and Semgrep scan (0 findings).
 
 #### TASK-1004 Governance & Infrastructure Record
 
@@ -339,7 +339,7 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
 - Existing color template: `UNCHANGED`
 - Selected motion effects: `None`
 - 21st.dev MCP: `NOT REQUIRED`
-- Summary: Created all 17 approved translation namespaces (`common`, `auth`, `navigation`, `dashboard`, `devices`, `soil`, `water`, `history`, `faucet`, `alerts`, `users`, `approvals`, `profile`, `settings`, `validation`, `errors`, `accessibility`) across `apps/web/messages/id.json` and `apps/web/messages/en.json` while preserving TASK-0601 `system` infrastructure. Enforced 100% key parity, real non-empty strings, and identical ICU placeholders (`{time}`, `{count}`, `{volume}`, `{name}`, `{metric}`, `{message}`, `{deviceId}`, `{deviceName}`). Preserved technical abbreviations (`N`, `P`, `K`, `pH`, `EC`, `TDS`, `ESP32`, `NodeMCU`, `MQTT`, `API`, `RBAC`, `mL`, `L`, `°C`, `%`) untranslated and omitted `BAT` parameter per `DEC-MON-086`. Added targeted unit test suite (`apps/web/test/unit/i18n-namespaces.test.ts`) passing 7/7 tests. User manually executed and verified reserved pre-commit suite (`npm run check:quality`). Hard-coded component UI text replacement remains TASK-0603; language gate and settings UI selector belong to TASK-0604.
+- Summary: Created all 17 approved translation namespaces (`common`, `auth`, `navigation`, `dashboard`, `devices`, `soil`, `water`, `history`, `faucet`, `alerts`, `users`, `approvals`, `profileee`, `settings`, `validation`, `errors`, `accessibility`) across `apps/web/messages/id.json` and `apps/web/messages/en.json` while preserving TASK-0601 `system` infrastructure. Enforced 100% key parity, real non-empty strings, and identical ICU placeholders (`{time}`, `{count}`, `{volume}`, `{name}`, `{metric}`, `{message}`, `{deviceId}`, `{deviceName}`). Preserved technical abbreviations (`N`, `P`, `K`, `pH`, `EC`, `TDS`, `ESP32`, `NodeMCU`, `MQTT`, `API`, `RBAC`, `mL`, `L`, `°C`, `%`) untranslated and omitted `BAT` parameter per `DEC-MON-086`. Added targeted unit test suite (`apps/web/test/unit/i18n-namespaces.test.ts`) passing 7/7 tests. User manually executed and verified reserved pre-commit suite (`npm run check:quality`). Hard-coded component UI text replacement remains TASK-0603; language gate and settings UI selector belong to TASK-0604.
 
 #### TASK-0603 Governance Record
 
@@ -350,7 +350,7 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
 - Existing color template: `UNCHANGED`
 - Selected motion effects: `None`
 - 21st.dev MCP: `NOT REQUIRED`
-- Summary: Replaced hard-coded user-facing text across all authentication pages, protected dashboard and sensor views (`/`, `/sensor`, `/soil`, `/water`, `/controls`, `/devices`, `/users`, `/approvals`, `/pengaturan`, `/profil`, `/notifikasi`), historical charts (`NPKChart`, `WaterNutrientChart`, `HistoricalChartControls`), faucet control components, and shell navigation (`Sidebar`, `TopAppBar`, `DeviceSelector`) using `next-intl` translation hooks. Preserved 100% key parity across `messages/id.json` and `messages/en.json` with matching ICU placeholders. Preserved canonical internal API/DB/MQTT values, hardware names, raw measurement numbers, and units (`N`, `P`, `K`, `pH`, `EC`, `TDS`, `ESP32`, `NodeMCU`, `MQTT`, `mL`, `L`, `m³/h`, `ppm`, `µS/cm`). Preserved `BAT` parameter omission per `DEC-MON-086`. Verified 100% test pass rate across 15 targeted unit test suites (107/107 tests), TypeScript typecheck (`tsc --noEmit` 0 errors), Next.js production build (`31/31` static pages), Playwright browser verification on `/login` and `/register`, and verified user-reported completion of all 5 reserved pre-commit checks (`test:coverage`, `test:integration`, `check:quality`, `test`, `test:e2e`). Initial language gate and settings UI switcher belong to `TASK-0604`.
+- Summary: Replaced hard-coded user-facing text across all authentication pages, protected dashboard and sensor views (`/`, `/sensor`, `/soil`, `/water`, `/controls`, `/devices`, `/users`, `/approvals`, `/setting`, `/profileee`, `/notifikasi`), historical charts (`NPKChart`, `WaterNutrientChart`, `HistoricalChartControls`), faucet control components, and shell navigation (`Sidebar`, `TopAppBar`, `DeviceSelector`) using `next-intl` translation hooks. Preserved 100% key parity across `messages/id.json` and `messages/en.json` with matching ICU placeholders. Preserved canonical internal API/DB/MQTT values, hardware names, raw measurement numbers, and units (`N`, `P`, `K`, `pH`, `EC`, `TDS`, `ESP32`, `NodeMCU`, `MQTT`, `mL`, `L`, `m³/h`, `ppm`, `µS/cm`). Preserved `BAT` parameter omission per `DEC-MON-086`. Verified 100% test pass rate across 15 targeted unit test suites (107/107 tests), TypeScript typecheck (`tsc --noEmit` 0 errors), Next.js production build (`31/31` static pages), Playwright browser verification on `/login` and `/register`, and verified user-reported completion of all 5 reserved pre-commit checks (`test:coverage`, `test:integration`, `check:quality`, `test`, `test:e2e`). Initial language gate and settings UI switcher belong to `TASK-0604`.
 
 #### TASK-0604 Governance Record
 
@@ -359,7 +359,7 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
 - Frontend impact: `MINOR`
 - Selected UI direction: `Premium Minimal Ops`
 - Existing color template: `UNCHANGED`
-- Summary: Implemented mandatory initial language gate (`Select Language / Pilih Bahasa`, English -> `en`, Bahasa Indonesia -> `id`) blocking unauthenticated access on `/login`, `/register`, `/forgot-password`, `/status` until a valid non-prefixed `locale` cookie is set. Implemented authenticated language modal selector exclusively on `/pengaturan` (`SettingsLocaleSwitcher`), backed by `PATCH /api/v1/me/preferences` with strict Zod schema validation (`UserPreferenceUpdateInputSchema`), `language.self.update` RBAC permission check, transactional persistence to `user_preferences` table with `profile.self.updated` audit logging, and immediate client-side `locale` cookie synchronization. Replaced inline select with accessible modal dialog adhering to `Premium Minimal Ops` (clear active indicator, localized error handling, preserved route & device context). Fixed presentation-layer system default device display labels (`Node Sensor Tanah` <-> `Soil Sensor Node`, `Node Kualitas Air` <-> `Water Quality Node`, `Node Tangki Air` <-> `Water Tank Node`) in `formatDeviceDisplayName` and `DeviceSelector` across `id` and `en` modes while preserving canonical device IDs, database records, deviceType enums, and user-custom device names. Responsive mobile selector centering and dropdown viewport bounding enforced across 360px, 390px, 430px, and desktop widths. Verified dynamic `<html lang>` attribute updates, device context and route preservation, canonical internal value stability, 100% test pass rate across 18 unit test suites (136/136 tests, including new `device-selector-localization.test.tsx`), 0 TypeScript errors, 32/32 static pages generated in Next.js production build, Playwright verification across desktop and mobile viewports with 0 console errors, and confirmed user pass across all 5 reserved pre-commit checks (`test:coverage`, `test:integration`, `check:quality`, `test`, `test:e2e`).
+- Summary: Implemented mandatory initial language gate (`Select Language / Pilih Bahasa`, English -> `en`, Bahasa Indonesia -> `id`) blocking unauthenticated access on `/login`, `/register`, `/forgot-password`, `/status` until a valid non-prefixed `locale` cookie is set. Implemented authenticated language modal selector exclusively on `/setting` (`SettingsLocaleSwitcher`), backed by `PATCH /api/v1/me/preferences` with strict Zod schema validation (`UserPreferenceUpdateInputSchema`), `language.self.update` RBAC permission check, transactional persistence to `user_preferences` table with `profileee.self.updated` audit logging, and immediate client-side `locale` cookie synchronization. Replaced inline select with accessible modal dialog adhering to `Premium Minimal Ops` (clear active indicator, localized error handling, preserved route & device context). Fixed presentation-layer system default device display labels (`Node Sensor Tanah` <-> `Soil Sensor Node`, `Node Kualitas Air` <-> `Water Quality Node`, `Node Tangki Air` <-> `Water Tank Node`) in `formatDeviceDisplayName` and `DeviceSelector` across `id` and `en` modes while preserving canonical device IDs, database records, deviceType enums, and user-custom device names. Responsive mobile selector centering and dropdown viewport bounding enforced across 360px, 390px, 430px, and desktop widths. Verified dynamic `<html lang>` attribute updates, device context and route preservation, canonical internal value stability, 100% test pass rate across 18 unit test suites (136/136 tests, including new `device-selector-localization.test.tsx`), 0 TypeScript errors, 32/32 static pages generated in Next.js production build, Playwright verification across desktop and mobile viewports with 0 console errors, and confirmed user pass across all 5 reserved pre-commit checks (`test:coverage`, `test:integration`, `check:quality`, `test`, `test:e2e`).
 
 #### TASK-0703 Governance Record
 
@@ -727,14 +727,14 @@ The Owner may perform only the actions defined in `RBAC.md`.
 
 The Admin may:
 
-- Manage only their own permitted profile fields.
+- Manage only their own permitted profileee fields.
 - View assigned devices.
 - View authorised monitoring.
 - Use faucet control only when explicitly granted.
 
 The Admin shall not:
 
-- View another user's private profile.
+- View another user's private profileee.
 - Edit another user.
 - Approve or reject an account.
 - Suspend or deactivate another user.
@@ -1139,7 +1139,7 @@ Examples:
 
 - Pending Admin opens protected route.
 - Admin approves another user.
-- Admin edits another profile.
+- Admin edits another profileee.
 - Admin changes their own role.
 - Admin changes their own status.
 - Admin accesses an unassigned device.
@@ -1166,7 +1166,7 @@ Required categories include:
 - Rejection.
 - Suspension.
 - Deactivation.
-- Profile updates.
+- profileee updates.
 - Device assignment.
 - Device revocation.
 - Login success and failure.

@@ -82,7 +82,7 @@ Kebun-Melon/
 │   ├── UI_UX.md
 │   └── USER_FLOWS.md
 ├── lib/                        # Shared utility modules and constants
-│   ├── constants.ts            # Mock sensor data, user profile, routes, NPK ranges
+│   ├── constants.ts            # Mock sensor data, user profileee, routes, NPK ranges
 │   └── utils.ts                # Classname helper (`cn` combining clsx + tailwind-merge)
 ├── components/                 # React component library
 │   ├── charts/                 # Recharts data visualization wrappers
@@ -108,9 +108,9 @@ Kebun-Melon/
     │   └── page.tsx
     ├── notifikasi/             # Notifications & Alerts page (`/notifikasi`)
     │   └── page.tsx
-    ├── pengaturan/             # Settings page (`/pengaturan`)
+    ├── setting/             # Settings page (`/setting`)
     │   └── page.tsx
-    └── profil/                 # Profile & Security page (`/profil`)
+    └── profileee/                 # profileee & Security page (`/profileee`)
         └── page.tsx
 ```
 
@@ -132,8 +132,8 @@ Routing is managed strictly by the Next.js App Router (`app/` directory).
 | `/water` | `app/water/page.tsx` | Client Component | **Water Quality & Reservoir Monitoring (`/water`)**: Real-time water metrics (pH, TDS, EC converted to `µS/cm`), historical telemetry chart (`WaterNutrientChart`, `HistoricalChartControls`), reservoir tank & flow metrics, 3-phase faucet preset UI. |
 | `/tanah` & `/air` | Legacy paths | Not Found | **Legacy Routes**: Superseded by canonical `/soil` and `/water` routes. Requests return 404 Not Found. |
 | `/notifikasi` | `app/notifikasi/page.tsx` | Server Component | **Notifikasi**: Sensor alert cards categorized by severity (error/kritis, warning/peringatan), target range comparisons, resolved alerts log. |
-| `/pengaturan` | `app/pengaturan/page.tsx` | Server Component | **Pengaturan**: Settings menu with user profile header card, navigation links to Profile, Notifications, Sensor Config, and Support. |
-| `/profil` | `app/profil/page.tsx` | Client Component | **Profil & Keamanan**: Editable user profile form (Name, WhatsApp, Farm Name), security options, logout button, fixed save CTA with toast. |
+| `/setting` | `app/setting/page.tsx` | Server Component | **setting**: Settings menu with user profileee header card, navigation links to profileee, Notifications, Sensor Config, and Support. |
+| `/profileee` | `app/profileee/page.tsx` | Client Component | **profilee & Keamanan**: Editable user profileee form (Name, WhatsApp, Farm Name), security options, logout button, fixed save CTA with toast. |
 
 ---
 
@@ -181,7 +181,7 @@ Node.js `v20.12.2`, npm `10.5.0` (`package-lock.json` lockfileVersion 3). Verifi
 Next.js CLI engine. Scripts: `dev`, `build`, `start`, `lint`. `npm run build` compiles clean static/SSR artifacts without errors.
 
 ### 4. Routing System & Structure
-Next.js 14 App Router (`app/`). 9 pages across root, `(auth)`, `/air`, `/tanah`, `/notifikasi`, `/pengaturan`, `/profil`.
+Next.js 14 App Router (`app/`). 9 pages across root, `(auth)`, `/air`, `/tanah`, `/notifikasi`, `/setting`, `/profileee`.
 
 ### 5. Styling System
 Tailwind CSS `^3.4.1`, PostCSS `^8`, Autoprefixer `^10.0.1`, `clsx` (`^2.1.1`), `tailwind-merge` (`^2.4.0`), `cva` (`^0.7.0`), custom CSS utilities in `app/globals.css`.
@@ -202,7 +202,7 @@ Native HTML inputs managed with local React `useState`. No React Hook Form, Zod,
 Simulated client-side `useState` form submission handlers in `/login`, `/register`, `/forgot-password`. No HTTP endpoints, password hashing, JWT/session tokens, cookies, or server-side auth checks exist.
 
 ### 11. Existing Role or Permission Logic
-Static profile string `"Pemilik Lahan"` in `USER_PROFILE` constant (`lib/constants.ts`). No RBAC middleware, role checking functions, or permission guards exist in the application code.
+Static profileee string `"Pemilik Lahan"` in `USER_profileeE` constant (`lib/constants.ts`). No RBAC middleware, role checking functions, or permission guards exist in the application code.
 
 ### 12. Current API Integrations
 0 active API endpoints or HTTP calls. The entire application operates on static mock objects in `lib/constants.ts`.
@@ -215,7 +215,7 @@ None installed. Location is represented as text `"Kebun Melon"` with a `MapPin` 
 
 ### 15. Internationalisation (I18N) Support
 
-`next-intl` infrastructure installed and configured in `@kebun-melon/web` (`TASK-0601`). All 17 approved translation namespaces (`common`, `auth`, `navigation`, `dashboard`, `devices`, `soil`, `water`, `history`, `faucet`, `alerts`, `users`, `approvals`, `profile`, `settings`, `validation`, `errors`, `accessibility`) plus preserved `system` created in `messages/id.json` and `messages/en.json` (`TASK-0602`). Hard-coded user-facing text across all authentication pages, protected dashboard and sensor views, historical charts, faucet control panels, and shell navigation migrated to `next-intl` translation hooks (`TASK-0603`) with 100% key parity, ICU placeholder consistency, technical abbreviation preservation, and comprehensive unit test verification. Mandatory initial language gate (`Select Language / Pilih Bahasa`), accessible Settings language modal switcher (`SettingsLocaleSwitcher` on `/pengaturan`), `/settings` permanent redirect, presentation-layer system default device label localization, and responsive mobile selector layout completed and verified (`TASK-0604`).
+`next-intl` infrastructure installed and configured in `@kebun-melon/web` (`TASK-0601`). All 17 approved translation namespaces (`common`, `auth`, `navigation`, `dashboard`, `devices`, `soil`, `water`, `history`, `faucet`, `alerts`, `users`, `approvals`, `profileee`, `settings`, `validation`, `errors`, `accessibility`) plus preserved `system` created in `messages/id.json` and `messages/en.json` (`TASK-0602`). Hard-coded user-facing text across all authentication pages, protected dashboard and sensor views, historical charts, faucet control panels, and shell navigation migrated to `next-intl` translation hooks (`TASK-0603`) with 100% key parity, ICU placeholder consistency, technical abbreviation preservation, and comprehensive unit test verification. Mandatory initial language gate (`Select Language / Pilih Bahasa`), accessible Settings language modal switcher (`SettingsLocaleSwitcher` on `/setting`), `/settings` permanent redirect, presentation-layer system default device label localization, and responsive mobile selector layout completed and verified (`TASK-0604`).
 
 ### 16. Existing Database or ORM Integration
 None. No database driver, ORM (Prisma/Drizzle), or persistence layer exists in the repository.
@@ -249,7 +249,7 @@ Completed and verified under `TASK-0807`. Dedicated `/controls` page hosting mod
 * `FaucetHistoryTable`: Paginated execution history table with status badges and action-aware details.
 
 ### 24. Existing User-Management or Approval Components
-`/pengaturan` settings page has Owner summary card, `/register` has a 2-step registration form for sign-up input. No Owner approval dashboard, pending queue, user list, or account status controls exist.
+`/setting` settings page has Owner summary card, `/register` has a 2-step registration form for sign-up input. No Owner approval dashboard, pending queue, user list, or account status controls exist.
 
 ### 25. Existing Tests and Test Frameworks
 None. No test runner (Jest, Vitest, Playwright, Cypress) or test files exist in the repository.
@@ -288,12 +288,12 @@ None. No `Dockerfile`, `docker-compose.yml`, or CI/CD deployment files exist.
 
 ### 32. Files and Visual Components That Must Be Preserved
 * Visual styling system: `app/globals.css`, `tailwind.config.ts`.
-* Route structures: `app/page.tsx`, `app/(auth)/login/page.tsx`, `app/(auth)/register/page.tsx`, `app/(auth)/forgot-password/page.tsx`, `app/air/page.tsx`, `app/tanah/page.tsx`, `app/notifikasi/page.tsx`, `app/pengaturan/page.tsx`, `app/profil/page.tsx`.
+* Route structures: `app/page.tsx`, `app/(auth)/login/page.tsx`, `app/(auth)/register/page.tsx`, `app/(auth)/forgot-password/page.tsx`, `app/air/page.tsx`, `app/tanah/page.tsx`, `app/notifikasi/page.tsx`, `app/setting/page.tsx`, `app/profileee/page.tsx`.
 * Navigation components: `components/navigation/BottomNav.tsx`, `components/navigation/TopAppBar.tsx`.
 * Visualization components: `components/charts/NPKChart.tsx`, `components/charts/WaterNutrientChart.tsx`.
 
 ### 33. Conflicts Between Current Codebase and Proposed Specifications
-* **Auth & RBAC (`RBAC.md` / `PRD.md`)**: Docs specify `OWNER` / `ADMIN` roles, public registration creating `ADMIN` (`PENDING_APPROVAL`), and Owner approval. Codebase has a static profile with no server auth or approval UI.
+* **Auth & RBAC (`RBAC.md` / `PRD.md`)**: Docs specify `OWNER` / `ADMIN` roles, public registration creating `ADMIN` (`PENDING_APPROVAL`), and Owner approval. Codebase has a static profileee with no server auth or approval UI.
 * **Device Access (`DEVICE_COMMUNICATION.md`)**: Docs require multi-device support, `deviceId` scoping, MQTT gateway, and telemetry fields (`Water BAT`, Lat, Long). Codebase has single-farm mock view with no device picker or battery/GPS fields.
 * **Internationalisation (`I18N.md`)**: Docs require dual `en` and `id` language support. Codebase is 100% hardcoded Indonesian.
 * **GIS & Mapping (`PRD.md`)**: Docs specify map visualization. Codebase displays text `"Kebun Melon"`.
@@ -340,9 +340,9 @@ The following reconciliation reflects the state of frontend integration against 
 | `/register` | `GET /api/v1/auth/register/capabilities` & `POST /api/v1/auth/register` | **Category A: Integrated** | 2-Step Registration Flow: Step 1 checks `/capabilities` and renders role selection (OWNER enabled if 0 owners, greyed out if Owner exists; ADMIN always enabled). Step 2 collects user details. Submits `role`, `fullName`, `email`, `password`. Creates `OWNER` directly as `ACTIVE` (redirects to `/login?registered=owner`) or `ADMIN` as `PENDING_APPROVAL` (redirects to `/status?reason=PENDING_APPROVAL`). Server enforces atomic concurrency lock. |
 | `/status` | `GET /api/v1/auth/session` & account status guards | **Category A: Integrated** | Revalidates account status via `/api/v1/auth/session`, renders pending/rejected/suspended/deactivated states, provides Logout/Refresh actions. |
 | App Shell Middleware & Guarding | `middleware.ts` Edge Guard | **Category A: Integrated** | Guards protected pages & `/api/v1/approvals/*`. Redirects unauthenticated page requests to `/login?redirect=<path>` and returns `401 UNAUTHENTICATED` for API requests. |
-| Logout Action (`/profil` & `/status`) | `POST /api/v1/auth/logout` implemented | **Category A: Integrated** | Connected to real `POST /api/v1/auth/logout` endpoint in both `/profil` and `/status` pages, revoking database session and clearing HTTP-only cookie. |
+| Logout Action (`/profileee` & `/status`) | `POST /api/v1/auth/logout` implemented | **Category A: Integrated** | Connected to real `POST /api/v1/auth/logout` endpoint in both `/profileee` and `/status` pages, revoking database session and clearing HTTP-only cookie. |
 | `/approvals` | `/api/v1/approvals/*` endpoints implemented | **Category A: Integrated** | Fetches real pending Admin list with search and pagination, fetches user details, executes real `approve` and `reject` actions with decision notes. |
-| `/pengaturan` Role Awareness | `GET /api/v1/auth/session` & RBAC | **Category A: Integrated** | Fetches authenticated session. Conditionally displays the **Persetujuan Admin** (`/approvals`) card link ONLY when `role === 'OWNER'`. Hidden for `ADMIN`. |
+| `/setting` Role Awareness | `GET /api/v1/auth/session` & RBAC | **Category A: Integrated** | Fetches authenticated session. Conditionally displays the **Persetujuan Admin** (`/approvals`) card link ONLY when `role === 'OWNER'`. Hidden for `ADMIN`. |
 | Dashboard (`/`) Telemetry | IoT/Telemetry API not implemented yet | **Category C: Deferred** | Telemetry endpoints are deferred to subsequent IoT tasks (TASK-0400+). Dashboard telemetry UI remains static until backend endpoints exist. |
 | `/soil` & `/water` Detail Pages | Telemetry APIs (`TASK-0501`–`TASK-0504`) integrated | **Category A: Integrated** | Canonical routes `/soil` and `/water` render live telemetry (`TASK-0501`/`TASK-0502`), historical telemetry query endpoints (`TASK-0503`), and historical chart components (`TASK-0504`). Legacy `/tanah` and `/air` routes return 404 Not Found. |
 | `/devices` & Device Selection | `GET /api/v1/devices`, `GET /api/v1/devices/{deviceId}`, `PATCH /api/v1/devices/{deviceId}` (`TASK-0302`/`TASK-0305`) | **Category A: Integrated** | Authorised devices sourced exclusively from `GET /api/v1/devices`. Owner receives global device visibility with canonical `deviceId` string badges and edit modal (`PATCH`). Admin visibility is strictly scoped to active assignments (`revokedAt === null`) with canonical `deviceId` strictly concealed across UI cards and selector dropdown. "Add Device" modal and `POST /api/v1/devices` are completely removed (`DEC-DEV-027`). |
@@ -402,7 +402,7 @@ The following facts are verified regarding the frontend architecture of `TASK-02
 - **RootLayout SSR Hydration:** `RootLayout` (`apps/web/app/layout.tsx`) retrieves session metadata during initial server-side rendering via `getSessionOrNull()` and passes it to `AuthProvider`, eliminating layout shifts and role-checking delays.
 - **Component Refactoring:**
   - `apps/web/app/page.tsx` (Dashboard): Removed client-side `useEffect` and `fetch('/api/v1/auth/session')`, consuming `useAuth()` directly.
-  - `apps/web/app/pengaturan/page.tsx` (Settings): Removed client-side `useEffect` session fetch and loading spinner, using `useAuth()` for instant profile display and role-gated menu rendering (`/users` and `/approvals` for `OWNER`).
+  - `apps/web/app/setting/page.tsx` (Settings): Removed client-side `useEffect` session fetch and loading spinner, using `useAuth()` for instant profileee display and role-gated menu rendering (`/users` and `/approvals` for `OWNER`).
   - `apps/web/components/navigation/TopAppBar.tsx`: Removed `user` prop drilling; consumes `useAuth()` directly.
   - `apps/web/components/navigation/Sidebar.tsx`: Removed `userRole` and `userName` props; consumes `useAuth()` directly for role-based navigation filtering.
 - **Design Governance:** Preserves `Premium Minimal Ops` aesthetic and established color palette with zero visual regression.

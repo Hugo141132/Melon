@@ -261,7 +261,7 @@ export default function NotifikasiPage() {
 
   return (
     <div className="bg-app-surface text-app-on-surface min-h-dvh pb-24 relative">
-      <TopAppBar showNotification notificationCount={errorCount} />
+      <TopAppBar />
 
       <main className="pt-20 px-[1rem] space-y-5">
         <section className="flex items-center justify-between animate-fade-in">

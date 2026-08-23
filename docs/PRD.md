@@ -73,8 +73,8 @@ The Owner shall be able to:
 - View all devices that fall within the Owner's authorised scope.
 - View current and historical monitoring data.
 - Access faucet-control functions according to the final control policy.
-- View and manage their own profile.
-- View and manage other users' profiles.
+- View and manage their own profilee.
+- View and manage other users' profilees.
 - Review pending Admin account registrations.
 - Approve or reject Admin account registrations.
 - Activate, suspend, or deactivate Admin accounts.
@@ -93,14 +93,14 @@ The Admin shall be able to:
 - View devices assigned or made available to the Admin.
 - View current and historical monitoring data.
 - Access faucet-control functions according to the final control policy.
-- View and edit only their own profile.
+- View and edit only their own profilee.
 - Change their own password and language preference.
 - View their own relevant activity where supported.
 
 The Admin shall not be able to:
 
-- View another user's private profile details unless explicitly exposed for operational purposes.
-- Edit another user's profile.
+- View another user's private profilee details unless explicitly exposed for operational purposes.
+- Edit another user's profilee.
 - Approve or reject account registrations.
 - Activate, suspend, or deactivate other users.
 - Assign roles to other users.
@@ -252,8 +252,8 @@ The first product scope includes:
 - Registration email ownership verification.
 - Owner approval and rejection workflow.
 - Owner and Admin role enforcement.
-- Own-profile management.
-- Owner management of other users' profiles.
+- Own-profilee management.
+- Owner management of other users' profilees.
 - Multi-device monitoring.
 - Device selection.
 - Device online and offline status.
@@ -329,7 +329,7 @@ The system shall:
 - Display only devices the user is authorised to access.
 - Clearly display the selected device name for all users, and canonical `deviceId` for Owner users only (concealed from Admins per `DEC-DEV-028`).
 - Resolve device selection fresh per session/load in a neutral initial state (`selectedDevice = null`) on bare routes (`/`, `/sensor`, `/soil` without `?deviceId=`). No device is automatically selected on fresh login or load; selection occurs only via explicit user action in the `/sensor` cards or header `DeviceSelector` (`DEC-DEV-029`).
-- **Route-Scoped Selection Rehydration & Removal of Historical Persistence**: The system shall NOT track, persist, or restore historical last-accessed device state across logins or in persistent storage (e.g. `localStorage`, cookies, profile preferences) (`DEC-DEV-029`). Once explicitly selected, selection is active in-memory and reflected in the route URL (`?deviceId=...`), rehydrating upon hard refresh on that device route after validating against the server-authorized list.
+- **Route-Scoped Selection Rehydration & Removal of Historical Persistence**: The system shall NOT track, persist, or restore historical last-accessed device state across logins or in persistent storage (e.g. `localStorage`, cookies, profilee preferences) (`DEC-DEV-029`). Once explicitly selected, selection is active in-memory and reflected in the route URL (`?deviceId=...`), rehydrating upon hard refresh on that device route after validating against the server-authorized list.
 - **History Scope Protection**: Telemetry historical charts (`TASK-0503`/`TASK-0504`), faucet-command history, device assignment/revocation history, status history, and audit history remain 100% intact (`DEC-DEV-029`).
 - Prevent data from different devices from being mixed.
 - Display an empty state when no devices are assigned or available.
@@ -650,10 +650,10 @@ The system shall:
 | Create Admin account request | Not required | Yes |
 | Approve Admin account | Yes | No |
 | Reject Admin account | Yes | No |
-| View own profile | Yes | Yes |
-| Edit own profile | Yes | Yes |
-| View other users' profiles | Yes | No |
-| Edit other users' profiles | Yes | No |
+| View own profilee | Yes | Yes |
+| Edit own profilee | Yes | Yes |
+| View other users' profilees | Yes | No |
+| Edit other users' profilees | Yes | No |
 | Suspend or deactivate Admin | Yes | No |
 | Change another user's role | Owner-controlled, subject to policy | No |
 | View authorised devices | Yes | Yes |
@@ -664,14 +664,14 @@ The system shall:
 | View audit logs | Yes | Limited or TBD |
 | Manage language preference | Yes | Yes |
 
-### 13.4 Profile Management (PRD-FR-036 / PRD-DATA-004)
+### 13.4 profilee Management (PRD-FR-036 / PRD-DATA-004)
 
-The Owner shall be able to manage other users' profiles.
+The Owner shall be able to manage other users' profilees.
 
-Owner profile-management actions may include:
+Owner profilee-management actions may include:
 
-- View profile.
-- Edit permitted profile fields.
+- View profilee.
+- Edit permitted profilee fields.
 - Change account status.
 - Reset or initiate password reset: TBD.
 - Assign device access.
@@ -679,20 +679,20 @@ Owner profile-management actions may include:
 - Review approval history.
 - Review account activity.
 
-The Admin shall only be able to manage their own profile.
+The Admin shall only be able to manage their own profilee.
 
 The Admin shall not be able to:
 
-- Open another user's profile-management page.
-- Submit profile changes for another user.
+- Open another user's profilee-management page.
+- Submit profilee changes for another user.
 - Modify user identifiers through API manipulation.
 - View Owner-only account-management data.
 
 ---
 
-## 14. User Profile Requirements
+## 14. User profilee Requirements
 
-Each user profile shall support at least:
+Each user profilee shall support at least:
 
 - User ID.
 - Full name.
@@ -704,7 +704,7 @@ Each user profile shall support at least:
 - Updated timestamp.
 - Last login timestamp, if enabled.
 
-Additional profile fields are TBD.
+Additional profilee fields are TBD.
 
 Users shall be able to change their own:
 
@@ -729,7 +729,7 @@ The system shall:
 - Provide a mandatory centered initial language-selection gate for unauthenticated visitors without a valid persisted locale cookie (`English` → `en`, `Bahasa Indonesia` → `id`).
 - Provide a language selector in Settings (`/settings`) for post-entry language changes (not in the application header, user menu, login forms, or mobile nav).
 - Apply the selected language without requiring the user to sign out.
-- Persist preference (cookie for unauthenticated, user profile for authenticated).
+- Persist preference (cookie for unauthenticated, user profilee for authenticated).
 - Use `en` (English) as the defined fallback language when keys are missing or invalid.
 - Translate navigation, forms, validation, statuses, alerts, account approval messages, monitoring labels, control messages, tables, and accessibility labels.
 - Update the HTML language attribute.
@@ -862,8 +862,8 @@ The system shall record audit events for at least:
 - Account rejection.
 - Account suspension.
 - Account deactivation.
-- Profile changes by an Owner.
-- Profile changes by the user.
+- profilee changes by an Owner.
+- profilee changes by the user.
 - Role changes.
 - Device access changes.
 - Login success.
@@ -943,11 +943,11 @@ Dependencies:
 - An Admin cannot approve or reject another account.
 - A user cannot register themselves as Owner through the public form.
 
-### 21.3 Profile and RBAC
+### 21.3 profilee and RBAC
 
-- An Owner can view and edit another user's permitted profile fields.
-- An Admin can view and edit only their own profile.
-- An Admin cannot access another user's profile-management endpoint by changing a URL or request payload.
+- An Owner can view and edit another user's permitted profilee fields.
+- An Admin can view and edit only their own profilee.
+- An Admin cannot access another user's profilee-management endpoint by changing a URL or request payload.
 - An Admin cannot change their own role or account status.
 - Owner-only pages and endpoints reject Admin access.
 - Permission behaviour remains the same in English and Bahasa Indonesia.
@@ -1024,7 +1024,7 @@ The following decisions must be resolved before their related implementation is 
 27. Default and fallback language (Resolved: default `id`, fallback `en`).
 28. Whether Owner approval immediately activates the Admin.
 29. Whether an approved Admin must verify email before activation.
-30. Exact profile fields.
+30. Exact profilee fields.
 31. Audit-log retention period.
 32. Export and reporting requirements.
 
@@ -1103,7 +1103,7 @@ The following facts are verified in the product implementation regarding `TASK-0
 
 The following facts are verified in the product implementation regarding `TASK-0215` (Centralized Authentication State Hydration):
 - **Requirement Fulfillment (PRD-FR-015):** The root server layout hydrates authentication and user metadata (`user`, `role`, `isAuthenticated`) via `AuthContext` on initial render.
-- **Immediate Role-Based UI Rendering:** UI elements requiring role awareness (`Sidebar` navigation, `/pengaturan` owner menus, top bar greeting and profile) render immediately upon page mount without layout shift or loading spinners.
+- **Immediate Role-Based UI Rendering:** UI elements requiring role awareness (`Sidebar` navigation, `/setting` owner menus, top bar greeting and profilee) render immediately upon page mount without layout shift or loading spinners.
 - **Client-Side Request Optimization:** Redundant client-side API requests to `/api/v1/auth/session` on page mount have been removed from the dashboard and settings pages.
 - **Security & Authorization Baseline:** All protected backend endpoints (`/api/v1/*`) and server actions remain strictly guarded with server-side authorization (`requireSession`, `requireRole`, `requirePermission`).
 <!-- TASK-0215 Reconciled: 2026-08-22 -->

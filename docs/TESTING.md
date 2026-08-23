@@ -149,7 +149,7 @@ Physical faucet-control testing shall begin with:
 - Registration.
 - Approval.
 - RBAC.
-- Profile management.
+- profilee management.
 - Device assignment.
 - Telemetry ingestion via **REST API over Wi-Fi** (soil payload validation, water quality payload validation, invalid payload rejection, unauthorized device rejection, shared BAT placement verification).
 - Telemetry ingestion via **MQTT/EMQX** (reservoir volume telemetry, reservoir flow rate telemetry, invalid topic/payload rejection, per-device ACL enforcement, broker reconnects, duplicate handling, gateway validation).
@@ -495,7 +495,7 @@ Test:
 - Admin permission matrix.
 - Device access.
 - View versus control.
-- Self-profile versus other-profile access.
+- Self-profilee versus other-profilee access.
 - Deny-by-default behaviour.
 - Authorised device list and detail test suite (`TASK-0305` / `DEC-DEV-028`):
   - `apps/web/app/api/v1/devices/test/route.test.ts` (24/24 tests):
@@ -609,7 +609,7 @@ Component tests shall verify isolated frontend behaviour.
 - No Owner-only links for Admin.
 - Mobile navigation.
 - Active route.
-- User profile menu.
+- User profilee menu.
 
 ## 11.3 Device Selector
 
@@ -670,7 +670,7 @@ Test each metric:
 - Pending user list.
 - Approval dialog.
 - Rejection dialog.
-- Profile edit.
+- profilee edit.
 - Device assignment.
 - Suspend and deactivate confirmation.
 
@@ -842,9 +842,9 @@ Test all account statuses:
 
 Owner can:
 
-- View own profile.
+- View own profilee.
 - Edit own permitted fields.
-- View Admin profile.
+- View Admin profilee.
 - Edit Admin permitted fields.
 - Approve Admin.
 - Reject Admin.
@@ -858,7 +858,7 @@ Owner can:
 
 Admin can:
 
-- View own profile.
+- View own profilee.
 - Edit own permitted fields.
 - View assigned devices.
 - View authorised monitoring.
@@ -867,8 +867,8 @@ Admin can:
 
 Admin cannot:
 
-- View another profile.
-- Edit another profile.
+- View another profilee.
+- Edit another profilee.
 - Change role.
 - Change status.
 - Approve account.
@@ -1284,7 +1284,7 @@ for:
 - History.
 - Alerts.
 - User management.
-- Profile.
+- profilee.
 - Settings.
 - Faucet control.
 - Errors.
@@ -1618,7 +1618,7 @@ The regression suite shall include:
 - Authentication.
 - Approval.
 - RBAC.
-- Profiles.
+- profilees.
 - Device assignment.
 - Monitoring.
 - History.
@@ -1673,7 +1673,7 @@ Examples:
 - Unauthorised faucet control.
 - Duplicate physical command execution.
 - Owner account created publicly.
-- Admin accesses another user's profile.
+- Admin accesses another user's profilee.
 - Device data leakage.
 - Production secret exposure.
 - Audit loss for control command.
@@ -1952,7 +1952,7 @@ Automated unit, API contract, and component verification for the mandatory initi
 ### Agent-Executed Automated Tests
 1. **Unit Test Suite Pass:** 18 test files, **136/136 tests passed** (`apps/web/test/unit/*`), including:
    - `i18n-language-gate-and-settings.test.tsx` (14 tests): Gate rendering for unauthenticated visitors without cookie, cookie persistence (`locale`), gate skip on valid cookie, accessible Settings modal dialog trigger & radio options, `PATCH /api/v1/me/preferences` invocation, error handling display, and route/device context preservation.
-   - `me-preferences-api.test.ts` (7 tests): Route validation for `preferredLocale`, RBAC `language.self.update` enforcement, unauthenticated rejection (401), invalid locale rejection (400), transaction persistence to `user_preferences` table, and `profile.self.updated` audit logging.
+   - `me-preferences-api.test.ts` (7 tests): Route validation for `preferredLocale`, RBAC `language.self.update` enforcement, unauthenticated rejection (401), invalid locale rejection (400), transaction persistence to `user_preferences` table, and `profilee.self.updated` audit logging.
    - `device-selector-localization.test.tsx` (8 tests): `formatDeviceDisplayName` localization of default labels in `id` and `en`, custom device name preservation, canonical `deviceId`/`deviceType` enum stability, DeviceSelector rendering in `id` and `en`, selected device persistence across locale switch, TopAppBar responsive centering, and dropdown viewport bounding at mobile widths (360px, 390px, 430px).
 2. **Static Typecheck:** Clean `npx tsc --noEmit` pass with 0 errors across `@kebun-melon/web`.
 3. **Production Build:** Static page generation pass (`32/32` static pages generated cleanly).
@@ -2137,7 +2137,7 @@ Automated unit, context mock, component rendering, and RBAC verification for cen
 
 ### Agent-Executed Automated Tests
 1. **Targeted Web App Test Suites Pass:**
-   - `apps/web/test/unit/pengaturan-page.test.tsx`: **3/3 tests passed (100%)** verifying immediate hydration on `/pengaturan` and role-based conditional rendering (`OWNER` vs `ADMIN`).
+   - `apps/web/test/unit/setting-page.test.tsx`: **3/3 tests passed (100%)** verifying immediate hydration on `/setting` and role-based conditional rendering (`OWNER` vs `ADMIN`).
    - `apps/web/test/unit/sidebar-navigation.test.tsx`: **6/6 tests passed (100%)** verifying `Sidebar` role filtering with mocked `AuthContext`.
    - `apps/web/test/unit/device-selector-localization.test.tsx`: **6/6 tests passed (100%)** verifying `TopAppBar` with mocked `AuthContext`.
 2. **Full Web Test Suite Pass:** **34 test files, 258/258 tests passed (100%)**.

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+﻿import { test, expect } from '@playwright/test';
 
 test.describe('Application E2E Smoke Tests', () => {
   test('unauthenticated request to protected route redirects to login or status', async ({

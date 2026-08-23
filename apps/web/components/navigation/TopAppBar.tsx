@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { MapPin, Bell } from 'lucide-react';
+import { MapPin } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { USER_PROFILE } from '@/lib/constants';
 import DeviceSelector from './DeviceSelector';
@@ -12,16 +12,10 @@ import Sidebar from './Sidebar';
 import { useAuth } from '@/context/AuthContext';
 
 interface TopAppBarProps {
-  showNotification?: boolean;
-  notificationCount?: number;
   showDeviceSelector?: boolean;
 }
 
-export default function TopAppBar({
-  showNotification = false,
-  notificationCount = 0,
-  showDeviceSelector = true,
-}: TopAppBarProps) {
+export default function TopAppBar({ showDeviceSelector = true }: TopAppBarProps) {
   const tAccessibility = useTranslations('accessibility');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const hoverTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -130,17 +124,7 @@ export default function TopAppBar({
 
         {/* Right Side Actions */}
         <div className="flex items-center gap-3 flex-shrink-0 ml-auto z-10">
-          {showNotification && (
-            <Link href="/notifikasi" className="relative cursor-pointer">
-              <Bell size={22} className="text-app-on-surface-variant" />
-              {notificationCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 bg-app-error text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-                  {notificationCount}
-                </span>
-              )}
-            </Link>
-          )}
-          <Link href="/profil" className="cursor-pointer">
+          <Link href="/profile" className="cursor-pointer">
             <div className="w-8 h-8 rounded-full overflow-hidden border border-app-primary/20 ring-2 ring-app-primary/10 flex items-center justify-center bg-app-primary text-on-primary font-bold text-xs">
               {initial ? (
                 initial

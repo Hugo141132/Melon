@@ -24,7 +24,7 @@ The API shall support:
 - Login and logout.
 - Admin registration.
 - Owner approval and rejection.
-- Owner and Admin profile management.
+- Owner and Admin profilee management.
 - Device listing and device access.
 - **Device Telemetry Ingestion (Soil and Water Quality via REST API over Wi-Fi)**.
 - Current soil and water monitoring query endpoints.
@@ -527,7 +527,7 @@ POST /api/v1/auth/change-password
 ```
 
 **Authentication:** Required
-**Permission:** `profile.password.update.self`
+**Permission:** `profilee.password.update.self`
 
 Request:
 
@@ -584,7 +584,7 @@ Response (HTTP 200 OK — strictly anti-enumeration):
 
 Server rules:
 - Unconditionally returns HTTP 200 with generic message whether user exists, is pending, is suspended, or does not exist.
-- Never reveals user existence or returns user profile metadata.
+- Never reveals user existence or returns user profilee metadata.
 - Applies timing-mitigation equalizers to prevent side-channel timing enumeration of account existence.
 - If user exists, generates a 256-bit CSPRNG token (valid for 15 minutes by default, configurable via `AUTH_RESET_TOKEN_EXPIRY_MINUTES`), persists SHA-256 hash in `password_reset_tokens`, and dispatches email via Resend (`sendPasswordResetEmail`).
 - Reset link URL is constructed strictly from configured `APP_URL` / `NEXT_PUBLIC_APP_URL` (in production, explicit HTTPS URL is required).
@@ -773,7 +773,7 @@ GET /api/v1/me
 ```
 
 **Authentication:** Required
-**Permission:** `profile.self.read`
+**Permission:** `profilee.self.read`
 
 Response:
 
@@ -797,14 +797,14 @@ Response:
 
 ---
 
-## 11.2 Update Current User Profile
+## 11.2 Update Current User profilee
 
 ```http
 PATCH /api/v1/me
 ```
 
 **Authentication:** Required
-**Permission:** `profile.self.update`
+**Permission:** `profilee.self.update`
 
 Request:
 
@@ -890,7 +890,7 @@ GET /api/v1/users
 ```
 
 **Authentication:** Required
-**Permission:** `profile.other.read`
+**Permission:** `profilee.other.read`
 
 Query parameters:
 
@@ -933,7 +933,7 @@ GET /api/v1/users/{userId}
 ```
 
 **Authentication:** Required
-**Permission:** `profile.other.read`
+**Permission:** `profilee.other.read`
 
 Response:
 
@@ -968,7 +968,7 @@ PATCH /api/v1/users/{userId}
 ```
 
 **Authentication:** Required
-**Permission:** `profile.other.update`
+**Permission:** `profilee.other.update`
 
 Request:
 
@@ -1458,7 +1458,7 @@ GET /api/v1/users/{userId}/devices
 ```
 
 **Authentication:** Required
-**Permission:** `device.assign` or `profile.other.read`
+**Permission:** `device.assign` or `profilee.other.read`
 
 ---
 
@@ -2508,7 +2508,7 @@ Cache-Control: private, no-store
 for:
 
 - Authentication.
-- User profiles.
+- User profilees.
 - Approvals.
 - Faucet commands.
 - Audit logs.

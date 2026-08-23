@@ -11,7 +11,6 @@ import {
   Users,
   ShieldCheck,
   Settings,
-  User,
   X,
   MapPin,
   ChevronRight,
@@ -19,6 +18,7 @@ import {
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
+import { ALERTS } from '@/lib/constants';
 
 export interface SidebarProps {
   isOpen: boolean;
@@ -34,8 +34,7 @@ export const SIDEBAR_NAV_ITEMS = [
   { href: '/devices', key: 'devices', icon: Cpu },
   { href: '/users', key: 'users', icon: Users, roleRequired: 'OWNER' },
   { href: '/approvals', key: 'approvals', icon: ShieldCheck, roleRequired: 'OWNER' },
-  { href: '/pengaturan', key: 'settings', icon: Settings },
-  { href: '/profil', key: 'profile', icon: User },
+  { href: '/setting', key: 'settings', icon: Settings },
 ];
 
 export default function Sidebar({ isOpen, onClose, onMouseEnter, onMouseLeave }: SidebarProps) {
@@ -43,6 +42,7 @@ export default function Sidebar({ isOpen, onClose, onMouseEnter, onMouseLeave }:
   const tNav = useTranslations('navigation');
   const tCommon = useTranslations('common');
   const { user, role } = useAuth();
+  const criticalCount = ALERTS.filter((a) => a.severity === 'error').length;
 
   const userName = user?.fullName || user?.email || '';
   const displayName = userName ? userName.trim().replace(/^pak\s+/i, '') : '';
@@ -115,15 +115,22 @@ export default function Sidebar({ isOpen, onClose, onMouseEnter, onMouseLeave }:
                   data-testid={`sidebar-item-${item.href.replace('/', '') || 'home'}`}
                 >
                   <div className="flex items-center gap-3">
-                    <Icon
-                      size={18}
-                      className={cn(
-                        'transition-transform group-hover:scale-110',
-                        isActive
-                          ? 'text-white'
-                          : 'text-app-on-surface-variant group-hover:text-app-primary'
+                    <div className="relative">
+                      <Icon
+                        size={18}
+                        className={cn(
+                          'transition-transform group-hover:scale-110',
+                          isActive
+                            ? 'text-white'
+                            : 'text-app-on-surface-variant group-hover:text-app-primary'
+                        )}
+                      />
+                      {item.href === '/notifikasi' && criticalCount > 0 && (
+                        <span className="absolute -top-1 -right-1.5 w-3.5 h-3.5 bg-app-error text-white text-[9px] font-bold rounded-full flex items-center justify-center border border-app-surface-container-lowest">
+                          {criticalCount}
+                        </span>
                       )}
-                    />
+                    </div>
                     <span>{tNav(item.key as any)}</span>
                   </div>
                   <ChevronRight

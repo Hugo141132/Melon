@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+﻿import { test, expect } from '@playwright/test';
 import { PrismaClient } from '@prisma/client';
 import { hashPassword } from '../packages/database/src/password-service';
 
@@ -405,7 +405,7 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
   // Flow 7: Language Switch
   test('Flow 7: Language selection switch preserves permissions and data', async ({ page }) => {
     await loginAsAdmin(page);
-    await page.goto('/pengaturan');
+    await page.goto('/setting');
     await expect(page.locator('body')).toContainText(/Pengaturan|Profil|Settings/i);
 
     // Open language selection modal via settings trigger button
@@ -423,7 +423,7 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
     }
 
     // Verify UI renders cleanly and navigation remains authoritative
-    await page.goto('/profil');
+    await page.goto('/profile');
     await expect(page.locator('body')).toContainText(
       /Profil & Keamanan|Profile & Security|Nama Lengkap|Full Name/i
     );

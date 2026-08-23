@@ -16,7 +16,7 @@ const WaterNutrientChart = dynamic(() => import('@/components/charts/WaterNutrie
 
 function ECGauge({ value }: { value: number }) {
   const tWater = useTranslations('water');
-  // Explicit presentation conversion from source unit (mS/cm) to display unit (µS/cm)
+  // Explicit presentation conversion from source unit (mS/cm) to display unit (ÂµS/cm)
   const displayVal = Math.round(value * 1000);
   const maxEC = 4000;
   const angle = -135 + (Math.min(displayVal, maxEC) / maxEC) * 270;
@@ -30,7 +30,7 @@ function ECGauge({ value }: { value: number }) {
         {/* Value overlay */}
         <div className="absolute inset-0 flex flex-col items-center justify-end pb-1">
           <span className="text-[28px] leading-9 font-bold text-app-primary">{displayVal}</span>
-          <span className="text-[12px] leading-4 text-app-on-surface-variant">µS/cm</span>
+          <span className="text-[12px] leading-4 text-app-on-surface-variant">ÂµS/cm</span>
         </div>
       </div>
       <div className="flex items-center gap-2 bg-app-primary/10 px-4 py-1.5 rounded-full mt-2">

@@ -218,7 +218,7 @@ describe('TASK-0604 — Mandatory Initial Language Gate & Settings Locale Change
   });
 
   describe('5. Next.js Routing Compatibility & Settings Redirect', () => {
-    it('has permanent redirect from /settings to /pengaturan in nextConfig', async () => {
+    it('has permanent redirect from /settings to /setting in nextConfig', async () => {
       expect(typeof nextConfig.redirects).toBe('function');
       const redirects = await nextConfig.redirects!();
       const settingsRedirect = redirects.find(
@@ -226,7 +226,7 @@ describe('TASK-0604 — Mandatory Initial Language Gate & Settings Locale Change
       );
 
       expect(settingsRedirect).toBeDefined();
-      expect(settingsRedirect?.destination).toBe('/pengaturan');
+      expect(settingsRedirect?.destination).toBe('/setting');
       expect(settingsRedirect?.permanent).toBe(true);
     });
   });

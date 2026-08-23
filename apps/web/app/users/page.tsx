@@ -411,7 +411,7 @@ export default function UserManagementPage() {
             <h1 className="text-[20px] font-bold text-red-900">{tUsers('forbiddenTitle')}</h1>
             <p className="text-[14px] text-red-700">{tUsers('forbiddenDesc')}</p>
             <Link
-              href="/pengaturan"
+              href="/setting"
               className="inline-block px-5 py-2.5 bg-red-700 text-white rounded-xl text-[14px] font-semibold hover:bg-red-800 transition-colors"
             >
               {tCommon('back')}

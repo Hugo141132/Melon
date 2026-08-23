@@ -22,7 +22,7 @@ The purpose of this specification is to ensure that:
 - Only authenticated users can access protected application features.
 - Admin accounts cannot access the protected website before Owner approval.
 - Owners can manage other users.
-- Admins can manage only their own profiles.
+- Admins can manage only their own profilees.
 - Monitoring access and faucet-control access are enforced separately.
 - Device-level access is checked for every device-specific request.
 - Role and account-status restrictions are enforced on the server, not only in the frontend.
@@ -38,7 +38,7 @@ This specification covers:
 - Canonical permissions.
 - Account statuses.
 - Registration and approval access.
-- Profile-management access.
+- profilee-management access.
 - Device-access rules.
 - Monitoring permissions.
 - Historical-data permissions.
@@ -192,10 +192,10 @@ The Owner shall be able to:
 - View current monitoring data.
 - View historical monitoring data.
 - View device status and alerts.
-- View their own profile.
-- Edit their own permitted profile fields.
-- View other users' profiles.
-- Edit permitted fields in other users' profiles.
+- View their own profilee.
+- Edit their own permitted profilee fields.
+- View other users' profilees.
+- Edit permitted fields in other users' profilees.
 - Review pending Admin registrations.
 - Approve Admin registrations.
 - Reject Admin registrations.
@@ -223,8 +223,8 @@ The Admin shall be able to:
 
 - Submit an account registration request.
 - Access protected application pages only after approval and activation.
-- View their own profile.
-- Edit only their own permitted profile fields.
+- View their own profilee.
+- Edit only their own permitted profilee fields.
 - Change their own password.
 - Change their own language preference.
 - View devices assigned to them (user-facing device `name` and status; canonical `deviceId` is strictly concealed per `DEC-DEV-028`).
@@ -236,8 +236,8 @@ The Admin shall be able to:
 The Admin shall not be able to:
 
 - View or edit the external canonical `deviceId` across any UI component or API response (`DEC-DEV-028`).
-- View another user's private profile.
-- Edit another user's profile.
+- View another user's private profilee.
+- Edit another user's profilee.
 - Approve or reject account registrations.
 - Activate, suspend, or deactivate another user.
 - Change their own role.
@@ -367,15 +367,15 @@ account.deactivate
 account.role.update
 ```
 
-### 9.2 Profile Permissions
+### 9.2 profilee Permissions
 
 ```text
-profile.self.read
-profile.self.update
-profile.other.read
-profile.other.update
-profile.password.update.self
-profile.password.reset.other
+profilee.self.read
+profilee.self.update
+profilee.other.read
+profilee.other.update
+profilee.password.update.self
+profilee.password.reset.other
 ```
 
 #### 9.3 Device Permissions
@@ -454,12 +454,12 @@ Legend:
 | `account.suspend` | Allow | Deny |
 | `account.deactivate` | Allow | Deny |
 | `account.role.update` | Allow | Deny |
-| `profile.self.read` | Allow | Allow |
-| `profile.self.update` | Allow | Allow |
-| `profile.other.read` | Allow | Deny |
-| `profile.other.update` | Allow | Deny |
-| `profile.password.update.self` | Allow | Allow |
-| `profile.password.reset.other` | Allow | Deny |
+| `profilee.self.read` | Allow | Allow |
+| `profilee.self.update` | Allow | Allow |
+| `profilee.other.read` | Allow | Deny |
+| `profilee.other.update` | Allow | Deny |
+| `profilee.password.update.self` | Allow | Allow |
+| `profilee.password.reset.other` | Allow | Deny |
 | `device.read` | Allow within scope (includes canonical `deviceId`) | Allow for assigned devices (canonical `deviceId` strictly concealed per `DEC-DEV-028`) |
 | `device.create` | Removed per `DEC-DEV-027` | Deny / Removed |
 | `device.update` | Allow (can edit canonical `deviceId` & `name` per `DEC-DEV-028`) | Deny |
@@ -538,13 +538,13 @@ Each decision shall record:
 
 ---
 
-## 12. Profile-Management Rules
+## 12. profilee-Management Rules
 
-### 12.1 Owner Profile
+### 12.1 Owner profilee
 
 An Owner may:
 
-- Read their own profile.
+- Read their own profilee.
 - Update their own permitted fields.
 - Change their own password.
 - Change their own preferred language.
@@ -559,8 +559,8 @@ An Owner may not:
 
 An Owner may:
 
-- View an Admin profile.
-- Edit permitted Admin profile fields.
+- View an Admin profilee.
+- Edit permitted Admin profilee fields.
 - Change an Admin account status.
 - Assign or remove device access.
 - Review the Admin's approval history.
@@ -577,14 +577,14 @@ An Owner shall not:
 
 An Admin may:
 
-- View their own profile.
+- View their own profilee.
 - Edit their own permitted fields.
 - Change their own password.
 - Change their own preferred language.
 
 An Admin may not:
 
-- View another user's private profile.
+- View another user's private profilee.
 - Change the `userId` target to edit another user.
 - Change their role.
 - Change their account status.
@@ -594,7 +594,7 @@ An Admin may not:
 
 ### 12.4 Editable Fields
 
-The final list of editable profile fields is `TBD`.
+The final list of editable profilee fields is `TBD`.
 
 At minimum, the implementation shall distinguish:
 
@@ -794,7 +794,7 @@ Owners may view:
 
 - Account registration events.
 - Approval and rejection events.
-- User-profile changes.
+- User-profilee changes.
 - Role changes.
 - Device-access assignments.
 - Login events.
@@ -807,7 +807,7 @@ Admin audit access is limited.
 
 An Admin may be allowed to view:
 
-- Their own profile-change history.
+- Their own profilee-change history.
 - Their own faucet-command history.
 - Activity for assigned devices.
 
@@ -862,7 +862,7 @@ The Owner interface may display:
 - Pending approvals.
 - Audit logs.
 - Settings.
-- Own profile.
+- Own profilee.
 
 ### 19.2 Admin Interface
 
@@ -874,13 +874,13 @@ The Admin interface may display:
 - History.
 - Alerts within scope.
 - Faucet control, if permitted.
-- Own profile.
+- Own profilee.
 - Own settings.
 
 The Admin interface shall not display Owner-only:
 
 - Pending approval management.
-- Other-user profile management.
+- Other-user profilee management.
 - Role management.
 - Device assignment management.
 - Full audit logs.
@@ -967,7 +967,7 @@ Specific requirements:
 - The server shall ignore any public request to create status `ACTIVE`.
 - An Admin shall not update their own role.
 - An Admin shall not update their own account status.
-- An Admin shall not update another user's profile.
+- An Admin shall not update another user's profilee.
 - Device access shall be verified independently of role.
 - Faucet control shall require explicit permission.
 
@@ -984,8 +984,8 @@ The system shall create audit events for at least:
 - Account suspension.
 - Account deactivation.
 - Role change.
-- Profile update by Owner.
-- Self-profile update.
+- profilee update by Owner.
+- Self-profilee update.
 - Device assignment.
 - Device unassignment.
 - Login success.
@@ -1045,9 +1045,9 @@ Audit records shall not include:
 - Duplicate approval attempts do not create conflicting status changes.
 - Approval decisions are audited.
 
-### 24.3 Profile Management
+### 24.3 profilee Management
 
-- An Owner can view and edit permitted fields in another user's profile.
+- An Owner can view and edit permitted fields in another user's profilee.
 - An Admin can view and edit only their own permitted fields.
 - An Admin cannot edit another user by changing a URL.
 - An Admin cannot edit another user by changing a request body.
@@ -1111,7 +1111,7 @@ The following RBAC decisions remain unresolved:
 16. Whether concurrent device commands are allowed.
 17. Whether Admins may view their own audit history.
 18. Whether Admins may view device-level control history for assigned devices.
-19. The final list of editable profile fields.
+19. The final list of editable profilee fields.
 20. Session invalidation strategy after suspension, deactivation, role changes, and device-access changes.
 21. Audit-log retention period.
 22. Whether multiple Owner accounts are allowed.
@@ -1124,7 +1124,7 @@ The following RBAC decisions remain unresolved:
 
 1. Owner and Admin roles are confirmed, but faucet-control access for each role is not yet confirmed.
 2. Multi-device support is confirmed, but the exact device-assignment model is not yet final.
-3. Owner management of other users is confirmed, but the permitted editable profile fields are not yet defined.
+3. Owner management of other users is confirmed, but the permitted editable profilee fields are not yet defined.
 4. Owner approval is confirmed, but the distinction between `APPROVED` and `ACTIVE` is unresolved.
 5. The first Owner provisioning process is implemented via secure one-time CLI (`DEC-AUTH-006`, `TASK-0106`).
 6. It is not yet confirmed whether multiple Owners are allowed.
@@ -1194,7 +1194,7 @@ The following facts are verified in the authorization architecture regarding `TA
 
 The following facts are verified in the authorization architecture regarding `TASK-0215` (Centralized Authentication State Hydration):
 - **Client-Side RBAC State:** User role (`OWNER`, `ADMIN`) and identity metadata are hydrated server-side in `RootLayout` via `getSessionOrNull()` and made available to all client components through `AuthContext` (`useAuth()`).
-- **Instant Role-Gated UI:** Role-gated interface elements (e.g. `/users` and `/approvals` links in `Sidebar` and `/pengaturan`) render immediately on page load according to the hydrated role, preventing UI pop-in and layout shift.
+- **Instant Role-Gated UI:** Role-gated interface elements (e.g. `/users` and `/approvals` links in `Sidebar` and `/setting`) render immediately on page load according to the hydrated role, preventing UI pop-in and layout shift.
 - **Server Authorization Primacy:** Hydrated client state is strictly for UI presentation. All API routes and mutations independently enforce session and RBAC checks (`requireSession`, `requireRole`, `requirePermission`, `requireDeviceViewAccess`).
 - **Security Invariants:** No sensitive token or secret is ever exposed to the client context or stored in browser storage (`localStorage` / `sessionStorage`).
 <!-- TASK-0215 Reconciled: 2026-08-22 -->

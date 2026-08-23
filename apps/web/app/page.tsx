@@ -2,7 +2,7 @@
 
 import React from 'react';
 import TopAppBar from '@/components/navigation/TopAppBar';
-import { DASHBOARD_DATA, ALERTS } from '@/lib/constants';
+import { DASHBOARD_DATA } from '@/lib/constants';
 import { Sun } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useAuth } from '@/context/AuthContext';
@@ -32,7 +32,6 @@ function HealthScoreGauge({ score }: { score: number }) {
 
 export default function DashboardPage() {
   const tDash = useTranslations('dashboard');
-  const criticalCount = ALERTS.filter((a) => a.severity === 'error').length;
   const { user } = useAuth();
 
   const rawName = user?.fullName || user?.email || '';
@@ -40,7 +39,7 @@ export default function DashboardPage() {
 
   return (
     <div className="bg-app-surface text-app-on-surface min-h-dvh pb-10">
-      <TopAppBar showNotification notificationCount={criticalCount} />
+      <TopAppBar />
 
       <main className="pt-20 px-[1rem] space-y-5">
         {/* ── Hero Greeting Section ─── */}

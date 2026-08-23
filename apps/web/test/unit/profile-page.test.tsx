@@ -2,7 +2,7 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import ProfilPage from '@/app/profil/page';
+import ProfilePage from '@/app/profile/page';
 import { NextIntlClientProvider } from 'next-intl';
 import idMessages from '@/messages/id.json';
 import enMessages from '@/messages/en.json';
@@ -20,7 +20,7 @@ vi.mock('@/context/AuthContext', () => ({
 }));
 
 vi.mock('next/navigation', () => ({
-  usePathname: () => '/profil',
+  usePathname: () => '/profile',
   useRouter: () => ({
     push: vi.fn(),
     prefetch: vi.fn(),
@@ -28,7 +28,7 @@ vi.mock('next/navigation', () => ({
   }),
 }));
 
-describe('ProfilPage Auth State Hydration and I18N', () => {
+describe('ProfilePage Auth State Hydration and I18N', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     global.fetch = vi.fn().mockImplementation(() =>
@@ -66,14 +66,14 @@ describe('ProfilPage Auth State Hydration and I18N', () => {
 
     render(
       <NextIntlClientProvider locale="id" messages={idMessages}>
-        <ProfilPage />
+        <ProfilePage />
       </NextIntlClientProvider>
     );
 
     expect(screen.getByText('Nama Lengkap')).toBeInTheDocument();
     expect(screen.getByText('Profil Saya')).toBeInTheDocument();
     expect(screen.getByText('ADMINISTRATOR - ACTIVE')).toBeInTheDocument();
-    expect(screen.queryByText('Memuat profil...')).not.toBeInTheDocument();
+    expect(screen.queryByText('Memuat Profile...')).not.toBeInTheDocument();
   });
 
   it('renders profile details immediately in English without blocking spinner', async () => {
@@ -91,7 +91,7 @@ describe('ProfilPage Auth State Hydration and I18N', () => {
 
     render(
       <NextIntlClientProvider locale="en" messages={enMessages}>
-        <ProfilPage />
+        <ProfilePage />
       </NextIntlClientProvider>
     );
 

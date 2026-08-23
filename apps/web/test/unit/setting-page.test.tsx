@@ -2,7 +2,7 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import PengaturanPage from '@/app/pengaturan/page';
+import SettingPage from '@/app/setting/page';
 import { NextIntlClientProvider } from 'next-intl';
 import idMessages from '@/messages/id.json';
 import { UserRole } from '@kebun-melon/contracts';
@@ -19,7 +19,7 @@ vi.mock('@/context/AuthContext', () => ({
 }));
 
 vi.mock('next/navigation', () => ({
-  usePathname: () => '/pengaturan',
+  usePathname: () => '/setting',
   useRouter: () => ({
     push: vi.fn(),
     prefetch: vi.fn(),
@@ -27,7 +27,7 @@ vi.mock('next/navigation', () => ({
   }),
 }));
 
-describe('PengaturanPage Auth State Hydration', () => {
+describe('SettingPage Auth State Hydration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -35,7 +35,7 @@ describe('PengaturanPage Auth State Hydration', () => {
   const renderComponent = () =>
     render(
       <NextIntlClientProvider locale="id" messages={idMessages}>
-        <PengaturanPage />
+        <SettingPage />
       </NextIntlClientProvider>
     );
 
@@ -59,7 +59,7 @@ describe('PengaturanPage Auth State Hydration', () => {
     expect(screen.queryByText('Memuat...')).not.toBeInTheDocument();
   });
 
-  it('renders Owner-only menu items when user is OWNER', () => {
+  it('renders OWNER / PIC role string when user is OWNER', () => {
     mockAuthContext = {
       user: {
         id: 'usr-2',
@@ -75,29 +75,6 @@ describe('PengaturanPage Auth State Hydration', () => {
     renderComponent();
 
     expect(screen.getAllByText('Owner Utama').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('PEMILIK LAHAN (OWNER)')).toBeInTheDocument();
-    expect(screen.getByText('Kelola status dan profil pengguna')).toBeInTheDocument();
-    expect(screen.getByText('Kelola persetujuan registrasi Admin')).toBeInTheDocument();
-  });
-
-  it('hides Owner-only menu items when user is ADMIN', () => {
-    mockAuthContext = {
-      user: {
-        id: 'usr-3',
-        fullName: 'Admin User',
-        email: 'admin@example.com',
-        accountStatus: 'ACTIVE',
-        activeRoles: [UserRole.ADMIN],
-      },
-      role: UserRole.ADMIN,
-      isAuthenticated: true,
-    };
-
-    renderComponent();
-
-    expect(screen.getAllByText('Admin User').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('ADMINISTRATOR')).toBeInTheDocument();
-    expect(screen.queryByText('Kelola status dan profil pengguna')).not.toBeInTheDocument();
-    expect(screen.queryByText('Kelola persetujuan registrasi Admin')).not.toBeInTheDocument();
+    expect(screen.getByText('OWNER / PIC')).toBeInTheDocument();
   });
 });

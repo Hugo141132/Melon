@@ -22,7 +22,7 @@ This document defines the application database model for:
 - Authentication and user accounts.
 - Owner approval of Admin registrations.
 - Role-based access control.
-- User profile management.
+- User profilee management.
 - Multiple ESP32/NodeMCU devices.
 - Device capabilities and assignments.
 - Soil telemetry.
@@ -199,7 +199,7 @@ erDiagram
 
 ## 6.1 `users` (DB-USER-001)
 
-Stores user identity, role-independent profile fields, account status, and approval eligibility.
+Stores user identity, role-independent profilee fields, account status, and approval eligibility.
 
 | Column | PostgreSQL type | Nullable | Constraints / Notes |
 |---|---|---:|---|
@@ -291,10 +291,10 @@ account.approve
 account.reject
 account.suspend
 account.deactivate
-profile.self.read
-profile.self.update
-profile.other.read
-profile.other.update
+profilee.self.read
+profilee.self.update
+profilee.other.read
+profilee.other.update
 device.read
 device.assign
 device.unassign
@@ -1179,8 +1179,8 @@ account.approved
 account.rejected
 account.suspended
 account.deactivated
-profile.self.updated
-profile.other.updated
+profilee.self.updated
+profilee.other.updated
 device.access.assigned
 device.access.removed
 auth.login.success
@@ -1564,7 +1564,7 @@ The database shall:
 
 # 25. Privacy and Data Minimisation
 
-The database shall store only profile data required by the product.
+The database shall store only profilee data required by the product.
 
 The following are `TBD`:
 
@@ -1702,7 +1702,7 @@ The database design is accepted when:
 
 1. Identifier strategy: UUID, UUIDv7, or ULID.
 2. Whether sites are required in version 1.
-3. Exact user profile fields.
+3. Exact user profilee fields.
 4. Whether username is required.
 5. Whether `APPROVED` and `ACTIVE` remain separate.
 6. Whether multiple Owner accounts are permitted.
@@ -1817,7 +1817,7 @@ The following facts are supported by the verified database interactions of `TASK
 
 The following facts are supported by the verified database interactions of `TASK-0215` (Centralized Authentication State Hydration):
 - **Single SSR Session Query:** During initial server rendering of `RootLayout`, `getSessionOrNull()` executes a single session lookup via `validateSession` (`packages/database/src/session-service.ts`), validating user account status and active roles.
-- **Database Query Reduction:** Eliminates repeated client-side database hits to the `sessions`, `users`, and `user_roles` tables triggered on component mounts (e.g. from `/` and `/pengaturan`).
+- **Database Query Reduction:** Eliminates repeated client-side database hits to the `sessions`, `users`, and `user_roles` tables triggered on component mounts (e.g. from `/` and `/setting`).
 - **Zero Schema Migrations:** No alterations to database tables, indexes, or relations were introduced.
 <!-- TASK-0215 Reconciled: 2026-08-22 -->
 

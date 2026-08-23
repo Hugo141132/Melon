@@ -44,7 +44,7 @@ The system shall provide:
 Only authorised users and services shall access:
 
 - Protected application pages.
-- User profiles.
+- User profilees.
 - Device data.
 - Device locations.
 - Historical monitoring.
@@ -491,7 +491,7 @@ The Owner may:
 
 The Admin may:
 
-- View and edit only their own profile.
+- View and edit only their own profilee.
 - View authorised devices assigned to them.
 - View authorised monitoring data for assigned devices.
 - Use faucet control for assigned devices while the account is active, the device is controllable, and faucet control is enabled (`ENABLE_FAUCET_CONTROL=true`).
@@ -500,7 +500,7 @@ The Admin may:
 The Admin shall not:
 
 - View or edit the external canonical `deviceId` across any UI component or API response (`DEC-DEV-028`).
-- View another user's private profile.
+- View another user's private profilee.
 - Edit another user.
 - Approve an account.
 - Reject an account.
@@ -949,7 +949,7 @@ Recommended classifications:
 |---|---|
 | Public | Approved help text |
 | Internal | Device names, non-sensitive settings |
-| Confidential | User profiles, device locations, telemetry |
+| Confidential | User profilees, device locations, telemetry |
 | Restricted | Password hashes, session tokens, credentials, private keys |
 
 ### 17.2 Encryption in Transit
@@ -1077,8 +1077,8 @@ account.approved
 account.rejected
 account.suspended
 account.deactivated
-profile.self.updated
-profile.other.updated
+profilee.self.updated
+profilee.other.updated
 device.access.assigned
 device.access.removed
 auth.login.success
@@ -1139,7 +1139,7 @@ Security monitoring should detect:
 - Repeated failed logins.
 - Registration floods.
 - Repeated forbidden requests.
-- Admin attempts to access other profiles.
+- Admin attempts to access other profilees.
 - Device publishing to unauthorised topics.
 - Unknown device connections.
 - Duplicate faucet commands.
@@ -1369,7 +1369,7 @@ Privacy retention and disclosure requirements are `TBD`.
 ### 30.2 Authorisation Tests
 
 - Admin cannot approve users.
-- Admin cannot edit another profile.
+- Admin cannot edit another profilee.
 - Admin cannot change own role.
 - Admin cannot change own status.
 - Admin cannot self-assign a device.

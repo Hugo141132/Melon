@@ -161,7 +161,7 @@ Responsibilities:
 
 - Render the existing user interface.
 - Display monitoring data.
-- Display user, role, approval, and profile pages.
+- Display user, role, approval, and profilee pages.
 - Provide device selection.
 - Provide charts and historical data.
 - Display alerts.
@@ -188,7 +188,7 @@ Responsibilities:
 - Server-side guest route guards (`DEC-AUTH-103` on `/login`, `/register`, `/forgot-password`, `/reset-password`, `/verify-email`).
 - RBAC and account approval/rejection gating via `emailVerifiedAt` (`DEC-AUTH-104`).
 - Account approval.
-- User-profile management.
+- User-profilee management.
 - Device access assignment.
 - Monitoring queries.
 - Historical-data queries.
@@ -404,7 +404,7 @@ history
 faucet-control
 alerts
 users
-profile
+profilee
 settings
 i18n
 ```
@@ -422,7 +422,7 @@ Recommended protected routes:
 /alerts
 /users
 /users/pending
-/profile
+/profilee
 /settings
 ```
 
@@ -958,7 +958,7 @@ The following remain canonical:
 - Audit event keys.
 - Device payload keys.
 
-Locale preference shall be stored in the user profile and, for unauthenticated pages, in a cookie or local storage. All user-facing UI text across authentication, dashboard, monitoring, controls, navigation, and historical charts is wired to `next-intl` translation keys (`TASK-0603`).
+Locale preference shall be stored in the user profilee and, for unauthenticated pages, in a cookie or local storage. All user-facing UI text across authentication, dashboard, monitoring, controls, navigation, and historical charts is wired to `next-intl` translation keys (`TASK-0603`).
 
 ---
 
@@ -1666,7 +1666,7 @@ The following facts are supported by the verified architecture of `TASK-0806` (`
 
 The following facts are supported by the verified architecture of `TASK-0215` (`AuthContext` and RootLayout SSR Hydration):
 - **Server-to-Client State Hydration:** `RootLayout` (`apps/web/app/layout.tsx`) retrieves session metadata during initial server-side rendering via `getSessionOrNull()` (`apps/web/lib/auth/rbac.ts`). This session data is passed to `AuthProvider` (`apps/web/context/AuthContext.tsx`), rendering authenticated state synchronously across client trees.
-- **Client State Unification:** Eliminates redundant client-side `useEffect` and `fetch('/api/v1/auth/session')` requests on page mount (e.g. on `/` and `/pengaturan`).
+- **Client State Unification:** Eliminates redundant client-side `useEffect` and `fetch('/api/v1/auth/session')` requests on page mount (e.g. on `/` and `/setting`).
 - **Clean Component Interfaces:** Eliminates prop-drilling of `user` and `role` down through `TopAppBar` into `Sidebar`. Components independently access `{ user, role, isAuthenticated }` using the `useAuth()` hook.
 - **Security & Authorization Boundaries:** Client-side `AuthContext` is restricted to UI presentation and route navigation. Server-side route handlers (`/api/v1/*`) and Server Actions maintain authoritative security checks via `requireSession()`, `requireRole()`, and `requirePermission()`. No secrets or raw tokens are stored in browser storage.
 <!-- TASK-0215 Reconciled: 2026-08-22 -->

@@ -101,10 +101,10 @@ An Owner may:
 * view alerts;
 * view faucet-command history;
 * access faucet-control functions when the relevant control permission is granted;
-* view their own profile;
-* edit their own profile;
-* view other users’ profiles;
-* edit permitted fields in other users’ profiles;
+* view their own profilee;
+* edit their own profilee;
+* view other users’ profilees;
+* edit permitted fields in other users’ profilees;
 * review pending Admin account registrations;
 * approve or reject Admin account registrations;
 * activate, suspend, or deactivate Admin accounts;
@@ -141,15 +141,15 @@ An Admin may:
 * view faucet-command history within their authorised scope;
 * access faucet-control functions only when the relevant control permission is granted;
 * acknowledge operational alerts when permitted;
-* view their own profile;
-* edit their own permitted profile fields;
+* view their own profilee;
+* edit their own permitted profilee fields;
 * change their own password;
 * change their own language preference.
 
 An Admin shall not be able to:
 
-* view another user’s private profile-management page;
-* edit another user’s profile;
+* view another user’s private profilee-management page;
+* edit another user’s profilee;
 * approve or reject account registrations;
 * activate, suspend, or deactivate another user;
 * assign roles to another user;
@@ -193,25 +193,25 @@ The interface shall provide distinct messages for:
 
 These messages shall be available in English and Bahasa Indonesia.
 
-### 4.4 Profile-Management Interface
+### 4.4 profilee-Management Interface
 
-The profile interface shall adapt to the authenticated user’s permissions.
+The profilee interface shall adapt to the authenticated user’s permissions.
 
 For an Owner:
 
 * the interface may display a user directory;
-* the interface may provide access to another user’s profile;
-* permitted profile fields may be edited;
+* the interface may provide access to another user’s profilee;
+* permitted profilee fields may be edited;
 * account status may be managed;
 * device access may be assigned where supported;
 * approval history may be displayed.
 
 For an Admin:
 
-* the interface shall only provide access to the Admin’s own profile;
+* the interface shall only provide access to the Admin’s own profilee;
 * role and account-status fields shall be read-only;
 * user-management navigation shall not be displayed;
-* changing a route parameter or request identifier shall not expose another user’s profile.
+* changing a route parameter or request identifier shall not expose another user’s profilee.
 
 ### 4.5 Monitoring and Faucet-Control Access
 
@@ -257,8 +257,8 @@ Relevant permissions include:
 * `alert.read`
 * `alert.acknowledge`
 * `audit.read`
-* `user.profile.read.self`
-* `user.profile.update.self`
+* `user.profilee.read.self`
+* `user.profilee.update.self`
 * `user.manage`
 * `user.account.approve`
 * `user.account.reject`
@@ -269,7 +269,7 @@ Relevant permissions include:
 
 Default permission principles:
 
-* self-profile permissions may be granted to Owner and Admin;
+* self-profilee permissions may be granted to Owner and Admin;
 * user-management permissions shall be restricted to Owner;
 * account-approval permissions shall be restricted to Owner;
 * device, monitoring, alert, and faucet-control permissions shall remain subject to the user’s authorised device scope;
@@ -277,7 +277,7 @@ Default permission principles:
 
 A control that the user cannot access should not be displayed as an enabled action.
 
-Hiding, disabling, or removing an interface control is not a substitute for server-side authorisation. Every protected page, API request, profile update, account-approval action, device-management action, and faucet-control command shall be independently authorised by the backend.
+Hiding, disabling, or removing an interface control is not a substitute for server-side authorisation. Every protected page, API request, profilee update, account-approval action, device-management action, and faucet-control command shall be independently authorised by the backend.
 
 
 ## 5. Information Architecture
@@ -307,7 +307,7 @@ The final labels and route names shall follow the existing frontend conventions 
 | `/controls` | Faucet commands and execution history |
 | `/users` | User and device-access management |
 | `/roles` | Role and permission management |
-| `/settings` | Profile, language, and application preferences |
+| `/settings` | profilee, language, and application preferences |
 
 Do not create duplicate pages where an existing route already satisfies the same responsibility.
 
@@ -337,7 +337,7 @@ The header shall provide access to:
 - global device status;
 - last data update;
 - alerts;
-- user profile menu.
+- user profilee menu.
 
 On smaller screens, these controls may move into a compact menu or drawer, but device context and critical status must remain visible.
 
@@ -371,7 +371,7 @@ The selector and `/devices` card list shall support:
 
 The selected device is retained in-memory during active application navigation.
 
-**Removal of Previously/Last-Accessed Device History & Route-Scoped Rehydration**: The application shall NOT track, persist, or restore previously/last-accessed device history across logins or in persistent storage (e.g. `localStorage`, cookies, profile preferences) (`DEC-DEV-029`). Device selection initializes in a neutral state (`selectedDevice = null`) on bare routes (`/`, `/sensor`, `/soil` without `?deviceId=`). Selection occurs strictly upon explicit user interaction in `/sensor` or the header `DeviceSelector`, synchronizing to the active route URL (`?deviceId=...`). Hard refresh (Ctrl+Shift+R) on a specific device route rehydrates that selection after validating against the server-authorized list. If access to the currently selected device is revoked or unassigned (or if an invalid ID is in the query), selection is cleared to `null` and a notice is displayed without silent fallback.
+**Removal of Previously/Last-Accessed Device History & Route-Scoped Rehydration**: The application shall NOT track, persist, or restore previously/last-accessed device history across logins or in persistent storage (e.g. `localStorage`, cookies, profilee preferences) (`DEC-DEV-029`). Device selection initializes in a neutral state (`selectedDevice = null`) on bare routes (`/`, `/sensor`, `/soil` without `?deviceId=`). Selection occurs strictly upon explicit user interaction in `/sensor` or the header `DeviceSelector`, synchronizing to the active route URL (`?deviceId=...`). Hard refresh (Ctrl+Shift+R) on a specific device route rehydrates that selection after validating against the server-authorized list. If access to the currently selected device is revoked or unassigned (or if an invalid ID is in the query), selection is cleared to `null` and a notice is displayed without silent fallback.
 
 **History Protection**: This policy applies strictly to device selector persistence and does NOT affect telemetry history/charts (`TASK-0503`/`TASK-0504`), faucet-command history, device assignment/revocation history, status history, or audit logs (`DEC-DEV-029`).
 
@@ -731,7 +731,7 @@ After selection:
 
 1. visible interface text updates;
 2. the HTML `lang` attribute updates;
-3. the preference is persisted (cookie for unauthenticated, user profile for authenticated);
+3. the preference is persisted (cookie for unauthenticated, user profilee for authenticated);
 4. current route and device context are preserved;
 5. RBAC, device assignment, and permissions remain completely unchanged.
 
@@ -755,7 +755,7 @@ Translate:
 - accessibility labels;
 - audit log presentations.
 
-All user-facing UI text elements have been migrated to `next-intl` translation keys across all auth and protected views (`TASK-0603`). The mandatory initial language gate, Settings modal language switcher (`SettingsLocaleSwitcher` on `/pengaturan`), `/settings` redirect, default device label localization, and responsive mobile selector centering have been implemented and verified (`TASK-0604`).
+All user-facing UI text elements have been migrated to `next-intl` translation keys across all auth and protected views (`TASK-0603`). The mandatory initial language gate, Settings modal language switcher (`SettingsLocaleSwitcher` on `/setting`), `/settings` redirect, default device label localization, and responsive mobile selector centering have been implemented and verified (`TASK-0604`).
 
 ### 15.5 Content That Must Not Be Translated
 
@@ -1267,7 +1267,7 @@ The verified implementation of `TASK-0806` (`FaucetEventProcessor` in `@kebun-me
 
 The verified implementation of `TASK-0215` (Centralized Authentication State Hydration) enhances the user interface experience while strictly respecting design governance:
 - **Design Tokens Unchanged:** Reuses approved `Premium Minimal Ops` tokens, layout hierarchy, and color palette without modifications.
-- **Elimination of Layout Shifts & Flashes:** Initial authentication and role state are available immediately upon server-render hydration, eliminating client-side delays, role-checking layout shifts, and loading spinners on `/pengaturan`, the dashboard (`/`), `TopAppBar`, and `Sidebar`.
+- **Elimination of Layout Shifts & Flashes:** Initial authentication and role state are available immediately upon server-render hydration, eliminating client-side delays, role-checking layout shifts, and loading spinners on `/setting`, the dashboard (`/`), `TopAppBar`, and `Sidebar`.
 - **Instant Role-Gated Rendering:** `OWNER`-specific navigation and settings items (`/users` and `/approvals`) render instantly without progressive popping or delayed entry.
 <!-- TASK-0215 Reconciled: 2026-08-22 -->
 

@@ -60,7 +60,7 @@ const nextConfig = {
     return [
       {
         source: '/settings',
-        destination: '/pengaturan',
+        destination: '/setting',
         permanent: true,
       },
     ];

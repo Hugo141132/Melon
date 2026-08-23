@@ -688,7 +688,7 @@ Implement transactional approval.
 **Priority:** `P0`
 **Status:** `DONE`
 **Dependencies:** `TASK-0105`, `TASK-0204`
-**Completed:** 2026-07-29 — Implemented server authorisation library (`apps/web/lib/auth/rbac.ts`) with session lookup (`requireSession`), active status revalidation (`requireActiveAccount`), role guards (`requireRole`), permission checks (`requirePermission`), profile self/permission checks (`requireSelfOrPermission`), assigned device view access (`requireDeviceViewAccess`), and controllable device access (`requireDeviceControlAccess`) with strict `ENABLE_FAUCET_CONTROL` feature flag enforcement. Verified with 18 unit tests in `apps/web/lib/auth/__tests__/rbac.test.ts`.
+**Completed:** 2026-07-29 — Implemented server authorisation library (`apps/web/lib/auth/rbac.ts`) with session lookup (`requireSession`), active status revalidation (`requireActiveAccount`), role guards (`requireRole`), permission checks (`requirePermission`), profileee self/permission checks (`requireSelfOrPermission`), assigned device view access (`requireDeviceViewAccess`), and controllable device access (`requireDeviceControlAccess`) with strict `ENABLE_FAUCET_CONTROL` feature flag enforcement. Verified with 18 unit tests in `apps/web/lib/auth/__tests__/rbac.test.ts`.
 
 ### Work
 
@@ -736,7 +736,7 @@ requireDeviceControlAccess()
 
 ---
 
-## TASK-0211 — Implement Self Profile
+## TASK-0211 — Implement Self profileee
 
 **Priority:** `P1`
 **Status:** `DONE`
@@ -754,7 +754,7 @@ PATCH /api/v1/me
 
 ### Acceptance Criteria
 
-- Owner and Admin can read own profile.
+- Owner and Admin can read own profileee.
 - Only allowlisted fields can be edited.
 - Role and status injection fail.
 - Changes are audited where required.
@@ -772,7 +772,7 @@ PATCH /api/v1/me
 Implemented complete Owner User Management:
 - Paginated user list & user details with strict Owner RBAC authorization (`account.read`, `account.update`, `account.suspend`, `account.activate`, `account.deactivate`).
 - Admin listing excluding soft-deleted accounts by default.
-- Permitted profile editing strictly allowlisting `fullName` and `username` (`email` read-only).
+- Permitted profileee editing strictly allowlisting `fullName` and `username` (`email` read-only).
 - Account suspension (`POST /api/v1/users/{userId}/suspend`) and reactivation (`POST /api/v1/users/{userId}/activate`).
 - Permanent account hard deletion (`DELETE /api/v1/users/{userId}`) for eligible ADMIN accounts (`ACTIVE`, `SUSPENDED`, `REJECTED`, `DEACTIVATED`, `APPROVED`), excluding `PENDING_APPROVAL` accounts (`409 CANNOT_DELETE_PENDING_APPROVAL`).
 - OWNER account deletion protection (`403 FORBIDDEN_TARGET`).
@@ -906,7 +906,7 @@ Implemented complete Owner User Management:
 **Priority:** `P1`
 **Status:** `DONE`
 **Dependencies:** `TASK-0204`, `TASK-0208`, `DEC-AUTH-105`
-**Completed:** 2026-08-22 — Implemented centralized authentication state hydration to eliminate delayed UI rendering and layout shifts across navigation and protected pages. Added React `AuthContext` (`AuthProvider` / `useAuth()`) in `@kebun-melon/web`, providing unified access to `{ user, role, isAuthenticated }`. Implemented `getSessionOrNull()` server helper in `lib/auth/rbac.ts` for safe, non-throwing session retrieval in `RootLayout` during SSR. Eliminated redundant client-side `useEffect` and `fetch('/api/v1/auth/session')` calls from `/`, `/pengaturan`, `/profil`, `TopAppBar`, and `Sidebar`. Refactored `Sidebar` and `TopAppBar` to consume `useAuth()` directly, removing unnecessary prop drilling. Refactored `/pengaturan` and `/profil` to instantaneously render user profile identity and role-conditional menu items (`/users` and `/approvals` for `OWNER`) without loading spinners. Maintained strict server-side RBAC and route protection. Verified 100% test pass rate across 35 unit test suites (260/260 tests) and 14 E2E critical flows.
+**Completed:** 2026-08-22 — Implemented centralized authentication state hydration to eliminate delayed UI rendering and layout shifts across navigation and protected pages. Added React `AuthContext` (`AuthProvider` / `useAuth()`) in `@kebun-melon/web`, providing unified access to `{ user, role, isAuthenticated }`. Implemented `getSessionOrNull()` server helper in `lib/auth/rbac.ts` for safe, non-throwing session retrieval in `RootLayout` during SSR. Eliminated redundant client-side `useEffect` and `fetch('/api/v1/auth/session')` calls from `/`, `/setting`, `/profileee`, `TopAppBar`, and `Sidebar`. Refactored `Sidebar` and `TopAppBar` to consume `useAuth()` directly, removing unnecessary prop drilling. Refactored `/setting` and `/profileee` to instantaneously render user profileee identity and role-conditional menu items (`/users` and `/approvals` for `OWNER`) without loading spinners. Maintained strict server-side RBAC and route protection. Verified 100% test pass rate across 35 unit test suites (260/260 tests) and 14 E2E critical flows.
 
 ### Work
 
@@ -916,19 +916,19 @@ Implemented complete Owner User Management:
 - Refactored `apps/web/app/page.tsx` to consume `useAuth()` for user greeting and removed client-side fetch logic.
 - Refactored `apps/web/components/navigation/TopAppBar.tsx` to consume `useAuth()` for avatar rendering and removed `user` prop drilling into `Sidebar`.
 - Refactored `apps/web/components/navigation/Sidebar.tsx` to consume `useAuth()` directly for username formatting and role-based menu filtering (`/users` and `/approvals`).
-- Refactored `apps/web/app/pengaturan/page.tsx` to consume `useAuth()`, removing client-side session fetching, spinners, and latency.
-- Refactored `apps/web/app/profil/page.tsx` to consume `useAuth()`, eliminating blocking full-page loading spinners.
+- Refactored `apps/web/app/setting/page.tsx` to consume `useAuth()`, removing client-side session fetching, spinners, and latency.
+- Refactored `apps/web/app/profileee/page.tsx` to consume `useAuth()`, eliminating blocking full-page loading spinners.
 - Updated unit test suites `sidebar-navigation.test.tsx` and `device-selector-localization.test.tsx` with `AuthContext` mocks.
-- Created `apps/web/test/unit/pengaturan-page.test.tsx` to verify immediate hydration and role-based menu display on `/pengaturan`.
-- Created `apps/web/test/unit/profil-page.test.tsx` to verify immediate hydration and I18N display on `/profil`.
+- Created `apps/web/test/unit/setting-page.test.tsx` to verify immediate hydration and role-based menu display on `/setting`.
+- Created `apps/web/test/unit/profileee-page.test.tsx` to verify immediate hydration and I18N display on `/profileee`.
 
 ### Acceptance Criteria
 
 - [x] Initial session is hydrated server-side in `RootLayout` with lightweight user/role metadata.
 - [x] Zero UI flashing or delayed role recognition on initial page load across protected routes.
-- [x] Redundant client-side calls to `/api/v1/auth/session` on mount removed from `/`, `/pengaturan`, and `/profil`.
+- [x] Redundant client-side calls to `/api/v1/auth/session` on mount removed from `/`, `/setting`, and `/profileee`.
 - [x] `TopAppBar` and `Sidebar` consume `useAuth()` without prop-drilling.
-- [x] `OWNER`-only menu items (`/users`, `/approvals`) on `/pengaturan` and `Sidebar` render immediately based on hydrated role state.
+- [x] `OWNER`-only menu items (`/users`, `/approvals`) on `/setting` and `Sidebar` render immediately based on hydrated role state.
 - [x] Security architecture and server-side RBAC enforcement remain unaffected.
 - [x] All unit tests pass (100% pass rate).
 
@@ -998,7 +998,7 @@ Implement:
 **Priority:** `P1`
 **Status:** `DONE`
 **Dependencies:** `TASK-0302`
-**Completed:** 2026-07-30 — Implemented typed device capabilities with single server-authoritative mapping source in `@kebun-melon/contracts`, runtime feature detection helper `supportsCapability`, MONITORING vs CONTROL capability categorization (`getCapabilityCategory`), atomic transaction reconciliation on device profile (`deviceType`) update in `@kebun-melon/database`, controlled one-time DB reconciliation removing obsolete `RELAY_CONTROL` & `SOLENOID_VALVE_CONTROL` rows on `water-tank-node-ryd0at`, and read-only capability rendering under Monitoring and Control headers on `/devices` UI. Added unit and integration test coverage across contract, database, and frontend layers.
+**Completed:** 2026-07-30 — Implemented typed device capabilities with single server-authoritative mapping source in `@kebun-melon/contracts`, runtime feature detection helper `supportsCapability`, MONITORING vs CONTROL capability categorization (`getCapabilityCategory`), atomic transaction reconciliation on device profileee (`deviceType`) update in `@kebun-melon/database`, controlled one-time DB reconciliation removing obsolete `RELAY_CONTROL` & `SOLENOID_VALVE_CONTROL` rows on `water-tank-node-ryd0at`, and read-only capability rendering under Monitoring and Control headers on `/devices` UI. Added unit and integration test coverage across contract, database, and frontend layers.
 
 ### Work
 
@@ -1569,7 +1569,7 @@ faucet
 alerts
 users
 approvals
-profile
+profileee
 settings
 validation
 errors
@@ -1612,7 +1612,7 @@ Key Implementation Details:
 - Conducted exhaustive literal sweeps and replaced hard-coded user-facing text with `next-intl` translation keys across all auth and protected pages:
   - Auth routes: `/(auth)/login`, `/(auth)/register`, `/(auth)/status`, `/(auth)/forgot-password`
   - Core navigation: `Sidebar.tsx`, `TopAppBar.tsx`, `DeviceSelector.tsx`
-  - Protected views: `/` (`MonitoringDashboard.tsx`), `/sensor`, `/soil`, `/water` (`WaterTankMonitoringCard.tsx`), `/controls` (`FaucetControlPanel.tsx`, `FaucetPresetSelector.tsx`, `FaucetConfirmationModal.tsx`, `FaucetStatusCard.tsx`, `FaucetHistoryTable.tsx`), `/devices`, `/users`, `/approvals`, `/pengaturan`, `/profil`, `/notifikasi`
+  - Protected views: `/` (`MonitoringDashboard.tsx`), `/sensor`, `/soil`, `/water` (`WaterTankMonitoringCard.tsx`), `/controls` (`FaucetControlPanel.tsx`, `FaucetPresetSelector.tsx`, `FaucetConfirmationModal.tsx`, `FaucetStatusCard.tsx`, `FaucetHistoryTable.tsx`), `/devices`, `/users`, `/approvals`, `/setting`, `/profileee`, `/notifikasi`
   - Historical telemetry charts & controls: `NPKChart.tsx`, `WaterNutrientChart.tsx`, `HistoricalChartControls.tsx`
 - Enforced 100% key parity across `messages/id.json` and `messages/en.json` (all 17 namespaces + `system`).
 - Preserved internal untranslated canonical values (API enums, database fields, MQTT topics, audit keys, hardware types, raw measurements, and unit symbols: `N`, `P`, `K`, `pH`, `EC`, `TDS`, `ESP32`, `NodeMCU`, `MQTT`, `mL`, `L`, `°C`, `m³/h`, `ppm`, `µS/cm`).
@@ -1638,7 +1638,7 @@ Key Implementation Details:
 **Priority:** `P1`
 **Status:** `DONE`
 **Dependencies:** `TASK-0601`, `TASK-0602`, `TASK-0603`, `TASK-0211`
-**Implementation Summary:** Implemented mandatory initial language gate (`Select Language / Pilih Bahasa`, English -> `en`, Bahasa Indonesia -> `id`) on `(auth)/layout.tsx` for visitors without valid `locale` cookie. Implemented authenticated language modal selector on `/pengaturan` (`SettingsLocaleSwitcher`) with accessible dialog pattern adhering to `Premium Minimal Ops` (clear active indicator, localized error handling, preserved route & device context), backed by `PATCH /api/v1/me/preferences` with strict Zod validation (`UserPreferenceUpdateInputSchema`), `language.self.update` RBAC check, database persistence with audit logging, and `/settings` Next.js permanent redirect. Fixed system default device display labels (`Node Sensor Tanah` <-> `Soil Sensor Node`, `Node Kualitas Air` <-> `Water Quality Node`, `Node Tangki Air` <-> `Water Tank Node`) in presentation layer while preserving custom names, device IDs, and canonical enums. Responsive mobile selector centering and dropdown viewport bounding enforced across 360px, 390px, 430px, and desktop viewports. Verified 100% test pass rate across 18 unit test suites (136/136 tests), 0 type errors, 32/32 static build routes, and Playwright verification across desktop and mobile with 0 console errors.
+**Implementation Summary:** Implemented mandatory initial language gate (`Select Language / Pilih Bahasa`, English -> `en`, Bahasa Indonesia -> `id`) on `(auth)/layout.tsx` for visitors without valid `locale` cookie. Implemented authenticated language modal selector on `/setting` (`SettingsLocaleSwitcher`) with accessible dialog pattern adhering to `Premium Minimal Ops` (clear active indicator, localized error handling, preserved route & device context), backed by `PATCH /api/v1/me/preferences` with strict Zod validation (`UserPreferenceUpdateInputSchema`), `language.self.update` RBAC check, database persistence with audit logging, and `/settings` Next.js permanent redirect. Fixed system default device display labels (`Node Sensor Tanah` <-> `Soil Sensor Node`, `Node Kualitas Air` <-> `Water Quality Node`, `Node Tangki Air` <-> `Water Tank Node`) in presentation layer while preserving custom names, device IDs, and canonical enums. Responsive mobile selector centering and dropdown viewport bounding enforced across 360px, 390px, 430px, and desktop viewports. Verified 100% test pass rate across 18 unit test suites (136/136 tests), 0 type errors, 32/32 static build routes, and Playwright verification across desktop and mobile with 0 console errors.
 
 ### Acceptance Criteria
 
@@ -1646,7 +1646,7 @@ Key Implementation Details:
 - [x] Unauthenticated preference persists in non-prefixed cookie (`locale`).
 - [x] Gate is skipped when a valid locale cookie already exists.
 - [x] Post-gate language changes available exclusively on the Settings page (`/settings`).
-- [x] Authenticated preference persists in user profile (`preferredLocale`).
+- [x] Authenticated preference persists in user profileee (`preferredLocale`).
 - [x] Page refresh retains active locale.
 - [x] Locale change does not alter device selection, canonical values, or RBAC.
 
@@ -2604,7 +2604,7 @@ Every completed feature shall satisfy:
 - `TASK-0209`
 - `TASK-0210`
 
-## Sprint 3 — Profiles and Devices
+## Sprint 3 — profileees and Devices
 
 - `TASK-0211`
 - `TASK-0212`

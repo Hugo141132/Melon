@@ -42,7 +42,7 @@ The following rules apply to all flows:
 5. Monitoring permission does not automatically grant faucet-control permission.
 6. Public registration creates an `OWNER` (with `accountStatus = ACTIVE`) ONLY IF no non-revoked Owner account exists in the system.
 7. Once an Owner account exists, public Owner selection is disabled and public registration creates an `ADMIN` with `PENDING_APPROVAL`.
-8. Admins may manage only their own profile.
+8. Admins may manage only their own profilee.
 9. Owners may manage other users within the authorised scope.
 10. Language selection must never alter permissions or account status.
 11. Canonical internal values must remain untranslated.
@@ -149,9 +149,9 @@ flowchart TD
     A[Owner opens User Management] --> B[Server verifies OWNER]
     B --> C[Load permitted users]
     C --> D[Owner selects user]
-    D --> E[Load profile and access information]
+    D --> E[Load profilee and access information]
     E --> F{Owner action}
-    F -- Edit profile --> G[Validate and save permitted fields]
+    F -- Edit profilee --> G[Validate and save permitted fields]
     F -- Assign device --> H[Create device-access assignment]
     F -- Remove device --> I[Deactivate device-access assignment]
     F -- Suspend --> J[Set SUSPENDED and invalidate sessions]
@@ -204,7 +204,7 @@ flowchart TD
     F --> G{User opens Settings?}
     G -- Yes --> H[Select new language in Settings]
     H --> I[Validate & update locale preference]
-    I --> J[Save to profile / cookie]
+    I --> J[Save to profilee / cookie]
     J --> K[UI updates language without re-authenticating]
 ```
 
@@ -433,7 +433,7 @@ flowchart TD
 4. The server queries accounts where `accountStatus = 'PENDING_APPROVAL'` and `emailVerifiedAt IS NOT NULL` (`DEC-AUTH-104`). Unverified accounts are excluded.
 5. The frontend displays pending verified users without exposing secrets.
 6. The Owner opens a registration record.
-7. The system displays submitted profile information and approval history.
+7. The system displays submitted profilee information and approval history.
 
 **Alternative flows:**
 
@@ -701,42 +701,42 @@ flowchart TD
 
 ---
 
-# 7. Profile and User-Management Flows
+# 7. profilee and User-Management Flows
 
-## Flow 13 — Owner Views Their Own Profile
+## Flow 13 — Owner Views Their Own profilee
 
 **Primary actor:** Owner
 **Preconditions:** Active Owner session.
-**Trigger:** Owner opens profile.
+**Trigger:** Owner opens profilee.
 
 **Main success flow:**
 
 1. The server verifies the session.
-2. The server checks `profile.self.read`.
-3. The server returns the Owner's permitted profile data.
+2. The server checks `profilee.self.read`.
+3. The server returns the Owner's permitted profilee data.
 4. The frontend displays system-managed fields as read-only.
 
-**Alternative flows:** Profile data is partially unavailable; show an error without exposing secrets.
+**Alternative flows:** profilee data is partially unavailable; show an error without exposing secrets.
 **Error flows:** Session expired: redirect to login.
 **Postconditions:** No data changes.
-**Required permissions:** `profile.self.read`.
+**Required permissions:** `profilee.self.read`.
 **Relevant account statuses:** `ACTIVE`.
-**UI states:** Loading, profile, error.
+**UI states:** Loading, profilee, error.
 **Audit events:** Normally none.
-**Open decisions:** Exact profile fields.
+**Open decisions:** Exact profilee fields.
 
 ---
 
-## Flow 14 — Owner Edits Their Own Profile
+## Flow 14 — Owner Edits Their Own profilee
 
 **Primary actor:** Owner
-**Preconditions:** Active Owner; profile open.
+**Preconditions:** Active Owner; profilee open.
 **Trigger:** Owner submits changes.
 
 **Main success flow:**
 
 1. The frontend permits editing only approved fields.
-2. The server verifies `profile.self.update`.
+2. The server verifies `profilee.self.update`.
 3. The server ignores or rejects role and status changes in this flow.
 4. The server validates fields.
 5. The server saves permitted changes.
@@ -745,16 +745,16 @@ flowchart TD
 
 **Alternative flows:** Email change requires reverification: `TBD`.
 **Error flows:** Validation failure, duplicate email, stale version conflict.
-**Postconditions:** Own profile is updated.
-**Required permissions:** `profile.self.update`.
+**Postconditions:** Own profilee is updated.
+**Required permissions:** `profilee.self.update`.
 **Relevant account statuses:** `ACTIVE`.
 **UI states:** Edit, saving, success, validation errors.
-**Audit events:** `profile.self.updated`.
+**Audit events:** `profilee.self.updated`.
 **Open decisions:** Editable fields and email-change policy.
 
 ---
 
-## Flow 15 — Owner Views Another User's Profile
+## Flow 15 — Owner Views Another User's profilee
 
 **Primary actor:** Owner
 **Preconditions:** Active Owner; target user exists within scope.
@@ -762,23 +762,23 @@ flowchart TD
 
 **Main success flow:**
 
-1. The server verifies role and `profile.other.read`.
+1. The server verifies role and `profilee.other.read`.
 2. The server verifies target-user scope.
-3. The server returns permitted profile and access data.
+3. The server returns permitted profilee and access data.
 4. The frontend displays role, status, device assignments, and approval history as allowed.
 
 **Alternative flows:** Target is another Owner; behaviour is `TBD`.
 **Error flows:** Out-of-scope target returns forbidden or concealed not-found.
 **Postconditions:** No data changes.
-**Required permissions:** `profile.other.read`.
+**Required permissions:** `profilee.other.read`.
 **Relevant account statuses:** Owner `ACTIVE`; target any retained status.
-**UI states:** Loading, user profile, not found, forbidden.
-**Audit events:** Optional sensitive profile view.
+**UI states:** Loading, user profilee, not found, forbidden.
+**Audit events:** Optional sensitive profilee view.
 **Open decisions:** Multiple-Owner management.
 
 ---
 
-## Flow 16 — Owner Edits Another User's Permitted Profile Fields
+## Flow 16 — Owner Edits Another User's Permitted profilee Fields
 
 **Primary actor:** Owner
 **Preconditions:** Owner may manage target user.
@@ -787,7 +787,7 @@ flowchart TD
 **Main success flow:**
 
 1. The frontend shows only Owner-editable fields.
-2. The server validates `profile.other.update`.
+2. The server validates `profilee.other.update`.
 3. The server verifies target scope.
 4. The server validates field-level permissions.
 5. The server saves approved changes.
@@ -796,11 +796,11 @@ flowchart TD
 
 **Alternative flows:** Role or status changes use separate dedicated actions.
 **Error flows:** Attempt to edit immutable or secret fields is rejected.
-**Postconditions:** Target profile is updated.
-**Required permissions:** `profile.other.update`.
+**Postconditions:** Target profilee is updated.
+**Required permissions:** `profilee.other.update`.
 **Relevant account statuses:** Owner `ACTIVE`; target varies.
 **UI states:** Edit, saving, success, field errors.
-**Audit events:** `profile.other.updated`.
+**Audit events:** `profilee.other.updated`.
 **Open decisions:** Exact Owner-editable fields.
 
 ---
@@ -832,31 +832,31 @@ flowchart TD
 
 ---
 
-## Flow 18 — Admin Views Their Own Profile
+## Flow 18 — Admin Views Their Own profilee
 
 **Primary actor:** Admin
 **Preconditions:** Active Admin session.
-**Trigger:** Admin opens profile.
+**Trigger:** Admin opens profilee.
 
 **Main success flow:**
 
-1. The server verifies `profile.self.read`.
+1. The server verifies `profilee.self.read`.
 2. The server uses the authenticated user ID, not a client-selected user ID.
-3. The system returns only the Admin's own profile.
+3. The system returns only the Admin's own profilee.
 4. The frontend displays role and account status as read-only.
 
 **Alternative flows:** None.
 **Error flows:** Session expired.
 **Postconditions:** No data changes.
-**Required permissions:** `profile.self.read`.
+**Required permissions:** `profilee.self.read`.
 **Relevant account statuses:** `ACTIVE`.
-**UI states:** Loading, profile, error.
+**UI states:** Loading, profilee, error.
 **Audit events:** Normally none.
 **Open decisions:** Exact fields.
 
 ---
 
-## Flow 19 — Admin Edits Their Own Profile
+## Flow 19 — Admin Edits Their Own profilee
 
 **Primary actor:** Admin
 **Preconditions:** Active Admin.
@@ -866,7 +866,7 @@ flowchart TD
 
 1. The frontend submits permitted fields.
 2. The server identifies the target from the session.
-3. The server verifies `profile.self.update`.
+3. The server verifies `profilee.self.update`.
 4. The server rejects role, account-status, device-assignment, and approval changes.
 5. The server validates and saves permitted fields.
 6. The system records an audit event.
@@ -874,16 +874,16 @@ flowchart TD
 
 **Alternative flows:** Password update uses a dedicated flow.
 **Error flows:** Invalid data, duplicate email, unauthorised field injection.
-**Postconditions:** Admin's own profile is updated.
-**Required permissions:** `profile.self.update`.
+**Postconditions:** Admin's own profilee is updated.
+**Required permissions:** `profilee.self.update`.
 **Relevant account statuses:** `ACTIVE`.
 **UI states:** Edit, saving, success, validation error.
-**Audit events:** `profile.self.updated`.
+**Audit events:** `profilee.self.updated`.
 **Open decisions:** Email-change policy.
 
 ---
 
-## Flow 20 — Admin Attempts to Access Another User's Profile
+## Flow 20 — Admin Attempts to Access Another User's profilee
 
 **Primary actor:** Admin
 **Preconditions:** Active Admin.
@@ -893,9 +893,9 @@ flowchart TD
 
 1. The server validates the session.
 2. The server sees that the requested target is not the authenticated Admin.
-3. The server verifies the Admin lacks `profile.other.read` or `profile.other.update`.
+3. The server verifies the Admin lacks `profilee.other.read` or `profilee.other.update`.
 4. The server returns `403` or concealed `404`.
-5. No private profile data is returned.
+5. No private profilee data is returned.
 
 **Alternative flows:** None.
 **Error flows:** Frontend may show a generic access-denied page.
@@ -1261,7 +1261,7 @@ flowchart TD
 3. The HTML `lang` attribute updates.
 4. Dates, times, and numbers use locale-aware formatting where specified.
 5. Canonical values, roles, permissions, and device access remain unchanged.
-6. For authenticated users, the preference is saved to their profile (`preferredLocale`).
+6. For authenticated users, the preference is saved to their profilee (`preferredLocale`).
 7. For unauthenticated visitors who previously selected language via the initial gate, preference is stored in non-prefixed cookie (`locale`).
 
 **Alternative flows:** Missing translation falls back to fallback language (`en`).
@@ -1278,12 +1278,12 @@ flowchart TD
 ## Flow 35 — User Refreshes After Changing Language
 
 **Primary actor:** Owner, Admin, or visitor
-**Preconditions:** A language preference has been stored in profile or cookie.
+**Preconditions:** A language preference has been stored in profilee or cookie.
 **Trigger:** Page refresh or new session.
 
 **Main success flow:**
 
-1. The system reads the authenticated profile preference (`preferredLocale`) or cookie (`locale`).
+1. The system reads the authenticated profilee preference (`preferredLocale`) or cookie (`locale`).
 2. If no valid locale exists for an unauthenticated visitor, display mandatory initial language-selection gate.
 3. The system validates the locale.
 4. The interface loads in the saved language.
@@ -1297,7 +1297,7 @@ flowchart TD
 **Relevant account statuses:** Any eligible page state.
 **UI states:** Correct locale rendered on initial page render without path redirect.
 **Audit events:** None.
-**Open decisions:** None (Precedence: Profile > Cookie > Gate > Default `id` / Fallback `en`).
+**Open decisions:** None (Precedence: profilee > Cookie > Gate > Default `id` / Fallback `en`).
 
 ---
 
@@ -1833,8 +1833,8 @@ account.rejected
 account.activated
 account.suspended
 account.deactivated
-profile.self.updated
-profile.other.updated
+profilee.self.updated
+profilee.other.updated
 device.access.assigned
 device.access.removed
 auth.login.success
@@ -1865,7 +1865,7 @@ Each audit event shall include relevant actor, target, timestamp, result, and sa
 2. Public registration shall force status `PENDING_APPROVAL`.
 3. Protected access shall require status `ACTIVE`.
 4. Role and status values from the browser shall never be trusted.
-5. An Admin shall never manage another user's profile.
+5. An Admin shall never manage another user's profilee.
 6. An Admin shall never approve, reject, suspend, activate, or deactivate another user.
 7. Device access shall be verified for every device-specific request.
 8. Monitoring permission shall remain separate from control permission.
@@ -1907,7 +1907,7 @@ Each audit event shall include relevant actor, target, timestamp, result, and sa
 24. Session duration and renewal.
 25. Permission-cache invalidation method.
 26. Language default and fallback.
-27. Exact editable profile fields.
+27. Exact editable profilee fields.
 28. Export permissions.
 29. Public support and legal pages.
 30. Notification channels.
@@ -1984,7 +1984,7 @@ The following facts are verified in the end-to-end user flow implementations reg
 
 The following facts are verified in the user flow implementations regarding `TASK-0215` (Centralized Authentication State Hydration):
 - **Immediate Navigation & Seamless Protected Access:** Upon successful login and on subsequent page navigations, the root server layout immediately hydrates authentication and role state into `AuthContext`.
-- **Flicker-Free Role-Based Views:** Users navigating to `/pengaturan`, the dashboard (`/`), or using the `Sidebar` experience instantaneous rendering of their identity, avatar, and role-restricted menus (`/users`, `/approvals` for `OWNER`) with zero loading spinners, skeleton flashes, or layout shifts.
+- **Flicker-Free Role-Based Views:** Users navigating to `/setting`, the dashboard (`/`), or using the `Sidebar` experience instantaneous rendering of their identity, avatar, and role-restricted menus (`/users`, `/approvals` for `OWNER`) with zero loading spinners, skeleton flashes, or layout shifts.
 - **Client Fetch Elimination:** Pages no longer initiate independent client-side `GET /api/v1/auth/session` calls during component mount, eliminating UI race conditions and redundant network requests.
 - **Unauthenticated Flow:** Unauthenticated users accessing protected routes continue to be redirected cleanly by server route guards.
 <!-- TASK-0215 Reconciled: 2026-08-22 -->

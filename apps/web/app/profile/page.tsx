@@ -27,7 +27,7 @@ interface UserProfileState {
   activeRoles: string[];
 }
 
-export default function ProfilPage() {
+export default function ProfilePage() {
   const tProfile = useTranslations('profile');
   const tCommon = useTranslations('common');
   const tAuth = useTranslations('auth');
@@ -228,7 +228,7 @@ export default function ProfilPage() {
         <div className="flex justify-between items-center px-[1rem] py-[8px] w-full h-16">
           <div className="flex items-center gap-4">
             <Link
-              href="/pengaturan"
+              href="/setting"
               className="active:scale-95 transition-transform p-2 rounded-full hover:bg-app-surface-container-highest cursor-pointer"
             >
               <ArrowLeft size={22} className="text-app-on-surface" />

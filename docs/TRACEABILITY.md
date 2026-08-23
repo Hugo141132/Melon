@@ -190,7 +190,7 @@ The following facts are verified in the traceability matrix regarding `TASK-0213
 The following facts are verified in the traceability matrix regarding `TASK-0215` (Centralized Authentication State Hydration):
 - **Implementation Status:** `TASK-0215` is implemented and verified (`34` unit test suites, `258/258` tests passed in web; typecheck 0 errors).
 - **Global Hydration Architecture:** `RootLayout` performs server-side session retrieval via `getSessionOrNull()` and hydrates `AuthProvider` (`AuthContext`), eliminating client-side layout shift and UI flicker.
-- **Redundant Fetch Elimination:** Removed duplicated `fetch('/api/v1/auth/session')` in `page.tsx` (Dashboard) and `pengaturan/page.tsx` (Settings).
+- **Redundant Fetch Elimination:** Removed duplicated `fetch('/api/v1/auth/session')` in `page.tsx` (Dashboard) and `setting/page.tsx` (Settings).
 - **Component Prop Cleanup:** `TopAppBar` and `Sidebar` consume `useAuth()` directly, removing prop drilling for `user` and `role`.
 - **Security & Authorization:** Non-sensitive session metadata only; server-side RBAC validation remains authoritative across all routes and API endpoints.
 <!-- TASK-0215 Reconciled: 2026-08-22 -->
