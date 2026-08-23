@@ -166,8 +166,9 @@ describe('TASK-0502 — Real-Time Monitoring Dashboard Integration Tests', () =>
     expect(screen.getByText('198')).toBeInTheDocument(); // Potassium
     expect(screen.getByText('28.5')).toBeInTheDocument(); // Temperature
     expect(screen.getByText('65.2')).toBeInTheDocument(); // Moisture
+    expect(screen.getByText('%RH')).toBeInTheDocument(); // Moisture Unit
     expect(screen.getByText('6.50')).toBeInTheDocument(); // pH
-    expect(screen.getByText('1.80')).toBeInTheDocument(); // EC
+    expect(screen.getByText('1800')).toBeInTheDocument(); // EC in µS/cm (1.8 * 1000)
   });
 
   it('3. Render Canonical WATER QUALITY Metrics (pH, TDS, EC)', async () => {
@@ -197,7 +198,7 @@ describe('TASK-0502 — Real-Time Monitoring Dashboard Integration Tests', () =>
 
     expect(screen.getByText('6.80')).toBeInTheDocument(); // pH
     expect(screen.getByText('450')).toBeInTheDocument(); // TDS
-    expect(screen.getByText('1.90')).toBeInTheDocument(); // EC
+    expect(screen.getByText('1900')).toBeInTheDocument(); // EC in µS/cm (1.9 * 1000)
   });
 
   it('4. Render Canonical WATER TANK Metrics (Volume, Flow Rate) without Reservoir terminology', async () => {

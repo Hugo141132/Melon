@@ -2,6 +2,7 @@
 
 import React from 'react';
 import TopAppBar from '@/components/navigation/TopAppBar';
+import MonitoringDashboard from '@/components/monitoring/MonitoringDashboard';
 import { DASHBOARD_DATA } from '@/lib/constants';
 import { Sun } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -41,7 +42,7 @@ export default function DashboardPage() {
     <div className="bg-app-surface text-app-on-surface min-h-dvh pb-10">
       <TopAppBar />
 
-      <main className="pt-20 px-[1rem] space-y-5">
+      <main className="pt-20 px-[1rem] max-w-4xl mx-auto space-y-5">
         {/* ── Hero Greeting Section ─── */}
         <section className="bg-app-surface-container-lowest rounded-2xl p-5 soft-elevation-lg border border-app-outline-variant/30 animate-fade-in">
           <div className="flex items-start justify-between gap-4">
@@ -83,6 +84,9 @@ export default function DashboardPage() {
             </div>
           </div>
         </section>
+
+        {/* ── Live Device Monitoring Dashboard ─── */}
+        <MonitoringDashboard />
       </main>
     </div>
   );

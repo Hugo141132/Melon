@@ -6,20 +6,41 @@ import HistoricalChartControls from '@/components/charts/HistoricalChartControls
 import { useDeviceContext } from '@/context/DeviceContext';
 import { useLatestMonitoring } from '@/hooks/useLatestMonitoring';
 import { useHistoricalMonitoring } from '@/hooks/useHistoricalMonitoring';
-import { WATER_DATA } from '@/lib/constants';
-import { CheckCircle, TrendingUp, Cpu } from 'lucide-react';
+import { CheckCircle, TrendingUp, Cpu, Clock, AlertTriangle } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
 const WaterNutrientChart = dynamic(() => import('@/components/charts/WaterNutrientChart'), {
   ssr: false,
 });
 
-function ECGauge({ value }: { value: number }) {
+// Format timestamp into Indonesian format
+function formatTimestamp(
+  isoString: string | null | undefined,
+  fallbackText = 'Belum ada data'
+): string {
+  if (!isoString) return fallbackText;
+  try {
+    const date = new Date(isoString);
+    if (isNaN(date.getTime())) return fallbackText;
+    return date.toLocaleTimeString('id-ID', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+  } catch {
+    return fallbackText;
+  }
+}
+
+function ECGauge({ value }: { value: number | null | undefined }) {
   const tWater = useTranslations('water');
-  // Explicit presentation conversion from source unit (mS/cm) to display unit (ÂµS/cm)
-  const displayVal = Math.round(value * 1000);
+  const hasValue = value !== null && value !== undefined && !isNaN(value);
+  // Explicit presentation conversion from source unit (mS/cm) to display unit (µS/cm)
+  const displayVal = hasValue ? Math.round(value * 1000) : '-';
+  const numDisplayVal = hasValue ? Math.round(value * 1000) : 0;
   const maxEC = 4000;
-  const angle = -135 + (Math.min(displayVal, maxEC) / maxEC) * 270;
+  const angle = hasValue ? -135 + (Math.min(numDisplayVal, maxEC) / maxEC) * 270 : -135;
+
   return (
     <div className="flex flex-col items-center mb-2">
       <div className="relative" style={{ width: 180, height: 90, overflow: 'hidden' }}>
@@ -30,7 +51,7 @@ function ECGauge({ value }: { value: number }) {
         {/* Value overlay */}
         <div className="absolute inset-0 flex flex-col items-center justify-end pb-1">
           <span className="text-[28px] leading-9 font-bold text-app-primary">{displayVal}</span>
-          <span className="text-[12px] leading-4 text-app-on-surface-variant">ÂµS/cm</span>
+          <span className="text-[12px] leading-4 text-app-on-surface-variant">µS/cm</span>
         </div>
       </div>
       <div className="flex items-center gap-2 bg-app-primary/10 px-4 py-1.5 rounded-full mt-2">
@@ -42,15 +63,19 @@ function ECGauge({ value }: { value: number }) {
 }
 
 // pH bar for Water Quality Node
-function PHBar({ value }: { value: number }) {
-  const pct = Math.max(0, Math.min(100, ((value - 1) / 13) * 100));
+function PHBar({ value }: { value: number | null | undefined }) {
+  const hasValue = value !== null && value !== undefined && !isNaN(value);
+  const pct = hasValue ? Math.max(0, Math.min(100, ((value - 1) / 13) * 100)) : 50;
+
   return (
     <div className="mt-4">
       <div className="h-2 w-full rounded-full ph-gradient relative overflow-hidden">
-        <div
-          className="absolute top-0 bottom-0 w-1.5 bg-white shadow-sm rounded-full border border-app-outline/20"
-          style={{ left: `${pct}%` }}
-        />
+        {hasValue && (
+          <div
+            className="absolute top-0 bottom-0 w-1.5 bg-white shadow-sm rounded-full border border-app-outline/20"
+            style={{ left: `${pct}%` }}
+          />
+        )}
       </div>
       <div className="flex justify-between mt-1 px-0.5">
         <span className="text-[10px] font-bold">1</span>
@@ -66,7 +91,7 @@ export default function WaterPage() {
   const tSoil = useTranslations('soil');
   const tCommon = useTranslations('common');
   const { selectedDevice } = useDeviceContext();
-  const { snapshot } = useLatestMonitoring();
+  const { snapshot, isStale } = useLatestMonitoring();
 
   const deviceType = selectedDevice?.deviceType;
 
@@ -98,14 +123,15 @@ export default function WaterPage() {
   });
 
   const waterData = snapshot?.water?.data;
-  const phVal = waterData?.ph ?? WATER_DATA.ph.value;
-  const tdsVal = waterData?.tds ?? WATER_DATA.tds.value;
-  const ecVal = waterData?.ec ?? WATER_DATA.ec.value;
+  const recordedAt = snapshot?.water?.recordedAt;
+  const phVal = waterData?.ph ?? null;
+  const tdsVal = waterData?.tds ?? null;
+  const ecVal = waterData?.ec ?? null;
   const statusLabel = waterData?.status || tCommon('optimal');
 
   return (
     <div className="bg-app-surface text-app-on-surface min-h-dvh pb-10">
-      <TopAppBar />
+      <TopAppBar showDeviceSelector={true} />
 
       <main className="pt-20 px-[1rem] max-w-4xl mx-auto space-y-5">
         {(isSoilNode || isTankNode) && (
@@ -128,16 +154,30 @@ export default function WaterPage() {
 
         {isQualityNode && (
           <>
+            {/* Status Overview & Real-Time Header */}
             <section className="bg-app-surface-container-lowest rounded-xl p-5 soft-elevation-lg border border-app-outline-variant/30 animate-fade-in">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-app-primary animate-pulse" />
-                  <span className="text-[14px] font-semibold text-app-primary">
-                    {tWater('statusLabel', { status: statusLabel })}
+                  <div
+                    className={`w-2 h-2 rounded-full ${
+                      isStale ? 'bg-amber-500' : 'bg-app-primary animate-pulse'
+                    }`}
+                  />
+                  <span
+                    className={`text-[14px] font-semibold ${
+                      isStale ? 'text-amber-700 dark:text-amber-400' : 'text-app-primary'
+                    }`}
+                  >
+                    {isStale
+                      ? tCommon('stale')
+                      : tWater('statusLabel', { status: statusLabel })}
                   </span>
                 </div>
-                <span className="text-[12px] text-app-on-surface-variant">
-                  {tSoil('realtimeUpdate')}
+                <span className="text-[12px] text-app-on-surface-variant flex items-center gap-1">
+                  <Clock size={12} />
+                  {tCommon('recordedAt', {
+                    time: formatTimestamp(recordedAt, tCommon('noDataAvailable')),
+                  })}
                 </span>
               </div>
               <p className="text-[18px] leading-7 font-semibold text-app-on-surface">
@@ -145,6 +185,17 @@ export default function WaterPage() {
               </p>
             </section>
 
+            {/* Stale Alert Banner */}
+            {isStale && (
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-center gap-3 animate-fade-in">
+                <AlertTriangle size={20} className="text-amber-600 flex-shrink-0" />
+                <p className="text-[13px] leading-5 text-amber-800 dark:text-amber-300 font-medium">
+                  {tSoil('realtimeUpdate')}: {tCommon('stale')}
+                </p>
+              </div>
+            )}
+
+            {/* EC Gauge Card */}
             <section className="bg-app-surface-container-lowest rounded-xl p-5 soft-elevation-lg border border-app-outline-variant/30 flex flex-col items-center animate-fade-in">
               <h3 className="text-[14px] font-semibold text-app-on-surface-variant self-start mb-4">
                 {tWater('ecCardTitle')}
@@ -152,6 +203,7 @@ export default function WaterPage() {
               <ECGauge value={ecVal} />
             </section>
 
+            {/* pH & TDS Parameter Cards */}
             <div className="grid grid-cols-2 gap-4 animate-fade-in">
               <div className="bg-app-surface-container-lowest rounded-xl p-5 soft-elevation-lg border border-app-outline-variant/30 flex flex-col justify-between">
                 <div>
@@ -159,9 +211,15 @@ export default function WaterPage() {
                     {tWater('phLevelTitle')}
                   </h3>
                   <div className="flex items-baseline gap-1">
-                    <span className="text-[28px] font-bold text-app-on-surface">{phVal}</span>
+                    <span className="text-[28px] font-bold text-app-on-surface">
+                      {phVal !== null && phVal !== undefined
+                        ? typeof phVal === 'number'
+                          ? phVal.toFixed(2)
+                          : phVal
+                        : '-'}
+                    </span>
                     <span className="text-[12px] text-app-on-surface-variant">
-                      {tCommon('normal')}
+                      {phVal !== null ? tCommon('normal') : ''}
                     </span>
                   </div>
                 </div>
@@ -174,7 +232,9 @@ export default function WaterPage() {
                     {tWater('tdsCardTitle')}
                   </h3>
                   <div className="flex items-baseline gap-1">
-                    <span className="text-[28px] font-bold text-app-on-surface">{tdsVal}</span>
+                    <span className="text-[28px] font-bold text-app-on-surface">
+                      {tdsVal !== null && tdsVal !== undefined ? tdsVal : '-'}
+                    </span>
                     <span className="text-[12px] text-app-on-surface-variant">ppm</span>
                   </div>
                 </div>
