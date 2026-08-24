@@ -122,16 +122,39 @@ TIMESTAMPTZ
 
 The application shall display timestamps according to the active locale and timezone.
 
-### 3.5 Deletion and Soft Deactivation Policies
+### 3.5 Deletion, Soft Deactivation, and Data Retention Policies
 
 Security-sensitive and historical records (audit logs, telemetry history) shall not be arbitrarily deleted.
 
-Deletion policies:
+#### Deletion and Deactivation Policies
 
 - Owner-initiated Admin Account Deletion (`DELETE /api/v1/users/{userId}`): Permanently hard-deletes the target Admin user row and account-owned dependent records (`sessions`, `user_roles`, `user_preferences`, `user_device_access`, `account_approvals`, `faucet_commands`) inside a single database transaction, while anonymizing `actorUserId` in existing audit logs and recording an `account.deleted` audit event.
-- Devices and Device assignments: Soft deletion or deactivation is used where historical telemetry reconstruction matters.
+- Devices and Device assignments: Soft deletion or deactivation is used where historical telemetry reconstruction matters (`DEC-DEV-030`). Hard device deletion is permanently disabled.
 
-Telemetry and audit records shall follow retention policies rather than user-triggered deletion.
+#### Telemetry Data Retention and Automated Maintenance Policy (TASK-0913)
+
+Telemetry and operational time-series data follow an automated lifecycle maintenance policy to prevent unbounded Supabase storage growth while ensuring compliance with the maximum 31-day historical query window (`DEC-MON-087`):
+
+1. **Raw Telemetry Retention TTL:** High-frequency raw sensor telemetry records and ephemeral operational errors older than **90 days** (`DEC-MON-048`) are automatically purged by scheduled maintenance routines.
+2. **Approved Telemetry & Operational Tables:**
+   - `soil_readings`
+   - `water_readings`
+   - `reservoir_water_readings`
+   - `sensor_battery_readings` (legacy schema coverage)
+   - `device_status_events`
+   - `integration_errors`
+3. **Protected & Exempt Data (Zero-Purge Guarantee):**
+   The following critical compliance, security, and operational audit tables are strictly **exempt** from telemetry retention cleanup (`SEC-DATA-004`) and are enforced as immutable / non-purgeable by `RetentionService`:
+   - `audit_logs` (Security and compliance audit history, retained indefinitely)
+   - `faucet_commands` (Actuator command audit trail and lifecycle records)
+   - `faucet_command_events` (Deterministic state transition log for faucet commands)
+   - `account_approvals` (Historical Owner approval and rejection decision trail)
+4. **Chunked Batch Deletion Strategy:**
+   To eliminate table locks, prevent transaction timeouts, and avoid impacting real-time telemetry ingestion, deletions are executed iteratively in batches (`RETENTION_BATCH_SIZE`, default `1000`) using indexed primary key ID ranges (`DELETE FROM <table> WHERE id IN (...)`) with an asynchronous event loop pause (`yieldMs: 20`) between batches.
+5. **Execution Architecture:**
+   - **Database Layer:** [`RetentionService`](file:///c:/Users/Puroh/Documents/Melon/packages/database/src/retention-service.ts) in `@kebun-melon/database`.
+   - **Background Worker:** [`RetentionScheduler`](file:///c:/Users/Puroh/Documents/Melon/apps/iot-gateway/src/maintenance/retention-scheduler.ts) in `apps/iot-gateway` running on a configurable interval (`RETENTION_INTERVAL_MS`, default 24h).
+   - **Operator CLI:** Standalone manual maintenance script [`scripts/cleanup-retention.ts`](file:///c:/Users/Puroh/Documents/Melon/scripts/cleanup-retention.ts) (`npm run db:cleanup`).
 
 ### 3.6 Monetary Data
 
@@ -543,6 +566,12 @@ INACTIVE
 - `device_id` shall be unique across active and inactive records.
 - `device_id` is editable only by Owner users. Admin users cannot view or edit canonical `device_id` (`DEC-DEV-028`).
 - In-app device creation is removed; new device records are provisioned via administrative seeds (`DEC-DEV-027`).
+- **Connection States**:
+  - Derived from `devices.last_message_at` relative to current time.
+  - Heartbeat failure thresholds strictly defined in `DEC-DEV-022`.
+- **Retention**:
+  - High-frequency telemetry records (soil, water quality, reservoir) older than 90 days are periodically purged using the `purge_expired_telemetry_records` stored procedure to cap database size.
+  - `audit_logs`, `faucet_commands`, and `faucet_command_events` have long-term immutable retention (minimum 1 year) and are excluded from routine telemetry cleanup.
 - **No Hard Delete for Devices (`DEC-DEV-030`)**: Devices are never deleted from the database. Deleting devices would destroy foreign-key relationships and erase telemetry, alert, command, and audit histories. Device lifecycle is controlled strictly via deactivation and reactivation:
   - **Deactivation**: `account_status = 'DEACTIVATED'`, `connection_status = 'INACTIVE'`, and `deactivated_at = NOW()`. Faucet control is blocked.
   - **Reactivation**: `account_status = 'ACTIVE'`, `connection_status = 'UNKNOWN'`, and `deactivated_at = NULL`. Full operational monitoring is resumed.

@@ -217,3 +217,14 @@ The following facts are verified in the traceability matrix regarding `TASK-0705
 - **Visual Design Integrity:** Preserves `Premium Minimal Ops` layout, badge placement, and design tokens (`bg-app-error text-white text-[9px] font-bold`) with automatic zero-count suppression.
 <!-- TASK-0705 Reconciled: 2026-08-23 -->
 
+---
+
+## Telemetry Data Retention & Maintenance Policy Traceability Note (Reconciled 2026-08-24)
+
+The following facts are verified in the traceability matrix regarding `TASK-0913` (Telemetry Data Retention and Automated Maintenance Policy):
+- **Implementation Status:** `TASK-0913` is implemented and verified (`packages/database/test/retention-service.test.ts` 8/8 passed, `apps/iot-gateway/src/__tests__/retention-scheduler.test.ts` 6/6 passed, full gateway suite 216/216 passed, database suite 108/108 passed, historical query suite 13/13 passed, typecheck 0 errors, security scan clean).
+- **Lifecycle & Storage Management:** Enforces 90-day retention cutoff (`DEC-MON-048`) across high-frequency raw telemetry (`soil_readings`, `water_readings`, `reservoir_water_readings`, `sensor_battery_readings`) and operational event tables (`device_status_events`, `integration_errors`).
+- **Strict Compliance Protection (`SEC-DATA-004`):** Compliance/security audit logs (`audit_logs`), actuator commands (`faucet_commands`, `faucet_command_events`), and account approvals (`account_approvals`) are explicitly marked as non-purgeable and exempt from cleanup.
+- **Lock-Free Chunked Batching:** Database pruning uses primary-key-indexed batch chunks (`batchSize: 1000`, `yieldMs: 20`) via `RetentionService`, eliminating table lock escalation and transaction timeouts.
+- **Background Orchestration:** Integrated into `apps/iot-gateway` via `RetentionScheduler` (default 24h interval) with overlap guard and structured JSON logging. Standalone operator execution enabled via `npm run db:cleanup` (`scripts/cleanup-retention.ts`).
+<!-- TASK-0913 Reconciled: 2026-08-24 -->

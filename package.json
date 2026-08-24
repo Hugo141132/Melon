@@ -44,6 +44,7 @@
     "db:test:seed": "npm run db:test:seed --workspace=packages/database",
     "db:test:seed-owner": "npm run db:test:seed-owner --workspace=packages/database",
     "db:test:user-repository": "npm run db:test:user-repository --workspace=packages/database",
+    "db:cleanup": "tsx scripts/cleanup-retention.ts",
     "env:check": "tsx scripts/check-env.ts all",
     "env:check:web": "tsx scripts/check-env.ts web",
     "env:check:gateway": "tsx scripts/check-env.ts gateway",

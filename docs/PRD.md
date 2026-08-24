@@ -455,21 +455,23 @@ Users shall be able to:
 
 - Select a device.
 - Select one or more monitoring metrics.
-- Select a date or date range.
+- Select a date or date range (default 24h, maximum 31 days per `DEC-MON-087`).
 - View data in charts or tables.
 - Identify gaps in received data.
 - View timestamps in the active locale and user timezone.
 - Distinguish missing data from zero values.
 - View the latest available value.
 
-The following are TBD:
+Data Lifecycle & Retention Rules (`DEC-MON-048` / `TASK-0913`):
+- **Raw Telemetry Retention TTL:** 90 days. Raw sensor telemetry records (`soil_readings`, `water_readings`, `reservoir_water_readings`, `sensor_battery_readings`) and ephemeral operational logs (`device_status_events`, `integration_errors`) older than 90 days are automatically purged via chunked batch maintenance.
+- **Maximum Query Range:** 31 days (`DEC-MON-087`).
+- **Protected Data:** `audit_logs`, `faucet_commands`, `faucet_command_events`, and `account_approvals` are strictly exempt from telemetry cleanup and preserved indefinitely (`SEC-DATA-004`).
 
-- Data-retention period.
-- Maximum date range per query.
-- Aggregation intervals.
+The following remain TBD:
+- Aggregation intervals for chart downsampling.
 - Export functionality.
 - Raw-data download permissions.
-- Long-term archival policy.
+- Long-term cold archival policy.
 
 Historical data shall remain isolated by device.
 

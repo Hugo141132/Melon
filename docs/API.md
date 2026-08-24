@@ -1718,9 +1718,10 @@ Response:
 
 # 17. Historical Monitoring Endpoints
 
-> **Approved Rules (`DEC-MON-087`):**
+> **Approved Rules (`DEC-MON-087` & `DEC-MON-048`):**
 > - **Default Range:** Last 24 hours (`from` defaults to `now - 24 hours`, `to` defaults to `now`).
 > - **Maximum Range:** 31 days (`to - from <= 31 days`). Range > 31 days returns HTTP 400 (`DATE_RANGE_EXCEEDED`).
+> - **Data Retention Guarantee:** Raw telemetry is retained for 90 days (`DEC-MON-048` / `TASK-0913`), ensuring all allowable queries within the 31-day window are fully preserved and performant.
 > - **Pagination:** Default `pageSize = 20`, Maximum `pageSize = 100`. `pageSize > 100` returns HTTP 400 (`VALIDATION_ERROR`). Default `page = 1`.
 > - **Raw Bounded Pagination Only:** Raw query telemetry series. Aggregation (`interval` parameter) is deferred until rules are approved.
 > - **Telemetry Isolation:** Water-quality history (`ph`, `tds`, `ec`) is separate from reservoir telemetry (`tankVolume`, `flowRate`).

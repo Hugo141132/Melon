@@ -54,6 +54,26 @@ export const gatewayEnvSchema = z.object({
   RATE_LIMIT_WINDOW_MS: z
     .preprocess((val) => (val ? parseInt(String(val), 10) : 60000), z.number().int().min(1000))
     .default(60000),
+  RETENTION_ENABLED: z
+    .preprocess((val) => {
+      if (val === undefined || val === null || val === '') return true;
+      if (val === 'true' || val === '1') return true;
+      if (val === 'false' || val === '0') return false;
+      return val;
+    }, z.boolean().default(true))
+    .default(true),
+  RETENTION_RAW_DAYS: z
+    .preprocess((val) => (val ? parseInt(String(val), 10) : 90), z.number().int().min(1))
+    .default(90),
+  RETENTION_BATCH_SIZE: z
+    .preprocess(
+      (val) => (val ? parseInt(String(val), 10) : 1000),
+      z.number().int().min(1).max(10000)
+    )
+    .default(1000),
+  RETENTION_INTERVAL_MS: z
+    .preprocess((val) => (val ? parseInt(String(val), 10) : 86400000), z.number().int().min(1000))
+    .default(86400000),
 });
 
 export type GatewayEnv = z.infer<typeof gatewayEnvSchema>;

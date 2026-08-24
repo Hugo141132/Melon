@@ -623,6 +623,7 @@ Acknowledgement processor
 Command-state machine
 Realtime broadcaster
 Persistence adapter
+RetentionScheduler (automated maintenance worker)
 Health endpoint
 ```
 
@@ -700,6 +701,32 @@ sequenceDiagram
 10. Update latest-device state.
 11. Emit live update.
 12. Record metrics.
+
+### 12.2 Telemetry Lifecycle and Automated Retention Architecture (TASK-0913)
+
+To prevent unbounded PostgreSQL database storage consumption on Supabase from continuous ESP32/NodeMCU telemetry ingestion, the architecture implements an automated data lifecycle maintenance mechanism:
+
+```mermaid
+flowchart TD
+    subgraph GatewayWorker [IoT Gateway Process]
+        RS[RetentionScheduler] -->|Every 24h| RJ[runRetentionJob]
+    end
+
+    subgraph DatabasePackage [@kebun-melon/database]
+        RJ --> Serv[RetentionService]
+        CLI[scripts/cleanup-retention.ts] --> Serv
+        Serv -->|Filter Cutoff now - 90d| Whitelist{Approved Table Whitelist}
+    end
+
+    subgraph StorageEngine [PostgreSQL Database]
+        Whitelist -->|Chunked Batch Deletion| ApprovedTbl[soil_readings / water_readings / reservoir_water_readings / device_status_events / integration_errors]
+        Whitelist -.->|STRICTLY EXEMPT / BLOCKED| ExemptTbl[audit_logs / faucet_commands / account_approvals]
+    end
+```
+
+- **Retention Scope:** Raw sensor telemetry records older than 90 days (`DEC-MON-048`) are iteratively deleted in batches of 1,000 rows (`RETENTION_BATCH_SIZE`) to prevent database lock escalation.
+- **Audit & Command Protection:** The `audit_logs`, `faucet_commands`, `faucet_command_events`, and `account_approvals` tables are strictly exempt from telemetry cleanup routines (`SEC-DATA-004`).
+- **Scheduling:** `RetentionScheduler` runs in the background of the long-lived `iot-gateway` service, with overlap protection (`isJobRunning` guard) and structured JSON audit logging.
 
 ---
 

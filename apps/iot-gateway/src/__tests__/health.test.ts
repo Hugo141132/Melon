@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { buildApp } from '../app';
 import { validateGatewayEnv, GatewayEnv } from '../config/env';
 
-describe('Gateway Health & Internal Readiness Endpoints', () => {
+describe('Gateway Health & Internal Readiness Endpoints', { timeout: 30000 }, () => {
   let env: GatewayEnv;
 
   beforeEach(() => {

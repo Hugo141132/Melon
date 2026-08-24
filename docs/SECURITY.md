@@ -976,11 +976,14 @@ Store only required user and device data.
 
 Location data shall be exposed only to authorised users.
 
-### 17.5 Retention
+### 17.5 Data Retention and Lifecycle Policy (TASK-0913 / SEC-DATA-004)
 
-Retention periods are `TBD`.
-
-Security-relevant records shall not be deleted before the approved retention period.
+1. **High-Frequency Raw Telemetry Retention:** Raw sensor telemetry (`soil_readings`, `water_readings`, `reservoir_water_readings`, `sensor_battery_readings`) and ephemeral operational logs (`device_status_events`, `integration_errors`) are subject to an automated 90-day retention policy (`DEC-MON-048`). Records older than 90 days are automatically purged in controlled batches.
+2. **Protected & Exempt Records (Non-Purgeable):**
+   - Compliance and security audit logs (`audit_logs`) are strictly exempt from telemetry purges and retained indefinitely.
+   - Actuator commands and lifecycle state transitions (`faucet_commands`, `faucet_command_events`) are retained permanently for physical accountability and safety auditing.
+   - Account approvals and rejection history (`account_approvals`) are retained permanently.
+3. **Immutability Enforcement:** The database service layer ([`RetentionService`](file:///c:/Users/Puroh/Documents/Melon/packages/database/src/retention-service.ts)) enforces a strict whitelist (`APPROVED_RETENTION_TABLES`). Any programmatic attempt to invoke retention deletion against protected tables throws `UnapprovedRetentionTableError`.
 
 ---
 
@@ -1001,11 +1004,11 @@ The database shall:
 
 Application users shall never connect directly to the database.
 
-### 18.1 Audit Immutability
+### 18.1 Audit Immutability (SEC-DATA-004)
 
 Audit logs shall be append-only through normal application functions.
 
-Normal application endpoints shall not support editing or deleting audit records.
+Normal application endpoints and automated maintenance jobs shall not support editing or deleting audit records. Audit records are explicitly excluded from data retention purges.
 
 ### 18.2 Telemetry Integrity
 

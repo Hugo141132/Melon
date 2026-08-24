@@ -10,4 +10,5 @@ export * from './telemetry-repository';
 export * from './alert-repository';
 export * from './faucet-command-repository';
 export * from './audit-repository';
+export * from './retention-service';
 export { CANONICAL_PERMISSIONS } from '../prisma/seed';

@@ -17,6 +17,7 @@ import {
   TelemetryProcessor,
   telemetryProcessor as defaultTelemetryProcessor,
 } from './telemetry/processor';
+import { RetentionScheduler } from './maintenance/retention-scheduler';
 import { registerHealthRoutes, DbChecker } from './routes/health';
 import { logger } from './observability/logger';
 
@@ -28,6 +29,7 @@ export interface AppOptions {
   acknowledgementProcessor?: AcknowledgementProcessor;
   faucetEventProcessor?: FaucetEventProcessor;
   telemetryProcessor?: TelemetryProcessor;
+  retentionScheduler?: RetentionScheduler;
 }
 
 // In-memory rate limit store for gateway HTTP endpoints
@@ -80,6 +82,7 @@ export function buildApp(options: AppOptions): {
   acknowledgementProcessor: AcknowledgementProcessor;
   faucetEventProcessor: FaucetEventProcessor;
   telemetryProcessor: TelemetryProcessor;
+  retentionScheduler: RetentionScheduler;
 } {
   const app = Fastify({
     logger: false, // We use our structured logger module with secret redaction
@@ -91,6 +94,8 @@ export function buildApp(options: AppOptions): {
     options.acknowledgementProcessor ?? defaultAcknowledgementProcessor;
   const faucetEventProcessor = options.faucetEventProcessor ?? defaultFaucetEventProcessor;
   const telemetryProcessor = options.telemetryProcessor ?? defaultTelemetryProcessor;
+  const retentionScheduler =
+    options.retentionScheduler ?? new RetentionScheduler({ env: options.env });
 
   commandPublisher.bind(options.env, mqttClient);
   acknowledgementProcessor.bind(options.env, mqttClient);
@@ -173,5 +178,6 @@ export function buildApp(options: AppOptions): {
     acknowledgementProcessor,
     faucetEventProcessor,
     telemetryProcessor,
+    retentionScheduler,
   };
 }

@@ -26,6 +26,7 @@ async function startServer() {
       acknowledgementProcessor,
       faucetEventProcessor,
       telemetryProcessor,
+      retentionScheduler,
     } = buildApp({ env });
 
     // Connect to MQTT Broker asynchronously (non-blocking server start)
@@ -57,6 +58,11 @@ async function startServer() {
       commandPublisher.startPolling(2000);
     }
 
+    // Start telemetry retention scheduler if DB is configured
+    if (env.DATABASE_URL && env.RETENTION_ENABLED) {
+      retentionScheduler.start();
+    }
+
     // Start Fastify HTTP server
     const address = await app.listen({ port: env.PORT, host: env.HOST });
     logger.info(`IoT Gateway HTTP server listening at ${address}`);
@@ -69,6 +75,7 @@ async function startServer() {
         acknowledgementProcessor.stop();
         faucetEventProcessor.stop();
         telemetryProcessor.stop();
+        retentionScheduler.stop();
         await app.close();
         await mqttClient.disconnect();
         logger.info('IoT Gateway Service shutdown complete.');

@@ -539,6 +539,17 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
 - 21st.dev MCP: `NOT REQUIRED`
 - Summary: Audited, hardened, and verified full monorepo unit test coverage across all 8 mandatory acceptance domains: account-status decisions, RBAC permission checks, device access isolation, telemetry validation (`BAT` parameter omitted per `DEC-MON-086`), phase/volume mapping calculations, command state machine transitions, idempotency deduplication, and bilingual locale validation. Hardened branch coverage in `@kebun-melon/contracts` for unrecognized device types, log level fallbacks, and user role deduplication. Verified 100% test pass rate across 102 test files (958/958 tests passed) and >99.6% line coverage in contracts. Maintained `ENABLE_FAUCET_CONTROL=false` safety default and asserted uncertain/timeout states strictly as `UNKNOWN`. Passed pre-commit quality suite (`npm run check:quality`): 0 TypeScript errors, 0 lint errors, clean Prettier formatting, 100% translation parity (`i18n:check`), 0 hardcoded secrets, 0 unapproved vulnerabilities, and successful 37-route Next.js production build.
 
+#### TASK-0913 Governance Record
+
+`TASK-0913` telemetry data retention and automated maintenance policy record:
+- Status: `DONE` (Completed 2026-08-24)
+- Frontend impact: `NONE`
+- Selected UI direction: `N/A`
+- Existing color template: `UNCHANGED`
+- Selected motion effects: `None`
+- 21st.dev MCP: `NOT REQUIRED`
+- Summary: Implemented automated telemetry data lifecycle management in `@kebun-melon/database` (`RetentionService`) and `@kebun-melon/iot-gateway` (`RetentionScheduler`). Enforces a 90-day retention cutoff (`DEC-MON-048`) for high-frequency raw telemetry (`soil_readings`, `water_readings`, `reservoir_water_readings`, `sensor_battery_readings`) and operational event logs (`device_status_events`, `integration_errors`). Preserved strict immutability and exemption for compliance and security audit logs (`audit_logs`), actuator commands (`faucet_commands`, `faucet_command_events`), and account approvals (`account_approvals`) per `SEC-DATA-004`. Implemented chunked batch deletion (`batchSize: 1000`, `yieldMs: 20`) to eliminate table locks and transaction timeouts. Integrated scheduled execution into the IoT Gateway service lifecycle (`RETENTION_INTERVAL_MS=86400000`) with overlap protection and structured JSON metrics logging. Provided standalone operator maintenance script (`scripts/cleanup-retention.ts` / `npm run db:cleanup`). Verified 100% test pass rate across dedicated unit test suites (`retention-service.test.ts` 8/8, `retention-scheduler.test.ts` 6/6), workspace typecheck (0 errors across 4 workspaces), secret scan (0 findings), dependency scan (0 unapproved advisories), and historical query non-regression (`historical-charts.test.tsx` 13/13). Staging update is managed through normal CI/CD after push without requiring manual database migrations.
+
 ---
 
 ## 5. Task Selection Rules

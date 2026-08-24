@@ -33,7 +33,7 @@
 | **Authentication** | `DEC-AUTH-001` to `DEC-AUTH-012` | **APPROVED** | HTTP-only secure cookies, PostgreSQL session table, 30m idle / 12h max timeouts, CLI Owner seed, no public Owner creation. `SameSite` cookie value: **TBD** — pending explicit user approval. |
 | **RBAC** | `DEC-RBAC-013` to `DEC-RBAC-019` | **APPROVED** | Owner has global device visibility. Admins have mandatory per-device assignments; device assignment automatically grants both monitoring and faucet control. Owners manage assignments. No separate per-user-device `canControl` permission in v1. |
 | **Devices** | `DEC-DEV-020` to `DEC-DEV-030` | **APPROVED** | Multi-protocol architecture: Soil & Water quality monitoring telemetry via REST API over Wi-Fi (no MQTT broker). Water Tank monitoring (tank volume & flow rate) via MQTT through an EMQX broker (MQTT 5.0 over TLS via IoT Gateway). Shared INA219 electrical monitoring via REST/Wi-Fi. Per-device credentials/ACLs, no anonymous access, no direct browser-to-MQTT. Offline threshold: **TBD**. Stale threshold: **TBD**. In-app device creation / Add Device removed (`DEC-DEV-027`). External `deviceId` editable by OWNER only; internal DB UUID immutable; canonical `deviceId` strictly hidden from ADMIN in UI & API (`DEC-DEV-028`). Previously/last-accessed device history & persistent restoration removed while preserving all telemetry/command/assignment/audit history (`DEC-DEV-029`). Hard delete of devices permanently removed in favor of `DEACTIVATED` / `ACTIVE` lifecycle (`DEC-DEV-030`). |
-| **Monitoring** | `DEC-MON-036` to `DEC-MON-050` | **APPROVED** | Three distinct monitoring domains: 1) Soil monitoring (NPK, Temp, Moisture, pH, EC in `µS/cm`, status), 2) Water Quality monitoring (pH, TDS in ppm, EC in `µS/cm`, status), 3) Water Tank monitoring (Tank Vol in `L`, Flow in `m³/h`, status). Canonical display unit for EC is `µS/cm` (values in `mS/cm` converted at presentation boundary via `×1000`). Control capabilities (Solenoid Valve, Relay) are actuators, not monitoring sensors. INA219 electrical monitoring tracks system electrical consumption (voltage, current, power) as device health/power telemetry, not as a battery percentage or primary agronomic measurement. Sensor precision and valid ranges: **TBD**. |
+| **Monitoring** | `DEC-MON-036` to `DEC-MON-050` | **APPROVED** | Three distinct monitoring domains: 1) Soil monitoring (NPK, Temp, Moisture, pH, EC in `µS/cm`, status), 2) Water Quality monitoring (pH, TDS in ppm, EC in `µS/cm`, status), 3) Water Tank monitoring (Tank Vol in `L`, Flow in `m³/h`, status). Canonical display unit for EC is `µS/cm` (values in `mS/cm` converted at presentation boundary via `×1000`). Control capabilities (Solenoid Valve, Relay) are actuators, not monitoring sensors. INA219 electrical monitoring tracks system electrical consumption (voltage, current, power) as device health/power telemetry, not as a battery percentage or primary agronomic measurement. 90-day raw telemetry retention TTL with chunked batch maintenance (`DEC-MON-048` / `TASK-0913`). Sensor precision and valid ranges: **TBD**. |
 | **Faucet Control** | `DEC-CTRL-051` to `DEC-CTRL-067` | **APPROVED** | Max 1 active command/device, no auto retries, `ENABLE_FAUCET_CONTROL=false` default, dual written sign-off (Owner + Hardware Lead) required before production activation. Duplicate command IDs never re-dispense. Timeout ≠ completion. ACK timeout, completion timeout, expiry duration: **TBD**. Cancellation/stop support: **TBD**. |
 | **I18N** | `DEC-I18N-068` to `DEC-I18N-074` | **APPROVED** | Default `id` (Bahasa Indonesia), `en` fallback, mandatory centered language-selection gate for unauthenticated visitors without valid locale (`English` -> `en`, `Bahasa Indonesia` -> `id`), cookie-based non-prefixed routing (no URL path pollution), subsequent language changes strictly in Settings (`/settings`), UTC storage with `Asia/Jakarta` (WIB) presentation. |
 | **Infrastructure** | `DEC-INF-075` to `DEC-INF-088` | **APPROVED (ORM DECISION REQUIRED)** | npm monorepo, PostgreSQL (ORM TBD — see §2.5). Backup schedule, retention period, RPO, and RTO: **TBD** — pending explicit user approval. |
@@ -49,7 +49,6 @@
 | `DEC-AUTH-010` | Email Verification | `P2` | Disabled in v1 (Admin accounts created by direct Owner approval) | None for internal/admin releases |
 | `DEC-AUTH-012` | Owner Account MFA | `P2` | Disabled in v1 (Strong password + session security enforced) | MFA can be added in Phase 9 security hardening |
 | `DEC-DEV-026` | Multi-Site Management | `P2` | Database schema includes optional `site_id`, UI defaults to primary site | Multi-site UI selector deferred to Phase 11 |
-| `DEC-MON-048` | Telemetry Data Retention | `P2` | 90 days raw telemetry, 1 year daily rollups | Database storage optimization deferred to Phase 9 |
 | `DEC-INF-077` | Redis Cache & Message Broker | `P2` | PostgreSQL for session state; SSE in-memory transport in v1 | Redis optional until multi-instance Gateway scale required |
 | `DEC-AUD-101` | Radix UI Dependency Cleanup | `P2` | Keep installed Radix packages in `package.json` | Used in Phase 2 for auth dialogs and tab components |
 
@@ -366,6 +365,18 @@
 
 ---
 
+#### DEC-MON-048: Telemetry Data Retention and Automated Maintenance Policy
+* **Related Task IDs**: `TASK-0913`
+* **Related Documentation**: `docs/DATABASE.md` §3.5, `docs/ARCHITECTURE.md` §12.2, `docs/SECURITY.md` §17.5, `docs/TESTING.md` §14
+* **Status**: **APPROVED & IMPLEMENTED** (Completed 2026-08-24)
+* **Approved Decision**:
+  1. **Telemetry Retention TTL**: Raw high-frequency time-series telemetry records (`soil_readings`, `water_readings`, `reservoir_water_readings`, `sensor_battery_readings`) and operational event logs (`device_status_events`, `integration_errors`) older than **90 days** are automatically purged.
+  2. **Bounded Query Compatibility**: The 90-day retention window fully accommodates the approved 31-day maximum historical chart query range (`DEC-MON-087`), ensuring zero degradation or data truncation on historical monitoring.
+  3. **Strict Compliance Exemption**: Security/compliance audit logs (`audit_logs`), faucet actuator command history (`faucet_commands`, `faucet_command_events`), and account approval decisions (`account_approvals`) are strictly excluded from telemetry cleanup and retained permanently (`SEC-DATA-004`).
+  4. **Chunked Deletion Strategy**: To avoid table locks and long transactions, deletions execute in primary-key chunks (`batchSize: 1000`) with an asynchronous delay (`yieldMs: 20`) between batches via [`RetentionService`](file:///c:/Users/Puroh/Documents/Melon/packages/database/src/retention-service.ts).
+  5. **Background Scheduling**: Managed by [`RetentionScheduler`](file:///c:/Users/Puroh/Documents/Melon/apps/iot-gateway/src/maintenance/retention-scheduler.ts) in `apps/iot-gateway` (default interval: 24h) with overlap guard and structured audit logging. Standalone execution supported via `npm run db:cleanup`.
+
+---
 
 ### 2.6 Internationalisation (I18N)
 

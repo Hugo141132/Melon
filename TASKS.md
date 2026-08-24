@@ -2263,6 +2263,34 @@ Apply to:
 
 ---
 
+## TASK-0913 — Implement Telemetry Data Retention and Automated Maintenance Policy
+
+**Priority:** `P1`
+**Status:** `DONE`
+**Dependencies:** `TASK-0104`, `TASK-0405`, `TASK-0406`
+**Related Decisions:** `DEC-MON-048`, `DEC-MON-087`
+**Completed:** 2026-08-24 — Implemented `RetentionService` in `@kebun-melon/database` (`packages/database/src/retention-service.ts`) supporting chunked batch purging (`batchSize: 1000`, `yieldMs: 20`) for approved telemetry tables (`soil_readings`, `water_readings`, `reservoir_water_readings`, `sensor_battery_readings`) and operational event tables (`device_status_events`, `integration_errors`) with default 90-day retention cutoff (`DEC-MON-048`). Strictly isolated and exempted `audit_logs`, `faucet_commands`, `faucet_command_events`, and `account_approvals` from purge routines (`SEC-DATA-004`). Configured environment variables (`RETENTION_ENABLED`, `RETENTION_RAW_DAYS`, `RETENTION_BATCH_SIZE`, `RETENTION_INTERVAL_MS`) with safe defaults. Implemented `RetentionScheduler` in `apps/iot-gateway` (`apps/iot-gateway/src/maintenance/retention-scheduler.ts`) integrated with Fastify lifecycle and structured logger (`TASK-0904`). Created standalone CLI script (`scripts/cleanup-retention.ts` / `npm run db:cleanup`). Added comprehensive unit test suites in `packages/database/test/retention-service.test.ts` (8/8 passed) and `apps/iot-gateway/src/__tests__/retention-scheduler.test.ts` (6/6 passed), verified TypeScript typecheck (0 errors across 4 workspaces), secret scanner (0 findings), dependency scanner (0 unapproved advisories), and historical query non-regression.
+
+### Work
+
+- Implement automated lifecycle and data retention management for time-series telemetry tables (`soil_readings`, `water_readings`, `reservoir_water_readings`, `sensor_battery_readings`) and operational events (`device_status_events`, `integration_errors`).
+- Enforce 90-day retention TTL for raw high-frequency telemetry records per `DEC-MON-048`, safely accommodating the 31-day maximum historical chart query window (`DEC-MON-087`).
+- Implement scheduled database cleanup mechanism (e.g., automated maintenance worker in `apps/iot-gateway` or scheduled PostgreSQL routine/`pg_cron` migration).
+- Isolate security and compliance audit records (`audit_logs`) and faucet command lifecycle history (`faucet_commands`, `faucet_command_events`) with dedicated long-term/immutable retention policies (minimum 1 year / non-purgeable under telemetry cleanup).
+- Add database storage usage monitoring and cleanup metrics/logging to prevent unbound Supabase storage capacity growth.
+- Add unit and integration tests verifying cleanup query execution, index performance, and non-regression on active historical queries.
+
+### Acceptance Criteria
+
+- [x] High-frequency raw telemetry records older than 90 days are automatically purged or archived.
+- [x] Historical monitoring queries within the approved 31-day window (`DEC-MON-087`) remain fully functional and performant.
+- [x] `audit_logs` and `faucet_commands` tables are excluded from telemetry purge routines.
+- [x] Database cleanup routines execute safely without locking tables or degrading real-time ingestion performance.
+- [x] Cleanup executions are logged with structured metrics (number of purged rows, duration).
+- [x] Unit and integration tests verify automated retention policy enforcement.
+
+---
+
 # 18. Phase 10 — Verification and Release
 
 ## TASK-1001 — Complete Unit Test Suite
@@ -2683,7 +2711,7 @@ Every completed feature shall satisfy:
 
 ## Sprint 8 — Hardening and Release
 
-- `TASK-0901` through `TASK-0909`
+- `TASK-0901` through `TASK-0913`
 - `TASK-1001` through `TASK-1010`
 
 Sprint duration and team capacity are `TBD`.

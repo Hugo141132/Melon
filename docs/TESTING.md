@@ -2170,5 +2170,33 @@ Automated unit, context, empty state, and telemetry freshness verification for l
 4. **Zero Mock Telemetry:** Complete removal of `NPK_TREND_DATA` and `EC_TREND_DATA` fallback dependencies in UI charts.
 <!-- TASK-0502 Reconciled: 2026-08-23 -->
 
+---
 
+# 52. Telemetry Data Retention and Automated Maintenance Policy Verification Suite (`TASK-0913`)
 
+Automated unit, batch chunking, table isolation, scheduler lifecycle, and historical query non-regression verification for data retention:
+
+### Agent-Executed Automated Tests
+1. **Targeted Database Retention Service Suite (`packages/database/test/retention-service.test.ts`):**
+   - **8/8 tests passed (100%)**:
+     - Verified exact 90-day cutoff date calculation (`now - 90 days`).
+     - Verified iterative chunked batching (`batchSize: 1000`) deleting across multiple batches until clear.
+     - Verified clean single-check execution on empty tables (0 rows deleted).
+     - Verified `UnapprovedRetentionTableError` is thrown when unapproved or protected tables (`audit_logs`, `faucet_commands`, etc.) are targeted.
+     - Verified compliance/security audit tables (`audit_logs`, `faucet_commands`, `faucet_command_events`, `account_approvals`) are NEVER touched during maintenance.
+     - Verified per-table summary reporting (`RetentionSummary`).
+2. **Targeted IoT Gateway Scheduler Suite (`apps/iot-gateway/src/__tests__/retention-scheduler.test.ts`):**
+   - **6/6 tests passed (100%)**:
+     - Verified scheduler disables when `RETENTION_ENABLED=false`.
+     - Verified recurring 24h periodic timer and initial startup run.
+     - Verified clean cancellation on `stop()` clearing both intervals and timeouts.
+     - Verified `isJobRunning` guard skips overlapping/concurrent triggers.
+     - Verified error propagation and structured JSON error logging.
+3. **Historical Telemetry Query Non-Regression:**
+   - `apps/web/test/unit/historical-charts.test.tsx` and historical API suites: **100% passed** verifying that 31-day historical query window (`DEC-MON-087`) is completely unaffected by 90-day retention pruning.
+4. **Static Quality & Security Audits:**
+   - `npm run typecheck`: **0 errors** across all 4 monorepo workspaces.
+   - `npm run scan:secrets`: **0 hardcoded secrets**.
+   - `npm run scan:deps`: **0 unapproved dependencies**.
+   - `npm run format:check`: **100% Prettier compliant**.
+<!-- TASK-0913 Reconciled: 2026-08-24 -->
