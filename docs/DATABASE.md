@@ -37,7 +37,13 @@ This document defines the application database model for:
 
 The database shall be the durable system of record for application state.
 
+### 2.1 TASK-0914 Environment & Schema Reconciliation
+`TASK-0914` required zero database schema migrations or data alterations:
+- **Environment Isolation:** Local development connects to its configured local database (`DATABASE_URL`), while Railway staging connects to the Supabase PostgreSQL database (`scqrbtfilmttqrutynyo`). Staging database records and canonical identities remain intact and unmodified.
+- **Dynamic Device Identity:** Canonical device strings (`devices.device_id`) are managed as environment data and resolved dynamically at runtime by simulation tools via CLI/environment variables, with no hardcoded device ID assumptions in source code.
+
 ---
+
 
 ## 3. Database Principles
 

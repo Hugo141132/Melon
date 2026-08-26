@@ -204,8 +204,10 @@ Data crossing any trust boundary shall be:
 - Authenticated where applicable.
 - Authorised.
 - Validated.
-- Encrypted in production.
-- Logged appropriately.
+- Encrypted in production and development (TLS 1.2/1.3 over TCP `mqtts://` port 8883 / WebSocket `wss://` port 8084 via EMQX Cloud with strict certificate verification `rejectUnauthorized: true`).
+- Logged appropriately with sensitive passwords, tokens, and credentials strictly redacted.
+- Segregated by environment topic namespaces (`agriculture/development/...` vs `agriculture/staging/...` vs `agriculture/production/...`) and unique client IDs (`gateway-kebun-melon-dev-local-*` vs `gateway-kebun-melon-staging-*` vs `sim-${tankDeviceId}-${random}`).
+- Validated for exact topic `deviceId` and payload `deviceId` parity to eliminate device-spoofing vectors. Hardware simulator identities are resolved dynamically via CLI/env rather than hardcoding canonical hardware IDs in source code.
 - Treated as untrusted input.
 
 The ESP32 device shall not be trusted merely because it is connected to the broker.
@@ -213,6 +215,7 @@ The ESP32 device shall not be trusted merely because it is connected to the brok
 The browser shall not be trusted to supply role, status, permission, device ownership, or target volume.
 
 ---
+
 
 ## 7. Authentication Security (SEC-AUTH-001..SEC-AUTH-005)
 

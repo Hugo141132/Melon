@@ -548,9 +548,20 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
 - Existing color template: `UNCHANGED`
 - Selected motion effects: `None`
 - 21st.dev MCP: `NOT REQUIRED`
-- Summary: Implemented automated telemetry data lifecycle management in `@kebun-melon/database` (`RetentionService`) and `@kebun-melon/iot-gateway` (`RetentionScheduler`). Enforces a 90-day retention cutoff (`DEC-MON-048`) for high-frequency raw telemetry (`soil_readings`, `water_readings`, `reservoir_water_readings`, `sensor_battery_readings`) and operational event logs (`device_status_events`, `integration_errors`). Preserved strict immutability and exemption for compliance and security audit logs (`audit_logs`), actuator commands (`faucet_commands`, `faucet_command_events`), and account approvals (`account_approvals`) per `SEC-DATA-004`. Implemented chunked batch deletion (`batchSize: 1000`, `yieldMs: 20`) to eliminate table locks and transaction timeouts. Integrated scheduled execution into the IoT Gateway service lifecycle (`RETENTION_INTERVAL_MS=86400000`) with overlap protection and structured JSON metrics logging. Provided standalone operator maintenance script (`scripts/cleanup-retention.ts` / `npm run db:cleanup`). Verified 100% test pass rate across dedicated unit test suites (`retention-service.test.ts` 8/8, `retention-scheduler.test.ts` 6/6), workspace typecheck (0 errors across 4 workspaces), secret scan (0 findings), dependency scan (0 unapproved advisories), and historical query non-regression (`historical-charts.test.tsx` 13/13). Staging update is managed through normal CI/CD after push without requiring manual database migrations.
+#### TASK-0914 Governance Record
+
+`TASK-0914` direct EMQX Cloud connectivity for local IoT Gateway record:
+- Status: `DONE` (Completed 2026-08-26)
+- Frontend impact: `NONE`
+- Selected UI direction: `N/A`
+- Existing color template: `UNCHANGED`
+- Selected motion effects: `None`
+- 21st.dev MCP: `NOT REQUIRED`
+- Summary: Configured direct EMQX Cloud MQTT 5.0 over TLS (`mqtts://` port 8883 / `wss://` port 8084) for local `apps/iot-gateway` and simulator execution (`scripts/device-simulator.ts`, `scripts/esp32-simulator.ts`), eliminating local Docker Mosquitto dependency for normal development workflows while keeping Mosquitto as an optional offline fallback. Preserved strict topic namespace isolation (`agriculture/development/...` vs `agriculture/staging/...`) and unique client IDs (`gateway-kebun-melon-dev-local-*` vs `gateway-kebun-melon-staging-*` vs `sim-${tankDeviceId}-${random}`), preventing client kick-offs on the shared EMQX broker. Upgraded simulator scripts to dynamically resolve target `WATER_TANK_NODE` canonical device identity at runtime via CLI (`--tank-device-id`, `--device-id`) or environment variables (`MQTT_TANK_DEVICE_ID`, `MQTT_DEVICE_ID`), eliminating hardcoded hardware IDs from source code. Enforced exact parity between topic `deviceId` and payload `deviceId` according to the canonical payload contract schema. Verified live development gateway connection, EMQX broker publishing, and local development database telemetry ingestion using the real development device ID. Documented that frontend monitoring UI smoke testing was intentionally deferred/skipped during backend gateway protocol validation. Confirmed staging infrastructure and database require zero alterations or redeployments. Maintained `ENABLE_FAUCET_CONTROL=false` baseline safety. Verified 100% test pass rate across unit test suites (`emqx-connectivity.test.ts` 7/7, `device-simulator.test.ts` 26/26, `broker-config.test.ts` 7/7, `test-env.ts` 18/18), TypeScript typecheck (0 errors across 4 monorepo workspaces), and secret scan (0 findings).
 
 ---
+
+
 
 ## 5. Task Selection Rules
 

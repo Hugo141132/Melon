@@ -1,7 +1,7 @@
 # System Requirement Traceability Matrix: Kebun Melon
 
 > **Task Reference:** `TASK-0003 — Establish Requirement IDs`
-> **Status:** DEFINED & RECONCILED (2026-08-10 — Synchronized with completed TASKS.md backlog)
+> **Status:** DEFINED & RECONCILED (2026-08-26 — Synchronized with completed TASKS.md backlog)
 > **Source of Truth Rule:** All requirement identifiers use standard 3-digit sequential numbering per family starting at `001`.
 
 ---
@@ -40,6 +40,7 @@
 | `SEC-OPS-003` | Database backup encryption and offsite storage | `docs/SECURITY.md` | - | `TASK-0909` | `TEST-SEC-005` | `DECISION_REQUIRED` |
 | `SEC-OPS-004` | Automated vulnerability scanning of dependencies | `docs/SECURITY.md` | - | `TASK-0906` | `TEST-SEC-005` | `IMPLEMENTED` |
 | `TEST-UNIT-001` | Environment variable validation unit tests | `docs/TESTING.md` | - | `TASK-0103` | `TEST-UNIT-001` | `VERIFIED` |
+
 | `TEST-UNIT-002` | Role and permission matrix unit tests | `docs/TESTING.md` | - | `TASK-0105` | `TEST-UNIT-002` | `VERIFIED` |
 | `TEST-UNIT-003` | Telemetry data freshness and status unit tests | `docs/TESTING.md` | `` | `TASK-0407` | `TEST-UNIT-003` | `DEFERRED` |
 | `TEST-UNIT-004` | I18N locale key and translation unit tests | `docs/TESTING.md` | `DEC-I18N-068` | `TASK-0601` | `TEST-UNIT-004` | `VERIFIED` |
@@ -228,3 +229,15 @@ The following facts are verified in the traceability matrix regarding `TASK-0913
 - **Lock-Free Chunked Batching:** Database pruning uses primary-key-indexed batch chunks (`batchSize: 1000`, `yieldMs: 20`) via `RetentionService`, eliminating table lock escalation and transaction timeouts.
 - **Background Orchestration:** Integrated into `apps/iot-gateway` via `RetentionScheduler` (default 24h interval) with overlap guard and structured JSON logging. Standalone operator execution enabled via `npm run db:cleanup` (`scripts/cleanup-retention.ts`).
 <!-- TASK-0913 Reconciled: 2026-08-24 -->
+
+---
+
+## Direct EMQX Cloud Connectivity & Device Simulator Traceability Note (Reconciled 2026-08-26)
+
+The following facts are verified in the traceability matrix regarding `TASK-0914` (Configure Direct EMQX Cloud Connectivity for Local IoT Gateway):
+- **Implementation Status:** `TASK-0914` is implemented and verified (`apps/iot-gateway/src/__tests__/emqx-connectivity.test.ts` 7/7 passed, `apps/iot-gateway/src/__tests__/device-simulator.test.ts` 26/26 passed, `apps/iot-gateway/src/__tests__/broker-config.test.ts` 7/7 passed, `scripts/test-env.ts` 18/18 passed, secrets scan 0 findings).
+- **Broker Topology:** Local development of `apps/iot-gateway` connects directly to EMQX Cloud over TLS (`mqtts://` port 8883 / `wss://` port 8084); Railway is not an MQTT proxy and Docker/Mosquitto is retained as an optional fallback only.
+- **Topic & Identity Isolation:** Partitioned into isolated `agriculture/development/...` vs `agriculture/staging/...` namespaces with unique client IDs (`gateway-kebun-melon-dev-local-*` vs `gateway-kebun-melon-staging-*` vs `sim-${tankDeviceId}-${random}`).
+- **Dynamic Simulator Identity:** `WATER_TANK_NODE` simulator resolves canonical target device ID at runtime via CLI (`--tank-device-id`, `--device-id`) or environment variables (`MQTT_TANK_DEVICE_ID`, `MQTT_DEVICE_ID`), eliminating hardcoded hardware IDs in source code. Exact topic `deviceId` and payload `deviceId` match is enforced.
+- **Verification Scope:** Live development gateway, EMQX Cloud broker, and canonical development device live ingestion verified. Monitoring UI smoke testing was intentionally deferred/skipped. Staging deployment requires no update.
+<!-- TASK-0914 Reconciled: 2026-08-26 -->

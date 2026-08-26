@@ -226,5 +226,50 @@ try {
   );
 }
 
+// 17. TASK-0914: Gateway in development accepts EMQX Cloud TLS and WSS broker URLs
+try {
+  const gEnvTls = validateGatewayEnv({
+    NODE_ENV: 'development',
+    APP_ENV: 'development',
+    MQTT_BROKER_URL: 'mqtts://dev-cluster.emqxsl.com:8883',
+    MQTT_GATEWAY_CLIENT_ID: 'gateway-kebun-melon-dev-local-01',
+  });
+  const gEnvWss = validateGatewayEnv({
+    NODE_ENV: 'development',
+    APP_ENV: 'development',
+    MQTT_BROKER_URL: 'wss://dev-cluster.emqxsl.com:8084/mqtt',
+    MQTT_GATEWAY_CLIENT_ID: 'gateway-kebun-melon-dev-local-01',
+  });
+  assert(
+    gEnvTls.MQTT_BROKER_URL === 'mqtts://dev-cluster.emqxsl.com:8883' &&
+      gEnvWss.MQTT_BROKER_URL === 'wss://dev-cluster.emqxsl.com:8084/mqtt' &&
+      gEnvTls.MQTT_GATEWAY_CLIENT_ID === 'gateway-kebun-melon-dev-local-01',
+    'TASK-0914: Gateway in development accepts EMQX Cloud TLS and WSS broker URLs'
+  );
+} catch (e: any) {
+  assert(false, 'TASK-0914 EMQX Cloud development env test failed: ' + e.message);
+}
+
+// 18. TASK-0914: Staging gateway accepts EMQX Cloud TLS configuration with staging client ID
+try {
+  const gEnvStaging = validateGatewayEnv({
+    NODE_ENV: 'production',
+    APP_ENV: 'staging',
+    MQTT_BROKER_URL: 'mqtts://staging-cluster.emqxsl.com:8883',
+    MQTT_GATEWAY_CLIENT_ID: 'gateway-kebun-melon-staging-01',
+    MQTT_GATEWAY_USERNAME: 'staging_gateway_user',
+    MQTT_GATEWAY_PASSWORD: 'staging_secret_password_123',
+    INTERNAL_SERVICE_TOKEN: 'super_secret_token_at_least_16_chars',
+  });
+  assert(
+    gEnvStaging.APP_ENV === 'staging' &&
+      gEnvStaging.MQTT_GATEWAY_CLIENT_ID === 'gateway-kebun-melon-staging-01' &&
+      gEnvStaging.MQTT_BROKER_URL === 'mqtts://staging-cluster.emqxsl.com:8883',
+    'TASK-0914: Staging gateway accepts EMQX Cloud TLS configuration with staging client ID'
+  );
+} catch (e: any) {
+  assert(false, 'TASK-0914 EMQX Cloud staging env test failed: ' + e.message);
+}
+
 console.log('\nSummary: ' + passed + ' passed, ' + failed + ' failed.');
 if (failed > 0) process.exit(1);

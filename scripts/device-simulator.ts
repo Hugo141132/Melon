@@ -76,37 +76,42 @@ export class DeviceSimulator {
 
     const envVar =
       process.env.MQTT_ENVIRONMENT ||
-      (process.env.NODE_ENV === 'production' ? 'production' : 'staging');
+      process.env.APP_ENV ||
+      (process.env.NODE_ENV === 'production' ? 'production' : 'development');
     const validEnv: 'development' | 'staging' | 'production' =
       envVar === 'development' || envVar === 'staging' || envVar === 'production'
         ? envVar
-        : 'staging';
+        : 'development';
 
-    const defaultDeviceId = config?.deviceId || creds.deviceId || 'esp32-001';
+    const defaultDeviceId = config?.deviceId || creds.deviceId;
 
     this.config = {
       environment: config?.environment || validEnv,
       siteId: config?.siteId || process.env.MQTT_SITE_ID || 'site-01',
-      deviceId: defaultDeviceId,
+      deviceId: defaultDeviceId || '',
       soilDeviceId:
         config?.soilDeviceId !== undefined
           ? config.soilDeviceId || undefined
           : process.env.MQTT_SOIL_DEVICE_ID ||
             process.env.SOIL_DEVICE_ID ||
-            (this.isSoilDevice(defaultDeviceId) ? defaultDeviceId : undefined),
+            (defaultDeviceId && this.isSoilDevice(defaultDeviceId) ? defaultDeviceId : undefined),
       waterDeviceId:
         config?.waterDeviceId !== undefined
           ? config.waterDeviceId || undefined
           : process.env.MQTT_WATER_DEVICE_ID ||
             process.env.WATER_DEVICE_ID ||
-            (this.isWaterQualityDevice(defaultDeviceId) ? defaultDeviceId : undefined),
+            (defaultDeviceId && this.isWaterQualityDevice(defaultDeviceId)
+              ? defaultDeviceId
+              : undefined),
       tankDeviceId:
         config?.tankDeviceId !== undefined
           ? config.tankDeviceId || undefined
           : process.env.MQTT_TANK_DEVICE_ID ||
-            (this.isTankDevice(defaultDeviceId)
+            (defaultDeviceId && this.isTankDevice(defaultDeviceId)
               ? defaultDeviceId
-              : process.env.MQTT_DEVICE_ID || creds.deviceId || 'water-tank-node-zi37gz'),
+              : config?.deviceId
+                ? config.deviceId
+                : process.env.MQTT_DEVICE_ID || creds.deviceId || undefined),
       apiBaseUrl: config?.apiBaseUrl || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000',
       brokerUrl: config?.brokerUrl || creds.brokerUrl,
       username: config?.username || creds.username,
@@ -388,13 +393,17 @@ export class DeviceSimulator {
     }
 
     const clientId = `sim-${this.getTankDeviceId()}-${Math.random().toString(16).substring(2, 8)}`;
+    const isWebSocket =
+      this.config.brokerUrl.startsWith('ws://') || this.config.brokerUrl.startsWith('wss://');
+
     this.client = mqtt.connect(this.config.brokerUrl, {
       username: this.config.username,
       password: this.config.password,
       clientId,
       clean: true,
-      path: '/mqtt',
       reconnectPeriod: 2000,
+      rejectUnauthorized: true,
+      ...(isWebSocket ? { path: '/mqtt' } : {}),
     });
 
     await new Promise<void>((resolve, reject) => {
@@ -980,7 +989,12 @@ async function runCli(): Promise<void> {
   const getArg = (name: string): string | undefined => {
     const prefix = `--${name}=`;
     const arg = args.find((a) => a.startsWith(prefix));
-    return arg ? arg.slice(prefix.length) : undefined;
+    if (arg) return arg.slice(prefix.length);
+    const flagIndex = args.indexOf(`--${name}`);
+    if (flagIndex !== -1 && args[flagIndex + 1] && !args[flagIndex + 1].startsWith('--')) {
+      return args[flagIndex + 1];
+    }
+    return undefined;
   };
 
   const scenario = getArg('scenario') || 'soil-telemetry';

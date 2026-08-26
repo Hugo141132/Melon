@@ -24,7 +24,11 @@
 | `DEC-CTRL-067` | Production Feature Flag | **APPROVED** | `ENABLE_FAUCET_CONTROL=false` by default; requires dual written Owner & Hardware Lead sign-off before production activation | Feature flag in `TASK-0103`; faucet code may be built and tested behind flag; production activation blocked until dual sign-off recorded |
 | `DEC-INF-078` | Web-to-Gateway Internal Health & Readiness Probe | **APPROVED** | Internal HTTP probe with mandatory `Authorization: Bearer <INTERNAL_SERVICE_TOKEN>`, 2000ms default timeout | Implemented in `TASK-0905` |
 
+> **Direct EMQX Cloud Development Connectivity Note (TASK-0914):** Local `apps/iot-gateway` and simulator scripts connect directly to EMQX Cloud over TLS (`mqtts://` / `wss://`) as the standard development path, eliminating Railway intermediary dependencies and local Docker Mosquitto runtime requirements (Mosquitto is retained as an optional fallback only). Topic namespaces (`agriculture/development/...` vs `agriculture/staging/...`) and unique client IDs remain strictly segregated. Hardware simulator identities are resolved dynamically via CLI/env without hardcoded hardware IDs.
+
 ---
+
+
 
 ### Table 2 — Feature-Specific Approved Decisions Grouped by Subsystem
 

@@ -2200,3 +2200,35 @@ Automated unit, batch chunking, table isolation, scheduler lifecycle, and histor
    - `npm run scan:deps`: **0 unapproved dependencies**.
    - `npm run format:check`: **100% Prettier compliant**.
 <!-- TASK-0913 Reconciled: 2026-08-24 -->
+
+---
+
+# 53. Direct EMQX Cloud Connectivity & Device Simulator Verification Suite (`TASK-0914`)
+
+Automated unit, client lifecycle, environment validation, and dynamic simulator identity verification for direct EMQX Cloud TLS connectivity:
+
+### Agent-Executed Automated Tests
+1. **Targeted IoT Gateway EMQX Connectivity Suite (`apps/iot-gateway/src/__tests__/emqx-connectivity.test.ts`):**
+   - **7/7 tests passed (100%)**:
+     - Verified direct connection to EMQX Cloud over TLS (`mqtts://` port 8883 / `wss://` port 8084) in development and staging configurations.
+     - Verified client lifecycle state transitions and health/readiness probe reporting (`/health` returns 200 pass; `/ready` returns 503 DEGRADED when disconnected and 200 UP when connected).
+     - Verified structured error logging with strict secret and token redaction.
+2. **Targeted Device Simulator Suite (`apps/iot-gateway/src/__tests__/device-simulator.test.ts`):**
+   - **26/26 tests passed (100%)**:
+     - Verified dynamic device-ID resolution (`--tank-device-id`, `MQTT_TANK_DEVICE_ID`) and clear actionable errors when device IDs are unconfigured without source code hardcoding.
+     - Verified canonical reservoir telemetry payload generation adhering strictly to contract schema (`schemaVersion`, `messageId`, `deviceId`, `siteId`, `sequence`, `recordedAt`, `sentAt`, `firmwareVersion`, `data: { tankVolume, flowRate, status }`).
+     - Verified topic `deviceId` and payload `deviceId` exact parity.
+     - Verified unique simulation client ID generation (`sim-${tankDeviceId}-${random}`).
+3. **Targeted Mosquitto Fallback Suite (`apps/iot-gateway/src/__tests__/broker-config.test.ts`):**
+   - **7/7 tests passed (100%)**:
+     - Verified static Mosquitto fallback configuration and ACL files are intact and insulated from runtime `.env` overrides.
+4. **Permanent Environment Configuration Suite (`scripts/test-env.ts`):**
+   - **18/18 tests passed (100%)**:
+     - Verified development accepts EMQX Cloud TLS/WSS URLs and staging validates required staging credentials and client IDs.
+5. **Static Quality & Security Audits:**
+   - `npm run scan:secrets`: **0 hardcoded secrets** detected in repository files or git history.
+6. **Live Runtime & Scope Verification:**
+   - Live development gateway, EMQX broker TLS, and canonical development device live ingestion verified end-to-end.
+   - **Deferred Verification:** Monitoring UI live smoke testing was intentionally **deferred/skipped** during backend gateway verification.
+   - **Staging Impact:** Staging deployment and database require no update or redeployment.
+<!-- TASK-0914 Reconciled: 2026-08-26 -->

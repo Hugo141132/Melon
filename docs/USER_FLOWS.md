@@ -48,8 +48,10 @@ The following rules apply to all flows:
 11. Canonical internal values must remain untranslated.
 12. Unresolved behaviour is marked `TBD`.
 13. Sensor thresholds, units, refresh intervals, hardware execution rules, and alert limits must not be invented by the frontend.
+14. Direct EMQX Cloud TLS connectivity for `apps/iot-gateway` (`TASK-0914`) preserves all user-facing monitoring and control flows without modifying client UX or authorization paths.
 
 ---
+
 
 ## 4. Shared Actors
 

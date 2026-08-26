@@ -24,7 +24,11 @@ The website acts as the communication and management interface between authorise
 
 The application must preserve the existing frontend design. New pages, components, states, and workflows must follow the visual and interaction standards defined in `FRONTEND_AUDIT.md` and `UI_UX.md`.
 
+### 2.1 Technical Reconciliation & Gateway Topology (TASK-0914)
+`TASK-0914` established direct EMQX Cloud TLS connectivity as the standard development path for `apps/iot-gateway`, eliminating local dependency on Mosquitto containers and bypassing Railway as an MQTT proxy. Topic namespaces (`agriculture/development/...` vs `agriculture/staging/...`) and client IDs remain strictly segregated. Hardware simulator identities are resolved dynamically at runtime via CLI/env rather than hardcoded. `ENABLE_FAUCET_CONTROL=false` remains the mandatory safety baseline.
+
 ---
+
 
 ## 3. Problem Statement
 

@@ -93,8 +93,19 @@ All exceptions must be recorded in `scripts/security-exceptions.json` using the 
 - **TASK-0806 Audit (2026-08-20):** Confirmed zero secret exceptions and zero dependency exceptions introduced; command event state machine enforces strict QoS 1 schema validation, stored action assertions, physical state mapping, and idempotent duplicate handling without security exceptions.
 - **TASK-0807 Audit (2026-08-20):** Confirmed zero secret exceptions and zero dependency exceptions introduced; Faucet Control UI dispatches commands using pure HTTP `Idempotency-Key` header, enforces server-derived volumes, restricts manual actions to modal confirmation, and executes 2.5s status polling strictly during active states with zero blind retries.
 - **TASK-0302 / Device Lifecycle Audit (2026-08-23):** Confirmed zero secret exceptions and zero dependency exceptions introduced; device activation and deactivation endpoints enforce strict Owner RBAC authorization (`device.activate` / `device.deactivate`), eliminate hard deletion, and log audit events with zero security exceptions.
+- **TASK-0914 Audit (2026-08-26):** Confirmed zero secret exceptions and zero dependency exceptions introduced; direct EMQX Cloud TLS connectivity and dynamic simulator identity strictly adhere to `SEC-OPS-001` (zero unapproved secrets) with runtime credential parsing, strict log redaction, and no hardcoded canonical hardware identities in source code.
 
 ---
+
+## Direct EMQX Cloud Connectivity & Simulator Security Exceptions Audit Note (Reconciled 2026-08-26)
+
+The verified implementation of `TASK-0914` (`apps/iot-gateway` and simulation scripts direct EMQX Cloud TLS connectivity) introduced zero new security exceptions, zero new secrets, and zero new dependencies:
+- **Zero Security Exceptions:** Adheres strictly to `SEC-OPS-001` (zero unapproved secrets) and `SEC-OPS-004` (zero unapproved high vulnerabilities).
+- **Environment Isolation:** Topics strictly partitioned into `agriculture/development/...` vs `agriculture/staging/...`, preventing crosstalk on shared broker clusters.
+- **Runtime Secret Isolation:** Broker credentials, TLS certs, and user tokens are loaded exclusively via environment variables with zero code tracking. Error messages and health checks strictly redact secrets.
+- **Dynamic Identity Security:** Device simulator resolves canonical target IDs dynamically via CLI/env without hardcoded hardware IDs in source code; exact topic and payload `deviceId` parity prevents spoofing vectors.
+<!-- TASK-0914 Reconciled: 2026-08-26 -->
+
 
 ## Monitoring and Device Security Exceptions Audit Note (Reconciled 2026-08-19)
 

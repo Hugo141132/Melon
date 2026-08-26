@@ -79,6 +79,13 @@ describe('TASK-0408: DeviceSimulator Unit & Scenario Verification', () => {
         '[DeviceSimulator] Missing registered WATER_QUALITY_NODE device configuration.'
       );
     });
+
+    it('throws clear configuration error when unconfigured WATER_TANK_NODE device ID is requested', () => {
+      const unconfigured = new DeviceSimulator({ tankDeviceId: '', deviceId: '' });
+      expect(() => unconfigured.getTankDeviceId()).toThrowError(
+        '[DeviceSimulator] Missing registered WATER_TANK_NODE device configuration.'
+      );
+    });
   });
 
   describe('Contract Payload Generation', () => {

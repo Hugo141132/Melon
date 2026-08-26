@@ -20,7 +20,11 @@ This document defines the user-interface and user-experience requirements for a 
 
 This document defines presentation and interaction behaviour. It does not define sensor calibration, measurement algorithms, firmware implementation, or hardware-level dispensing logic.
 
+### 1.1 TASK-0914 Boundary & UI Status Note
+`TASK-0914` (direct EMQX Cloud TLS connectivity for `apps/iot-gateway`) is a backend gateway and simulator hardening task (`Frontend impact: NONE`). The approved visual UI layouts, design tokens, and components remain unaltered. Monitoring UI smoke testing was intentionally deferred/skipped during backend gateway verification.
+
 ---
+
 
 ## 2. Source-of-Truth Hierarchy
 

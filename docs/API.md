@@ -39,6 +39,11 @@ The API shall support:
 
 Note: Water tank telemetry (volume & flow rate) is ingested separately via MQTT/EMQX through the IoT Gateway service, not through the REST API. Electrical monitoring (voltage, current, power) via INA219 is sent via REST over Wi-Fi.
 
+### 2.1 TASK-0914 Architectural Reconciliation
+REST Soil and Water Quality telemetry ingestion endpoints (`POST /api/v1/devices/{deviceId}/telemetry/soil` and `.../water`) remain unchanged by `TASK-0914`. Direct EMQX Cloud TLS connectivity applies exclusively to the MQTT reservoir telemetry and faucet-control boundary handled by `apps/iot-gateway`. REST API interfaces, endpoints, error responses, and `ENABLE_FAUCET_CONTROL=false` safety defaults remain untouched.
+
+---
+
 The API shall not expose:
 
 - MQTT broker credentials.
@@ -1431,8 +1436,8 @@ Rules:
 POST /api/v1/devices/{deviceId}/deactivate
 ```
 
-**Authentication:** Required  
-**Permission:** `device.deactivate` (Owner only)  
+**Authentication:** Required
+**Permission:** `device.deactivate` (Owner only)
 **Description:** Deactivates an active device, setting `accountStatus = 'DEACTIVATED'`, `connectionStatus = 'INACTIVE'`, populating `deactivatedAt = NOW()`, and preventing faucet commands.
 
 Response:
@@ -1458,8 +1463,8 @@ Response:
 POST /api/v1/devices/{deviceId}/activate
 ```
 
-**Authentication:** Required  
-**Permission:** `device.activate` (Owner only; `DEC-DEV-030`)  
+**Authentication:** Required
+**Permission:** `device.activate` (Owner only; `DEC-DEV-030`)
 **Description:** Reactivates a deactivated device, restoring `accountStatus = 'ACTIVE'`, resetting `connectionStatus = 'UNKNOWN'`, and clearing `deactivatedAt = NULL`.
 
 Response:
@@ -1485,7 +1490,7 @@ Response:
 GET /api/v1/devices/{deviceId}/capabilities
 ```
 
-**Authentication:** Required  
+**Authentication:** Required
 **Permission:** `device.read`
 
 ---
@@ -1496,7 +1501,7 @@ GET /api/v1/devices/{deviceId}/capabilities
 DELETE /api/v1/devices/{deviceId}
 ```
 
-**Status:** `REMOVED / FORBIDDEN` per `DEC-DEV-030`  
+**Status:** `REMOVED / FORBIDDEN` per `DEC-DEV-030`
 **Description:** Hard deletion of devices is permanently removed to prevent catastrophic relational data loss across telemetry, audit trails, commands, and access assignments. Device lifecycle must be managed exclusively via Deactivation and Reactivation.
 
 ---
@@ -2969,4 +2974,4 @@ The following facts are supported by the verified implementation of `TASK-0215` 
 - **Server Component Session Helper:** Created `getSessionOrNull()` in `apps/web/lib/auth/rbac.ts` allowing Server Components (specifically `RootLayout`) to retrieve the authenticated session (`AuthenticatedUserSession`) during SSR without throwing 401 exceptions.
 - **Client Session Endpoint Optimization:** Redundant client-side calls to `GET /api/v1/auth/session` on page component mounts have been eliminated, as the root layout hydrates session state directly via `AuthContext`.
 - **API Security Unchanged:** The `GET /api/v1/auth/session` endpoint remains available and functional for client-initiated session verification if needed. All protected REST endpoints continue to enforce strict server-side authentication and authorization.
-<!-- TASK-0215 Reconciled: 2026-08-22 -->
+<!-- TASK-0215 Reconciled: 2026-08-22 -->

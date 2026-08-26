@@ -3,6 +3,9 @@
 > **Task Reference:** `TASK-0001 — Confirm Existing Frontend Technology`
 > **Audit Status:** Complete — Confirmed & Verified
 > **Source of Truth Rule:** The existing frontend design and visual layout remain the visual source of truth.
+>
+> **Reconciliation Note (TASK-0914):** `TASK-0914` (EMQX Cloud direct connectivity) is a backend gateway and simulator hardening task (`Frontend impact: NONE`). Frontend UI layouts, components, charts, and styling are preserved without modification. Monitoring UI smoke testing was intentionally deferred/skipped during backend gateway verification.
+
 
 ---
 

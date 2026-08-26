@@ -20,10 +20,10 @@ import { generateMosquittoHash } from '../../../../scripts/generate-mqtt-pwfile'
  */
 
 const getExpectedUsernames = () => ({
-  gatewayUsername: process.env.MQTT_GATEWAY_USERNAME ?? 'gateway_user',
-  device1Username: process.env.MQTT_DEV1_USERNAME ?? 'device_esp32_001',
-  device2Username: process.env.MQTT_DEV2_USERNAME ?? 'device_node_002',
-  unauthUsername: process.env.MQTT_UNAUTH_USERNAME ?? 'unauthorized_device',
+  gatewayUsername: 'gateway_user',
+  device1Username: 'device_esp32_001',
+  device2Username: 'device_node_002',
+  unauthUsername: 'unauthorized_device',
 });
 
 describe('TASK-0402: MQTT Broker Configuration & Security Controls', () => {

@@ -202,14 +202,24 @@ The device shall:
 The broker shall:
 
 - Require authentication.
-- Support encrypted connections in production.
+- Support encrypted connections in production and development (TLS over TCP `mqtts://` port 8883 or WebSocket `wss://` port 8084).
 - Enforce topic-level publish and subscribe permissions.
 - Reject anonymous production access.
 - Support device Last Will and Testament.
 - Expose operational metrics and logs.
 - Permit revocation of a single device without affecting other devices.
 
+#### 5.2.1 Broker Connectivity Architecture (EMQX Cloud & Local Fallback)
+
+- **Primary Path:** Direct connection to **EMQX Cloud** over TLS (`mqtts://` port 8883 / `wss://` port 8084) is the standard MQTT communication path for both local development (`APP_ENV=development`) and staging (`APP_ENV=staging`). Railway staging is an isolated application deployment and is not an MQTT proxy or intermediary for local development.
+- **Environment & Topic Isolation:** All MQTT topics are strictly partitioned by environment namespace (`agriculture/development/...` vs `agriculture/staging/...` vs `agriculture/production/...`), allowing shared broker clusters without telemetry or command crosstalk.
+- **Client ID Collision Avoidance:** Local gateways default to `gateway-kebun-melon-dev-local-01` and staging gateways use `gateway-kebun-melon-staging-*`; simulation clients use `sim-${tankDeviceId}-${random}` to ensure simultaneous connections never kick off active hardware or gateway sessions.
+- **Dynamic Simulator Identity & Topic/Payload Parity:** Simulator target device IDs are resolved dynamically at runtime via CLI arguments (`--tank-device-id`, `--device-id`) or environment variables (`MQTT_TANK_DEVICE_ID`, `MQTT_DEVICE_ID`). No canonical device IDs are hardcoded in source files. The topic `deviceId` and JSON payload `deviceId` strictly match.
+- **Offline Local Fallback:** Local Eclipse Mosquitto via Docker Compose (`docker-compose.yml`) is preserved as an explicit optional fallback for offline development.
+- **Verification Status:** Live gateway/EMQX/canonical-device runtime ingestion verified. Monitoring UI smoke testing was intentionally deferred/skipped. Staging requires no update or redeployment.
+
 ### 5.3 IoT Gateway
+
 
 The gateway shall be a continuously running backend service.
 

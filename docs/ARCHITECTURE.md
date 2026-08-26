@@ -143,6 +143,17 @@ flowchart LR
 1. **Soil & Water Quality Telemetry**: Equipment sends REST API calls over Wi-Fi directly to backend REST endpoints (`W`), which validate, persist (`DB`), and emit real-time updates (`R`).
 2. **Reservoir-Water Telemetry & Control**: Reservoir nodes connect via MQTT 5.0 over TLS to the EMQX broker (`M`). The IoT Gateway (`G`) ingests messages, validates payloads, persists to PostgreSQL (`DB`), and handles faucet commands.
 
+#### 4.1.1 Gateway Connectivity Topology & Runtime Isolation (TASK-0914)
+
+- **Direct EMQX Cloud TLS Connectivity:** Both local development gateways (`APP_ENV=development`) and Railway staging gateways (`APP_ENV=staging`) connect **directly to EMQX Cloud** over TLS (`mqtts://` port 8883 / `wss://` port 8084). Railway staging serves purely as a distinct cloud deployment and is never an MQTT proxy or intermediary for local development.
+- **Environment & Topic Namespace Isolation:** Topics are strictly partitioned by environment namespace (`agriculture/development/...` vs `agriculture/staging/...` vs `agriculture/production/...`).
+- **Client ID Isolation:** Development gateway defaults to `gateway-kebun-melon-dev-local-01` and staging uses `gateway-kebun-melon-staging-*`; development simulators use `sim-${tankDeviceId}-${random}`, preventing broker session takeover or disconnect collisions with physical hardware.
+- **Simulator Dynamic Identity:** Simulator device IDs are resolved at runtime via CLI flags (`--tank-device-id`, `--device-id`) or environment variables (`MQTT_TANK_DEVICE_ID`, `MQTT_DEVICE_ID`). No canonical device IDs are hardcoded in source code. Topic `deviceId` and payload `deviceId` strictly match.
+- **Offline Fallback:** Local Docker Eclipse Mosquitto is retained as an explicit, optional offline development fallback only.
+- **Safety Defaults:** `ENABLE_FAUCET_CONTROL=false` is enforced across all environments.
+- **Verification Status:** Live gateway/EMQX/canonical-device runtime ingestion passed. Monitoring UI smoke testing was intentionally deferred/skipped. Staging requires no update or redeployment.
+
+
 ---
 
 ## 5. Logical Architecture

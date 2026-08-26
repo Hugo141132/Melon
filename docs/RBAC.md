@@ -58,6 +58,10 @@ This specification does not define:
 - ESP32/NodeMCU firmware.
 - Physical faucet execution logic.
 - Hardware safety design.
+
+### 3.1 TASK-0914 Infrastructure Reconciliation
+`TASK-0914` (direct EMQX Cloud TLS connectivity for `apps/iot-gateway`) operates strictly at the backend messaging and gateway infrastructure boundary. All user-level RBAC enforcement, `OWNER` global visibility, `ADMIN` device assignment scoping, canonical `deviceId` concealment for Admin users (`DEC-DEV-028`), and `ENABLE_FAUCET_CONTROL=false` safety policies remain unchanged.
+
 - Final MQTT topic structure.
 - Final device communication protocol.
 - Agronomic or water-quality thresholds.

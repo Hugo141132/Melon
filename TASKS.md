@@ -2291,6 +2291,47 @@ Apply to:
 
 ---
 
+## TASK-0914 — Configure Direct EMQX Cloud Connectivity for Local IoT Gateway
+
+**Priority:** `P0`
+**Status:** `DONE`
+**Dependencies:** `TASK-0103`, `TASK-0401`, `TASK-0402`
+**Related Decisions:** `DEC-DEV-020`, `DEC-MON-086`
+**Completed:** 2026-08-26 — Configured local `apps/iot-gateway` and development simulators (`scripts/device-simulator.ts`, `scripts/esp32-simulator.ts`) to connect directly to EMQX Cloud over TLS (`mqtts://` port 8883 / `wss://` port 8084) as the standard development path, eliminating dependencies on Railway staging routing or running local Docker Mosquitto containers. Preserved local Docker Mosquitto broker setup as an explicit optional fallback. Reused existing `GatewayMqttClient`, exponential reconnect logic, secret redaction (`redactSecrets`, `redactString`), topic routing, and `/ready` health state transitions. Enforced development vs staging environment topic isolation (`agriculture/development/...` vs `agriculture/staging/...`) and unique client IDs (`gateway-kebun-melon-dev-local-*` vs `gateway-kebun-melon-staging-*` vs `sim-${tankDeviceId}-${random}`) to prevent client kick-off collisions on the shared EMQX broker. Upgraded simulator scripts to dynamically resolve target `WATER_TANK_NODE` canonical device identity at runtime via CLI (`--tank-device-id`, `--device-id`) or environment variables (`MQTT_TANK_DEVICE_ID`, `MQTT_DEVICE_ID`), eliminating hardcoded hardware IDs from source code. Enforced exact parity between topic `deviceId` and payload `deviceId` according to the canonical payload contract schema. Verified live development gateway connection, EMQX broker publishing, and local development database telemetry ingestion using the real development device ID. Documented that frontend monitoring UI smoke testing was intentionally deferred/skipped during backend gateway protocol validation. Confirmed staging infrastructure and database require zero alterations or redeployments. Updated `.env.example` and `apps/iot-gateway/.env.example` templates with placeholders, preserving zero hardcoded secrets and `ENABLE_FAUCET_CONTROL=false` safety defaults. Added focused unit test suite in `apps/iot-gateway/src/__tests__/emqx-connectivity.test.ts` (7/7 passed), updated `apps/iot-gateway/src/__tests__/device-simulator.test.ts` (26/26 passed), `apps/iot-gateway/src/__tests__/broker-config.test.ts` (7/7 passed), updated environment validation suite `scripts/test-env.ts` (18/18 passed), verified TypeScript typecheck (0 errors across all workspaces), and passed secret scanner with 0 findings.
+
+
+### Work
+
+- Configure local `apps/iot-gateway` development path to connect directly to EMQX Cloud via MQTT 5.0 over TLS (`mqtts://` port 8883 or `wss://` port 8084).
+- Ensure MQTT devices and locally running gateway communicate through EMQX Cloud using TLS with strict certificate verification (`rejectUnauthorized: true`).
+- Reuse existing `GatewayMqttClient`, reconnect behavior, environment validation, secret redaction, topic router, and readiness checks.
+- Make EMQX Cloud the normal local-development MQTT path, keeping local Docker Mosquitto as an explicit optional fallback.
+- Preserve environment isolation (`agriculture/development/...` vs `agriculture/staging/...`) and existing per-device ACL/topic isolation.
+- Ensure local and staging client IDs/credentials cannot accidentally collide.
+- Update `.env.example` templates with secure placeholders; never commit real EMQX credentials or certificates.
+- Inspect and adjust development scripts (`scripts/device-simulator.ts`, `scripts/mqtt-config.ts`, `scripts/test-env.ts`) so the normal local development workflow starts against EMQX Cloud with dynamic device ID resolution without hardcoded hardware IDs.
+- Keep REST-based Soil/Water Quality telemetry untouched and preserve `ENABLE_FAUCET_CONTROL=false` safety defaults.
+- Add focused unit, integration, and config tests verifying EMQX Cloud connectivity and environment isolation.
+
+### Acceptance Criteria
+
+- [x] Local `apps/iot-gateway` connects directly to EMQX Cloud over TLS (`mqtts://` / `wss://`).
+- [x] Local Docker Mosquitto broker is retained as an explicit optional fallback.
+- [x] Development and staging topics remain strictly segregated (`agriculture/development/...` vs `agriculture/staging/...`).
+- [x] Local and staging client IDs cannot collide on the broker.
+- [x] Device simulator resolves target device identity dynamically via CLI/env without hardcoded hardware IDs in source code.
+- [x] Topic and payload `deviceId` strictly match according to canonical schema.
+- [x] Live development gateway, EMQX broker TLS, and database ingestion verified end-to-end.
+- [x] Monitoring UI smoke testing is recorded as intentionally deferred/skipped during backend gateway testing.
+- [x] Staging requires no update or redeployment.
+- [x] Environment templates contain placeholders only with zero committed secrets.
+- [x] REST Soil/Water Quality telemetry remains untouched.
+- [x] Safety defaults (`ENABLE_FAUCET_CONTROL=false`) remain strictly enforced.
+- [x] Unit, integration, and config tests pass with 100% success rate.
+
+
+---
+
 # 18. Phase 10 — Verification and Release
 
 ## TASK-1001 — Complete Unit Test Suite
