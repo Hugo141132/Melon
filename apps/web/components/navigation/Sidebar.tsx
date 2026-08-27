@@ -94,11 +94,12 @@ export default function Sidebar({ isOpen, onClose, onMouseEnter, onMouseLeave }:
           {SIDEBAR_NAV_ITEMS.filter((item) => !item.roleRequired || item.roleRequired === role).map(
             (item) => {
               const Icon = item.icon;
+              const currentPath = pathname || '';
               const isActive =
-                pathname === item.href ||
-                (item.href !== '/' && pathname.startsWith(item.href)) ||
+                currentPath === item.href ||
+                (item.href !== '/' && currentPath.startsWith(item.href)) ||
                 (item.href === '/sensor' &&
-                  ['/sensor', '/soil', '/water', '/controls'].includes(pathname));
+                  ['/sensor', '/soil', '/water', '/controls'].includes(currentPath));
 
               return (
                 <Link

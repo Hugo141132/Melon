@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useDeviceContext } from '@/context/DeviceContext';
+import { useAuth } from '@/context/AuthContext';
 import FaucetPresetSelector, {
   AuthoritativePhysicalState,
   formatLitersDisplay,
@@ -46,10 +47,11 @@ export default function FaucetControlPanel() {
   const tFaucet = useTranslations('faucet');
   const tDevices = useTranslations('devices');
   const tCommon = useTranslations('common');
-  const { selectedDevice } = useDeviceContext();
+  const { selectedDevice, isLoading: isDeviceLoading } = useDeviceContext();
+  const { isAuthenticated, user } = useAuth();
 
-  // Permissions & Auth state
-  const [hasControlPermission, setHasControlPermission] = useState<boolean>(true);
+  // Permissions & Auth state (hydrated directly from AuthContext without client fetch delay)
+  const hasControlPermission = Boolean(isAuthenticated && user);
   const isFeatureEnabled = true;
 
   // Plant count state (default 1)
@@ -68,32 +70,6 @@ export default function FaucetControlPanel() {
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
-
-  // Check auth & permissions once on mount
-  useEffect(() => {
-    let isMounted = true;
-    const checkAuth = async () => {
-      try {
-        const res = await fetch('/api/v1/auth/session');
-        const json = await res.json();
-        if (isMounted) {
-          if (json.success && json.data?.authenticated && json.data?.user) {
-            setHasControlPermission(true);
-          } else {
-            setHasControlPermission(false);
-          }
-        }
-      } catch {
-        if (isMounted) {
-          setHasControlPermission(false);
-        }
-      }
-    };
-    checkAuth();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
 
   // Stable recent command fetcher parameterized by device ID
   const fetchRecentCommands = useCallback(async (targetDeviceId: string) => {
@@ -300,6 +276,10 @@ export default function FaucetControlPanel() {
       {selectedDevice ? (
         <section>
           <FaucetHistoryTable deviceId={selectedDevice.deviceId || selectedDevice.id} />
+        </section>
+      ) : isDeviceLoading ? (
+        <section>
+          <FaucetHistoryTable deviceId={null} isLoading={true} />
         </section>
       ) : (
         <section className="p-8 bg-app-surface-container-lowest rounded-2xl border border-app-outline-variant/20 text-center text-xs text-app-on-surface-variant space-y-2">

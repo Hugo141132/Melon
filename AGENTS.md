@@ -559,7 +559,20 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
 - 21st.dev MCP: `NOT REQUIRED`
 - Summary: Configured direct EMQX Cloud MQTT 5.0 over TLS (`mqtts://` port 8883 / `wss://` port 8084) for local `apps/iot-gateway` and simulator execution (`scripts/device-simulator.ts`, `scripts/esp32-simulator.ts`), eliminating local Docker Mosquitto dependency for normal development workflows while keeping Mosquitto as an optional offline fallback. Preserved strict topic namespace isolation (`agriculture/development/...` vs `agriculture/staging/...`) and unique client IDs (`gateway-kebun-melon-dev-local-*` vs `gateway-kebun-melon-staging-*` vs `sim-${tankDeviceId}-${random}`), preventing client kick-offs on the shared EMQX broker. Upgraded simulator scripts to dynamically resolve target `WATER_TANK_NODE` canonical device identity at runtime via CLI (`--tank-device-id`, `--device-id`) or environment variables (`MQTT_TANK_DEVICE_ID`, `MQTT_DEVICE_ID`), eliminating hardcoded hardware IDs from source code. Enforced exact parity between topic `deviceId` and payload `deviceId` according to the canonical payload contract schema. Verified live development gateway connection, EMQX broker publishing, and local development database telemetry ingestion using the real development device ID. Documented that frontend monitoring UI smoke testing was intentionally deferred/skipped during backend gateway protocol validation. Confirmed staging infrastructure and database require zero alterations or redeployments. Maintained `ENABLE_FAUCET_CONTROL=false` baseline safety. Verified 100% test pass rate across unit test suites (`emqx-connectivity.test.ts` 7/7, `device-simulator.test.ts` 26/26, `broker-config.test.ts` 7/7, `test-env.ts` 18/18), TypeScript typecheck (0 errors across 4 monorepo workspaces), and secret scan (0 findings).
 
+#### Controls Loading Experience & Responsive Header Centering Governance Record (Reconciled 2026-08-28)
+
+`TASK-0807` / `TASK-0502` / `TASK-0306` loading & layout stabilization record:
+- Status: `DONE` (Reconciled 2026-08-28)
+- Frontend impact: `MINOR`
+- Selected UI direction: `Premium Minimal Ops`
+- Existing color template: `UNCHANGED`
+- Selected motion effects: `Skeleton loading`, `Dropdown`
+- 21st.dev MCP: `NOT REQUIRED`
+- Summary: Reconciled `/controls` loading transition and global header `DeviceSelector` responsive centering. Created route-level instant loading shell (`apps/web/app/controls/loading.tsx`) rendering the complete page composition immediately upon navigation. Replaced generic single-box placeholder in `WaterTankMonitoringCard` with structural 2-column skeleton cards matching the loaded card layout. Hydrated auth state in `FaucetControlPanel` via `useAuth()`, eliminating redundant client-side `/api/v1/auth/session` calls. Rendered structured skeleton rows in `FaucetHistoryTable` during device loading to eliminate layout jumping. Refactored `TopAppBar` to a balanced 3-column CSS Grid (`grid grid-cols-[1fr_auto_1fr] items-center px-4 h-14`), constraining flanking items to identical `1fr` widths and guaranteeing mathematical 50% horizontal center alignment for `DeviceSelector` across desktop, tablet, and mobile. Centered `DeviceSelector` dropdown overlay and alert notices under the trigger button (`left-1/2 -translate-x-1/2`) with viewport clamping (`max-w-[calc(100vw-2rem)]`). Hardened `Sidebar` with null-safety for `pathname`. Verified 100% test pass rate across 34 unit test suites (257/257 tests in `@kebun-melon/web`), monorepo typecheck (0 errors across 4 workspaces), Next.js production build (37/37 routes compiled), Playwright smoke tests (2/2 passed with Microsoft Edge), and manual authenticated browser testing. Preserved `TASK-1004` as `IN_PROGRESS` and verified all five pre-commit validation commands as `PASS` (`test:coverage`, `test:integration`, `check:quality`, `test`, `test:e2e`).
+
+
 ---
+
 
 
 

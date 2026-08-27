@@ -1118,3 +1118,15 @@ The following facts are verified in the product implementation regarding `TASK-0
 - **Security & Authorization Baseline:** All protected backend endpoints (`/api/v1/*`) and server actions remain strictly guarded with server-side authorization (`requireSession`, `requireRole`, `requirePermission`).
 <!-- TASK-0215 Reconciled: 2026-08-22 -->
 
+---
+
+## Controls Loading Experience & Responsive Header Centering Implementation Note (Reconciled 2026-08-27)
+
+The following facts are verified in the product implementation regarding `TASK-0807`, `TASK-0502`, and `TASK-0306` (`/controls` Loading & Header Stability):
+- **Instant Route Shell & Structural Skeletons:** `/controls` utilizes a route-level loading shell (`apps/web/app/controls/loading.tsx`) and granular structural skeletons matching the exact two-section loaded layout in `WaterTankMonitoringCard`, `FaucetControlPanel`, and `FaucetHistoryTable`, preventing layout shifts and blank box jumping.
+- **Centralized Auth & Device State:** `FaucetControlPanel` consumes centralized `useAuth()` state, eliminating redundant client session fetches, and renders stable skeleton rows in `FaucetHistoryTable` during device loading without flashing unselected notice boxes.
+- **Header Device Selector Centering:** `TopAppBar` implements a balanced 3-column CSS Grid (`grid-cols-[1fr_auto_1fr]`) ensuring the `DeviceSelector` is geometrically centered at 50% width across desktop, tablet, and mobile regardless of unequal brand logo and avatar dimensions, with dropdown overlays centered and bounded within the viewport.
+- **Functional Requirements Contracts:** All functional requirements, safety policies (`ENABLE_FAUCET_CONTROL=false` baseline), RBAC enforcement, and device communication contracts remain fully preserved and unchanged.
+<!-- Controls Loading & Header Centering Reconciled: 2026-08-27 -->
+
+

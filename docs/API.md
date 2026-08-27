@@ -2975,3 +2975,12 @@ The following facts are supported by the verified implementation of `TASK-0215` 
 - **Client Session Endpoint Optimization:** Redundant client-side calls to `GET /api/v1/auth/session` on page component mounts have been eliminated, as the root layout hydrates session state directly via `AuthContext`.
 - **API Security Unchanged:** The `GET /api/v1/auth/session` endpoint remains available and functional for client-initiated session verification if needed. All protected REST endpoints continue to enforce strict server-side authentication and authorization.
 <!-- TASK-0215 Reconciled: 2026-08-22 -->
+
+---
+
+## Controls Loading Experience & Header Alignment API Note (Reconciled 2026-08-27)
+
+The verified implementation of `TASK-0807`, `TASK-0502`, and `TASK-0306` (`/controls` Loading & Header Layout Stabilization on 2026-08-27) operates strictly within frontend presentation components:
+- **Client Request Optimization:** `FaucetControlPanel` consumes centralized `useAuth()`, eliminating redundant client-side `GET /api/v1/auth/session` calls upon mounting `/controls`.
+- **API Contracts Unchanged:** Zero modifications were made to REST API route signatures, request schemas, response formats, idempotency headers, or status codes across `/api/v1/devices/*`, `/api/v1/monitoring/*`, or `/api/v1/auth/*`.
+<!-- Controls Loading & Header Centering API Reconciled: 2026-08-27 -->

@@ -32,11 +32,16 @@ export interface FaucetHistoryItem {
 }
 
 export interface FaucetHistoryTableProps {
-  deviceId: string;
+  deviceId?: string | null;
+  isLoading?: boolean;
   className?: string;
 }
 
-export default function FaucetHistoryTable({ deviceId, className }: FaucetHistoryTableProps) {
+export default function FaucetHistoryTable({
+  deviceId,
+  isLoading = false,
+  className,
+}: FaucetHistoryTableProps) {
   const tFaucet = useTranslations('faucet');
   const tCommon = useTranslations('common');
 
@@ -51,6 +56,8 @@ export default function FaucetHistoryTable({ deviceId, className }: FaucetHistor
     totalPages: 1,
   });
 
+  const isTableLoading = loading || isLoading;
+
   const tFaucetRef = React.useRef(tFaucet);
   React.useEffect(() => {
     tFaucetRef.current = tFaucet;
@@ -58,6 +65,7 @@ export default function FaucetHistoryTable({ deviceId, className }: FaucetHistor
 
   const fetchHistory = useCallback(
     async (pageToFetch = 1) => {
+      if (!deviceId) return;
       setLoading(true);
       setErrorMsg(null);
       try {
@@ -93,6 +101,8 @@ export default function FaucetHistoryTable({ deviceId, className }: FaucetHistor
   useEffect(() => {
     if (deviceId) {
       fetchHistory(1);
+    } else {
+      setHistory([]);
     }
   }, [deviceId, statusFilter, fetchHistory]);
 
@@ -160,7 +170,7 @@ export default function FaucetHistoryTable({ deviceId, className }: FaucetHistor
             title={tCommon('refresh')}
             data-testid="btn-refresh-history"
           >
-            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            <RefreshCw size={14} className={isTableLoading ? 'animate-spin' : ''} />
           </button>
         </div>
       </div>
@@ -190,7 +200,7 @@ export default function FaucetHistoryTable({ deviceId, className }: FaucetHistor
             </tr>
           </thead>
           <tbody className="divide-y divide-app-outline-variant/10">
-            {loading ? (
+            {isTableLoading ? (
               [1, 2, 3].map((i) => (
                 <tr key={i} className="animate-pulse">
                   <td className="p-3">

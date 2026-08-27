@@ -71,9 +71,9 @@ describe('WaterTankMonitoringCard Component Tests', () => {
       </DeviceProvider>
     );
 
-    expect(await screen.findByText('Volume Air Tangki')).toBeInTheDocument();
+    expect(await screen.findByText('450.5')).toBeInTheDocument();
+    expect(screen.getByText('Volume Air Tangki')).toBeInTheDocument();
     expect(screen.getByText('Debit Air')).toBeInTheDocument();
-    expect(screen.getByText('450.5')).toBeInTheDocument();
     expect(screen.getByText('L')).toBeInTheDocument();
     expect(screen.getByText('2.4')).toBeInTheDocument();
     expect(screen.getByText('m³/h')).toBeInTheDocument();
@@ -107,9 +107,10 @@ describe('WaterTankMonitoringCard Component Tests', () => {
       </DeviceProvider>
     );
 
-    expect(await screen.findByText('Volume Air Tangki')).toBeInTheDocument();
+    const dashes = await screen.findAllByText('—');
+    expect(dashes.length).toBe(2);
+    expect(screen.getByText('Volume Air Tangki')).toBeInTheDocument();
     expect(screen.getByText('Debit Air')).toBeInTheDocument();
-    expect(screen.getAllByText('—').length).toBe(2);
     expect(screen.getByText('L')).toBeInTheDocument();
     expect(screen.getByText('m³/h')).toBeInTheDocument();
     expect(screen.getAllByText('Belum ada data').length).toBeGreaterThan(0);

@@ -241,3 +241,22 @@ The following facts are verified in the traceability matrix regarding `TASK-0914
 - **Dynamic Simulator Identity:** `WATER_TANK_NODE` simulator resolves canonical target device ID at runtime via CLI (`--tank-device-id`, `--device-id`) or environment variables (`MQTT_TANK_DEVICE_ID`, `MQTT_DEVICE_ID`), eliminating hardcoded hardware IDs in source code. Exact topic `deviceId` and payload `deviceId` match is enforced.
 - **Verification Scope:** Live development gateway, EMQX Cloud broker, and canonical development device live ingestion verified. Monitoring UI smoke testing was intentionally deferred/skipped. Staging deployment requires no update.
 <!-- TASK-0914 Reconciled: 2026-08-26 -->
+
+---
+
+## Controls Loading Experience & Responsive Header Centering Traceability Note (Reconciled 2026-08-27)
+
+The following facts are verified in the traceability matrix regarding `TASK-0807`, `TASK-0502`, `TASK-0306`, and `TASK-1004` (`/controls` Loading Stability & Header Centering):
+- **Traceability Baseline:** Traced as UI regressions discovered during `TASK-1004` staging verification and resolved under `TASK-0807` (Faucet Control UI), `TASK-0502` (Telemetry Freshness & Presentation), and `TASK-0306` (Device Selector State).
+- **Implementation Status:**
+  - `TASK-0807`: `DONE` (reconciled with route loading shell `apps/web/app/controls/loading.tsx`, structured skeletons in `WaterTankMonitoringCard` & `FaucetHistoryTable`, and `useAuth()` hydration).
+  - `TASK-0306`: `DONE` (reconciled with balanced 3-column CSS Grid in `TopAppBar` and centered dropdown overlay in `DeviceSelector`).
+  - `TASK-1004`: `IN_PROGRESS` (Phase 10 staging infrastructure verification ongoing; release gate remains blocked).
+- **Automated Verification:** Targeted loading suite `controls-loading-transition.test.tsx` (4/4 passed), `water-tank-monitoring-card.test.tsx` (6/6 passed), `device-selector-localization.test.tsx` (7/7 passed), full web suite (34 files, 257/257 passed), monorepo typecheck (0 errors across 4 workspaces), Next.js build (37/37 routes compiled), Playwright smoke tests (2/2 passed).
+- **Manual Verification:** Authenticated browser testing verified immediate structural visibility, zero layout jumps, and symmetric 50% header centering across desktop, tablet, and mobile.
+- **Pre-Commit Gate Status (Reconciled 2026-08-28):** All 5 pre-commit test commands verified **PASS** (`test:coverage`, `test:integration`, `check:quality`, `test`, `test:e2e` with 14/14 Playwright tests passed).
+<!-- Controls Loading & Header Centering Traceability Reconciled: 2026-08-28 -->
+
+
+
+

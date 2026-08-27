@@ -2053,3 +2053,15 @@ The following facts are verified in the user flow implementations regarding `TAS
 - **Unauthenticated Flow:** Unauthenticated users accessing protected routes continue to be redirected cleanly by server route guards.
 <!-- TASK-0215 Reconciled: 2026-08-22 -->
 
+---
+
+## Controls Loading Experience & Responsive Header Centering User Flows Implementation Note (Reconciled 2026-08-27)
+
+The following facts are verified in the user flow implementations regarding `TASK-0807`, `TASK-0502`, and `TASK-0306` (`/controls` Loading & Header Stability):
+- **Immediate Structural Visibility on `/controls`:** When a user navigates to `/controls` via client links or direct URL, the route-level instant loading shell renders the complete page composition immediately without blank box collapse or layout jumping.
+- **Stable Component Telemetry Hydration:** While live reservoir telemetry, auth state, and device capabilities resolve, `WaterTankMonitoringCard` renders structured metric cards (Volume & Flow Rate) and `FaucetHistoryTable` renders structured table skeleton rows without flashing unselected device alert boxes.
+- **Seamless Responsive Header Interaction:** The global `DeviceSelector` in `TopAppBar` remains centered in the exact 50% horizontal center across desktop, tablet, and mobile; opening the selector displays the search and device list centered directly under the trigger and bounded within the viewport.
+- **User Flows Invariants:** All functional workflows, permission gates, safety warnings, and offline states remain preserved and unchanged.
+<!-- Controls Loading & Header Centering User Flows Reconciled: 2026-08-27 -->
+
+

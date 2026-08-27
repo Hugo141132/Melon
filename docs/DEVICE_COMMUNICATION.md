@@ -1924,3 +1924,13 @@ The following facts are supported by the verified device communication implement
 `TASK-0215` (Centralized Authentication State Hydration) operates exclusively within the Next.js frontend presentation layer and server-side layout session hydration. It does not modify ESP32, NodeMCU, REST telemetry ingestion, MQTT 5.0 over TLS, broker topic ACLs, or device-gateway communication contracts. Device selection and telemetry streams remain completely decoupled from root authentication hydration.
 <!-- TASK-0215 Reconciled: 2026-08-22 -->
 
+---
+
+## 47. Controls Loading Experience & Header Centering Device Protocol Independence
+
+The verified implementation of `TASK-0807`, `TASK-0502`, and `TASK-0306` (`/controls` Loading & Header Layout Stabilization on 2026-08-27) operates strictly within the Next.js App Router presentation layer, component skeleton rendering, and CSS Grid layout.
+- **Zero Protocol Impact:** No modifications were made to ESP32/NodeMCU firmware contracts, REST telemetry ingestion (`/api/v1/devices/{deviceId}/telemetry/*`), MQTT 5.0 over TLS topics, QoS levels, broker ACLs, or device-gateway payload schemas.
+- **Authoritative Physical Faucet State Invariant:** The presentation layer continues to strictly consume the authoritative physical state machine (`OPEN`, `CLOSED`, `UNKNOWN`) derived from verified device execution events (`TASK-0806`), with zero fabricated state or assumed valve positions during loading.
+<!-- Controls Loading & Header Centering Device Communication Reconciled: 2026-08-27 -->
+
+

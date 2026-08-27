@@ -1206,3 +1206,15 @@ The following facts are verified in the authorization architecture regarding `TA
 - **Security Invariants:** No sensitive token or secret is ever exposed to the client context or stored in browser storage (`localStorage` / `sessionStorage`).
 <!-- TASK-0215 Reconciled: 2026-08-22 -->
 
+---
+
+## Controls Loading & Header Device Selector RBAC Implementation Note (Reconciled 2026-08-27)
+
+The following facts are verified in the RBAC implementation regarding `TASK-0807`, `TASK-0502`, and `TASK-0306` (`/controls` Loading & Header Stability):
+- **Auth Hydration in Controls:** `FaucetControlPanel` consumes centralized `useAuth()`, eliminating redundant client-side `/api/v1/auth/session` calls while maintaining full role-aware control state disabling for unauthorized accounts.
+- **Server-Side Authorization Primacy:** All faucet commands dispatched from `/controls` continue to be strictly validated and authorized server-side via `device.control.dispense` / `requirePermission`.
+- **Admin Canonical Concealment:** Centered header `DeviceSelector` and `/controls` view strictly maintain canonical `deviceId` concealment for Admin users (`DEC-DEV-028`).
+- **RBAC Policy Invariants:** Zero changes to roles (`OWNER`, `ADMIN`), account statuses, or canonical permissions.
+<!-- Controls Loading & Header Centering RBAC Reconciled: 2026-08-27 -->
+
+

@@ -94,6 +94,7 @@ All exceptions must be recorded in `scripts/security-exceptions.json` using the 
 - **TASK-0807 Audit (2026-08-20):** Confirmed zero secret exceptions and zero dependency exceptions introduced; Faucet Control UI dispatches commands using pure HTTP `Idempotency-Key` header, enforces server-derived volumes, restricts manual actions to modal confirmation, and executes 2.5s status polling strictly during active states with zero blind retries.
 - **TASK-0302 / Device Lifecycle Audit (2026-08-23):** Confirmed zero secret exceptions and zero dependency exceptions introduced; device activation and deactivation endpoints enforce strict Owner RBAC authorization (`device.activate` / `device.deactivate`), eliminate hard deletion, and log audit events with zero security exceptions.
 - **TASK-0914 Audit (2026-08-26):** Confirmed zero secret exceptions and zero dependency exceptions introduced; direct EMQX Cloud TLS connectivity and dynamic simulator identity strictly adhere to `SEC-OPS-001` (zero unapproved secrets) with runtime credential parsing, strict log redaction, and no hardcoded canonical hardware identities in source code.
+- **Controls Loading & Header Centering Audit (2026-08-27):** Confirmed zero secret exceptions and zero dependency exceptions introduced; route loading shell, structural skeletons, and header CSS grid layout enforce presentation safety and zero fabricated sensor data with zero security exceptions.
 
 ---
 
@@ -169,4 +170,15 @@ The verified implementation of `TASK-0215` (`AuthContext` and RootLayout SSR Hyd
 - **Session Data Minimization:** Context state carries only safe, non-sensitive session metadata (`id`, `fullName`, `email`, `accountStatus`, `activeRoles`). No session tokens or credentials are held in client context or stored in `localStorage`/`sessionStorage`.
 - **Server Authorization Primacy:** Hydrated client state is strictly for UI rendering; server-side RBAC guards remain authoritative on all routes and actions.
 <!-- TASK-0215 Reconciled: 2026-08-22 -->
+
+---
+
+## Controls Loading & Header Device Selector Security Exceptions Audit Note (Reconciled 2026-08-27)
+
+The verified implementation of `TASK-0807`, `TASK-0502`, and `TASK-0306` (`/controls` Loading & Header Layout Stabilization) introduced zero new security exceptions, zero new secrets, and zero new dependencies:
+- **Zero Security Exceptions:** Adheres strictly to `SEC-OPS-001` (zero unapproved secrets) and `SEC-OPS-004` (zero unapproved high vulnerabilities).
+- **Data Freshness & Integrity:** Structural skeletons present stable layouts without displaying fabricated telemetry or assumed physical actuator positions.
+- **Unmodified Security Baseline:** `scripts/security-exceptions.json` remains completely unmodified and zero exceptions are registered.
+<!-- Controls Loading & Header Centering Security Exceptions Reconciled: 2026-08-27 -->
+
 

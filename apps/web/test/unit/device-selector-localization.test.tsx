@@ -253,11 +253,11 @@ describe('DeviceSelector Mobile Centering & Viewport Bounding (360px, 390px, 430
       </NextIntlClientProvider>
     );
 
-    // TopAppBar centering container classes
-    const centerContainer = container.querySelector('.absolute.left-1\\/2');
-    expect(centerContainer).toBeInTheDocument();
-    expect(centerContainer?.className).toContain('-translate-x-1/2');
-    expect(centerContainer?.className).toContain('max-w-[calc(100vw-6.5rem)]');
+    // TopAppBar balanced 3-column CSS grid structure
+    const header = container.querySelector('header');
+    expect(header).toBeInTheDocument();
+    expect(header?.className).toContain('grid');
+    expect(header?.className).toContain('grid-cols-[1fr_auto_1fr]');
 
     // Open dropdown
     const trigger = screen.getByTestId('device-selector-trigger');
@@ -268,8 +268,7 @@ describe('DeviceSelector Mobile Centering & Viewport Bounding (360px, 390px, 430
     expect(dropdown.className).toContain('w-[calc(100vw-2rem)]');
     expect(dropdown.className).toContain('left-1/2');
     expect(dropdown.className).toContain('-translate-x-1/2');
-    expect(dropdown.className).toContain('sm:right-0');
-    expect(dropdown.className).toContain('sm:left-auto');
+    expect(dropdown.className).toContain('sm:w-80');
   });
 
   it('supports single-device state on mobile without overflow', () => {

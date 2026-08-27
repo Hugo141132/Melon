@@ -92,38 +92,36 @@ export default function TopAppBar({ showDeviceSelector = true }: TopAppBarProps)
 
   return (
     <>
-      <header className="fixed top-0 w-full z-40 bg-app-surface shadow-[0_4px_20px_rgba(121,86,75,0.12)] flex justify-between items-center px-[1rem] h-14 gap-2 relative">
+      <header className="fixed top-0 left-0 right-0 w-full z-40 bg-app-surface shadow-[0_4px_20px_rgba(121,86,75,0.12)] grid grid-cols-[1fr_auto_1fr] items-center px-4 h-14">
         {/* Top-Left Logo / Brand (Triggers Sidebar) */}
-        <button
-          type="button"
-          onClick={handleLogoClick}
-          onMouseEnter={handleLogoMouseEnter}
-          onMouseLeave={handleLogoMouseLeave}
-          onFocus={handleLogoFocus}
-          aria-label={tAccessibility('openSidebar')}
-          aria-expanded={sidebarOpen}
-          className="flex items-center gap-2 flex-shrink-0 cursor-pointer p-1.5 -ml-1.5 rounded-xl hover:bg-app-surface-container-low transition-colors group text-left z-10"
-          data-testid="top-logo-trigger"
-        >
-          <div className="w-8 h-8 rounded-xl bg-app-primary/10 flex items-center justify-center text-app-primary group-hover:bg-app-primary group-hover:text-white transition-colors">
-            <MapPin size={18} strokeWidth={2} />
-          </div>
-          <span className="font-bold text-[18px] sm:text-[20px] leading-7 text-app-primary tracking-tight hidden xs:inline">
-            Kebun Melon
-          </span>
-        </button>
-
-        {/* Device Selector — Centered in Top Bar */}
-        {shouldShowDeviceSelector && (
-          <div className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 max-w-[calc(100vw-6.5rem)] sm:max-w-md w-full flex items-center justify-center pointer-events-none z-10">
-            <div className="pointer-events-auto flex items-center justify-center">
-              <DeviceSelector />
+        <div className="flex items-center justify-start min-w-0">
+          <button
+            type="button"
+            onClick={handleLogoClick}
+            onMouseEnter={handleLogoMouseEnter}
+            onMouseLeave={handleLogoMouseLeave}
+            onFocus={handleLogoFocus}
+            aria-label={tAccessibility('openSidebar')}
+            aria-expanded={sidebarOpen}
+            className="flex items-center gap-2 flex-shrink-0 cursor-pointer p-1.5 -ml-1.5 rounded-xl hover:bg-app-surface-container-low transition-colors group text-left z-10"
+            data-testid="top-logo-trigger"
+          >
+            <div className="w-8 h-8 rounded-xl bg-app-primary/10 flex items-center justify-center text-app-primary group-hover:bg-app-primary group-hover:text-white transition-colors">
+              <MapPin size={18} strokeWidth={2} />
             </div>
-          </div>
-        )}
+            <span className="font-bold text-[18px] sm:text-[20px] leading-7 text-app-primary tracking-tight hidden xs:inline">
+              Kebun Melon
+            </span>
+          </button>
+        </div>
+
+        {/* Device Selector — Balanced Horizontal Center */}
+        <div className="flex items-center justify-center min-w-0">
+          {shouldShowDeviceSelector && <DeviceSelector />}
+        </div>
 
         {/* Right Side Actions */}
-        <div className="flex items-center gap-3 flex-shrink-0 ml-auto z-10">
+        <div className="flex items-center justify-end gap-3 flex-shrink-0 min-w-0 z-10">
           <Link href="/profile" className="cursor-pointer">
             <div className="w-8 h-8 rounded-full overflow-hidden border border-app-primary/20 ring-2 ring-app-primary/10 flex items-center justify-center bg-app-primary text-on-primary font-bold text-xs">
               {initial ? (

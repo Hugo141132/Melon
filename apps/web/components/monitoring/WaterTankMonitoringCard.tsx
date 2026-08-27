@@ -75,17 +75,73 @@ export function WaterTankMonitoringCard() {
     );
   }
 
-  // 2. Loading State (Skeleton)
+  // 2. Loading State (Structural Skeleton matching loaded layout)
   if (isLoading) {
     return (
-      <div
-        className="bg-app-surface-container-lowest rounded-2xl p-5 border border-app-outline-variant/30 soft-elevation-lg space-y-4 animate-pulse"
-        data-testid="water-tank-skeleton"
-      >
-        <div className="h-6 bg-app-surface-container rounded w-1/3" />
-        <div className="grid grid-cols-2 gap-3">
-          <div className="h-24 bg-app-surface-container rounded-xl" />
-          <div className="h-24 bg-app-surface-container rounded-xl" />
+      <div className="space-y-4" data-testid="water-tank-skeleton">
+        {/* Device Header Banner Skeleton */}
+        <div className="bg-app-surface-container-lowest rounded-2xl p-5 border border-app-outline-variant/30 soft-elevation-lg flex flex-wrap items-center justify-between gap-3 animate-pulse">
+          <div className="flex items-center gap-3">
+            <div className="w-3 h-3 rounded-full bg-app-surface-container flex-shrink-0" />
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2">
+                {selectedDevice ? (
+                  <h2 className="text-[16px] font-bold text-app-on-surface">
+                    {formatDeviceDisplayName(selectedDevice, tDevices)}
+                  </h2>
+                ) : (
+                  <div className="h-5 w-36 bg-app-surface-container rounded" />
+                )}
+                <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded bg-app-surface-container text-app-on-surface-variant">
+                  {selectedDevice?.deviceType || 'WATER_TANK_NODE'}
+                </span>
+              </div>
+              <div className="h-3 w-28 bg-app-surface-container rounded" />
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="h-6 w-20 bg-app-surface-container rounded-full" />
+            <div className="w-8 h-8 rounded-xl border border-app-outline-variant/30 bg-app-surface-container/40" />
+          </div>
+        </div>
+
+        {/* 2-col Metric Card Grid Skeleton */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Tank Volume Card Skeleton */}
+          <div className="bg-app-surface-container-lowest rounded-xl p-5 soft-elevation-lg border border-app-outline-variant/30 flex flex-col justify-between animate-pulse">
+            <div>
+              <h3 className="text-[14px] font-semibold text-app-on-surface-variant mb-2">
+                {tWater('tankVolume')}
+              </h3>
+              <div className="flex items-baseline gap-1">
+                <div className="h-9 w-20 bg-app-surface-container rounded my-0.5" />
+                <span className="text-[12px] text-app-on-surface-variant">L</span>
+              </div>
+            </div>
+            <div className="mt-4">
+              <div className="h-2 w-full rounded-full bg-app-surface-container" />
+              <div className="flex justify-between mt-1">
+                <span className="text-[10px] font-bold text-app-on-surface-variant">0L</span>
+                <span className="text-[10px] font-bold text-app-on-surface-variant">600L</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Flow Rate Card Skeleton */}
+          <div className="bg-app-surface-container-lowest rounded-xl p-5 soft-elevation-lg border border-app-outline-variant/30 flex flex-col justify-between animate-pulse">
+            <div>
+              <h3 className="text-[14px] font-semibold text-app-on-surface-variant mb-2">
+                {tWater('flowRate')}
+              </h3>
+              <div className="flex items-baseline gap-1">
+                <div className="h-9 w-16 bg-app-surface-container rounded my-0.5" />
+                <span className="text-[12px] text-app-on-surface-variant">m³/h</span>
+              </div>
+            </div>
+            <div className="mt-4 flex items-center gap-1">
+              <div className="h-4 w-24 bg-app-surface-container rounded" />
+            </div>
+          </div>
         </div>
       </div>
     );

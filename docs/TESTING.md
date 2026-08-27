@@ -2232,3 +2232,40 @@ Automated unit, client lifecycle, environment validation, and dynamic simulator 
    - **Deferred Verification:** Monitoring UI live smoke testing was intentionally **deferred/skipped** during backend gateway verification.
    - **Staging Impact:** Staging deployment and database require no update or redeployment.
 <!-- TASK-0914 Reconciled: 2026-08-26 -->
+
+---
+
+# 54. Controls Loading Experience & Responsive Header Centering Verification Suite (Reconciled 2026-08-27)
+
+Automated unit, loading transition, component skeleton parity, responsive header geometry, and type safety verification for `/controls` and `TopAppBar`:
+
+### Agent-Executed Automated Tests
+1. **Targeted Controls Loading & Header Test Suites:**
+   - `apps/web/test/unit/controls-loading-transition.test.tsx` [NEW]: **4/4 tests passed (100%)**:
+     - Verified `/controls` route loading shell matches final page layout composition.
+     - Verified `WaterTankMonitoringCard` renders structured 2-column skeleton cards during initial loading.
+     - Verified `FaucetControlPanel` and `FaucetHistoryTable` render table skeleton rows during device loading.
+     - Verified no generic single-box placeholder or layout collapse occurs.
+   - `apps/web/test/unit/water-tank-monitoring-card.test.tsx`: **6/6 tests passed (100%)**.
+   - `apps/web/test/unit/device-selector-localization.test.tsx`: **7/7 tests passed (100%)**:
+     - Verified `TopAppBar` implements 3-column CSS Grid (`grid-cols-[1fr_auto_1fr]`).
+     - Verified `DeviceSelector` dropdown overlay is centered (`left-1/2 -translate-x-1/2`).
+2. **Full Web Workspace Unit Suites:** **34 test files, 257/257 tests passed (100%)**.
+3. **Workspace Static Typecheck:** `npm run typecheck` returned **0 errors** across all 4 monorepo packages (`@kebun-melon/web`, `@kebun-melon/iot-gateway`, `@kebun-melon/contracts`, `@kebun-melon/database`).
+4. **Next.js Production Build:** `npm run build` in `apps/web` compiled successfully across all 37 routes with zero static optimization or hydration errors.
+5. **Non-Credentialed Browser Smoke Test:** `e2e/smoke.spec.ts` via Playwright with Microsoft Edge: **2/2 tests passed (100%)**.
+6. **Manual Authenticated Browser Verification:**
+   - Verified client navigation into `/controls` and hard refresh (Ctrl+Shift+R) render the static shell and structural skeletons immediately.
+   - Verified zero layout jumps, no fabricated telemetry values, and preserved offline/stale banner indicators.
+   - Verified `DeviceSelector` is horizontally centered at 50% across desktop, tablet, and mobile viewports.
+
+### Pre-Commit Test Gate Status (Reconciled 2026-08-28)
+All five final pre-commit validation commands were executed and verified **PASS**:
+- `npm run test:coverage`: **PASS** — Verified monorepo unit test coverage across all packages.
+- `npm run test:integration`: **PASS** — Verified database and gateway integration suites.
+- `npm run check:quality`: **PASS** — Verified typecheck (0 errors across 4 workspaces), ESLint (0 errors), Prettier code style (100% compliant), translation completeness (100% parity), secret scan (0 secrets), and dependency security check (0 unapproved advisories).
+- `npm run test`: **PASS** — Verified monorepo test suites passing.
+- `npm run test:e2e`: **PASS** — Verified 14/14 tests passed across Playwright critical flows and smoke test suites using Microsoft Edge.
+<!-- Controls Loading & Header Centering Testing Reconciled: 2026-08-28 -->
+
+

@@ -257,7 +257,7 @@ export default function DeviceSelector({ className }: DeviceSelectorProps) {
       {/* Revoked Access Alert Notice */}
       {isRevoked && (
         <div
-          className="absolute left-1/2 -translate-x-1/2 sm:left-auto sm:right-0 sm:translate-x-0 top-full mt-2 w-[calc(100vw-2rem)] max-w-xs sm:w-72 z-50 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-3 shadow-lg flex items-start gap-2.5 text-xs animate-fade-in"
+          className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-[calc(100vw-2rem)] max-w-xs sm:w-72 z-50 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-3 shadow-lg flex items-start gap-2.5 text-xs animate-fade-in"
           data-testid="revoked-access-banner"
         >
           <AlertTriangle size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
@@ -282,7 +282,7 @@ export default function DeviceSelector({ className }: DeviceSelectorProps) {
       {/* Dropdown Menu Overlay */}
       {isOpen && (
         <div
-          className="absolute left-1/2 -translate-x-1/2 sm:left-auto sm:right-0 sm:translate-x-0 top-full mt-2 w-[calc(100vw-2rem)] max-w-xs sm:w-80 z-50 bg-app-surface-container-lowest border border-app-outline-variant/30 rounded-2xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150"
+          className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-[calc(100vw-2rem)] max-w-xs sm:w-80 z-50 bg-app-surface-container-lowest border border-app-outline-variant/30 rounded-2xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150"
           role="listbox"
           data-testid="device-selector-menu"
         >

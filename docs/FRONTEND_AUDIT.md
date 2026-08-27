@@ -411,3 +411,18 @@ The following facts are verified regarding the frontend architecture of `TASK-02
 - **Design Governance:** Preserves `Premium Minimal Ops` aesthetic and established color palette with zero visual regression.
 <!-- TASK-0215 Reconciled: 2026-08-22 -->
 
+---
+
+## Controls Loading & Header Alignment Frontend Audit Note (Reconciled 2026-08-27)
+
+The following frontend components were audited and reconciled for `TASK-0807`, `TASK-0502`, and `TASK-0306`:
+- **`apps/web/app/controls/loading.tsx` [NEW]:** Route-level loading shell rendering the complete structural page layout for Next.js App Router streaming.
+- **`apps/web/components/monitoring/WaterTankMonitoringCard.tsx` [AUDITED]:** Refactored from a generic single box to structured 2-column metric cards (Tank Volume & Flow Rate) with matching borders, heights, and gauge shapes.
+- **`apps/web/components/controls/FaucetControlPanel.tsx` [AUDITED]:** Refactored to consume centralized `useAuth()` directly and retain stable skeleton state during initial device resolution.
+- **`apps/web/components/controls/FaucetHistoryTable.tsx` [AUDITED]:** Added `isLoading` state rendering structured table skeleton rows matching loaded table column widths.
+- **`apps/web/components/navigation/TopAppBar.tsx` [AUDITED]:** Refactored layout to a balanced 3-column CSS Grid (`grid grid-cols-[1fr_auto_1fr] items-center px-4 h-14`), constraining start and end items to equal `1fr` widths and guaranteeing exact 50% horizontal center alignment for `DeviceSelector`.
+- **`apps/web/components/navigation/DeviceSelector.tsx` [AUDITED]:** Positioned dropdown menu and alert overlays symmetrically below the trigger (`left-1/2 -translate-x-1/2`) with viewport clamping (`max-w-[calc(100vw-2rem)]`).
+- **`apps/web/components/navigation/Sidebar.tsx` [AUDITED]:** Hardened `currentPath` derivation with fallback to empty string when `pathname` is null.
+<!-- Controls Loading & Header Centering Frontend Audit Reconciled: 2026-08-27 -->
+
+

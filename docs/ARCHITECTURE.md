@@ -1711,3 +1711,19 @@ The following facts are supported by the verified architecture of `TASK-0215` (`
 - **Security & Authorization Boundaries:** Client-side `AuthContext` is restricted to UI presentation and route navigation. Server-side route handlers (`/api/v1/*`) and Server Actions maintain authoritative security checks via `requireSession()`, `requireRole()`, and `requirePermission()`. No secrets or raw tokens are stored in browser storage.
 <!-- TASK-0215 Reconciled: 2026-08-22 -->
 
+---
+
+## Controls Loading & Header Centering Architecture Note (Reconciled 2026-08-27)
+
+The following architecture facts are supported by the verified implementation of `TASK-0807`, `TASK-0502`, and `TASK-0306` (`/controls` Loading & Header Layout Stabilization on 2026-08-27):
+- **Next.js Route-Level Loading Shell:** `apps/web/app/controls/loading.tsx` supplies Next.js App Router with an instant static page shell that matches the visual composition of the loaded page during streaming and navigation transitions.
+- **Component-Level Granular Loading Boundaries:** `WaterTankMonitoringCard` and `FaucetHistoryTable` encapsulate structural skeleton states that preserve card geometry and table headers while dynamic reservoir telemetry and command histories resolve asynchronously.
+- **Centralized Auth Consumption in Controls:** `FaucetControlPanel` consumes centralized `useAuth()` state, eliminating legacy client-side session fetches and preventing UI race conditions on mount.
+- **Balanced 3-Column Header Grid:** `TopAppBar` implements `grid grid-cols-[1fr_auto_1fr] items-center px-4 h-14` to geometrically center `DeviceSelector` at 50% header width across desktop, tablet, and mobile, decoupling center alignment from asymmetrical left/right child dimensions.
+- **Environment Infrastructure Separation:**
+  - **Local Development:** Uses dedicated Supabase project `xjsencdgfcbkzdzqcnqx` via `aws-1-ap-south-1.pooler.supabase.com:6543?pgbouncer=true`.
+  - **Staging Platform:** Uses Railway staging services and separate Supabase project `scqrbtfilmttqrutynyo` via `aws-0-ap-south-1.pooler.supabase.com:6543?pgbouncer=true`.
+  - **Tooling Access:** Supabase MCP targets staging only.
+<!-- Controls Loading & Architecture Reconciled: 2026-08-27 -->
+
+

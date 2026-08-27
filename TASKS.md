@@ -1102,6 +1102,8 @@ PATCH /api/v1/devices/{deviceId}
 - If currently selected device access is revoked/unassigned, selection clears to `null` with a notice banner, without silent fallback.
 - Handled loading skeleton states vs true empty lists on `/sensor`.
 - Historical telemetry charts (`TASK-0503`/`TASK-0504`), faucet commands, assignments, status events, and audit logs remain 100% intact (`DEC-DEV-029`).
+**Responsive Header Centering Reconciliation (2026-08-27):** Reconciled `TopAppBar` header layout from `flex justify-between` to balanced 3-column CSS Grid (`grid grid-cols-[1fr_auto_1fr] items-center px-4 h-14`), constraining flanking items to identical `1fr` widths and guaranteeing exact 50% horizontal center alignment for `DeviceSelector` across desktop, tablet, and mobile. Positioned `DeviceSelector` dropdown overlay and alert banner symmetrically beneath trigger (`left-1/2 -translate-x-1/2`) with viewport clamping (`max-w-[calc(100vw-2rem)]`). Verified 100% test pass on `device-selector-localization.test.tsx` (7/7 tests).
+
 
 ### Work
 
@@ -1937,6 +1939,12 @@ EXPIRED
 - Full disabled and warning state handling for null device, unauthenticated/unauthorized users (`device.control.dispense`), disabled feature flag (`ENABLE_FAUCET_CONTROL=false`), offline devices (`OFFLINE`/`INACTIVE`), and active command in progress.
 - 100% Indonesian and English translation key parity with matching ICU placeholders.
 - Verified 100% test pass rate across 24 unit tests (`apps/web/test/unit/faucet-control-ui.test.tsx`), workspace TypeScript typecheck (0 errors), Semgrep scan (0 findings), and Next.js production build.
+**Loading & Layout Stability Reconciliation (2026-08-27):** Resolved `/controls` loading regression discovered during staging evaluation:
+- Replaced generic 1-box skeleton in `WaterTankMonitoringCard` with structural skeleton matching the 2-section loaded layout (Header card + 2-col metric cards grid with Tank Volume & Flow Rate labels, 0L-600L gauge shell, and units immediately visible).
+- Eliminated layout shift in `FaucetControlPanel` by utilizing hydrated `useAuth()` state and keeping `FaucetHistoryTable` with structured skeleton rows active during device resolution instead of flashing unselected notice boxes.
+- Implemented route-level instant loading shell (`apps/web/app/controls/loading.tsx`) to stream the static page composition immediately on navigation.
+- Centered global header `DeviceSelector` horizontally across desktop, tablet, and mobile using a balanced 3-column CSS Grid (`grid-cols-[1fr_auto_1fr]`) in `TopAppBar`, eliminating horizontal offset caused by unequal left/right brand/avatar dimensions, and centered dropdown menu overlays under the trigger button.
+- Added comprehensive unit test suite (`apps/web/test/unit/controls-loading-transition.test.tsx`). Verified 100% test pass rate across all 34 web unit test suites (257/257 tests), TypeScript typecheck (0 errors across 4 monorepo packages), and Next.js production build (37/37 routes).
 
 ### Acceptance Criteria
 

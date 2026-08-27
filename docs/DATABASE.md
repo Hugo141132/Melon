@@ -1862,3 +1862,17 @@ The following facts are supported by the verified database interactions of `TASK
 - **Zero Schema Migrations:** No alterations to database tables, indexes, or relations were introduced.
 <!-- TASK-0215 Reconciled: 2026-08-22 -->
 
+---
+
+## Local vs Staging Database Separation & Controls Loading Implementation Note (Reconciled 2026-08-27)
+
+The following environment topology and database facts are verified regarding `TASK-0807`, `TASK-0502`, and `TASK-0306`:
+- **Local vs Staging Environment Separation:**
+  - **Local Development Database:** Dedicated Supabase PostgreSQL project `xjsencdgfcbkzdzqcnqx` connected via Supavisor transaction pooler `aws-1-ap-south-1.pooler.supabase.com:6543?pgbouncer=true` (or session pooler on port `5432`).
+  - **Railway Staging Database:** Dedicated Supabase PostgreSQL project `scqrbtfilmttqrutynyo` connected via staging Supavisor pooler `aws-0-ap-south-1.pooler.supabase.com:6543?pgbouncer=true`.
+  - **Tooling Boundary:** `@mcp:supabase:` is configured exclusively for staging project `scqrbtfilmttqrutynyo` and must not be used as authority for local development database state.
+- **Transient Connectivity Reconciliation:** The earlier local Prisma connection timeout was transient; local connection parameters (`postgres.xjsencdgfcbkzdzqcnqx` on `aws-1` port 6543 with `?pgbouncer=true`) are verified and active.
+- **Zero Schema Migrations:** No database schema alterations, Prisma migrations, index modifications, or repository signature changes were made for the 2026-08-27 UI loading and header centering reconciliations.
+<!-- Controls Loading & Database Separation Reconciled: 2026-08-27 -->
+
+

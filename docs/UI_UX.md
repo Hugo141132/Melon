@@ -1303,4 +1303,19 @@ The verified implementation of `TASK-0502` (Live Soil and Water Monitoring UI Da
 - **Agreed Units:** NPK (`mg/kg`), pH (*no unit*), Moisture (`%RH`), Temperature (`°C`), EC (`µS/cm`), TDS (`ppm`).
 <!-- TASK-0502 Reconciled: 2026-08-23 -->
 
+---
+
+## Controls Loading Structural Skeletons & Responsive Header Centering UI/UX Note (Reconciled 2026-08-27)
+
+The verified implementation of `TASK-0807`, `TASK-0502`, and `TASK-0306` (`/controls` Loading & Header Layout Stabilization on 2026-08-27) reconciles visual stability and layout symmetry:
+- **Frontend Impact:** `MINOR`
+- **Selected UI Direction:** `Premium Minimal Ops` (authoritative brand color palette and tokens UNCHANGED)
+- **Selected Motion Effects:** `Skeleton loading`, `Dropdown`
+- **21st.dev MCP:** `NOT REQUIRED`
+- **Structural Loading Skeletons:** Replaced the generic single-box placeholder with a structured layout shell (`apps/web/app/controls/loading.tsx`) and granular component skeletons in `WaterTankMonitoringCard` and `FaucetHistoryTable`. The visual structure (Header card, 2-column metric cards for Tank Volume and Flow Rate, controls panel, and 4-row history table) is visible immediately upon navigation, eliminating layout shifting.
+- **Header CSS Grid Alignment:** Refactored `TopAppBar` to a balanced 3-column CSS Grid (`grid grid-cols-[1fr_auto_1fr] items-center px-4 h-14`), constraining start and end columns to identical `1fr` widths and centering `DeviceSelector` at the exact 50% horizontal center of the header on desktop, tablet, and mobile.
+- **Dropdown Overlay Centering:** Updated `DeviceSelector` dropdown menu to center symmetrically beneath the trigger button (`left-1/2 -translate-x-1/2`) with viewport clamping (`max-w-[calc(100vw-2rem)]`), ensuring dropdown contents remain fully visible and aligned across all screen widths.
+<!-- Controls Loading & Header Centering UI/UX Reconciled: 2026-08-27 -->
+
+
 

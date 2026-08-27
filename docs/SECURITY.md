@@ -1609,3 +1609,14 @@ The following security controls are active and verified for `TASK-0215` (Central
 - **Safe Non-Throwing Retrieval:** `getSessionOrNull()` safely catches and neutralizes unauthenticated session errors during SSR without leaking stack traces or unhandled exceptions.
 <!-- TASK-0215 Reconciled: 2026-08-22 -->
 
+---
+
+## Controls Loading & Header Device Selector Security Controls Implementation Note (Reconciled 2026-08-27)
+
+The following security controls are active and verified regarding `TASK-0807`, `TASK-0502`, and `TASK-0306` (`/controls` Loading & Header Stability):
+- **Zero Fabricated State:** Skeletons and placeholder states in `WaterTankMonitoringCard` and `FaucetControlPanel` never fabricate sensor measurements (e.g. tank volume, flow rate) or physical actuator states (`OPEN` / `CLOSED`) during loading.
+- **Admin Device ID Concealment:** The centered header `DeviceSelector` and controls views strictly preserve canonical `deviceId` concealment for Admin accounts (`DEC-DEV-028`).
+- **Zero Security Exceptions:** No security controls, session policies, CSRF protections, or authorization gates were relaxed or bypassed.
+<!-- Controls Loading & Header Centering Security Reconciled: 2026-08-27 -->
+
+
