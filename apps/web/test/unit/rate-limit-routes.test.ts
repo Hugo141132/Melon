@@ -1,5 +1,29 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { clearRateLimitStore } from '../../lib/rate-limit';
+
+const { mockRegisterUser, mockLoginUser, mockCreateEmailVerificationToken } = vi.hoisted(() => ({
+  mockRegisterUser: vi.fn(),
+  mockLoginUser: vi.fn(),
+  mockCreateEmailVerificationToken: vi.fn(),
+}));
+
+vi.mock('@kebun-melon/database', async (importOriginal) => {
+  const actual: any = await importOriginal();
+  return {
+    ...actual,
+    prisma: {},
+    registerUser: mockRegisterUser,
+    loginUser: mockLoginUser,
+    UserRepository: class {
+      createEmailVerificationToken = mockCreateEmailVerificationToken;
+    },
+  };
+});
+
+vi.mock('@/lib/email/resend', () => ({
+  sendVerificationEmail: vi.fn().mockResolvedValue({ id: 'mock-email-id' }),
+}));
+
 import { POST as loginPOST } from '../../app/api/v1/auth/login/route';
 import { POST as registerPOST } from '../../app/api/v1/auth/register/route';
 
@@ -9,8 +33,36 @@ describe('Rate Limiting API Routes Integration (TASK-0902)', () => {
 
   beforeEach(() => {
     clearRateLimitStore();
+    vi.clearAllMocks();
     process.env.RATE_LIMIT_LOGIN_MAX = '5';
     process.env.RATE_LIMIT_REGISTER_MAX = '3';
+
+    mockLoginUser.mockResolvedValue({
+      token: 'mock-session-token',
+      user: {
+        id: '11111111-1111-1111-1111-111111111111',
+        fullName: 'Test User',
+        email: 'user@example.com',
+        accountStatus: 'ACTIVE',
+        activeRoles: ['ADMIN'],
+      },
+    });
+
+    mockRegisterUser.mockResolvedValue({
+      user: {
+        id: '22222222-2222-2222-2222-222222222222',
+        fullName: 'Test Admin',
+        email: 'admin@example.com',
+        accountStatus: 'PENDING_APPROVAL',
+        roles: ['ADMIN'],
+      },
+    });
+
+    mockCreateEmailVerificationToken.mockResolvedValue({
+      success: true,
+      code: '123456',
+      rawToken: 'mock-raw-token',
+    });
   });
 
   afterEach(() => {

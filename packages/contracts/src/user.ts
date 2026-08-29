@@ -307,3 +307,29 @@ export const ResendVerificationEmailInputSchema = z
   .strict();
 
 export type ResendVerificationEmailInput = z.infer<typeof ResendVerificationEmailInputSchema>;
+
+/**
+ * Public input schema for requesting a verified email change.
+ * Requires candidate new email and caller's current password.
+ * Strict object validation rejects extraneous injected fields.
+ */
+export const RequestEmailChangeInputSchema = z
+  .object({
+    newEmail: z.string().trim().email('Invalid email address format.'),
+    currentPassword: z.string().min(1, 'Current password is required.'),
+  })
+  .strict();
+
+export type RequestEmailChangeInput = z.infer<typeof RequestEmailChangeInputSchema>;
+
+/**
+ * Public input schema for verifying a requested email change with 6-digit code.
+ * Strict object validation rejects extraneous injected fields.
+ */
+export const VerifyEmailChangeInputSchema = z
+  .object({
+    code: z.string().trim().min(1, 'Verification code is required.'),
+  })
+  .strict();
+
+export type VerifyEmailChangeInput = z.infer<typeof VerifyEmailChangeInputSchema>;

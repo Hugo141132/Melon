@@ -2272,7 +2272,7 @@ All five final pre-commit validation commands were executed and verified **PASS*
 
 # 55. Single Active Session & Verified Email Change Test Suite Specifications (Reconciled 2026-08-29)
 
-> **Associated Tasks:** `TASK-0217` (P0, DONE), `TASK-0216` (P1, READY)
+> **Associated Tasks:** `TASK-0217` (P0, DONE), `TASK-0216` (P1, READY_FOR_TEST)
 > **Governing Decisions:** `DEC-AUTH-106`, `DEC-AUTH-107`, `DEC-UIUX-102`
 
 ### 1. Single Active Session Enforcement Verification (`TASK-0217` / `DEC-AUTH-107`) — VERIFIED & COMPLETED
@@ -2294,20 +2294,23 @@ All five final pre-commit validation commands were executed and verified **PASS*
 - **Profile Security Component Tests (`apps/web/test/unit/profile-page.test.tsx`):**
   - **4/4 tests passed** (Absence of "Linked Devices" card, presence of Account & Session Security section, omission of client IP/User-Agent, PasswordChangeModal wiring and redirect to `/login?message=PASSWORD_CHANGED`).
 
-### 2. Verified Self-Service Email Change Verification (`TASK-0216` / `DEC-AUTH-106` — PLANNED)
-- **Database & Repository Tests (`user-repository.test.ts`):**
-  - Verify `requestEmailChange` enforces caller password validation before issuing code.
-  - Verify generation of 6-digit numeric CSPRNG code with 15-minute expiry.
-  - Verify storage of `sha256(userId:newEmail:code)` in `email_verification_tokens.token_hash` and candidate email in `pending_email`.
-  - Verify candidate email uniqueness check rejects already-registered or pending email addresses.
-  - Verify existing email remains authoritative for logins while email change is pending.
-  - Verify `verifyEmailChange` updates `users.email` and `users.emailVerifiedAt = NOW()` inside an atomic transaction.
-  - Verify token is deleted upon successful verification and cannot be replayed.
-  - Verify structured audit log `account.email.changed` contains non-sensitive metadata only (zero raw old/new email strings).
-- **API Route Tests (`apps/web/test/unit/me-email-routes.test.ts`):**
-  - Verify `POST /api/v1/me/email/request` rate limiting (3 req/min) and auth guard.
-  - Verify `POST /api/v1/me/email/verify` rate limiting (5 req/min) and auth guard.
-- **Frontend & E2E Flows:**
-  - Verify 2-step Change Email modal in `/profile` with 60-second resend cooldown timer.
-  - Verify user active session remains continuous without forced logout after email change.
-<!-- Testing Specifications Reconciled: 2026-08-29 -->
+### 2. Verified Self-Service Email Change Verification (`TASK-0216` / `DEC-AUTH-106`) — VERIFIED & COMPLETED (DONE)
+- **Targeted Automated Test Suites (6 test files, 59/59 tests passed, 100%):**
+  1. `packages/contracts/src/__tests__/user.test.ts`: **14/14 tests passed** (Schema validation for `RequestEmailChangeInputSchema` and `VerifyEmailChangeInputSchema`, trimming/normalization, 6-digit code format constraints).
+  2. `packages/database/test/user-repository-email-change.test.ts`: **13/13 tests passed** (Enforcing current password check, 6-digit CSPRNG generation, `pending_email` and `sha256(userId:newEmail:code)` storage, candidate email collision check against existing users and pending tokens, atomic promotion with session preservation, token deletion, non-sensitive audit logging, and `P2034` write conflict backoff retries).
+  3. `apps/web/test/unit/email-change-routes.test.ts`: **14/14 tests passed** (`POST /api/v1/me/email/request` and `POST /api/v1/me/email/verify` session validation, `profilee.self.update` permission check, 3 req/min and 5 req/min rate limiters, Resend email dispatch, and HTTP error envelopes).
+  4. `apps/web/test/unit/email-change-ui.test.tsx`: **7/7 tests passed** (`EmailChangeModal` step 1 password & new email input, step 2 6-digit code entry, 60s cooldown timer persisted in `sessionStorage`, reactive UI error presentation, and zero-reload `AuthContext` state update).
+  5. `apps/web/test/unit/profile-page.test.tsx`: **4/4 tests passed** (Profile page integration, Change Email button wiring, Account & Session Security card rendering, zero layout shift).
+  6. `apps/web/test/unit/i18n-completeness.test.ts`: **7/7 tests passed** (100% translation key parity across Indonesian `messages/id.json` and English `messages/en.json`).
+- **Test-Isolation & Regression Hardening (Resolved 2026-08-30):**
+  - Investigated pre-commit test-isolation bugs: (1) an incomplete glob pattern in `packages/database/vitest.config.ts` allowed top-level database integration tests (`approvals.service.integration.test.ts`) to execute during unit/coverage runs without test DB safety guards; (2) `apps/web/test/unit/rate-limit-routes.test.ts` called `registerPOST` without mocking `@kebun-melon/database` or `@/lib/email/resend`, executing live registration writes against Supabase DEV; (3) `e2e/critical-flows.spec.ts` used `test.beforeAll()` to upsert a hardcoded Owner account using ambient `DATABASE_URL`, writing persistent data to Supabase DEV.
+  - Hardened exclude patterns (`**/*.integration.test.ts`, `test/*.integration.test.ts`, `test/**/*.integration.test.ts`) in `vitest.config.ts` and added fail-closed `validateTestDatabaseUrl` guards across all database integration test suites.
+  - Added comprehensive in-memory module mocks for `@kebun-melon/database` (`registerUser`, `loginUser`, `UserRepository`) and `@/lib/email/resend` in `apps/web/test/unit/rate-limit-routes.test.ts`.
+  - Hardened `packages/database/src/owner-provisioning.ts` (`validateTestDatabaseUrl`) with remote host exclusion (`supabase.co`, `supabase.com`, `railway.app`, `neon.tech`) and database name constraints (`test` or `disposable`).
+  - Updated `e2e/critical-flows.spec.ts` and `playwright.config.ts` to enforce isolated test DBs (`E2E_DATABASE_URL` / `TEST_DATABASE_URL`), eliminated all hardcoded credentials and remote URL fallbacks, adopted dynamic synthetic E2E identities, and added deterministic teardown in `test.afterAll`.
+  - Reconciled translation key `profile.tooManyRequests` in `messages/id.json` and `messages/en.json`, with `apps/web/test/unit/i18n-namespaces.test.ts` passing **8/8 tests**.
+  - Verified 100% test pass rate across all 5 pre-commit quality gates: `npm run test:coverage` (PASS), `npm run test:integration` (PASS), `npm run check:quality` (PASS), `npm run test` (112 test files, 1045/1045 passed), and `npm run test:e2e` (14/14 tests passed, 12 critical flows + 2 smoke tests) with zero Supabase DEV database pollution confirmed via read-only SQL inspection.
+- **Static Typecheck:** `npm run typecheck` returned **0 errors** across all 4 monorepo packages (`@kebun-melon/web`, `@kebun-melon/iot-gateway`, `@kebun-melon/contracts`, `@kebun-melon/database`).
+- **Database Schema Validation:** `npm run db:validate` confirmed schema is valid and synchronized with DEV database.
+- **Manual Authenticated End-to-End Verification:** **PASSED** (Successfully verified 2-step email change modal, current password re-authentication, candidate email validation, Resend 6-digit verification code delivery, 60s cooldown timer, code verification, atomic database update, immediate zero-reload `AuthContext` update, and preserved active session without logout).
+<!-- Testing Specifications Reconciled: 2026-08-30 -->

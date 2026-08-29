@@ -467,3 +467,175 @@ export async function sendVerificationEmail(
     };
   }
 }
+
+/**
+ * Generates bilingual HTML content for 6-digit email change verification code.
+ */
+function getEmailChangeCodeEmailHtml(
+  name: string,
+  code: string,
+  locale: string
+): { subject: string; html: string; text: string } {
+  const isId = locale === 'id';
+
+  const subject = isId
+    ? `Kode Verifikasi Perubahan Email: ${code} — Kebun Melon`
+    : `Email Change Verification Code: ${code} — Kebun Melon`;
+
+  const greeting = isId ? `Halo ${name || 'Pengguna'},` : `Hello ${name || 'User'},`;
+  const intro = isId
+    ? 'Kami menerima permintaan untuk mengubah alamat email akun Kebun Melon Anda. Masukkan 6 digit kode verifikasi berikut untuk mengonfirmasi perubahan email ini:'
+    : 'We received a request to change the email address for your Kebun Melon account. Enter the following 6-digit verification code to confirm this email change:';
+  const expiryNotice = isId
+    ? 'Kode verifikasi ini berlaku selama 15 menit dan hanya dapat digunakan sekali.'
+    : 'This verification code is valid for 15 minutes and can only be used once.';
+  const securityNotice = isId
+    ? 'Jangan bagikan kode ini kepada siapa pun. Tim Kebun Melon tidak akan pernah meminta kode verifikasi Anda.'
+    : 'Do not share this code with anyone. Kebun Melon team will never ask for your verification code.';
+  const ignoreNotice = isId
+    ? 'Jika Anda tidak meminta perubahan alamat email di Kebun Melon, silakan abaikan email ini. Alamat email Anda saat ini tidak akan berubah.'
+    : 'If you did not request to change your email address on Kebun Melon, please ignore this email. Your current email address will remain unchanged.';
+
+  const html = `
+<!DOCTYPE html>
+<html lang="${isId ? 'id' : 'en'}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${subject}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f4f7f4; margin: 0; padding: 24px; color: #1e293b; }
+    .container { max-width: 560px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 32px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+    .header { text-align: center; margin-bottom: 24px; }
+    .header h1 { color: #166534; font-size: 24px; margin: 0; font-weight: 700; }
+    .content { font-size: 16px; line-height: 1.6; }
+    .code-box { text-align: center; margin: 28px 0; }
+    .code-card { display: inline-block; background-color: #f0fdf4; border: 2px dashed #16a34a; border-radius: 12px; padding: 18px 36px; }
+    .code-text { font-size: 38px; font-weight: 800; letter-spacing: 8px; color: #166534; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace; margin: 0; }
+    .footer { margin-top: 32px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-size: 13px; color: #64748b; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Kebun Melon</h1>
+    </div>
+    <div class="content">
+      <p><strong>${greeting}</strong></p>
+      <p>${intro}</p>
+      <div class="code-box">
+        <div class="code-card">
+          <p class="code-text">${code}</p>
+        </div>
+      </div>
+      <p style="color: #166534; font-weight: 600; font-size: 14px; text-align: center;">${expiryNotice}</p>
+      <p style="color: #64748b; font-size: 14px; margin-top: 20px;">${securityNotice}</p>
+      <p style="color: #64748b; font-size: 14px;">${ignoreNotice}</p>
+    </div>
+    <div class="footer">
+      <p>© ${new Date().getFullYear()} Kebun Melon Monitoring System. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>
+  `.trim();
+
+  const text = `
+Kebun Melon
+==============================
+
+${greeting}
+
+${intro}
+
+KODE VERIFIKASI PERUBAHAN EMAIL / EMAIL CHANGE VERIFICATION CODE:
+-----------------------------------------------------------------
+${code}
+-----------------------------------------------------------------
+
+${expiryNotice}
+${securityNotice}
+${ignoreNotice}
+
+© ${new Date().getFullYear()} Kebun Melon Monitoring System.
+  `.trim();
+
+  return { subject, html, text };
+}
+
+/**
+ * Sends an email change verification code email via the approved Resend provider.
+ * Implements bounded retry handling for transient errors.
+ */
+export async function sendEmailChangeVerificationEmail(
+  input: SendVerificationEmailInput
+): Promise<SendVerificationEmailResult> {
+  const reqLogger = logger.child({
+    requestId: input.requestId,
+  });
+
+  const env = validateServerEnv();
+  const code = input.code || input.rawToken || '';
+  const locale = input.locale || env.DEFAULT_LOCALE || 'id';
+  const name = input.recipientName || '';
+
+  const { subject, html, text } = getEmailChangeCodeEmailHtml(name, code, locale);
+
+  const apiKey = env.RESEND_API_KEY || process.env.RESEND_API_KEY;
+  const fromEmail =
+    env.RESEND_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || 'Kebun Melon <onboarding@resend.dev>';
+
+  // In test environment or when API key is unconfigured in development, simulate safely
+  if (!apiKey || env.NODE_ENV === 'test' || process.env.NODE_ENV === 'test') {
+    reqLogger.info(
+      'Resend API key unconfigured or test environment active; simulated email change verification delivery'
+    );
+    return {
+      success: true,
+      emailSent: false,
+      simulated: true,
+    };
+  }
+
+  try {
+    const resend = new Resend(apiKey);
+    const result = await sendWithRetry(
+      resend,
+      {
+        from: fromEmail,
+        to: [input.toEmail],
+        subject,
+        html,
+        text,
+      },
+      reqLogger
+    );
+
+    if (!result.success) {
+      reqLogger.error(
+        'Resend delivery reported error for email change: ' + (result.error || 'Unknown error')
+      );
+      return {
+        success: false,
+        emailSent: false,
+        error: result.error,
+      };
+    }
+
+    reqLogger.info('Email change verification code dispatched successfully via Resend');
+    return {
+      success: true,
+      emailSent: true,
+      id: result.id,
+    };
+  } catch (err: any) {
+    reqLogger.error(
+      'Unexpected exception during Resend email change dispatch: ' + (err?.message || String(err))
+    );
+    return {
+      success: false,
+      emailSent: false,
+      error: err?.message || 'Email delivery failed',
+    };
+  }
+}

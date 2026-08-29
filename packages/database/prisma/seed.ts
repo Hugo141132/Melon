@@ -72,6 +72,12 @@ export const CANONICAL_PERMISSIONS: SeedPermissionDef[] = [
     adminAccess: true,
   },
   {
+    code: 'profilee.self.update',
+    description: 'Update own profile (canonical)',
+    ownerAccess: true,
+    adminAccess: true,
+  },
+  {
     code: 'profile.other.read',
     description: 'View other user profiles',
     ownerAccess: true,

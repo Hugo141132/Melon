@@ -145,6 +145,71 @@ export type VerifyEmailWithTokenResult =
       message: string;
     };
 
+export interface RequestEmailChangeInput {
+  userId: string;
+  newEmail: string;
+  currentPassword: string;
+  expiryMinutes?: number;
+  ipAddress?: string;
+  userAgent?: string;
+  requestId?: string;
+}
+
+export type RequestEmailChangeError =
+  | 'USER_NOT_FOUND'
+  | 'ACCOUNT_NOT_ACTIVE'
+  | 'INVALID_CREDENTIALS'
+  | 'SAME_EMAIL'
+  | 'DUPLICATE_EMAIL'
+  | 'INTERNAL_ERROR';
+
+export type RequestEmailChangeResult =
+  | {
+      success: true;
+      rawToken: string;
+      code: string;
+      expiresAt: Date;
+      pendingEmail: string;
+      user: PublicSafeUserDto;
+    }
+  | {
+      success: false;
+      error: RequestEmailChangeError;
+      message: string;
+    };
+
+export interface VerifyEmailChangeInput {
+  userId: string;
+  code: string;
+  ipAddress?: string;
+  userAgent?: string;
+  requestId?: string;
+}
+
+export type VerifyEmailChangeError =
+  | 'USER_NOT_FOUND'
+  | 'ACCOUNT_NOT_ACTIVE'
+  | 'NO_PENDING_EMAIL_CHANGE'
+  | 'INVALID_VERIFICATION_CODE'
+  | 'TOKEN_EXPIRED'
+  | 'DUPLICATE_EMAIL'
+  | 'CONCURRENCY_CONFLICT'
+  | 'TOKEN_ALREADY_USED'
+  | 'INTERNAL_ERROR';
+
+export type VerifyEmailChangeResult =
+  | {
+      success: true;
+      email: string;
+      emailVerifiedAt: Date;
+      user: PublicSafeUserDto;
+    }
+  | {
+      success: false;
+      error: VerifyEmailChangeError;
+      message: string;
+    };
+
 export interface UserLifecycleInput {
   targetUserId: string;
   actorUserId: string;
@@ -2414,6 +2479,339 @@ export class UserRepository {
    */
   async verifyEmailWithCode(input: VerifyEmailWithTokenInput): Promise<VerifyEmailWithTokenResult> {
     return this.verifyEmailWithToken(input);
+  }
+
+  /**
+   * Requests a verified self-email change for an active authenticated user.
+   * Validates currentPassword, candidate email format & uniqueness against both
+   * existing users and active pending tokens, generates 6-digit CSPRNG code with 15m expiry,
+   * hashes code with userId:newEmail scope, and stages pendingEmail.
+   */
+  async requestEmailChange(input: RequestEmailChangeInput): Promise<RequestEmailChangeResult> {
+    try {
+      const user = await this.prisma.user.findUnique({
+        where: { id: input.userId },
+        select: {
+          id: true,
+          fullName: true,
+          email: true,
+          username: true,
+          passwordHash: true,
+          accountStatus: true,
+          emailVerifiedAt: true,
+          lastLoginAt: true,
+          suspendedAt: true,
+          deactivatedAt: true,
+          createdAt: true,
+          updatedAt: true,
+          userRoles: {
+            where: { revokedAt: null },
+            select: {
+              id: true,
+              userId: true,
+              roleId: true,
+              assignedByUserId: true,
+              assignedAt: true,
+              revokedAt: true,
+              role: { select: { code: true } },
+            },
+          },
+        },
+      });
+
+      if (!user) {
+        return {
+          success: false,
+          error: 'USER_NOT_FOUND',
+          message: 'User profile could not be found.',
+        };
+      }
+
+      if (user.accountStatus !== AccountStatus.ACTIVE) {
+        return {
+          success: false,
+          error: 'ACCOUNT_NOT_ACTIVE',
+          message: `Account is ${user.accountStatus}. Only ACTIVE accounts can request email changes.`,
+        };
+      }
+
+      if (!input.currentPassword) {
+        return {
+          success: false,
+          error: 'INVALID_CREDENTIALS',
+          message: 'Current password is required to change email.',
+        };
+      }
+
+      const isPasswordValid = await verifyPassword(user.passwordHash, input.currentPassword);
+      if (!isPasswordValid) {
+        return {
+          success: false,
+          error: 'INVALID_CREDENTIALS',
+          message: 'Current password provided is incorrect.',
+        };
+      }
+
+      const normalisedNewEmail = normaliseEmail(input.newEmail);
+      if (normalisedNewEmail === normaliseEmail(user.email)) {
+        return {
+          success: false,
+          error: 'SAME_EMAIL',
+          message: 'New email cannot be the same as your current email.',
+        };
+      }
+
+      // Check candidate-email uniqueness against existing users
+      const existingUser = await this.prisma.user.findUnique({
+        where: { email: normalisedNewEmail },
+        select: { id: true },
+      });
+
+      if (existingUser) {
+        return {
+          success: false,
+          error: 'DUPLICATE_EMAIL',
+          message: 'The specified email address is already in use.',
+        };
+      }
+
+      // Check candidate-email uniqueness against active pending tokens of other users
+      const activePendingToken = await this.prisma.emailVerificationToken.findFirst({
+        where: {
+          pendingEmail: normalisedNewEmail,
+          expiresAt: { gt: new Date() },
+          userId: { not: user.id },
+        },
+        select: { id: true },
+      });
+
+      if (activePendingToken) {
+        return {
+          success: false,
+          error: 'DUPLICATE_EMAIL',
+          message: 'The specified email address is already pending verification by another user.',
+        };
+      }
+
+      // Generate 6-digit numeric CSPRNG code (100000 - 999999)
+      const code = String(crypto.randomInt(100000, 1000000));
+      const tokenHash = crypto
+        .createHash('sha256')
+        .update(`${user.id}:${normalisedNewEmail}:${code}`)
+        .digest('hex');
+      const expiryMinutes = input.expiryMinutes ?? 15;
+      const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000);
+
+      await this.prisma.$transaction(async (tx) => {
+        await tx.emailVerificationToken.deleteMany({
+          where: { userId: user.id },
+        });
+
+        await tx.emailVerificationToken.create({
+          data: {
+            tokenHash,
+            userId: user.id,
+            pendingEmail: normalisedNewEmail,
+            expiresAt,
+          },
+        });
+      });
+
+      const safeUser = toPublicSafeUserDto(this.mapPrismaUserToRawDbUser(user));
+
+      return {
+        success: true,
+        rawToken: code,
+        code,
+        pendingEmail: normalisedNewEmail,
+        user: safeUser,
+        expiresAt,
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        error: 'INTERNAL_ERROR',
+        message: 'An unexpected internal error occurred while requesting email change.',
+      };
+    }
+  }
+
+  /**
+   * Verifies and confirms a requested email change with the 6-digit verification code.
+   * Atomically confirms email uniqueness, promotes pending email to user.email,
+   * updates emailVerifiedAt timestamp, deletes the consumed token, and records audit log.
+   */
+  async verifyEmailChange(input: VerifyEmailChangeInput): Promise<VerifyEmailChangeResult> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: input.userId },
+      select: { id: true, accountStatus: true },
+    });
+
+    if (!user) {
+      return {
+        success: false,
+        error: 'USER_NOT_FOUND',
+        message: 'User not found.',
+      };
+    }
+
+    if (user.accountStatus !== AccountStatus.ACTIVE) {
+      return {
+        success: false,
+        error: 'ACCOUNT_NOT_ACTIVE',
+        message: `Account is ${user.accountStatus}. Only ACTIVE accounts can verify email changes.`,
+      };
+    }
+
+    const MAX_RETRIES = 3;
+    let attempt = 0;
+
+    while (attempt < MAX_RETRIES) {
+      try {
+        const result = await this.prisma.$transaction(
+          async (tx) => {
+            const tokenRecord = await tx.emailVerificationToken.findFirst({
+              where: {
+                userId: input.userId,
+                pendingEmail: { not: null },
+              },
+            });
+
+            if (!tokenRecord || !tokenRecord.pendingEmail) {
+              return {
+                success: false as const,
+                error: 'NO_PENDING_EMAIL_CHANGE' as const,
+                message: 'No pending email change request found.',
+              };
+            }
+
+            if (tokenRecord.expiresAt < new Date()) {
+              await tx.emailVerificationToken.delete({
+                where: { id: tokenRecord.id },
+              });
+              return {
+                success: false as const,
+                error: 'TOKEN_EXPIRED' as const,
+                message: 'Email verification code has expired. Please request a new code.',
+              };
+            }
+
+            const expectedHash = crypto
+              .createHash('sha256')
+              .update(`${input.userId}:${tokenRecord.pendingEmail}:${input.code.trim()}`)
+              .digest('hex');
+
+            if (expectedHash !== tokenRecord.tokenHash) {
+              return {
+                success: false as const,
+                error: 'INVALID_VERIFICATION_CODE' as const,
+                message: 'Invalid email verification code.',
+              };
+            }
+
+            // Atomic uniqueness re-verification
+            const existingUserWithEmail = await tx.user.findUnique({
+              where: { email: tokenRecord.pendingEmail },
+              select: { id: true },
+            });
+
+            if (existingUserWithEmail && existingUserWithEmail.id !== input.userId) {
+              await tx.emailVerificationToken.delete({
+                where: { id: tokenRecord.id },
+              });
+              return {
+                success: false as const,
+                error: 'DUPLICATE_EMAIL' as const,
+                message: 'The specified email address is already in use by another account.',
+              };
+            }
+
+            const updatedUser = await tx.user.update({
+              where: { id: input.userId },
+              data: {
+                email: tokenRecord.pendingEmail,
+                emailVerifiedAt: new Date(),
+              },
+              include: {
+                userRoles: {
+                  where: { revokedAt: null },
+                  include: { role: true },
+                },
+              },
+            });
+
+            await tx.emailVerificationToken.delete({
+              where: { id: tokenRecord.id },
+            });
+
+            await tx.auditLog.create({
+              data: {
+                eventKey: AuditEventKey.ACCOUNT_EMAIL_CHANGED,
+                actorUserId: input.userId,
+                actorRole: null,
+                targetType: 'USER',
+                targetId: input.userId,
+                result: 'SUCCESS',
+                previousValues: { emailChanged: true },
+                newValues: { emailChanged: true },
+                metadata: {
+                  action: 'EMAIL_CHANGE_VERIFIED',
+                },
+                requestId: input.requestId,
+                ipAddress: input.ipAddress,
+                userAgent: input.userAgent,
+              },
+            });
+
+            return {
+              success: true as const,
+              email: tokenRecord.pendingEmail,
+              emailVerifiedAt: updatedUser.emailVerifiedAt!,
+              user: toPublicSafeUserDto(this.mapPrismaUserToRawDbUser(updatedUser)),
+            };
+          },
+          {
+            isolationLevel: 'RepeatableRead',
+          }
+        );
+
+        return result;
+      } catch (err: any) {
+        if (err.code === 'P2034') {
+          attempt++;
+          if (attempt < MAX_RETRIES) {
+            const delayMs = Math.pow(2, attempt) * 50 + Math.random() * 50;
+            await new Promise((resolve) => setTimeout(resolve, delayMs));
+            continue;
+          }
+          return {
+            success: false,
+            error: 'CONCURRENCY_CONFLICT',
+            message: 'A concurrent request is already processing this email change.',
+          };
+        }
+
+        if (err.code === 'P2025') {
+          return {
+            success: false,
+            error: 'TOKEN_ALREADY_USED',
+            message: 'Email verification code has already been used.',
+          };
+        }
+
+        return {
+          success: false,
+          error: 'INTERNAL_ERROR',
+          message: 'An internal error occurred during email verification.',
+        };
+      }
+    }
+
+    return {
+      success: false,
+      error: 'INTERNAL_ERROR',
+      message: 'Failed to verify email change after maximum retries.',
+    };
   }
 
   /**

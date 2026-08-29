@@ -4,10 +4,12 @@ import path from 'path';
 const hasTestDb = Boolean(process.env.TEST_DATABASE_URL || process.env.DATABASE_URL);
 
 const dbIntegrationPatterns = [
+  '**/*.integration.test.ts',
+  'test/*.integration.test.ts',
+  'test/**/*.integration.test.ts',
   'test/integration.test.ts',
   'test/seed-owner.test.ts',
   'test/seed.test.ts',
-  'test/**/*.integration.test.ts',
 ];
 
 export default defineConfig({

@@ -2,14 +2,30 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { PrismaClient } from '@prisma/client';
 import { UserRepository } from '../src/user-repository';
 import { AccountStatus, UserRole } from '@kebun-melon/contracts';
-import { execSync } from 'child_process';
+import { validateTestDatabaseUrl } from '../src/owner-provisioning';
 
 describe('TASK-0206 Approvals Database Integration & Security Test Suite', () => {
+  const testDbUrl = process.env.TEST_DATABASE_URL || process.env.DATABASE_URL;
+
+  if (!testDbUrl) {
+    throw new Error(
+      'TEST_DATABASE_URL or DATABASE_URL environment variable is required to run integration tests.\n' +
+        'Example: TEST_DATABASE_URL="postgresql://postgres:postgres@localhost:55432/kebun_melon_disposable_test"\n'
+    );
+  }
+
+  // Validate test database URL safety (requires db name to contain 'test' or 'disposable')
+  validateTestDatabaseUrl(testDbUrl);
+
   let prisma: PrismaClient;
   let userRepo: UserRepository;
 
   beforeAll(async () => {
-    prisma = new PrismaClient();
+    prisma = new PrismaClient({
+      datasources: {
+        db: { url: testDbUrl },
+      },
+    });
     userRepo = new UserRepository(prisma);
   });
 

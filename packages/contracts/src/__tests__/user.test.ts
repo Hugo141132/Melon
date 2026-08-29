@@ -9,6 +9,8 @@ import {
   RawDbUserWithRoles,
   ForgotPasswordInputSchema,
   ResetPasswordInputSchema,
+  RequestEmailChangeInputSchema,
+  VerifyEmailChangeInputSchema,
 } from '../index';
 
 describe('TASK-0201 Contracts & DTO Verification', () => {
@@ -299,6 +301,88 @@ describe('TASK-0201 Contracts & DTO Verification', () => {
           token: 'tok',
           newPassword: 'pass',
           accountStatus: 'ACTIVE',
+        }).success
+      ).toBe(false);
+    });
+
+    it('validates RequestEmailChangeInputSchema correctly', () => {
+      expect(
+        RequestEmailChangeInputSchema.safeParse({
+          newEmail: 'newemail@example.com',
+          currentPassword: 'CurrentPassword123!',
+        }).success
+      ).toBe(true);
+
+      // Trims whitespace
+      const parsed = RequestEmailChangeInputSchema.safeParse({
+        newEmail: '  trimmed@example.com  ',
+        currentPassword: 'CurrentPassword123!',
+      });
+      expect(parsed.success).toBe(true);
+      if (parsed.success) {
+        expect(parsed.data.newEmail).toBe('trimmed@example.com');
+      }
+
+      // Invalid emails
+      expect(
+        RequestEmailChangeInputSchema.safeParse({
+          newEmail: 'invalid-email',
+          currentPassword: 'ValidPassword123!',
+        }).success
+      ).toBe(false);
+
+      // Missing current password
+      expect(
+        RequestEmailChangeInputSchema.safeParse({
+          newEmail: 'valid@example.com',
+          currentPassword: '',
+        }).success
+      ).toBe(false);
+      expect(
+        RequestEmailChangeInputSchema.safeParse({
+          newEmail: 'valid@example.com',
+        }).success
+      ).toBe(false);
+
+      // Rejects injected fields (strict)
+      expect(
+        RequestEmailChangeInputSchema.safeParse({
+          newEmail: 'valid@example.com',
+          currentPassword: 'Password123!',
+          role: 'OWNER',
+        }).success
+      ).toBe(false);
+    });
+
+    it('validates VerifyEmailChangeInputSchema correctly', () => {
+      expect(
+        VerifyEmailChangeInputSchema.safeParse({
+          code: '123456',
+        }).success
+      ).toBe(true);
+
+      // Trims code whitespace
+      const parsed = VerifyEmailChangeInputSchema.safeParse({
+        code: '  654321  ',
+      });
+      expect(parsed.success).toBe(true);
+      if (parsed.success) {
+        expect(parsed.data.code).toBe('654321');
+      }
+
+      // Empty code
+      expect(
+        VerifyEmailChangeInputSchema.safeParse({
+          code: '',
+        }).success
+      ).toBe(false);
+      expect(VerifyEmailChangeInputSchema.safeParse({}).success).toBe(false);
+
+      // Rejects injected fields (strict)
+      expect(
+        VerifyEmailChangeInputSchema.safeParse({
+          code: '123456',
+          newEmail: 'hacker@example.com',
         }).success
       ).toBe(false);
     });

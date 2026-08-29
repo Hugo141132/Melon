@@ -4,13 +4,11 @@ import {
   DeviceAssignmentRepository,
   DeviceAssignmentError,
 } from '../src/device-assignment-repository';
+import { validateTestDatabaseUrl } from '../src/owner-provisioning';
 
 const testDbUrl = process.env.TEST_DATABASE_URL || process.env.DATABASE_URL;
 
-describe(
-  'DeviceAssignmentRepository Integration Tests',
-  { timeout: 30000, hookTimeout: 30000 },
-  () => {
+describe('DeviceAssignmentRepository Integration Tests', { timeout: 30000 }, () => {
     let prisma: PrismaClient;
     let repo: DeviceAssignmentRepository;
 
@@ -26,6 +24,7 @@ describe(
           'TEST_DATABASE_URL or DATABASE_URL must be provided for integration tests.'
         );
       }
+      validateTestDatabaseUrl(url);
       prisma = new PrismaClient({ datasources: { db: { url } } });
       repo = new DeviceAssignmentRepository(prisma);
 

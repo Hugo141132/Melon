@@ -35,6 +35,9 @@ export default defineConfig({
     env: {
       ...process.env,
       ENABLE_FAUCET_CONTROL: 'true',
+      ...(process.env.E2E_DATABASE_URL || process.env.TEST_DATABASE_URL
+        ? { DATABASE_URL: process.env.E2E_DATABASE_URL || process.env.TEST_DATABASE_URL }
+        : {}),
     },
   },
 });

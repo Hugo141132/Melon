@@ -183,10 +183,10 @@ The verified implementation of `TASK-0807`, `TASK-0502`, and `TASK-0306` (`/cont
 
 ---
 
-## Profile Security & Single Active Session Exceptions Note (Reconciled 2026-08-29)
+## Profile Security & Single Active Session Exceptions Note (Reconciled 2026-08-30)
 
 > **Policy Confirmation:** `ZERO SECURITY EXCEPTIONS INTRODUCED`
-> **Associated Tasks:** `TASK-0217` (P0, DONE), `TASK-0216` (P1, READY)
+> **Associated Tasks:** `TASK-0217` (P0, DONE), `TASK-0216` (P1, DONE)
 > **Governing Decisions:** `DEC-AUTH-106`, `DEC-AUTH-107`, `DEC-UIUX-102`
 
 The approved specifications for single active session enforcement (`TASK-0217`) and verified self-email change (`TASK-0216`) introduce zero security exceptions and require zero entries in `scripts/security-exceptions.json`:
@@ -194,4 +194,4 @@ The approved specifications for single active session enforcement (`TASK-0217`) 
 - **Verified Email Change Security (`DEC-AUTH-106`):** Adheres strictly to `SEC-AUTH-006` and `SEC-AUTH-007`. Re-authenticates user via current password, generates 6-digit CSPRNG verification codes with 15-minute expiry, stores tokens strictly as SHA-256 hashes, maintains authority of existing email until confirmed, and omits raw email strings from audit logs (`account.email.changed`).
 - **Profile UI Privacy (`DEC-UIUX-102`):** Removes misleading "Linked Devices" and omits unapproved client PII (IP address and User-Agent) from frontend display. Change Password consumes existing endpoint with full session revocation.
 - **Scanning Governance:** Zero exceptions to `SEC-OPS-001` (zero unapproved secrets) or `SEC-OPS-004` (zero unapproved high vulnerabilities). `scripts/security-exceptions.json` remains completely empty and unmodified.
-<!-- Single Active Session & Email Change Security Exceptions Reconciled: 2026-08-29 -->
+<!-- Single Active Session & Email Change Security Exceptions Reconciled: 2026-08-30 -->

@@ -51,19 +51,32 @@ export function validateEmail(email: string): boolean {
  */
 export function validateTestDatabaseUrl(url: string | undefined): string {
   if (!url) {
-    throw new Error('TEST_DATABASE_URL environment variable is required for test execution.');
+    throw new Error(
+      'Safety check failed: TEST_DATABASE_URL or E2E_DATABASE_URL environment variable is required for test execution.'
+    );
   }
   try {
     const parsed = new URL(url);
+    const host = parsed.hostname.toLowerCase();
+    if (
+      host.includes('supabase.co') ||
+      host.includes('supabase.com') ||
+      host.includes('railway.app') ||
+      host.includes('neon.tech')
+    ) {
+      throw new Error(
+        `Safety check failed: Test database host '${host}' cannot target remote Supabase, Railway, or managed cloud environments.`
+      );
+    }
     const dbName = parsed.pathname.replace(/^\//, '');
     if (!dbName.toLowerCase().includes('test') && !dbName.toLowerCase().includes('disposable')) {
       throw new Error(
-        `Safety check failed: TEST_DATABASE_URL database name '${dbName}' must explicitly contain 'test' or 'disposable'.`
+        `Safety check failed: Test database name '${dbName}' must explicitly contain 'test' or 'disposable'.`
       );
     }
   } catch (err: any) {
     if (err.message.startsWith('Safety check failed')) throw err;
-    throw new Error(`Invalid TEST_DATABASE_URL format: ${err.message}`);
+    throw new Error(`Invalid test database URL format: ${err.message}`);
   }
   return url;
 }

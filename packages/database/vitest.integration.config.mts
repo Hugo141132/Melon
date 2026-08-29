@@ -17,6 +17,7 @@ export default defineConfig({
       'test/integration.test.ts',
       'test/seed-owner.test.ts',
       'test/seed.test.ts',
+      'test/*.integration.test.ts',
       'test/**/*.integration.test.ts',
     ],
   },

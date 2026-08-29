@@ -2,12 +2,13 @@ import { test, expect } from '@playwright/test';
 import { PrismaClient } from '@prisma/client';
 import { hashPassword } from '../packages/database/src/password-service';
 
+const dbUrl =
+  process.env.E2E_DATABASE_URL || process.env.TEST_DATABASE_URL || process.env.DATABASE_URL;
+
 const prisma = new PrismaClient({
   datasources: {
     db: {
-      url:
-        process.env.DATABASE_URL ||
-        'postgresql://postgres:Hpnh_5312132@db.xjsencdgfcbkzdzqcnqx.supabase.co:6543/postgres',
+      url: dbUrl,
     },
   },
 });
@@ -15,13 +16,16 @@ const prisma = new PrismaClient({
 test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
   const timestamp = Date.now();
   const testAdminEmail = `e2e_admin_${timestamp}@example.com`;
-  const testAdminPassword = 'AdminPassword123!';
+  const testAdminPassword = 'E2eAdminPassword123!';
   const testAdminName = `E2E Admin ${timestamp}`;
-  const ownerEmail = 'purohitanayakahaq@gmail.com';
-  const ownerPassword = 'OwnerPassword123!';
+  const ownerEmail = `e2e_owner_${timestamp}@example.com`;
+  const ownerPassword = 'E2eOwnerPassword123!';
+  const ownerName = `E2E Owner ${timestamp}`;
 
+  let ownerUserId: string;
   let adminUserId: string;
   let targetDeviceId: string;
+  let createdDeviceByTest: boolean = false;
 
   async function selectLanguageIfGated(page: any, locale: 'id' | 'en' = 'id') {
     const label = locale === 'id' ? 'Bahasa Indonesia' : 'English';
@@ -36,49 +40,45 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
   }
 
   test.beforeAll(async () => {
-    // 0. Clean up previous test admin users and their relations to allow fresh registration
+    // 0. Clean up previous test admin and owner users and their relations to allow fresh test run
     const existingTestUsers = await prisma.user.findMany({
-      where: { email: { startsWith: 'e2e_admin_' } },
+      where: {
+        OR: [{ email: { startsWith: 'e2e_admin_' } }, { email: { startsWith: 'e2e_owner_' } }],
+      },
       select: { id: true },
     });
     const userIds = existingTestUsers.map((u) => u.id);
     if (userIds.length > 0) {
       await prisma.userRoleAssignment.deleteMany({ where: { userId: { in: userIds } } });
       await prisma.userDeviceAccess.deleteMany({ where: { userId: { in: userIds } } });
-      await prisma.accountApproval.deleteMany({ where: { applicantUserId: { in: userIds } } });
+      await prisma.accountApproval.deleteMany({
+        where: {
+          OR: [{ applicantUserId: { in: userIds } }, { decidedByUserId: { in: userIds } }],
+        },
+      });
       await prisma.session.deleteMany({ where: { userId: { in: userIds } } });
       await prisma.faucetCommand.deleteMany({ where: { initiatedByUserId: { in: userIds } } });
       await prisma.user.deleteMany({ where: { id: { in: userIds } } });
     }
 
-    // 1. Ensure Owner user exists in DB with known credentials
+    // 1. Ensure synthetic Owner user exists in test DB with known test credentials
     const ownerPasswordHash = await hashPassword(ownerPassword);
-    const owner = await prisma.user.upsert({
-      where: { email: ownerEmail },
-      update: {
-        passwordHash: ownerPasswordHash,
-        accountStatus: 'ACTIVE',
-        emailVerifiedAt: new Date(),
-      },
-      create: {
+    const owner = await prisma.user.create({
+      data: {
         email: ownerEmail,
-        fullName: 'Hugo P Owner',
+        fullName: ownerName,
         passwordHash: ownerPasswordHash,
         accountStatus: 'ACTIVE',
         emailVerifiedAt: new Date(),
       },
     });
+    ownerUserId = owner.id;
 
     const ownerRole = await prisma.role.findUnique({ where: { code: 'OWNER' } });
     if (ownerRole) {
-      const existingAssignment = await prisma.userRoleAssignment.findFirst({
-        where: { userId: owner.id, roleId: ownerRole.id },
+      await prisma.userRoleAssignment.create({
+        data: { userId: owner.id, roleId: ownerRole.id },
       });
-      if (!existingAssignment) {
-        await prisma.userRoleAssignment.create({
-          data: { userId: owner.id, roleId: ownerRole.id },
-        });
-      }
     }
 
     // Clean up any existing Owner sessions to ensure single active session test isolation
@@ -126,14 +126,16 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
         },
       });
       targetDeviceId = newDev.id;
+      createdDeviceByTest = true;
     }
   });
 
   test.afterAll(async () => {
-    if (adminUserId) {
+    const userIdsToClean = [adminUserId, ownerUserId].filter(Boolean);
+    if (userIdsToClean.length > 0) {
       const fcIds = (
         await prisma.faucetCommand.findMany({
-          where: { initiatedByUserId: adminUserId },
+          where: { initiatedByUserId: { in: userIdsToClean } },
           select: { id: true },
         })
       ).map((c) => c.id);
@@ -142,13 +144,28 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
           where: { faucetCommandId: { in: fcIds } },
         });
       }
-      await prisma.faucetCommand.deleteMany({ where: { initiatedByUserId: adminUserId } });
-      await prisma.userDeviceAccess.deleteMany({ where: { userId: adminUserId } });
-      await prisma.userRoleAssignment.deleteMany({ where: { userId: adminUserId } });
-      await prisma.accountApproval.deleteMany({ where: { applicantUserId: adminUserId } });
-      await prisma.session.deleteMany({ where: { userId: adminUserId } });
-      await prisma.user.deleteMany({ where: { id: adminUserId } });
+      await prisma.faucetCommand.deleteMany({
+        where: { initiatedByUserId: { in: userIdsToClean } },
+      });
+      await prisma.userDeviceAccess.deleteMany({ where: { userId: { in: userIdsToClean } } });
+      await prisma.userRoleAssignment.deleteMany({ where: { userId: { in: userIdsToClean } } });
+      await prisma.accountApproval.deleteMany({
+        where: {
+          OR: [
+            { applicantUserId: { in: userIdsToClean } },
+            { decidedByUserId: { in: userIdsToClean } },
+          ],
+        },
+      });
+      await prisma.session.deleteMany({ where: { userId: { in: userIdsToClean } } });
+      await prisma.user.deleteMany({ where: { id: { in: userIdsToClean } } });
     }
+
+    if (createdDeviceByTest && targetDeviceId) {
+      await prisma.deviceCapability.deleteMany({ where: { deviceId: targetDeviceId } });
+      await prisma.device.deleteMany({ where: { id: targetDeviceId } });
+    }
+
     await prisma.$disconnect();
   });
 

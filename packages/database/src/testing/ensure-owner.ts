@@ -1,20 +1,25 @@
 import { PrismaClient } from '@prisma/client';
 import { hashPassword } from '../password-service';
+import { validateTestDatabaseUrl } from '../owner-provisioning';
 
 async function ensureOwner() {
-  const dbUrl =
-    process.env.DATABASE_URL ||
-    'postgresql://postgres:Hpnh_5312132@db.xjsencdgfcbkzdzqcnqx.supabase.co:5432/postgres';
+  const rawDbUrl =
+    process.env.TEST_DATABASE_URL || process.env.E2E_DATABASE_URL || process.env.DATABASE_URL;
+  const dbUrl = validateTestDatabaseUrl(rawDbUrl);
   const prisma = new PrismaClient({ datasources: { db: { url: dbUrl } } });
 
+  const ownerEmail = process.env.TEST_OWNER_EMAIL || 'test_owner@example.com';
+  const ownerPassword = process.env.TEST_OWNER_PASSWORD || 'TestOwnerPassword123!';
+  const ownerName = process.env.TEST_OWNER_NAME || 'Test Owner';
+
   try {
-    const passwordHash = await hashPassword('OwnerPassword123!');
+    const passwordHash = await hashPassword(ownerPassword);
     const owner = await prisma.user.upsert({
-      where: { email: 'purohitanayakahaq@gmail.com' },
+      where: { email: ownerEmail },
       update: { passwordHash, accountStatus: 'ACTIVE' },
       create: {
-        email: 'purohitanayakahaq@gmail.com',
-        fullName: 'Hugo P',
+        email: ownerEmail,
+        fullName: ownerName,
         passwordHash,
         accountStatus: 'ACTIVE',
       },
@@ -35,9 +40,7 @@ async function ensureOwner() {
       }
     }
 
-    console.log(
-      'SUCCESS: Ensured Owner account with email: purohitanayakahaq@gmail.com and password: OwnerPassword123!'
-    );
+    console.log(`SUCCESS: Ensured Owner account with email: ${ownerEmail}`);
   } finally {
     await prisma.$disconnect();
   }

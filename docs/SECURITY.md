@@ -324,6 +324,18 @@ Registration email ownership verification shall enforce the following security c
 - **Frontend In-Flight Request Deduplication**: The `/verify-email` view uses a module-level in-flight Promise map with immediate cache eviction on settlement (`finally`), preventing competing network requests during React Strict Mode or remounts while delivering navigation triggers to the active mount.
 - **Delivery & Testing Scope**: Verification has been manually exercised using Resend test mode/test recipients and 6-digit code dispatch. We have not yet tested delivery to arbitrary real email recipients using a verified custom sending domain, because no such domain is currently configured. Real-mailbox deliverability is treated as pending deployment/infrastructure acceptance, not an application logic failure.
 
+### 7.9 Self-Service Verified Email Change Security (SEC-AUTH-006 / DEC-AUTH-106)
+
+Self-service email changes for authenticated users shall enforce the following security controls:
+
+- **Re-Authentication Barrier**: `POST /api/v1/me/email/request` mandates verification of the user's `currentPassword` before accepting an email change request.
+- **Authority Isolation**: The existing email remains 100% authoritative for login, notifications, and access control until the new email address is verified.
+- **Candidate Uniqueness & Collision Checking**: The candidate `newEmail` is verified for uniqueness against both existing `User.email` records and active `EmailVerificationToken.pendingEmail` tokens.
+- **Token Cryptography & Scoping**: Generates a 6-digit numeric CSPRNG code (`100000`–`999999`) with 15-minute expiry (`AUTH_VERIFY_TOKEN_EXPIRY_MINUTES = 15`), persisting only user-and-target-scoped SHA-256 hashes `sha256(userId:newEmail:code)` in `email_verification_tokens`. Raw codes are never persisted or logged.
+- **Atomic Promotion & Concurrency**: Verification (`POST /api/v1/me/email/verify`) operates in an atomic `RepeatableRead` transaction with bounded exponential backoff retries (3 attempts) on `P2034` write conflicts.
+- **Session Preservation**: Upon verification, the active session is preserved and synchronized in-memory via `AuthContext` without forced logout.
+- **Privacy-Preserving Audit Logging**: The emitted `account.email.changed` audit log contains strictly non-sensitive metadata (`{ emailChanged: true }`), omitting raw plaintext old/new email addresses.
+
 ---
 
 ## 8. Password Security
@@ -1652,3 +1664,15 @@ The following security controls are active and verified regarding `TASK-0217` (S
 - **Fail-Closed Logout Semantics:** `POST /api/v1/auth/logout` extracts the session token, revokes the session row in PostgreSQL (`revoked_at = NOW()`), records an `AUTH_LOGOUT` audit log, and clears the cookie. If an unexpected server/database error occurs, the endpoint fails closed with HTTP 500 `INTERNAL_ERROR` rather than a false 204 success.
 - **Profile UI Privacy & Password Revocation (`DEC-UIUX-102`):** Removed misleading "Linked Devices" from `/profile`, omitted unapproved client PII (IP address and User-Agent), and wired Change Password to `POST /api/v1/auth/change-password` with session revocation and redirect to `/login?message=PASSWORD_CHANGED`.
 <!-- TASK-0217 Reconciled: 2026-08-29 -->
+
+---
+
+## Verified Self-Email Change & Test Isolation Security Controls Note (Reconciled 2026-08-30)
+
+The following security controls are active and verified regarding `TASK-0216` (Verified Self-Email Change) and test environment isolation:
+- **Authority Preservation (`DEC-AUTH-106`):** The current email remains 100% authoritative for authentication, RBAC authorization, and system communications until the verification code sent to the new email is verified.
+- **Re-Authentication Requirement:** Requesting an email change strictly requires valid `currentPassword` verification, preventing session hijackers or unauthorized physical access from initiating email changes without credentials.
+- **Scoped Token Hashing & CSPRNG:** Verification codes are 6-digit numeric CSPRNG strings with 15-minute expiry. Stored token hashes in PostgreSQL are scoped cryptographically via `sha256(userId:newEmail:code)`, preventing replay or cross-user token substitution.
+- **Privacy-Preserving Audit Logging (`SEC-AUTH-006`):** Emits structured audit event `account.email.changed` containing strictly non-sensitive audit metadata (user ID, timestamp, IP/actor reference) without logging raw plaintext old or new email addresses.
+- **Test Database Isolation & Fail-Closed Guards:** `validateTestDatabaseUrl` enforces strict isolation across test runners. All automated integration and E2E suites fail closed if executed against remote cloud environments (`supabase.co`, `supabase.com`, `railway.app`, `neon.tech`), and all E2E test identities use synthetic disposable identifiers with full deterministic teardown.
+<!-- TASK-0216 Reconciled: 2026-08-30 -->

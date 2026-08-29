@@ -18,6 +18,7 @@ import { USER_PROFILE } from '@/lib/constants';
 import { useTranslations } from 'next-intl';
 import { useAuth } from '@/context/AuthContext';
 import { PasswordChangeModal } from './PasswordChangeModal';
+import { EmailChangeModal } from './EmailChangeModal';
 
 interface UserProfileState {
   id: string;
@@ -32,7 +33,7 @@ export default function ProfilePage() {
   const tProfile = useTranslations('profile');
   const tCommon = useTranslations('common');
   const tAuth = useTranslations('auth');
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, updateUser } = useAuth();
 
   const [profile, setProfile] = useState<UserProfileState | null>(
     user
@@ -53,10 +54,12 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(!user);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [emailSaved, setEmailSaved] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [unauthenticated, setUnauthenticated] = useState(!isAuthenticated && !user);
   const [loggingOut, setLoggingOut] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
 
   // Sync state if user changes from auth context
   useEffect(() => {
@@ -130,6 +133,13 @@ export default function ProfilePage() {
       isMounted = false;
     };
   }, [user]);
+
+  const handleEmailChangeSuccess = (promotedEmail: string) => {
+    setProfile((prev) => (prev ? { ...prev, email: promotedEmail } : null));
+    updateUser?.({ email: promotedEmail });
+    setEmailSaved(true);
+    setTimeout(() => setEmailSaved(false), 4000);
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -292,11 +302,20 @@ export default function ProfilePage() {
               />
             </div>
 
-            {/* Email (Read-Only) */}
+            {/* Email (Read-Only with Change Email Action) */}
             <div className="space-y-2">
-              <label className="text-[14px] font-semibold text-app-on-surface-variant px-1 block">
-                {tProfile('email')}
-              </label>
+              <div className="flex items-center justify-between px-1">
+                <label className="text-[14px] font-semibold text-app-on-surface-variant block">
+                  {tProfile('email')}
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setIsEmailModalOpen(true)}
+                  className="text-[13px] font-semibold text-app-primary hover:underline active:scale-95 transition-all cursor-pointer"
+                >
+                  {tProfile('changeEmail')}
+                </button>
+              </div>
               <input
                 className="w-full h-[56px] px-4 bg-app-surface-container-low border-[1.5px] border-app-outline-variant rounded-xl text-app-on-surface-variant outline-none cursor-not-allowed text-[16px]"
                 type="email"
@@ -346,7 +365,7 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {/* Email Verification */}
+            {/* Email Verification Status */}
             <div className="w-full flex items-center justify-between p-4">
               <div className="flex items-center gap-4">
                 <div className="w-10 h-10 rounded-full bg-app-surface-container-low flex items-center justify-center text-app-primary">
@@ -363,6 +382,13 @@ export default function ProfilePage() {
                   </p>
                 </div>
               </div>
+              <button
+                type="button"
+                onClick={() => setIsEmailModalOpen(true)}
+                className="text-[13px] font-semibold text-app-primary hover:underline px-2 py-1 rounded-lg hover:bg-app-surface-container cursor-pointer transition-colors"
+              >
+                {tProfile('changeEmail')}
+              </button>
             </div>
 
             {/* Password */}
@@ -436,10 +462,23 @@ export default function ProfilePage() {
         </div>
       )}
 
+      {emailSaved && (
+        <div className="fixed bottom-28 left-1/2 -translate-x-1/2 bg-app-primary text-white px-6 py-3 rounded-full shadow-2xl text-[14px] font-medium z-[100] animate-slide-up flex items-center gap-2">
+          <CheckCircle size={16} fill="white" />
+          <span>{tProfile('emailChangedToast')}</span>
+        </div>
+      )}
+
       {/* Modals */}
       <PasswordChangeModal
         isOpen={isPasswordModalOpen}
         onClose={() => setIsPasswordModalOpen(false)}
+      />
+      <EmailChangeModal
+        isOpen={isEmailModalOpen}
+        onClose={() => setIsEmailModalOpen(false)}
+        onSuccess={handleEmailChangeSuccess}
+        currentEmail={profile?.email || user?.email || ''}
       />
     </div>
   );
