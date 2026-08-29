@@ -1,4 +1,4 @@
-﻿import { test, expect } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 import { PrismaClient } from '@prisma/client';
 import { hashPassword } from '../packages/database/src/password-service';
 
@@ -80,6 +80,9 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
         });
       }
     }
+
+    // Clean up any existing Owner sessions to ensure single active session test isolation
+    await prisma.session.deleteMany({ where: { userId: owner.id } });
 
     // 2. Ensure test controllable device exists in DB
     const existingDevice = await prisma.device.findFirst({
@@ -237,13 +240,14 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
     // Verify DB status updated to ACTIVE
     const approvedUser = await prisma.user.findUnique({ where: { id: adminUserId } });
     expect(approvedUser?.accountStatus).toBe('ACTIVE');
+
+    // Cleanly log out Owner to release single active session
+    await page.request.post('/api/v1/auth/logout');
+    await page.context().clearCookies();
   });
 
   // Flow 3: Active Admin Login
   test('Flow 3: Active Admin logs in successfully', async ({ page }) => {
-    // Clear session cookies to log out Owner
-    await page.context().clearCookies();
-
     await page.goto('/login');
     await selectLanguageIfGated(page, 'id');
     await page.fill('input#email', testAdminEmail);
@@ -326,6 +330,10 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
       where: { userId: adminUserId, deviceId: targetDeviceId, revokedAt: null },
     });
     expect(verifiedAssignment).not.toBeNull();
+
+    // Cleanly log out Owner to release single active session
+    await page.request.post('/api/v1/auth/logout');
+    await page.context().clearCookies();
   });
 
   // Flow 5: Admin views monitoring metrics for assigned device
@@ -586,12 +594,8 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
       data: { revokedAt: new Date() },
     });
 
-    // Log in as Admin
-    await page.goto('/login');
-    await selectLanguageIfGated(page, 'id');
-    await page.fill('input#email', testAdminEmail);
-    await page.fill('input#password', testAdminPassword);
-    await page.click('button[type="submit"]');
+    // Log in as Admin using existing active session
+    await loginAsAdmin(page);
 
     // Attempt to invoke faucet command API for revoked device
     const targetDev = await prisma.device.findUnique({ where: { id: targetDeviceId } });

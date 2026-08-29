@@ -124,7 +124,7 @@ function StatusContent() {
   const handleLogout = async () => {
     setLoggingOut(true);
     try {
-      await fetch('/api/v1/auth/logout', { method: 'POST' });
+      await fetch('/api/v1/auth/logout', { method: 'POST', credentials: 'same-origin' });
     } catch {
       // Ignore network error during logout cleanup
     } finally {

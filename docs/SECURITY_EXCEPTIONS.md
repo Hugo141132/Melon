@@ -183,10 +183,10 @@ The verified implementation of `TASK-0807`, `TASK-0502`, and `TASK-0306` (`/cont
 
 ---
 
-## Planned Profile Security & Single Active Session Exceptions Note (Reconciled 2026-08-29)
+## Profile Security & Single Active Session Exceptions Note (Reconciled 2026-08-29)
 
 > **Policy Confirmation:** `ZERO SECURITY EXCEPTIONS INTRODUCED`
-> **Associated Tasks:** `TASK-0217` (P0, READY), `TASK-0216` (P1, READY)
+> **Associated Tasks:** `TASK-0217` (P0, DONE), `TASK-0216` (P1, READY)
 > **Governing Decisions:** `DEC-AUTH-106`, `DEC-AUTH-107`, `DEC-UIUX-102`
 
 The approved specifications for single active session enforcement (`TASK-0217`) and verified self-email change (`TASK-0216`) introduce zero security exceptions and require zero entries in `scripts/security-exceptions.json`:

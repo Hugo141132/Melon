@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, Suspense } from 'react';
-import { Mail, Lock, Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
 function LoginForm() {
@@ -21,6 +21,10 @@ function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const messageParam = searchParams.get('message');
+  const [successMessage] = useState(
+    messageParam === 'PASSWORD_CHANGED' ? tAuth('passwordChangedSuccess') : ''
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,6 +54,11 @@ function LoginForm() {
           router.push(`/verify-email?email=${encodeURIComponent(email.trim())}`);
           return;
         }
+        if (json.error?.code === 'ACTIVE_SESSION_EXISTS') {
+          setErrorMessage(tAuth('activeSessionExists'));
+          setLoading(false);
+          return;
+        }
         setErrorMessage(json.error?.message || tAuth('loginFailed'));
         setLoading(false);
         return;
@@ -65,6 +74,13 @@ function LoginForm() {
 
   return (
     <form className="space-y-6" onSubmit={handleSubmit}>
+      {successMessage && (
+        <div className="p-3.5 bg-primary/10 border border-primary/30 rounded-xl text-primary text-[14px] leading-[20px] flex items-start gap-2.5">
+          <CheckCircle size={18} className="mt-0.5 shrink-0" />
+          <span>{successMessage}</span>
+        </div>
+      )}
+
       {errorMessage && (
         <div className="p-3.5 bg-error-container/20 border border-error/30 rounded-xl text-error text-[14px] leading-[20px] flex items-start gap-2.5">
           <AlertCircle size={18} className="mt-0.5 shrink-0" />

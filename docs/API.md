@@ -492,10 +492,19 @@ Response:
 204 No Content
 ```
 
+Error Responses:
+
+```text
+500 Internal Server Error (INTERNAL_ERROR - unexpected revocation or database failure)
+```
+
 Server actions:
 
-- Revoke or invalidate the current session.
-- Record logout where configured.
+- Extract session token from cookie store (or fallback header).
+- Revoke or invalidate the current session in PostgreSQL (`revoked_at = NOW()`).
+- Clear session cookie with `Max-Age=0`.
+- Record `AUTH_LOGOUT` audit log.
+- Unexpected failures fail closed and return standard `INTERNAL_ERROR` (500) rather than a false 204 success.
 
 ---
 

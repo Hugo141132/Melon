@@ -2270,31 +2270,31 @@ All five final pre-commit validation commands were executed and verified **PASS*
 
 ---
 
-# 55. Planned Single Active Session & Verified Email Change Test Suite Specifications (Reconciled 2026-08-29)
+# 55. Single Active Session & Verified Email Change Test Suite Specifications (Reconciled 2026-08-29)
 
-> **Implementation Status:** `APPROVED TEST SPECIFICATIONS — TO BE EXECUTED DURING TASK IMPLEMENTATION`
-> **Associated Tasks:** `TASK-0217` (P0, READY), `TASK-0216` (P1, READY)
+> **Associated Tasks:** `TASK-0217` (P0, DONE), `TASK-0216` (P1, READY)
 > **Governing Decisions:** `DEC-AUTH-106`, `DEC-AUTH-107`, `DEC-UIUX-102`
 
-The following test suites and verification cases are specified for implementation under `TASK-0217` and `TASK-0216`:
-
-### 1. Single Active Session Enforcement Verification (`TASK-0217` / `DEC-AUTH-107`)
-- **Unit & Service Tests (`session-service.test.ts`):**
-  - Verify `loginUser` checks for existing active session where `revokedAt IS NULL`, `now < expiresAt`, and `now - lastSeenAt <= 30m`.
-  - Verify throwing `ActiveSessionExistsError` when an active session exists.
-  - Verify pre-existing active session is preserved and not invalidated or downgraded when a concurrent login is rejected.
-  - Verify stale sessions (expired `> 8h`, idle-timed-out `> 30m`, or `revokedAt IS NOT NULL`) are pruned/soft-revoked and do NOT block login.
-  - Verify concurrent login race condition safety using PostgreSQL transaction locking.
-- **API Route Tests (`apps/web/test/unit/login-route.test.ts`):**
-  - Verify `POST /api/v1/auth/login` returns HTTP 409 Conflict (`ACTIVE_SESSION_EXISTS`) on concurrent login attempt.
-  - Verify localized error response in `id` and `en` locales.
+### 1. Single Active Session Enforcement Verification (`TASK-0217` / `DEC-AUTH-107`) — VERIFIED & COMPLETED
+- **PostgreSQL 15 Integration Tests (`packages/database/test/session-service.integration.test.ts`):**
+  - **10 / 10 tests passed (100%)** in local disposable Docker PostgreSQL runner (`packages/database/scripts/run-session-docker-integration-test.ts`):
+    1. Valid ACTIVE login returns raw token and safe DTO, stores token hash only, updates lastLoginAt, creates audit record without secrets.
+    2. Invalid email or wrong password throws generic InvalidCredentialsError (no account enumeration).
+    3. Non-ACTIVE accounts are rejected with AccountStatusForbiddenError.
+    4. Session lookup enforces 30-min idle and 8-hour absolute timeouts.
+    5. Account status changes to non-ACTIVE immediately invalidate sessions upon lookup.
+    6. Logout revokes session and creates audit log, and is safe & idempotent when repeated.
+    7. Simultaneous concurrent login attempts for the same user atomically allow exactly one session and reject the other with ActiveSessionExistsError.
+    8. Existing active session is preserved when a conflicting login attempt is rejected.
+    9. Expired, idle (>30m), and revoked sessions do not block new login attempts.
+    10. Regression Flow: Login A succeeds $\rightarrow$ Login B is denied (409) $\rightarrow$ Logout A revokes session $\rightarrow$ Login B succeeds $\rightarrow$ exactly one valid active session remains.
+- **API Route Tests:**
+  - `apps/web/app/api/v1/auth/login/test/route.test.ts`: **5/5 tests passed** (HTTP 409 Conflict `ACTIVE_SESSION_EXISTS`, localized error payload, existing session preservation).
+  - `apps/web/app/api/v1/auth/logout/test/route.test.ts`: **4/4 tests passed** (Cookie extraction via `cookies()` and raw headers, 204 No Content, fail-closed 500 `INTERNAL_ERROR` on server errors).
 - **Profile Security Component Tests (`apps/web/test/unit/profile-page.test.tsx`):**
-  - Verify "Linked Devices" card is completely absent from the DOM.
-  - Verify "Account & Session Security" section renders active session status and email verification badge.
-  - Verify absence of client IP address and User-Agent from rendered output.
-  - Verify "Change Password" modal opens, validates passwords, submits to `POST /api/v1/auth/change-password`, and redirects to `/login` upon success.
+  - **4/4 tests passed** (Absence of "Linked Devices" card, presence of Account & Session Security section, omission of client IP/User-Agent, PasswordChangeModal wiring and redirect to `/login?message=PASSWORD_CHANGED`).
 
-### 2. Verified Self-Service Email Change Verification (`TASK-0216` / `DEC-AUTH-106`)
+### 2. Verified Self-Service Email Change Verification (`TASK-0216` / `DEC-AUTH-106` — PLANNED)
 - **Database & Repository Tests (`user-repository.test.ts`):**
   - Verify `requestEmailChange` enforces caller password validation before issuing code.
   - Verify generation of 6-digit numeric CSPRNG code with 15-minute expiry.
@@ -2310,4 +2310,4 @@ The following test suites and verification cases are specified for implementatio
 - **Frontend & E2E Flows:**
   - Verify 2-step Change Email modal in `/profile` with 60-second resend cooldown timer.
   - Verify user active session remains continuous without forced logout after email change.
-<!-- Planned Testing Specifications Reconciled: 2026-08-29 -->
+<!-- Testing Specifications Reconciled: 2026-08-29 -->

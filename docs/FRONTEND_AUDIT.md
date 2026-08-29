@@ -429,20 +429,15 @@ The following frontend components were audited and reconciled for `TASK-0807`, `
 
 ## Profile Management & Security UI Frontend Audit Note (Reconciled 2026-08-29)
 
-> **Implementation Status:** `CURRENT CODEBASE REPRESENTS PRE-TASK-0217 / PRE-TASK-0216 STATE`
-> **Associated Tasks:** `TASK-0217` (P0, READY), `TASK-0216` (P1, READY)
+> **Associated Tasks:** `TASK-0217` (P0, DONE), `TASK-0216` (P1, READY)
 > **Governing Decisions:** `DEC-AUTH-106`, `DEC-AUTH-107`, `DEC-UIUX-102`
 
-An audit of the current `/profile` component (`apps/web/app/profile/page.tsx`) confirms the baseline implementation prior to `TASK-0217` and `TASK-0216` execution:
-- **Current Baseline (`apps/web/app/profile/page.tsx`):**
-  - Displays user profile header and editable `fullName` field (`PATCH /api/v1/me`).
-  - Contains a hardcoded "Linked Devices" card (`USER_PROFILE.devicesCount: 3`) which conflates physical IoT monitoring nodes with user client sessions.
-  - Contains an unwired "Change Password" button that does not trigger a modal or invoke the backend.
-  - Renders email as a read-only field without self-service email change capability.
-- **Approved Future Frontend Scope (`TASK-0217` / `TASK-0216`):**
-  - **Removal of Linked Devices Card:** Permanently remove the "Linked Devices" card from `/profile`.
-  - **Account & Session Security Section:** Render active session status (single active session indicator) and email verification status badge. Client IP and User-Agent are omitted from the UI display.
-  - **Change Password Modal:** Wire "Change Password" to an accessible dialog submitting to `POST /api/v1/auth/change-password` with redirect to `/login` upon success.
+The following frontend changes are audited and verified for `TASK-0217` (Profile Management & Security UI):
+- **Removal of Linked Devices Card:** The misleading "Linked Devices" card has been permanently removed from `/profile` (`apps/web/app/profile/page.tsx`), eliminating confusion with physical ESP32 monitoring nodes.
+- **Account & Session Security Section:** Implemented an operational security section displaying single active session status and email verification status badge (`Terverifikasi` / `Verified`). Client IP and User-Agent are omitted in accordance with privacy and scope constraints.
+- **PasswordChangeModal Component (`apps/web/app/profile/PasswordChangeModal.tsx`) [NEW]:** Accessible modal dialog wired directly to `POST /api/v1/auth/change-password`. Upon successful password change (HTTP 204), all active sessions are revoked and the user is redirected to `/login?message=PASSWORD_CHANGED`.
+- **Logout Path Hardening:** `handleLogout` in `/profile` and `/(auth)/status` explicitly sends `credentials: 'same-origin'` to `POST /api/v1/auth/logout`.
+- **Approved Future Frontend Scope (`TASK-0216`):**
   - **Change Email Modal:** Implement a 2-step modal dialog for current password confirmation + new email entry, followed by 6-digit numeric verification code entry with 60-second cooldown timer.
-  - **Visual Governance:** Conforms to `Premium Minimal Ops`, motion effects `Modal` and `Button hover`, with color tokens `UNCHANGED`.
+- **Visual Governance:** Conforms strictly to `Premium Minimal Ops`, motion effects `Modal` and `Button hover`, with color tokens `UNCHANGED`.
 <!-- Profile Security Frontend Audit Reconciled: 2026-08-29 -->

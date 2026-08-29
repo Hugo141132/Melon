@@ -38,6 +38,13 @@ export class UnverifiedEmailError extends Error {
   }
 }
 
+export class ActiveSessionExistsError extends Error {
+  constructor() {
+    super('An active session already exists for this account.');
+    this.name = 'ActiveSessionExistsError';
+  }
+}
+
 /**
  * Hashes a raw session token using SHA-256 (hex-encoded).
  * Raw session tokens are never stored in the database.
@@ -111,8 +118,37 @@ export async function loginUser(
 
   const sessionId = crypto.randomUUID();
 
-  await prisma.$transaction([
-    prisma.session.create({
+  await prisma.$transaction(async (tx) => {
+    // 1. Lock the user row to prevent race conditions on concurrent logins
+    await tx.$executeRaw`SELECT id FROM users WHERE id = ${user.id}::uuid FOR UPDATE`;
+
+    // 2. Prune expired or idle-timed-out sessions for this user
+    const thirtyMinsAgo = new Date(now.getTime() - SESSION_IDLE_TIMEOUT_MS);
+    await tx.session.updateMany({
+      where: {
+        userId: user.id,
+        revokedAt: null,
+        OR: [{ expiresAt: { lte: now } }, { lastSeenAt: { lte: thirtyMinsAgo } }],
+      },
+      data: {
+        revokedAt: now,
+      },
+    });
+
+    // 3. Check if there is still an active session
+    const existingSession = await tx.session.findFirst({
+      where: {
+        userId: user.id,
+        revokedAt: null,
+      },
+    });
+
+    if (existingSession) {
+      throw new ActiveSessionExistsError();
+    }
+
+    // 4. Create new session, update user, write audit log
+    await tx.session.create({
       data: {
         id: sessionId,
         sessionTokenHash,
@@ -122,12 +158,14 @@ export async function loginUser(
         ipAddress: metadata?.ipAddress ?? null,
         userAgent: metadata?.userAgent ?? null,
       },
-    }),
-    prisma.user.update({
+    });
+
+    await tx.user.update({
       where: { id: user.id },
       data: { lastLoginAt: now },
-    }),
-    prisma.auditLog.create({
+    });
+
+    await tx.auditLog.create({
       data: {
         eventKey: AuditEventKey.AUTH_LOGIN_SUCCESS,
         actorUserId: user.id,
@@ -142,8 +180,8 @@ export async function loginUser(
         ipAddress: metadata?.ipAddress ?? null,
         userAgent: metadata?.userAgent ?? null,
       },
-    }),
-  ]);
+    });
+  });
 
   const rawUserWithRoles: RawDbUserWithRoles = {
     id: user.id,
@@ -189,7 +227,7 @@ export interface ValidatedSession {
 
 /**
  * Validates a session by its raw token.
- * Checks 30-minute idle timeout, 12-hour absolute lifetime, and revalidates that the user's
+ * Checks 30-minute idle timeout, 8-hour absolute lifetime, and revalidates that the user's
  * account status remains ACTIVE. If invalid, soft-revokes the session and returns null.
  */
 export async function validateSession(
@@ -225,7 +263,7 @@ export async function validateSession(
     return null;
   }
 
-  // 12-hour absolute lifetime check
+  // 8-hour absolute lifetime check
   if (now.getTime() >= session.expiresAt.getTime()) {
     await prisma.session.update({
       where: { id: session.id },

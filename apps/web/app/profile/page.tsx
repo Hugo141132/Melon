@@ -17,6 +17,7 @@ import {
 import { USER_PROFILE } from '@/lib/constants';
 import { useTranslations } from 'next-intl';
 import { useAuth } from '@/context/AuthContext';
+import { PasswordChangeModal } from './PasswordChangeModal';
 
 interface UserProfileState {
   id: string;
@@ -55,6 +56,7 @@ export default function ProfilePage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [unauthenticated, setUnauthenticated] = useState(!isAuthenticated && !user);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
 
   // Sync state if user changes from auth context
   useEffect(() => {
@@ -174,7 +176,7 @@ export default function ProfilePage() {
   const handleLogout = async () => {
     setLoggingOut(true);
     try {
-      await fetch('/api/v1/auth/logout', { method: 'POST' });
+      await fetch('/api/v1/auth/logout', { method: 'POST', credentials: 'same-origin' });
     } catch {
       // Ignore network error during logout cleanup
     } finally {
@@ -188,15 +190,13 @@ export default function ProfilePage() {
       <div className="bg-app-surface text-app-on-surface min-h-dvh flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl p-6 max-w-sm w-full text-center space-y-4 soft-elevation">
           <AlertCircle className="w-12 h-12 text-app-error mx-auto" />
-          <h2 className="text-xl font-bold">Sesi Berakhir</h2>
-          <p className="text-sm text-app-on-surface-variant">
-            Sesi Anda telah berakhir atau akun tidak aktif. Silakan masuk kembali.
-          </p>
+          <h2 className="text-xl font-bold">{tProfile('sessionExpiredTitle')}</h2>
+          <p className="text-sm text-app-on-surface-variant">{tProfile('sessionExpiredDesc')}</p>
           <Link
             href="/login"
             className="block w-full py-3 bg-app-primary text-white rounded-xl font-semibold active:scale-95 transition-transform"
           >
-            Kembali ke Login
+            {tProfile('backToLogin')}
           </Link>
         </div>
       </div>
@@ -308,11 +308,11 @@ export default function ProfilePage() {
             {/* Username / Alias (Editable) */}
             <div className="space-y-2">
               <label className="text-[14px] font-semibold text-app-on-surface-variant px-1 block">
-                Username / Alias (Opsional)
+                {tProfile('usernameLabel')}
               </label>
               <input
                 className="w-full h-[56px] px-4 bg-white border-[1.5px] border-app-outline-variant rounded-xl focus:border-app-primary focus:ring-1 focus:ring-app-primary outline-none transition-all text-[16px]"
-                placeholder="username"
+                placeholder={tProfile('usernamePlaceholder')}
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
@@ -322,14 +322,54 @@ export default function ProfilePage() {
           </div>
         </section>
 
-        {/* Section 2: Security */}
+        {/* Section 2: Account & Session Security */}
         <section className="space-y-[1rem]">
           <h2 className="text-[20px] font-semibold text-app-on-surface px-1">
             {tProfile('securityTitle')}
           </h2>
           <div className="bg-white rounded-2xl soft-elevation overflow-hidden divide-y divide-app-surface-container">
+            {/* Session Status */}
+            <div className="w-full flex items-center justify-between p-4">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-full bg-app-surface-container-low flex items-center justify-center text-app-primary">
+                  <Smartphone size={18} />
+                </div>
+                <div>
+                  <p className="text-[16px] font-semibold text-app-on-surface">
+                    {tProfile('activeSession')}
+                  </p>
+                  <p className="text-[12px] text-app-primary font-medium flex items-center gap-1">
+                    <CheckCircle size={12} />
+                    {tProfile('singleSessionEnforced')}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Email Verification */}
+            <div className="w-full flex items-center justify-between p-4">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-full bg-app-surface-container-low flex items-center justify-center text-app-primary">
+                  <CheckCircle size={18} />
+                </div>
+                <div>
+                  <p className="text-[16px] font-semibold text-app-on-surface">
+                    {tProfile('emailStatus')}
+                  </p>
+                  <p className="text-[12px] text-app-primary font-medium flex items-center gap-1">
+                    {profile?.accountStatus === 'ACTIVE' || user?.accountStatus === 'ACTIVE'
+                      ? tProfile('verified')
+                      : tProfile('unverified')}
+                  </p>
+                </div>
+              </div>
+            </div>
+
             {/* Password */}
-            <button className="w-full flex items-center justify-between p-4 active:bg-app-surface-container transition-colors text-left group cursor-pointer">
+            <button
+              onClick={() => setIsPasswordModalOpen(true)}
+              className="w-full flex items-center justify-between p-4 active:bg-app-surface-container transition-colors text-left group cursor-pointer"
+            >
               <div className="flex items-center gap-4">
                 <div className="w-10 h-10 rounded-full bg-app-surface-container-low flex items-center justify-center text-app-primary">
                   <Lock size={18} />
@@ -339,28 +379,7 @@ export default function ProfilePage() {
                     {tProfile('changePassword')}
                   </p>
                   <p className="text-[12px] text-app-on-surface-variant">
-                    Terakhir diubah {USER_PROFILE.lastPasswordChange}
-                  </p>
-                </div>
-              </div>
-              <ArrowLeft
-                size={18}
-                className="text-app-on-surface-variant rotate-180 group-active:translate-x-1 transition-transform"
-              />
-            </button>
-
-            {/* Devices */}
-            <button className="w-full flex items-center justify-between p-4 active:bg-app-surface-container transition-colors text-left group cursor-pointer">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-full bg-app-surface-container-low flex items-center justify-center text-app-primary">
-                  <Smartphone size={18} />
-                </div>
-                <div>
-                  <p className="text-[16px] font-semibold text-app-on-surface">
-                    {tProfile('linkedDevices')}
-                  </p>
-                  <p className="text-[12px] text-app-primary font-medium">
-                    {USER_PROFILE.devicesCount} Perangkat Aktif
+                    {tProfile('changePasswordDesc')}
                   </p>
                 </div>
               </div>
@@ -416,6 +435,12 @@ export default function ProfilePage() {
           {tProfile('savedToast')}
         </div>
       )}
+
+      {/* Modals */}
+      <PasswordChangeModal
+        isOpen={isPasswordModalOpen}
+        onClose={() => setIsPasswordModalOpen(false)}
+      />
     </div>
   );
 }

@@ -2,6 +2,10 @@ import { execSync } from 'child_process';
 import crypto from 'crypto';
 import net from 'net';
 
+import path from 'path';
+
+const PKG_DIR = path.resolve(__dirname, '..');
+
 async function getAvailablePort(): Promise<number> {
   return new Promise((resolve, reject) => {
     const server = net.createServer();
@@ -16,6 +20,7 @@ async function getAvailablePort(): Promise<number> {
 
 function run(cmd: string, env: Record<string, string> = {}) {
   execSync(cmd, {
+    cwd: PKG_DIR,
     stdio: 'inherit',
     env: { ...process.env, ...env },
   });
@@ -68,9 +73,13 @@ async function main() {
 
     // 5. Execute session integration tests with process-isolated TEST_DATABASE_URL
     console.log('[5/5] Executing session service integration test suite...');
-    run(`npx vitest run test/session-service.integration.test.ts`, {
-      TEST_DATABASE_URL: testDbUrl,
-    });
+    run(
+      `npx vitest run test/session-service.integration.test.ts --config vitest.integration.config.mts`,
+      {
+        TEST_DATABASE_URL: testDbUrl,
+        DATABASE_URL: testDbUrl,
+      }
+    );
 
     console.log('--- REPRODUCIBLE DOCKER SESSION INTEGRATION TEST SUCCEEDED ---');
   } finally {

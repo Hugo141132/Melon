@@ -1728,19 +1728,19 @@ The following architecture facts are supported by the verified implementation of
 
 ---
 
-## Planned Single Active Session & Verified Email Change Architecture Note (Reconciled 2026-08-29)
+## Single Active Session & Verified Email Change Architecture Note (Reconciled 2026-08-29)
 
-> **Implementation Status:** `APPROVED & READY — NOT YET IMPLEMENTED IN CODEBASE`
+> **Associated Tasks:** `TASK-0217` (P0, DONE), `TASK-0216` (P1, READY)
 > **Governing Decisions:** `DEC-AUTH-106`, `DEC-AUTH-107`, `DEC-UIUX-102`
-> **Associated Tasks:** `TASK-0217` (P0, READY), `TASK-0216` (P1, READY)
 
-The following architectural specifications define the planned security and profile management workflows prior to code modification:
+The following architectural specifications define the verified security and profile management workflows:
 
 1. **Single Active Session Concurrency Architecture (`DEC-AUTH-107` / `TASK-0217`):**
    - **Concurrency Model:** Enforces a strict upper bound of exactly one active session per user account across all client devices.
-   - **Transactional Guard:** During `POST /api/v1/auth/login`, `session-service.ts` queries active sessions inside a locked PostgreSQL transaction. Stale sessions (expired `> 8h`, idle-timed-out `> 30m`, or already revoked) are automatically pruned and soft-revoked.
+   - **Transactional Guard:** During `POST /api/v1/auth/login`, `session-service.ts` acquires an explicit row lock (`SELECT id FROM users WHERE id = ${user.id}::uuid FOR UPDATE`) inside a PostgreSQL transaction. Stale sessions (expired `> 8h`, idle-timed-out `> 30m`, or already revoked) are automatically pruned and soft-revoked.
    - **Denial & Session Preservation:** If a valid, non-expired, non-idle, non-revoked session exists, the new login attempt is rejected with HTTP 409 Conflict (`ACTIVE_SESSION_EXISTS`). The pre-existing active session is preserved without interruption or downgrade.
-   - **Database Index Optimization:** Planned addition of composite index `@@index([userId, revokedAt, expiresAt], map: "sessions_user_active_idx")` on `sessions` table (requires Prisma migration upon implementation).
+   - **Database Index Optimization:** Backed by composite index `@@index([userId, revokedAt, expiresAt], map: "sessions_user_active_idx")` created via migration `20260820000000_add_session_user_active_index`.
+   - **Fail-Closed Logout:** `POST /api/v1/auth/logout` extracts the cookie via Next.js `cookies().get(SESSION_COOKIE_NAME)` (with URL-decoding fallback), revokes the session in PostgreSQL, clears the cookie, and fails closed with standard `INTERNAL_ERROR` (500) if an unexpected error occurs.
 
 2. **Verified Self-Service Email Change Architecture (`DEC-AUTH-106` / `TASK-0216`):**
    - **Authority Isolation:** When an authenticated user requests an email update (`POST /api/v1/me/email/request`), the existing email retains 100% authority for all system logins and alerts until the new email is confirmed.
@@ -1751,8 +1751,8 @@ The following architectural specifications define the planned security and profi
 3. **Profile Security UI Architecture (`DEC-UIUX-102`):**
    - **Decoupling from IoT Terminology:** The misleading "Linked Devices" card is removed from `/profile`, eliminating confusion with physical ESP32 monitoring nodes.
    - **Security Management Section:** Replaced with Account & Session Security status (single active session indicator, email verification badge, and password change metadata). Unapproved client PII (IP address and User-Agent) is omitted from the UI.
-   - **Password Change Service Reuse:** Wires the Change Password modal to the existing `POST /api/v1/auth/change-password` endpoint with automatic session revocation and redirect to `/login`.
+   - **Password Change Service Reuse:** Wires the Change Password modal to the existing `POST /api/v1/auth/change-password` endpoint with automatic session revocation and redirect to `/login?message=PASSWORD_CHANGED`.
 
 4. **Staging & Database Deployment Requirements:**
-   - Both `TASK-0217` and `TASK-0216` will require database migrations (`npx prisma migrate deploy`) and staging service redeployment on Railway/Supabase when implemented. Zero schema or runtime changes have been applied in this documentation phase.
+   - `TASK-0217` requires applying migration `20260820000000_add_session_user_active_index` (`npx prisma migrate deploy`) to staging Supabase and redeploying the `web` service on Railway.
 <!-- Single Active Session & Email Change Architecture Reconciled: 2026-08-29 -->

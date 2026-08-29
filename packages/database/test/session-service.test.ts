@@ -3,6 +3,7 @@ import {
   hashSessionToken,
   InvalidCredentialsError,
   AccountStatusForbiddenError,
+  ActiveSessionExistsError,
   SESSION_COOKIE_NAME,
   SESSION_IDLE_TIMEOUT_MS,
   SESSION_ABSOLUTE_LIFETIME_MS,
@@ -40,5 +41,9 @@ describe('Session Service Unit Tests', () => {
     const suspendedErr = new AccountStatusForbiddenError(AccountStatus.SUSPENDED);
     expect(suspendedErr.status).toBe(AccountStatus.SUSPENDED);
     expect(suspendedErr.message).toContain('SUSPENDED');
+
+    const sessionExistsErr = new ActiveSessionExistsError();
+    expect(sessionExistsErr.message).toContain('active session already exists');
+    expect(sessionExistsErr.name).toBe('ActiveSessionExistsError');
   });
 });

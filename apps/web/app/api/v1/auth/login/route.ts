@@ -7,6 +7,7 @@ import {
   SESSION_COOKIE_NAME,
   SESSION_ABSOLUTE_LIFETIME_SECONDS,
   UnverifiedEmailError,
+  ActiveSessionExistsError,
 } from '@kebun-melon/database';
 import { AccountStatus, LoginInputSchema } from '@kebun-melon/contracts';
 import { ZodError } from 'zod';
@@ -140,6 +141,21 @@ export async function POST(request: Request) {
           meta: { requestId },
         },
         { status: 403 }
+      );
+    } else if (
+      error instanceof ActiveSessionExistsError ||
+      error?.name === 'ActiveSessionExistsError'
+    ) {
+      errResponse = NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'ACTIVE_SESSION_EXISTS',
+            message: error.message,
+          },
+          meta: { requestId },
+        },
+        { status: 409 }
       );
     } else {
       errResponse = NextResponse.json(

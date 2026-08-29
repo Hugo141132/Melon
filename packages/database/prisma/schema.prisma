@@ -523,6 +523,7 @@ model Session {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId, revokedAt, expiresAt], map: "sessions_user_active_idx")
   @@map("sessions")
 }
 

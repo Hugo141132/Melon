@@ -1638,5 +1638,17 @@ The following security controls are active and verified for `TASK-0215` (Central
 The following security controls are active and verified regarding `TASK-0807`, `TASK-0502`, and `TASK-0306` (`/controls` Loading & Header Stability):
 - **Zero Fabricated State:** Skeletons and placeholder states in `WaterTankMonitoringCard` and `FaucetControlPanel` never fabricate sensor measurements (e.g. tank volume, flow rate) or physical actuator states (`OPEN` / `CLOSED`) during loading.
 - **Admin Device ID Concealment:** The centered header `DeviceSelector` and controls views strictly preserve canonical `deviceId` concealment for Admin accounts (`DEC-DEV-028`).
-- **Zero Security Exceptions:** No security controls, session policies, CSRF protections, or authorization gates were relaxed or bypassed.
 <!-- Controls Loading & Header Centering Security Reconciled: 2026-08-27 -->
+
+---
+
+## Single Active Session Enforcement & Profile Security Controls Note (Reconciled 2026-08-29)
+
+The following security controls are active and verified regarding `TASK-0217` (Single Active Session Enforcement and Profile Security UI):
+- **Universal Single Active Session Limit (`DEC-AUTH-107` / `SEC-AUTH-007`):** Enforces at most 1 active session per user account across all client devices.
+- **Fail-Closed Concurrency & Database Row Locking:** During login, `session-service.ts` acquires an explicit PostgreSQL user row lock (`SELECT id FROM users WHERE id = ${user.id}::uuid FOR UPDATE`) inside a transaction, eliminating race conditions during simultaneous login attempts.
+- **Conflict Denial & Session Preservation:** A new valid login attempt against an account with an active session is rejected with HTTP 409 Conflict (`ACTIVE_SESSION_EXISTS`). The pre-existing valid active session is never invalidated or downgraded by the rejected attempt.
+- **Automatic Stale Session Pruning:** Sessions past their absolute lifetime (8 hours), idle timeout (30 minutes), or explicitly revoked are soft-revoked inside the login transaction and do not block subsequent logins.
+- **Fail-Closed Logout Semantics:** `POST /api/v1/auth/logout` extracts the session token, revokes the session row in PostgreSQL (`revoked_at = NOW()`), records an `AUTH_LOGOUT` audit log, and clears the cookie. If an unexpected server/database error occurs, the endpoint fails closed with HTTP 500 `INTERNAL_ERROR` rather than a false 204 success.
+- **Profile UI Privacy & Password Revocation (`DEC-UIUX-102`):** Removed misleading "Linked Devices" from `/profile`, omitted unapproved client PII (IP address and User-Agent), and wired Change Password to `POST /api/v1/auth/change-password` with session revocation and redirect to `/login?message=PASSWORD_CHANGED`.
+<!-- TASK-0217 Reconciled: 2026-08-29 -->

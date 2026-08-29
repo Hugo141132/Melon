@@ -1153,16 +1153,15 @@ The following facts are verified in the product implementation regarding `TASK-0
 
 ---
 
-## Planned Verified Self-Email Change & Single Active Session Requirements Note (Reconciled 2026-08-29)
+## Verified Self-Email Change & Single Active Session Requirements Note (Reconciled 2026-08-29)
 
-> **Implementation Status:** `APPROVED & READY — NOT YET IMPLEMENTED IN CODEBASE`
 > **Associated Requirements:** `PRD-FR-024` (Self-Email Change), `PRD-FR-025` (Single Active Session Enforcement)
-> **Associated Tasks:** `TASK-0217` (P0, READY), `TASK-0216` (P1, READY)
+> **Associated Tasks:** `TASK-0217` (P0, DONE), `TASK-0216` (P1, READY)
 > **Governing Decisions:** `DEC-AUTH-106`, `DEC-AUTH-107`, `DEC-UIUX-102`
 
-The following product requirements define the planned capabilities prior to implementation:
+The following product requirements define the security and profile management capabilities:
 - **`PRD-FR-024` (Verified Self-Email Change):** Enables authenticated users to update their registered email address. The existing email remains 100% authoritative for all system access until the 6-digit numeric verification code (15-minute expiry) delivered to the new email is confirmed. Preserves active session without logout, validates uniqueness, and records non-sensitive audit metadata (`account.email.changed`).
-- **`PRD-FR-025` (Single Active Session Enforcement):** Guarantees at most 1 active login session per user account across all devices. Submitting valid credentials when an active, non-expired, non-idle, non-revoked session exists rejects the login with HTTP 409 Conflict (`ACTIVE_SESSION_EXISTS`) and preserves the existing session. Expired (`> 8h`), idle-timed-out (`> 30m`), or revoked sessions are pruned and do not block login.
-- **Profile Security Reconciliation:** Permanently removes "Linked Devices" from `/profile`, replaces it with Account & Session Security status (omitting client IP and User-Agent), and wires Change Password directly to `POST /api/v1/auth/change-password`.
-- **Database & Staging Impacts:** Both tasks will require database migrations and staging deployment when executed. Zero source code or database migrations have been executed during this documentation phase.
+- **`PRD-FR-025` (Single Active Session Enforcement - IMPLEMENTED & VERIFIED):** Guarantees at most 1 active login session per user account across all devices. Submitting valid credentials when an active, non-expired, non-idle, non-revoked session exists rejects the login with HTTP 409 Conflict (`ACTIVE_SESSION_EXISTS`) and preserves the existing session. Expired (`> 8h`), idle-timed-out (`> 30m`), or revoked sessions are pruned and do not block login. Concurrency is race-safe and fail-closed via PostgreSQL user-row locking.
+- **Profile Security Reconciliation (IMPLEMENTED & VERIFIED):** Permanently removes "Linked Devices" from `/profile`, replaces it with Account & Session Security status (omitting client IP and User-Agent), and wires Change Password directly to `POST /api/v1/auth/change-password` with redirect to `/login?message=PASSWORD_CHANGED`.
+- **Database & Staging Impacts:** `TASK-0217` migration `20260820000000_add_session_user_active_index` has been created and verified locally, pending deployment to Supabase staging and Railway `web` service.
 <!-- Single Active Session & Email Change PRD Reconciled: 2026-08-29 -->

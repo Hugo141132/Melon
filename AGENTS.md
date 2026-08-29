@@ -242,14 +242,14 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
 #### TASK-0217 Governance Record
 
 `TASK-0217` single active session enforcement and profile security UI record:
-- Status: `READY`
+- Status: `DONE` (Completed 2026-08-29)
 - Priority: `P0` (Security-critical session enforcement)
 - Frontend impact: `MINOR`
 - Selected UI direction: `Premium Minimal Ops`
 - Existing color template: `UNCHANGED`
 - Selected motion effects: `Modal`, `Button hover`
 - 21st.dev MCP: `NOT REQUIRED`
-- Summary: Single active session enforcement and profile interface reconciliation governed by `DEC-AUTH-107` and `DEC-UIUX-102`. Enforces exactly 1 active session per user account, rejecting incoming valid logins with HTTP 409 Conflict (`ACTIVE_SESSION_EXISTS`) and preserving pre-existing live sessions without invalidation. Automatically prunes expired (`> 8h`), idle-timed-out (`> 30m`), or revoked sessions inside the transaction. Optimizes session lookups via composite index `sessions(user_id, revoked_at, expires_at)`. Reconciles `/profile` by permanently removing the misleading "Linked Devices" card, replacing it with an operational "Account & Session Security" section (active session status, email verification status badge, omitting unapproved client PII), and wiring "Change Password" directly to existing backend endpoint `POST /api/v1/auth/change-password` with session revocation and redirect to `/login`.
+- Summary: Single active session enforcement and profile interface reconciliation governed by `DEC-AUTH-107` and `DEC-UIUX-102`. Enforces exactly 1 active session per user account, rejecting incoming valid logins with HTTP 409 Conflict (`ACTIVE_SESSION_EXISTS`) and preserving pre-existing live sessions without invalidation. Automatically prunes expired (`> 8h`), idle-timed-out (`> 30m`), or revoked sessions inside the locked transaction. Optimizes session lookups via composite index `sessions_user_active_idx` on `sessions(user_id, revoked_at, expires_at)`. Reconciles `/profile` by permanently removing the misleading "Linked Devices" card, replacing it with an operational "Account & Session Security" section (active session status, email verification status badge, omitting unapproved client PII), and wiring "Change Password" directly to existing backend endpoint `POST /api/v1/auth/change-password` with session revocation and redirect to `/login?message=PASSWORD_CHANGED`. Verified 100% test pass rate across focused unit test suites (`profile-page.test.tsx`, `route.test.ts`, `session-service.test.ts`), translation completeness checks (100% key parity), and TypeScript typecheck (0 errors across 4 monorepo workspaces).
 
 #### TASK-0216 Governance Record
 

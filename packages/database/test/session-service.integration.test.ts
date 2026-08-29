@@ -7,6 +7,7 @@ import {
   hashSessionToken,
   InvalidCredentialsError,
   AccountStatusForbiddenError,
+  ActiveSessionExistsError,
   SESSION_IDLE_TIMEOUT_MS,
   SESSION_ABSOLUTE_LIFETIME_MS,
 } from '../src/session-service';
@@ -196,7 +197,7 @@ describe('TASK-0204 Login and Session Management Integration Test Suite', () => 
     ).rejects.toThrow(AccountStatusForbiddenError);
   });
 
-  it('4. Session lookup enforces 30-min idle and 12-hour absolute timeouts', async () => {
+  it('4. Session lookup enforces 30-min idle and 8-hour absolute timeouts', async () => {
     await createTestUser('session.user@example.com', AccountStatus.ACTIVE);
 
     const loginRes = await loginUser(prisma, {
@@ -227,7 +228,7 @@ describe('TASK-0204 Login and Session Management Integration Test Suite', () => 
     });
     expect(dbIdleSession?.revokedAt).not.toBeNull();
 
-    // Create a new session for 12-hour absolute test
+    // Create a new session for 8-hour absolute test
     const loginRes2 = await loginUser(prisma, {
       email: 'session.user@example.com',
       password: 'ValidPassword123!',
@@ -306,5 +307,159 @@ describe('TASK-0204 Login and Session Management Integration Test Suite', () => 
     // Random non-existent token logout (safe, returns false)
     const invalidRevoke = await revokeSession(prisma, 'nonexistenttoken');
     expect(invalidRevoke).toBe(false);
+  });
+  it('7. Simultaneous concurrent login attempts for the same user atomically allow exactly one session and reject the other with ActiveSessionExistsError', async () => {
+    const user = await createTestUser('concurrent.user@example.com', AccountStatus.ACTIVE);
+
+    // Trigger two simultaneous logins for the same user concurrently
+    const [resA, resB] = await Promise.allSettled([
+      loginUser(prisma, {
+        email: 'concurrent.user@example.com',
+        password: 'ValidPassword123!',
+      }),
+      loginUser(prisma, {
+        email: 'concurrent.user@example.com',
+        password: 'ValidPassword123!',
+      }),
+    ]);
+
+    // Exactly one must succeed, and exactly one must fail with ActiveSessionExistsError
+    const fulfilled = [resA, resB].filter((r) => r.status === 'fulfilled');
+    const rejected = [resA, resB].filter((r) => r.status === 'rejected');
+
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+
+    const successfulResult = (fulfilled[0] as PromiseFulfilledResult<any>).value;
+    expect(successfulResult.rawToken).toBeDefined();
+
+    const rejectedError = (rejected[0] as PromiseRejectedResult).reason;
+    expect(rejectedError.name).toBe('ActiveSessionExistsError');
+
+    // Verify in database: exactly ONE active (non-revoked) session exists
+    const activeSessions = await prisma.session.findMany({
+      where: {
+        userId: user.id,
+        revokedAt: null,
+      },
+    });
+    expect(activeSessions).toHaveLength(1);
+  });
+
+  it('8. Existing active session is preserved when a conflicting login attempt is rejected', async () => {
+    const user = await createTestUser('preserve.user@example.com', AccountStatus.ACTIVE);
+
+    // Initial valid login
+    const loginRes1 = await loginUser(prisma, {
+      email: 'preserve.user@example.com',
+      password: 'ValidPassword123!',
+    });
+    expect(loginRes1.rawToken).toBeDefined();
+
+    // Subsequent conflicting login
+    await expect(
+      loginUser(prisma, {
+        email: 'preserve.user@example.com',
+        password: 'ValidPassword123!',
+      })
+    ).rejects.toThrow(ActiveSessionExistsError);
+
+    // Verify existing session remains valid and NOT revoked
+    const validLookup = await validateSession(prisma, loginRes1.rawToken);
+    expect(validLookup).not.toBeNull();
+    expect(validLookup?.user.id).toBe(user.id);
+  });
+
+  it('9. Expired, idle (>30m), and revoked sessions do not block new login attempts', async () => {
+    const user = await createTestUser('bypass.user@example.com', AccountStatus.ACTIVE);
+
+    // 1. Prior idle session (>30m)
+    const idleLogin = await loginUser(prisma, {
+      email: 'bypass.user@example.com',
+      password: 'ValidPassword123!',
+    });
+    const idleTokenHash = hashSessionToken(idleLogin.rawToken);
+    const thirtyOneMinsAgo = new Date(Date.now() - (SESSION_IDLE_TIMEOUT_MS + 60000));
+    await prisma.session.update({
+      where: { sessionTokenHash: idleTokenHash },
+      data: { lastSeenAt: thirtyOneMinsAgo },
+    });
+
+    // New login succeeds (auto-prunes idle session)
+    const newLogin1 = await loginUser(prisma, {
+      email: 'bypass.user@example.com',
+      password: 'ValidPassword123!',
+    });
+    expect(newLogin1.rawToken).toBeDefined();
+
+    // Verify old idle session is now revoked in DB
+    const oldIdleDb = await prisma.session.findUnique({
+      where: { sessionTokenHash: idleTokenHash },
+    });
+    expect(oldIdleDb?.revokedAt).not.toBeNull();
+
+    // 2. Prior expired session (>8h)
+    const expiredTokenHash = hashSessionToken(newLogin1.rawToken);
+    await prisma.session.update({
+      where: { sessionTokenHash: expiredTokenHash },
+      data: { expiresAt: new Date(Date.now() - 1000) },
+    });
+
+    // New login succeeds (auto-prunes expired session)
+    const newLogin2 = await loginUser(prisma, {
+      email: 'bypass.user@example.com',
+      password: 'ValidPassword123!',
+    });
+    expect(newLogin2.rawToken).toBeDefined();
+
+    // 3. Explicitly revoked session
+    await revokeSession(prisma, newLogin2.rawToken);
+
+    // New login succeeds
+    const newLogin3 = await loginUser(prisma, {
+      email: 'bypass.user@example.com',
+      password: 'ValidPassword123!',
+    });
+    expect(newLogin3.rawToken).toBeDefined();
+  });
+
+  it('10. Browser B succeeds after Browser A logs out from concurrent rejection', async () => {
+    const user = await createTestUser('regression.user@example.com', AccountStatus.ACTIVE);
+
+    // 1. Browser A logs in
+    const loginA = await loginUser(prisma, {
+      email: 'regression.user@example.com',
+      password: 'ValidPassword123!',
+    });
+    expect(loginA.rawToken).toBeDefined();
+
+    // 2. Browser B attempts login and fails with 409
+    await expect(
+      loginUser(prisma, {
+        email: 'regression.user@example.com',
+        password: 'ValidPassword123!',
+      })
+    ).rejects.toThrow(ActiveSessionExistsError);
+
+    // 3. Browser A logs out
+    const revoked = await revokeSession(prisma, loginA.rawToken);
+    expect(revoked).toBe(true);
+
+    // 4. Browser B attempts login again and succeeds
+    const loginB = await loginUser(prisma, {
+      email: 'regression.user@example.com',
+      password: 'ValidPassword123!',
+    });
+    expect(loginB.rawToken).toBeDefined();
+
+    // 5. Verify exactly one valid active session remains
+    const validLookup = await validateSession(prisma, loginB.rawToken);
+    expect(validLookup).not.toBeNull();
+
+    const allSessions = await prisma.session.findMany({
+      where: { userId: user.id, revokedAt: null },
+    });
+    expect(allSessions.length).toBe(1);
+    expect(allSessions[0].id).toBe(validLookup?.session.id);
   });
 });

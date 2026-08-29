@@ -1910,3 +1910,14 @@ The following environment topology and database facts are verified regarding `TA
 - **Transient Connectivity Reconciliation:** The earlier local Prisma connection timeout was transient; local connection parameters (`postgres.xjsencdgfcbkzdzqcnqx` on `aws-1` port 6543 with `?pgbouncer=true`) are verified and active.
 - **Zero Schema Migrations:** No database schema alterations, Prisma migrations, index modifications, or repository signature changes were made for the 2026-08-27 UI loading and header centering reconciliations.
 <!-- Controls Loading & Database Separation Reconciled: 2026-08-27 -->
+
+---
+
+## Single Active Session Enforcement Database Implementation Note (Reconciled 2026-08-29)
+
+The following facts are supported by the verified database interactions of `TASK-0217` (Single Active Session Enforcement and Profile Security UI):
+- **Prisma Migration & Composite Index:** Migration `20260820000000_add_session_user_active_index` adds the composite index `sessions_user_active_idx` on `sessions(user_id, revoked_at, expires_at)` to optimize active session verification and pruning queries.
+- **Fail-Closed Concurrency Locking:** `loginUser` (`packages/database/src/session-service.ts`) executes inside a serializable/locked transaction that acquires an explicit row lock (`SELECT id FROM users WHERE id = ${user.id}::uuid FOR UPDATE`) before pruning expired/idle sessions and evaluating existing active sessions.
+- **Active Session Evaluation & Denial:** If an active session exists (`revoked_at IS NULL`, `expires_at > NOW()`, `NOW() - last_seen_at <= 30m`), `ActiveSessionExistsError` is thrown inside the transaction, preserving the pre-existing session row unmodified.
+- **Fail-Closed Logout Revocation:** `revokeSession` atomically updates `sessions.revoked_at = NOW()` and inserts a structured audit record (`AUTH_LOGOUT`). Unexpected database failures fail closed with standard error responses.
+<!-- TASK-0217 Reconciled: 2026-08-29 -->

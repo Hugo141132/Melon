@@ -937,7 +937,8 @@ Implemented complete Owner User Management:
 ## TASK-0217 — Implement Single Active Session Enforcement and Profile Security UI
 
 **Priority:** `P0`
-**Status:** `READY`
+**Status:** `DONE`
+**Completed:** 2026-08-29
 **Dependencies:** `TASK-0204`, `TASK-0211`, `TASK-0215`, `DEC-AUTH-107`, `DEC-UIUX-102`
 
 ### Work
@@ -954,19 +955,19 @@ Implemented complete Owner User Management:
 4. **Profile UI Refactor & Password Change Wiring (`apps/web/app/profile/page.tsx`):**
    - Permanently remove the misleading "Linked Devices" card (`USER_PROFILE.devicesCount: 3`).
    - Replace with "Account & Session Security" section displaying the single active session status and email verification badge. Omit unapproved client PII (IP address and User-Agent).
-   - Wire "Change Password" button to a modal form submitting to `POST /api/v1/auth/change-password` with `{ currentPassword, newPassword, newPasswordConfirmation }`, handling validation errors, and redirecting to `/login` upon 204 No Content.
+   - Wire "Change Password" button to a modal form submitting to `POST /api/v1/auth/change-password` with `{ currentPassword, newPassword, newPasswordConfirmation }`, handling validation errors, and redirecting to `/login?message=PASSWORD_CHANGED` upon 204 No Content.
 5. **I18N Support:**
    - Add 100% key-parity translations across `messages/id.json` and `messages/en.json` for single-session rejection, change password modal, and session security UI.
 
 ### Acceptance Criteria
 
-- [ ] Submitting valid credentials while an active session exists returns HTTP 409 Conflict (`ACTIVE_SESSION_EXISTS`).
-- [ ] The existing active session remains valid and is not revoked by the rejected login attempt.
-- [ ] Expired, idle-timed-out (>30m), or revoked sessions do not block subsequent logins.
-- [ ] Race conditions between simultaneous logins for the same account are prevented at the database boundary.
-- [ ] "Linked Devices" card is completely removed from `/profile`.
-- [ ] "Change Password" on `/profile` executes `POST /api/v1/auth/change-password` and redirects to `/login`.
-- [ ] All unit, API, and component tests pass (100% pass rate).
+- [x] Submitting valid credentials while an active session exists returns HTTP 409 Conflict (`ACTIVE_SESSION_EXISTS`).
+- [x] The existing active session remains valid and is not revoked by the rejected login attempt.
+- [x] Expired, idle-timed-out (>30m), or revoked sessions do not block subsequent logins.
+- [x] Race conditions between simultaneous logins for the same account are prevented at the database boundary.
+- [x] "Linked Devices" card is completely removed from `/profile`.
+- [x] "Change Password" on `/profile` executes `POST /api/v1/auth/change-password` and redirects to `/login`.
+- [x] All unit, API, and component tests pass (100% pass rate).
 
 ---
 

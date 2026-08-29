@@ -633,7 +633,7 @@ The following facts are supported by the verified decisions governance of `TASK-
 - **Decision:**
   1. **Removal of Linked Devices:** The "Linked Devices" card is permanently removed from `/profile`.
   2. **Account & Session Security UI:** Replaced with an operational Account & Session Security section displaying the single active session status, email verification status badge, and last password change metadata. In accordance with strict scope control, unapproved client PII (IP address and User-Agent) is omitted from the UI display.
-  3. **Change Password Integration:** The "Change Password" action triggers an accessible modal dialog submitting directly to the existing backend endpoint `POST /api/v1/auth/change-password`. Upon successful password change (HTTP 204), all active sessions are revoked and the user is redirected to `/login`.
+  3. **Change Password Integration:** The "Change Password" action triggers an accessible modal dialog submitting directly to the existing backend endpoint `POST /api/v1/auth/change-password`. Upon successful password change (HTTP 204), all active sessions are revoked and the user is redirected to `/login?message=PASSWORD_CHANGED`.
   4. **Change Email Integration:** A "Change Email" modal provides a 2-step flow: current password verification + new email entry, followed by 6-digit verification code entry with a 60-second cooldown timer.
   5. **Visual Governance:** Conforms strictly to `Premium Minimal Ops` with `globals.css` color tokens unchanged.
 <!-- TASK-0217 Reconciled: 2026-08-29 -->

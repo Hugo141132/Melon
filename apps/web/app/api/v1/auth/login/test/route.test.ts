@@ -119,4 +119,24 @@ describe('POST /api/v1/auth/login Route Handler Unit Tests', () => {
     expect(json.success).toBe(false);
     expect(json.error.code).toBe('VALIDATION_ERROR');
   });
+
+  it('5. Returns 409 Conflict ACTIVE_SESSION_EXISTS when active session exists', async () => {
+    vi.spyOn(dbModule, 'loginUser').mockRejectedValueOnce(new dbModule.ActiveSessionExistsError());
+
+    const req = new Request('http://localhost:3000/api/v1/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: 'user@example.com',
+        password: 'ValidPassword123!',
+      }),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(409);
+
+    const json = await res.json();
+    expect(json.success).toBe(false);
+    expect(json.error.code).toBe('ACTIVE_SESSION_EXISTS');
+  });
 });
