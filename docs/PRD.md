@@ -201,7 +201,7 @@ The initial Owner account is provisioned via CLI seed (`scripts/seed-owner.ts`).
 - Login and session issuance remain blocked server-side with `EMAIL_NOT_VERIFIED` (HTTP 403) until the Owner verifies email ownership (`emailVerifiedAt IS NOT NULL`).
 - The provisioning process outputs a secure email verification link or dispatches verification via Resend.
 
-### 6.5 Login Behaviour (PRD-FR-019)
+### 6.5 Login Behaviour (PRD-FR-019 / PRD-FR-025)
 
 The login page shall:
 
@@ -211,6 +211,8 @@ The login page shall:
 - Prevent access for invalid credentials.
 - Prevent access with HTTP 403 `EMAIL_NOT_VERIFIED` for unverified accounts (`emailVerifiedAt IS NULL`).
 - Prevent access for `PENDING_APPROVAL`, `REJECTED`, `SUSPENDED`, or `DEACTIVATED` accounts.
+- Enforce single active session policy (`PRD-FR-025` / `DEC-AUTH-107`): if valid credentials are submitted while the account already has an active, non-expired, non-idle, non-revoked session, reject the login with HTTP 409 Conflict (`ACTIVE_SESSION_EXISTS`) and preserve the existing active session.
+- Automatically prune expired (`> 8h`), idle-timed-out (`> 30m`), or revoked sessions without blocking login.
 - Display an appropriate account-status message without exposing sensitive system information.
 - Redirect an approved and active user to the appropriate authenticated landing page (`/`).
 - Record successful and failed login attempts according to the security policy.
@@ -234,14 +236,34 @@ The registration email verification workflow shall:
 
 - Provide mandatory email ownership verification for `OWNER` and `ADMIN` roles using Resend (`DEC-AUTH-104` / `TASK-0214`).
 - Track email verification via an independent, nullable `emailVerifiedAt` timestamp on the `users` table, completely decoupled from `accountStatus`.
-- Issue 256-bit CSPRNG verification tokens valid for 24 hours (`AUTH_VERIFY_TOKEN_EXPIRY_HOURS = 24`), storing only SHA-256 hashes in `email_verification_tokens`.
-- Invalidate prior unused verification tokens for that user upon issuing a new token.
-- Support `POST /api/v1/auth/verify-email`: verifies token, updates `emailVerifiedAt`, deletes token, and returns user status without creating an authentication session.
+- Issue 6-digit numeric CSPRNG verification codes (`100000`–`999999`) valid for 15 minutes (`AUTH_VERIFY_TOKEN_EXPIRY_MINUTES = 15`), storing only user-scoped SHA-256 hashes `sha256(userId:code)` in `email_verification_tokens`.
+- Invalidate prior unused verification codes for that user upon issuing a new code.
+- Support `POST /api/v1/auth/verify-email`: verifies code/token, updates `emailVerifiedAt`, deletes token, and returns user status without creating an authentication session.
 - Support `POST /api/v1/auth/resend-verification`: public endpoint with anti-enumeration (unconditional generic 200) and 3 req/min rate limit.
 - Handle database concurrency safely: bounded exponential backoff retries (3 attempts) on Prisma `P2034` write conflicts, returning `CONCURRENCY_CONFLICT` (HTTP 409) on retry exhaustion and `TOKEN_ALREADY_USED` (HTTP 400) for consumed tokens.
 - Handle frontend StrictMode/remount concurrency safely: token-keyed in-flight Promise deduplication with immediate cache eviction upon settlement (`finally`), ensuring single network requests while delivering navigation triggers to the active mount.
 - Enforce server-side guest guard (`DEC-AUTH-103`): authenticated users navigating to `/verify-email` are redirected server-side to `/`.
-- *Delivery & Testing Status*: Verification has been manually exercised using Resend test mode/test recipients and the Resend-provided verification link. We have not yet tested delivery to arbitrary real email recipients using a verified custom sending domain, because no such domain is currently configured. Real-mailbox deliverability is treated as pending deployment/infrastructure acceptance, not an application logic failure.
+
+### 6.8 Self-Service Verified Email Change (PRD-FR-024 / DEC-AUTH-106)
+
+The self-service email change workflow shall:
+
+- Allow authenticated users (`OWNER` and `ADMIN` with `accountStatus = ACTIVE`) to update their registered email address.
+- Maintain existing email authority: current email remains 100% authoritative for all system logins and communications until the new email is verified.
+- Re-authenticate via current password check prior to sending a verification code.
+- Issue a 6-digit numeric CSPRNG code with 15-minute expiry delivered to the new email via Resend (`sendWithRetry`).
+- Store candidate email in `email_verification_tokens.pending_email` and user-and-target-scoped hash `sha256(userId:newEmail:code)`.
+- Atomically update `users.email` and `users.emailVerifiedAt = NOW()`, delete the token, and preserve active session continuity upon verification.
+- Enforce privacy in audit logs: `account.email.changed` records non-sensitive metadata only; raw old and new email strings are never logged.
+
+### 6.9 Profile Security Management & Linked Devices Removal (DEC-UIUX-102)
+
+The profile management interface (`/profile`) shall:
+
+- Permanently remove the misleading "Linked Devices" card (`USER_PROFILE.devicesCount: 3`) to eliminate confusion with physical IoT monitoring nodes.
+- Display an operational "Account & Session Security" section showing single active session status and email verification badge.
+- Omit client IP address and User-Agent from display to prevent unapproved PII leakage.
+- Wire "Change Password" directly to existing endpoint `POST /api/v1/auth/change-password`, revoking all active sessions and redirecting to `/login` upon success.
 
 ---
 
@@ -1129,4 +1151,18 @@ The following facts are verified in the product implementation regarding `TASK-0
 - **Functional Requirements Contracts:** All functional requirements, safety policies (`ENABLE_FAUCET_CONTROL=false` baseline), RBAC enforcement, and device communication contracts remain fully preserved and unchanged.
 <!-- Controls Loading & Header Centering Reconciled: 2026-08-27 -->
 
+---
 
+## Planned Verified Self-Email Change & Single Active Session Requirements Note (Reconciled 2026-08-29)
+
+> **Implementation Status:** `APPROVED & READY — NOT YET IMPLEMENTED IN CODEBASE`
+> **Associated Requirements:** `PRD-FR-024` (Self-Email Change), `PRD-FR-025` (Single Active Session Enforcement)
+> **Associated Tasks:** `TASK-0217` (P0, READY), `TASK-0216` (P1, READY)
+> **Governing Decisions:** `DEC-AUTH-106`, `DEC-AUTH-107`, `DEC-UIUX-102`
+
+The following product requirements define the planned capabilities prior to implementation:
+- **`PRD-FR-024` (Verified Self-Email Change):** Enables authenticated users to update their registered email address. The existing email remains 100% authoritative for all system access until the 6-digit numeric verification code (15-minute expiry) delivered to the new email is confirmed. Preserves active session without logout, validates uniqueness, and records non-sensitive audit metadata (`account.email.changed`).
+- **`PRD-FR-025` (Single Active Session Enforcement):** Guarantees at most 1 active login session per user account across all devices. Submitting valid credentials when an active, non-expired, non-idle, non-revoked session exists rejects the login with HTTP 409 Conflict (`ACTIVE_SESSION_EXISTS`) and preserves the existing session. Expired (`> 8h`), idle-timed-out (`> 30m`), or revoked sessions are pruned and do not block login.
+- **Profile Security Reconciliation:** Permanently removes "Linked Devices" from `/profile`, replaces it with Account & Session Security status (omitting client IP and User-Agent), and wires Change Password directly to `POST /api/v1/auth/change-password`.
+- **Database & Staging Impacts:** Both tasks will require database migrations and staging deployment when executed. Zero source code or database migrations have been executed during this documentation phase.
+<!-- Single Active Session & Email Change PRD Reconciled: 2026-08-29 -->

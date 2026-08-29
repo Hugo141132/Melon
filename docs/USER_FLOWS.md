@@ -527,10 +527,11 @@ flowchart TD
 2. The server loads canonical role and status.
 3. The server verifies status `ACTIVE`.
 4. The server verifies `emailVerifiedAt IS NOT NULL` (returns HTTP 403 `EMAIL_NOT_VERIFIED` if null).
-5. The server creates a secure session.
-6. The server loads permissions and assigned devices.
-7. The frontend redirects to `/`.
-7. The interface displays only permitted navigation items.
+5. The server checks for existing active sessions (`revokedAt IS NULL`, `< 8h`, idle `< 30m`). If an active session exists, the server rejects the login attempt with HTTP 409 Conflict (`ACTIVE_SESSION_EXISTS`) and preserves the existing session (`DEC-AUTH-107`).
+6. The server creates a secure session and rotates session tokens.
+7. The server loads permissions and assigned devices.
+8. The frontend redirects to `/`.
+9. The interface displays only permitted navigation items.
 
 **Alternative flows:**
 
@@ -539,6 +540,7 @@ flowchart TD
 **Error flows:**
 
 - Invalid credentials.
+- Active session already exists on another client: displays localized conflict error (*"Akun sedang aktif di perangkat lain"* / *"Account is currently active in another session"*); existing session remains active.
 - Authentication service failure.
 - Account changed to suspended before session creation.
 
@@ -969,9 +971,9 @@ flowchart TD
 
 ## Flow 22A — Owner Deactivates a Device
 
-**Primary actor:** Owner  
-**Preconditions:** Owner is `ACTIVE`; target device is currently `ACTIVE`.  
-**Trigger:** Owner clicks "Deactivate Device" and confirms in modal on `/devices`.  
+**Primary actor:** Owner
+**Preconditions:** Owner is `ACTIVE`; target device is currently `ACTIVE`.
+**Trigger:** Owner clicks "Deactivate Device" and confirms in modal on `/devices`.
 
 **Main success flow:**
 
@@ -986,19 +988,19 @@ flowchart TD
 9. A `device.deactivated` audit log event is recorded with actor ID and timestamp.
 10. The UI updates device status badge to `DEACTIVATED` (inactive) and presents a "Reactivate" action. All historical telemetry, readings, and logs remain completely preserved.
 
-**Alternative flows:** Device is already deactivated; system returns current status.  
-**Error flows:** Unauthenticated request (401), non-Owner request (403), device not found (404).  
-**Postconditions:** Device is deactivated and prevented from taking commands. Historical data is preserved.  
-**Required permissions:** `device.deactivate` (Owner only).  
-**Audit events:** `device.deactivated`.  
+**Alternative flows:** Device is already deactivated; system returns current status.
+**Error flows:** Unauthenticated request (401), non-Owner request (403), device not found (404).
+**Postconditions:** Device is deactivated and prevented from taking commands. Historical data is preserved.
+**Required permissions:** `device.deactivate` (Owner only).
+**Audit events:** `device.deactivated`.
 
 ---
 
 ## Flow 22B — Owner Reactivates a Device
 
-**Primary actor:** Owner  
-**Preconditions:** Owner is `ACTIVE`; target device is currently `DEACTIVATED`.  
-**Trigger:** Owner clicks "Reactivate" and confirms in modal on `/devices`.  
+**Primary actor:** Owner
+**Preconditions:** Owner is `ACTIVE`; target device is currently `DEACTIVATED`.
+**Trigger:** Owner clicks "Reactivate" and confirms in modal on `/devices`.
 
 **Main success flow:**
 
@@ -1012,11 +1014,11 @@ flowchart TD
 8. A `device.activated` audit log event is recorded with actor ID and timestamp.
 9. The UI updates the device status badge to `ACTIVE` and restores standard operational views.
 
-**Alternative flows:** Device is already active; system returns current status.  
-**Error flows:** Unauthenticated request (401), non-Owner request (403), device not found (404).  
-**Postconditions:** Device account status is restored to `ACTIVE`.  
-**Required permissions:** `device.activate` (Owner only).  
-**Audit events:** `device.activated`.  
+**Alternative flows:** Device is already active; system returns current status.
+**Error flows:** Unauthenticated request (401), non-Owner request (403), device not found (404).
+**Postconditions:** Device account status is restored to `ACTIVE`.
+**Required permissions:** `device.activate` (Owner only).
+**Audit events:** `device.activated`.
 
 ---
 
@@ -2064,4 +2066,62 @@ The following facts are verified in the user flow implementations regarding `TAS
 - **User Flows Invariants:** All functional workflows, permission gates, safety warnings, and offline states remain preserved and unchanged.
 <!-- Controls Loading & Header Centering User Flows Reconciled: 2026-08-27 -->
 
+---
 
+## Flow 27 — Authenticated User Self-Service Email Change (FLOW-AUTH-027 / TASK-0216)
+
+**Primary actor:** Authenticated Owner or Admin with `accountStatus = ACTIVE`
+**Preconditions:** User is authenticated with an active session on `/profile`.
+**Trigger:** User clicks "Change Email" button next to their email field on `/profile`.
+
+**Main success flow:**
+
+1. The user opens `/profile` and clicks "Change Email".
+2. The frontend renders the "Change Email" modal dialog (Step 1: Current Password & New Email Address).
+3. The user enters their current password and desired new email address, then clicks "Send Verification Code".
+4. The frontend submits `POST /api/v1/me/email/request` with `{ currentPassword, newEmail }`.
+5. The server validates current password, confirms `newEmail` is valid and not already registered, generates a 6-digit numeric CSPRNG code with 15-minute expiry, persists `sha256(userId:newEmail:code)` in `email_verification_tokens.pending_email`, and dispatches the code email via Resend (`sendWithRetry`).
+6. The modal advances to Step 2 (6-digit numeric verification code input) with a 60-second resend cooldown timer persisted in `sessionStorage`.
+7. The user retrieves the 6-digit code sent to the *new* email inbox and enters it in the modal.
+8. The frontend submits `POST /api/v1/me/email/verify` with `{ code }`.
+9. The server verifies code validity, atomicity, and candidate email uniqueness in a PostgreSQL transaction, updates `users.email = newEmail` and `users.emailVerifiedAt = NOW()`, deletes the verification token, emits an audit log `account.email.changed` (with non-sensitive metadata; NO raw old/new emails in log), and returns HTTP 200 with updated email metadata.
+10. The frontend updates the active `AuthContext` with the new email, closes the modal, and displays a localized success toast notification.
+11. The user's active session is preserved without forced logout.
+
+**Error flows:**
+- Incorrect current password: displays inline error (*"Kata sandi saat ini salah"* / *"Current password is incorrect"*).
+- Target email already registered: displays conflict error (*"Email sudah digunakan"* / *"Email is already in use"*).
+- Invalid or expired 6-digit code: displays inline error (*"Kode verifikasi tidak valid atau kedaluwarsa"* / *"Invalid or expired verification code"*).
+- Rate limit exceeded (3 req/min for request, 5 req/min for verify): returns HTTP 429 with retry delay banner.
+
+**Postconditions:** User email address is updated; active session preserved; audit log recorded with non-sensitive metadata.
+**Required permissions:** `profilee.self.update`.
+**Audit events:** `account.email.changed`.
+
+---
+
+## Flow 28 — Profile Password Change and Session Invalidation (FLOW-AUTH-028 / TASK-0217)
+
+**Primary actor:** Authenticated Owner or Admin with `accountStatus = ACTIVE`
+**Preconditions:** User is authenticated with an active session on `/profile`.
+**Trigger:** User clicks "Change Password" button in Account & Session Security section on `/profile`.
+
+**Main success flow:**
+
+1. The user opens `/profile` and views the Account & Session Security section.
+2. The user clicks "Change Password".
+3. The frontend renders the "Change Password" modal dialog (`currentPassword`, `newPassword`, `newPasswordConfirmation`).
+4. The user fills in all required fields and submits the form.
+5. The frontend sends `POST /api/v1/auth/change-password` with `{ currentPassword, newPassword, newPasswordConfirmation }`.
+6. The server validates the current password, enforces password complexity rules on the new password, hashes the new password with Argon2id, transactionally updates `users.password_hash`, revokes all active sessions for the user in `sessions`, and clears authentication cookies, returning HTTP 204 No Content.
+7. The frontend clears client auth context and redirects the user to `/login?message=PASSWORD_CHANGED`.
+8. The user logs in with the new password.
+
+**Error flows:**
+- Incorrect current password: displays inline error message without revoking session.
+- New password does not meet complexity: displays validation feedback on required criteria.
+- Password confirmation mismatch: displays inline validation error.
+
+**Postconditions:** Password updated; all prior sessions revoked; user redirected to login.
+**Required permissions:** `profilee.password.update.self`.
+**Audit events:** `auth.password.changed`.

@@ -33,6 +33,10 @@
 | `PRD-FR-021` | Device selector interface and context persistence | `docs/PRD.md` | - | `TASK-0306` | `TEST-E2E-003` | `READY_FOR_IMPLEMENTATION` |
 | `PRD-FR-022` | Device access scope enforcement | `docs/PRD.md` | `DEC-RBAC-016` | `TASK-0304` | `TEST-SEC-003` | `READY_FOR_IMPLEMENTATION` |
 | `PRD-FR-023` | Soil monitoring metrics display | `docs/PRD.md` | `DEC-MON-036` | `TASK-0501` | `TEST-API-003` | `VERIFIED` |
+| `PRD-FR-024` | Self-service verified email address change | `docs/PRD.md` | `DEC-AUTH-106` | `TASK-0216` | `TEST-API-001` | `READY_FOR_IMPLEMENTATION` |
+| `PRD-FR-025` | Single active session enforcement per account | `docs/PRD.md` | `DEC-AUTH-107` | `TASK-0217` | `TEST-SEC-001` | `READY_FOR_IMPLEMENTATION` |
+| `SEC-AUTH-006` | Email change token scoping and non-sensitive audit logging | `docs/SECURITY.md` | `DEC-AUTH-106` | `TASK-0216` | `TEST-SEC-005` | `READY_FOR_IMPLEMENTATION` |
+| `SEC-AUTH-007` | Atomic single active session verification and race-safe login rejection | `docs/SECURITY.md` | `DEC-AUTH-107` | `TASK-0217` | `TEST-SEC-001` | `READY_FOR_IMPLEMENTATION` |
 | `SEC-DATA-003` | Content Security Policy (CSP) and security headers | `docs/SECURITY.md` | - | `TASK-0901` | `TEST-SEC-005` | `IMPLEMENTED` |
 | `SEC-DATA-004` | Immutable append-only audit log storage | `docs/SECURITY.md` | - | `TASK-0903` | `TEST-DB-002` | `READY_FOR_IMPLEMENTATION` |
 | `SEC-OPS-001` | Automated secret scanning in CI pipeline | `docs/SECURITY.md` | - | `TASK-0906` | `TEST-SEC-005` | `IMPLEMENTED` |
@@ -257,6 +261,20 @@ The following facts are verified in the traceability matrix regarding `TASK-0807
 - **Pre-Commit Gate Status (Reconciled 2026-08-28):** All 5 pre-commit test commands verified **PASS** (`test:coverage`, `test:integration`, `check:quality`, `test`, `test:e2e` with 14/14 Playwright tests passed).
 <!-- Controls Loading & Header Centering Traceability Reconciled: 2026-08-28 -->
 
+---
 
+## Verified Self-Email Change & Single Active Session Traceability Note (Reconciled 2026-08-29)
 
-
+The following facts are verified in the traceability matrix regarding `TASK-0216` (Verified Self-Email Change) and `TASK-0217` (Single Active Session Enforcement and Profile Security UI):
+- **Traceability Baseline:** Defined under `PRD-FR-024`, `PRD-FR-025`, `SEC-AUTH-006`, and `SEC-AUTH-007` to satisfy product requirements for self-service email updates, account/session concurrency security, and profile security interface reconciliation.
+- **Task Readiness & Prioritization:**
+  - `TASK-0216`: Status `READY`, Priority `P1`. Governed by `DEC-AUTH-106`.
+  - `TASK-0217`: Status `READY`, Priority `P0` (Security-critical session enforcement). Governed by `DEC-AUTH-107` and `DEC-UIUX-102`.
+- **Architectural Safeguards:**
+  - `TASK-0216` enforces 100% authority of the current email until the new email is verified via 6-digit numeric CSPRNG code with 15-minute expiry. Emits structured non-sensitive audit metadata (`account.email.changed`) without logging raw plaintext old/new email strings.
+  - `TASK-0217` enforces exactly 1 active session per user account, rejecting new valid logins with HTTP 409 Conflict (`ACTIVE_SESSION_EXISTS`) and preserving existing sessions. Prunes stale/expired sessions without blocking login. Removes misleading "Linked Devices" card from `/profile` and connects "Change Password" directly to existing `POST /api/v1/auth/change-password`.
+- **Database & Staging Implications:**
+  - `TASK-0216` requires a Prisma migration to add nullable `pending_email` to `email_verification_tokens`.
+  - `TASK-0217` requires a Prisma migration to add composite index `(user_id, revoked_at, expires_at)` to `sessions`.
+  - Staging will require deployment and migration execution upon implementation.
+<!-- TASK-0216 and TASK-0217 Traceability Reconciled: 2026-08-29 -->

@@ -1314,8 +1314,27 @@ The verified implementation of `TASK-0807`, `TASK-0502`, and `TASK-0306` (`/cont
 - **21st.dev MCP:** `NOT REQUIRED`
 - **Structural Loading Skeletons:** Replaced the generic single-box placeholder with a structured layout shell (`apps/web/app/controls/loading.tsx`) and granular component skeletons in `WaterTankMonitoringCard` and `FaucetHistoryTable`. The visual structure (Header card, 2-column metric cards for Tank Volume and Flow Rate, controls panel, and 4-row history table) is visible immediately upon navigation, eliminating layout shifting.
 - **Header CSS Grid Alignment:** Refactored `TopAppBar` to a balanced 3-column CSS Grid (`grid grid-cols-[1fr_auto_1fr] items-center px-4 h-14`), constraining start and end columns to identical `1fr` widths and centering `DeviceSelector` at the exact 50% horizontal center of the header on desktop, tablet, and mobile.
-- **Dropdown Overlay Centering:** Updated `DeviceSelector` dropdown menu to center symmetrically beneath the trigger button (`left-1/2 -translate-x-1/2`) with viewport clamping (`max-w-[calc(100vw-2rem)]`), ensuring dropdown contents remain fully visible and aligned across all screen widths.
 <!-- Controls Loading & Header Centering UI/UX Reconciled: 2026-08-27 -->
 
+---
 
+## Profile Security Management and Verified Email Change UI/UX Note (DEC-UIUX-102 / TASK-0216 / TASK-0217)
 
+The profile management interface (`/profile`) is reconciled to provide secure, production-grade account management conforming to strict frontend governance:
+- **Frontend Impact:** `MINOR`
+- **Selected UI Direction:** `Premium Minimal Ops` (authoritative brand color palette and tokens UNCHANGED)
+- **Selected Motion Effects:** `Modal`, `Button hover`, `Skeleton loading`
+- **21st.dev MCP:** `NOT REQUIRED` (reuses existing design tokens, form components, and modal dialog primitives)
+- **Removal of Linked Devices:** The misleading "Linked Devices" card (`USER_PROFILE.devicesCount: 3`) is permanently removed, eliminating confusion with physical IoT monitoring nodes.
+- **Account & Session Security Section:** Replaced with a clean, operational "Account & Session Security" card displaying:
+  - Single active session status (*"Sesi Aktif: 1 Perangkat"* / *"Active Session: 1 Device"*).
+  - Email verification status badge (*"Terverifikasi"* / *"Verified"*).
+  - Last password modification metadata where available.
+  - Unapproved client PII (IP address and User-Agent) is strictly omitted from the display.
+- **Change Password Modal:** The "Change Password" action triggers an accessible modal dialog submitting to `POST /api/v1/auth/change-password` with `{ currentPassword, newPassword, newPasswordConfirmation }`. Validations display inline, and successful completion (HTTP 204) triggers a clean redirect to `/login?message=PASSWORD_CHANGED`.
+- **Change Email Modal:** A 2-step modal flow:
+  - Step 1: Current password confirmation and candidate email input.
+  - Step 2: 6-digit numeric verification code input with 60-second cooldown timer persisted in `sessionStorage`.
+  - Upon successful verification, active `AuthContext` is synchronized immediately without requiring full-page reload or re-login.
+- **Accessibility & Touch Targets:** Form inputs and action buttons enforce standard 44px minimum touch targets, proper ARIA labels (`aria-labelledby`, `aria-describedby`), and clear focus rings.
+<!-- Profile Security UI/UX Reconciled: 2026-08-29 -->

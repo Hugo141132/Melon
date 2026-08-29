@@ -425,4 +425,24 @@ The following frontend components were audited and reconciled for `TASK-0807`, `
 - **`apps/web/components/navigation/Sidebar.tsx` [AUDITED]:** Hardened `currentPath` derivation with fallback to empty string when `pathname` is null.
 <!-- Controls Loading & Header Centering Frontend Audit Reconciled: 2026-08-27 -->
 
+---
 
+## Profile Management & Security UI Frontend Audit Note (Reconciled 2026-08-29)
+
+> **Implementation Status:** `CURRENT CODEBASE REPRESENTS PRE-TASK-0217 / PRE-TASK-0216 STATE`
+> **Associated Tasks:** `TASK-0217` (P0, READY), `TASK-0216` (P1, READY)
+> **Governing Decisions:** `DEC-AUTH-106`, `DEC-AUTH-107`, `DEC-UIUX-102`
+
+An audit of the current `/profile` component (`apps/web/app/profile/page.tsx`) confirms the baseline implementation prior to `TASK-0217` and `TASK-0216` execution:
+- **Current Baseline (`apps/web/app/profile/page.tsx`):**
+  - Displays user profile header and editable `fullName` field (`PATCH /api/v1/me`).
+  - Contains a hardcoded "Linked Devices" card (`USER_PROFILE.devicesCount: 3`) which conflates physical IoT monitoring nodes with user client sessions.
+  - Contains an unwired "Change Password" button that does not trigger a modal or invoke the backend.
+  - Renders email as a read-only field without self-service email change capability.
+- **Approved Future Frontend Scope (`TASK-0217` / `TASK-0216`):**
+  - **Removal of Linked Devices Card:** Permanently remove the "Linked Devices" card from `/profile`.
+  - **Account & Session Security Section:** Render active session status (single active session indicator) and email verification status badge. Client IP and User-Agent are omitted from the UI display.
+  - **Change Password Modal:** Wire "Change Password" to an accessible dialog submitting to `POST /api/v1/auth/change-password` with redirect to `/login` upon success.
+  - **Change Email Modal:** Implement a 2-step modal dialog for current password confirmation + new email entry, followed by 6-digit numeric verification code entry with 60-second cooldown timer.
+  - **Visual Governance:** Conforms to `Premium Minimal Ops`, motion effects `Modal` and `Button hover`, with color tokens `UNCHANGED`.
+<!-- Profile Security Frontend Audit Reconciled: 2026-08-29 -->

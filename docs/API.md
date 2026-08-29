@@ -464,7 +464,7 @@ Successful response:
 }
 ```
 
-Account-state errors:
+Account-state and concurrency errors:
 
 ```text
 ACCOUNT_PENDING_APPROVAL
@@ -473,6 +473,7 @@ ACCOUNT_REJECTED
 ACCOUNT_SUSPENDED
 ACCOUNT_DEACTIVATED
 EMAIL_NOT_VERIFIED
+ACTIVE_SESSION_EXISTS (HTTP 409 Conflict - single active session policy per DEC-AUTH-107)
 ```
 
 ---
@@ -761,7 +762,7 @@ Response (HTTP 200 OK — strictly anti-enumeration):
 Server rules:
 - Unconditionally returns HTTP 200 with generic message whether user exists, is already verified, or does not exist (anti-enumeration).
 - Applies timing-mitigation equalizers to prevent side-channel timing attacks.
-- If an account exists and `email_verified_at` is null, invalidates prior verification tokens, generates a new 256-bit token (valid for 24 hours), and dispatches bilingual verification email via Resend.
+- If an account exists and `email_verified_at` is null, invalidates prior verification tokens, generates a new 6-digit verification code (valid for 15 minutes per `AUTH_VERIFY_TOKEN_EXPIRY_MINUTES = 15`), and dispatches bilingual verification email via Resend (`DEC-AUTH-104` / `TASK-0214`).
 
 Possible errors:
 - `400 Bad Request`: `VALIDATION_ERROR` (invalid email)
@@ -881,6 +882,105 @@ Response:
   }
 }
 ```
+
+---
+
+## 11.4 Request Email Change
+
+```http
+POST /api/v1/me/email/request
+```
+
+**Authentication:** Required
+**Permission:** `profilee.self.update`
+
+Request:
+
+```json
+{
+  "newEmail": "newadmin@example.com",
+  "currentPassword": "current-secure-password"
+}
+```
+
+Server rules:
+- Requires active authenticated session.
+- Verifies `currentPassword` against caller account.
+- Normalizes `newEmail` (`trim().toLowerCase()`).
+- Rejects request if `newEmail` matches caller's existing authoritative email (`SAME_EMAIL`).
+- Validates that `newEmail` is not already taken by another user (`DUPLICATE_EMAIL`).
+- Generates a 6-digit numeric CSPRNG verification code (`100000`–`999999`) with 15-minute expiry (`AUTH_VERIFY_TOKEN_EXPIRY_MINUTES = 15`).
+- Persists user-and-target-scoped hash `sha256(userId:newEmail:code)` in `email_verification_tokens.token_hash` and candidate email in `email_verification_tokens.pending_email`.
+- Dispatches verification email strictly to `newEmail` via Resend (`sendWithRetry`).
+- Existing user email remains 100% authoritative for all system access until verification.
+- Enforces rate limit of 3 req/min (`RATE_LIMIT_EMAIL_CHANGE_REQUEST_MAX = 3`).
+
+Response:
+
+```json
+{
+  "success": true,
+  "data": {
+    "status": "VERIFICATION_CODE_SENT",
+    "expiresAt": "2026-08-29T17:49:38.000Z"
+  }
+}
+```
+
+Possible errors:
+- `400 Bad Request`: `VALIDATION_ERROR`, `SAME_EMAIL`
+- `401 Unauthorized`: `UNAUTHORIZED`, `INVALID_CREDENTIALS`
+- `409 Conflict`: `DUPLICATE_EMAIL`
+- `429 Too Many Requests`: `RATE_LIMITED`
+
+---
+
+## 11.5 Verify Email Change
+
+```http
+POST /api/v1/me/email/verify
+```
+
+**Authentication:** Required
+**Permission:** `profilee.self.update`
+
+Request:
+
+```json
+{
+  "code": "482910"
+}
+```
+
+Server rules:
+- Requires active authenticated session.
+- Locates active `email_verification_tokens` record matching `userId` and `pending_email IS NOT NULL` where `token_hash = sha256(userId:pending_email:code)`.
+- Validates code has not expired (`expiresAt > NOW()`).
+- In an atomic transaction:
+  - Re-verifies candidate email uniqueness.
+  - Updates `users.email = pending_email` and `users.emailVerifiedAt = NOW()`.
+  - Deletes the consumed verification token.
+  - Emits structured audit log `account.email.changed` with strictly non-sensitive metadata (actor ID, target ID, action string; NO raw old/new plaintext emails).
+- Preserves current active session in-memory without forced logout.
+- Enforces rate limit of 5 req/min (`RATE_LIMIT_EMAIL_CHANGE_VERIFY_MAX = 5`).
+
+Response:
+
+```json
+{
+  "success": true,
+  "data": {
+    "email": "newadmin@example.com",
+    "emailVerifiedAt": "2026-08-29T17:35:00.000Z"
+  }
+}
+```
+
+Possible errors:
+- `400 Bad Request`: `INVALID_VERIFICATION_CODE`, `TOKEN_EXPIRED`, `NO_PENDING_EMAIL_CHANGE`
+- `401 Unauthorized`: `UNAUTHORIZED`
+- `409 Conflict`: `DUPLICATE_EMAIL`, `CONCURRENCY_CONFLICT`
+- `429 Too Many Requests`: `RATE_LIMITED`
 
 ---
 
@@ -2983,4 +3083,4 @@ The following facts are supported by the verified implementation of `TASK-0215` 
 The verified implementation of `TASK-0807`, `TASK-0502`, and `TASK-0306` (`/controls` Loading & Header Layout Stabilization on 2026-08-27) operates strictly within frontend presentation components:
 - **Client Request Optimization:** `FaucetControlPanel` consumes centralized `useAuth()`, eliminating redundant client-side `GET /api/v1/auth/session` calls upon mounting `/controls`.
 - **API Contracts Unchanged:** Zero modifications were made to REST API route signatures, request schemas, response formats, idempotency headers, or status codes across `/api/v1/devices/*`, `/api/v1/monitoring/*`, or `/api/v1/auth/*`.
-<!-- Controls Loading & Header Centering API Reconciled: 2026-08-27 -->
+<!-- Controls Loading & Header Centering API Reconciled: 2026-08-27 -->

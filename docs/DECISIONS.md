@@ -16,7 +16,7 @@
 |---|---|---|---|---|
 | `DEC-INF-075` | Monorepo Structure | **APPROVED** | npm monorepo workspace (`apps/web`, `apps/iot-gateway`, `packages/database`, `packages/contracts`) | Structure repository into workspaces in `TASK-0101` |
 | `DEC-INF-076` | Database ORM Selection | **DECISION REQUIRED** | PostgreSQL confirmed. ORM not yet selected — neither Prisma nor Drizzle is present in `package.json`. User must select exactly one before `TASK-0104` begins. Recommendation: Prisma (see §2.5). | Record selection here once user decides. Do not install either ORM until user selects. |
-| `DEC-AUTH-001` | Authentication Architecture | **APPROVED** | HTTP-only secure cookies (`HttpOnly`, `Secure` in prod, `SameSite` policy **TBD**) + PostgreSQL session store | Implement in `TASK-0204` (30m idle, 12h max). `SameSite=Strict` not yet explicitly approved — see DEC-AUTH-001 note. |
+| `DEC-AUTH-001` | Authentication Architecture | **APPROVED** | HTTP-only secure cookies (`HttpOnly`, `Secure` in prod, `SameSite=Strict`) + PostgreSQL session store | Implemented in `TASK-0204` (30m idle, 8h absolute maximum lifetime per `SECURITY.md` §9.2 and `session-service.ts`). |
 | `DEC-AUTH-006` | First Owner Provisioning | **APPROVED** | CLI interactive seed script (`npm run seed:owner`). Public sign-up NEVER creates Owner. | Implement in `TASK-0106` |
 | `DEC-RBAC-015` | Admin Faucet Authorization | **APPROVED (REVISED)** | `Active ADMIN + assigned device access + active/controllable device = faucet-control permission` | Remove separate `canControl` grant. Device assignment confers control. |
 | `DEC-DEV-020` | Device Communication Protocol | **APPROVED** | MQTT 5.0 over TLS via long-running backend IoT Gateway service | Implement in `TASK-0401` (per-device username/password & ACLs) |
@@ -34,7 +34,7 @@
 
 | Subsystem | Decision IDs | Status | Approved Policy |
 |---|---|---|---|
-| **Authentication** | `DEC-AUTH-001` to `DEC-AUTH-012` | **APPROVED** | HTTP-only secure cookies, PostgreSQL session table, 30m idle / 12h max timeouts, CLI Owner seed, no public Owner creation. `SameSite` cookie value: **TBD** — pending explicit user approval. |
+| **Authentication** | `DEC-AUTH-001` to `DEC-AUTH-012`, `DEC-AUTH-102` to `DEC-AUTH-107` | **APPROVED** | HTTP-only secure cookies (`HttpOnly`, `Secure`, `SameSite=Strict`), PostgreSQL session table, 30m idle / 8h absolute maximum lifetime, CLI Owner seed, no public Owner creation, mandatory 6-digit email verification, 15m password recovery, verified self-email change, and single active session enforcement. |
 | **RBAC** | `DEC-RBAC-013` to `DEC-RBAC-019` | **APPROVED** | Owner has global device visibility. Admins have mandatory per-device assignments; device assignment automatically grants both monitoring and faucet control. Owners manage assignments. No separate per-user-device `canControl` permission in v1. |
 | **Devices** | `DEC-DEV-020` to `DEC-DEV-030` | **APPROVED** | Multi-protocol architecture: Soil & Water quality monitoring telemetry via REST API over Wi-Fi (no MQTT broker). Water Tank monitoring (tank volume & flow rate) via MQTT through an EMQX broker (MQTT 5.0 over TLS via IoT Gateway). Shared INA219 electrical monitoring via REST/Wi-Fi. Per-device credentials/ACLs, no anonymous access, no direct browser-to-MQTT. Offline threshold: **TBD**. Stale threshold: **TBD**. In-app device creation / Add Device removed (`DEC-DEV-027`). External `deviceId` editable by OWNER only; internal DB UUID immutable; canonical `deviceId` strictly hidden from ADMIN in UI & API (`DEC-DEV-028`). Previously/last-accessed device history & persistent restoration removed while preserving all telemetry/command/assignment/audit history (`DEC-DEV-029`). Hard delete of devices permanently removed in favor of `DEACTIVATED` / `ACTIVE` lifecycle (`DEC-DEV-030`). |
 | **Monitoring** | `DEC-MON-036` to `DEC-MON-050` | **APPROVED** | Three distinct monitoring domains: 1) Soil monitoring (NPK, Temp, Moisture, pH, EC in `µS/cm`, status), 2) Water Quality monitoring (pH, TDS in ppm, EC in `µS/cm`, status), 3) Water Tank monitoring (Tank Vol in `L`, Flow in `m³/h`, status). Canonical display unit for EC is `µS/cm` (values in `mS/cm` converted at presentation boundary via `×1000`). Control capabilities (Solenoid Valve, Relay) are actuators, not monitoring sensors. INA219 electrical monitoring tracks system electrical consumption (voltage, current, power) as device health/power telemetry, not as a battery percentage or primary agronomic measurement. 90-day raw telemetry retention TTL with chunked batch maintenance (`DEC-MON-048` / `TASK-0913`). Sensor precision and valid ranges: **TBD**. |
@@ -42,7 +42,7 @@
 | **I18N** | `DEC-I18N-068` to `DEC-I18N-074` | **APPROVED** | Default `id` (Bahasa Indonesia), `en` fallback, mandatory centered language-selection gate for unauthenticated visitors without valid locale (`English` -> `en`, `Bahasa Indonesia` -> `id`), cookie-based non-prefixed routing (no URL path pollution), subsequent language changes strictly in Settings (`/settings`), UTC storage with `Asia/Jakarta` (WIB) presentation. |
 | **Infrastructure** | `DEC-INF-075` to `DEC-INF-088` | **APPROVED (ORM DECISION REQUIRED)** | npm monorepo, PostgreSQL (ORM TBD — see §2.5). Backup schedule, retention period, RPO, and RTO: **TBD** — pending explicit user approval. |
 | **Testing** | `DEC-TST-089` to `DEC-TST-100` | **APPROVED** | Modern Evergreen browsers. Mobile viewport primary (360-430px). Accessibility standard: **TBD**. API performance targets (p95): **TBD**. Physical test run count per faucet phase: **TBD**. |
-| **UI/UX & Frontend** | `DEC-UIUX-101` | **APPROVED** | 6 primary UI directions (1 per task), authoritative Kebun Melon color palette (UNCHANGED), controlled 12-motion library, performant motion quality, mandatory task-level frontend declaration, 21st.dev MCP required ONLY for material redesigns. |
+| **UI/UX & Frontend** | `DEC-UIUX-101`, `DEC-UIUX-102` | **APPROVED** | 6 primary UI directions (1 per task), authoritative Kebun Melon color palette (UNCHANGED), controlled 12-motion library, performant motion quality, mandatory task-level frontend declaration, 21st.dev MCP required ONLY for material redesigns, removal of Linked Devices from profile, and Account/Session Security management. |
 
 ---
 
@@ -80,6 +80,8 @@
 | `TASK-0203` | Implement Public Admin Registration | `BACKLOG` | Depends on `TASK-0201` and `TASK-0202` (both BACKLOG). |
 | `TASK-0204` | Implement Login and Session Management | `BLOCKED` | Depends on `TASK-0201` (BACKLOG) and `TASK-0002` (DONE). Blocked transitively via `TASK-0201`. |
 | `TASK-0209` | Implement Authorisation Library | `BACKLOG` | Depends on `TASK-0105` and `TASK-0204` (both blocked/backlog). |
+| `TASK-0216` | Implement Verified Self-Email Change | `READY` | Depends on `TASK-0201`, `TASK-0211`, `TASK-0214` (all DONE), `DEC-AUTH-106` (APPROVED). |
+| `TASK-0217` | Implement Single Active Session Enforcement & Profile Security UI | `READY` | Depends on `TASK-0204`, `TASK-0211`, `TASK-0215` (all DONE), `DEC-AUTH-107`, `DEC-UIUX-102` (all APPROVED). Priority `P0`. |
 | `TASK-0301` | Implement Site Model | `BLOCKED` | Depends on `TASK-0104` (BLOCKED) and `TASK-0002` (DONE). |
 | `TASK-0302` | Implement Device Registry | `BACKLOG` | Depends on `TASK-0104` (BLOCKED). |
 | `TASK-0304` | Implement User-Device Assignments | `BACKLOG` | Depends on `TASK-0302` and `TASK-0209` (both blocked/backlog). |
@@ -99,13 +101,12 @@
 
 #### DEC-AUTH-001: Authentication Architecture and Session Library
 * **Related Task IDs**: `TASK-0204`
-* **Related Documentation**: `PRD.md` §6.1, `SECURITY.md` §3.1, `FRONTEND_AUDIT.md` §6.10
+* **Related Documentation**: `PRD.md` §6.1, `SECURITY.md` §3.1, §9.2, `FRONTEND_AUDIT.md` §6.10
 * **Status**: **APPROVED BY USER**
-* **Current Confirmed Facts**: Next.js 14 App Router; login/register forms use client `useState`.
+* **Current Confirmed Facts**: Next.js 14 App Router; custom session handlers backed by a PostgreSQL `sessions` table using HTTP-only secure cookies.
 * **Approved Decision**: Custom session handlers backed by a PostgreSQL `sessions` table using HTTP-only secure cookies.
-* **Session Configuration**: 30-minute idle timeout, 12-hour absolute maximum lifetime, `HttpOnly`, `Secure` in production.
-* **SameSite Policy**: **TBD** — the value `SameSite=Strict` was not separately and explicitly approved. Browser-compatibility with all application flows (cross-origin auth redirects, etc.) has not been evaluated. Implement as the appropriate SameSite value until explicit user approval is recorded here.
-* **Security Implications**: High — HTTP-only secure cookies prevent XSS token theft; PostgreSQL session storage enables instant server-side session revocation upon user suspension.
+* **Session Configuration**: 30-minute idle timeout (`SESSION_IDLE_TIMEOUT_MS = 1800000`), 8-hour absolute maximum lifetime (`SESSION_ABSOLUTE_LIFETIME_MS = 28800000` / `SESSION_ABSOLUTE_LIFETIME_SECONDS = 28800`), `HttpOnly`, `Secure` in production, `SameSite=Strict`.
+* **Security Implications**: High — HTTP-only secure cookies prevent XSS token theft; PostgreSQL session storage enables instant server-side session revocation upon user suspension or password change. Single active session enforcement is mandated per `DEC-AUTH-107`.
 
 ---
 
@@ -429,7 +430,7 @@
   3. **Admin Approval Gate**: Pending Admin registrations cannot be approved or rejected by an Owner via `approvePendingAdmin` or `rejectPendingAdmin` until `emailVerifiedAt` is populated (unverified requests return `INVALID_STATUS` / HTTP 409). Unverified Admin accounts are filtered from the active Owner approval queue (`getPendingApprovals`).
   4. **Admin Status Preservation**: Verifying email ownership leaves an Admin account in `PENDING_APPROVAL` status and automatically redirects to `/status?status=PENDING_APPROVAL` until explicitly reviewed and approved by an Owner.
   5. **Session-Free Verification Endpoint**: `POST /api/v1/auth/verify-email` verifies email ownership exclusively and MUST NOT issue, create, or return an authentication session.
-  6. **Token Security**: Verification tokens are generated as 256-bit CSPRNG random hex strings. Only the SHA-256 hash is persisted in `email_verification_tokens`. Token expiry is 24 hours (`AUTH_VERIFY_TOKEN_EXPIRY_HOURS = 24`). Creating a new token invalidates prior unused tokens for that user.
+  6. **Token Security**: Verification codes are generated as 6-digit numeric CSPRNG random codes (100000–999999). Scoped SHA-256 hash `sha256(userId:code)` is persisted in `email_verification_tokens.token_hash`. Token/code expiry is approved as **15 minutes** (`AUTH_VERIFY_TOKEN_EXPIRY_MINUTES = 15`). Creating a new code invalidates prior unused tokens for that user.
   7. **Rate Limiting & Anti-Enumeration**: `POST /api/v1/auth/resend-verification` enforces 3 req/min rate limit (`RATE_LIMIT_RESEND_VERIFICATION_MAX = 3`), timing attack mitigations, and returns generic HTTP 200 without exposing account existence.
   8. **Concurrency & Database Retries**: In `verifyEmailWithToken`, Prisma `P2034` transaction write conflicts are retried with bounded exponential backoff (3 attempts), returning controlled `CONCURRENCY_CONFLICT` (HTTP 409) if exhausted and `TOKEN_ALREADY_USED` (HTTP 400) for `P2025` (deleted token).
   9. **Frontend In-Flight Deduplication**: `/verify-email` utilizes a token-keyed in-flight Promise map with immediate cache eviction upon settlement (`finally`), ensuring exactly 1 network POST in React Strict Mode/remounts while delivering the result to the active mount and removing decorative illustrations for a clean layout.
@@ -612,3 +613,40 @@ The following facts are supported by the verified decisions governance of `TASK-
   5. **UI Rendering Stability:** Eliminates loading spinners and delays on `/setting` and navigation items (`/users` and `/approvals` for `OWNER`), ensuring instant, flicker-free rendering conforming to `Premium Minimal Ops`.
 <!-- TASK-0215 Reconciled: 2026-08-22 -->
 
+---
+
+## DEC-AUTH-107: Single Active Session Enforcement and Race-Safe Concurrency Policy
+- **Status:** APPROVED
+- **Context:** To safeguard physical control operations, monitoring integrity, and prevent credential sharing or concurrent unauthorized access, the system must enforce exactly one valid active session per user account across all devices.
+- **Decision:**
+  1. **Strict Single-Session Rule:** Exactly one valid active session is permitted per user account.
+  2. **Denial & Preservation Semantics:** If valid credentials (`email` + `password`) are submitted during `POST /api/v1/auth/login` while that account already has an active, non-expired, non-idle, non-revoked session in PostgreSQL, the incoming login attempt is **REJECTED** with HTTP 409 Conflict (`ACTIVE_SESSION_EXISTS`). The pre-existing valid active session is **NEVER** invalidated or revoked by the rejected login attempt.
+  3. **Automatic Stale Session Pruning:** Sessions that have reached absolute expiry (`expiresAt <= NOW()`), idle timeout (`NOW() - lastSeenAt > 30m`), or have been explicitly revoked (`revokedAt IS NOT NULL`) are soft-revoked/pruned within the login transaction and do **NOT** block login.
+  4. **Race-Safe DB Boundary:** Concurrency is enforced atomically inside a PostgreSQL/Prisma transaction using user row locking (`FOR UPDATE` / advisory lock) and indexed lookups on `sessions(user_id, revoked_at, expires_at)`.
+<!-- TASK-0217 Reconciled: 2026-08-29 -->
+
+---
+
+## DEC-UIUX-102: Profile Security Management and Linked Devices Removal
+- **Status:** APPROVED
+- **Context:** The `/profile` interface contained a misleading "Linked Devices" card (`USER_PROFILE.devicesCount: 3`) which created confusion between IoT physical monitoring nodes and user client devices, while the Change Password button was an un-wired placeholder.
+- **Decision:**
+  1. **Removal of Linked Devices:** The "Linked Devices" card is permanently removed from `/profile`.
+  2. **Account & Session Security UI:** Replaced with an operational Account & Session Security section displaying the single active session status, email verification status badge, and last password change metadata. In accordance with strict scope control, unapproved client PII (IP address and User-Agent) is omitted from the UI display.
+  3. **Change Password Integration:** The "Change Password" action triggers an accessible modal dialog submitting directly to the existing backend endpoint `POST /api/v1/auth/change-password`. Upon successful password change (HTTP 204), all active sessions are revoked and the user is redirected to `/login`.
+  4. **Change Email Integration:** A "Change Email" modal provides a 2-step flow: current password verification + new email entry, followed by 6-digit verification code entry with a 60-second cooldown timer.
+  5. **Visual Governance:** Conforms strictly to `Premium Minimal Ops` with `globals.css` color tokens unchanged.
+<!-- TASK-0217 Reconciled: 2026-08-29 -->
+
+---
+
+## DEC-AUTH-106: Verified Self-Email Change Architecture
+- **Status:** APPROVED
+- **Context:** Authenticated users (`OWNER` and `ADMIN` with `accountStatus = ACTIVE`) require the capability to update their registered email address safely without opening account takeover vectors, losing access upon typo, or leaking PII in audit records.
+- **Decision:**
+  1. **Staged Verification & Authority Isolation:** When an authenticated user requests an email change (`POST /api/v1/me/email/request`), the current email remains 100% authoritative for all system logins, alerts, and access control until the new email address is confirmed.
+  2. **Reusing 6-Digit Code Infrastructure:** Email change verification reuses the existing 6-digit numeric CSPRNG code mechanism (`100000`–`999999`) with approved **15-minute expiry** (`AUTH_VERIFY_TOKEN_EXPIRY_MINUTES = 15`). The code is delivered strictly to the *new* candidate email address via Resend (`sendWithRetry`).
+  3. **Database Schema & Token Scoping:** The `email_verification_tokens` table is augmented with a nullable `pending_email` column (`VARCHAR(320)`). The verification token hash is stored securely as user-and-target-scoped SHA-256 hash `sha256(userId:newEmail:code)` in `token_hash`. Raw codes are never persisted or logged.
+  4. **Uniqueness & Race Condition Protection:** Candidate email uniqueness is verified both upon request creation and atomically during verification commit (`POST /api/v1/me/email/verify`). Replayed, expired, or invalid codes are safely rejected.
+  5. **Session Preservation & Non-Sensitive Audit Logging:** Successful verification atomically updates `users.email = newEmail` and `users.emailVerifiedAt = NOW()`, purges the token, synchronizes the active session context in-memory without forced logout, and emits a structured audit log (`account.email.changed`) containing strictly non-sensitive audit metadata (no raw plaintext old/new email strings).
+<!-- TASK-0216 Reconciled: 2026-08-29 -->

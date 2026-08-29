@@ -2268,4 +2268,46 @@ All five final pre-commit validation commands were executed and verified **PASS*
 - `npm run test:e2e`: **PASS** — Verified 14/14 tests passed across Playwright critical flows and smoke test suites using Microsoft Edge.
 <!-- Controls Loading & Header Centering Testing Reconciled: 2026-08-28 -->
 
+---
 
+# 55. Planned Single Active Session & Verified Email Change Test Suite Specifications (Reconciled 2026-08-29)
+
+> **Implementation Status:** `APPROVED TEST SPECIFICATIONS — TO BE EXECUTED DURING TASK IMPLEMENTATION`
+> **Associated Tasks:** `TASK-0217` (P0, READY), `TASK-0216` (P1, READY)
+> **Governing Decisions:** `DEC-AUTH-106`, `DEC-AUTH-107`, `DEC-UIUX-102`
+
+The following test suites and verification cases are specified for implementation under `TASK-0217` and `TASK-0216`:
+
+### 1. Single Active Session Enforcement Verification (`TASK-0217` / `DEC-AUTH-107`)
+- **Unit & Service Tests (`session-service.test.ts`):**
+  - Verify `loginUser` checks for existing active session where `revokedAt IS NULL`, `now < expiresAt`, and `now - lastSeenAt <= 30m`.
+  - Verify throwing `ActiveSessionExistsError` when an active session exists.
+  - Verify pre-existing active session is preserved and not invalidated or downgraded when a concurrent login is rejected.
+  - Verify stale sessions (expired `> 8h`, idle-timed-out `> 30m`, or `revokedAt IS NOT NULL`) are pruned/soft-revoked and do NOT block login.
+  - Verify concurrent login race condition safety using PostgreSQL transaction locking.
+- **API Route Tests (`apps/web/test/unit/login-route.test.ts`):**
+  - Verify `POST /api/v1/auth/login` returns HTTP 409 Conflict (`ACTIVE_SESSION_EXISTS`) on concurrent login attempt.
+  - Verify localized error response in `id` and `en` locales.
+- **Profile Security Component Tests (`apps/web/test/unit/profile-page.test.tsx`):**
+  - Verify "Linked Devices" card is completely absent from the DOM.
+  - Verify "Account & Session Security" section renders active session status and email verification badge.
+  - Verify absence of client IP address and User-Agent from rendered output.
+  - Verify "Change Password" modal opens, validates passwords, submits to `POST /api/v1/auth/change-password`, and redirects to `/login` upon success.
+
+### 2. Verified Self-Service Email Change Verification (`TASK-0216` / `DEC-AUTH-106`)
+- **Database & Repository Tests (`user-repository.test.ts`):**
+  - Verify `requestEmailChange` enforces caller password validation before issuing code.
+  - Verify generation of 6-digit numeric CSPRNG code with 15-minute expiry.
+  - Verify storage of `sha256(userId:newEmail:code)` in `email_verification_tokens.token_hash` and candidate email in `pending_email`.
+  - Verify candidate email uniqueness check rejects already-registered or pending email addresses.
+  - Verify existing email remains authoritative for logins while email change is pending.
+  - Verify `verifyEmailChange` updates `users.email` and `users.emailVerifiedAt = NOW()` inside an atomic transaction.
+  - Verify token is deleted upon successful verification and cannot be replayed.
+  - Verify structured audit log `account.email.changed` contains non-sensitive metadata only (zero raw old/new email strings).
+- **API Route Tests (`apps/web/test/unit/me-email-routes.test.ts`):**
+  - Verify `POST /api/v1/me/email/request` rate limiting (3 req/min) and auth guard.
+  - Verify `POST /api/v1/me/email/verify` rate limiting (5 req/min) and auth guard.
+- **Frontend & E2E Flows:**
+  - Verify 2-step Change Email modal in `/profile` with 60-second resend cooldown timer.
+  - Verify user active session remains continuous without forced logout after email change.
+<!-- Planned Testing Specifications Reconciled: 2026-08-29 -->

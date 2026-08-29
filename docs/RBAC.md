@@ -1217,4 +1217,22 @@ The following facts are verified in the RBAC implementation regarding `TASK-0807
 - **RBAC Policy Invariants:** Zero changes to roles (`OWNER`, `ADMIN`), account statuses, or canonical permissions.
 <!-- Controls Loading & Header Centering RBAC Reconciled: 2026-08-27 -->
 
+---
 
+## Planned Profile Security & Single Active Session RBAC Note (Reconciled 2026-08-29)
+
+> **Implementation Status:** `APPROVED & READY — REUSES EXISTING CANONICAL PERMISSIONS`
+> **Associated Tasks:** `TASK-0217` (P0, READY), `TASK-0216` (P1, READY)
+> **Governing Decisions:** `DEC-AUTH-106`, `DEC-AUTH-107`, `DEC-UIUX-102`
+
+The following role and authorization principles apply to planned self-email change and single-session enforcement:
+- **Reuse of Approved Self-Profile Permissions:**
+  - Self-service email change (`POST /api/v1/me/email/request`, `POST /api/v1/me/email/verify`) reuses the existing canonical `profilee.self.update` permission granted to both `OWNER` and `ADMIN` roles. No unnecessary granular permissions (e.g. `email.change.request`) are introduced.
+  - Password change from `/profile` consumes the existing backend endpoint `POST /api/v1/auth/change-password` guarded by `profilee.password.update.self`.
+- **Universal Single Active Session Policy (`DEC-AUTH-107`):**
+  - Single active session enforcement applies equally across `OWNER` and `ADMIN` roles. No role-based bypass of the single-session limit is permitted.
+  - A rejected concurrent login returns HTTP 409 Conflict (`ACTIVE_SESSION_EXISTS`) and preserves the existing session regardless of caller role.
+- **Authority & Account Status Invariants:**
+  - Email updates require `accountStatus = ACTIVE`. Self-email change is unavailable to `PENDING_APPROVAL`, `REJECTED`, `SUSPENDED`, or `DEACTIVATED` accounts.
+  - Changing an email address never alters account roles (`OWNER` / `ADMIN`), approval history, or user device assignments (`user_device_access`).
+<!-- Single Active Session & Email Change RBAC Reconciled: 2026-08-29 -->

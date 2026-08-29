@@ -934,6 +934,80 @@ Implemented complete Owner User Management:
 
 ---
 
+## TASK-0217 — Implement Single Active Session Enforcement and Profile Security UI
+
+**Priority:** `P0`
+**Status:** `READY`
+**Dependencies:** `TASK-0204`, `TASK-0211`, `TASK-0215`, `DEC-AUTH-107`, `DEC-UIUX-102`
+
+### Work
+
+1. **Database Index Optimization:**
+   - Add composite index `@@index([userId, revokedAt, expiresAt], map: "sessions_user_active_idx")` to `Session` model in `packages/database/prisma/schema.prisma`.
+2. **Session Service Layer (`@kebun-melon/database`):**
+   - Update `loginUser` in `session-service.ts` to execute an atomic active session verification inside a locked transaction (`RepeatableRead` / `Serializable` or row locking on `user.id`).
+   - Automatically prune/soft-revoke sessions that are idle-timed-out (`now - lastSeenAt > 30m`), expired (`now >= expiresAt`), or revoked (`revokedAt IS NOT NULL`).
+   - If an active, non-expired, non-idle, non-revoked session exists for the user, throw `ActiveSessionExistsError` (`CONCURRENT_SESSION_DENIED`).
+   - Strictly preserve the existing active session without revoking or invalidating it.
+3. **Login API Route (`apps/web`):**
+   - Update `POST /api/v1/auth/login` to catch `ActiveSessionExistsError` and return HTTP 409 Conflict (`ACTIVE_SESSION_EXISTS`) with clear localized error messaging.
+4. **Profile UI Refactor & Password Change Wiring (`apps/web/app/profile/page.tsx`):**
+   - Permanently remove the misleading "Linked Devices" card (`USER_PROFILE.devicesCount: 3`).
+   - Replace with "Account & Session Security" section displaying the single active session status and email verification badge. Omit unapproved client PII (IP address and User-Agent).
+   - Wire "Change Password" button to a modal form submitting to `POST /api/v1/auth/change-password` with `{ currentPassword, newPassword, newPasswordConfirmation }`, handling validation errors, and redirecting to `/login` upon 204 No Content.
+5. **I18N Support:**
+   - Add 100% key-parity translations across `messages/id.json` and `messages/en.json` for single-session rejection, change password modal, and session security UI.
+
+### Acceptance Criteria
+
+- [ ] Submitting valid credentials while an active session exists returns HTTP 409 Conflict (`ACTIVE_SESSION_EXISTS`).
+- [ ] The existing active session remains valid and is not revoked by the rejected login attempt.
+- [ ] Expired, idle-timed-out (>30m), or revoked sessions do not block subsequent logins.
+- [ ] Race conditions between simultaneous logins for the same account are prevented at the database boundary.
+- [ ] "Linked Devices" card is completely removed from `/profile`.
+- [ ] "Change Password" on `/profile` executes `POST /api/v1/auth/change-password` and redirects to `/login`.
+- [ ] All unit, API, and component tests pass (100% pass rate).
+
+---
+
+## TASK-0216 — Implement Verified Self-Email Change Workflow
+
+**Priority:** `P1`
+**Status:** `READY`
+**Dependencies:** `TASK-0201`, `TASK-0211`, `TASK-0214`, `DEC-AUTH-106`
+
+### Work
+
+1. **Database Schema & Token Scoping:**
+   - Add nullable `pendingEmail` (`pending_email VARCHAR(320)`) to `EmailVerificationToken` model in `packages/database/prisma/schema.prisma`.
+   - Create versioned SQL migration for `email_verification_tokens`.
+2. **Contracts (`@kebun-melon/contracts`):**
+   - Define `RequestEmailChangeInputSchema` (`{ newEmail: string, currentPassword?: string }`) and `VerifyEmailChangeInputSchema` (`{ code: string }`).
+   - Add `AuditEventKey.ACCOUNT_EMAIL_CHANGED` (`account.email.changed`).
+3. **Repository & Service Layer (`@kebun-melon/database`):**
+   - Implement `requestEmailChange` in `UserRepository`: verifies current password, normalises new email (`trim().toLowerCase()`), verifies that candidate email is not equal to current email, checks uniqueness across `User.email` and active `EmailVerificationToken.pendingEmail`, generates 6-digit numeric CSPRNG code (`100000`–`999999`) with 15-minute expiry, stores scoped SHA-256 hash `sha256(userId:newEmail:code)` in `email_verification_tokens`, and dispatches email via Resend (`sendWithRetry`).
+   - Implement `verifyEmailChange` in `UserRepository`: verifies 6-digit code, confirms candidate email uniqueness atomically inside transaction, updates `users.email = newEmail` and `users.emailVerifiedAt = NOW()`, deletes verification token, and emits structured audit log (`account.email.changed`) with strictly non-sensitive audit metadata (no raw old/new plaintext email strings).
+4. **API Route Handlers (`apps/web`):**
+   - `POST /api/v1/me/email/request`: Protected endpoint requiring active session (`profile.self.update`), rate-limited to 3 req/min.
+   - `POST /api/v1/me/email/verify`: Protected endpoint requiring active session (`profile.self.update`), rate-limited to 5 req/min.
+5. **Frontend UI (`apps/web/app/profile/page.tsx`):**
+   - Implement "Change Email" modal adhering to `Premium Minimal Ops`: Step 1 (current password verification + new email entry), Step 2 (6-digit numeric code entry with 60s cooldown timer persisted via `sessionStorage`), localized error alerts, and immediate `AuthContext` state synchronization upon success.
+6. **I18N Support:**
+   - Add 100% key-parity translations across `messages/id.json` and `messages/en.json` for email change dialogs, validations, toasts, and transactional email templates.
+
+### Acceptance Criteria
+
+- [ ] Current email remains 100% authoritative for login, communications, and access control until the new email is confirmed.
+- [ ] Duplicate target emails (already registered by another user) are rejected.
+- [ ] Verification codes are 6-digit numeric CSPRNG strings with 15-minute expiry.
+- [ ] Expired, invalid, or replayed codes are rejected safely.
+- [ ] Successful verification atomically updates `users.email` and `users.emailVerifiedAt`.
+- [ ] Active session context is preserved without forced logout.
+- [ ] Audit log records `account.email.changed` with strictly non-sensitive metadata (no raw plaintext emails).
+- [ ] All unit, API, and component tests pass (100% pass rate).
+
+---
+
 # 11. Phase 3 — Device Registry and Access
 
 ## TASK-0301 — Implement Site Model

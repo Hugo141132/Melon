@@ -463,26 +463,26 @@ INDEX password_reset_tokens_token_hash_idx ON password_reset_tokens (token_hash)
 
 ---
 
-## 6.8 `email_verification_tokens` (DB-AUTH-006 / DEC-AUTH-104)
+## 6.8 `email_verification_tokens` (DB-AUTH-006 / DEC-AUTH-104 / DEC-AUTH-106)
 
-Stores cryptographic hashes for registration email ownership verification codes and tokens.
+Stores cryptographic hashes for registration email ownership verification and verified self-email change codes.
 
 | Column | Type | Nullable | Notes |
 |---|---|---:|---|
 | `id` | UUID | No | Primary key |
 | `user_id` | UUID | No | Foreign key referencing `users(id) ON DELETE CASCADE` |
-| `token_hash` | VARCHAR(64) | No | Unique cryptographic SHA-256 hex digest of `userId:code` (or legacy raw token) |
-| `expires_at` | TIMESTAMPTZ | No | Expiration timestamp (default 15 minutes) |
+| `token_hash` | VARCHAR(64) | No | Unique cryptographic SHA-256 hex digest (`sha256(userId:code)` or `sha256(userId:newEmail:code)`) |
+| `pending_email` | VARCHAR(320) | Yes | Target candidate email for email change flow (`NULL` for registration verification) |
+| `expires_at` | TIMESTAMPTZ | No | Expiration timestamp (approved: 15 minutes) |
 | `created_at` | TIMESTAMPTZ | No | Code generation timestamp (`DEFAULT NOW()`) |
 
 ### Constraints & Security Rules
 
-- **Raw Code Storage Forbidden**: The raw 6-digit numeric CSPRNG code is never stored in plaintext; only the SHA-256 hash scoped to user ID (`sha256(userId:code)`) is persisted in `token_hash`. Scoping prevents unique constraint collisions when different users receive the same 6-digit random code.
-- **Single Use**: Upon successful verification (`verifyEmailWithToken`), the token record is consumed/deleted and `users.email_verified_at` is stamped with `NOW()`.
-- **Status Decoupling**: Verification updates `email_verified_at` independently and strictly preserves `account_status` (`ADMIN` remains `PENDING_APPROVAL`, `OWNER` remains `ACTIVE`).
+- **Raw Code Storage Forbidden**: The raw 6-digit numeric CSPRNG code is never stored in plaintext; only the SHA-256 hash scoped to user ID (and target email when applicable) is persisted in `token_hash`. Scoping prevents unique constraint collisions.
+- **Single Use**: Upon successful verification, the token record is consumed/deleted and `users.email_verified_at` (and `users.email` if `pending_email` was set) is updated.
+- **Authority Isolation**: When `pending_email` is set for email change requests (`DEC-AUTH-106`), the current `users.email` remains 100% authoritative until verification completes.
 - **Transactional Invalidation**: Creating a new verification code transactionally deletes/invalidates prior unused codes for the user.
-- **Concurrency & Conflict Handling**: `verifyEmailWithToken` wraps transactions in bounded exponential backoff retries (3 attempts) on Prisma `P2034` write conflicts. If retries are exhausted, it raises `CONCURRENCY_CONFLICT`. If the token is already deleted/consumed (`P2025`), it returns `TOKEN_ALREADY_USED`.
-- **Approval & Rejection Integrity**: `approvePendingAdmin` and `rejectPendingAdmin` select `emailVerifiedAt` in their transactional projections and strictly require `emailVerifiedAt IS NOT NULL`, rejecting unverified accounts with `INVALID_STATUS`.
+- **Concurrency & Conflict Handling**: `verifyEmailWithToken` / `verifyEmailChange` wraps transactions in bounded exponential backoff retries (3 attempts) on Prisma `P2034` write conflicts.
 
 ### Recommended Indexes
 
@@ -490,6 +490,42 @@ Stores cryptographic hashes for registration email ownership verification codes 
 UNIQUE INDEX email_verification_tokens_token_hash_key ON email_verification_tokens (token_hash)
 INDEX email_verification_tokens_user_id_idx ON email_verification_tokens (user_id)
 INDEX email_verification_tokens_expires_at_idx ON email_verification_tokens (expires_at)
+```
+
+---
+
+## 6.9 `sessions` (DB-AUTH-007 / DEC-AUTH-001 / DEC-AUTH-107)
+
+Stores active authentication sessions with server-managed revocation and single active session concurrency enforcement.
+
+| Column | Type | Nullable | Notes |
+|---|---|---:|---|
+| `id` | UUID | No | Primary key (`DEFAULT gen_random_uuid()`) |
+| `user_id` | UUID | No | Foreign key referencing `users(id) ON DELETE CASCADE` |
+| `session_token_hash` | VARCHAR(64) | No | Unique SHA-256 hex digest of the raw session secret |
+| `expires_at` | TIMESTAMPTZ | No | Absolute session expiration (8 hours max lifetime) |
+| `revoked_at` | TIMESTAMPTZ | Yes | Explicit revocation timestamp (`NULL` if active) |
+| `last_seenAt` | TIMESTAMPTZ | No | Inactivity timestamp for 30-minute idle timeout (`DEFAULT NOW()`) |
+| `ip_address` | VARCHAR(45) | Yes | Client IP address at session creation |
+| `user_agent` | TEXT | Yes | Client User-Agent at session creation |
+| `created_at` | TIMESTAMPTZ | No | Session creation timestamp (`DEFAULT NOW()`) |
+| `updated_at` | TIMESTAMPTZ | No | Updated on modification (`last_seen_at` bump, etc.) |
+
+### Constraints & Security Rules
+
+- **Single Active Session Rule (`DEC-AUTH-107`)**: Each user account is strictly limited to at most 1 active, non-revoked, non-expired, non-idle session at any time.
+- **Login Rejection Semantics**: A login attempt with valid credentials when an active session exists returns HTTP 409 Conflict (`ACTIVE_SESSION_EXISTS`) and preserves the existing session.
+- **Automatic Stale Pruning**: Sessions with `expires_at <= NOW()`, `NOW() - last_seen_at > 30m`, or `revoked_at IS NOT NULL` do not block new logins and are soft-revoked.
+- **Transactional Row Locking**: Active session queries during login use row locks (`FOR UPDATE`) to prevent concurrent race conditions across simultaneous login requests.
+- **Session Revocation on Password Change**: Changing or resetting passwords transactionally sets `revoked_at = NOW()` for all sessions belonging to that `user_id`.
+
+### Recommended Indexes
+
+```text
+UNIQUE INDEX sessions_session_token_hash_key ON sessions (session_token_hash)
+INDEX sessions_user_id_idx ON sessions (user_id)
+INDEX sessions_expires_at_idx ON sessions (expires_at)
+INDEX sessions_user_active_idx ON sessions (user_id, revoked_at, expires_at)
 ```
 
 ---
@@ -966,21 +1002,21 @@ EXPIRED
 ### Constraints (TASK-0802 / TASK-0807)
 
 ```sql
-ALTER TABLE "faucet_commands" ADD CONSTRAINT "faucet_commands_action_check" 
+ALTER TABLE "faucet_commands" ADD CONSTRAINT "faucet_commands_action_check"
 CHECK (
   (
-    action = 'DISPENSE' 
-    AND phase IS NOT NULL 
-    AND plant_count IS NOT NULL 
-    AND plant_count >= 1 
-    AND target_volume_ml IS NOT NULL 
+    action = 'DISPENSE'
+    AND phase IS NOT NULL
+    AND plant_count IS NOT NULL
+    AND plant_count >= 1
+    AND target_volume_ml IS NOT NULL
     AND target_volume_ml = (CASE phase WHEN 1 THEN 300 WHEN 2 THEN 1000 WHEN 3 THEN 1500 ELSE -1 END) * plant_count
   )
   OR
   (
-    action IN ('OPEN', 'CLOSE') 
-    AND phase IS NULL 
-    AND plant_count IS NULL 
+    action IN ('OPEN', 'CLOSE')
+    AND phase IS NULL
+    AND plant_count IS NULL
     AND target_volume_ml IS NULL
   )
 );
@@ -1874,5 +1910,3 @@ The following environment topology and database facts are verified regarding `TA
 - **Transient Connectivity Reconciliation:** The earlier local Prisma connection timeout was transient; local connection parameters (`postgres.xjsencdgfcbkzdzqcnqx` on `aws-1` port 6543 with `?pgbouncer=true`) are verified and active.
 - **Zero Schema Migrations:** No database schema alterations, Prisma migrations, index modifications, or repository signature changes were made for the 2026-08-27 UI loading and header centering reconciliations.
 <!-- Controls Loading & Database Separation Reconciled: 2026-08-27 -->
-
-

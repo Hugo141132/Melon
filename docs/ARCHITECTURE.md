@@ -1726,4 +1726,33 @@ The following architecture facts are supported by the verified implementation of
   - **Tooling Access:** Supabase MCP targets staging only.
 <!-- Controls Loading & Architecture Reconciled: 2026-08-27 -->
 
+---
 
+## Planned Single Active Session & Verified Email Change Architecture Note (Reconciled 2026-08-29)
+
+> **Implementation Status:** `APPROVED & READY — NOT YET IMPLEMENTED IN CODEBASE`
+> **Governing Decisions:** `DEC-AUTH-106`, `DEC-AUTH-107`, `DEC-UIUX-102`
+> **Associated Tasks:** `TASK-0217` (P0, READY), `TASK-0216` (P1, READY)
+
+The following architectural specifications define the planned security and profile management workflows prior to code modification:
+
+1. **Single Active Session Concurrency Architecture (`DEC-AUTH-107` / `TASK-0217`):**
+   - **Concurrency Model:** Enforces a strict upper bound of exactly one active session per user account across all client devices.
+   - **Transactional Guard:** During `POST /api/v1/auth/login`, `session-service.ts` queries active sessions inside a locked PostgreSQL transaction. Stale sessions (expired `> 8h`, idle-timed-out `> 30m`, or already revoked) are automatically pruned and soft-revoked.
+   - **Denial & Session Preservation:** If a valid, non-expired, non-idle, non-revoked session exists, the new login attempt is rejected with HTTP 409 Conflict (`ACTIVE_SESSION_EXISTS`). The pre-existing active session is preserved without interruption or downgrade.
+   - **Database Index Optimization:** Planned addition of composite index `@@index([userId, revokedAt, expiresAt], map: "sessions_user_active_idx")` on `sessions` table (requires Prisma migration upon implementation).
+
+2. **Verified Self-Service Email Change Architecture (`DEC-AUTH-106` / `TASK-0216`):**
+   - **Authority Isolation:** When an authenticated user requests an email update (`POST /api/v1/me/email/request`), the existing email retains 100% authority for all system logins and alerts until the new email is confirmed.
+   - **6-Digit CSPRNG Code Verification:** Verification code is delivered strictly to the candidate email via Resend (`sendWithRetry`) with 15-minute expiry (`AUTH_VERIFY_TOKEN_EXPIRY_MINUTES = 15`).
+   - **Scoped Token Hash & Pending Email Storage:** Stored as `sha256(userId:newEmail:code)` in `email_verification_tokens` using a planned nullable `pending_email VARCHAR(320)` column (requires Prisma migration upon implementation).
+   - **Atomic Verification & Non-Sensitive Audit Logging:** `POST /api/v1/me/email/verify` atomically updates `users.email = newEmail` and `users.emailVerifiedAt = NOW()`, deletes the token, maintains active session continuity in-memory without forced logout, and emits structured audit logs (`account.email.changed`) containing strictly non-sensitive metadata (no raw old/new plaintext emails).
+
+3. **Profile Security UI Architecture (`DEC-UIUX-102`):**
+   - **Decoupling from IoT Terminology:** The misleading "Linked Devices" card is removed from `/profile`, eliminating confusion with physical ESP32 monitoring nodes.
+   - **Security Management Section:** Replaced with Account & Session Security status (single active session indicator, email verification badge, and password change metadata). Unapproved client PII (IP address and User-Agent) is omitted from the UI.
+   - **Password Change Service Reuse:** Wires the Change Password modal to the existing `POST /api/v1/auth/change-password` endpoint with automatic session revocation and redirect to `/login`.
+
+4. **Staging & Database Deployment Requirements:**
+   - Both `TASK-0217` and `TASK-0216` will require database migrations (`npx prisma migrate deploy`) and staging service redeployment on Railway/Supabase when implemented. Zero schema or runtime changes have been applied in this documentation phase.
+<!-- Single Active Session & Email Change Architecture Reconciled: 2026-08-29 -->

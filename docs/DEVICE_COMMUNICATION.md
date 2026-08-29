@@ -1933,4 +1933,15 @@ The verified implementation of `TASK-0807`, `TASK-0502`, and `TASK-0306` (`/cont
 - **Authoritative Physical Faucet State Invariant:** The presentation layer continues to strictly consume the authoritative physical state machine (`OPEN`, `CLOSED`, `UNKNOWN`) derived from verified device execution events (`TASK-0806`), with zero fabricated state or assumed valve positions during loading.
 <!-- Controls Loading & Header Centering Device Communication Reconciled: 2026-08-27 -->
 
+---
 
+## 48. Account Sessions & Profile Security Device Protocol Independence (Reconciled 2026-08-29)
+
+> **Task Reference:** `TASK-0216` (Verified Self-Email Change), `TASK-0217` (Single Active Session Enforcement & Profile Security UI)
+> **Governing Decisions:** `DEC-AUTH-106`, `DEC-AUTH-107`, `DEC-UIUX-102`
+
+The approved authentication, single-session concurrency, and profile security specifications operate strictly within the human user identity and browser session boundary:
+- **Zero Device Protocol & MQTT Impact:** No modifications are introduced to ESP32/NodeMCU firmware contracts, Wi-Fi REST telemetry ingestion, MQTT 5.0 over TLS protocols, QoS levels, broker topic ACLs, or device payload schemas.
+- **Strict Domain Separation (IoT Nodes vs. User Browser Sessions):** The removal of the misleading "Linked Devices" card from `/profile` (`DEC-UIUX-102`) eliminates conceptual ambiguity between user client browser sessions and agricultural IoT hardware devices (`SOIL_NODE`, `WATER_QUALITY_NODE`, `WATER_TANK_NODE`).
+- **Device Authorization Invariance:** Single active session enforcement on user accounts (`DEC-AUTH-107`) and verified email updates (`DEC-AUTH-106`) do not alter device RBAC access scopes (`user_device_access`), telemetry stream subscription boundaries, or physical faucet actuator safety controls.
+<!-- Account Sessions vs IoT Devices Reconciled: 2026-08-29 -->

@@ -396,6 +396,18 @@ Password recovery and email reset flow shall conform to the following security c
 - **Account Eligibility**: Password reset is restricted to accounts with `ACTIVE` status. Password reset MUST NEVER activate, approve, or alter the `accountStatus` of pending or suspended accounts.
 - **Audit Logging**: Structured audit logs are emitted for `auth.password_reset.requested`, `auth.password_reset.completed`, and `auth.password_reset.failed` without logging passwords, tokens, or hashes.
 
+### 8.5 Verified Self-Service Email Change (DEC-AUTH-106 / TASK-0216)
+
+Self-service email change for authenticated users shall conform to the following security controls:
+
+- **Authentication & Eligibility**: Only authenticated users with `ACTIVE` account status may request an email change. Current password verification is required before generating a verification code.
+- **Authority Isolation**: The user's existing email address remains 100% authoritative for all system logins, notifications, alerts, and access control until the new email address is successfully verified.
+- **6-Digit Code Cryptography**: Verification codes are 6-digit numeric CSPRNG codes (`100000`–`999999`) with an approved 15-minute lifetime (`AUTH_VERIFY_TOKEN_EXPIRY_MINUTES = 15`).
+- **Target & User Scoped Hashing**: The code is hashed as `sha256(userId:newEmail:code)` and stored in `email_verification_tokens.token_hash`, with candidate email stored in `email_verification_tokens.pending_email`. Raw codes are never stored in plaintext or logged.
+- **Atomic Uniqueness & Commit**: Target email uniqueness is validated at request time and re-validated inside the commit transaction. Verification updates `users.email = newEmail` and `users.emailVerifiedAt = NOW()`, deletes the token, and preserves the active session without forced logout.
+- **Rate Limiting & Anti-Abuse**: `POST /api/v1/me/email/request` is rate-limited to 3 req/min; `POST /api/v1/me/email/verify` is rate-limited to 5 req/min.
+- **Privacy-Preserving Audit Logging**: Audit log for `account.email.changed` records non-sensitive operational metadata (e.g. `{ action: 'EMAIL_CHANGED' }`, actor user ID, target user ID, timestamp). Plaintext raw old or new email addresses MUST NEVER be recorded in audit log records.
+
 ---
 
 ## 9. Session Security
@@ -417,7 +429,7 @@ SameSite=Strict
 The approved session expiration limits are:
 
 - **Idle timeout**: 30 minutes of inactivity.
-- **Absolute expiry**: 8 hours maximum session lifetime.
+- **Absolute expiry**: 8 hours maximum session lifetime (`SESSION_ABSOLUTE_LIFETIME_MS = 28800000`).
 - Revocation on logout, password change, suspension, or deactivation.
 
 ### 9.3 Session Revocation
@@ -425,7 +437,7 @@ The approved session expiration limits are:
 Sessions shall be revoked or restricted when:
 
 - User logs out.
-- Password changes.
+- Password changes (revokes all active sessions).
 - Account is suspended.
 - Account is deactivated.
 - Role changes.
@@ -454,9 +466,19 @@ Controls may include:
 - Rejection of cross-origin form submissions.
 - JSON-only state-changing API endpoints.
 
+### 9.6 Single Active Session Enforcement (DEC-AUTH-107 / TASK-0217)
+
+To prevent credential sharing, concurrent operational conflicts, and session hijacking risks, the system strictly enforces a single active session policy:
+
+- **Maximum 1 Active Session**: Each user account is permitted exactly one valid active session at any given time.
+- **Denial & Preservation Semantics**: When valid credentials (`email` + `password`) are provided during `POST /api/v1/auth/login`, if an active session already exists (where `revokedAt IS NULL`, `NOW() < expiresAt`, and `NOW() - lastSeenAt <= 30m`), the login request is rejected with HTTP 409 Conflict (`ACTIVE_SESSION_EXISTS`).
+- **Existing Session Integrity**: The existing valid active session is NEVER revoked, invalidated, or downgraded by the rejected concurrent login attempt.
+- **Automatic Stale Session Cleanup**: Expired (`NOW() >= expiresAt`), idle-timed-out (`NOW() - lastSeenAt > 30m`), or revoked sessions are soft-revoked inside the transaction and do not block subsequent logins.
+- **Database Concurrency Guarantee**: Single active session checks are executed atomically inside a PostgreSQL/Prisma transaction using user row locking and indexed lookups on `sessions(user_id, revoked_at, expires_at)`.
+
 ---
 
-## 10. Authorisation Security (SEC-RBAC-001..SEC-RBAC-004)
+## 10. Authorisation Security (SEC-RBAC-001..SEC-RBAC-004)004)
 
 ### 10.1 Server-Side Enforcement
 
@@ -1618,5 +1640,3 @@ The following security controls are active and verified regarding `TASK-0807`, `
 - **Admin Device ID Concealment:** The centered header `DeviceSelector` and controls views strictly preserve canonical `deviceId` concealment for Admin accounts (`DEC-DEV-028`).
 - **Zero Security Exceptions:** No security controls, session policies, CSRF protections, or authorization gates were relaxed or bypassed.
 <!-- Controls Loading & Header Centering Security Reconciled: 2026-08-27 -->
-
-
