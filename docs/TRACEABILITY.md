@@ -278,3 +278,19 @@ The following facts are verified in the traceability matrix regarding `TASK-0216
   - `TASK-0217` added migration `20260820000000_add_session_user_active_index` for composite index `sessions_user_active_idx` on `sessions(user_id, revoked_at, expires_at)`.
   - Railway web service will require redeployment following branch merge; IoT Gateway requires zero redeployment.
 <!-- TASK-0216 and TASK-0217 Traceability Reconciled: 2026-08-30 -->
+
+---
+
+## Historical Monitoring Chart Visualization & Client Cache Traceability Note (Reconciled 2026-08-30)
+
+The following facts are verified in the traceability matrix regarding `TASK-0504` (Implement Historical Charts) and `DEC-UIUX-104`:
+- **Traceability Baseline:** Traced from `PRD-FR-028`, `DEC-MON-087`, `DEC-MON-088`, and `DEC-UIUX-104` to satisfy requirements for soil NPK multi-line visualization, instant range cache switching, decoupled readable X-axis tick generation, and application locale formatting without trailing punctuation.
+- **Implementation Status:** `TASK-0504` is fully implemented and verified (`apps/web/test/unit/historical-charts.test.tsx` 18/18 passed, `soil-telemetry-ui.test.tsx` 7/7 passed, full web suite passed, typecheck 0 errors, Playwright visual range verification for 24h, 7d, 30d passed).
+- **Core Architecture & UX Improvements:**
+  - *NPK LineChart Visualization:* Soil NPK trend renders as a multi-line Recharts `LineChart` (Nitrogen `#0d631b`, Phosphorus `#884200`, Potassium `#476800`) with smooth curves and null-gap preservation (`connectNulls={false}`). Individual metrics render as AreaCharts.
+  - *Client-Side 1-Hour Aggregation:* Raw telemetry is grouped and averaged into 1-hour intervals on the client side purely for visual smoothing, leaving backend telemetry ingestion and real-time streaming contracts unchanged.
+  - *Instant Client-Side Cache Reuse:* Switching between 24h, 7d, and 30d presets checks in-memory `globalHistoryCache` before making network requests, rendering cached data instantly with `loading=false` and zero skeleton flashes.
+  - *Range-Based Decoupled X-Axis Formatting (`getCustomXTicks`):* Separates displayed X-axis tick count from 1-hour data resolution: 24h displays 5–8 time ticks; 7d displays 4–5 well-spaced daily ticks to eliminate text overlap on mobile screens; 30d displays spaced date ticks across the month.
+  - *Application Locale-Aware Formatting (`formatDayMonth`):* Date labels and tooltip headers follow `useLocale()` (`id` -> `20 Agu`, `en` -> `20 Aug`) with trailing commas and periods stripped.
+<!-- TASK-0504 Traceability Reconciled: 2026-08-30 -->
+

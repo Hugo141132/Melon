@@ -18,6 +18,85 @@ export interface UseHistoricalMonitoringOptions {
 
 const MAX_RANGE_MS = 31 * 24 * 60 * 60 * 1000; // 31 days per DEC-MON-087
 
+const TIME_DRIFT_TOLERANCE_MS = 60 * 1000; // 1 minute tolerance for recent data
+
+// In-memory cache to prevent reloading the entire history
+interface GlobalCache {
+  rawData: any[];
+  earliestDate: number;
+  latestDate: number;
+}
+export const globalHistoryCache = new Map<string, GlobalCache>();
+
+function groupDataByHour(data: any[], isMultiDay: boolean): BaseSeriesItem[] {
+  const groups = new Map<number, any[]>();
+
+  for (const item of data) {
+    const d = new Date(item.timestamp);
+    d.setMinutes(0, 0, 0); // Truncate to the top of the hour
+    const t = d.getTime();
+    if (!groups.has(t)) {
+      groups.set(t, []);
+    }
+    groups.get(t)!.push(item);
+  }
+
+  const result: BaseSeriesItem[] = [];
+  const sortedKeys = Array.from(groups.keys()).sort((a, b) => a - b);
+
+  for (const t of sortedKeys) {
+    const items = groups.get(t)!;
+    const itemDate = new Date(t);
+    const day = itemDate.getDate();
+    const month = itemDate
+      .toLocaleDateString('id-ID', { month: 'short' })
+      .replace(/,/g, '')
+      .replace(/\./g, '')
+      .trim();
+    const hh = String(itemDate.getHours()).padStart(2, '0');
+    const mm = String(itemDate.getMinutes()).padStart(2, '0');
+    const timeStr = isMultiDay ? `${day} ${month} ${hh}:${mm}` : `${hh}:${mm}`;
+
+    const avg = (field: string) => {
+      const valid = items.filter((i) => typeof i[field] === 'number');
+      if (valid.length === 0) return null;
+      const sum = valid.reduce((acc, i) => acc + i[field], 0);
+      return Number((sum / valid.length).toFixed(2));
+    };
+
+    // Calculate averages for numeric metrics
+    const n = avg('nitrogen');
+    const p = avg('phosphorus');
+    const k = avg('potassium');
+
+    const ecRaw = avg('ec');
+    // Explicit presentation conversion from source unit (mS/cm) to display unit (µS/cm: 1 mS/cm = 1000 µS/cm)
+    const ecVal = ecRaw !== null ? Math.round(ecRaw * 1000) : null;
+
+    // Sort items by timestamp to ensure we get the latest status
+    items.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+    result.push({
+      timestamp: itemDate.toISOString(),
+      time: timeStr,
+      nitrogen: n,
+      phosphorus: p,
+      potassium: k,
+      n, // map to n for NPKChart compatibility
+      p, // map to p for NPKChart compatibility
+      k, // map to k for NPKChart compatibility
+      temperature: avg('temperature'),
+      moisture: avg('moisture'),
+      ph: avg('ph'),
+      tds: avg('tds'),
+      ec: ecVal,
+      status: items[items.length - 1].status, // take latest status within this hour
+    });
+  }
+
+  return result;
+}
+
 export function useHistoricalMonitoring({
   deviceId,
   domain,
@@ -86,78 +165,123 @@ export function useHistoricalMonitoring({
     const range = calculateDateRange();
     if (!range) {
       setData([]);
+      setLoading(false);
       return;
     }
 
+    const fromTime = range.from.getTime();
+    const toTime = range.to.getTime();
+    const cacheKey = `${domain}-${deviceId}`;
+
+    // Initialize cache for this device/domain if it doesn't exist
+    if (!globalHistoryCache.has(cacheKey)) {
+      globalHistoryCache.set(cacheKey, { rawData: [], earliestDate: toTime, latestDate: 0 });
+    }
+    const cache = globalHistoryCache.get(cacheKey)!;
+
+    const rangesToFetch: { from: Date; to: Date }[] = [];
+
+    // Determine which sub-ranges are missing from the cache
+    if (cache.rawData.length === 0) {
+      rangesToFetch.push({ from: range.from, to: range.to });
+    } else {
+      // If we requested earlier data than what's cached
+      if (fromTime < cache.earliestDate) {
+        rangesToFetch.push({ from: range.from, to: new Date(cache.earliestDate) });
+      }
+      // If we requested newer data than what's cached (with drift tolerance)
+      if (toTime > cache.latestDate + TIME_DRIFT_TOLERANCE_MS) {
+        rangesToFetch.push({ from: new Date(cache.latestDate), to: range.to });
+      }
+    }
+
+    // If all requested data already exists in cache, update immediately without loading state
+    if (rangesToFetch.length === 0) {
+      const filteredData = cache.rawData.filter((item) => {
+        const t = new Date(item.timestamp).getTime();
+        return t >= fromTime && t <= toTime;
+      });
+
+      const isMultiDay = toTime - fromTime > 24 * 60 * 60 * 1000;
+      const aggregatedItems = groupDataByHour(filteredData, isMultiDay);
+
+      setData(aggregatedItems);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
+    // Real API fetch required -> show loading state
     setLoading(true);
     setError(null);
 
     try {
-      const fromIso = range.from.toISOString();
-      const toIso = range.to.toISOString();
-      const pageSize = 100;
-      let page = 1;
-      let allSeries: any[] = [];
-      let totalPages = 1;
+      // Fetch the missing ranges
+      for (const fetchRange of rangesToFetch) {
+        const fromIso = fetchRange.from.toISOString();
+        const toIso = fetchRange.to.toISOString();
+        const pageSize = 100;
+        let page = 1;
+        let totalPages = 1;
 
-      const isMultiDay = range.to.getTime() - range.from.getTime() > 24 * 60 * 60 * 1000;
+        while (page <= totalPages && page <= 10) {
+          const url = `/api/v1/devices/${encodeURIComponent(
+            deviceId
+          )}/monitoring/${domain}/history?from=${encodeURIComponent(
+            fromIso
+          )}&to=${encodeURIComponent(toIso)}&pageSize=${pageSize}&page=${page}`;
 
-      while (page <= totalPages && page <= 10) {
-        const url = `/api/v1/devices/${encodeURIComponent(
-          deviceId
-        )}/monitoring/${domain}/history?from=${encodeURIComponent(
-          fromIso
-        )}&to=${encodeURIComponent(toIso)}&pageSize=${pageSize}&page=${page}`;
+          const res = await fetch(url);
+          if (!res.ok) {
+            const errJson = await res.json().catch(() => ({}));
+            throw new Error(
+              errJson?.error?.message || `Gagal mengambil data riwayat (HTTP ${res.status}).`
+            );
+          }
 
-        const res = await fetch(url);
-        if (!res.ok) {
-          const errJson = await res.json().catch(() => ({}));
-          throw new Error(
-            errJson?.error?.message || `Gagal mengambil data riwayat (HTTP ${res.status}).`
-          );
+          const json = await res.json();
+          if (!json.success || !json.data) {
+            throw new Error(json?.error?.message || 'Respons API riwayat tidak valid.');
+          }
+
+          const seriesChunk = json.data.series || [];
+          cache.rawData = cache.rawData.concat(seriesChunk);
+
+          totalPages = json.data.pagination?.totalPages || 1;
+          page++;
         }
-
-        const json = await res.json();
-        if (!json.success || !json.data) {
-          throw new Error(json?.error?.message || 'Respons API riwayat tidak valid.');
-        }
-
-        const seriesChunk = json.data.series || [];
-        allSeries = allSeries.concat(seriesChunk);
-
-        totalPages = json.data.pagination?.totalPages || 1;
-        page++;
       }
 
-      // Format items with localised time display & presentation boundary EC conversion (mS/cm -> µS/cm)
-      const formattedItems: BaseSeriesItem[] = allSeries.map((item: any) => {
-        const itemDate = new Date(item.timestamp);
-        const timeStr = isMultiDay
-          ? itemDate.toLocaleString('id-ID', {
-              day: '2-digit',
-              month: 'short',
-              hour: '2-digit',
-              minute: '2-digit',
-            })
-          : itemDate.toLocaleTimeString('id-ID', {
-              hour: '2-digit',
-              minute: '2-digit',
-            });
+      // Deduplicate and sort cached data after merging
+      cache.rawData.sort(
+        (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      );
 
-        // Explicit presentation conversion from source unit (mS/cm) to display unit (µS/cm: 1 mS/cm = 1000 µS/cm)
-        let ecVal = item.ec;
-        if (ecVal !== null && ecVal !== undefined && typeof ecVal === 'number') {
-          ecVal = Math.round(ecVal * 1000);
+      const uniqueData = [];
+      let lastTime = '';
+      for (const item of cache.rawData) {
+        if (item.timestamp !== lastTime) {
+          uniqueData.push(item);
+          lastTime = item.timestamp;
         }
+      }
 
-        return {
-          ...item,
-          ec: ecVal,
-          time: timeStr,
-        };
+      cache.rawData = uniqueData;
+      cache.earliestDate = Math.min(fromTime, cache.earliestDate);
+      cache.latestDate = Math.max(toTime, cache.latestDate);
+
+      // Filter raw data to match the requested range precisely
+      const filteredData = cache.rawData.filter((item) => {
+        const t = new Date(item.timestamp).getTime();
+        return t >= fromTime && t <= toTime;
       });
 
-      setData(formattedItems);
+      const isMultiDay = toTime - fromTime > 24 * 60 * 60 * 1000;
+
+      // Downsample/aggregate data to 1-hour interval for UI visualization
+      const aggregatedItems = groupDataByHour(filteredData, isMultiDay);
+
+      setData(aggregatedItems);
     } catch (err: any) {
       setError(err?.message || 'Terjadi kesalahan saat memuat data riwayat.');
       setData([]);

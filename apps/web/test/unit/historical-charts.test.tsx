@@ -3,7 +3,7 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor, renderHook, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import HistoricalChartControls from '@/components/charts/HistoricalChartControls';
-import NPKChart from '@/components/charts/NPKChart';
+import NPKChart, { getCustomXTicks, formatDayMonth } from '@/components/charts/NPKChart';
 import WaterNutrientChart from '@/components/charts/WaterNutrientChart';
 import { useHistoricalMonitoring } from '@/hooks/useHistoricalMonitoring';
 
@@ -144,15 +144,19 @@ describe('TASK-0504 — Historical Monitoring Charts & Controls Fixes Test Suite
 
   describe('useHistoricalMonitoring Hook & Presentation Boundary EC Conversion', () => {
     it('fetches history API, formats series data, and converts EC from mS/cm to µS/cm', async () => {
+      const now = new Date();
+      const tenHoursAgo = new Date(now.getTime() - 10 * 60 * 60 * 1000);
+      const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
       const mockHistoryResponse = {
         success: true,
         data: {
           deviceId: 'soil-node-001',
-          from: '2026-08-10T00:00:00.000Z',
-          to: '2026-08-11T00:00:00.000Z',
+          from: yesterday.toISOString(),
+          to: now.toISOString(),
           series: [
             {
-              timestamp: '2026-08-10T10:00:00.000Z',
+              timestamp: tenHoursAgo.toISOString(),
               nitrogen: 45,
               phosphorus: 20,
               potassium: 35,
@@ -192,6 +196,73 @@ describe('TASK-0504 — Historical Monitoring Charts & Controls Fixes Test Suite
       expect(result.current.data[0].ec).toBe(1800); // verified conversion to µS/cm
       expect(result.current.data[0].moisture).toBeNull(); // verify null preserved
       expect(result.current.error).toBeNull();
+    });
+
+    it('updates immediately from cache without loading state when switching presets for already-fetched ranges', async () => {
+      const now = new Date();
+      const twoDaysAgo = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
+      const sixDaysAgo = new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000);
+      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+      const mock7dResponse = {
+        success: true,
+        data: {
+          deviceId: 'soil-node-cache-test',
+          from: sevenDaysAgo.toISOString(),
+          to: now.toISOString(),
+          series: [
+            {
+              timestamp: sixDaysAgo.toISOString(),
+              nitrogen: 50,
+              phosphorus: 25,
+              potassium: 30,
+              temperature: 27,
+              ec: 1.5,
+              moisture: 60,
+            },
+            {
+              timestamp: twoDaysAgo.toISOString(),
+              nitrogen: 40,
+              phosphorus: 20,
+              potassium: 35,
+              temperature: 26,
+              ec: 1.8,
+              moisture: 65,
+            },
+          ],
+          pagination: { page: 1, pageSize: 100, totalRecords: 2, totalPages: 1 },
+        },
+      };
+
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => mock7dResponse,
+      });
+      global.fetch = fetchMock;
+
+      const { result } = renderHook(() =>
+        useHistoricalMonitoring({
+          deviceId: 'soil-node-cache-test',
+          domain: 'soil',
+          initialPreset: '7d',
+        })
+      );
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(result.current.data.length).toBe(2);
+
+      // Now switch preset to 24h (which is a subset of 7d, but data timestamp is 2 days ago so 24h will have 0 or subset)
+      act(() => {
+        result.current.setPreset('24h');
+      });
+
+      // Loading should immediately be false without any extra fetch
+      expect(result.current.loading).toBe(false);
+      expect(fetchMock).toHaveBeenCalledTimes(1); // No new network call!
     });
 
     it('enforces maximum 31 days date range limit per DEC-MON-087', async () => {
@@ -266,6 +337,104 @@ describe('TASK-0504 — Historical Monitoring Charts & Controls Fixes Test Suite
       expect(
         screen.getByText('Tidak ada data riwayat untuk rentang waktu ini.')
       ).toBeInTheDocument();
+    });
+  });
+
+  describe('formatDayMonth and getCustomXTicks Range-Based X-Axis Formatting', () => {
+    it('formats day and month correctly based on locale without trailing commas or punctuation', () => {
+      const date = new Date('2026-08-20T10:00:00.000Z');
+
+      // Indonesian locale test
+      const idFormatted = formatDayMonth(date, 'id');
+      expect(idFormatted).toMatch(/^20\s(Agu|Agst)$/);
+      expect(idFormatted).not.toContain(',');
+      expect(idFormatted).not.toContain('.');
+
+      // English locale test
+      const enFormatted = formatDayMonth(date, 'en');
+      expect(enFormatted).toBe('20 Aug');
+      expect(enFormatted).not.toContain(',');
+      expect(enFormatted).not.toContain('.');
+    });
+
+    it('generates 5-8 readable time labels for 24 Hours range instead of all 24 hours', () => {
+      const data24h = Array.from({ length: 24 }, (_, i) => {
+        const d = new Date('2026-08-30T00:00:00.000Z');
+        d.setHours(i);
+        const hourStr = String(i).padStart(2, '0');
+        return {
+          timestamp: d.toISOString(),
+          time: `${hourStr}:00`,
+          n: 40,
+          p: 20,
+          k: 30,
+        };
+      });
+
+      const { ticks, formatTick } = getCustomXTicks(data24h, '24h', 'id');
+      expect(ticks.length).toBeGreaterThanOrEqual(5);
+      expect(ticks.length).toBeLessThanOrEqual(8);
+      expect(ticks.length).toBeLessThan(24);
+      expect(formatTick(ticks[0])).toBe('00:00');
+    });
+
+    it('generates well-spaced daily labels (4-5 labels) for 7 Days range preventing overlap and respecting locale', () => {
+      const data7d = Array.from({ length: 168 }, (_, i) => {
+        const d = new Date('2026-08-24T00:00:00.000Z');
+        d.setHours(i);
+        const day = d.getDate();
+        const hour = String(d.getHours()).padStart(2, '0');
+        return {
+          timestamp: d.toISOString(),
+          time: `${day} Agu ${hour}:00`,
+          n: 40,
+          p: 20,
+          k: 30,
+        };
+      });
+
+      // Test Indonesian locale
+      const { ticks: idTicks, formatTick: formatIdTick } = getCustomXTicks(data7d, '7d', 'id');
+      expect(idTicks.length).toBeGreaterThanOrEqual(4);
+      expect(idTicks.length).toBeLessThanOrEqual(5); // Spaced nicely so labels do not overlap
+      expect(formatIdTick(idTicks[0])).toMatch(/^24\s(Agu|Agst)$/);
+      expect(formatIdTick(idTicks[0])).not.toContain(',');
+
+      // Test English locale
+      const { ticks: enTicks, formatTick: formatEnTick } = getCustomXTicks(data7d, '7d', 'en');
+      expect(enTicks.length).toBe(idTicks.length);
+      expect(formatEnTick(enTicks[0])).toBe('24 Aug');
+      expect(formatEnTick(enTicks[enTicks.length - 1])).toBe('30 Aug');
+      expect(formatEnTick(enTicks[0])).not.toContain(',');
+    });
+
+    it('generates spaced date labels across 30 Days range with clean locale formatting', () => {
+      const data30d = Array.from({ length: 720 }, (_, i) => {
+        const d = new Date('2026-08-01T00:00:00.000Z');
+        d.setHours(i);
+        const day = String(d.getDate()).padStart(2, '0');
+        const hour = String(d.getHours()).padStart(2, '0');
+        return {
+          timestamp: d.toISOString(),
+          time: `${day} Agu ${hour}:00`,
+          n: 40,
+          p: 20,
+          k: 30,
+        };
+      });
+
+      // Test Indonesian locale
+      const { ticks: idTicks, formatTick: formatIdTick } = getCustomXTicks(data30d, '30d', 'id');
+      expect(idTicks.length).toBeGreaterThanOrEqual(5);
+      expect(idTicks.length).toBeLessThanOrEqual(8);
+      expect(idTicks.length).toBeLessThan(30);
+      expect(formatIdTick(idTicks[0])).toMatch(/^1\s(Agu|Agst)$/);
+      expect(formatIdTick(idTicks[0])).not.toContain(',');
+
+      // Test English locale
+      const { ticks: enTicks, formatTick: formatEnTick } = getCustomXTicks(data30d, '30d', 'en');
+      expect(formatEnTick(enTicks[0])).toBe('1 Aug');
+      expect(formatEnTick(enTicks[0])).not.toContain(',');
     });
   });
 });

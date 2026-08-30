@@ -481,20 +481,22 @@ Users shall be able to:
 
 - Select a device.
 - Select one or more monitoring metrics.
-- Select a date or date range (default 24h, maximum 31 days per `DEC-MON-087`).
-- View data in charts or tables.
-- Identify gaps in received data.
-- View timestamps in the active locale and user timezone.
+- View data in charts (NPK visualized via multi-line `LineChart` with Nitrogen `#0d631b`, Phosphorus `#884200`, Potassium `#476800`, single metrics via AreaCharts per `DEC-UIUX-104`).
+- Switch range presets (24 Hours, 7 Days, 30 Days) instantly using client-side cache reuse without full reloads or loading skeleton flashes.
+- Identify gaps in received data without fake zeroes (`connectNulls={false}`).
+- View X-axis tick labels decoupled from 1-hour data resolution (5–8 time ticks for 24h, 4–5 daily ticks for 7d to eliminate mobile label overlap, and spaced date ticks for 30d).
+- View timestamps formatted according to the application's active locale without trailing punctuation (`20 Agu` / `20 Aug`).
 - Distinguish missing data from zero values.
 - View the latest available value.
 
-Data Lifecycle & Retention Rules (`DEC-MON-048` / `TASK-0913`):
+Data Lifecycle & Retention Rules (`DEC-MON-048` / `TASK-0913`, `DEC-UIUX-104`):
 - **Raw Telemetry Retention TTL:** 90 days. Raw sensor telemetry records (`soil_readings`, `water_readings`, `reservoir_water_readings`, `sensor_battery_readings`) and ephemeral operational logs (`device_status_events`, `integration_errors`) older than 90 days are automatically purged via chunked batch maintenance.
 - **Maximum Query Range:** 31 days (`DEC-MON-087`).
+- **Visualization Aggregation:** 1-hour client-side bucket averaging purely for chart stability (`DEC-UIUX-104`).
 - **Protected Data:** `audit_logs`, `faucet_commands`, `faucet_command_events`, and `account_approvals` are strictly exempt from telemetry cleanup and preserved indefinitely (`SEC-DATA-004`).
 
 The following remain TBD:
-- Aggregation intervals for chart downsampling.
+- Server-side downsampling intervals for multi-month raw data exports.
 - Export functionality.
 - Raw-data download permissions.
 - Long-term cold archival policy.

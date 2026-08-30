@@ -653,6 +653,21 @@ Test each metric:
 - Tank volume.
 - Flow rate.
 
+### 11.4.1 Historical Monitoring Charts Testing (`TASK-0504`, `DEC-UIUX-104`)
+
+Unit and component test suite (`apps/web/test/unit/historical-charts.test.tsx` and `apps/web/test/unit/soil-telemetry-ui.test.tsx`):
+- **NPK LineChart Rendering:** Verifies NPK trend renders with three separate series (Nitrogen `#0d631b`, Phosphorus `#884200`, Potassium `#476800`) and individual AreaCharts with correct localized titles.
+- **Instant Client-Side Range Switching:** Verifies switching between range presets (24h, 7d, 30d) resolves synchronously from `globalHistoryCache` with `loading=false`, eliminating skeleton flashes and redundant network calls.
+- **Range-Based X-Axis Formatting (`getCustomXTicks`):**
+  - *24 Hours:* Generates 5–8 evenly spaced readable time ticks (`HH:mm`) rather than displaying all 24 hours.
+  - *7 Days:* Generates 4–5 well-spaced daily ticks (`DD MMM`) to prevent text overlap on mobile screens while preserving 1-hour resolution data points.
+  - *30 Days:* Generates 5–7 evenly spaced date ticks across the month.
+- **Locale-Aware Formatting & Punctuation Cleanup (`formatDayMonth`):**
+  - Formats date labels dynamically according to active locale: Indonesian (`20 Agu`) vs English (`20 Aug`).
+  - Strips trailing commas and periods from axis labels, data strings, and tooltip headers (`20 Agu`, not `20 Agu,`).
+- **State Handling:** Verifies loading skeleton, empty state banners (`Tidak ada data riwayat untuk rentang waktu ini.`), and error banners.
+- **Verification Gates:** Verified with 25 passing unit tests across charting suites, 0 TypeScript compile errors across 4 workspaces, and visual UI verification via Playwright for 24h, 7d, and 30d views.
+
 ## 11.5 Faucet Control
 
 - Phase selection.

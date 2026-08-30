@@ -296,6 +296,7 @@ export default function WaterPage() {
               <WaterNutrientChart
                 data={historyData}
                 selectedMetric={selectedMetric}
+                preset={preset}
                 loading={historyLoading}
                 error={historyError}
               />

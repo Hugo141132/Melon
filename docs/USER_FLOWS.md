@@ -1255,7 +1255,7 @@ The application does NOT provide a "Delete Device" flow. Device removal from the
 
 ---
 
-## Flow 32 — User Views Historical Data
+## Flow 32 — User Views Historical Data (`DEC-MON-087`, `DEC-UIUX-104`)
 
 **Primary actor:** Owner or Admin
 **Preconditions:** Active user; device authorised.
@@ -1267,10 +1267,12 @@ The application does NOT provide a "Delete Device" flow. Device removal from the
 2. The user selects or retains a device (resolved via canonical string `deviceId` or database UUID `id`).
 3. The server verifies device access for the target device.
 4. The system loads default date range (last 24 hours) and default metrics. Date range is capped at 31 days (`DEC-MON-087`).
-5. The frontend displays historical chart components (`NPKChart`, `WaterNutrientChart`, `HistoricalChartControls`).
-6. Missing intervals are rendered as visual gaps (`connectNulls={false}`), never synthesized zeros.
-7. Telemetry EC values stored in `mS/cm` are converted to `µS/cm` (×1000) for display.
-8. Dates and numbers are formatted using the active locale (`id-ID`).
+5. The frontend aggregates raw readings into 1-hour intervals purely for chart visualization without changing backend telemetry ingestion or real-time streaming contracts.
+6. The frontend displays historical chart components (`NPKChart` rendering NPK as a multi-line `LineChart` with Nitrogen `#0d631b`, Phosphorus `#884200`, Potassium `#476800`, `WaterNutrientChart`, `HistoricalChartControls`).
+7. X-axis tick density is decoupled from 1-hour data resolution via `getCustomXTicks`: 24h shows 5–8 time labels; 7d shows 4–5 well-spaced daily labels to eliminate label crowding and text overlap; 30d shows spaced date labels.
+8. Missing intervals are rendered as visual gaps (`connectNulls={false}`), never synthesized zeros.
+9. Telemetry EC values stored in `mS/cm` are converted to `µS/cm` (×1000) for display.
+10. Dates and numbers are formatted according to the application's active locale (`formatDayMonth`) without trailing commas or periods (`20 Agu` / `20 Aug`).
 
 **Alternative flows:** No historical readings exist; API returns HTTP 200 with an empty series array and the UI displays a no-data banner.
 **Error flows:** Date range exceeds 31 days (HTTP 400 `DATE_RANGE_EXCEEDED`), query failure, or unauthorised device access (HTTP 403/404).
@@ -1283,29 +1285,29 @@ The application does NOT provide a "Delete Device" flow. Device removal from the
 
 ---
 
-## Flow 33 — User Changes the Historical Date Range
+## Flow 33 — User Changes the Historical Date Range (`DEC-UIUX-104`)
 
 **Primary actor:** Owner or Admin
 **Preconditions:** History page open.
-**Trigger:** User submits a new range.
+**Trigger:** User switches range preset (24 Hours, 7 Days, 30 Days) or submits custom range.
 
 **Main success flow:**
 
-1. The frontend validates date order.
-2. The server validates range and maximum query limit.
-3. The server verifies device access again.
-4. The system returns data for the requested period.
-5. Charts and tables update.
-6. The selected range remains visible.
+1. The frontend checks if the requested range is already present in the client-side telemetry cache (`globalHistoryCache`).
+2. **If cached:** The system slices and aggregates the in-memory telemetry immediately, updating the chart with `loading=false` and zero skeleton flashes.
+3. **If not cached:** The frontend issues `GET /api/v1/devices/{deviceId}/monitoring/{soil|water}/history` with ISO 8601 query bounds (`startDate`, `endDate`).
+4. The server validates range bounds (maximum 31 days per `DEC-MON-087`) and verifies device access.
+5. The server returns paginated raw telemetry records.
+6. The frontend populates client cache, recalculates 1-hour visualization buckets and X-axis ticks, and renders the updated chart.
+7. The selected range chip highlights accordingly.
 
-**Alternative flows:** Aggregation level changes automatically for long periods.
-**Error flows:** Invalid range, unsupported future dates, excessive range.
-**Postconditions:** History reflects the selected period.
+**Alternative flows:** Aggregation remains 1 hour client-side across all presets; X-axis ticks adapt dynamically (5–8 ticks for 24h, 4–5 daily ticks for 7d, spaced ticks for 30d).
+**Error flows:** Invalid range order, future dates, excessive range > 31 days (HTTP 400 `DATE_RANGE_EXCEEDED`).
+**Postconditions:** History reflects the selected period without unnecessary network roundtrips.
 **Required permissions:** `monitoring.history.read`.
 **Relevant account statuses:** `ACTIVE`.
-**UI states:** Filtering, loading, results, range error.
+**UI states:** Instant cache render, loading (when uncached), results, range error.
 **Audit events:** None.
-**Open decisions:** Maximum range and aggregation rules.
 
 ---
 

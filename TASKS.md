@@ -1560,8 +1560,14 @@ Implement bounded history for soil and water.
 **Priority:** `P1`
 **Status:** `DONE`
 **Dependencies:** `TASK-0503`
-**Completed:** 2026-08-12 — Implemented historical monitoring chart components and data fetching layer (`useHistoricalMonitoring` hook, `HistoricalChartControls`, `NPKChart`, `WaterNutrientChart`) on canonical `/soil` and `/water` routes (legacy `/tanah` and `/air` return 404 Not Found). Enforced `DEC-MON-087` & `DEC-MON-088` date-range validation (default 24h, max 31 days) and raw pagination item concatenation (`pageSize=100`, page 1..N). Preserved `null` values as visual gaps (`connectNulls={false}`), handled empty history with HTTP 200 and no-data UI (no fake zeros or 404s), synchronized `DeviceSelector` context across routes, resolved canonical string `deviceId` and database UUID lookups, converted stored `mS/cm` EC values to `µS/cm` for display, applied Indonesian localization (`id-ID`) for timestamps and UI text, and supported responsive mobile layouts (360px–430px). Verified 100% pass across targeted unit tests (`apps/web/test/unit/historical-charts.test.tsx`), authenticated Playwright OWNER/ADMIN E2E testing, full pre-commit verification suite (`test:coverage`, `test:integration`, `check:quality`, `test`, `test:e2e`), and 17-file specification document reconciliation.
+**Completed:** 2026-08-12 — Implemented historical monitoring chart components and data fetching layer (`useHistoricalMonitoring` hook, `HistoricalChartControls`, `NPKChart`, `WaterNutrientChart`) on canonical `/soil` and `/water` routes (legacy `/tanah` and `/air` return 404 Not Found). Enforced `DEC-MON-087` & `DEC-MON-088` date-range validation (default 24h, max 31 days) and raw pagination item concatenation (`pageSize=100`, page 1..N). Preserved `null` values as visual gaps (`connectNulls={false}`), handled empty history with HTTP 200 and no-data UI (no fake zeros or 404s), synchronized `DeviceSelector` context across routes, resolved canonical string `deviceId` and database UUID lookups, converted stored `mS/cm` EC values to `µS/cm` for display, applied localization for timestamps and UI text, and supported responsive mobile layouts (360px–430px). Verified 100% pass across targeted unit tests (`apps/web/test/unit/historical-charts.test.tsx`), authenticated Playwright OWNER/ADMIN E2E testing, full pre-commit verification suite (`test:coverage`, `test:integration`, `check:quality`, `test`, `test:e2e`), and 17-file specification document reconciliation.
 **Reconciliation Note (2026-08-19):** Reconciled `useHistoricalMonitoring` hook and sensor domain pages (`/soil`, `/water`) to consistently pass immutable database UUID `devices.id` in `activeDeviceId`. Verified clean empty state rendering on HTTP 200 empty responses without erroneous 404 banners.
+**Enhancement Note (2026-08-30):**
+- **NPK LineChart Visualization**: Switched NPK visualization from BarChart to LineChart with 3 distinct series for Nitrogen (`#0d631b`), Phosphorus (`#884200`), and Potassium (`#476800`). Corrected data key bindings (`n`, `p`, `k`) in hourly grouping. Historical data remains aggregated at 1-hour intervals purely for chart visualization without changing telemetry ingestion or real-time updates.
+- **Instant Client Cache Range Switching**: Refactored `useHistoricalMonitoring` to reuse cached raw telemetry across range presets (24h, 7d, 30d), re-aggregating instantly client-side without full reloads or skeleton loading flashes when cached data is available.
+- **Range-Based X-Axis Tick Formatting (`getCustomXTicks`)**: Separated displayed X-axis tick density from 1-hour data resolution. 24h shows ~5-8 readable time labels; 7d shows 4-5 well-spaced daily labels to eliminate crowding and overlap; 30d shows spaced date labels across 30 days. Full 1-hour resolution is preserved in data points and tooltips.
+- **Locale-Aware Formatting & Punctuation Cleanup**: Integrated `useLocale()` from `next-intl` (`formatDayMonth`), ensuring month names match the application language (`20 Agu` / `24 Agu` for Indonesian, `20 Aug` / `24 Aug` for English) and removing all unwanted commas and periods from axis ticks, data strings, and tooltip headers.
+- **Verification**: Added unit test coverage for `formatDayMonth`, locale switching, 7d/24h/30d tick generation (25/25 unit tests passing across charting suites), verified TypeScript typecheck (0 errors across 4 workspaces), and verified UI via Playwright.
 
 ### Work
 
@@ -1570,9 +1576,11 @@ Implement bounded historical chart visualization.
 ### Acceptance Criteria
 
 - Metrics can be selected.
-- Date range can be changed.
+- Date range can be changed with instant client cache switching when data exists.
+- NPK trend is visualized using responsive LineChart.
 - Missing values are represented accurately.
-- Chart text is localised.
+- X-axis labels are decoupled from data resolution to ensure clean spacing and prevent overlap.
+- Chart text and axis dates are localised according to application language without trailing punctuation.
 - Mobile layout remains usable.
 
 ---

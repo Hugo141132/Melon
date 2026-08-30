@@ -413,6 +413,7 @@ export default function SoilPage() {
               <NPKChart
                 data={historyData}
                 selectedMetric={selectedMetric}
+                preset={preset}
                 loading={historyLoading}
                 error={historyError}
               />

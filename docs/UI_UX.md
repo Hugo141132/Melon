@@ -562,15 +562,23 @@ The flow-rate component shall show:
 - trend or recent history where useful;
 - no-flow, unavailable, and invalid states.
 
-### 11.5 Historical Telemetry Charts (`DEC-MON-088`)
+### 11.5 Historical Telemetry Charts (`DEC-MON-088`, `DEC-UIUX-104`)
 
 Historical charts render on domain detail pages (`/soil` and `/water`; legacy `/tanah` and `/air` return 404 Not Found):
 
-- **Chart Controls:** Metric toggle chips, date range selector (24-hour default, 31-day max range), and pagination controls.
-- **Null Value Representation:** Missing values render as visual gaps (`connectNulls={false}`).
+- **NPK Trend Visualization:** Soil NPK trend renders as a multi-line Recharts `LineChart` featuring three distinct series: Nitrogen (`#0d631b`), Phosphorus (`#884200`), and Potassium (`#476800`) with smooth monotone curves, active hover dots, and null-gap preservation (`connectNulls={false}`). Individual metrics (Temperature, Moisture, pH, EC, TDS) render as AreaCharts with smooth gradient fills.
+- **Client-Side Hourly Aggregation:** Historical readings are grouped and averaged into 1-hour intervals client-side purely for visualization stability and noise reduction. This does not alter backend telemetry ingestion or real-time streaming data contracts.
+- **Instant Client-Side Cache Reuse:** Switching between range presets (24 Hours, 7 Days, 30 Days) reuses existing cached telemetry in memory, instantly recalculating and displaying charts with `loading=false` without skeleton flashes or redundant network requests.
+- **Range-Based X-Axis Tick Formatting:** X-axis tick label density is decoupled from 1-hour data resolution to ensure clean readability across all device viewports:
+  - **24 Hours:** Displays ~5–8 evenly spaced readable time ticks (e.g. `00:00`, `04:00`, `08:00`, `12:00`, `16:00`, `20:00`).
+  - **7 Days:** Displays 4–5 well-spaced daily ticks (stepping every 2 days when > 4 days) to eliminate label crowding and text overlap on mobile screens while preserving all hourly data points.
+  - **30 Days:** Displays ~5–7 cleanly spaced date ticks across the month.
+- **Application Locale-Aware Formatting:** Date and time labels follow the application's active language via `useLocale()` (`formatDayMonth`):
+  - **Indonesian (`id`):** e.g., `20 Agu`, `24 Agu`.
+  - **English (`en`):** e.g., `20 Aug`, `24 Aug`.
+  - All unwanted trailing commas and periods are stripped from axis ticks, raw data strings, and tooltip headers (`20 Agu`, not `20 Agu,`).
 - **EC Display Unit:** Electrical Conductivity is stored in `mS/cm` and converted to `µS/cm` (×1000) for display.
 - **Empty State:** Queries returning zero records display a translated no-data banner (HTTP 200), not zero values or a 404 error.
-- **Localization:** Timestamps are formatted using Indonesian locale (`id-ID`).
 
 ---
 

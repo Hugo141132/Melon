@@ -1,9 +1,9 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
-  BarChart,
-  Bar,
+  LineChart,
+  Line,
   AreaChart,
   Area,
   XAxis,
@@ -12,7 +12,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import { BaseSeriesItem } from '@/hooks/useHistoricalMonitoring';
 
 const NPK_COLORS = {
@@ -24,19 +24,163 @@ const NPK_COLORS = {
 export interface NPKChartProps {
   data?: BaseSeriesItem[];
   selectedMetric?: string;
+  preset?: string;
   loading?: boolean;
   error?: string | null;
+}
+
+export function formatDayMonth(date: Date, locale: string = 'id'): string {
+  const day = date.getDate();
+  const intlLocale = locale === 'en' ? 'en-US' : 'id-ID';
+  const month = date
+    .toLocaleDateString(intlLocale, { month: 'short' })
+    .replace(/,/g, '')
+    .replace(/\./g, '')
+    .trim();
+  return `${day} ${month}`;
+}
+
+export function getCustomXTicks(
+  data: BaseSeriesItem[],
+  preset?: string,
+  locale: string = 'id'
+): {
+  ticks: string[];
+  formatTick: (value: string) => string;
+} {
+  if (!data || data.length === 0) {
+    return { ticks: [], formatTick: (v: string) => v };
+  }
+
+  if (data.length <= 1) {
+    return { ticks: [data[0].time], formatTick: (v: string) => v };
+  }
+
+  const firstTime = new Date(data[0].timestamp).getTime();
+  const lastTime = new Date(data[data.length - 1].timestamp).getTime();
+  const spanHours = (lastTime - firstTime) / (1000 * 60 * 60);
+
+  const is24h = preset === '24h' || (spanHours > 0 && spanHours <= 24);
+  const is7d = preset === '7d' || (spanHours > 24 && spanHours <= 8 * 24);
+
+  const tickLabels = new Map<string, string>();
+
+  if (is24h) {
+    // 24 Hours: show ~5-8 readable time labels without displaying every single hour
+    if (data.length <= 8) {
+      for (const d of data) {
+        const itemDate = new Date(d.timestamp);
+        const hh = String(itemDate.getHours()).padStart(2, '0');
+        const mm = String(itemDate.getMinutes()).padStart(2, '0');
+        tickLabels.set(d.time, `${hh}:${mm}`);
+      }
+      return {
+        ticks: data.map((d) => d.time),
+        formatTick: (v: string) => tickLabels.get(v) || v,
+      };
+    }
+
+    const step = Math.max(1, Math.floor(data.length / 6));
+    const selectedTicks: string[] = [];
+    for (let i = 0; i < data.length; i += step) {
+      const item = data[i];
+      selectedTicks.push(item.time);
+      const itemDate = new Date(item.timestamp);
+      const hh = String(itemDate.getHours()).padStart(2, '0');
+      const mm = String(itemDate.getMinutes()).padStart(2, '0');
+      tickLabels.set(item.time, `${hh}:${mm}`);
+    }
+    return {
+      ticks: selectedTicks,
+      formatTick: (v: string) => tickLabels.get(v) || v,
+    };
+  }
+
+  if (is7d) {
+    // 7 Days: group by calendar date, display with comfortable spacing (4-5 labels to prevent overlap)
+    const dayGroups = new Map<string, BaseSeriesItem>();
+    for (const item of data) {
+      const d = new Date(item.timestamp);
+      const dateKey = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+      if (!dayGroups.has(dateKey)) {
+        dayGroups.set(dateKey, item);
+      }
+    }
+
+    const distinctDays = Array.from(dayGroups.values());
+    const selectedTicks: string[] = [];
+
+    // Step of 2 when > 4 days ensures 4 clean labels with plenty of margin, completely eliminating label overlap
+    const step = distinctDays.length > 4 ? 2 : 1;
+    for (let i = 0; i < distinctDays.length; i += step) {
+      const item = distinctDays[i];
+      selectedTicks.push(item.time);
+      tickLabels.set(item.time, formatDayMonth(new Date(item.timestamp), locale));
+    }
+
+    // Include the final day if not yet included
+    const lastDayItem = distinctDays[distinctDays.length - 1];
+    if (!selectedTicks.includes(lastDayItem.time)) {
+      selectedTicks.push(lastDayItem.time);
+      tickLabels.set(lastDayItem.time, formatDayMonth(new Date(lastDayItem.timestamp), locale));
+    }
+
+    return {
+      ticks: selectedTicks,
+      formatTick: (v: string) => {
+        if (tickLabels.has(v)) return tickLabels.get(v)!;
+        const parts = v.replace(/,/g, '').replace(/\./g, '').split(' ');
+        return parts.length >= 2 ? `${parts[0]} ${parts[1]}` : v;
+      },
+    };
+  }
+
+  // 30 Days: group by day, display ~5-7 date labels with appropriate spacing
+  const dayGroups = new Map<string, BaseSeriesItem>();
+  for (const item of data) {
+    const d = new Date(item.timestamp);
+    const dateKey = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+    if (!dayGroups.has(dateKey)) {
+      dayGroups.set(dateKey, item);
+    }
+  }
+
+  const distinctDays = Array.from(dayGroups.values());
+  const step = Math.ceil(distinctDays.length / 6);
+  const selectedTicks: string[] = [];
+  for (let i = 0; i < distinctDays.length; i += step) {
+    const item = distinctDays[i];
+    selectedTicks.push(item.time);
+    tickLabels.set(item.time, formatDayMonth(new Date(item.timestamp), locale));
+  }
+
+  const lastDayItem = distinctDays[distinctDays.length - 1];
+  if (!selectedTicks.includes(lastDayItem.time)) {
+    selectedTicks.push(lastDayItem.time);
+    tickLabels.set(lastDayItem.time, formatDayMonth(new Date(lastDayItem.timestamp), locale));
+  }
+
+  return {
+    ticks: selectedTicks,
+    formatTick: (v: string) => {
+      if (tickLabels.has(v)) return tickLabels.get(v)!;
+      const parts = v.replace(/,/g, '').replace(/\./g, '').split(' ');
+      return parts.length >= 2 ? `${parts[0]} ${parts[1]}` : v;
+    },
+  };
 }
 
 export default function NPKChart({
   data = [],
   selectedMetric = 'npk',
+  preset,
   loading = false,
   error = null,
 }: NPKChartProps) {
   const tSoil = useTranslations('soil');
   const tHistory = useTranslations('history');
   const tCommon = useTranslations('common');
+  const locale = useLocale();
 
   const singleMetricConfig: Record<
     string,
@@ -59,6 +203,21 @@ export default function NPKChart({
   const titleText = isSingleMetric
     ? tSoil('metricHistoryTitle', { metric: singleConfig?.label || selectedMetric })
     : tSoil('npkTrend');
+
+  const { ticks, formatTick } = useMemo(() => {
+    return getCustomXTicks(data, preset, locale);
+  }, [data, preset, locale]);
+
+  const cleanLabelFormatter = (label: any, payload: any[]) => {
+    if (payload && payload.length > 0 && payload[0]?.payload?.timestamp) {
+      const d = new Date(payload[0].payload.timestamp);
+      const dateStr = formatDayMonth(d, locale);
+      const hh = String(d.getHours()).padStart(2, '0');
+      const mm = String(d.getMinutes()).padStart(2, '0');
+      return preset === '24h' ? `${hh}:${mm}` : `${dateStr} ${hh}:${mm}`;
+    }
+    return typeof label === 'string' ? label.replace(/,/g, '').replace(/\./g, '').trim() : label;
+  };
 
   return (
     <div className="bg-app-surface-container-lowest rounded-xl p-5 soft-elevation-lg border border-app-outline-variant/30">
@@ -112,6 +271,9 @@ export default function NPKChart({
                 <CartesianGrid strokeDasharray="3 3" stroke="#eeeeee" vertical={false} />
                 <XAxis
                   dataKey="time"
+                  ticks={ticks.length > 0 ? ticks : undefined}
+                  tickFormatter={formatTick}
+                  interval={0}
                   tick={{ fontSize: 11, fill: '#40493d' }}
                   axisLine={false}
                   tickLine={false}
@@ -124,6 +286,7 @@ export default function NPKChart({
                     borderRadius: '12px',
                     fontSize: '12px',
                   }}
+                  labelFormatter={cleanLabelFormatter}
                   formatter={(value: any) => [
                     value !== null && value !== undefined
                       ? `${value} ${singleConfig.unit}`.trim()
@@ -144,15 +307,13 @@ export default function NPKChart({
                 />
               </AreaChart>
             ) : (
-              <BarChart
-                data={data}
-                margin={{ top: 4, right: 0, left: -30, bottom: 0 }}
-                barGap={2}
-                barCategoryGap="30%"
-              >
+              <LineChart data={data} margin={{ top: 4, right: 4, left: -25, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#eeeeee" vertical={false} />
                 <XAxis
                   dataKey="time"
+                  ticks={ticks.length > 0 ? ticks : undefined}
+                  tickFormatter={formatTick}
+                  interval={0}
                   tick={{ fontSize: 11, fill: '#40493d' }}
                   axisLine={false}
                   tickLine={false}
@@ -170,6 +331,7 @@ export default function NPKChart({
                     borderRadius: '12px',
                     fontSize: '12px',
                   }}
+                  labelFormatter={cleanLabelFormatter}
                   formatter={(value: any, name: any) => [
                     value !== null && value !== undefined
                       ? `${value} mg/kg`
@@ -177,25 +339,40 @@ export default function NPKChart({
                     name,
                   ]}
                 />
-                <Bar
+                <Line
+                  type="monotone"
                   dataKey="n"
                   name={tSoil('nitrogen')}
-                  fill={NPK_COLORS.n}
-                  radius={[4, 4, 0, 0]}
+                  stroke={NPK_COLORS.n}
+                  strokeWidth={2.5}
+                  connectNulls={false}
+                  dot={false}
+                  activeDot={{ r: 5, fill: NPK_COLORS.n }}
+                  strokeLinecap="round"
                 />
-                <Bar
+                <Line
+                  type="monotone"
                   dataKey="p"
                   name={tSoil('phosphorus')}
-                  fill={NPK_COLORS.p}
-                  radius={[4, 4, 0, 0]}
+                  stroke={NPK_COLORS.p}
+                  strokeWidth={2.5}
+                  connectNulls={false}
+                  dot={false}
+                  activeDot={{ r: 5, fill: NPK_COLORS.p }}
+                  strokeLinecap="round"
                 />
-                <Bar
+                <Line
+                  type="monotone"
                   dataKey="k"
                   name={tSoil('potassium')}
-                  fill={NPK_COLORS.k}
-                  radius={[4, 4, 0, 0]}
+                  stroke={NPK_COLORS.k}
+                  strokeWidth={2.5}
+                  connectNulls={false}
+                  dot={false}
+                  activeDot={{ r: 5, fill: NPK_COLORS.k }}
+                  strokeLinecap="round"
                 />
-              </BarChart>
+              </LineChart>
             )}
           </ResponsiveContainer>
         </div>

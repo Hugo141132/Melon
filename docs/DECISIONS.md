@@ -650,3 +650,21 @@ The following facts are supported by the verified decisions governance of `TASK-
   4. **Uniqueness & Race Condition Protection:** Candidate email uniqueness is verified both upon request creation and atomically during verification commit (`POST /api/v1/me/email/verify`). Replayed, expired, or invalid codes are safely rejected.
   5. **Session Preservation & Non-Sensitive Audit Logging:** Successful verification atomically updates `users.email = newEmail` and `users.emailVerifiedAt = NOW()`, purges the token, synchronizes the active session context in-memory without forced logout, and emits a structured audit log (`account.email.changed`) containing strictly non-sensitive audit metadata (no raw plaintext old/new email strings).
 <!-- TASK-0216 Reconciled: 2026-08-29 -->
+
+---
+
+## DEC-UIUX-104: Historical Monitoring Chart Visualization, Instant Client-Side Cache Reuse, and Range-Based X-Axis Separation
+- **Status:** APPROVED
+- **Context:** The Soil historical chart on `/soil` experienced visual rendering gaps (NPK bar charts requiring property key alignment `nitrogen`/`phosphorus`/`potassium` to `n`/`p`/`k`), unnecessary full-range loading flashes during preset switches (24h, 7d, 30d) even when data was cached, X-axis label crowding and overlap on multi-day ranges due to tight coupling between hourly aggregation and label display density, and hardcoded Indonesian punctuation (`20 Agu,`).
+- **Decision:**
+  1. **NPK LineChart Visualization:** NPK trend is visualized using a multi-line Recharts `LineChart` with three distinct series (Nitrogen `#0d631b`, Phosphorus `#884200`, Potassium `#476800`) with smooth monotone curves, active hover dots, and null-gap preservation (`connectNulls={false}`).
+  2. **Visualization-Only 1-Hour Aggregation:** Historical chart data is aggregated at 1-hour intervals on the client side purely for visual stability and noise reduction. This does not alter backend telemetry ingestion, storage precision, or real-time SSE stream updates.
+  3. **Instant Client Cache Range Switching:** The `useHistoricalMonitoring` hook checks global in-memory telemetry bounds before triggering network fetches. When switching between 24h, 7d, and 30d presets where requested ranges already reside in memory, data is filtered, aggregated, and rendered immediately with `loading = false`, eliminating skeleton loading flashes and redundant HTTP roundtrips.
+  4. **Decoupling X-Axis Label Density from Data Resolution (`getCustomXTicks`):**
+     - **24 Hours:** Retains full 1-hour resolution with ~5–8 evenly spaced readable time ticks (e.g. `00:00`, `04:00`, `08:00`, etc.).
+     - **7 Days:** Retains full 1-hour resolution with 4–5 well-spaced daily ticks (stepping every 2 days when > 4 days) to guarantee zero label overlap on mobile and desktop viewports.
+     - **30 Days:** Retains full 1-hour resolution with ~5–7 cleanly spaced date ticks across the month.
+  5. **Application Locale-Aware Formatting & Punctuation Cleanup:**
+     - X-axis date labels and tooltip headers follow the application's active locale via `useLocale()` from `next-intl` (`formatDayMonth`): Indonesian (`id` -> `20 Agu`, `24 Agu`) vs English (`en` -> `20 Aug`, `24 Aug`).
+     - All trailing commas and periods are stripped from date labels, raw data time strings, and tooltip headers.
+<!-- TASK-0504 Reconciled: 2026-08-30 -->

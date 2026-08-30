@@ -504,6 +504,24 @@ The actuator control interface is structured into modular, single-responsibility
 2. **Polling Lifecycle**: `FaucetStatusCard` polls `GET /api/v1/devices/{deviceId}/faucet-commands/{commandId}` every 2,500ms strictly while status is `QUEUED`, `SENT`, `ACKNOWLEDGED`, or `IN_PROGRESS`. Polling immediately terminates upon reaching any terminal state (`COMPLETED`, `FAILED`, `CANCELLED`, `TIMEOUT`, `EXPIRED`) or upon component unmount.
 3. **Physical State Derivation**: Authoritative physical valve state (`OPEN`, `CLOSED`, `UNKNOWN`) is derived strictly from verified terminal command outcomes (`COMPLETED OPEN` $\rightarrow$ `OPEN`, `COMPLETED CLOSE` $\rightarrow$ `CLOSED`; active commands, failures, and `DISPENSE` completions strictly present `UNKNOWN`).
 
+### 8.6 Historical Monitoring UI Subsystem (`/soil`, `/water` / TASK-0504, DEC-UIUX-104)
+
+The historical monitoring visualization architecture decouples raw backend telemetry storage and pagination from presentation-layer client aggregation and formatting:
+
+```text
+/soil | /water (Client Page Views)
+└── HistoricalChartControls (Metric toggles, Range presets: 24h / 7d / 30d)
+└── useHistoricalMonitoring (Hook managing network fetch, globalHistoryCache, 1h aggregation)
+    ├── NPKChart (Multi-line LineChart for N/P/K, AreaChart for single metrics)
+    └── WaterNutrientChart (AreaCharts with smooth gradients for pH / EC / TDS)
+```
+
+**Architecture Contracts:**
+1. **Client-Side Hourly Aggregation**: Telemetry readings are grouped and averaged into 1-hour intervals client-side purely for chart visualization stability without altering backend telemetry contracts or real-time streaming updates.
+2. **Instant Client-Side Cache Reuse**: `useHistoricalMonitoring` maintains an in-memory `globalHistoryCache`. When switching between range presets (24h, 7d, 30d) where data has already been fetched, the hook immediately filters, aggregates, and renders data with `loading=false`, eliminating skeleton flashes and redundant network requests.
+3. **Decoupled X-Axis Tick Density (`getCustomXTicks`)**: Displays readable X-axis tick labels independent of 1-hour data resolution (5–8 time ticks for 24h, 4–5 daily ticks for 7d preventing text overlap on mobile screens, and spaced date ticks for 30d), while retaining full 1-hour resolution data points and tooltips.
+4. **Application Locale-Aware Formatting (`formatDayMonth`)**: Formats date ticks and tooltip headers based on `useLocale()` from `next-intl` (`id` $\rightarrow$ `20 Agu`, `en` $\rightarrow$ `20 Aug`) with trailing punctuation completely stripped.
+
 ---
 
 ## 9. Authentication Architecture

@@ -1832,12 +1832,12 @@ Response:
 
 # 17. Historical Monitoring Endpoints
 
-> **Approved Rules (`DEC-MON-087` & `DEC-MON-048`):**
+> **Approved Rules (`DEC-MON-087`, `DEC-MON-048`, & `DEC-UIUX-104`):**
 > - **Default Range:** Last 24 hours (`from` defaults to `now - 24 hours`, `to` defaults to `now`).
 > - **Maximum Range:** 31 days (`to - from <= 31 days`). Range > 31 days returns HTTP 400 (`DATE_RANGE_EXCEEDED`).
 > - **Data Retention Guarantee:** Raw telemetry is retained for 90 days (`DEC-MON-048` / `TASK-0913`), ensuring all allowable queries within the 31-day window are fully preserved and performant.
 > - **Pagination:** Default `pageSize = 20`, Maximum `pageSize = 100`. `pageSize > 100` returns HTTP 400 (`VALIDATION_ERROR`). Default `page = 1`.
-> - **Raw Bounded Pagination Only:** Raw query telemetry series. Aggregation (`interval` parameter) is deferred until rules are approved.
+> - **Raw Bounded Query Contract:** API endpoints return raw bounded historical telemetry series without server-side downsampling. Client-side grouping (e.g. 1-hour interval bucket aggregation per `DEC-UIUX-104`) is executed purely at the presentation layer for chart visualization stability.
 > - **Telemetry Isolation:** Water-quality history (`ph`, `tds`, `ec`) is separate from reservoir telemetry (`tankVolume`, `flowRate`).
 > - **Identifier Resolution:** `{deviceId}` parameter accepts both canonical string `deviceId` (e.g. `soil-node-001`) and database UUID `id`.
 > - **Empty History Response:** Queries matching zero records return HTTP `200 OK` with an empty `series: []` array and `totalRecords: 0`, NOT a 404 error or fabricated zero records.

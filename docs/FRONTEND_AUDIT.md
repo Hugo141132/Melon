@@ -235,10 +235,10 @@ Standard Next.js App Router workspace with `app/`, `components/`, `lib/`, `docs/
 * Page-level sub-components: `HealthScoreGauge`, `MetricCard`, `ECGauge`, `PHBar`, `NPKMeter`, `AlertCard`, `SettingItem`, `PasswordStrengthMeter`.
 
 ### 20. Existing Soil-Monitoring Components
-`app/tanah/page.tsx`, `components/charts/NPKChart.tsx`, inline `NPKMeter` cards. Telemetry values present: N (145 mg/kg), P (42 mg/kg), K (198 mg/kg), Soil status ("Optimal"). Temp, Moisture, pH, EC are rendered on dashboard (`app/page.tsx`).
+Canonical `/soil` page (`app/soil/page.tsx`), `components/charts/NPKChart.tsx`, `components/charts/HistoricalChartControls.tsx`, `hooks/useHistoricalMonitoring.ts`. Telemetry parameters present: Nitrogen, Phosphorus, Potassium (`mg/kg`), Temperature (`°C`), Moisture (`%RH`), pH, EC (`µS/cm`), and derived Soil status. `NPKChart` renders NPK trend as a multi-line Recharts `LineChart` (Nitrogen `#0d631b`, Phosphorus `#884200`, Potassium `#476800`) and individual metrics as AreaCharts. Utilizes 1-hour client-side grouping, instant client caching across range presets (24h, 7d, 30d), range-based X-axis tick generation (`getCustomXTicks`), and application locale formatting without trailing punctuation (`DEC-UIUX-104`).
 
 ### 21. Existing Water-Monitoring Components
-`app/air/page.tsx`, `components/charts/WaterNutrientChart.tsx`, inline `ECGauge` (1.8 mS/cm), `PHBar` (6.2), TDS metric (920 ppm), Tank Volume progress bar (450/600L), Flow Rate metric (12.5 L/min). Note: `BAT` (Battery) parameter is removed from soil & water quality nodes (`DEC-MON-086`, superseding `DEC-MON-085`). Latitude and Longitude parameters are deleted.
+Canonical `/water` page (`app/water/page.tsx`), `components/charts/WaterNutrientChart.tsx`, `components/charts/HistoricalChartControls.tsx`, `hooks/useHistoricalMonitoring.ts`. Telemetry parameters present: EC (`µS/cm`), pH, TDS (`ppm`), and Water status. `WaterNutrientChart` renders historical nutrient curves with smooth gradients, range-based X-axis tick generation, and instant client cache switching. Note: `BAT` (Battery) parameter is removed from soil & water quality nodes (`DEC-MON-086`, superseding `DEC-MON-085`). Latitude and Longitude parameters are deleted.
 
 ### 22. Existing Device-Selection Components
 None. Current UI assumes a single farm view without device picker, multi-device list, or `deviceId` context.

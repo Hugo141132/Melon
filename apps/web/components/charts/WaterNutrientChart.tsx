@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   AreaChart,
   Area,
@@ -10,12 +10,14 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import { BaseSeriesItem } from '@/hooks/useHistoricalMonitoring';
+import { getCustomXTicks, formatDayMonth } from './NPKChart';
 
 export interface WaterNutrientChartProps {
   data?: BaseSeriesItem[];
   selectedMetric?: string;
+  preset?: string;
   loading?: boolean;
   error?: string | null;
 }
@@ -23,12 +25,14 @@ export interface WaterNutrientChartProps {
 export default function WaterNutrientChart({
   data = [],
   selectedMetric = 'ec',
+  preset,
   loading = false,
   error = null,
 }: WaterNutrientChartProps) {
   const tWater = useTranslations('water');
   const tHistory = useTranslations('history');
   const tCommon = useTranslations('common');
+  const locale = useLocale();
 
   const waterMetricConfig: Record<
     string,
@@ -40,6 +44,21 @@ export default function WaterNutrientChart({
   };
 
   const active = waterMetricConfig[selectedMetric] || waterMetricConfig.ec;
+
+  const { ticks, formatTick } = useMemo(() => {
+    return getCustomXTicks(data, preset, locale);
+  }, [data, preset, locale]);
+
+  const cleanLabelFormatter = (label: any, payload: any[]) => {
+    if (payload && payload.length > 0 && payload[0]?.payload?.timestamp) {
+      const d = new Date(payload[0].payload.timestamp);
+      const dateStr = formatDayMonth(d, locale);
+      const hh = String(d.getHours()).padStart(2, '0');
+      const mm = String(d.getMinutes()).padStart(2, '0');
+      return preset === '24h' ? `${hh}:${mm}` : `${dateStr} ${hh}:${mm}`;
+    }
+    return typeof label === 'string' ? label.replace(/,/g, '').replace(/\./g, '').trim() : label;
+  };
 
   return (
     <div className="bg-app-surface-container-lowest rounded-xl p-5 soft-elevation-lg border border-app-outline-variant/30">
@@ -79,6 +98,9 @@ export default function WaterNutrientChart({
               <CartesianGrid strokeDasharray="3 3" stroke="#eeeeee" vertical={false} />
               <XAxis
                 dataKey="time"
+                ticks={ticks.length > 0 ? ticks : undefined}
+                tickFormatter={formatTick}
+                interval={0}
                 tick={{ fontSize: 11, fill: '#40493d' }}
                 axisLine={false}
                 tickLine={false}
@@ -91,6 +113,7 @@ export default function WaterNutrientChart({
                   borderRadius: '12px',
                   fontSize: '12px',
                 }}
+                labelFormatter={cleanLabelFormatter}
                 formatter={(value: any) => [
                   value !== null && value !== undefined
                     ? `${value} ${active.unit}`.trim()
