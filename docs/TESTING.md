@@ -2329,3 +2329,29 @@ All five final pre-commit validation commands were executed and verified **PASS*
 - **Database Schema Validation:** `npm run db:validate` confirmed schema is valid and synchronized with DEV database.
 - **Manual Authenticated End-to-End Verification:** **PASSED** (Successfully verified 2-step email change modal, current password re-authentication, candidate email validation, Resend 6-digit verification code delivery, 60s cooldown timer, code verification, atomic database update, immediate zero-reload `AuthContext` update, and preserved active session without logout).
 <!-- Testing Specifications Reconciled: 2026-08-30 -->
+
+---
+
+# 56. Faucet Control UI Refinement & Lifecycle Regression Test Suite (Reconciled 2026-09-01)
+
+Automated unit, database repository, IoT gateway event processor, device simulator, and type safety verification for Faucet Controls:
+
+### Agent-Executed Automated Tests
+1. **Faucet Control UI Tests (`apps/web/test/unit/faucet-control-ui.test.tsx`):** **27/27 tests passed (100%)**:
+   - Verified physical valve state guards: `CLOSED` state disables 0.3L, 1L, 1.5L dispensing preset cards, plant count stepper controls (`-`, input, `+`), and Close Valve manual action while keeping Open Valve enabled.
+   - Verified `OPEN` state disables Open Valve manual action while keeping dispensing presets and Close Valve enabled.
+   - Verified `UNKNOWN` state enables all valid actions.
+   - Verified clean, enum-free status presentation across status cards, action headers, and history tables in English and Indonesian.
+2. **Database Repository Lifecycle Tests (`packages/database/src/__tests__/faucet-command-repository.test.ts`):** **25/25 tests passed (100%)**:
+   - Verified `addCommandEvent()` transactionally rejects/ignores non-terminal progress events (`IN_PROGRESS`) when the parent command is in a terminal status (`COMPLETED`, `FAILED`, `CANCELLED`, `TIMEOUT`, `EXPIRED`), returning the latest event idempotently.
+   - Verified `addCommandEvent()` throws `FaucetCommandNotFoundError` when target command does not exist.
+3. **IoT Gateway Event Processor Tests (`apps/iot-gateway/src/__tests__/faucet-event-processor.test.ts`):** **32/32 tests passed (100%)**:
+   - Verified late `IN_PROGRESS` events for commands in terminal status `COMPLETED` are ignored and do not call `addCommandEvent()`.
+   - Verified graceful handling and logging when `updateCommandStatus` or `addCommandEvent` encounters concurrent transition to terminal status (`InvalidCommandStateTransitionError`).
+4. **Device Simulator Scenario Tests (`apps/iot-gateway/src/__tests__/device-simulator.test.ts`):** **31/31 tests passed (100%)**:
+   - Verified `sendFaucetProgress()` publishes with QoS 1.
+   - Verified lifecycle scenarios (`faucet-dispense`, `faucet-open`, `faucet-close`) execute with realistic hardware delays.
+5. **Full Web Workspace Unit Suite (`apps/web/test/unit`):** **36 test files, 288/288 tests passed (100%)**.
+6. **Workspace Static Typecheck:** `npm run typecheck` returned **0 errors** across all 4 monorepo packages (`@kebun-melon/web`, `@kebun-melon/iot-gateway`, `@kebun-melon/contracts`, `@kebun-melon/database`).
+<!-- Faucet Controls Testing Reconciled: 2026-09-01 -->
+

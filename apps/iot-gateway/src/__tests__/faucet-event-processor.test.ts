@@ -954,6 +954,113 @@ describe('TASK-0806: FaucetEventProcessor (Faucet Execution State Machine & Even
       expect(updateCalled).toBe(false);
     });
 
+    it('ignores late IN_PROGRESS events for commands already in terminal state COMPLETED without adding events', async () => {
+      let addEventCalled = false;
+      let updateCalled = false;
+
+      const mockCommand = {
+        id: 'cmd-uuid-completed',
+        commandId: 'cmd-completed-01',
+        deviceId: 'water-tank-001',
+        action: FaucetCommandAction.OPEN,
+        status: FaucetCommandStatus.COMPLETED,
+        events: [],
+      };
+
+      const mockFaucetCommandRepo = {
+        getCommandById: async () => mockCommand as any,
+        updateCommandStatus: async () => {
+          updateCalled = true;
+          return mockCommand as any;
+        },
+        addCommandEvent: async () => {
+          addEventCalled = true;
+          return {} as any;
+        },
+      };
+
+      const mockDeviceRepo = {
+        getDeviceByCanonicalId: async () => mockWaterNodeDevice as any,
+      };
+
+      const processor = new FaucetEventProcessor({
+        env,
+        faucetCommandRepo: mockFaucetCommandRepo as any,
+        deviceRepo: mockDeviceRepo as any,
+      });
+
+      const topic = 'agriculture/development/site-01/water-tank-001/event/faucet';
+      const eventPayload = Buffer.from(
+        JSON.stringify({
+          schemaVersion: '1.0',
+          messageId: 'event-msg-late-progress',
+          commandId: 'cmd-completed-01',
+          deviceId: 'water-tank-001',
+          data: {
+            status: 'IN_PROGRESS',
+          },
+        })
+      );
+
+      const result = await processor.processEventMessage(topic, eventPayload);
+
+      expect(result.success).toBe(true);
+      expect(result.reason).toContain('terminal state');
+      expect(updateCalled).toBe(false);
+      expect(addEventCalled).toBe(false);
+    });
+
+    it('gracefully handles concurrent transition to terminal status when updateCommandStatus throws InvalidCommandStateTransitionError', async () => {
+      const mockCommand = {
+        id: 'cmd-uuid-ack',
+        commandId: 'cmd-ack-01',
+        deviceId: 'water-tank-001',
+        action: FaucetCommandAction.OPEN,
+        status: FaucetCommandStatus.ACKNOWLEDGED,
+        events: [],
+      };
+
+      const { InvalidCommandStateTransitionError } = await import('@kebun-melon/database');
+
+      const mockFaucetCommandRepo = {
+        getCommandById: async () => mockCommand as any,
+        updateCommandStatus: async () => {
+          throw new InvalidCommandStateTransitionError(
+            FaucetCommandStatus.COMPLETED,
+            FaucetCommandStatus.IN_PROGRESS
+          );
+        },
+      };
+
+      const mockDeviceRepo = {
+        getDeviceByCanonicalId: async () => mockWaterNodeDevice as any,
+      };
+
+      const processor = new FaucetEventProcessor({
+        env,
+        faucetCommandRepo: mockFaucetCommandRepo as any,
+        deviceRepo: mockDeviceRepo as any,
+      });
+
+      const topic = 'agriculture/development/site-01/water-tank-001/event/faucet';
+      const eventPayload = Buffer.from(
+        JSON.stringify({
+          schemaVersion: '1.0',
+          messageId: 'event-msg-concurrent-progress',
+          commandId: 'cmd-ack-01',
+          deviceId: 'water-tank-001',
+          data: {
+            status: 'IN_PROGRESS',
+          },
+        })
+      );
+
+      const result = await processor.processEventMessage(topic, eventPayload);
+
+      expect(result.success).toBe(true);
+      expect(result.reason).toContain('terminal state');
+    });
+
     it('ignores invalid initial state transitions (e.g. IN_PROGRESS while QUEUED)', async () => {
       let updateCalled = false;
 

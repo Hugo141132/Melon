@@ -3093,3 +3093,14 @@ The verified implementation of `TASK-0807`, `TASK-0502`, and `TASK-0306` (`/cont
 - **Client Request Optimization:** `FaucetControlPanel` consumes centralized `useAuth()`, eliminating redundant client-side `GET /api/v1/auth/session` calls upon mounting `/controls`.
 - **API Contracts Unchanged:** Zero modifications were made to REST API route signatures, request schemas, response formats, idempotency headers, or status codes across `/api/v1/devices/*`, `/api/v1/monitoring/*`, or `/api/v1/auth/*`.
 <!-- Controls Loading & Header Centering API Reconciled: 2026-08-27 -->
+
+---
+
+## Faucet Command Lifecycle Regression & Event Append API Note (Reconciled 2026-09-01)
+
+The following facts are supported by the verified implementation of the Faucet Command Lifecycle regression hardening (`TASK-0806`, `TASK-0807`):
+- **API Contracts Unchanged:** REST endpoints `GET /api/v1/devices/{deviceId}/faucet-commands` and `GET /api/v1/devices/{deviceId}/faucet-commands/{commandId}` retain exact JSON schemas, pagination formats, and status codes.
+- **Append-Only Event Store Integrity:** The `events` array in `FaucetCommandDto` returns the ordered history of lifecycle milestones. Multiple `IN_PROGRESS` events prior to `COMPLETED` represent intermediate progress milestones (e.g. incremental volume telemetry) and are valid.
+- **Terminal State Immuntability:** Non-terminal progress events arriving after the command reaches a terminal status (`COMPLETED`, `FAILED`, `CANCELLED`, `TIMEOUT`, `EXPIRED`) are strictly rejected at the database repository and ignored by the gateway event processor, ensuring the returned `events` array never exhibits post-completion state regression.
+<!-- Faucet Command Lifecycle Regression API Reconciled: 2026-09-01 -->
+

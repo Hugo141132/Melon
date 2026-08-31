@@ -256,7 +256,7 @@ export default function FaucetHistoryTable({
                               ? item.plantCount
                                 ? `(Fase ${item.phase} × ${item.plantCount})`
                                 : tFaucet('phaseBadge', { phase: item.phase })
-                              : '(DISPENSE)'}
+                              : `(${tFaucet('commandActionDispense')})`}
                           </span>
                         </>
                       ) : (

@@ -294,3 +294,18 @@ The following facts are verified in the traceability matrix regarding `TASK-0504
   - *Application Locale-Aware Formatting (`formatDayMonth`):* Date labels and tooltip headers follow `useLocale()` (`id` -> `20 Agu`, `en` -> `20 Aug`) with trailing commas and periods stripped.
 <!-- TASK-0504 Traceability Reconciled: 2026-08-30 -->
 
+---
+
+## Faucet Controls UI Refinement & Lifecycle Regression Traceability Note (Reconciled 2026-09-01)
+
+The following facts are verified in the traceability matrix regarding `TASK-0807` (Faucet Control UI Refinement), `TASK-0806` (Command Event State Machine), and `TASK-0408` (Device Simulator):
+- **Traceability Baseline:** Traced from `PRD-FR-020`, `PRD-FR-021`, and `DEC-CTRL-090` to resolve user-observed discrepancies during manual verification of `/controls`.
+- **Implementation Status:**
+  - `TASK-0807`: `DONE` (Reconciled with physical valve state action guards: `CLOSED` disables dispensing presets and Close Valve; `OPEN` disables Open Valve; `UNKNOWN` enables all valid actions. Cleaned user-facing localization by removing redundant uppercase enum tokens `(CLOSED)`, `(COMPLETED)`, `(OPEN)`).
+  - `TASK-0806`: `DONE` (Hardened with transactional terminal state protection in `addCommandEvent()` to prevent late non-terminal event insertion, and handled concurrent state transition errors gracefully in `FaucetEventProcessor`).
+  - `TASK-0408`: `DONE` (Aligned simulator `sendFaucetProgress` to canonical QoS 1 and added realistic asynchronous actuation delays).
+- **Append-Only Event Store Confirmation:** Verified that multiple `IN_PROGRESS` events occurring before `COMPLETED` represent valid intermediate progress milestones emitted by the device; only regressions occurring after terminal states are rejected.
+- **Verification Summary:** All targeted unit suites passed (UI 27/27, DB repository 25/25, Gateway event processor 32/32, Simulator 31/31), web unit suites 288/288 passed, and monorepo static typecheck returned 0 errors.
+<!-- Faucet Controls UI & Lifecycle Traceability Reconciled: 2026-09-01 -->
+
+

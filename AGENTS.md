@@ -600,8 +600,19 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
 - 21st.dev MCP: `NOT REQUIRED`
 - Summary: Reconciled `/controls` loading transition and global header `DeviceSelector` responsive centering. Created route-level instant loading shell (`apps/web/app/controls/loading.tsx`) rendering the complete page composition immediately upon navigation. Replaced generic single-box placeholder in `WaterTankMonitoringCard` with structural 2-column skeleton cards matching the loaded card layout. Hydrated auth state in `FaucetControlPanel` via `useAuth()`, eliminating redundant client-side `/api/v1/auth/session` calls. Rendered structured skeleton rows in `FaucetHistoryTable` during device loading to eliminate layout jumping. Refactored `TopAppBar` to a balanced 3-column CSS Grid (`grid grid-cols-[1fr_auto_1fr] items-center px-4 h-14`), constraining flanking items to identical `1fr` widths and guaranteeing mathematical 50% horizontal center alignment for `DeviceSelector` across desktop, tablet, and mobile. Centered `DeviceSelector` dropdown overlay and alert notices under the trigger button (`left-1/2 -translate-x-1/2`) with viewport clamping (`max-w-[calc(100vw-2rem)]`). Hardened `Sidebar` with null-safety for `pathname`. Verified 100% test pass rate across 34 unit test suites (257/257 tests in `@kebun-melon/web`), monorepo typecheck (0 errors across 4 workspaces), Next.js production build (37/37 routes compiled), Playwright smoke tests (2/2 passed with Microsoft Edge), and manual authenticated browser testing. Preserved `TASK-1004` as `IN_PROGRESS` and verified all five pre-commit validation commands as `PASS` (`test:coverage`, `test:integration`, `check:quality`, `test`, `test:e2e`).
 
+#### Faucet Controls UI Refinement & Lifecycle Regression Hardening Governance Record (Reconciled 2026-09-01)
+
+`TASK-0807` / `TASK-0806` / `TASK-0408` faucet controls & lifecycle reconciliation record:
+- Status: `DONE` (Reconciled 2026-09-01)
+- Frontend impact: `MINOR`
+- Selected UI direction: `Premium Minimal Ops`
+- Existing color template: `UNCHANGED`
+- Selected motion effects: `Card hover`, `Button hover`, `Modal`
+- 21st.dev MCP: `NOT REQUIRED`
+- Summary: Refined `/controls` UI action enablement and hardened faucet command lifecycle event persistence following manual verification. Enforced physical-valve-state-aware action guards: when physical valve state is `CLOSED`, dispensing preset cards (0.3 L, 1 L, 1.5 L), plant count stepper buttons (`-`, input, `+`), and "Close Valve" manual action are disabled, leaving only "Open Valve" enabled; when `OPEN`, "Open Valve" is disabled while dispensing presets and "Close Valve" remain enabled; when `UNKNOWN`, all valid actions remain enabled. Cleaned user-facing localization by removing redundant parenthetical uppercase enum strings (`(CLOSED)`, `(COMPLETED)`, `(OPEN)`, `(DISPENSE)`) across badges, status headers, and history tables in English and Indonesian with 100% dictionary key parity. Fixed lifecycle regression where late non-terminal events (`IN_PROGRESS`) were accepted after `COMPLETED` by adding transactional terminal state protection in `FaucetCommandRepository.addCommandEvent` (`packages/database`), and caught concurrent transition errors in `FaucetEventProcessor` (`apps/iot-gateway`). Aligned simulator `sendFaucetProgress` to canonical QoS 1 and added realistic simulation delays. Confirmed that `faucet_command_events` is an append-only milestone log where multiple intermediate `IN_PROGRESS` events before `COMPLETED` are valid. Verified 100% test pass rate across targeted UI tests (27/27), database tests (25/25), gateway tests (32/32), simulator tests (31/31), web unit tests (36 files, 288/288), and workspace typecheck (0 errors across 4 monorepo packages).
 
 ---
+
 
 
 

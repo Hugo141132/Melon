@@ -513,6 +513,7 @@ export class FaucetCommandRepository {
 
   /**
    * Appends a new event to the append-only faucet command event store.
+   * Rejects/ignores non-terminal progress events if command is already in a terminal state.
    */
   async addCommandEvent(
     idOrCommandId: string,
@@ -528,55 +529,70 @@ export class FaucetCommandRepository {
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
       idOrCommandId
     );
-    const existingCmd = await this.prisma.faucetCommand.findFirst({
-      where: isUuid
-        ? { OR: [{ id: idOrCommandId }, { commandId: idOrCommandId }] }
-        : { commandId: idOrCommandId },
-    });
 
-    if (!existingCmd) {
-      throw new FaucetCommandNotFoundError(`Faucet command '${idOrCommandId}' was not found.`);
-    }
-
-    if (eventData.messageId) {
-      const existingEvt = await this.prisma.faucetCommandEvent.findFirst({
-        where: { messageId: eventData.messageId },
+    return await this.prisma.$transaction(async (tx) => {
+      const existingCmd = await tx.faucetCommand.findFirst({
+        where: isUuid
+          ? { OR: [{ id: idOrCommandId }, { commandId: idOrCommandId }] }
+          : { commandId: idOrCommandId },
       });
 
-      if (existingEvt) {
-        return this.formatEventDto(existingEvt);
+      if (!existingCmd) {
+        throw new FaucetCommandNotFoundError(`Faucet command '${idOrCommandId}' was not found.`);
       }
-    }
 
-    try {
-      const created = await this.prisma.faucetCommandEvent.create({
-        data: {
-          faucetCommandId: existingCmd.id,
-          eventStatus: eventData.eventStatus,
-          messageId: eventData.messageId || null,
-          reasonCode: eventData.reasonCode || null,
-          actualVolumeMl: eventData.actualVolumeMl !== undefined ? eventData.actualVolumeMl : null,
-          recordedAt: eventData.recordedAt || null,
-          receivedAt: new Date(),
-          metadata: eventData.metadata
-            ? (eventData.metadata as Prisma.InputJsonValue)
-            : Prisma.JsonNull,
-        },
-      });
+      // If command is already in a terminal state, non-terminal progress events must not be added
+      if (FINAL_STATUSES.includes(existingCmd.status as FaucetCommandStatus)) {
+        const latestEvt = await tx.faucetCommandEvent.findFirst({
+          where: { faucetCommandId: existingCmd.id },
+          orderBy: { receivedAt: 'desc' },
+        });
+        if (latestEvt) {
+          return this.formatEventDto(latestEvt);
+        }
+      }
 
-      return this.formatEventDto(created);
-    } catch (error: any) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2002' &&
-        eventData.messageId
-      ) {
-        const existingEvt = await this.prisma.faucetCommandEvent.findFirst({
+      if (eventData.messageId) {
+        const existingEvt = await tx.faucetCommandEvent.findFirst({
           where: { messageId: eventData.messageId },
         });
-        if (existingEvt) return this.formatEventDto(existingEvt);
+
+        if (existingEvt) {
+          return this.formatEventDto(existingEvt);
+        }
       }
-      throw error;
-    }
+
+      try {
+        const created = await tx.faucetCommandEvent.create({
+          data: {
+            faucetCommandId: existingCmd.id,
+            eventStatus: eventData.eventStatus,
+            messageId: eventData.messageId || null,
+            reasonCode: eventData.reasonCode || null,
+            actualVolumeMl:
+              eventData.actualVolumeMl !== undefined ? eventData.actualVolumeMl : null,
+            recordedAt: eventData.recordedAt || null,
+            receivedAt: new Date(),
+            metadata: eventData.metadata
+              ? (eventData.metadata as Prisma.InputJsonValue)
+              : Prisma.JsonNull,
+          },
+        });
+
+        return this.formatEventDto(created);
+      } catch (error: any) {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === 'P2002' &&
+          eventData.messageId
+        ) {
+          const existingEvt = await tx.faucetCommandEvent.findFirst({
+            where: { messageId: eventData.messageId },
+          });
+          if (existingEvt) return this.formatEventDto(existingEvt);
+        }
+        throw error;
+      }
+    });
   }
 }

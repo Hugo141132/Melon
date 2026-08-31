@@ -185,56 +185,56 @@ export default function FaucetStatusCard({
         return {
           bg: 'bg-blue-50 text-blue-800 border-blue-200',
           icon: Clock,
-          label: `${tFaucet('queued')} (QUEUED)`,
+          label: tFaucet('queued'),
           animate: false,
         };
       case 'SENT':
         return {
           bg: 'bg-indigo-50 text-indigo-800 border-indigo-200',
           icon: Loader2,
-          label: `${tFaucet('sent')} (SENT)`,
+          label: tFaucet('sent'),
           animate: true,
         };
       case 'ACKNOWLEDGED':
         return {
           bg: 'bg-cyan-50 text-cyan-800 border-cyan-200',
           icon: ShieldCheck,
-          label: `${tFaucet('acknowledged')} (ACKNOWLEDGED)`,
+          label: tFaucet('acknowledged'),
           animate: false,
         };
       case 'IN_PROGRESS':
         return {
           bg: 'bg-amber-50 text-amber-800 border-amber-300',
           icon: Loader2,
-          label: `${tFaucet('inProgress')} (IN_PROGRESS)`,
+          label: tFaucet('inProgress'),
           animate: true,
         };
       case 'COMPLETED':
         return {
           bg: 'bg-emerald-50 text-emerald-800 border-emerald-300',
           icon: CheckCircle2,
-          label: `${tFaucet('completed')} (COMPLETED)`,
+          label: tFaucet('completed'),
           animate: false,
         };
       case 'FAILED':
         return {
           bg: 'bg-rose-50 text-rose-800 border-rose-300',
           icon: XCircle,
-          label: `${tFaucet('failed')} (FAILED)`,
+          label: tFaucet('failed'),
           animate: false,
         };
       case 'TIMEOUT':
         return {
           bg: 'bg-amber-50 text-amber-900 border-amber-300',
           icon: AlertTriangle,
-          label: `${tFaucet('timeout')} (TIMEOUT)`,
+          label: tFaucet('timeout'),
           animate: false,
         };
       case 'EXPIRED':
         return {
           bg: 'bg-gray-100 text-gray-800 border-gray-300',
           icon: Clock,
-          label: `${tFaucet('expired')} (EXPIRED)`,
+          label: tFaucet('expired'),
           animate: false,
         };
       default:
@@ -333,7 +333,13 @@ export default function FaucetStatusCard({
               </span>
             </>
           ) : (
-            <span className="text-[14px] font-extrabold block font-mono">{action}</span>
+            <span className="text-[14px] font-extrabold block font-mono">
+              {action === 'OPEN'
+                ? tFaucet('commandActionOpen')
+                : action === 'CLOSE'
+                  ? tFaucet('commandActionClose')
+                  : action}
+            </span>
           )}
         </div>
       </div>

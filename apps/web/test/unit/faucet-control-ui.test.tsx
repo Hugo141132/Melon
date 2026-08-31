@@ -187,9 +187,7 @@ describe('FaucetPresetSelector', () => {
       />
     );
 
-    expect(screen.getByTestId('authoritative-physical-state')).toHaveTextContent(
-      'TIDAK DIKETAHUI (UNKNOWN)'
-    );
+    expect(screen.getByTestId('authoritative-physical-state')).toHaveTextContent('Tidak Diketahui');
 
     rerender(
       <FaucetPresetSelector
@@ -199,7 +197,7 @@ describe('FaucetPresetSelector', () => {
       />
     );
 
-    expect(screen.getByTestId('authoritative-physical-state')).toHaveTextContent('TERBUKA (OPEN)');
+    expect(screen.getByTestId('authoritative-physical-state')).toHaveTextContent('Terbuka');
 
     rerender(
       <FaucetPresetSelector
@@ -209,9 +207,84 @@ describe('FaucetPresetSelector', () => {
       />
     );
 
-    expect(screen.getByTestId('authoritative-physical-state')).toHaveTextContent(
-      'TERTUTUP (CLOSED)'
+    expect(screen.getByTestId('authoritative-physical-state')).toHaveTextContent('Tertutup');
+  });
+
+  it('disables Start Dispensing and Close Valve buttons when physical valve state is CLOSED', () => {
+    render(
+      <FaucetPresetSelector
+        selectedDevice={mockOnlineDevice}
+        hasControlPermission={true}
+        isFeatureEnabled={true}
+        physicalState="CLOSED"
+        onSelectPreset={vi.fn()}
+        onSelectManualAction={vi.fn()}
+      />
     );
+
+    // Dispensing presets and plant count controls should be disabled
+    expect(screen.getByTestId('btn-select-phase-1')).toBeDisabled();
+    expect(screen.getByTestId('btn-select-phase-2')).toBeDisabled();
+    expect(screen.getByTestId('btn-select-phase-3')).toBeDisabled();
+    expect(screen.getByTestId('input-plant-count')).toBeDisabled();
+    expect(screen.getByTestId('btn-increment-plant')).toBeDisabled();
+    expect(screen.getByTestId('btn-decrement-plant')).toBeDisabled();
+
+    // Close Valve button should be disabled (already closed)
+    expect(screen.getByTestId('btn-manual-close')).toBeDisabled();
+
+    // Open Valve button should remain enabled
+    expect(screen.getByTestId('btn-manual-open')).toBeEnabled();
+  });
+
+  it('disables Open Valve button and keeps Start Dispensing & Close Valve enabled when physical valve state is OPEN', () => {
+    render(
+      <FaucetPresetSelector
+        selectedDevice={mockOnlineDevice}
+        hasControlPermission={true}
+        isFeatureEnabled={true}
+        physicalState="OPEN"
+        onSelectPreset={vi.fn()}
+        onSelectManualAction={vi.fn()}
+      />
+    );
+
+    // Dispensing presets and plant count controls should be enabled
+    expect(screen.getByTestId('btn-select-phase-1')).toBeEnabled();
+    expect(screen.getByTestId('btn-select-phase-2')).toBeEnabled();
+    expect(screen.getByTestId('btn-select-phase-3')).toBeEnabled();
+    expect(screen.getByTestId('input-plant-count')).toBeEnabled();
+    expect(screen.getByTestId('btn-increment-plant')).toBeEnabled();
+
+    // Open Valve button should be disabled (already open)
+    expect(screen.getByTestId('btn-manual-open')).toBeDisabled();
+
+    // Close Valve button should remain enabled
+    expect(screen.getByTestId('btn-manual-close')).toBeEnabled();
+  });
+
+  it('keeps all valid actions enabled when physical valve state is UNKNOWN', () => {
+    render(
+      <FaucetPresetSelector
+        selectedDevice={mockOnlineDevice}
+        hasControlPermission={true}
+        isFeatureEnabled={true}
+        physicalState="UNKNOWN"
+        onSelectPreset={vi.fn()}
+        onSelectManualAction={vi.fn()}
+      />
+    );
+
+    // Dispensing presets and plant count controls should be enabled
+    expect(screen.getByTestId('btn-select-phase-1')).toBeEnabled();
+    expect(screen.getByTestId('btn-select-phase-2')).toBeEnabled();
+    expect(screen.getByTestId('btn-select-phase-3')).toBeEnabled();
+    expect(screen.getByTestId('input-plant-count')).toBeEnabled();
+    expect(screen.getByTestId('btn-increment-plant')).toBeEnabled();
+
+    // Both Open and Close Valve buttons should be enabled
+    expect(screen.getByTestId('btn-manual-open')).toBeEnabled();
+    expect(screen.getByTestId('btn-manual-close')).toBeEnabled();
   });
 
   it('disables preset selection and manual controls when device is null', () => {
@@ -356,7 +429,7 @@ describe('FaucetConfirmationModal', () => {
     );
 
     expect(screen.getByTestId('faucet-confirmation-modal')).toBeInTheDocument();
-    expect(screen.getByText('Konfirmasi Buka Keran (OPEN)')).toBeInTheDocument();
+    expect(screen.getByText('Konfirmasi Buka Keran')).toBeInTheDocument();
     expect(
       screen.getByText(/Apakah Anda yakin ingin membuka katup keran air/i)
     ).toBeInTheDocument();
@@ -382,7 +455,7 @@ describe('FaucetConfirmationModal', () => {
     );
 
     expect(screen.getByTestId('faucet-confirmation-modal')).toBeInTheDocument();
-    expect(screen.getByText('Konfirmasi Tutup Keran (CLOSE)')).toBeInTheDocument();
+    expect(screen.getByText('Konfirmasi Tutup Keran')).toBeInTheDocument();
 
     const confirmBtn = screen.getByTestId('btn-confirm-dispense');
     fireEvent.click(confirmBtn);
@@ -449,13 +522,11 @@ describe('FaucetStatusCard & Authoritative Physical State', () => {
     render(<FaucetStatusCard deviceId={mockOnlineDevice.deviceId!} command={mockCommand} />);
 
     expect(screen.getByTestId('faucet-status-card')).toBeInTheDocument();
-    expect(screen.getByText('Selesai (COMPLETED)')).toBeInTheDocument();
+    expect(screen.getByText('Selesai')).toBeInTheDocument();
     expect(screen.getAllByText(/2 L/).length).toBeGreaterThan(0);
 
     // Completed DISPENSE maps to UNKNOWN physical state (does not infer closed valve)
-    expect(screen.getByTestId('status-card-physical-state')).toHaveTextContent(
-      'TIDAK DIKETAHUI (UNKNOWN)'
-    );
+    expect(screen.getByTestId('status-card-physical-state')).toHaveTextContent('Tidak Diketahui');
 
     // Advance timers by 10 seconds
     act(() => {
@@ -541,7 +612,7 @@ describe('FaucetStatusCard & Authoritative Physical State', () => {
 
     render(<FaucetStatusCard deviceId={mockOnlineDevice.deviceId!} command={openCommand} />);
 
-    expect(screen.getByTestId('status-card-physical-state')).toHaveTextContent('TERBUKA (OPEN)');
+    expect(screen.getByTestId('status-card-physical-state')).toHaveTextContent('Terbuka');
   });
 
   it('displays confirmed CLOSED physical state for completed CLOSE command', () => {
@@ -558,7 +629,7 @@ describe('FaucetStatusCard & Authoritative Physical State', () => {
 
     render(<FaucetStatusCard deviceId={mockOnlineDevice.deviceId!} command={closeCommand} />);
 
-    expect(screen.getByTestId('status-card-physical-state')).toHaveTextContent('TERTUTUP (CLOSED)');
+    expect(screen.getByTestId('status-card-physical-state')).toHaveTextContent('Tertutup');
   });
 
   it('cleans up polling interval immediately when component unmounts', async () => {
@@ -822,8 +893,8 @@ describe('FaucetHistoryTable', () => {
     const items = await screen.findAllByText('0.9 L');
     expect(items.length).toBeGreaterThan(0);
     expect(screen.getByText('(Fase 1 × 3)')).toBeInTheDocument();
-    expect(screen.getByText('Buka Keran (OPEN)')).toBeInTheDocument();
-    expect(screen.getByText('Tutup Keran (CLOSE)')).toBeInTheDocument();
+    expect(screen.getByText('Buka Keran')).toBeInTheDocument();
+    expect(screen.getByText('Tutup Keran')).toBeInTheDocument();
 
     fetchSpy.mockRestore();
   });

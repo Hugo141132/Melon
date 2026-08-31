@@ -1945,3 +1945,14 @@ The approved authentication, single-session concurrency, and profile security sp
 - **Strict Domain Separation (IoT Nodes vs. User Browser Sessions):** The removal of the misleading "Linked Devices" card from `/profile` (`DEC-UIUX-102`) eliminates conceptual ambiguity between user client browser sessions and agricultural IoT hardware devices (`SOIL_NODE`, `WATER_QUALITY_NODE`, `WATER_TANK_NODE`).
 - **Device Authorization Invariance:** Single active session enforcement on user accounts (`DEC-AUTH-107`) and verified email updates (`DEC-AUTH-106`) do not alter device RBAC access scopes (`user_device_access`), telemetry stream subscription boundaries, or physical faucet actuator safety controls.
 <!-- Account Sessions vs IoT Devices Reconciled: 2026-08-29 -->
+
+---
+
+## 49. Faucet Execution Event QoS & Simulator Protocol Alignment (Reconciled 2026-09-01)
+
+The following communication contracts are reinforced and verified for faucet command event processing (`TASK-0806`, `TASK-0408`):
+- **Canonical Topic Routing & QoS 1 Parity:** Execution events published to `agriculture/{environment}/{siteId}/{deviceId}/event/faucet` require QoS 1 for all statuses (`IN_PROGRESS`, `COMPLETED`, `FAILED`). The device simulator (`scripts/device-simulator.ts`) is aligned to publish `IN_PROGRESS` with QoS 1, eliminating transport-level delivery discrepancy.
+- **Physical Actuation Timing & Lifecycle Simulation:** Hardware simulations introduce realistic asynchronous actuation delays (e.g., 300ms post-ACK, 500ms post-progress) to accurately model physical valve movement and liquid flow, preventing packet bursts and network interleaving.
+- **Append-Only Progress Event Delivery:** Devices may emit periodic intermediate `IN_PROGRESS` telemetry events during active execution. The gateway event processor appends these milestone events without regressing state, and enforces terminal state immutability once `COMPLETED` or `FAILED` is reached.
+<!-- Faucet Execution Event QoS Reconciled: 2026-09-01 -->
+

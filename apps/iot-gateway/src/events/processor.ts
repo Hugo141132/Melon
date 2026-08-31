@@ -4,6 +4,7 @@ import {
   FaucetCommandRepository,
   DeviceRepository,
   AlertRepository,
+  InvalidCommandStateTransitionError,
 } from '@kebun-melon/database';
 import {
   FaucetCommandStatus,
@@ -298,56 +299,70 @@ export class FaucetEventProcessor {
       const isDispense = command.action === FaucetCommandAction.DISPENSE;
       const actualVolumeMl = isDispense ? payload.data.actualVolumeMl : undefined;
 
-      if (command.status === FaucetCommandStatus.ACKNOWLEDGED) {
-        await this.faucetCommandRepo.updateCommandStatus(
-          command.commandId,
-          FaucetCommandStatus.IN_PROGRESS,
-          {
+      try {
+        if (command.status === FaucetCommandStatus.ACKNOWLEDGED) {
+          await this.faucetCommandRepo.updateCommandStatus(
+            command.commandId,
+            FaucetCommandStatus.IN_PROGRESS,
+            {
+              messageId: payload.messageId,
+              recordedAt,
+              actualVolumeMl,
+              metadata: {
+                eventData: payload.data,
+                physicalState: 'UNKNOWN',
+                action: command.action,
+              },
+            }
+          );
+          logger.info('Faucet command state updated to IN_PROGRESS', {
+            commandId: command.commandId,
+            deviceId: command.deviceId,
+            action: command.action,
             messageId: payload.messageId,
-            recordedAt,
+          });
+          return { success: true };
+        } else if (command.status === FaucetCommandStatus.IN_PROGRESS) {
+          // Append progress event log idempotently without failing
+          await this.faucetCommandRepo.addCommandEvent(command.commandId, {
+            eventStatus: FaucetCommandStatus.IN_PROGRESS,
+            messageId: payload.messageId,
             actualVolumeMl,
+            recordedAt,
             metadata: {
               eventData: payload.data,
               physicalState: 'UNKNOWN',
               action: command.action,
             },
-          }
-        );
-        logger.info('Faucet command state updated to IN_PROGRESS', {
-          commandId: command.commandId,
-          deviceId: command.deviceId,
-          action: command.action,
-          messageId: payload.messageId,
-        });
-        return { success: true };
-      } else if (command.status === FaucetCommandStatus.IN_PROGRESS) {
-        // Append progress event log idempotently without failing
-        await this.faucetCommandRepo.addCommandEvent(command.commandId, {
-          eventStatus: FaucetCommandStatus.IN_PROGRESS,
-          messageId: payload.messageId,
-          actualVolumeMl,
-          recordedAt,
-          metadata: {
-            eventData: payload.data,
-            physicalState: 'UNKNOWN',
+          });
+          logger.info('Appended progress event for command already IN_PROGRESS', {
+            commandId: command.commandId,
             action: command.action,
-          },
-        });
-        logger.info('Appended progress event for command already IN_PROGRESS', {
-          commandId: command.commandId,
-          action: command.action,
-          messageId: payload.messageId,
-        });
-        return { success: true };
-      } else {
-        logger.warn('Ignored IN_PROGRESS event: invalid initial command status', {
-          commandId: command.commandId,
-          currentStatus: command.status,
-        });
-        return {
-          success: true,
-          reason: `IN_PROGRESS event ignored because command status is '${command.status}'`,
-        };
+            messageId: payload.messageId,
+          });
+          return { success: true };
+        } else {
+          logger.warn('Ignored IN_PROGRESS event: invalid initial command status', {
+            commandId: command.commandId,
+            currentStatus: command.status,
+          });
+          return {
+            success: true,
+            reason: `IN_PROGRESS event ignored because command status is '${command.status}'`,
+          };
+        }
+      } catch (err: any) {
+        if (err instanceof InvalidCommandStateTransitionError) {
+          logger.info('Ignored IN_PROGRESS event: command already reached terminal status', {
+            commandId: command.commandId,
+            error: err.message,
+          });
+          return {
+            success: true,
+            reason: `IN_PROGRESS event ignored because command has reached a terminal state`,
+          };
+        }
+        throw err;
       }
     } else if (eventStatusStr === 'COMPLETED') {
       // Action-specific volume validation

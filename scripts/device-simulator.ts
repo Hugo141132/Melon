@@ -10,6 +10,7 @@ import {
   FaucetAckReasonCode,
   FAUCET_ACK_REASON_CODES,
   FAUCET_PRESET_VOLUMES,
+  MonitoringStatus,
 } from '@kebun-melon/contracts';
 
 export interface DeviceSimulatorConfig {
@@ -30,9 +31,10 @@ export interface FaucetCommandPayload {
   commandId: string;
   deviceId: string;
   siteId?: string | null;
-  action: 'DISPENSE';
-  phase: number;
-  targetVolumeMl: number;
+  action: 'DISPENSE' | 'OPEN' | 'CLOSE';
+  phase?: number;
+  plantCount?: number;
+  targetVolumeMl?: number;
   requestedAt: string;
   expiresAt: string;
 }
@@ -91,27 +93,25 @@ export class DeviceSimulator {
       deviceId: defaultDeviceId || '',
       soilDeviceId:
         config?.soilDeviceId !== undefined
-          ? config.soilDeviceId || undefined
+          ? config.soilDeviceId || ''
           : process.env.MQTT_SOIL_DEVICE_ID ||
             process.env.SOIL_DEVICE_ID ||
-            (defaultDeviceId && this.isSoilDevice(defaultDeviceId) ? defaultDeviceId : undefined),
+            (defaultDeviceId && this.isSoilDevice(defaultDeviceId) ? defaultDeviceId : ''),
       waterDeviceId:
         config?.waterDeviceId !== undefined
-          ? config.waterDeviceId || undefined
+          ? config.waterDeviceId || ''
           : process.env.MQTT_WATER_DEVICE_ID ||
             process.env.WATER_DEVICE_ID ||
-            (defaultDeviceId && this.isWaterQualityDevice(defaultDeviceId)
-              ? defaultDeviceId
-              : undefined),
+            (defaultDeviceId && this.isWaterQualityDevice(defaultDeviceId) ? defaultDeviceId : ''),
       tankDeviceId:
         config?.tankDeviceId !== undefined
-          ? config.tankDeviceId || undefined
+          ? config.tankDeviceId || ''
           : process.env.MQTT_TANK_DEVICE_ID ||
             (defaultDeviceId && this.isTankDevice(defaultDeviceId)
               ? defaultDeviceId
               : config?.deviceId
                 ? config.deviceId
-                : process.env.MQTT_DEVICE_ID || creds.deviceId || undefined),
+                : process.env.MQTT_DEVICE_ID || creds.deviceId || ''),
       apiBaseUrl: config?.apiBaseUrl || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000',
       brokerUrl: config?.brokerUrl || creds.brokerUrl,
       username: config?.username || creds.username,
@@ -239,7 +239,7 @@ export class DeviceSimulator {
         moisture: 67.3,
         ph: 6.5,
         ec: 1.42,
-        status: 'NORMAL',
+        status: MonitoringStatus.NORMAL,
         ...customData,
       },
       ...payloadOverrides,
@@ -308,7 +308,7 @@ export class DeviceSimulator {
         ph: 7.1,
         tds: 420,
         ec: 0.84,
-        status: 'NORMAL',
+        status: MonitoringStatus.NORMAL,
         ...customData,
       },
       ...payloadOverrides,
@@ -376,7 +376,7 @@ export class DeviceSimulator {
       data: {
         tankVolume: 75.0,
         flowRate: 2.3,
-        status: 'NORMAL',
+        status: MonitoringStatus.NORMAL,
         ...customData,
       },
       ...payloadOverrides,
@@ -396,7 +396,7 @@ export class DeviceSimulator {
     const isWebSocket =
       this.config.brokerUrl.startsWith('ws://') || this.config.brokerUrl.startsWith('wss://');
 
-    this.client = mqtt.connect(this.config.brokerUrl, {
+    const client = mqtt.connect(this.config.brokerUrl, {
       username: this.config.username,
       password: this.config.password,
       clientId,
@@ -405,26 +405,27 @@ export class DeviceSimulator {
       rejectUnauthorized: true,
       ...(isWebSocket ? { path: '/mqtt' } : {}),
     });
+    this.client = client;
 
     await new Promise<void>((resolve, reject) => {
       const timeout = setTimeout(() => {
-        if (this.client) this.client.end(true);
+        client.end(true);
         reject(new Error(`[${this.getTankDeviceId()} Simulator] MQTT connection timeout`));
       }, 10000);
 
-      this.client.on('connect', () => {
+      client.on('connect', () => {
         clearTimeout(timeout);
         resolve();
       });
 
-      this.client.on('error', (err) => {
+      client.on('error', (err) => {
         clearTimeout(timeout);
-        if (this.client) this.client.end(true);
+        client.end(true);
         reject(err);
       });
     });
 
-    return this.client;
+    return client;
   }
 
   /**
@@ -524,11 +525,18 @@ export class DeviceSimulator {
   }
 
   /**
+   * Helper delay for realistic physical hardware simulation.
+   */
+  private async sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  /**
    * Publishes Faucet Progress Event over MQTT.
    */
   public async sendFaucetProgress(
     commandId: string,
-    actualVolumeMl: number
+    actualVolumeMl?: number
   ): Promise<{ topic: string; payload: unknown }> {
     const tankId = this.getTankDeviceId();
     const topic = `agriculture/${this.config.environment}/${this.config.siteId}/${tankId}/event/faucet`;
@@ -540,11 +548,13 @@ export class DeviceSimulator {
       recordedAt: new Date().toISOString(),
       data: {
         status: 'IN_PROGRESS',
-        actualVolumeMl,
+        ...(typeof actualVolumeMl === 'number' && !isNaN(actualVolumeMl) && actualVolumeMl >= 0
+          ? { actualVolumeMl }
+          : {}),
       },
     };
 
-    await this.publishRawMqtt(topic, payload, { qos: 0, retain: false });
+    await this.publishRawMqtt(topic, payload, { qos: 1, retain: false });
     return { topic, payload };
   }
 
@@ -553,22 +563,27 @@ export class DeviceSimulator {
    */
   public async sendFaucetCompletion(
     commandId: string,
-    targetVolumeMl: number,
-    actualVolumeMl: number
+    targetVolumeMl?: number,
+    actualVolumeMl?: number
   ): Promise<{ topic: string; payload: unknown }> {
     const tankId = this.getTankDeviceId();
     const topic = `agriculture/${this.config.environment}/${this.config.siteId}/${tankId}/event/faucet`;
+    const dataObj: Record<string, unknown> = {
+      status: 'COMPLETED',
+    };
+    if (typeof targetVolumeMl === 'number' && !isNaN(targetVolumeMl) && targetVolumeMl > 0) {
+      dataObj.targetVolumeMl = targetVolumeMl;
+    }
+    if (typeof actualVolumeMl === 'number' && !isNaN(actualVolumeMl) && actualVolumeMl >= 0) {
+      dataObj.actualVolumeMl = actualVolumeMl;
+    }
     const payload = {
       schemaVersion: '1.0',
       messageId: `event-completed-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
       commandId,
       deviceId: tankId,
       recordedAt: new Date().toISOString(),
-      data: {
-        status: 'COMPLETED',
-        targetVolumeMl,
-        actualVolumeMl,
-      },
+      data: dataObj,
     };
 
     await this.publishRawMqtt(topic, payload, { qos: 1, retain: false });
@@ -609,8 +624,10 @@ export class DeviceSimulator {
   ): Promise<ScenarioResult> {
     try {
       await this.sendFaucetAck(commandId, true);
+      await this.sleep(300);
       const halfVolume = Math.round(targetVolumeMl / 2);
       await this.sendFaucetProgress(commandId, halfVolume);
+      await this.sleep(500);
       await this.sendFaucetCompletion(commandId, targetVolumeMl, targetVolumeMl + 2);
 
       return {
@@ -627,6 +644,88 @@ export class DeviceSimulator {
         status: 'FAILED',
         message: `Failed to simulate Faucet Dispense Lifecycle: ${String(err)}`,
       };
+    }
+  }
+
+  /**
+   * Simulates full Faucet Manual OPEN Lifecycle: ACK -> IN_PROGRESS -> COMPLETED
+   * Physical state transitions: COMPLETED OPEN -> 'OPEN'
+   */
+  public async runFaucetOpenLifecycleScenario(commandId: string): Promise<ScenarioResult> {
+    try {
+      await this.sendFaucetAck(commandId, true);
+      await this.sleep(300);
+      await this.sendFaucetProgress(commandId);
+      await this.sleep(500);
+      await this.sendFaucetCompletion(commandId);
+
+      return {
+        scenario: 'faucet-open-lifecycle',
+        simulated: true,
+        status: 'SUCCESS',
+        message: `Successfully simulated Faucet Manual OPEN Lifecycle for command '${commandId}'.`,
+        details: { commandId, action: 'OPEN' },
+      };
+    } catch (err) {
+      return {
+        scenario: 'faucet-open-lifecycle',
+        simulated: false,
+        status: 'FAILED',
+        message: `Failed to simulate Faucet Manual OPEN Lifecycle: ${String(err)}`,
+      };
+    }
+  }
+
+  /**
+   * Simulates full Faucet Manual CLOSE Lifecycle: ACK -> IN_PROGRESS -> COMPLETED
+   * Physical state transitions: COMPLETED CLOSE -> 'CLOSED'
+   */
+  public async runFaucetCloseLifecycleScenario(commandId: string): Promise<ScenarioResult> {
+    try {
+      await this.sendFaucetAck(commandId, true);
+      await this.sleep(300);
+      await this.sendFaucetProgress(commandId);
+      await this.sleep(500);
+      await this.sendFaucetCompletion(commandId);
+
+      return {
+        scenario: 'faucet-close-lifecycle',
+        simulated: true,
+        status: 'SUCCESS',
+        message: `Successfully simulated Faucet Manual CLOSE Lifecycle for command '${commandId}'.`,
+        details: { commandId, action: 'CLOSE' },
+      };
+    } catch (err) {
+      return {
+        scenario: 'faucet-close-lifecycle',
+        simulated: false,
+        status: 'FAILED',
+        message: `Failed to simulate Faucet Manual CLOSE Lifecycle: ${String(err)}`,
+      };
+    }
+  }
+
+  /**
+   * Automatically executes the appropriate lifecycle scenario based on command action (DISPENSE, OPEN, CLOSE).
+   */
+  public async runFaucetLifecycleScenario(command: FaucetCommandPayload): Promise<ScenarioResult> {
+    const action = command.action || 'DISPENSE';
+    switch (action) {
+      case 'OPEN':
+        return this.runFaucetOpenLifecycleScenario(command.commandId);
+      case 'CLOSE':
+        return this.runFaucetCloseLifecycleScenario(command.commandId);
+      case 'DISPENSE': {
+        const targetVol =
+          typeof command.targetVolumeMl === 'number' && !isNaN(command.targetVolumeMl)
+            ? command.targetVolumeMl
+            : command.phase && FAUCET_PRESET_VOLUMES[command.phase]
+              ? FAUCET_PRESET_VOLUMES[command.phase]
+              : 1000;
+        return this.runFaucetDispenseLifecycleScenario(command.commandId, targetVol);
+      }
+      default:
+        return this.runFaucetRejectionScenario(command.commandId, 'UNSUPPORTED_ACTION');
     }
   }
 
@@ -1090,6 +1189,14 @@ async function runCli(): Promise<void> {
         const targetVol = FAUCET_PRESET_VOLUMES[phase] || 1000;
         result = await simulator.runFaucetDispenseLifecycleScenario(cmdId, targetVol);
         break;
+      case 'faucet-open':
+        const openCmdId = getArg('command-id') || `cmd-cli-${Date.now()}`;
+        result = await simulator.runFaucetOpenLifecycleScenario(openCmdId);
+        break;
+      case 'faucet-close':
+        const closeCmdId = getArg('command-id') || `cmd-cli-${Date.now()}`;
+        result = await simulator.runFaucetCloseLifecycleScenario(closeCmdId);
+        break;
       case 'faucet-reject':
         const rejCmdId = getArg('command-id') || `cmd-cli-${Date.now()}`;
         const reason = (getArg('reason') || 'DEVICE_BUSY') as FaucetAckReasonCode;
@@ -1107,9 +1214,10 @@ async function runCli(): Promise<void> {
         await simulator.listenFaucetCommands(async (cmd) => {
           console.log(`[DeviceSimulator CLI] Received Faucet Command:`, cmd);
           console.log(
-            `[DeviceSimulator CLI] Automatically executing dispense lifecycle for command '${cmd.commandId}'...`
+            `[DeviceSimulator CLI] Automatically executing lifecycle for command '${cmd.commandId}' (action: '${cmd.action}')...`
           );
-          await simulator.runFaucetDispenseLifecycleScenario(cmd.commandId, cmd.targetVolumeMl);
+          const lifecycleResult = await simulator.runFaucetLifecycleScenario(cmd);
+          console.log(`[DeviceSimulator CLI] Lifecycle execution result:`, lifecycleResult);
         });
         // Keep listener open
         return;
@@ -1145,7 +1253,7 @@ async function runCli(): Promise<void> {
           scenario,
           simulated: false,
           status: 'FAILED',
-          message: `Unknown scenario '${scenario}'. Allowed scenarios: soil-telemetry, water-telemetry, reservoir-telemetry, faucet-dispense, faucet-reject, faucet-fail, faucet-listener, duplicate, invalid-json, missing-field, non-finite, device-mismatch, out-of-order, disconnect-reconnect, heartbeat, timeout.`,
+          message: `Unknown scenario '${scenario}'. Allowed scenarios: soil-telemetry, water-telemetry, reservoir-telemetry, faucet-dispense, faucet-open, faucet-close, faucet-reject, faucet-fail, faucet-listener, duplicate, invalid-json, missing-field, non-finite, device-mismatch, out-of-order, disconnect-reconnect, heartbeat, timeout.`,
         };
         break;
     }

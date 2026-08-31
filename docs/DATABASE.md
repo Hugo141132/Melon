@@ -1921,3 +1921,15 @@ The following facts are supported by the verified database interactions of `TASK
 - **Active Session Evaluation & Denial:** If an active session exists (`revoked_at IS NULL`, `expires_at > NOW()`, `NOW() - last_seen_at <= 30m`), `ActiveSessionExistsError` is thrown inside the transaction, preserving the pre-existing session row unmodified.
 - **Fail-Closed Logout Revocation:** `revokeSession` atomically updates `sessions.revoked_at = NOW()` and inserts a structured audit record (`AUTH_LOGOUT`). Unexpected database failures fail closed with standard error responses.
 <!-- TASK-0217 Reconciled: 2026-08-29 -->
+
+---
+
+## Faucet Command Lifecycle Regression Hardening & Event Append Note (Reconciled 2026-09-01)
+
+The following facts are supported by the verified database interactions of the Faucet Command Lifecycle regression hardening (`TASK-0806`, `TASK-0807`):
+- **Zero Schema Migrations:** No alterations to database tables, indexes, constraints, or schema migrations were required.
+- **Terminal State Protection in Event Append:** `FaucetCommandRepository.addCommandEvent` executes inside an atomic transaction. If the parent record in `faucet_commands` has already reached a terminal state (`COMPLETED`, `FAILED`, `CANCELLED`, `TIMEOUT`, `EXPIRED`), non-terminal progress events (such as late `IN_PROGRESS` events) are rejected/ignored and the latest existing event record is returned idempotently without inserting trailing records into `faucet_command_events`.
+- **Append-Only Progress Event Model:** Confirms that `faucet_command_events` is an append-only audit and milestone store. Multiple intermediate `IN_PROGRESS` events logged prior to reaching `COMPLETED` (e.g., intermediate volume milestones during long-running dispenses) are valid, expected, and preserved.
+- **Transactional Consistency:** Atomic re-verification of the parent command status inside `prisma.$transaction` prevents concurrent race conditions between completion commits and late progress event handling.
+<!-- Faucet Command Lifecycle Regression Reconciled: 2026-09-01 -->
+

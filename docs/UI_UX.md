@@ -1346,3 +1346,22 @@ The profile management interface (`/profile`) is reconciled to provide secure, p
   - Upon successful verification, active `AuthContext` is synchronized immediately without requiring full-page reload or re-login.
 - **Accessibility & Touch Targets:** Form inputs and action buttons enforce standard 44px minimum touch targets, proper ARIA labels (`aria-labelledby`, `aria-describedby`), and clear focus rings.
 <!-- Profile Security UI/UX Reconciled: 2026-08-29 -->
+
+---
+
+## Faucet Controls Physical-State Action Guards and Clean Status Presentation UI/UX Note (Reconciled 2026-09-01)
+
+The faucet control interface (`/controls`) has been refined to enforce physical-state-aware action guards and clean localized status presentation adhering strictly to design governance:
+- **Frontend Impact:** `MINOR`
+- **Selected UI Direction:** `Premium Minimal Ops` (authoritative brand color palette and design tokens UNCHANGED)
+- **Selected Motion Effects:** `Card hover`, `Button hover`, `Modal`
+- **21st.dev MCP:** `NOT REQUIRED` (reuses existing control panel cards, stepper inputs, and modal dialog primitives)
+- **Physical Valve State Action Enablement:**
+  - When authoritative physical state is `CLOSED`: "Start Dispensing" preset cards (0.3 L, 1 L, 1.5 L), plant count stepper buttons (`-`, input, `+`), and "Close Valve" manual action are disabled. Only "Open Valve" remains enabled.
+  - When authoritative physical state is `OPEN`: "Open Valve" is disabled (cannot re-open an already open valve). "Start Dispensing" presets and "Close Valve" remain enabled.
+  - When authoritative physical state is `UNKNOWN`: All valid actions remain enabled (subject to global device connectivity and permissions).
+- **Elimination of Redundant Enum Suffixes:**
+  - Removed parenthetical uppercase enum concatenations (e.g., `(CLOSED)`, `(COMPLETED)`, `(OPEN)`, `(DISPENSE)`) from all user-facing UI elements, badges, headers, and history tables.
+  - User-facing status labels present clean localized text (e.g., `Completed`, `Closed`, `Open`, `In Progress`, `Queued`, `Sent`, `Acknowledged`, `Failed`, `Timed Out`, `Expired` / `Selesai`, `Tertutup`, `Terbuka`, `Sedang berjalan`, `Menunggu antrean`, `Terkirim`, `Diterima perangkat`, `Gagal`, `Waktu habis`, `Kedaluwarsa`) across both English and Indonesian with 100% key parity.
+<!-- Faucet Controls Physical-State Action Guards UI/UX Reconciled: 2026-09-01 -->
+

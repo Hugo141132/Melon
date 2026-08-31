@@ -194,6 +194,25 @@ describe('TASK-0408: DeviceSimulator Unit & Scenario Verification', () => {
       expect(publishSpy).toHaveBeenCalledOnce();
     });
 
+    it('creates valid IN_PROGRESS event payload without volume for manual OPEN/CLOSE', async () => {
+      const publishSpy = vi.spyOn(simulator, 'publishRawMqtt').mockResolvedValue(undefined);
+
+      const res = await simulator.sendFaucetProgress('cmd-uuid-103-open');
+
+      expect(res.topic).toBe(
+        'agriculture/staging/site-test-01/water-tank-node-test-001/event/faucet'
+      );
+      expect(res.payload).toMatchObject({
+        schemaVersion: '1.0',
+        commandId: 'cmd-uuid-103-open',
+        data: {
+          status: 'IN_PROGRESS',
+        },
+      });
+      expect((res.payload as any).data.actualVolumeMl).toBeUndefined();
+      expect(publishSpy).toHaveBeenCalledOnce();
+    });
+
     it('creates valid COMPLETED event payload', async () => {
       const publishSpy = vi.spyOn(simulator, 'publishRawMqtt').mockResolvedValue(undefined);
 
@@ -211,6 +230,26 @@ describe('TASK-0408: DeviceSimulator Unit & Scenario Verification', () => {
           actualVolumeMl: 1005,
         },
       });
+      expect(publishSpy).toHaveBeenCalledOnce();
+    });
+
+    it('creates valid COMPLETED event payload without volume for manual OPEN/CLOSE', async () => {
+      const publishSpy = vi.spyOn(simulator, 'publishRawMqtt').mockResolvedValue(undefined);
+
+      const res = await simulator.sendFaucetCompletion('cmd-uuid-104-open');
+
+      expect(res.topic).toBe(
+        'agriculture/staging/site-test-01/water-tank-node-test-001/event/faucet'
+      );
+      expect(res.payload).toMatchObject({
+        schemaVersion: '1.0',
+        commandId: 'cmd-uuid-104-open',
+        data: {
+          status: 'COMPLETED',
+        },
+      });
+      expect((res.payload as any).data.targetVolumeMl).toBeUndefined();
+      expect((res.payload as any).data.actualVolumeMl).toBeUndefined();
       expect(publishSpy).toHaveBeenCalledOnce();
     });
 
@@ -243,6 +282,80 @@ describe('TASK-0408: DeviceSimulator Unit & Scenario Verification', () => {
       expect(res.simulated).toBe(true);
       expect(res.status).toBe('SUCCESS');
       expect(res.scenario).toBe('faucet-dispense-lifecycle');
+    });
+
+    it('executes full Faucet Manual OPEN Lifecycle scenario', async () => {
+      vi.spyOn(simulator, 'publishRawMqtt').mockResolvedValue(undefined);
+
+      const res = await simulator.runFaucetOpenLifecycleScenario('cmd-scenario-open-001');
+
+      expect(res.simulated).toBe(true);
+      expect(res.status).toBe('SUCCESS');
+      expect(res.scenario).toBe('faucet-open-lifecycle');
+      expect(res.details).toEqual({ commandId: 'cmd-scenario-open-001', action: 'OPEN' });
+    });
+
+    it('executes full Faucet Manual CLOSE Lifecycle scenario', async () => {
+      vi.spyOn(simulator, 'publishRawMqtt').mockResolvedValue(undefined);
+
+      const res = await simulator.runFaucetCloseLifecycleScenario('cmd-scenario-close-001');
+
+      expect(res.simulated).toBe(true);
+      expect(res.status).toBe('SUCCESS');
+      expect(res.scenario).toBe('faucet-close-lifecycle');
+      expect(res.details).toEqual({ commandId: 'cmd-scenario-close-001', action: 'CLOSE' });
+    });
+
+    it('automatically executes appropriate lifecycle scenario based on command payload action', async () => {
+      vi.spyOn(simulator, 'publishRawMqtt').mockResolvedValue(undefined);
+
+      const openRes = await simulator.runFaucetLifecycleScenario({
+        schemaVersion: '1.0',
+        commandId: 'cmd-auto-open',
+        deviceId: 'water-tank-node-test-001',
+        action: 'OPEN',
+        requestedAt: new Date().toISOString(),
+        expiresAt: new Date().toISOString(),
+      });
+      expect(openRes.status).toBe('SUCCESS');
+      expect(openRes.scenario).toBe('faucet-open-lifecycle');
+
+      const closeRes = await simulator.runFaucetLifecycleScenario({
+        schemaVersion: '1.0',
+        commandId: 'cmd-auto-close',
+        deviceId: 'water-tank-node-test-001',
+        action: 'CLOSE',
+        requestedAt: new Date().toISOString(),
+        expiresAt: new Date().toISOString(),
+      });
+      expect(closeRes.status).toBe('SUCCESS');
+      expect(closeRes.scenario).toBe('faucet-close-lifecycle');
+
+      const dispenseRes = await simulator.runFaucetLifecycleScenario({
+        schemaVersion: '1.0',
+        commandId: 'cmd-auto-dispense',
+        deviceId: 'water-tank-node-test-001',
+        action: 'DISPENSE',
+        phase: 1,
+        plantCount: 2,
+        targetVolumeMl: 600,
+        requestedAt: new Date().toISOString(),
+        expiresAt: new Date().toISOString(),
+      });
+      expect(dispenseRes.status).toBe('SUCCESS');
+      expect(dispenseRes.scenario).toBe('faucet-dispense-lifecycle');
+
+      const unsupportedRes = await simulator.runFaucetLifecycleScenario({
+        schemaVersion: '1.0',
+        commandId: 'cmd-auto-unsupported',
+        deviceId: 'water-tank-node-test-001',
+        action: 'INVALID_ACTION' as any,
+        requestedAt: new Date().toISOString(),
+        expiresAt: new Date().toISOString(),
+      });
+      expect(unsupportedRes.status).toBe('SUCCESS');
+      expect(unsupportedRes.scenario).toBe('faucet-rejection');
+      expect(unsupportedRes.details?.reasonCode).toBe('UNSUPPORTED_ACTION');
     });
 
     it('executes Faucet Command Rejection scenario', async () => {

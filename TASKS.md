@@ -1983,6 +1983,12 @@ POST /devices/{deviceId}/faucet-commands
 **Dependencies:** `TASK-0805`
 **Historical Completion:** 2026-08-03 — Implemented `FaucetEventProcessor` in `@kebun-melon/iot-gateway` (`apps/iot-gateway/src/events/processor.ts`) to subscribe to canonical faucet execution event topics (`agriculture/{environment}/{siteId}/{deviceId}/event/faucet`, QoS 1). Validated topic/payload deviceId matching, resolved external device ID to internal device UUID, and enforced `WATER_TANK_NODE` device type scope. Executed strict `ACKNOWLEDGED` → `IN_PROGRESS` → `COMPLETED` and `ACKNOWLEDGED`/`IN_PROGRESS` → `FAILED` state transitions with `FaucetCommandEvent` audit creation and `actualVolumeMl` / `reasonCode` tracking.
 **Revision Completion (2026-08-20):** Updated `FaucetEventProcessor` in `@kebun-melon/iot-gateway` (`apps/iot-gateway/src/events/processor.ts`) to handle execution events across all supported faucet command actions (`DISPENSE`, `OPEN`, and `CLOSE`). Implemented authoritative physical state determination: `COMPLETED OPEN` → `OPEN`, `COMPLETED CLOSE` → `CLOSED`, `COMPLETED DISPENSE` → `UNKNOWN` (strictly avoiding assuming closed valve), and failed/uncertain/in-progress → `UNKNOWN`. Enforced persisted command action validation against `[DISPENSE, OPEN, CLOSE]`. Enforced contract-consistent volume rules: `DISPENSE` validates non-negative `actualVolumeMl` and target volume match if provided; `OPEN` and `CLOSE` treat volume measurement as non-applicable and store `null`/`undefined` in the command record without failing execution confirmations. Guaranteed terminal-state immutability (`COMPLETED`, `FAILED`, `CANCELLED`, `TIMEOUT`, `EXPIRED`), duplicate `messageId` idempotency, progress event appending, and `CommandFailureAlert` dispatching on `FAILED` events. Verified 100% test pass rate across 32 unit tests (`apps/iot-gateway/src/__tests__/faucet-event-processor.test.ts`), full 212-test IoT Gateway test suite, 934-test workspace suite, Semgrep security scan (0 findings), and TypeScript typecheck (0 errors).
+**Lifecycle Regression & Progress Event Hardening (2026-09-01):** Hardened transactional event processing and simulator behavior:
+- Enforced terminal state protection in `FaucetCommandRepository.addCommandEvent` (`packages/database`) to reject/ignore non-terminal progress events (`IN_PROGRESS`) when the command has already reached a final status (`COMPLETED`, `FAILED`, `CANCELLED`, `TIMEOUT`, `EXPIRED`), returning the latest event idempotently.
+- Wrapped state mutations in `FaucetEventProcessor.processEventMessage` (`apps/iot-gateway`) to safely catch and ignore `InvalidCommandStateTransitionError` when concurrent transitions to terminal states occur.
+- Aligned `scripts/device-simulator.ts` MQTT progress publishing to canonical QoS 1 and added realistic simulation delays (300ms post-ACK, 500ms post-progress).
+- Confirmed that `faucet_command_events` is an append-only audit store where multiple intermediate `IN_PROGRESS` milestones before `COMPLETED` are expected; only post-terminal regressions are rejected.
+- Verified 100% test pass rate across database tests (`faucet-command-repository.test.ts`, 25/25), gateway tests (`faucet-event-processor.test.ts`, 32/32), and simulator tests (`device-simulator.test.ts`, 31/31).
 
 ### Work
 
@@ -2037,6 +2043,11 @@ EXPIRED
 - Implemented route-level instant loading shell (`apps/web/app/controls/loading.tsx`) to stream the static page composition immediately on navigation.
 - Centered global header `DeviceSelector` horizontally across desktop, tablet, and mobile using a balanced 3-column CSS Grid (`grid-cols-[1fr_auto_1fr]`) in `TopAppBar`, eliminating horizontal offset caused by unequal left/right brand/avatar dimensions, and centered dropdown menu overlays under the trigger button.
 - Added comprehensive unit test suite (`apps/web/test/unit/controls-loading-transition.test.tsx`). Verified 100% test pass rate across all 34 web unit test suites (257/257 tests), TypeScript typecheck (0 errors across 4 monorepo packages), and Next.js production build (37/37 routes).
+**UI Action Guards & Clean Localization Reconciliation (2026-09-01):** Refined `/controls` UI action guards and status presentation:
+- Physical valve state now controls action enablement: `CLOSED` state disables dispensing preset cards (0.3 L, 1 L, 1.5 L), plant count stepper controls (`-`, input, `+`), and Close Valve action while keeping Open Valve enabled; `OPEN` state disables Open Valve while keeping dispensing presets and Close Valve enabled; `UNKNOWN` enables all valid actions.
+- Eliminated redundant uppercase enum display suffixes (`(CLOSED)`, `(COMPLETED)`, `(OPEN)`, `(DISPENSE)`) across badges, status headers, and history tables in English and Indonesian dictionaries with 100% key parity.
+- Updated `apps/web/test/unit/faucet-control-ui.test.tsx` (27/27 tests passed) and full web unit suite (36 test files, 288/288 tests passed).
+
 
 ### Acceptance Criteria
 

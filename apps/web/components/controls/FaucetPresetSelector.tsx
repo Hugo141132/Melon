@@ -165,6 +165,11 @@ export default function FaucetPresetSelector({
   const disabledReason = getDisabledReason();
   const isDisabled = disabledReason !== null;
 
+  // State-aware action disablement based on authoritative physical valve state
+  const isPresetDisabled = isDisabled || physicalState === 'CLOSED';
+  const isOpenDisabled = isDisabled || physicalState === 'OPEN';
+  const isCloseDisabled = isDisabled || physicalState === 'CLOSED';
+
   return (
     <div className={cn('space-y-6', className)} data-testid="faucet-preset-selector">
       {/* Header & Device Status */}
@@ -241,7 +246,7 @@ export default function FaucetPresetSelector({
         <div className="flex items-center gap-2 self-start sm:self-auto">
           <button
             type="button"
-            disabled={isDisabled || plantCount <= 1}
+            disabled={isPresetDisabled || plantCount <= 1}
             onClick={handleDecrement}
             className="w-9 h-9 rounded-xl border border-app-outline-variant/40 bg-app-surface-container-lowest hover:bg-app-surface-container text-app-on-surface flex items-center justify-center transition-colors disabled:opacity-40 cursor-pointer active:scale-95"
             aria-label="Kurangi jumlah tanaman"
@@ -257,7 +262,7 @@ export default function FaucetPresetSelector({
               min={1}
               step={1}
               value={plantCount}
-              disabled={isDisabled}
+              disabled={isPresetDisabled}
               onChange={(e) => {
                 const val = parseInt(e.target.value, 10);
                 updatePlantCount(isNaN(val) ? 1 : val);
@@ -269,7 +274,7 @@ export default function FaucetPresetSelector({
 
           <button
             type="button"
-            disabled={isDisabled}
+            disabled={isPresetDisabled}
             onClick={handleIncrement}
             className="w-9 h-9 rounded-xl border border-app-outline-variant/40 bg-app-surface-container-lowest hover:bg-app-surface-container text-app-on-surface flex items-center justify-center transition-colors disabled:opacity-40 cursor-pointer active:scale-95"
             aria-label="Tambah jumlah tanaman"
@@ -294,7 +299,7 @@ export default function FaucetPresetSelector({
               key={preset.phase}
               className={cn(
                 'bg-app-surface-container-lowest p-5 rounded-2xl border transition-all duration-200 flex flex-col justify-between space-y-4 shadow-sm relative overflow-hidden group',
-                isDisabled
+                isPresetDisabled
                   ? 'opacity-60 border-app-outline-variant/30 grayscale-[20%]'
                   : 'border-app-outline-variant/40 hover:border-app-primary/60 hover:-translate-y-1 hover:shadow-md cursor-pointer'
               )}
@@ -337,14 +342,14 @@ export default function FaucetPresetSelector({
               {/* Action Button */}
               <button
                 type="button"
-                disabled={isDisabled}
+                disabled={isPresetDisabled}
                 onClick={() =>
-                  !isDisabled &&
+                  !isPresetDisabled &&
                   onSelectPreset(preset.phase, preset.volumeL, plantCount, totalLiters)
                 }
                 className={cn(
                   'w-full py-2.5 px-4 rounded-xl font-semibold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95',
-                  isDisabled
+                  isPresetDisabled
                     ? 'bg-app-surface-container text-app-on-surface-variant/50 cursor-not-allowed'
                     : 'bg-app-primary text-white hover:bg-app-primary-container shadow-xs'
                 )}
@@ -407,11 +412,11 @@ export default function FaucetPresetSelector({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
           <button
             type="button"
-            disabled={isDisabled}
-            onClick={() => !isDisabled && onSelectManualAction && onSelectManualAction('OPEN')}
+            disabled={isOpenDisabled}
+            onClick={() => !isOpenDisabled && onSelectManualAction && onSelectManualAction('OPEN')}
             className={cn(
               'py-2.5 px-4 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 border',
-              isDisabled
+              isOpenDisabled
                 ? 'bg-app-surface-container text-app-on-surface-variant/50 border-app-outline-variant/20 cursor-not-allowed'
                 : 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700 shadow-xs'
             )}
@@ -423,11 +428,13 @@ export default function FaucetPresetSelector({
 
           <button
             type="button"
-            disabled={isDisabled}
-            onClick={() => !isDisabled && onSelectManualAction && onSelectManualAction('CLOSE')}
+            disabled={isCloseDisabled}
+            onClick={() =>
+              !isCloseDisabled && onSelectManualAction && onSelectManualAction('CLOSE')
+            }
             className={cn(
               'py-2.5 px-4 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 border',
-              isDisabled
+              isCloseDisabled
                 ? 'bg-app-surface-container text-app-on-surface-variant/50 border-app-outline-variant/20 cursor-not-allowed'
                 : 'bg-slate-700 hover:bg-slate-800 text-white border-slate-800 shadow-xs'
             )}

@@ -538,6 +538,39 @@ describe('FaucetCommandRepository Unit & Integration Tests', () => {
       expect(result.id).toBe('evt-003');
       expect(mockPrisma.faucetCommandEvent.create).not.toHaveBeenCalled();
     });
+
+    it('ignores non-terminal progress events and returns latest event when command is in terminal status (COMPLETED)', async () => {
+      const completedRecord = { ...mockCommandRecord, status: 'COMPLETED' };
+      const latestCompletedEvent = {
+        id: 'evt-completed-01',
+        faucetCommandId: mockCommandRecord.id,
+        eventStatus: 'COMPLETED',
+        messageId: 'msg-completed-01',
+        receivedAt: new Date('2026-08-02T10:02:00Z'),
+      };
+
+      mockPrisma.faucetCommand.findFirst.mockResolvedValue(completedRecord);
+      mockPrisma.faucetCommandEvent.findFirst.mockResolvedValue(latestCompletedEvent);
+
+      const result = await repository.addCommandEvent(mockCommandRecord.id, {
+        eventStatus: FaucetCommandStatus.IN_PROGRESS,
+        messageId: 'msg-late-progress',
+      });
+
+      expect(result.id).toBe('evt-completed-01');
+      expect(result.eventStatus).toBe('COMPLETED');
+      expect(mockPrisma.faucetCommandEvent.create).not.toHaveBeenCalled();
+    });
+
+    it('throws FaucetCommandNotFoundError when target command does not exist in addCommandEvent', async () => {
+      mockPrisma.faucetCommand.findFirst.mockResolvedValue(null);
+
+      await expect(
+        repository.addCommandEvent('non-existent-cmd', {
+          eventStatus: FaucetCommandStatus.IN_PROGRESS,
+        })
+      ).rejects.toThrow(FaucetCommandNotFoundError);
+    });
   });
 
   describe('getCommandById', () => {
