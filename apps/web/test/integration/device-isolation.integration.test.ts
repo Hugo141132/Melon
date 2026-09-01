@@ -165,7 +165,7 @@ describe('API Integration Test Suite — Device Isolation & Authorization (TASK-
             'idempotency-key': 'idem-key-100',
             Cookie: 'session_token=valid-token',
           },
-          body: JSON.stringify({ phase: 1 }),
+          body: JSON.stringify({ action: 'DISPENSE', phase: 1, plantCount: 10 }),
         }
       );
 
@@ -220,7 +220,7 @@ describe('API Integration Test Suite — Device Isolation & Authorization (TASK-
             'idempotency-key': 'idem-key-999',
             Cookie: 'session_token=valid-token',
           },
-          body: JSON.stringify({ phase: 1 }),
+          body: JSON.stringify({ action: 'DISPENSE', phase: 1, plantCount: 1 }),
         }
       );
 

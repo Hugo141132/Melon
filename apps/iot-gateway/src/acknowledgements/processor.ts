@@ -17,6 +17,7 @@ import { GatewayEnv } from '../config/env';
 import { mqttTopicRouter } from '../mqtt/router';
 import { logger } from '../observability/logger';
 import { metricsCollector } from '../observability/metrics';
+import { publishRealtimeEvent } from '../events/webhook';
 
 export interface AcknowledgementProcessorOptions {
   env?: GatewayEnv;
@@ -273,6 +274,17 @@ export class AcknowledgementProcessor {
           deviceId: command.deviceId,
           messageId: payload.messageId,
         });
+
+        await publishRealtimeEvent(
+          this.env,
+          'faucet.command.updated',
+          {
+            commandId: command.commandId,
+            status: FaucetCommandStatus.ACKNOWLEDGED,
+          },
+          device.deviceId
+        );
+
         return { success: true };
       } else {
         // ACKs for QUEUED, ACKNOWLEDGED, IN_PROGRESS, or final states must be ignored/logged without regression
@@ -329,6 +341,17 @@ export class AcknowledgementProcessor {
             });
           }
         }
+
+        await publishRealtimeEvent(
+          this.env,
+          'faucet.command.updated',
+          {
+            commandId: command.commandId,
+            status: FaucetCommandStatus.FAILED,
+            reasonCode,
+          },
+          device.deviceId
+        );
 
         return { success: true };
       } else {

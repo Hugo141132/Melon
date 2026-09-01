@@ -14,6 +14,9 @@ vi.mock('@kebun-melon/database', async () => {
       userDeviceAccess: {
         findFirst: vi.fn(),
       },
+      device: {
+        findFirst: vi.fn(),
+      },
     },
   };
 });

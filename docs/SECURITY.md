@@ -1676,3 +1676,45 @@ The following security controls are active and verified regarding `TASK-0216` (V
 - **Privacy-Preserving Audit Logging (`SEC-AUTH-006`):** Emits structured audit event `account.email.changed` containing strictly non-sensitive audit metadata (user ID, timestamp, IP/actor reference) without logging raw plaintext old or new email addresses.
 - **Test Database Isolation & Fail-Closed Guards:** `validateTestDatabaseUrl` enforces strict isolation across test runners. All automated integration and E2E suites fail closed if executed against remote cloud environments (`supabase.co`, `supabase.com`, `railway.app`, `neon.tech`), and all E2E test identities use synthetic disposable identifiers with full deterministic teardown.
 <!-- TASK-0216 Reconciled: 2026-08-30 -->
+
+
+---
+
+## TASK-0915: Real-Time Faucet Command History Synchronization
+
+*This section documents the resolution of real-time event delivery failures across the system (Recorded: 2026-09-01).*
+
+### 1. Original Problem
+- Faucet Command History did not update automatically.
+- QUEUED appeared immediately, but SENT/ACKNOWLEDGED/IN_PROGRESS/COMPLETED required a manual refresh.
+
+### 2. Investigation Timeline
+- Initial suspicion: Frontend state reconciliation logic.
+- Investigated React 18 batching and `lastEvent`/`useEffect` flow.
+- Investigated device ID filtering for Server-Sent Events (SSE).
+- Discovered that the issue affected both `ADMIN` and `OWNER` accounts, eliminating RBAC/UUID filtering as the root cause.
+
+### 3. Final Root Cause
+- IoT Gateway sends `faucet.command.updated` through an internal webhook.
+- Next.js middleware blocked `/api/v1/internal/realtime/publish` because it lacked a user `session_token` cookie.
+- Backend-to-backend authentication uses `INTERNAL_SERVICE_TOKEN` instead of user sessions.
+- The webhook returned a `401 UNAUTHENTICATED` before reaching the route handler.
+- Therefore, `realtimeEventHub` never received IoT lifecycle events, and SSE never delivered status updates to `FaucetHistoryTable`.
+
+### 4. Final Fix
+- Added `/api/v1/internal/` to `PUBLIC_PATH_PREFIXES` in the Next.js middleware.
+- Kept `INTERNAL_SERVICE_TOKEN` validation inside the internal realtime publish route to enforce machine-to-machine authentication.
+- Preserved all security and RBAC isolation mechanisms.
+
+### 5. Verification
+- `OWNER` and `ADMIN` were both affected prior to the fix.
+- `FaucetStatusCard` updated correctly because it used fallback polling.
+- `FaucetHistoryTable` depended entirely on SSE.
+- After the fix, the expected flow (`QUEUED` → `SENT` → `ACKNOWLEDGED` → `IN_PROGRESS` → `COMPLETED`) successfully updates the same history row without requiring manual refresh.
+
+### 6. Deployment Notes
+- **Only the web application deployment is required.**
+- No database migrations.
+- No IoT Gateway deployment required.
+- No MQTT configuration changes required.
+- Staging environments must update the `web` service to reflect the middleware change.

@@ -102,6 +102,31 @@ export async function GET(request: Request) {
     }
   }
 
+  // Resolve targetDeviceId to both UUID and canonical ID for accurate filtering
+  let resolvedDeviceIds: string[] = [];
+  if (targetDeviceId) {
+    try {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        targetDeviceId
+      );
+      const device = prisma?.device?.findFirst
+        ? await prisma.device.findFirst({
+            where: isUuid
+              ? { OR: [{ id: targetDeviceId }, { deviceId: targetDeviceId }] }
+              : { deviceId: targetDeviceId },
+            select: { id: true, deviceId: true },
+          })
+        : null;
+      if (device) {
+        resolvedDeviceIds = [device.id, device.deviceId];
+      } else {
+        resolvedDeviceIds = [targetDeviceId];
+      }
+    } catch {
+      resolvedDeviceIds = [targetDeviceId];
+    }
+  }
+
   const encoder = new TextEncoder();
   let heartbeatTimer: NodeJS.Timeout | null = null;
   let unsubscribeEventHub: (() => void) | null = null;
@@ -125,9 +150,11 @@ export async function GET(request: Request) {
 
       // 2. Subscribe to Realtime Event Hub
       unsubscribeEventHub = realtimeEventHub.subscribe((event: RealtimeMonitoringEvent) => {
-        // Filter by deviceId if specified
-        if (targetDeviceId && event.deviceId && event.deviceId !== targetDeviceId) {
-          return;
+        // Filter by deviceId if specified (matching against both UUID and canonical ID)
+        if (targetDeviceId && event.deviceId) {
+          if (!resolvedDeviceIds.includes(event.deviceId)) {
+            return;
+          }
         }
 
         // Filter by channel if specified

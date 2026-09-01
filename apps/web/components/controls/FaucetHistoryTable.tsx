@@ -13,6 +13,7 @@ import {
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 import { formatLitersDisplay } from './FaucetPresetSelector';
+import { useRealtimeMonitoring } from '@/hooks/use-realtime-monitoring';
 
 export interface FaucetHistoryItem {
   id: string;
@@ -105,6 +106,42 @@ export default function FaucetHistoryTable({
       setHistory([]);
     }
   }, [deviceId, statusFilter, fetchHistory]);
+
+  const handleRealtimeEvent = useCallback(
+    (name: string, data: any) => {
+      if (name !== 'faucet.command.updated' || !data) return;
+
+      const eventData = data as any;
+      const commandId = eventData.commandId;
+      if (!commandId) return;
+
+      setHistory((prev) => {
+        const idx = prev.findIndex((item) => item.commandId === commandId);
+        if (idx !== -1) {
+          // Update existing command
+          const newHistory = [...prev];
+          newHistory[idx] = {
+            ...newHistory[idx],
+            ...eventData,
+          };
+          return newHistory;
+        } else {
+          // Prepend new command (if matching filter)
+          if (statusFilter !== 'ALL' && eventData.status !== statusFilter) {
+            return prev;
+          }
+          return [eventData, ...prev].slice(0, pagination.pageSize);
+        }
+      });
+    },
+    [statusFilter, pagination.pageSize]
+  );
+
+  useRealtimeMonitoring({
+    channels: ['commands'],
+    deviceId: deviceId || undefined,
+    onEvent: handleRealtimeEvent,
+  });
 
   const getStatusBadgeStyle = (status: string) => {
     switch (status) {

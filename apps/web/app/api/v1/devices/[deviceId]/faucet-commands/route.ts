@@ -29,6 +29,7 @@ import {
   applyRateLimitToResponse,
 } from '@/lib/rate-limit';
 import { validateServerEnv } from '@/lib/env/server';
+import { realtimeEventHub } from '@/lib/realtime/event-hub';
 
 export async function POST(request: Request, props: { params: Promise<{ deviceId: string }> }) {
   const params = await props.params;
@@ -163,6 +164,19 @@ export async function POST(request: Request, props: { params: Promise<{ deviceId
 
     const faucetRepo = new FaucetCommandRepository(prisma);
     const command = await faucetRepo.createCommand(parseResult.data, session.id, actorRole);
+
+    try {
+      realtimeEventHub.publish({
+        name: 'faucet.command.updated',
+        deviceId: device.deviceId,
+        data: command,
+      });
+    } catch (realtimeErr) {
+      logger.error('Failed to publish realtime event on command creation', realtimeErr, {
+        deviceId: device.deviceId,
+        commandId: command.commandId,
+      });
+    }
 
     const response = NextResponse.json(
       {

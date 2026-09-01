@@ -1958,3 +1958,45 @@ The following facts are supported by the current implementation regarding device
 - **Summary:** Revalidated duplicate command protection for all three faucet command action types (`DISPENSE`, `OPEN`, `CLOSE`) including the `plantCount` multiplier contract introduced in `TASK-0802`/`TASK-0803`. Confirmed that the existing `createCommand` implementation in `FaucetCommandRepository` (`packages/database/src/faucet-command-repository.ts`) is already correct for all three actions: the transactional idempotency key check compares `deviceId`, `action`, `phase ?? null`, and `plantCount ?? null`, which correctly produces `null` for both `OPEN` and `CLOSE` (which carry no phase/plantCount) and detects `plantCount` mismatches for `DISPENSE` network retries. No production code changes were required. Added 7 targeted unit tests to `packages/database/src/__tests__/faucet-command-repository.test.ts`: (1) DISPENSE + different `plantCount` → conflict, (2) DISPENSE + identical `plantCount` network retry → returns existing, (3) OPEN idempotent re-submission → returns existing, (4) OPEN key reused for CLOSE action → conflict, (5) CLOSE idempotent re-submission → returns existing, (6) P2002 race recovery for OPEN → returns existing, (7) P2002 race recovery for CLOSE → returns existing. Verified 21/21 tests pass (14 original + 7 new) with zero regressions across full workspace test suite. No database migrations, API changes, or frontend changes required.
 
 <!-- TASK-0808 Completed: 2026-08-20 -->
+
+
+---
+
+## TASK-0915: Real-Time Faucet Command History Synchronization
+
+*This section documents the resolution of real-time event delivery failures across the system (Recorded: 2026-09-01).*
+
+### 1. Original Problem
+- Faucet Command History did not update automatically.
+- QUEUED appeared immediately, but SENT/ACKNOWLEDGED/IN_PROGRESS/COMPLETED required a manual refresh.
+
+### 2. Investigation Timeline
+- Initial suspicion: Frontend state reconciliation logic.
+- Investigated React 18 batching and `lastEvent`/`useEffect` flow.
+- Investigated device ID filtering for Server-Sent Events (SSE).
+- Discovered that the issue affected both `ADMIN` and `OWNER` accounts, eliminating RBAC/UUID filtering as the root cause.
+
+### 3. Final Root Cause
+- IoT Gateway sends `faucet.command.updated` through an internal webhook.
+- Next.js middleware blocked `/api/v1/internal/realtime/publish` because it lacked a user `session_token` cookie.
+- Backend-to-backend authentication uses `INTERNAL_SERVICE_TOKEN` instead of user sessions.
+- The webhook returned a `401 UNAUTHENTICATED` before reaching the route handler.
+- Therefore, `realtimeEventHub` never received IoT lifecycle events, and SSE never delivered status updates to `FaucetHistoryTable`.
+
+### 4. Final Fix
+- Added `/api/v1/internal/` to `PUBLIC_PATH_PREFIXES` in the Next.js middleware.
+- Kept `INTERNAL_SERVICE_TOKEN` validation inside the internal realtime publish route to enforce machine-to-machine authentication.
+- Preserved all security and RBAC isolation mechanisms.
+
+### 5. Verification
+- `OWNER` and `ADMIN` were both affected prior to the fix.
+- `FaucetStatusCard` updated correctly because it used fallback polling.
+- `FaucetHistoryTable` depended entirely on SSE.
+- After the fix, the expected flow (`QUEUED` → `SENT` → `ACKNOWLEDGED` → `IN_PROGRESS` → `COMPLETED`) successfully updates the same history row without requiring manual refresh.
+
+### 6. Deployment Notes
+- **Only the web application deployment is required.**
+- No database migrations.
+- No IoT Gateway deployment required.
+- No MQTT configuration changes required.
+- Staging environments must update the `web` service to reflect the middleware change.

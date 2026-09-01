@@ -108,7 +108,7 @@ describe('API Integration Test Suite — Faucet Idempotency & Phase Mapping (TAS
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'idempotency-key': 'idem-key-phase1' },
-          body: JSON.stringify({ phase: 1 }),
+          body: JSON.stringify({ action: 'DISPENSE', phase: 1, plantCount: 1 }),
         }
       );
 
@@ -134,7 +134,7 @@ describe('API Integration Test Suite — Faucet Idempotency & Phase Mapping (TAS
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'idempotency-key': 'idem-key-phase2' },
-          body: JSON.stringify({ phase: 2 }),
+          body: JSON.stringify({ action: 'DISPENSE', phase: 2, plantCount: 1 }),
         }
       );
 
@@ -160,7 +160,7 @@ describe('API Integration Test Suite — Faucet Idempotency & Phase Mapping (TAS
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'idempotency-key': 'idem-key-phase3' },
-          body: JSON.stringify({ phase: 3 }),
+          body: JSON.stringify({ action: 'DISPENSE', phase: 3, plantCount: 1 }),
         }
       );
 
@@ -174,13 +174,13 @@ describe('API Integration Test Suite — Faucet Idempotency & Phase Mapping (TAS
       expect(json.data.targetVolumeMl).toBe(1500);
     });
 
-    it('rejects invalid phase values (e.g. phase 4) with 422 INVALID_PHASE', async () => {
+    it('rejects invalid phase values (e.g. phase 4) with 422 VALIDATION_ERROR', async () => {
       const req = new Request(
         `http://localhost/api/v1/devices/${mockCanonicalDeviceId}/faucet-commands`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'idempotency-key': 'idem-key-invalid' },
-          body: JSON.stringify({ phase: 4 }),
+          body: JSON.stringify({ action: 'DISPENSE', phase: 4, plantCount: 1 }),
         }
       );
 
@@ -190,7 +190,7 @@ describe('API Integration Test Suite — Faucet Idempotency & Phase Mapping (TAS
       const json = await res.json();
 
       expect(res.status).toBe(422);
-      expect(json.error.code).toBe('INVALID_PHASE');
+      expect(json.error.code).toBe('VALIDATION_ERROR');
     });
   });
 
@@ -203,7 +203,7 @@ describe('API Integration Test Suite — Faucet Idempotency & Phase Mapping (TAS
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'idempotency-key': 'idem-replay-001' },
-          body: JSON.stringify({ phase: 1 }),
+          body: JSON.stringify({ action: 'DISPENSE', phase: 1, plantCount: 1 }),
         }
       );
       const res1 = await createFaucetCommandHandler(req1, {
@@ -216,7 +216,7 @@ describe('API Integration Test Suite — Faucet Idempotency & Phase Mapping (TAS
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'idempotency-key': 'idem-replay-001' },
-          body: JSON.stringify({ phase: 1 }),
+          body: JSON.stringify({ action: 'DISPENSE', phase: 1, plantCount: 1 }),
         }
       );
       const res2 = await createFaucetCommandHandler(req2, {
@@ -242,7 +242,7 @@ describe('API Integration Test Suite — Faucet Idempotency & Phase Mapping (TAS
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'idempotency-key': 'idem-conflict-001' },
-          body: JSON.stringify({ phase: 2 }),
+          body: JSON.stringify({ action: 'DISPENSE', phase: 2, plantCount: 1 }),
         }
       );
 
@@ -269,7 +269,7 @@ describe('API Integration Test Suite — Faucet Idempotency & Phase Mapping (TAS
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'idempotency-key': 'idem-active-001' },
-          body: JSON.stringify({ phase: 1 }),
+          body: JSON.stringify({ action: 'DISPENSE', phase: 1, plantCount: 1 }),
         }
       );
 

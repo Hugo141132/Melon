@@ -18,6 +18,7 @@ import { GatewayEnv } from '../config/env';
 import { mqttTopicRouter } from '../mqtt/router';
 import { logger } from '../observability/logger';
 import { metricsCollector } from '../observability/metrics';
+import { publishRealtimeEvent } from './webhook';
 
 export type AuthoritativePhysicalFaucetState = 'OPEN' | 'CLOSED' | 'UNKNOWN';
 
@@ -321,6 +322,18 @@ export class FaucetEventProcessor {
             action: command.action,
             messageId: payload.messageId,
           });
+
+          await publishRealtimeEvent(
+            this.env,
+            'faucet.command.updated',
+            {
+              commandId: command.commandId,
+              status: FaucetCommandStatus.IN_PROGRESS,
+              actualVolumeMl,
+            },
+            device.deviceId
+          );
+
           return { success: true };
         } else if (command.status === FaucetCommandStatus.IN_PROGRESS) {
           // Append progress event log idempotently without failing
@@ -340,6 +353,18 @@ export class FaucetEventProcessor {
             action: command.action,
             messageId: payload.messageId,
           });
+
+          await publishRealtimeEvent(
+            this.env,
+            'faucet.command.updated',
+            {
+              commandId: command.commandId,
+              status: FaucetCommandStatus.IN_PROGRESS,
+              actualVolumeMl,
+            },
+            device.deviceId
+          );
+
           return { success: true };
         } else {
           logger.warn('Ignored IN_PROGRESS event: invalid initial command status', {
@@ -425,6 +450,18 @@ export class FaucetEventProcessor {
           actualVolumeMl,
           messageId: payload.messageId,
         });
+
+        await publishRealtimeEvent(
+          this.env,
+          'faucet.command.updated',
+          {
+            commandId: command.commandId,
+            status: FaucetCommandStatus.COMPLETED,
+            actualVolumeMl,
+          },
+          device.deviceId
+        );
+
         return { success: true };
       } else {
         logger.warn('Ignored COMPLETED event: invalid initial command status', {
@@ -491,6 +528,18 @@ export class FaucetEventProcessor {
             });
           }
         }
+
+        await publishRealtimeEvent(
+          this.env,
+          'faucet.command.updated',
+          {
+            commandId: command.commandId,
+            status: FaucetCommandStatus.FAILED,
+            reasonCode,
+            actualVolumeMl,
+          },
+          device.deviceId
+        );
 
         return { success: true };
       } else {

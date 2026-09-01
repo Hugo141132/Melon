@@ -30,6 +30,7 @@ export const gatewayEnvSchema = z.object({
   MQTT_CLIENT_CERT_PATH: z.string().optional(),
   MQTT_CLIENT_KEY_PATH: z.string().optional(),
   INTERNAL_SERVICE_TOKEN: z.string().min(16).optional(),
+  WEB_APP_URL: z.string().url().optional(),
   HOST: z.string().default('0.0.0.0'),
   PORT: z
     .preprocess(
@@ -129,6 +130,11 @@ export function validateGatewayEnv(
         z.number().int().min(1)
       )
       .default(isTest ? 1000 : 60),
+    WEB_APP_URL: z
+      .string()
+      .url()
+      .optional()
+      .default(isTest ? 'http://127.0.0.1:3000' : env.WEB_APP_URL || 'http://127.0.0.1:3000'),
   });
 
   const result = dynamicSchema.safeParse(env);

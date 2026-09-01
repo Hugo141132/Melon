@@ -16,6 +16,7 @@ import { GatewayEnv } from '../config/env';
 import { mqttTopicRouter, AllowedEnvironment } from '../mqtt/router';
 import { logger } from '../observability/logger';
 import { metricsCollector } from '../observability/metrics';
+import { publishRealtimeEvent } from '../events/webhook';
 
 export interface CommandPublisherOptions {
   env?: GatewayEnv;
@@ -194,6 +195,17 @@ export class CommandPublisher {
               expiresAt: cmd.expiresAt,
             });
             result.expiredCount++;
+
+            await publishRealtimeEvent(
+              this.env,
+              'faucet.command.updated',
+              {
+                commandId: cmd.commandId,
+                status: FaucetCommandStatus.EXPIRED,
+                reasonCode: 'EXPIRED_COMMAND',
+              },
+              cmd.deviceId
+            );
           } catch (expErr) {
             logger.error('Failed to mark command as EXPIRED', expErr, { commandId: cmd.commandId });
             result.failedCount++;
@@ -321,6 +333,16 @@ export class CommandPublisher {
             retain: false,
           });
           result.publishedCount++;
+
+          await publishRealtimeEvent(
+            this.env,
+            'faucet.command.updated',
+            {
+              commandId: cmd.commandId,
+              status: FaucetCommandStatus.SENT,
+            },
+            device.deviceId
+          );
         } catch (pubErr: any) {
           // Failure: Command remains QUEUED in database
           metricsCollector.incrementCommandFailures();
