@@ -1457,7 +1457,7 @@ The application does NOT provide a "Delete Device" flow. Device removal from the
 1. The UI highlights Phase 1 (0.3 L per plant).
 2. User adjusts `plantCount` stepper ($\ge 1$). UI displays live calculation ($0.3\text{ L} \times \text{count} = \text{Total L}$).
 3. The UI does not allow arbitrary target substitution.
-4. The system opens the confirmation modal displaying device name, phase, plant count, and calculated Liters.
+4. The system opens the simplified confirmation modal displaying preset phase, plant count, total water volume in Liters, and connection status.
 
 **Alternative flows:** User changes to another phase before confirming.
 **Error flows:** Preset configuration missing; action is unavailable.
@@ -1499,7 +1499,7 @@ No command is created until explicit modal confirmation.
 
 **Main success flow:**
 
-1. The UI opens a dedicated confirmation modal with explicit valve operation warnings.
+1. The UI opens a dedicated simplified confirmation modal displaying the selected action, target device headline, and connection status.
 2. For manual actions, `phase`, `plantCount`, and volume targets are omitted.
 3. User confirms action in the modal.
 4. The frontend dispatches `POST /api/v1/devices/{deviceId}/faucet-commands` with `{ action: 'OPEN' | 'CLOSE' }` and HTTP `Idempotency-Key` header.

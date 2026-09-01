@@ -1365,3 +1365,23 @@ The faucet control interface (`/controls`) has been refined to enforce physical-
   - User-facing status labels present clean localized text (e.g., `Completed`, `Closed`, `Open`, `In Progress`, `Queued`, `Sent`, `Acknowledged`, `Failed`, `Timed Out`, `Expired` / `Selesai`, `Tertutup`, `Terbuka`, `Sedang berjalan`, `Menunggu antrean`, `Terkirim`, `Diterima perangkat`, `Gagal`, `Waktu habis`, `Kedaluwarsa`) across both English and Indonesian with 100% key parity.
 <!-- Faucet Controls Physical-State Action Guards UI/UX Reconciled: 2026-09-01 -->
 
+---
+
+## Faucet Confirmation Modal UI Simplification Note (DEC-UIUX-105 / Reconciled 2026-09-01)
+
+The water dispensing and manual valve confirmation modal (`FaucetConfirmationModal.tsx`) on `/controls` is streamlined to eliminate visual clutter and present essential operational details:
+- **Frontend Impact:** `MINOR`
+- **Selected UI Direction:** `Premium Minimal Ops` (authoritative brand color palette and design tokens UNCHANGED)
+- **Selected Motion Effects:** `Modal`, `Button hover`
+- **21st.dev MCP:** `NOT REQUIRED` (streamlined existing modal layout without structural redesign)
+- **Removal of Redundant Details:**
+  - Removed "Device Name" and "Site Location" fields from the modal details grid to eliminate visual repetition (device identity is already clearly established in the header selector and confirmation prompt).
+- **Simplified Confirmation Headline:**
+  - Removed `(a L × b plants)` calculation formula text from the confirmation headline across both Indonesian (`id`) and English (`en`) translation dictionaries, leaving a clean, concise statement (`Confirm dispense of {total} L total to {deviceName}.` / `Konfirmasi pengaliran total {total} L ke {deviceName}.`).
+- **Removal of Safety Disclaimer Cards:**
+  - Removed the "Automatic Command Safety" informational card block from both automated dispensing flows and manual valve operations (`OPEN`/`CLOSE`).
+- **Preserved Operational & Security Flows:**
+  - Kept all backend audit logging, RBAC authorization checks, API contracts, IoT Gateway MQTT command publishing, and CSPRNG idempotency key handling completely unchanged.
+<!-- Faucet Confirmation Modal UI Simplification Reconciled: 2026-09-01 -->
+
+

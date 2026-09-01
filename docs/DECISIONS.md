@@ -42,7 +42,7 @@
 | **I18N** | `DEC-I18N-068` to `DEC-I18N-074` | **APPROVED** | Default `id` (Bahasa Indonesia), `en` fallback, mandatory centered language-selection gate for unauthenticated visitors without valid locale (`English` -> `en`, `Bahasa Indonesia` -> `id`), cookie-based non-prefixed routing (no URL path pollution), subsequent language changes strictly in Settings (`/settings`), UTC storage with `Asia/Jakarta` (WIB) presentation. |
 | **Infrastructure** | `DEC-INF-075` to `DEC-INF-088` | **APPROVED (ORM DECISION REQUIRED)** | npm monorepo, PostgreSQL (ORM TBD — see §2.5). Backup schedule, retention period, RPO, and RTO: **TBD** — pending explicit user approval. |
 | **Testing** | `DEC-TST-089` to `DEC-TST-100` | **APPROVED** | Modern Evergreen browsers. Mobile viewport primary (360-430px). Accessibility standard: **TBD**. API performance targets (p95): **TBD**. Physical test run count per faucet phase: **TBD**. |
-| **UI/UX & Frontend** | `DEC-UIUX-101`, `DEC-UIUX-102` | **APPROVED** | 6 primary UI directions (1 per task), authoritative Kebun Melon color palette (UNCHANGED), controlled 12-motion library, performant motion quality, mandatory task-level frontend declaration, 21st.dev MCP required ONLY for material redesigns, removal of Linked Devices from profile, and Account/Session Security management. |
+| **UI/UX & Frontend** | `DEC-UIUX-101` to `DEC-UIUX-105` | **APPROVED** | 6 primary UI directions (1 per task), authoritative Kebun Melon color palette (UNCHANGED), controlled 12-motion library, performant motion quality, mandatory task-level frontend declaration, 21st.dev MCP required ONLY for material redesigns, removal of Linked Devices from profile, Account/Session Security management, and simplified faucet confirmation modal. |
 
 ---
 
@@ -668,3 +668,16 @@ The following facts are supported by the verified decisions governance of `TASK-
      - X-axis date labels and tooltip headers follow the application's active locale via `useLocale()` from `next-intl` (`formatDayMonth`): Indonesian (`id` -> `20 Agu`, `24 Agu`) vs English (`en` -> `20 Aug`, `24 Aug`).
      - All trailing commas and periods are stripped from date labels, raw data time strings, and tooltip headers.
 <!-- TASK-0504 Reconciled: 2026-08-30 -->
+
+---
+
+## DEC-UIUX-105: Faucet Confirmation Modal UI Simplification
+- **Status:** APPROVED
+- **Context:** The water dispensing confirmation modal on `/controls` (`FaucetConfirmationModal.tsx`) contained redundant information (Device Name and Site Location duplicated in the details grid, an algebraic calculation formula `(a L × b plants)` cluttering the prompt headline, and verbose "Automatic Command Safety" informational disclaimer cards).
+- **Decision:**
+  1. **Removal of Redundant Detail Fields:** Removed "Device Name" and "Site Location" rows from the confirmation modal details grid. The target device identity remains clearly established in the header device selector and the confirmation prompt headline.
+  2. **Confirmation Headline Simplification:** Removed the `(a L × b plants)` calculation formula text from the confirmation prompt across English and Indonesian dictionaries, rendering a clean, concise statement (`Confirm dispense of {total} L total to {deviceName}.` / `Konfirmasi pengaliran total {total} L ke {deviceName}.`).
+  3. **Removal of Safety Disclaimer Cards:** Removed the "Automatic Command Safety" informational card block from both automated dispensing and manual valve operations (`OPEN`/`CLOSE`).
+  4. **Preserved Flow and Backend Invariance:** Zero changes to backend audit logging, RBAC authorization, API routes, IoT Gateway MQTT command publishing, or CSPRNG idempotency key handling.
+  5. **Visual Governance:** Conforms strictly to `Premium Minimal Ops` with design tokens unchanged.
+<!-- TASK-0807 Reconciled: 2026-09-01 -->

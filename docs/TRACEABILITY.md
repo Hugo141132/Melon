@@ -308,4 +308,20 @@ The following facts are verified in the traceability matrix regarding `TASK-0807
 - **Verification Summary:** All targeted unit suites passed (UI 27/27, DB repository 25/25, Gateway event processor 32/32, Simulator 31/31), web unit suites 288/288 passed, and monorepo static typecheck returned 0 errors.
 <!-- Faucet Controls UI & Lifecycle Traceability Reconciled: 2026-09-01 -->
 
+---
+
+## Faucet Confirmation Modal UI Simplification Traceability Note (Reconciled 2026-09-01)
+
+The following facts are verified in the traceability matrix regarding `TASK-0807` (Confirmation Modal UI Simplification) and `DEC-UIUX-105`:
+- **Traceability Baseline:** Traced from `PRD-FR-029`, `PRD-FR-030`, and `DEC-UIUX-105` to streamline modal presentation and eliminate visual clutter.
+- **Implementation Status:** `TASK-0807` (Confirmation Modal Simplification) is implemented and verified (`apps/web/components/controls/FaucetConfirmationModal.tsx`, `apps/web/test/unit/faucet-control-ui.test.tsx` 27/27 passed).
+- **Core Simplification Summary:**
+  - *Removal of Redundant Details:* Removed "Device Name" and "Site Location" rows from the modal details grid (device identity is already presented in the header selector and prompt headline).
+  - *Headline Simplification:* Removed `(a L × b plants)` calculation text from the confirmation prompt across English and Indonesian dictionaries, leaving a clean, readable confirmation statement.
+  - *Removal of Safety Cards:* Removed the "Automatic Command Safety" informational disclaimer cards (`ShieldCheck`, `automaticSafetyTitle`, `automaticSafetyDesc`, `manualOpenDesc`, `manualCloseDesc`) from both dispense and manual valve confirmation flows.
+- **Backend & Flow Invariance:** Zero modifications to backend audit logging, RBAC authorization middleware, API contracts, IoT Gateway MQTT dispatch, or CSPRNG idempotency key handling.
+- **Verification Evidence:** 100% test pass rate across focused UI unit tests (27/27), full monorepo Vitest test suite (112 test files, 1,062 tests), and all pre-commit quality gates (`npm run check:quality`).
+<!-- Faucet Confirmation Modal Simplification Traceability Reconciled: 2026-09-01 -->
+
+
 

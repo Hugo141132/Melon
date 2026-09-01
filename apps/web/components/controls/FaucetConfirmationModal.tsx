@@ -1,16 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import {
-  X,
-  Droplets,
-  AlertTriangle,
-  Loader2,
-  CheckCircle2,
-  ShieldCheck,
-  Power,
-  PowerOff,
-} from 'lucide-react';
+import { X, Droplets, AlertTriangle, Loader2, CheckCircle2, Power, PowerOff } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { AuthorisedDevice } from '@/context/DeviceContext';
 import { formatLitersDisplay } from './FaucetPresetSelector';
@@ -165,31 +156,11 @@ export default function FaucetConfirmationModal({
                 ? tFaucet('confirmClosePrompt', { deviceName: selectedDevice.deviceName })
                 : tFaucet('confirmDispensePrompt', {
                     total: formattedTotalL,
-                    perPlant: formattedVolumeL,
-                    count: plantCount,
                     deviceName: selectedDevice.deviceName,
                   })}
           </p>
 
           <div className="grid grid-cols-2 gap-2 pt-2 border-t border-app-outline-variant/15 text-xs">
-            <div>
-              <span className="text-app-on-surface-variant block text-[10px] uppercase font-bold">
-                {tDevices('deviceName')}:
-              </span>
-              <span className="font-semibold text-app-on-surface truncate block">
-                {selectedDevice.deviceName}
-              </span>
-            </div>
-
-            <div>
-              <span className="text-app-on-surface-variant block text-[10px] uppercase font-bold">
-                {tDevices('siteLocation')}:
-              </span>
-              <span className="font-semibold text-app-on-surface">
-                {selectedDevice.siteName || tDevices('mainSiteDefault')}
-              </span>
-            </div>
-
             {isDispense && phase ? (
               <>
                 <div>
@@ -254,22 +225,8 @@ export default function FaucetConfirmationModal({
           </div>
         </div>
 
-        {/* Safety Note & Submit Form */}
+        {/* Submit Form */}
         <form onSubmit={handleConfirmSubmit} className="space-y-4">
-          <div className="p-3 bg-app-surface-container rounded-xl text-[11px] text-app-on-surface-variant space-y-1">
-            <div className="flex items-center gap-1.5 font-bold text-app-on-surface">
-              <ShieldCheck size={14} className="text-app-primary" />
-              <span>{tFaucet('automaticSafetyTitle')}</span>
-            </div>
-            <p>
-              {isOpenAction
-                ? tFaucet('manualOpenDesc')
-                : isCloseAction
-                  ? tFaucet('manualCloseDesc')
-                  : tFaucet('automaticSafetyDesc')}
-            </p>
-          </div>
-
           {/* Form Actions */}
           <div className="flex items-center justify-end gap-3 pt-2 border-t border-app-outline-variant/20">
             <button

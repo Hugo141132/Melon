@@ -410,7 +410,7 @@ describe('FaucetConfirmationModal', () => {
     expect(screen.getByTestId('faucet-confirmation-modal')).toBeInTheDocument();
     expect(screen.getAllByText(/0\.9 L/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/3 tanaman/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Water Tank Node 01').length).toBeGreaterThan(0);
+    expect(screen.getByText(/Water Tank Node 01/)).toBeInTheDocument();
     expect(screen.getByTestId('btn-confirm-dispense')).toBeInTheDocument();
   });
 

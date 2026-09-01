@@ -1183,12 +1183,21 @@ async function runCli(): Promise<void> {
           },
         };
         break;
-      case 'faucet-dispense':
+      case 'faucet-dispense': {
         const cmdId = getArg('command-id') || `cmd-cli-${Date.now()}`;
         const phase = Number(getArg('phase') || '2');
-        const targetVol = FAUCET_PRESET_VOLUMES[phase] || 1000;
+        const plantCountArg = getArg('plant-count') || getArg('plantCount');
+        const plantCount = plantCountArg ? Math.max(1, parseInt(plantCountArg, 10)) : 1;
+        const explicitVolumeArg =
+          getArg('target-volume-ml') || getArg('targetVolumeMl') || getArg('volume');
+        const explicitVolume = explicitVolumeArg ? Number(explicitVolumeArg) : undefined;
+        const targetVol =
+          typeof explicitVolume === 'number' && !isNaN(explicitVolume) && explicitVolume > 0
+            ? explicitVolume
+            : (FAUCET_PRESET_VOLUMES[phase] || 1000) * plantCount;
         result = await simulator.runFaucetDispenseLifecycleScenario(cmdId, targetVol);
         break;
+      }
       case 'faucet-open':
         const openCmdId = getArg('command-id') || `cmd-cli-${Date.now()}`;
         result = await simulator.runFaucetOpenLifecycleScenario(openCmdId);

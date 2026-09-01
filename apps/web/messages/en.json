@@ -438,7 +438,7 @@
     "waterPerPlant": "Water per Plant",
     "startDispensing": "Start Dispensing",
     "confirmDispenseTitle": "Confirm Water Dispensing",
-    "confirmDispensePrompt": "Confirm dispense of {total} L total ({perPlant} L × {count} plants) to \n{deviceName}.",
+    "confirmDispensePrompt": "Confirm dispense of {total} L total to {deviceName}.",
     "manualControlTitle": "Manual Valve Control",
     "manualControlSubtitle": "Manually open or close the water valve.",
     "openValve": "Open Valve",

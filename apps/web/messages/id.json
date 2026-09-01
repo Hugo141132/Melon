@@ -438,7 +438,7 @@
     "waterPerPlant": "Air per Tanaman",
     "startDispensing": "Mulai Pengaliran",
     "confirmDispenseTitle": "Konfirmasi Pengaliran Air",
-    "confirmDispensePrompt": "Konfirmasi pengaliran total {total} L ({perPlant} L × {count} tanaman) ke \n{deviceName}.",
+    "confirmDispensePrompt": "Konfirmasi pengaliran total {total} L ke {deviceName}.",
     "manualControlTitle": "Kontrol Manual Keran",
     "manualControlSubtitle": "Buka atau tutup katup keran air secara manual.",
     "openValve": "Buka Keran",

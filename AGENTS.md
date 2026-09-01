@@ -611,6 +611,17 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
 - 21st.dev MCP: `NOT REQUIRED`
 - Summary: Refined `/controls` UI action enablement and hardened faucet command lifecycle event persistence following manual verification. Enforced physical-valve-state-aware action guards: when physical valve state is `CLOSED`, dispensing preset cards (0.3 L, 1 L, 1.5 L), plant count stepper buttons (`-`, input, `+`), and "Close Valve" manual action are disabled, leaving only "Open Valve" enabled; when `OPEN`, "Open Valve" is disabled while dispensing presets and "Close Valve" remain enabled; when `UNKNOWN`, all valid actions remain enabled. Cleaned user-facing localization by removing redundant parenthetical uppercase enum strings (`(CLOSED)`, `(COMPLETED)`, `(OPEN)`, `(DISPENSE)`) across badges, status headers, and history tables in English and Indonesian with 100% dictionary key parity. Fixed lifecycle regression where late non-terminal events (`IN_PROGRESS`) were accepted after `COMPLETED` by adding transactional terminal state protection in `FaucetCommandRepository.addCommandEvent` (`packages/database`), and caught concurrent transition errors in `FaucetEventProcessor` (`apps/iot-gateway`). Aligned simulator `sendFaucetProgress` to canonical QoS 1 and added realistic simulation delays. Confirmed that `faucet_command_events` is an append-only milestone log where multiple intermediate `IN_PROGRESS` events before `COMPLETED` are valid. Verified 100% test pass rate across targeted UI tests (27/27), database tests (25/25), gateway tests (32/32), simulator tests (31/31), web unit tests (36 files, 288/288), and workspace typecheck (0 errors across 4 monorepo packages).
 
+#### Faucet Confirmation Modal UI Simplification Governance Record (Reconciled 2026-09-01)
+
+`TASK-0807` faucet confirmation modal simplification record:
+- Status: `DONE` (Reconciled 2026-09-01)
+- Frontend impact: `MINOR`
+- Selected UI direction: `Premium Minimal Ops`
+- Existing color template: `UNCHANGED`
+- Selected motion effects: `Modal`, `Button hover`
+- 21st.dev MCP: `NOT REQUIRED`
+- Summary: Streamlined the water dispensing and manual valve confirmation modal UI (`FaucetConfirmationModal.tsx`). Removed redundant "Device Name" and "Site Location" fields from the details grid, eliminated the `(a L × b plants)` calculation formula substring from the confirmation prompt in English and Indonesian dictionaries, and permanently removed the "Automatic Command Safety" informational disclaimer cards (`automaticSafetyTitle`, `automaticSafetyDesc`, `manualOpenDesc`, `manualCloseDesc`, and `ShieldCheck` icon). Kept all backend logging, RBAC checks, API contracts, and IoT Gateway MQTT dispatch logic completely untouched. Verified 100% test pass rate across focused unit tests (`faucet-control-ui.test.tsx` 27/27), full monorepo test suite (112 files, 1,062 tests), and pre-commit quality checks (`check:quality`).
+
 ---
 
 

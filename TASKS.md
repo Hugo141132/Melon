@@ -2047,6 +2047,12 @@ EXPIRED
 - Physical valve state now controls action enablement: `CLOSED` state disables dispensing preset cards (0.3 L, 1 L, 1.5 L), plant count stepper controls (`-`, input, `+`), and Close Valve action while keeping Open Valve enabled; `OPEN` state disables Open Valve while keeping dispensing presets and Close Valve enabled; `UNKNOWN` enables all valid actions.
 - Eliminated redundant uppercase enum display suffixes (`(CLOSED)`, `(COMPLETED)`, `(OPEN)`, `(DISPENSE)`) across badges, status headers, and history tables in English and Indonesian dictionaries with 100% key parity.
 - Updated `apps/web/test/unit/faucet-control-ui.test.tsx` (27/27 tests passed) and full web unit suite (36 test files, 288/288 tests passed).
+**Confirmation Modal UI Simplification (2026-09-01):** Streamlined the water dispensing and manual valve confirmation modal UI (`FaucetConfirmationModal.tsx`):
+- Removed redundant "Device Name" and "Site Location" fields from the modal details grid (device identity is clearly established by the headline prompt and header selector).
+- Removed the `(a L × b plants)` calculation formula text from the confirmation headline across all supported locales (`en.json` and `id.json`).
+- Removed the "Automatic Command Safety" informational disclaimer cards (`automaticSafetyTitle`, `automaticSafetyDesc`, `manualOpenDesc`, `manualCloseDesc`, and `ShieldCheck` icon) from both dispense and manual valve confirmation flows.
+- Confirmed that backend audit logging, RBAC authorization, API contracts, IoT Gateway MQTT dispatch, and security flows remain completely untouched.
+- Verified 100% test pass rate across focused UI unit tests (`faucet-control-ui.test.tsx` 27/27), full monorepo test suite (112 test files, 1,062 tests), and all pre-commit quality gates (`npm run check:quality`).
 
 
 ### Acceptance Criteria
