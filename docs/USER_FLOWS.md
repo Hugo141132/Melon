@@ -1430,18 +1430,20 @@ The application does NOT provide a "Delete Device" flow. Device removal from the
 
 **Main success flow:**
 
-1. The server verifies device access.
-2. The server verifies whether the role/user has `device.control.dispense` and `ENABLE_FAUCET_CONTROL=true`.
-3. The system loads device control availability and authoritative physical state (`OPEN`, `CLOSED`, `UNKNOWN`).
-4. If permitted and controllable, preset controls (Phase 1, 2, 3), `plantCount` stepper, and manual `OPEN`/`CLOSE` buttons are enabled.
-5. If monitoring-only or feature flag is disabled, controls remain disabled with a clear notice banner.
+1. The UI shell renders immediately with component-level skeleton loaders (`FaucetPresetSelectorSkeleton`, `WaterTankMonitoringCard` skeleton, and `FaucetHistoryTable` skeleton), without blocking the initial page presentation.
+2. Device context, telemetry snapshot, and recent command history load asynchronously in the background.
+3. The server verifies device access.
+4. The server verifies whether the role/user has `device.control.dispense` and `ENABLE_FAUCET_CONTROL=true`.
+5. The system resolves device control availability and authoritative physical state (`OPEN`, `CLOSED`, `UNKNOWN`).
+6. If permitted and controllable, preset controls (Phase 1, 2, 3), `plantCount` stepper, and manual `OPEN`/`CLOSE` buttons transition seamlessly into enabled interactive state.
+7. If monitoring-only or feature flag is disabled, controls remain disabled with a clear notice banner.
 
 **Alternative flows:** Device offline or status unknown; banner renders specific offline/state reason.
 **Error flows:** Direct access without permission returns `403`.
 **Postconditions:** Control UI reflects current permission, device state, and authoritative physical badge.
 **Required permissions:** `device.control.dispense` for actionable access.
 **Relevant account statuses:** `ACTIVE`.
-**UI states:** Available, disabled banner, offline, loading.
+**UI states:** Available, disabled banner, offline, loading (route fallback shell and component-level skeletons).
 **Audit events:** Normally none.
 
 ---

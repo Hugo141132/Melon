@@ -622,6 +622,17 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
 - 21st.dev MCP: `NOT REQUIRED`
 - Summary: Streamlined the water dispensing and manual valve confirmation modal UI (`FaucetConfirmationModal.tsx`). Removed redundant "Device Name" and "Site Location" fields from the details grid, eliminated the `(a L × b plants)` calculation formula substring from the confirmation prompt in English and Indonesian dictionaries, and permanently removed the "Automatic Command Safety" informational disclaimer cards (`automaticSafetyTitle`, `automaticSafetyDesc`, `manualOpenDesc`, `manualCloseDesc`, and `ShieldCheck` icon). Kept all backend logging, RBAC checks, API contracts, and IoT Gateway MQTT dispatch logic completely untouched. Verified 100% test pass rate across focused unit tests (`faucet-control-ui.test.tsx` 27/27), full monorepo test suite (112 files, 1,062 tests), and pre-commit quality checks (`check:quality`).
 
+#### Faucet Control Page Loading Strategy Governance Record (Reconciled 2026-09-02)
+
+`TASK-0807` faucet control page loading strategy record:
+- Status: `DONE` (Reconciled 2026-09-02)
+- Frontend impact: `MINOR`
+- Selected UI direction: `Premium Minimal Ops`
+- Existing color template: `UNCHANGED`
+- Selected motion effects: `Skeleton loading`
+- 21st.dev MCP: `NOT REQUIRED`
+- Summary: Improved Faucet Control page loading strategy by separating initial page shell rendering from asynchronous device, telemetry, and command fetching. Extracted `apps/web/components/controls/FaucetPresetSelectorSkeleton.tsx` to serve as a reusable component-level skeleton matching exact layout tokens. Updated `FaucetControlPanel.tsx` to render this skeleton while `isDeviceLoading` is true, completely eliminating the flash of premature disabled error states ("Silakan pilih perangkat tandon air") and layout jumping during initial device context hydration. Refactored `apps/web/app/controls/loading.tsx` to reuse `FaucetPresetSelectorSkeleton`, avoiding markup duplication while preserving the Next.js route-level loading fallback for slow-network bundle delivery. Verified 100% test pass rate across `controls-loading-transition.test.tsx` (5/5), `faucet-control-ui.test.tsx` (27/27), full web unit suite (36 files, 288/288 tests), and workspace typecheck (0 errors across 4 monorepo packages).
+
 ---
 
 

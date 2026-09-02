@@ -7,6 +7,7 @@ import FaucetPresetSelector, {
   AuthoritativePhysicalState,
   formatLitersDisplay,
 } from './FaucetPresetSelector';
+import FaucetPresetSelectorSkeleton from './FaucetPresetSelectorSkeleton';
 import FaucetConfirmationModal from './FaucetConfirmationModal';
 import FaucetStatusCard, { FaucetCommandDto, ACTIVE_COMMAND_STATUSES } from './FaucetStatusCard';
 import FaucetHistoryTable from './FaucetHistoryTable';
@@ -247,19 +248,23 @@ export default function FaucetControlPanel() {
       )}
 
       {/* Preset Selector Card */}
-      <section className="bg-app-surface-container-lowest p-6 rounded-2xl border border-app-outline-variant/30 soft-elevation-lg">
-        <FaucetPresetSelector
-          selectedDevice={selectedDevice}
-          hasControlPermission={hasControlPermission}
-          isFeatureEnabled={isFeatureEnabled}
-          activeCommand={activeCommand}
-          physicalState={physicalState}
-          plantCount={plantCount}
-          onPlantCountChange={setPlantCount}
-          onSelectPreset={handleSelectPreset}
-          onSelectManualAction={handleSelectManualAction}
-        />
-      </section>
+      {isDeviceLoading ? (
+        <FaucetPresetSelectorSkeleton />
+      ) : (
+        <section className="bg-app-surface-container-lowest p-6 rounded-2xl border border-app-outline-variant/30 soft-elevation-lg">
+          <FaucetPresetSelector
+            selectedDevice={selectedDevice}
+            hasControlPermission={hasControlPermission}
+            isFeatureEnabled={isFeatureEnabled}
+            activeCommand={activeCommand}
+            physicalState={physicalState}
+            plantCount={plantCount}
+            onPlantCountChange={setPlantCount}
+            onSelectPreset={handleSelectPreset}
+            onSelectManualAction={handleSelectManualAction}
+          />
+        </section>
+      )}
 
       {/* Active Command Status Card (If an active or recent command exists) */}
       {selectedDevice && activeCommand && (

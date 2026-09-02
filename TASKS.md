@@ -2053,6 +2053,11 @@ EXPIRED
 - Removed the "Automatic Command Safety" informational disclaimer cards (`automaticSafetyTitle`, `automaticSafetyDesc`, `manualOpenDesc`, `manualCloseDesc`, and `ShieldCheck` icon) from both dispense and manual valve confirmation flows.
 - Confirmed that backend audit logging, RBAC authorization, API contracts, IoT Gateway MQTT dispatch, and security flows remain completely untouched.
 - Verified 100% test pass rate across focused UI unit tests (`faucet-control-ui.test.tsx` 27/27), full monorepo test suite (112 test files, 1,062 tests), and all pre-commit quality gates (`npm run check:quality`).
+**Faucet Control Page Loading Strategy Reconciliation (2026-09-02):** Improved `/controls` initial loading UX and perceived performance:
+- Extracted reusable preset selector skeleton component (`apps/web/components/controls/FaucetPresetSelectorSkeleton.tsx`) matching exact layout tokens (plant count stepper, 3 preset cards, manual control buttons).
+- Updated `FaucetControlPanel.tsx` to render `<FaucetPresetSelectorSkeleton />` during `isDeviceLoading`, completely eliminating the premature flashing of the disabled banner ("Silakan pilih perangkat tandon air") while device context resolves.
+- Refactored `apps/web/app/controls/loading.tsx` to reuse `FaucetPresetSelectorSkeleton`, avoiding markup duplication while preserving the Next.js route-level loading fallback for slow-network bundle delivery.
+- Updated `apps/web/test/unit/controls-loading-transition.test.tsx` to verify component-level skeleton rendering without warning banners (5/5 tests passed). Verified full unit suite (36 files, 288/288 passed) and monorepo TypeScript typecheck (0 errors across 4 workspaces).
 
 
 ### Acceptance Criteria

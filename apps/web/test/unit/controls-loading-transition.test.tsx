@@ -127,6 +127,28 @@ describe('Controls Page Loading & Layout Stability Tests', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('FaucetControlPanel renders FaucetPresetSelectorSkeleton during initial device loading without flashing disabled warning banner', () => {
+    global.fetch = vi.fn().mockImplementation(
+      () => new Promise(() => {}) // pending loading
+    );
+
+    render(
+      <AuthProvider initialSession={mockOwnerSession as any}>
+        <DeviceProvider>
+          <FaucetControlPanel />
+        </DeviceProvider>
+      </AuthProvider>
+    );
+
+    // Skeleton should be rendered immediately
+    expect(screen.getByTestId('controls-loading-presets')).toBeInTheDocument();
+    expect(screen.queryByTestId('faucet-preset-selector')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('faucet-disabled-banner')).not.toBeInTheDocument();
+
+    // History table should also render skeleton
+    expect(screen.getByTestId('faucet-history-table')).toBeInTheDocument();
+  });
+
   it('FaucetHistoryTable renders skeleton rows and maintains layout when isLoading is true', () => {
     render(<FaucetHistoryTable deviceId={null} isLoading={true} />);
 

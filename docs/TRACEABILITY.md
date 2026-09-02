@@ -367,3 +367,23 @@ The following facts are verified in the traceability matrix regarding `TASK-0807
 - No IoT Gateway deployment required.
 - No MQTT configuration changes required.
 - Staging environments must update the `web` service to reflect the middleware change.
+
+---
+
+## Faucet Control Page Loading Strategy Traceability Note (Reconciled 2026-09-02)
+
+The following facts are verified in the traceability matrix regarding `TASK-0807` (Faucet Control Page Loading Strategy & Component-Level Skeletons):
+- **Traceability Baseline:** Defined under `UI_UX.md` and `PRD-FR-014` to provide immediate perceived page responsiveness without blocking initial UI presentation or flashing false unselected warning states during device context rehydration.
+- **Implementation Status:** `TASK-0807` (Loading Strategy Reconciliation) is implemented and verified:
+  - Extracted reusable preset selector skeleton component (`apps/web/components/controls/FaucetPresetSelectorSkeleton.tsx`).
+  - Integrated component-level skeleton loading into `apps/web/components/controls/FaucetControlPanel.tsx` during `isDeviceLoading`.
+  - Refactored route-level fallback shell `apps/web/app/controls/loading.tsx` to reuse `FaucetPresetSelectorSkeleton`.
+- **Architectural Invariance:**
+  - Preserved existing Next.js route-level `loading.tsx` fallback for bundle delivery on slow network connections.
+  - Zero backend API alterations, zero RBAC changes, zero MQTT topic/payload contract modifications, and zero database schema changes.
+- **Automated Verification:**
+  - Verified 100% test pass rate in targeted loading suite `apps/web/test/unit/controls-loading-transition.test.tsx` (5/5 tests passed).
+  - Verified 100% test pass rate in `apps/web/test/unit/faucet-control-ui.test.tsx` (27/27 tests passed).
+  - Monorepo TypeScript type checking passed with 0 errors across 4 workspaces (`tsc --noEmit`).
+<!-- Faucet Control Loading Strategy Traceability Reconciled: 2026-09-02 -->
+
