@@ -2329,7 +2329,7 @@ Apply to:
 
 **Priority:** `P0`
 **Status:** `BLOCKED`
-**Dependencies:** `TASK-0402`, hosting decision
+**Dependencies:** `TASK-0402`, Production EMQX Cluster Provisioning
 
 ### Acceptance Criteria
 
@@ -2364,7 +2364,7 @@ Apply to:
 
 **Priority:** `P0`
 **Status:** `BLOCKED`
-**Dependencies:** hosting decision
+**Dependencies:** `TASK-0104`, Offsite Backup Storage Selection (e.g., Cloudflare R2 / AWS S3)
 
 ### Acceptance Criteria
 
@@ -2561,10 +2561,10 @@ Critical unit coverage includes:
 
 **Priority:** `P0`
 **Status:** `IN_PROGRESS`
-**Dependencies:** Core UI, APIs, and Staging Infrastructure
-**Infrastructure Provisioned:**
-- Staging Web: `https://melon-monitor.up.railway.app`
-- Staging Gateway: `https://iot-melon-g4t3.up.railway.app/`
+**Dependencies:** Core UI, APIs, and Containerized Staging Infrastructure (`TASK-1012`)
+**Infrastructure Provisioned (Transitioning from Railway to Containerized Staging):**
+- Staging Web: Containerized Next.js Staging Runtime (decommissioning `https://melon-monitor.up.railway.app`)
+- Staging Gateway: Containerized IoT Gateway Runtime (decommissioning `https://iot-melon-g4t3.up.railway.app/`)
 - Staging Database: Supabase PostgreSQL (`scqrbtfilmttqrutynyo`) via Supavisor Pooler (`aws-0-ap-south-1.pooler.supabase.com:6543`)
 - Staging Broker: EMQX Cloud Serverless (`wss://` TLS active, per-device topic ACLs)
 - Safety Configuration: `ENABLE_FAUCET_CONTROL=false` strictly enforced
@@ -2673,7 +2673,7 @@ Required flows status:
 
 **Priority:** `P0`
 **Status:** `BACKLOG`
-**Dependencies:** All required Phase 10 tasks
+**Dependencies:** All required Phase 10 tasks (including `TASK-1011`, `TASK-1012`)
 
 ### Checklist
 
@@ -2694,7 +2694,7 @@ Required flows status:
 
 **Priority:** `P0`
 **Status:** `BLOCKED`
-**Dependencies:** `TASK-1009`
+**Dependencies:** `TASK-1009`, `TASK-1011`
 
 ### Release order
 
@@ -2716,6 +2716,126 @@ Required flows status:
 - No command anomaly occurs.
 - Rollback remains available.
 - Release is documented.
+
+---
+
+## TASK-1011 — Provision and Configure Production VPS Infrastructure
+
+**Priority:** `P0`
+**Status:** `BACKLOG`
+**Dependencies:** `TASK-0905`, `TASK-0907`, `TASK-0909`, `TASK-1004`, `TASK-1012`, VPS Provider Selection, Production Domain & DNS Provisioning
+**Related Decisions:** `DEC-INF-075`, `DEC-INF-078`, `DEC-DEV-020`, `DEC-CTRL-067`
+
+### Purpose
+
+Prepare, harden, and automate the production deployment environment on a dedicated Linux VPS (completely decoupled from Railway). Establish a containerized multi-service runtime, secure TLS reverse proxy, isolated production Supabase database connection, production EMQX broker integration, automated backup pipeline, and observability integration with Sentry and Grafana.
+
+### Work
+
+- **VPS Host Environment Preparation & Hardening:**
+  - Provision Linux VPS (Ubuntu 24.04 LTS recommended, min 2 vCPU, 4GB RAM, SSD storage).
+  - Configure non-root deploy user (`deploy`) with sudo privileges.
+  - Enforce SSH key-based authentication with root login and password authentication disabled (`sshd_config`).
+  - Configure host firewall (`ufw`) allowing only incoming ports: `22` (SSH or custom port), `80` (HTTP for ACME challenge), and `443` (HTTPS). Block all external access to internal service ports (`3000`, `3001`, `5432`, `1883`).
+  - Install and configure `fail2ban` for intrusion prevention and automated IP bans.
+  - Install modern Docker Engine and Docker Compose v2 with log rotation limits (`json-file`, `max-size: 10m`, `max-file: 3`).
+
+- **Containerization & Deployment Strategy:**
+  - Create production multi-stage Dockerfile for `@kebun-melon/web` utilizing Next.js standalone output (`output: 'standalone'`) to produce a minimal runtime image running as a non-root `nextjs` user.
+  - Create production multi-stage Dockerfile for `@kebun-melon/iot-gateway` compiling TypeScript to `dist/` and executing under Node.js 20 LTS as non-root `node` user.
+  - Create `docker-compose.prod.yml` defining:
+    - `web`: Next.js frontend and REST API (internal port `3000`, bridge network).
+    - `iot-gateway`: Fastify IoT service + MQTT client (internal port `3001`, bridge network).
+    - `reverse-proxy`: Nginx or Caddy container routing incoming traffic.
+  - Configure health checks (`/health` and `/ready`) and restart policies (`restart: unless-stopped`) for all containers.
+
+- **Secrets Management & Environment Handling:**
+  - Strictly prohibit committing production secrets or baking `.env` into Docker images.
+  - Maintain production environment file (`.env.production`) securely on the VPS host with restricted permissions (`chmod 600`), injected into Docker Compose at runtime.
+  - Enforce validation of all required production variables via `scripts/check-env.ts` during container entrypoint:
+    - Application: `NODE_ENV=production`, `NEXT_PUBLIC_APP_URL=https://<production-domain>`.
+    - Authentication: `SESSION_SECRET`, `INTERNAL_SERVICE_TOKEN`, `RESEND_API_KEY`.
+    - Safety: `ENABLE_FAUCET_CONTROL=false` (mandatory production default).
+
+- **Production Database & Supabase Connectivity:**
+  - Configure connectivity to the dedicated Supabase Production PostgreSQL instance using TLS encryption.
+  - Route transactional application queries through the Supavisor connection pooler (`port 6543`, transaction pool mode) to prevent connection exhaustion.
+  - Integrate Prisma migration deployment (`npx prisma migrate deploy`) as a pre-start container step or automated deployment hook prior to launching new application versions.
+
+- **Production EMQX Broker Connectivity:**
+  - Connect `iot-gateway` to the production EMQX Cloud cluster over TLS (`mqtts://` port `8883` or `wss://` port `8084`).
+  - Configure unique production client ID, production service username, and strong password credentials.
+  - Enforce the production topic hierarchy: `agriculture/production/{siteId}/{deviceId}/...` matching `DEC-DEV-020` and `TASK-0907`.
+  - Verify that devices and gateway operate under strict per-device topic ACLs with anonymous access disabled.
+
+- **HTTPS Reverse Proxy & Web Routing:**
+  - Configure reverse proxy (Nginx or Caddy) with automated Let's Encrypt TLS certificate issuance and renewal.
+  - Automatically redirect all port 80 HTTP traffic to port 443 HTTPS.
+  - Apply production security headers per `docs/SECURITY.md §16.8`: HSTS (`Strict-Transport-Security: max-age=63072000; includeSubDomains; preload`), `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, and restrictive Content Security Policy (CSP).
+  - Configure Server-Sent Events (SSE) route handling (`/api/v1/realtime/stream`): disable proxy buffering (`proxy_buffering off;`), set `proxy_read_timeout 86400s;`, and pass required headers (`Cache-Control: no-cache`, `Connection: keep-alive`).
+  - Restrict internal gateway webhook (`/api/v1/internal/*`) to the internal Docker bridge network, protected by `INTERNAL_SERVICE_TOKEN`.
+
+- **Database & Application Backup Strategy:**
+  - Fulfill requirements of `TASK-0909` (Configure Backup and Restore).
+  - Configure daily automated encrypted database dumps (`pg_dump` with AES-256 encryption via GPG/OpenSSL).
+  - Automate offsite upload of encrypted backup archives to secure object storage (e.g., AWS S3 or Cloudflare R2) with a 30-day retention and lifecycle rotation.
+  - Provide and verify a documented restore script (`scripts/restore-production-db.sh`) tested against an isolated staging or local database.
+
+- **Monitoring & Observability Integration:**
+  - **Sentry**: Configure `@sentry/nextjs` in `apps/web` with production DSN, environment tagging (`production`), and source-map upload for real-time frontend and API crash reporting.
+  - **Grafana Cloud**:
+    - Ship application and container logs to Grafana Cloud Loki via Grafana Alloy or Docker Loki plugin.
+    - Scrape system metrics (CPU, RAM, disk, network) using node_exporter or Alloy and ship to Grafana Prometheus.
+    - Set up alerting rules for container restarts, API 5xx spikes, and memory exhaustion.
+
+### Acceptance Criteria
+
+- [ ] VPS provisioned, SSH hardened (no root/password auth), and UFW firewall active (only 22, 80, 443 open).
+- [ ] Multi-stage Dockerfiles build clean, unprivileged production images for `@kebun-melon/web` and `@kebun-melon/iot-gateway`.
+- [ ] Docker Compose orchestrates web, gateway, and reverse proxy with health checks and restart policies.
+- [ ] Reverse proxy serves valid HTTPS, redirects HTTP, passes HSTS/security headers, and streams SSE without buffering.
+- [ ] `apps/web` connects securely to Supabase Production PostgreSQL over TLS via connection pooler.
+- [ ] `apps/iot-gateway` connects to production EMQX over TLS (`mqtts://`), publishes/subscribes strictly to `agriculture/production/...`, and synchronizes realtime events to web backend.
+- [ ] `ENABLE_FAUCET_CONTROL=false` is strictly verified in the production environment.
+- [ ] Automated encrypted backup cron runs, uploads offsite, and passes a documented restore drill.
+- [ ] Sentry captures unhandled errors and Grafana displays host metrics and application logs.
+- [ ] Production infrastructure operates completely decoupled from Railway.
+
+---
+
+## TASK-1012 — Decommission Railway and Establish Containerized Staging Architecture
+
+**Priority:** `P0`
+**Status:** `BACKLOG`
+**Dependencies:** `TASK-0101`, `TASK-0905`, `TASK-0914`
+**Related Decisions:** `DEC-INF-075`, `DEC-DEV-020`
+
+### Purpose
+
+Formally decommission Railway PaaS services for staging. Transition the staging environment to a containerized Docker-based architecture (`docker-compose.staging.yml`) connected to the existing cloud Supabase Staging (`scqrbtfilmttqrutynyo`) and EMQX Cloud Staging (`agriculture/staging/...`). Establish a dual-stage staging model: (1) local containerized staging for development and automated E2E runs without cloud hosting fees, and (2) pre-production staging on VPS (either co-located on a staging subdomain or as a pre-release validation drill on the VPS host provisioned in `TASK-1011`).
+
+### Work
+
+- **Railway Decommissioning & Reference Purge:**
+  - Retire active Railway web (`melon-monitor.up.railway.app`) and gateway (`iot-melon-g4t3.up.railway.app`) services and revoke Railway API tokens/webhooks.
+  - Update documentation and scripts to eliminate active Railway references, ensuring zero runtime dependencies on Railway PaaS.
+- **Containerized Staging Strategy:**
+  - Create `docker-compose.staging.yml` defining `web` (Next.js 16 standalone) and `iot-gateway` (Fastify + MQTT) connecting to Supabase Staging (`scqrbtfilmttqrutynyo`) and EMQX Cloud Staging (`agriculture/staging/...`).
+  - Implement `.env.staging.example` template with clear placeholders and zero hardcoded secrets.
+  - Retain strict `ENABLE_FAUCET_CONTROL=false` safety default.
+- **Dual-Tier Staging Execution Model:**
+  - **Tier 1 (Local Containerized Staging):** Enable local multi-service execution (`docker compose -f docker-compose.staging.yml up`) so that developers and CI/CD test runners can execute full E2E critical flows (`TASK-1004`) locally against the cloud staging database and EMQX broker at $0 infrastructure cost.
+  - **Tier 2 (VPS Pre-Production Staging Verification):** When the production VPS is provisioned under `TASK-1011`, validate the containerized staging stack on the VPS host (via a staging profile/subdomain `staging.<domain>` or as an initial staging runbook) to test real Linux OS environment, reverse proxy TLS, and external device connectivity prior to production promotion.
+
+### Acceptance Criteria
+
+- [ ] Railway web and gateway services decommissioned and removed from active infrastructure inventory.
+- [ ] All remaining documentation and configuration references treating Railway as active staging are purged or updated to historical notes.
+- [ ] `docker-compose.staging.yml` orchestrates `@kebun-melon/web` and `@kebun-melon/iot-gateway` cleanly in staging mode.
+- [ ] Staging containers connect successfully to Supabase Staging (`scqrbtfilmttqrutynyo`) and EMQX Cloud Staging (`agriculture/staging/...`).
+- [ ] `TASK-1004` End-to-End critical flows execute successfully against the containerized staging runtime.
+- [ ] `ENABLE_FAUCET_CONTROL=false` is strictly maintained and verified in staging.
+- [ ] Zero hardcoded secrets and zero cost overhead for maintaining staging before VPS deployment.
 
 ---
 

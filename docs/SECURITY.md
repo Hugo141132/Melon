@@ -1539,7 +1539,7 @@ The security implementation is accepted when:
 26. Incident-response ownership.
 27. Hardware secure boot and flash encryption.
 28. Penetration-testing scope.
-29. Production hosting environment.
+29. ~~Production hosting environment.~~ **RESOLVED** — Dedicated Linux VPS with containerized topology behind automated HTTPS reverse proxy (`TASK-1011`, `DEC-INF-088`).
 30. Regulatory and privacy obligations.
 
 ---
@@ -1553,7 +1553,7 @@ The security implementation is accepted when:
 5. Device authentication may use passwords or certificates; the final production approach is not selected.
 6. Hardware fail-safe behaviour requires confirmation from the hardware team.
 7. Audit, backup, and personal-data retention periods are not defined.
-8. The production hosting environment is still under discussion.
+8. ~~The production hosting environment is still under discussion.~~ **RESOLVED** — Dedicated Linux VPS with Docker Compose, hardened OS, UFW firewall, SSH key-only access, non-root containers, and automated HTTPS reverse proxy (`TASK-1011`); staging is containerized (`TASK-1012`), decoupled from Railway (`DEC-INF-088`).
 9. MFA is recommended for Owner accounts but not yet approved.
 10. Security testing must be completed before production physical control is enabled.
 

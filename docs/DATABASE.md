@@ -39,7 +39,7 @@ The database shall be the durable system of record for application state.
 
 ### 2.1 TASK-0914 Environment & Schema Reconciliation
 `TASK-0914` required zero database schema migrations or data alterations:
-- **Environment Isolation:** Local development connects to its configured local database (`DATABASE_URL`), while Railway staging connects to the Supabase PostgreSQL database (`scqrbtfilmttqrutynyo`). Staging database records and canonical identities remain intact and unmodified.
+- **Environment Isolation:** Local development connects to its configured local database (`DATABASE_URL`), while staging connects to the dedicated Supabase PostgreSQL database (`scqrbtfilmttqrutynyo`) (formerly hosted on Railway, transitioning to containerized staging per `TASK-1012`). Staging database records and canonical identities remain intact and unmodified.
 - **Dynamic Device Identity:** Canonical device strings (`devices.device_id`) are managed as environment data and resolved dynamically at runtime by simulation tools via CLI/environment variables, with no hardcoded device ID assumptions in source code.
 
 ---
@@ -1905,7 +1905,7 @@ The following facts are supported by the verified database interactions of `TASK
 The following environment topology and database facts are verified regarding `TASK-0807`, `TASK-0502`, and `TASK-0306`:
 - **Local vs Staging Environment Separation:**
   - **Local Development Database:** Dedicated Supabase PostgreSQL project `xjsencdgfcbkzdzqcnqx` connected via Supavisor transaction pooler `aws-1-ap-south-1.pooler.supabase.com:6543?pgbouncer=true` (or session pooler on port `5432`).
-  - **Railway Staging Database:** Dedicated Supabase PostgreSQL project `scqrbtfilmttqrutynyo` connected via staging Supavisor pooler `aws-0-ap-south-1.pooler.supabase.com:6543?pgbouncer=true`.
+  - **Staging Database:** Dedicated Supabase PostgreSQL project `scqrbtfilmttqrutynyo` connected via staging Supavisor pooler `aws-0-ap-south-1.pooler.supabase.com:6543?pgbouncer=true` (formerly referred to as Railway staging database; staging is now containerized per `TASK-1012`).
   - **Tooling Boundary:** `@mcp:supabase:` is configured exclusively for staging project `scqrbtfilmttqrutynyo` and must not be used as authority for local development database state.
 - **Transient Connectivity Reconciliation:** The earlier local Prisma connection timeout was transient; local connection parameters (`postgres.xjsencdgfcbkzdzqcnqx` on `aws-1` port 6543 with `?pgbouncer=true`) are verified and active.
 - **Zero Schema Migrations:** No database schema alterations, Prisma migrations, index modifications, or repository signature changes were made for the 2026-08-27 UI loading and header centering reconciliations.

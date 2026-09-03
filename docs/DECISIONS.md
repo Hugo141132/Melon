@@ -23,6 +23,7 @@
 | `DEC-CTRL-051` | Faucet Command Concurrency | **APPROVED** | Maximum 1 active command per device; no auto retries; idempotency key required | Implement in `TASK-0802` & `TASK-0803` |
 | `DEC-CTRL-067` | Production Feature Flag | **APPROVED** | `ENABLE_FAUCET_CONTROL=false` by default; requires dual written Owner & Hardware Lead sign-off before production activation | Feature flag in `TASK-0103`; faucet code may be built and tested behind flag; production activation blocked until dual sign-off recorded |
 | `DEC-INF-078` | Web-to-Gateway Internal Health & Readiness Probe | **APPROVED** | Internal HTTP probe with mandatory `Authorization: Bearer <INTERNAL_SERVICE_TOKEN>`, 2000ms default timeout | Implemented in `TASK-0905` |
+| `DEC-INF-088` | Production VPS & Containerized Staging Architecture | **APPROVED** | Production on dedicated Linux VPS with Docker Compose and automated HTTPS reverse proxy (`TASK-1011`); staging environment containerized (`TASK-1012`), completely decoupled from Railway | Implement in `TASK-1011` and `TASK-1012` |
 
 > **Direct EMQX Cloud Development Connectivity Note (TASK-0914):** Local `apps/iot-gateway` and simulator scripts connect directly to EMQX Cloud over TLS (`mqtts://` / `wss://`) as the standard development path, eliminating Railway intermediary dependencies and local Docker Mosquitto runtime requirements (Mosquitto is retained as an optional fallback only). Topic namespaces (`agriculture/development/...` vs `agriculture/staging/...`) and unique client IDs remain strictly segregated. Hardware simulator identities are resolved dynamically via CLI/env without hardcoded hardware IDs.
 
@@ -40,7 +41,7 @@
 | **Monitoring** | `DEC-MON-036` to `DEC-MON-050` | **APPROVED** | Three distinct monitoring domains: 1) Soil monitoring (NPK, Temp, Moisture, pH, EC in `µS/cm`, status), 2) Water Quality monitoring (pH, TDS in ppm, EC in `µS/cm`, status), 3) Water Tank monitoring (Tank Vol in `L`, Flow in `m³/h`, status). Canonical display unit for EC is `µS/cm` (values in `mS/cm` converted at presentation boundary via `×1000`). Control capabilities (Solenoid Valve, Relay) are actuators, not monitoring sensors. INA219 electrical monitoring tracks system electrical consumption (voltage, current, power) as device health/power telemetry, not as a battery percentage or primary agronomic measurement. 90-day raw telemetry retention TTL with chunked batch maintenance (`DEC-MON-048` / `TASK-0913`). Sensor precision and valid ranges: **TBD**. |
 | **Faucet Control** | `DEC-CTRL-051` to `DEC-CTRL-067` | **APPROVED** | Max 1 active command/device, no auto retries, `ENABLE_FAUCET_CONTROL=false` default, dual written sign-off (Owner + Hardware Lead) required before production activation. Duplicate command IDs never re-dispense. Timeout ≠ completion. ACK timeout, completion timeout, expiry duration: **TBD**. Cancellation/stop support: **TBD**. |
 | **I18N** | `DEC-I18N-068` to `DEC-I18N-074` | **APPROVED** | Default `id` (Bahasa Indonesia), `en` fallback, mandatory centered language-selection gate for unauthenticated visitors without valid locale (`English` -> `en`, `Bahasa Indonesia` -> `id`), cookie-based non-prefixed routing (no URL path pollution), subsequent language changes strictly in Settings (`/settings`), UTC storage with `Asia/Jakarta` (WIB) presentation. |
-| **Infrastructure** | `DEC-INF-075` to `DEC-INF-088` | **APPROVED (ORM DECISION REQUIRED)** | npm monorepo, PostgreSQL (ORM TBD — see §2.5). Backup schedule, retention period, RPO, and RTO: **TBD** — pending explicit user approval. |
+| **Infrastructure** | `DEC-INF-075` to `DEC-INF-088` | **APPROVED** | npm monorepo, PostgreSQL with Prisma ORM, internal health probes, dedicated Linux VPS production with Docker Compose (`TASK-1011`), and containerized staging decoupled from Railway (`TASK-1012`). Backup schedule and retention: daily automated encrypted pg_dump with offsite object storage. |
 | **Testing** | `DEC-TST-089` to `DEC-TST-100` | **APPROVED** | Modern Evergreen browsers. Mobile viewport primary (360-430px). Accessibility standard: **TBD**. API performance targets (p95): **TBD**. Physical test run count per faucet phase: **TBD**. |
 | **UI/UX & Frontend** | `DEC-UIUX-101` to `DEC-UIUX-105` | **APPROVED** | 6 primary UI directions (1 per task), authoritative Kebun Melon color palette (UNCHANGED), controlled 12-motion library, performant motion quality, mandatory task-level frontend declaration, 21st.dev MCP required ONLY for material redesigns, removal of Linked Devices from profile, Account/Session Security management, and simplified faucet confirmation modal. |
 
@@ -367,6 +368,19 @@
      - Gateway unreachable / network failure / timeout / 401 $\rightarrow$ `dependencies.gateway = "down"`, `dependencies.broker = "down"`.
      - Web overall readiness (`GET /ready`) returns HTTP 200 when `database`, `gateway`, and `broker` are all `"up"`, and HTTP 503 when any dependency is `"down"`.
      - Liveness (`GET /health`) remains strictly independent of all downstream dependency failures (always HTTP 200 `{ "status": "ok" }`).
+
+---
+
+#### DEC-INF-088: Production VPS Hosting & Containerized Staging Architecture
+* **Related Task IDs**: `TASK-1011`, `TASK-1012`
+* **Related Documentation**: `docs/ARCHITECTURE.md` §22, `docs/SECURITY.md` §27, `docs/PRD.md` §10, `TASKS.md`
+* **Status**: **APPROVED BY USER**
+* **Approved Decision**:
+  1. **Production Hosting**: Production application runtime (`apps/web`, `apps/iot-gateway`) shall be deployed to a dedicated Linux VPS using a multi-service Docker Compose topology (`TASK-1011`).
+  2. **Automated Reverse Proxy & TLS**: Production uses an automated HTTPS reverse proxy (Caddy or Nginx) with Let's Encrypt automated TLS certificate issuance and renewal, strict security headers, and unbuffered SSE proxying (`/api/v1/realtime/stream`).
+  3. **Staging Architecture**: Railway PaaS is decommissioned. Staging transitions to a dual-tier containerized staging architecture (`TASK-1012`): Tier 1 (local containerized staging using `docker-compose.staging.yml` connecting to cloud Supabase Staging and EMQX Cloud Staging at $0 cost) and Tier 2 (pre-production verification drill on the VPS host).
+  4. **Strict Environment Segregation**: Development, staging, and production maintain 100% isolation across databases, secrets, domains, broker credentials, and topic namespaces (`agriculture/production/...` vs `agriculture/staging/...` vs `agriculture/development/...`).
+  5. **Safety Baseline**: `ENABLE_FAUCET_CONTROL=false` remains strictly enforced across all environments.
 
 ---
 

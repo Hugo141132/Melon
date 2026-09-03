@@ -329,7 +329,7 @@ Preferred deployment format:
 Docker containers
 ```
 
-The final hosting platform is `TBD`.
+Production hosting is a dedicated Linux VPS with Docker Compose (`TASK-1011`). Staging is containerized staging (`TASK-1012`), completely decoupled from Railway.
 
 ---
 
@@ -1116,10 +1116,10 @@ flowchart LR
 
 ### 22.2 Staging
 
-Staging environment topology is fully provisioned and verified:
+Staging environment topology uses containerized staging (`TASK-1012`):
 
-- **Web Frontend**: Railway PaaS (`https://melon-monitor.up.railway.app`)
-- **IoT Gateway Service**: Railway PaaS (`https://iot-gateway-production-7e17.up.railway.app`)
+- **Web Frontend**: Containerized Next.js standalone runtime (`docker-compose.staging.yml`; formerly Railway PaaS `melon-monitor.up.railway.app`, now decommissioned)
+- **IoT Gateway Service**: Containerized Fastify IoT service (`docker-compose.staging.yml`; formerly Railway PaaS `iot-gateway-production-7e17.up.railway.app`, now decommissioned)
 - **Staging Database**: Supabase PostgreSQL (`scqrbtfilmttqrutynyo`) via Supavisor Session Pooler (`aws-0-ap-south-1.pooler.supabase.com:6543`)
 - **Staging MQTT Broker**: EMQX Cloud Serverless (`wss://` WebSockets / TLS, client password authentication, per-device topic ACLs)
 - **Safety Policy**: `ENABLE_FAUCET_CONTROL=false` strictly enforced
@@ -1138,16 +1138,12 @@ Production shall use:
 - Metrics.
 - Controlled migrations.
 
-### 22.4 Hosting Options
+### 22.4 Hosting Architecture
 
-Possible hosting models:
+Approved hosting model:
 
-- VPS with Docker.
-- Managed container platform.
-- Kubernetes, only when scale justifies it.
-- Hybrid deployment with broker and gateway on a dedicated server.
-
-The final hosting platform is `TBD`.
+- **Production**: Dedicated Linux VPS running containerized multi-service Docker Compose topology (`web`, `iot-gateway`, `reverse-proxy`) behind an automated HTTPS reverse proxy (Caddy or Nginx) with automated Let's Encrypt TLS renewal (`TASK-1011`).
+- **Staging**: Dual-tier containerized staging (`TASK-1012`): Tier 1 (local containerized staging for development/E2E testing at $0 cost) and Tier 2 (pre-production validation drill on the VPS host). Railway PaaS is decommissioned.
 
 ---
 
@@ -1740,7 +1736,7 @@ The following architecture facts are supported by the verified implementation of
 - **Balanced 3-Column Header Grid:** `TopAppBar` implements `grid grid-cols-[1fr_auto_1fr] items-center px-4 h-14` to geometrically center `DeviceSelector` at 50% header width across desktop, tablet, and mobile, decoupling center alignment from asymmetrical left/right child dimensions.
 - **Environment Infrastructure Separation:**
   - **Local Development:** Uses dedicated Supabase project `xjsencdgfcbkzdzqcnqx` via `aws-1-ap-south-1.pooler.supabase.com:6543?pgbouncer=true`.
-  - **Staging Platform:** Uses Railway staging services and separate Supabase project `scqrbtfilmttqrutynyo` via `aws-0-ap-south-1.pooler.supabase.com:6543?pgbouncer=true`.
+  - **Staging Platform:** Uses containerized staging services (`TASK-1012`; formerly Railway) and separate Supabase project `scqrbtfilmttqrutynyo` via `aws-0-ap-south-1.pooler.supabase.com:6543?pgbouncer=true`.
   - **Tooling Access:** Supabase MCP targets staging only.
 <!-- Controls Loading & Architecture Reconciled: 2026-08-27 -->
 
@@ -1772,7 +1768,7 @@ The following architectural specifications define the verified security and prof
    - **Password Change Service Reuse:** Wires the Change Password modal to the existing `POST /api/v1/auth/change-password` endpoint with automatic session revocation and redirect to `/login?message=PASSWORD_CHANGED`.
 
 4. **Staging & Database Deployment Requirements:**
-   - `TASK-0217` requires applying migration `20260820000000_add_session_user_active_index` (`npx prisma migrate deploy`) to staging Supabase and redeploying the `web` service on Railway.
+   - `TASK-0217` requires applying migration `20260820000000_add_session_user_active_index` (`npx prisma migrate deploy`) to staging Supabase and updating the containerized `web` service (`TASK-1012`).
 <!-- Single Active Session & Email Change Architecture Reconciled: 2026-08-29 -->
 
 

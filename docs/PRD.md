@@ -936,7 +936,7 @@ Current assumptions:
 7. The system will initially support Owner and Admin roles only.
 8. English and Bahasa Indonesia are the initial interface languages.
 9. Sensor thresholds, units, and measurement rules will be supplied externally.
-10. The hosting environment is still under discussion.
+10. ~~The hosting environment is still under discussion.~~ **RESOLVED** — Production on dedicated Linux VPS (`TASK-1011`); staging environment containerized (`TASK-1012`), completely decoupled from Railway (`DEC-INF-088`).
 11. The final device communication protocol is not yet formally approved.
 12. Device access may need to be restricted per user, site, or organisation.
 
@@ -1032,7 +1032,7 @@ The following decisions must be resolved before their related implementation is 
 1. Exact frontend framework and version.
 2. Final backend framework.
 3. Final database and ORM.
-4. Final hosting environment.
+4. ~~Final hosting environment.~~ **RESOLVED** — Dedicated Linux VPS with Docker Compose for production (`TASK-1011`) and containerized staging (`TASK-1012`) (`DEC-INF-088`).
 5. Final device communication protocol.
 6. MQTT broker choice, if MQTT is approved.
 7. Exact sensor units.
@@ -1165,7 +1165,7 @@ The following product requirements define the security and profile management ca
 - **`PRD-FR-024` (Verified Self-Email Change):** Enables authenticated users to update their registered email address. The existing email remains 100% authoritative for all system access until the 6-digit numeric verification code (15-minute expiry) delivered to the new email is confirmed. Preserves active session without logout, validates uniqueness, and records non-sensitive audit metadata (`account.email.changed`).
 - **`PRD-FR-025` (Single Active Session Enforcement - IMPLEMENTED & VERIFIED):** Guarantees at most 1 active login session per user account across all devices. Submitting valid credentials when an active, non-expired, non-idle, non-revoked session exists rejects the login with HTTP 409 Conflict (`ACTIVE_SESSION_EXISTS`) and preserves the existing session. Expired (`> 8h`), idle-timed-out (`> 30m`), or revoked sessions are pruned and do not block login. Concurrency is race-safe and fail-closed via PostgreSQL user-row locking.
 - **Profile Security Reconciliation (IMPLEMENTED & VERIFIED):** Permanently removes "Linked Devices" from `/profile`, replaces it with Account & Session Security status (omitting client IP and User-Agent), and wires Change Password directly to `POST /api/v1/auth/change-password` with redirect to `/login?message=PASSWORD_CHANGED`.
-- **Database & Staging Impacts:** `TASK-0217` migration `20260820000000_add_session_user_active_index` has been created and verified locally, pending deployment to Supabase staging and Railway `web` service.
+- **Database & Staging Impacts:** `TASK-0217` migration `20260820000000_add_session_user_active_index` has been created and verified locally, pending deployment to Supabase staging and containerized staging `web` service (`TASK-1012`).
 <!-- Single Active Session & Email Change PRD Reconciled: 2026-08-29 -->
 
 
