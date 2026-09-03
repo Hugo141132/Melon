@@ -3146,3 +3146,18 @@ The following facts are supported by the verified implementation of the Faucet C
 - No IoT Gateway deployment required.
 - No MQTT configuration changes required.
 - Staging environments must update the `web` service to reflect the middleware change.
+
+---
+
+## Operational Overview Dashboard API & External Integration Note (TASK-0506 / Reconciled 2026-09-02)
+
+The operational dashboard (`/` and `/dashboard`) interacts with API surfaces as follows:
+- **Backend API Consumption:** Reuses `GET /api/v1/devices` and server layout auth hydration (`useAuth()`), requiring zero new proprietary backend API endpoints.
+- **External Environmental Weather Contract:**
+  - `WeatherCard.tsx` fetches environmental metrics client-side from the public Open-Meteo REST API:
+    - **Endpoint:** `https://api.open-meteo.com/v1/forecast?latitude=-7.172934&longitude=113.2257627&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,uv_index&timezone=Asia/Jakarta`
+    - **Caching & Polling:** Fetches on component mount with a 15-minute background refresh interval and manual refresh button.
+    - **WMO Weather Codes:** Maps WMO weather code integers (`0-99`) to localized condition keys (`weatherClear`, `weatherPartlyCloudy`, `weatherCloudy`, `weatherRain`, `weatherThunderstorm`).
+- **Zero API Regressions:** No existing REST endpoint signatures, schemas, or status codes were modified.
+<!-- TASK-0506 API Reconciled: 2026-09-02 -->
+

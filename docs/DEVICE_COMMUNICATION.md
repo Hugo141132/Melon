@@ -1998,3 +1998,14 @@ The following communication contracts are reinforced and verified for faucet com
 - No IoT Gateway deployment required.
 - No MQTT configuration changes required.
 - Staging environments must update the `web` service to reflect the middleware change.
+
+---
+
+## 50. Operational Overview Dashboard & Fleet Aggregation Note (TASK-0506 / Reconciled 2026-09-02)
+
+The operational dashboard (`/` and `/dashboard`) maintains complete separation from IoT device communication boundaries:
+- **Presentation-Layer Fleet Aggregation:** Node connection counts (`Total`, `Online`, `Offline/Stale`) are aggregated in-memory from `DeviceContext` (`GET /api/v1/devices`), eliminating duplicate SSE subscriptions or MQTT stream overhead on the overview homepage.
+- **Dedicated Telemetry Routes:** Live telemetry streaming and historical charts remain strictly encapsulated in dedicated domain pages (`/sensor`, `/soil`, `/water`, `/controls`).
+- **Zero Firmware or Broker Impact:** `TASK-0506` introduced zero modifications to ESP32/NodeMCU firmware contracts, REST ingestion endpoints, MQTT 5.0 TLS topics, QoS policies, or gateway schemas.
+<!-- TASK-0506 Device Communication Reconciled: 2026-09-02 -->
+

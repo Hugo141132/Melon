@@ -1718,3 +1718,15 @@ The following security controls are active and verified regarding `TASK-0216` (V
 - No IoT Gateway deployment required.
 - No MQTT configuration changes required.
 - Staging environments must update the `web` service to reflect the middleware change.
+
+---
+
+## Operational Dashboard & Environmental Weather Security Controls Note (TASK-0506 / Reconciled 2026-09-02)
+
+The following security and privacy controls are verified for `TASK-0506` (`/` and `/dashboard`):
+- **Fixed Coordinates & Zero Geolocation Tracking:** Environmental weather in `WeatherCard.tsx` uses hardcoded static farm coordinates (Latitude `-7.172934`, Longitude `113.2257627`). Browser geolocation APIs (`navigator.geolocation`) are completely omitted, preventing client location tracking or PII leakage.
+- **Public Weather API Boundary:** Weather data is retrieved client-side from the public Open-Meteo REST API without storing, transmitting, or embedding third-party API keys or credentials.
+- **Canonical Identifier Concealment:** The dashboard summary cards expose only aggregated node counts (`Total`, `Online`, `Offline/Stale`). Canonical device IDs (`deviceId`) remain concealed from Admin users (`DEC-DEV-028`).
+- **Zero Ingestion of Synthetic Claims:** The synthetic 92/100 health score is permanently deleted, eliminating fabricated system health representations.
+<!-- TASK-0506 Security Reconciled: 2026-09-02 -->
+

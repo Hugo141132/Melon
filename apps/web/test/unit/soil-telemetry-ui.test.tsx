@@ -385,7 +385,7 @@ describe('TASK-0502 — Live Soil and Water Monitoring UI Data Binding', () => {
         <DashboardPage />
       </DeviceProvider>
     );
-    expect(screen.getByText(/Kondisi Cuaca Lingkungan/i)).toBeInTheDocument();
+    expect(screen.getByText(/King Agrowisata/i)).toBeInTheDocument();
     expect(screen.queryByText(/Pemantauan Tanah \(SOIL\)/i)).toBeNull();
     expect(screen.queryByText(/Kualitas Air Irigasi/i)).toBeNull();
     expect(screen.queryByText(/Pemantauan Tangki Air/i)).toBeNull();

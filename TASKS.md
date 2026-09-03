@@ -1613,6 +1613,46 @@ Server-Sent Events
 
 ---
 
+## TASK-0506 — Premium Modern Monitoring Dashboard UI Upgrade
+
+**Priority:** `P1`
+**Status:** `DONE`
+**Dependencies:** `TASK-0502`, `TASK-0501`
+**Completed:** 2026-09-02 — Upgraded the root overview dashboard (`/` and `/dashboard`) into a focused premium modern operational bento dashboard adhering to `Premium Minimal Ops`:
+- **Fake Health Score Removal:** Permanently eliminated the synthetic `92/100` score gauge, "Excellent" indicator, and fake "Your farm conditions are overall in an optimal state" text from all dashboard views.
+- **Fixed-Location Weather Integration:** Implemented `WeatherCard.tsx` bound strictly to fixed coordinates: Latitude `-7.172934`, Longitude `113.2257627` (King Agrowisata). Integrated Open-Meteo REST API (`temperature_2m`, `apparent_temperature`, `relative_humidity_2m`, `weather_code`, `wind_speed_10m`, `uv_index`) with zero browser geolocation, WMO code interpretation, smooth skeleton loader, full-width untruncated metrics grid below the hero card, subtle semantic color tints (green for humidity, neutral olive for wind, warm amber for UV), and fallback states.
+- **Focused Operational Bento Layout:** Streamlined the root dashboard to focus strictly on real-time operational essentials (Hero Overview card with system greeting and 3-column node summary metrics, plus full-width environmental weather panel below). Avoided portal clutter and duplicate telemetry cards by delegating detailed monitoring to `/sensor`, controls to `/controls`, notifications to `/notifikasi`, and settings to `/setting`.
+- **Text & Clutter Pruning:** Removed redundant header pills ("Real-Time System") and decorative subtitles ("Real-time soil, water quality, and reservoir telemetry"). Removed "Live Weather" text badge from weather card.
+- **Zero Emojis Enforced:** Eliminated all emoji characters across headings, greetings, labels, and status badges in favor of SVG icon design tokens.
+- **Direct Route Support:** Rendered identical `DashboardView` directly on both `/` and `/dashboard` without HTTP redirects.
+- **I18N & Quality:** Maintained 100% key parity across `messages/id.json` and `messages/en.json`. Added comprehensive unit test suite in `apps/web/test/unit/dashboard-page.test.tsx` (6/6 passed, including automated Unicode emoji scanning).
+
+### Work
+
+Implement:
+- Focused operational bento dashboard layout (Hero Overview + Node Summary KPIs + Full-Width Fixed Weather Card).
+- Fixed-location weather card without geolocation for "King Agrowisata".
+- Subtle semantic weather tinting and full parameter visibility without text truncation.
+- Clean zero-emoji visual hierarchy.
+- Removal of portal-like overview clutter (System Snapshot, Quick Actions, duplicate domain cards/fleet directory) from root dashboard.
+- Removal of fake health score components and redundant subtitle pills.
+- Direct `/dashboard` rendering.
+
+### Acceptance Criteria
+
+- [x] Fake health score (92/100) and synthetic optimal status claims are removed.
+- [x] Weather data is strictly bound to fixed coordinates (-7.172934, 113.2257627) for King Agrowisata with no geolocation.
+- [x] Weather card is positioned full-width below hero card, preventing label truncation with semantic metric tints.
+- [x] Homepage focuses strictly on Hero overview, node summary metrics, and fixed-location weather card.
+- [x] Portal-like overview sections (System Snapshot, Quick Actions) and duplicate domain cards/fleet directory are removed from root dashboard.
+- [x] Redundant header pill and subtitle text removed.
+- [x] Zero emojis exist across all dashboard greetings, cards, and labels.
+- [x] Direct navigation to `/` and `/dashboard` renders cleanly.
+- [x] English and Indonesian translations are complete with 100% key parity.
+- [x] All unit and type tests pass.
+
+---
+
 # 14. Phase 6 — Internationalisation
 
 ## TASK-0601 — Select and Configure I18N Library

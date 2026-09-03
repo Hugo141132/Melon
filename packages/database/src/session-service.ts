@@ -118,70 +118,76 @@ export async function loginUser(
 
   const sessionId = crypto.randomUUID();
 
-  await prisma.$transaction(async (tx) => {
-    // 1. Lock the user row to prevent race conditions on concurrent logins
-    await tx.$executeRaw`SELECT id FROM users WHERE id = ${user.id}::uuid FOR UPDATE`;
+  await prisma.$transaction(
+    async (tx) => {
+      // 1. Lock the user row to prevent race conditions on concurrent logins
+      await tx.$executeRaw`SELECT id FROM users WHERE id = ${user.id}::uuid FOR UPDATE`;
 
-    // 2. Prune expired or idle-timed-out sessions for this user
-    const thirtyMinsAgo = new Date(now.getTime() - SESSION_IDLE_TIMEOUT_MS);
-    await tx.session.updateMany({
-      where: {
-        userId: user.id,
-        revokedAt: null,
-        OR: [{ expiresAt: { lte: now } }, { lastSeenAt: { lte: thirtyMinsAgo } }],
-      },
-      data: {
-        revokedAt: now,
-      },
-    });
-
-    // 3. Check if there is still an active session
-    const existingSession = await tx.session.findFirst({
-      where: {
-        userId: user.id,
-        revokedAt: null,
-      },
-    });
-
-    if (existingSession) {
-      throw new ActiveSessionExistsError();
-    }
-
-    // 4. Create new session, update user, write audit log
-    await tx.session.create({
-      data: {
-        id: sessionId,
-        sessionTokenHash,
-        userId: user.id,
-        expiresAt,
-        lastSeenAt: now,
-        ipAddress: metadata?.ipAddress ?? null,
-        userAgent: metadata?.userAgent ?? null,
-      },
-    });
-
-    await tx.user.update({
-      where: { id: user.id },
-      data: { lastLoginAt: now },
-    });
-
-    await tx.auditLog.create({
-      data: {
-        eventKey: AuditEventKey.AUTH_LOGIN_SUCCESS,
-        actorUserId: user.id,
-        actorRole: primaryRole,
-        targetType: 'User',
-        targetId: user.id,
-        result: 'SUCCESS',
-        metadata: {
-          sessionId,
+      // 2. Prune expired or idle-timed-out sessions for this user
+      const thirtyMinsAgo = new Date(now.getTime() - SESSION_IDLE_TIMEOUT_MS);
+      await tx.session.updateMany({
+        where: {
+          userId: user.id,
+          revokedAt: null,
+          OR: [{ expiresAt: { lte: now } }, { lastSeenAt: { lte: thirtyMinsAgo } }],
         },
-        requestId: metadata?.requestId ?? null,
-        ipAddress: metadata?.ipAddress ?? null,
-        userAgent: metadata?.userAgent ?? null,
-      },
-    });
-  });
+        data: {
+          revokedAt: now,
+        },
+      });
+
+      // 3. Check if there is still an active session
+      const existingSession = await tx.session.findFirst({
+        where: {
+          userId: user.id,
+          revokedAt: null,
+        },
+      });
+
+      if (existingSession) {
+        throw new ActiveSessionExistsError();
+      }
+
+      // 4. Create new session, update user, write audit log
+      await tx.session.create({
+        data: {
+          id: sessionId,
+          sessionTokenHash,
+          userId: user.id,
+          expiresAt,
+          lastSeenAt: now,
+          ipAddress: metadata?.ipAddress ?? null,
+          userAgent: metadata?.userAgent ?? null,
+        },
+      });
+
+      await tx.user.update({
+        where: { id: user.id },
+        data: { lastLoginAt: now },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          eventKey: AuditEventKey.AUTH_LOGIN_SUCCESS,
+          actorUserId: user.id,
+          actorRole: primaryRole,
+          targetType: 'User',
+          targetId: user.id,
+          result: 'SUCCESS',
+          metadata: {
+            sessionId,
+          },
+          requestId: metadata?.requestId ?? null,
+          ipAddress: metadata?.ipAddress ?? null,
+          userAgent: metadata?.userAgent ?? null,
+        },
+      });
+    },
+    {
+      maxWait: 15000,
+      timeout: 20000,
+    }
+  );
 
   const rawUserWithRoles: RawDbUserWithRoles = {
     id: user.id,

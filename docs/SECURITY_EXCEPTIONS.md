@@ -237,3 +237,25 @@ The approved specifications for single active session enforcement (`TASK-0217`) 
 - No IoT Gateway deployment required.
 - No MQTT configuration changes required.
 - Staging environments must update the `web` service to reflect the middleware change.
+
+---
+
+## TASK-0506: Operational Overview Bento Dashboard & Environmental Weather Security Baseline
+
+*This section documents security audit verification and exception status for the operational dashboard redesign and weather integration (Recorded: 2026-09-02).*
+
+### 1. Security Exception Status
+- **Zero Security Exceptions Introduced:** The implementation introduces no security exemptions, bypasses, or relaxed controls.
+
+### 2. Geolocation Privacy & Zero-Browser Permissions
+- **Zero Client Geolocation Access:** Browser Geolocation API (`navigator.geolocation`) is completely disabled and unused.
+- **Fixed Hardcoded Coordinates:** Weather queries use immutable, serverless-safe, hardcoded farm coordinates (`Latitude: -7.172934`, `Longitude: 113.2257627`). No user location or device GPS data is collected, stored, or leaked.
+
+### 3. External API Isolation
+- **Client-Side Open-Meteo Integration:** Calls to `https://api.open-meteo.com` are anonymous, public, read-only GET requests requiring zero API keys, secrets, or privileged credentials.
+- **CORS & Network Safety:** Browser requests directly to Open-Meteo do not forward internal session tokens, authorization headers, or cookies.
+
+### 4. Fleet Overview Scoping & Canonical Concealment
+- **RBAC Enforcement:** Dashboard metrics derive strictly from `DeviceContext` backed by `GET /api/v1/devices`, honoring `requirePermission(session, 'device.read')` and active account status.
+- **Admin Canonical Identifier Concealment:** In accordance with `DEC-DEV-028`, Admin users receive only masked display labels without canonical `deviceId` exposure in DOM or payloads.
+

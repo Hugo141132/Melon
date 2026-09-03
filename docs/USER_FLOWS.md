@@ -1030,29 +1030,30 @@ The application does NOT provide a "Delete Device" flow. Device removal from the
 
 # 9. Monitoring Flows
 
-## Flow 23 — User Opens the Monitoring Dashboard
+## Flow 23 — User Opens the Operational Dashboard (TASK-0506 / DEC-UIUX-106)
 
 **Primary actor:** Owner or Admin
 **Preconditions:** Active authenticated session.
-**Trigger:** User opens dashboard.
+**Trigger:** User navigates to `/` or `/dashboard`.
 
 **Main success flow:**
 
 1. The server validates session and active account status (`requireActiveAccount`).
 2. The server loads devices within the user's scope: Owner receives global scope with canonical `deviceId` in safe DTO; Admin receives only active assignments (`revokedAt IS NULL`) with canonical `deviceId` strictly concealed (`DEC-DEV-028` / `TASK-0305`).
-3. The frontend loads dashboard shell and available devices.
-4. The frontend initializes in a neutral device state (`selectedDevice = null` per `DEC-DEV-029`) on fresh bare routes (`/`, `/sensor`, `/soil` without `?deviceId=`). No device is selected automatically on fresh load or login.
-5. When the user explicitly selects a device (via the `/sensor` device cards or the header `DeviceSelector`), the system sets shared `DeviceContext` and synchronizes the active route URL (`?deviceId=...`). Hard refresh (Ctrl+Shift+R) on a specific device route rehydrates that candidate after server-side authorization validation.
-6. The dashboard displays soil, water, tank, flow, status, and timestamp components for the explicitly selected device.
+3. The frontend loads the focused Bento dashboard shell (`DashboardView.tsx`).
+4. The top Hero section renders immediately with the user's localized greeting (`Selamat Datang, [Name]`), localized date, and operational node summary KPIs (Total Nodes, Online Nodes in solid agricultural green `#0d631b`, Offline/Stale Nodes).
+5. The full-width Environmental Weather Panel (`WeatherCard.tsx`) loads environmental metrics for the fixed farm location (`King Agrowisata`, `-7.172934, 113.2257627`) via Open-Meteo REST API without browser geolocation.
+6. Environmental parameters (Air Humidity in soft green tint, Wind Speed in subtle olive tint, UV Index in subtle warm amber tint) render without text truncation.
+7. Portal-like overview clutter (System Snapshot, Quick Actions, duplicate domain cards) and synthetic 92/100 health score are omitted. Detailed telemetry monitoring is navigated via `/sensor`, `/soil`, `/water`, and `/controls`.
 
-**Alternative flows:** No assigned devices; show dedicated empty state.
-**Error flows:** Unauthenticated request returns HTTP 401 `UNAUTHENTICATED`; non-active account returns HTTP 403 `ACCOUNT_NOT_ACTIVE`.
-**Postconditions:** Authorised monitoring context is visible.
-**Required permissions:** `device.read`, `monitoring.current.read`.
+**Alternative flows:** No assigned devices; device summary KPIs render 0 with weather panel fully functional.
+**Error flows:** Unauthenticated request returns HTTP 401 `UNAUTHENTICATED` (redirects to `/login`); non-active account returns HTTP 403 `ACCOUNT_NOT_ACTIVE` (redirects to `/status`).
+**Postconditions:** Operational overview is displayed with 0 emojis across all cards.
+**Required permissions:** `device.read`.
 **Relevant account statuses:** `ACTIVE`.
-**UI states:** Loading, dashboard, no devices, error.
+**UI states:** Loading (skeletons), loaded dashboard, empty devices, error.
 **Audit events:** Normally none.
-**Open decisions:** None. Neutral initial selection (`selectedDevice = null`) on bare routes with route-scoped rehydration on specific device routes (`DEC-DEV-029`).
+**Open decisions:** None. Resolved per `DEC-UIUX-106`.
 
 ---
 
@@ -2171,3 +2172,20 @@ The following facts are verified in the user flow implementations regarding `TAS
 - No IoT Gateway deployment required.
 - No MQTT configuration changes required.
 - Staging environments must update the `web` service to reflect the middleware change.
+
+---
+
+## Operational Overview Dashboard User Flows Note (TASK-0506 / Reconciled 2026-09-02)
+
+The operational dashboard user journey is reconciled to guarantee a distraction-free, premium monitoring overview:
+- **Direct Navigation (`/` and `/dashboard`):** Both routes render `DashboardView.tsx` directly without redirects.
+- **Immediate Visual Status:**
+  - The user immediately observes real-time operational device fleet counts (`Total`, `Online` in solid green `#0d631b`, `Offline/Stale`).
+  - The user reviews live local weather at `King Agrowisata` (`-7.172934, 113.2257627`) in a full-width panel with untruncated metrics (Humidity, Wind Speed, UV Index).
+- **Navigation to Granular Features:**
+  - Detailed sensor and telemetry inspection: navigated explicitly via `/sensor`, `/soil`, or `/water`.
+  - Irrigation and solenoid valve control: navigated explicitly via `/controls`.
+  - Account and session security: navigated explicitly via `/profile` and `/setting`.
+- **Zero Emoji Experience:** All status badges, headings, and metrics present a clean, professional aesthetic without emojis.
+<!-- TASK-0506 User Flows Reconciled: 2026-09-02 -->
+

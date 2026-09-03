@@ -2397,3 +2397,25 @@ Automated unit, database repository, IoT gateway event processor, device simulat
 - No IoT Gateway deployment required.
 - No MQTT configuration changes required.
 - Staging environments must update the `web` service to reflect the middleware change.
+
+---
+
+# 57. Operational Overview Dashboard & Fixed Weather Test Suite (TASK-0506 / Reconciled 2026-09-02)
+
+Automated unit, integration, and type safety verification for `TASK-0506`:
+
+### Agent-Executed Automated Tests (`apps/web/test/unit/dashboard-page.test.tsx`)
+- **Suite Pass Rate:** **6/6 tests passed (100%)**:
+  1. *Removal of Fake Health Score:* Asserts absence of `92/100`, "Excellent", or synthetic farm performance claims in rendered output.
+  2. *Fixed Coordinates & Open-Meteo Integration:* Asserts `WeatherCard` requests exact coordinates (`latitude=-7.172934&longitude=113.2257627`) for `King Agrowisata` and renders temperature, feels like, humidity, wind speed, and UV index.
+  3. *Operational Node Summary KPIs:* Asserts accurate rendering of Total registered nodes, Online connected nodes, and Offline / Stale nodes calculated from `useDeviceContext()`.
+  4. *Clutter Elimination:* Confirms portal-like sections (System Snapshot, Quick Actions) and redundant hero subtitle texts are removed.
+  5. *Route Parity:* Asserts identical `DashboardView` renders cleanly on `/` and `/dashboard` without HTTP redirects.
+  6. *Automated Unicode Emoji Scan:* Asserts zero emoji characters exist across all rendered greetings, card titles, and status labels.
+
+### Monorepo Quality Gates
+- **Static Typecheck:** `npm run typecheck` returned **0 errors** across all 4 monorepo workspaces (`@kebun-melon/web`, `@kebun-melon/iot-gateway`, `@kebun-melon/contracts`, `@kebun-melon/database`).
+- **Translation Completeness:** `npm run i18n:check` passed with 100% key parity across `messages/id.json` and `messages/en.json`.
+- **Prettier Code Style:** `npm run format:check` confirmed all files are 100% compliant.
+<!-- TASK-0506 Testing Reconciled: 2026-09-02 -->
+

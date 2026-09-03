@@ -483,3 +483,23 @@ The following frontend changes are audited and verified for `TASK-0217` (Profile
 - No IoT Gateway deployment required.
 - No MQTT configuration changes required.
 - Staging environments must update the `web` service to reflect the middleware change.
+
+---
+
+## Operational Overview Dashboard Frontend Audit Note (TASK-0506 / Reconciled 2026-09-02)
+
+The following frontend components were created, refactored, and audited for `TASK-0506`:
+- **`apps/web/components/dashboard/DashboardView.tsx` [NEW]:**
+  - Unified operational overview component rendered cleanly on both `/` (`apps/web/app/page.tsx`) and `/dashboard` (`apps/web/app/dashboard/page.tsx`).
+  - Implements vertical Bento hierarchy: Top Hero Overview card with greeting (`Selamat Datang, [Name]`), localized date, and 3 node summary cards (`Total Perangkat`, `Terhubung` in solid green `#0d631b`, `Terputus / Stale`).
+  - Renders the full-width `WeatherCard` in a dedicated section below the hero.
+- **`apps/web/components/dashboard/WeatherCard.tsx` [NEW]:**
+  - Self-contained environmental weather card bound to `FIXED_WEATHER_LOCATION` (`latitude: -7.172934`, `longitude: 113.2257627`, location name: `"King Agrowisata"`).
+  - Fetches Open-Meteo REST API on mount with 15-minute periodic auto-refresh and manual refresh button.
+  - Features smooth skeleton loading state (`weather-skeleton`), current temperature with "feels like" metric, localized condition badge, and 3-column metric cards with subtle semantic tints (Air Humidity in soft green, Wind Speed in subtle olive/neutral, UV Index in subtle warm amber).
+- **Component Pruning & Clutter Elimination:**
+  - Removed synthetic 92/100 health score component.
+  - Removed portal-like overview sections (`SystemSnapshot`, `QuickActions`, duplicate domain cards) from the root dashboard.
+- **Zero Emoji Compliance:** All icon representations use Lucide SVG components with zero unicode emoji characters.
+<!-- TASK-0506 Frontend Audit Reconciled: 2026-09-02 -->
+

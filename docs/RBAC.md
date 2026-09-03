@@ -1277,3 +1277,17 @@ The following role and authorization principles apply to verified self-email cha
 - No IoT Gateway deployment required.
 - No MQTT configuration changes required.
 - Staging environments must update the `web` service to reflect the middleware change.
+
+---
+
+## Operational Dashboard & Overview Scoping RBAC Note (TASK-0506 / Reconciled 2026-09-02)
+
+The operational overview dashboard (`/` and `/dashboard`) adheres strictly to server-side RBAC scoping rules:
+- **Universal Authenticated Access:** Both `OWNER` and `ADMIN` roles with `accountStatus = ACTIVE` can access `/` and `/dashboard`. Unauthenticated requests redirect to `/login`, and non-active accounts redirect to `/status`.
+- **Fleet Metric Role Scoping:**
+  - **Owner Scope:** Node summary KPIs (`devices.length`, `onlineDevicesCount`, `offlineOrStaleCount`) reflect all registered nodes across the farm.
+  - **Admin Scope:** Summary KPIs reflect strictly active assigned nodes (`user_device_access.revokedAt IS NULL`). Unassigned devices remain completely invisible and are excluded from all counts.
+- **Privacy & Canonical Concealment:** The dashboard presents aggregate node counts only; no raw identifiers or canonical `deviceId` strings are exposed in the overview cards (`DEC-DEV-028`).
+- **Environmental Weather Isolation:** The weather panel is an environmental metric component bound to static farm coordinates (`King Agrowisata`), completely decoupled from individual device authorization or role permissions.
+<!-- TASK-0506 RBAC Reconciled: 2026-09-02 -->
+

@@ -26,6 +26,7 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
   let adminUserId: string;
   let targetDeviceId: string;
   let createdDeviceByTest: boolean = false;
+  let originalConnectionStatus: string | null = null;
 
   async function selectLanguageIfGated(page: any, locale: 'id' | 'en' = 'id') {
     const label = locale === 'id' ? 'Bahasa Indonesia' : 'English';
@@ -86,12 +87,20 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
 
     // 2. Ensure test controllable device exists in DB
     const existingDevice = await prisma.device.findFirst({
-      where: { accountStatus: 'ACTIVE' },
+      where: { accountStatus: 'ACTIVE', deviceType: 'WATER_TANK_NODE' },
       include: { capabilities: true },
     });
 
     if (existingDevice) {
       targetDeviceId = existingDevice.id;
+      // Ensure target device is ONLINE for faucet control test flows
+      if (existingDevice.connectionStatus !== 'ONLINE') {
+        originalConnectionStatus = existingDevice.connectionStatus;
+        await prisma.device.update({
+          where: { id: targetDeviceId },
+          data: { connectionStatus: 'ONLINE' },
+        });
+      }
       // Ensure it has FAUCET_CONTROL capability
       const hasControl = existingDevice.capabilities.some((c) => c.capability === 'FAUCET_CONTROL');
       if (!hasControl) {
@@ -164,6 +173,11 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
     if (createdDeviceByTest && targetDeviceId) {
       await prisma.deviceCapability.deleteMany({ where: { deviceId: targetDeviceId } });
       await prisma.device.deleteMany({ where: { id: targetDeviceId } });
+    } else if (targetDeviceId && originalConnectionStatus && originalConnectionStatus !== 'ONLINE') {
+      await prisma.device.update({
+        where: { id: targetDeviceId },
+        data: { connectionStatus: originalConnectionStatus as any },
+      });
     }
 
     await prisma.$disconnect();

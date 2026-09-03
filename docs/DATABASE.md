@@ -1975,3 +1975,13 @@ The following facts are supported by the verified database interactions of the F
 - No IoT Gateway deployment required.
 - No MQTT configuration changes required.
 - Staging environments must update the `web` service to reflect the middleware change.
+
+---
+
+## Operational Overview Dashboard & Transaction Resilience Note (TASK-0506 / Reconciled 2026-09-02)
+
+The database interactions for `TASK-0506` are verified as follows:
+- **Zero Schema Migrations:** No alterations to PostgreSQL tables, schemas, relations, or indexes were introduced for the dashboard upgrade.
+- **Session Interactive Transaction Resilience:** In `packages/database/src/session-service.ts`, configured `prisma.$transaction(..., { maxWait: 15000, timeout: 20000 })` during user authentication and session creation. This prevents transaction timeout errors (`Transaction not found`) during high-latency remote database queries while preserving fail-closed single active session guarantees (`DEC-AUTH-107`).
+<!-- TASK-0506 Database Reconciled: 2026-09-02 -->
+

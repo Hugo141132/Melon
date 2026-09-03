@@ -362,6 +362,23 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
 - 21st.dev MCP: `NOT REQUIRED`
 - Summary: Reconciled real telemetry data binding across `/soil` and `/water` routes. Unified all 7 soil telemetry parameters (Nitrogen, Phosphorus, Potassium, Temperature, Moisture, pH, EC) into the single approved `SoilMetricMeter` visual card design. Reconciled parameter titles in Indonesian and English dictionaries (`messages/id.json`, `messages/en.json`) to remove redundant "Soil" / "Tanah" prefixes (`Nitrogen`, `Fosfor` / `Phosphorus`, `Kalium` / `Potassium`, `Suhu` / `Temperature`, `Kelembapan` / `Moisture`, `pH`, `EC`). Bound agreed units: NPK (`mg/kg`), pH (*no unit*), Moisture (`%RH`), Temperature (`°C`), EC (`µS/cm`), TDS (`ppm`). Completely removed fallback mock datasets (`NPK_TREND_DATA`, `EC_TREND_DATA`) from charts (`NPKChart`, `WaterNutrientChart`), ensuring empty series cleanly render empty notices (`Tidak ada data riwayat untuk rentang waktu ini.`) without fake graph lines. Enforced stale telemetry suppression: when telemetry is stale (`isStale: true` or `connectionStatus: STALE`), numerical sensor values are suppressed and rendered as `'-'` with `0%` gauge fills, active status quotes are hidden, and the prominent Stale Alert Banner (`Update: Real-Time: Kedaluwarsa`) is displayed while preserving `lastSeenAt`/`recordedAt` timestamps. Restored homepage (`/`) overview isolation by removing embedded `MonitoringDashboard`. Verified 100% test pass rate across 33 unit test files (251/251 tests) and TypeScript typecheck (0 errors).
 
+#### TASK-0506 Governance Record
+
+`TASK-0506` operational overview bento dashboard & environmental weather integration record:
+- Status: `DONE` (Completed 2026-09-02)
+- Frontend impact: `MINOR`
+- Selected UI direction: `Premium Minimal Ops`
+- Existing color template: `UNCHANGED`
+- Selected motion effects: `Card hover`, `Skeleton loading`
+- 21st.dev MCP: `NOT REQUIRED`
+- Summary: Redesigned the root overview dashboard (`/` and `/dashboard`) into a focused operational Bento dashboard adhering strictly to `Premium Minimal Ops` and `DEC-UIUX-106`.
+  - **Layout & Structure**: Top Hero Overview card with real-time operational greeting, localized date, and 3-column node summary metrics (Total, Online in solid green `#0d631b`, Offline/Stale), followed by a full-width environmental weather panel below. Removed all portal-like clutter (System Snapshot, Quick Actions, duplicate domain cards, fleet directory) to maintain clean operational focus.
+  - **Environmental Weather Integration**: Implemented `WeatherCard.tsx` connecting directly to Open-Meteo REST API using fixed farm coordinates (`Latitude: -7.172934`, `Longitude: 113.2257627`) for `"King Agrowisata"`. Displays temperature, apparent temperature, WMO weather interpretation, and a 3-column sub-metrics grid featuring subtle semantic tints: Air Humidity in soft agricultural green (`bg-app-primary-fixed/20 border-app-primary/25`), Wind Speed in subtle neutral/olive (`bg-app-outline-variant/20 border-app-outline-variant/45`), and UV Index in subtle warm harvest amber (`bg-app-tertiary-fixed/35 border-app-tertiary/25`). Removed "Live Weather" badge text; zero browser geolocation API access used.
+  - **Fake Health Score Pruning**: Permanently removed synthetic `92/100` health score gauge, "Excellent" indicator, and fake optimal condition claims.
+  - **Zero Emoji Policy**: Enforced 100% SVG icon token usage (Lucide icons); zero Unicode emojis across headings, greetings, labels, badges, or translation files.
+  - **Session Resilience**: Hardened transaction timeout in `packages/database/src/session-service.ts` to `{ maxWait: 15000, timeout: 20000 }` to avoid Prisma transaction aborts during remote database pool latency while strictly preserving atomic single active session row locks (`SELECT ... FOR UPDATE`).
+  - **Verification**: Verified 100% test pass rate in `apps/web/test/unit/dashboard-page.test.tsx` (6/6 passing including automated emoji scan), 100% translation key parity (`npm run i18n:check`), Prettier code style (`npm run format:check`), and monorepo TypeScript typecheck (0 errors across 4 workspaces).
+
 #### TASK-0601 Governance Record
 
 `TASK-0601` I18N infrastructure & configuration record:

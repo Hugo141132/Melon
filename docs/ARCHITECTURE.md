@@ -1816,3 +1816,21 @@ The following architectural specifications define the verified security and prof
 - No IoT Gateway deployment required.
 - No MQTT configuration changes required.
 - Staging environments must update the `web` service to reflect the middleware change.
+
+---
+
+## Operational Overview Dashboard Architecture Note (TASK-0506 / Reconciled 2026-09-02)
+
+The system architecture cleanly delineates top-level operational overview from specialized domain workflows:
+1. **Root Overview Isolation:**
+   - Routes `/` and `/dashboard` render `DashboardView.tsx`, providing a focused high-level status summary (user greeting, date, aggregate node metrics, and environmental weather at `King Agrowisata`).
+   - Portal clutter (System Snapshot, Quick Actions, duplicate domain cards) and synthetic claims (92/100 health score) are omitted from the overview architecture.
+2. **Dedicated Domain Page Architecture:**
+   - Sensor fleet inspection is dedicated to `/sensor`.
+   - Bounded historical telemetry charts and real-time sensor streams are dedicated to `/soil` and `/water`.
+   - Solenoid valve irrigation control and actuator command history are dedicated to `/controls`.
+   - Account and session security are dedicated to `/profile` and `/setting`.
+3. **External Weather Component Architecture:**
+   - `WeatherCard.tsx` is an isolated presentation-layer component communicating directly with Open-Meteo REST API using fixed farm coordinates (`-7.172934, 113.2257627`). Zero backend routing, zero database persistence, and zero browser geolocation APIs are involved.
+<!-- TASK-0506 Architecture Reconciled: 2026-09-02 -->
+

@@ -35,6 +35,7 @@
 | `PRD-FR-023` | Soil monitoring metrics display | `docs/PRD.md` | `DEC-MON-036` | `TASK-0501` | `TEST-API-003` | `VERIFIED` |
 | `PRD-FR-024` | Self-service verified email address change | `docs/PRD.md` | `DEC-AUTH-106` | `TASK-0216` | `TEST-API-001` | `VERIFIED` |
 | `PRD-FR-025` | Single active session enforcement per account | `docs/PRD.md` | `DEC-AUTH-107` | `TASK-0217` | `TEST-SEC-001` | `VERIFIED` |
+| `PRD-FR-040` | Operational overview Bento dashboard and environmental weather | `docs/PRD.md` | `DEC-UIUX-106` | `TASK-0506` | `TEST-UI-006` | `VERIFIED` |
 | `SEC-AUTH-006` | Email change token scoping and non-sensitive audit logging | `docs/SECURITY.md` | `DEC-AUTH-106` | `TASK-0216` | `TEST-SEC-005` | `VERIFIED` |
 | `SEC-AUTH-007` | Atomic single active session verification and race-safe login rejection | `docs/SECURITY.md` | `DEC-AUTH-107` | `TASK-0217` | `TEST-SEC-001` | `VERIFIED` |
 | `SEC-DATA-003` | Content Security Policy (CSP) and security headers | `docs/SECURITY.md` | - | `TASK-0901` | `TEST-SEC-005` | `IMPLEMENTED` |
@@ -386,4 +387,25 @@ The following facts are verified in the traceability matrix regarding `TASK-0807
   - Verified 100% test pass rate in `apps/web/test/unit/faucet-control-ui.test.tsx` (27/27 tests passed).
   - Monorepo TypeScript type checking passed with 0 errors across 4 workspaces (`tsc --noEmit`).
 <!-- Faucet Control Loading Strategy Traceability Reconciled: 2026-09-02 -->
+
+---
+
+## Operational Overview Bento Dashboard & Environmental Weather Traceability Note (Reconciled 2026-09-02)
+
+The following facts are verified in the traceability matrix regarding `TASK-0506` (Operational Overview Bento Dashboard & Environmental Weather Integration):
+- **Traceability Baseline:** Defined under `PRD-FR-040`, `DEC-UIUX-106`, and `UI_UX.md` to provide a focused, high-density Bento dashboard layout displaying real-time system greetings, localized time, role-scoped fleet operational metrics, and client-side environmental weather without duplicating dedicated sensor/device monitoring views.
+- **Implementation Status:** `TASK-0506` is fully implemented and verified:
+  - Built unified Bento client view (`apps/web/components/dashboard/DashboardView.tsx`) rendered identically across `/` and `/dashboard`.
+  - Built standalone environmental weather component (`apps/web/components/dashboard/WeatherCard.tsx`) querying Open-Meteo REST API using fixed farm coordinates (`Latitude: -7.172934`, `Longitude: 113.2257627`) for `"King Agrowisata"`.
+  - Enforced zero-emoji policy across all presentation layers and translation bundles (`messages/id.json`, `messages/en.json`).
+  - Pruned synthetic health scores (`92/100`), quick action cards, and duplicate domain links.
+- **Architectural & Security Invariance:**
+  - Zero database schema alterations and zero security exceptions.
+  - Session login transaction timeout hardened in `packages/database/src/session-service.ts` to `{ maxWait: 15000, timeout: 20000 }` to withstand remote pool latency while preserving single active session locks (`SELECT ... FOR UPDATE`).
+- **Automated Verification:**
+  - Automated unit tests in `apps/web/test/unit/dashboard-page.test.tsx` passed (6/6 tests passed).
+  - Translation parity verified at 100% via `npm run i18n:check`.
+  - Monorepo TypeScript type checking passed with 0 errors across 4 workspaces (`tsc --noEmit`).
+<!-- Operational Overview Dashboard Traceability Reconciled: 2026-09-02 -->
+
 

@@ -1427,3 +1427,28 @@ The water dispensing and manual valve confirmation modal (`FaucetConfirmationMod
 - No IoT Gateway deployment required.
 - No MQTT configuration changes required.
 - Staging environments must update the `web` service to reflect the middleware change.
+
+---
+
+## Operational Overview Dashboard & Bento Layout UI/UX Note (TASK-0506 / Reconciled 2026-09-02)
+
+The root overview dashboard (`/` and `/dashboard`) has been upgraded to a focused, premium operational console adhering strictly to design governance:
+- **Frontend Impact:** `MINOR`
+- **Selected UI Direction:** `Premium Minimal Ops` (and Soft Bento layout)
+- **Existing Color Template:** `UNCHANGED` (Authoritative MD3 Forest Green tokens: `app-primary: #0d631b`, `app-primary-fixed: #a3f69c`, `app-outline-variant: #bfcaba`, `app-tertiary: #884200`, `app-tertiary-fixed: #ffdcc6`, `app-surface-container-lowest: #ffffff`)
+- **Selected Motion Effects:** `Card hover`, `Button hover`, `Skeleton loading`
+- **21st.dev MCP:** `NOT REQUIRED` (streamlined existing dashboard layout and components without introducing external dependencies)
+- **Vertical Bento Grid Hierarchy:**
+  - **Top Section (Hero & Node Summary):** High-contrast header card with clean greeting (`Selamat Datang, [Name]`), localized date string, and 3-column node status KPI metrics:
+    - *Total Nodes:* Neutral container surface.
+    - *Online Connected Nodes:* Solid agricultural green (`#0d631b`) with white text and vibrant fixed badge for strong visual identity.
+    - *Offline / Stale Nodes:* Neutral container surface with subtle indicator.
+  - **Below Section (Environmental Weather Panel):** Full-width card (`WeatherCard.tsx`) rendering live weather at `King Agrowisata` (`-7.172934, 113.2257627`). Moving the panel below the hero provides full desktop horizontal width, completely resolving prior text truncation on "Kelembapan Udara" and "Kecepatan Angin".
+- **Semantic Weather Metric Tints:**
+  - *Air Humidity:* Soft agricultural green tint (`bg-app-primary-fixed/20 border-app-primary/25`).
+  - *Wind Speed:* Subtle neutral / olive tint (`bg-app-outline-variant/20 border-app-outline-variant/45`).
+  - *UV Index:* Subtle warm harvest amber tint (`bg-app-tertiary-fixed/35 border-app-tertiary/25`).
+- **Zero Emoji Governance:** All emojis are completely banned from UI code and translation dictionaries; professional Lucide icons (`MapPin`, `Droplets`, `Wind`, `Sun`, `Cpu`, `Activity`, `Cloud`, etc.) provide clean visual semantics.
+- **Section Clean-Up:** Removed synthetic 92/100 health score and portal-like sections (System Snapshot, Quick Actions, duplicate domain cards) from the root dashboard.
+<!-- TASK-0506 UI/UX Reconciled: 2026-09-02 -->
+

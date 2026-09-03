@@ -723,3 +723,20 @@ The following facts are supported by the verified decisions governance of `TASK-
 - No IoT Gateway deployment required.
 - No MQTT configuration changes required.
 - Staging environments must update the `web` service to reflect the middleware change.
+
+---
+
+## DEC-UIUX-106: Operational Overview Bento Dashboard, Fixed Environmental Weather, and Zero-Emoji Policy
+- **Status:** APPROVED
+- **Context:** The root overview dashboard (`/` and `/dashboard`) previously contained synthetic metrics (a fake 92/100 health score with hardcoded optimal status claims), portal-like duplicate sections (System Snapshot, Quick Actions, and duplicate domain cards) that created cognitive clutter, text truncation on environmental weather labels ("Kelembapan Udara" and "Kecepatan Angin") due to narrow column widths, and inconsistent emoji usage.
+- **Decision:**
+  1. **Permanent Removal of Synthetic Metrics:** Removed the 92/100 health score gauge and synthetic optimal farm status claims. The dashboard presents strictly authentic operational fleet data.
+  2. **Vertical Bento Layout Hierarchy:** Structured the overview into two clean sections:
+     - **Top Section (Hero & Node Summary):** High-contrast header card with user greeting (`Selamat Datang, [Name]`), localized date, and 3-column node status KPI metrics (Total Registered Nodes, Online Nodes in solid agricultural green `#0d631b`, and Offline / Stale Nodes). Redundant placeholder subtitles (`"Real-Time System"`) are removed.
+     - **Below Section (Full-Width Weather Panel):** Positioned `WeatherCard.tsx` in a full-width container below the hero card, providing ample horizontal space to render all environmental parameters without label truncation.
+  3. **Fixed Environmental Weather Integration (`King Agrowisata`):** Bound strictly to static farm coordinates (Latitude `-7.172934`, Longitude `113.2257627`) for `King Agrowisata` via public Open-Meteo REST API. Browser geolocation APIs are completely banned. "Live Weather" badge text is removed.
+  4. **Semantic Weather Metric Card Tints:** Applied subtle semantic color tints using project design tokens (Air Humidity in soft green `bg-app-primary-fixed/20 border-app-primary/25`, Wind Speed in subtle olive/neutral `bg-app-outline-variant/20 border-app-outline-variant/45`, UV Index in subtle warm harvest amber `bg-app-tertiary-fixed/35 border-app-tertiary/25`).
+  5. **Zero-Emoji Policy:** Banned all unicode emojis across UI components and translation dictionaries in favor of standard Lucide SVG icons.
+  6. **Overview Scope Boundaries:** Detailed telemetry charts and sensor fleet directories remain dedicated to `/sensor`, `/soil`, `/water`, and `/controls`.
+<!-- TASK-0506 Reconciled: 2026-09-02 -->
+

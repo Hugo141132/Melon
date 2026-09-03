@@ -1209,3 +1209,18 @@ The following product requirements define the security and profile management ca
 - No IoT Gateway deployment required.
 - No MQTT configuration changes required.
 - Staging environments must update the `web` service to reflect the middleware change.
+
+---
+
+## Operational Overview Dashboard & Environmental Weather Implementation Note (TASK-0506 / Reconciled 2026-09-02)
+
+The following product requirements define the authenticated root dashboard (`/` and `/dashboard`) operational experience:
+- **`PRD-FR-040` (Operational Overview Dashboard & Fixed Environmental Weather):**
+  - **Focused Bento Composition:** The authenticated homepage presents a streamlined operational summary without duplicating detailed telemetry charts or device registries.
+  - **Top Hero Overview:** Displays a clean user greeting (`Selamat Datang, [Name]`), localized full date, and real-time operational device summary KPIs (Total Registered Nodes, Online Nodes in solid agricultural green `#0d631b`, Offline/Stale Nodes). Redundant placeholder subtitle texts (`"Real-Time System"`, `"Real-time soil, water quality, and reservoir telemetry"`) are permanently removed.
+  - **Fixed Environmental Weather Panel (`King Agrowisata`):** Positioned below the hero card as a full-width panel to display environmental parameters (Air Humidity, Wind Speed, UV Index) without label truncation. Bound strictly to static farm coordinates (Latitude `-7.172934`, Longitude `113.2257627`) via Open-Meteo REST API with zero browser geolocation tracking.
+  - **Visual & Semantic Hierarchy:** "Live Weather" badge text removed in favor of clean location identity. Weather metric cards utilize subtle semantic token tints (Air Humidity in soft green, Wind Speed in subtle olive/neutral, UV Index in subtle warm amber).
+  - **Zero Emoji Policy:** All emoji characters across headings, greetings, labels, and status badges are replaced with professional Lucide SVG icons.
+  - **Removal of Synthetic Metrics & Section Clutter:** The synthetic 92/100 health score gauge and portal-like sections (System Snapshot, Quick Actions, duplicate domain cards) are completely removed, keeping detailed sensor workflows dedicated to `/sensor`, `/soil`, `/water`, and `/controls`.
+<!-- TASK-0506 PRD Reconciled: 2026-09-02 -->
+
