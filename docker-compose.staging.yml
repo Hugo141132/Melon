@@ -1,0 +1,61 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: kebun-melon-staging-web
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    env_file:
+      - path: .env.staging
+        required: false
+    environment:
+      - NODE_ENV=production
+      - APP_ENV=staging
+      - PORT=3000
+      - HOSTNAME=0.0.0.0
+      - INTERNAL_GATEWAY_URL=http://iot-gateway:3001
+      - ENABLE_FAUCET_CONTROL=false
+    networks:
+      - melon-staging-network
+    depends_on:
+      iot-gateway:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -f http://localhost:3000/health || exit 1']
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  iot-gateway:
+    build:
+      context: .
+      dockerfile: apps/iot-gateway/Dockerfile
+    container_name: kebun-melon-staging-gateway
+    restart: unless-stopped
+    ports:
+      - '3001:3001'
+    env_file:
+      - path: .env.staging
+        required: false
+    environment:
+      - NODE_ENV=production
+      - APP_ENV=staging
+      - PORT=3001
+      - HOST=0.0.0.0
+      - WEB_APP_URL=http://web:3000
+      - ENABLE_FAUCET_CONTROL=false
+    networks:
+      - melon-staging-network
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -f http://localhost:3001/health || exit 1']
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+networks:
+  melon-staging-network:
+    driver: bridge

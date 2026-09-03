@@ -1985,3 +1985,17 @@ The database interactions for `TASK-0506` are verified as follows:
 - **Session Interactive Transaction Resilience:** In `packages/database/src/session-service.ts`, configured `prisma.$transaction(..., { maxWait: 15000, timeout: 20000 })` during user authentication and session creation. This prevents transaction timeout errors (`Transaction not found`) during high-latency remote database queries while preserving fail-closed single active session guarantees (`DEC-AUTH-107`).
 <!-- TASK-0506 Database Reconciled: 2026-09-02 -->
 
+---
+
+## Staging Database Migration Alignment & Schema Status (TASK-1012 / Reconciled 2026-09-03)
+
+The following database migration facts and staging schema alignment actions are verified for `TASK-1012` (Containerized Staging Architecture):
+- **Staging Database Target:** Dedicated Supabase PostgreSQL project `scqrbtfilmttqrutynyo` connected via Supavisor pooler `aws-0-ap-south-1.pooler.supabase.com:6543?pgbouncer=true` (runtime) and port `5432` (session pooler for migration advisory locks).
+- **Prisma Migration Alignment:** Synchronized the Supabase Staging schema with all 10 repository migrations by deploying the two pending additive migrations:
+  1. `20260820000000_add_session_user_active_index`: Created composite index `sessions_user_active_idx` on `sessions(user_id, revoked_at, expires_at)` to optimize active session verification queries (`DEC-AUTH-107`).
+  2. `20260829170000_add_pending_email_to_email_verification_tokens`: Added nullable column `pending_email VARCHAR(320)` to `email_verification_tokens` to support the verified self-service email change workflow (`DEC-AUTH-106`).
+- **Migration Safety & Integrity:** Both migrations are strictly additive and non-destructive. Existing data, tokens, and active sessions were preserved with zero table drops and zero locking downtime.
+- **Verification Status:** Querying `_prisma_migrations` confirms all 10 migrations are successfully applied (`finished_at` recorded) on Supabase Staging. Schema matches `packages/database/prisma/schema.prisma` with zero drift.
+<!-- TASK-1012 Database Reconciled: 2026-09-03 -->
+
+

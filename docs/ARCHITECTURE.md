@@ -143,15 +143,15 @@ flowchart LR
 1. **Soil & Water Quality Telemetry**: Equipment sends REST API calls over Wi-Fi directly to backend REST endpoints (`W`), which validate, persist (`DB`), and emit real-time updates (`R`).
 2. **Reservoir-Water Telemetry & Control**: Reservoir nodes connect via MQTT 5.0 over TLS to the EMQX broker (`M`). The IoT Gateway (`G`) ingests messages, validates payloads, persists to PostgreSQL (`DB`), and handles faucet commands.
 
-#### 4.1.1 Gateway Connectivity Topology & Runtime Isolation (TASK-0914)
+#### 4.1.1 Gateway Connectivity Topology & Runtime Isolation (TASK-0914, TASK-1012)
 
-- **Direct EMQX Cloud TLS Connectivity:** Both local development gateways (`APP_ENV=development`) and Railway staging gateways (`APP_ENV=staging`) connect **directly to EMQX Cloud** over TLS (`mqtts://` port 8883 / `wss://` port 8084). Railway staging serves purely as a distinct cloud deployment and is never an MQTT proxy or intermediary for local development.
+- **Direct EMQX Cloud TLS Connectivity:** Both local development gateways (`APP_ENV=development`) and containerized staging gateways (`APP_ENV=staging`, `TASK-1012`) connect **directly to EMQX Cloud** over TLS (`mqtts://` port 8883 / `wss://` port 8084). Railway PaaS is formally decommissioned and is neither an MQTT proxy nor a hosting platform for the system.
 - **Environment & Topic Namespace Isolation:** Topics are strictly partitioned by environment namespace (`agriculture/development/...` vs `agriculture/staging/...` vs `agriculture/production/...`).
 - **Client ID Isolation:** Development gateway defaults to `gateway-kebun-melon-dev-local-01` and staging uses `gateway-kebun-melon-staging-*`; development simulators use `sim-${tankDeviceId}-${random}`, preventing broker session takeover or disconnect collisions with physical hardware.
 - **Simulator Dynamic Identity:** Simulator device IDs are resolved at runtime via CLI flags (`--tank-device-id`, `--device-id`) or environment variables (`MQTT_TANK_DEVICE_ID`, `MQTT_DEVICE_ID`). No canonical device IDs are hardcoded in source code. Topic `deviceId` and payload `deviceId` strictly match.
 - **Offline Fallback:** Local Docker Eclipse Mosquitto is retained as an explicit, optional offline development fallback only.
 - **Safety Defaults:** `ENABLE_FAUCET_CONTROL=false` is enforced across all environments.
-- **Verification Status:** Live gateway/EMQX/canonical-device runtime ingestion passed. Monitoring UI smoke testing was intentionally deferred/skipped. Staging requires no update or redeployment.
+- **Verification Status:** Live gateway/EMQX/canonical-device runtime ingestion passed. Staging runs via containerized Docker Compose (`docker-compose.staging.yml`) connected to cloud Supabase Staging and EMQX Cloud Staging.
 
 
 ---
@@ -1830,3 +1830,26 @@ The system architecture cleanly delineates top-level operational overview from s
    - `WeatherCard.tsx` is an isolated presentation-layer component communicating directly with Open-Meteo REST API using fixed farm coordinates (`-7.172934, 113.2257627`). Zero backend routing, zero database persistence, and zero browser geolocation APIs are involved.
 <!-- TASK-0506 Architecture Reconciled: 2026-09-02 -->
 
+---
+
+## Containerized Staging Architecture & Railway Decommissioning Note (TASK-1012 / Reconciled 2026-09-03)
+
+The staging environment is formally decoupled from Railway PaaS and transitioned to a containerized Docker-based architecture:
+1. **PaaS Decommissioning**: Railway services (`melon-monitor.up.railway.app` and `iot-melon-g4t3.up.railway.app`) are decommissioned. All deployment and testing dependencies on Railway are eliminated.
+2. **Containerized Staging Model (`docker-compose.staging.yml`)**:
+   - **`web` Service**: Next.js 16 standalone multi-stage Alpine container (`apps/web/Dockerfile`) serving port 3000. Traces dependencies from monorepo packages, runs as unprivileged user `nextjs` (UID 1001), and provides liveness healthcheck via `GET /health`.
+   - **`iot-gateway` Service**: Fastify + MQTT multi-stage Alpine container (`apps/iot-gateway/Dockerfile`) serving port 3001. Runs as unprivileged user `gateway` (UID 1001) with liveness healthcheck via `GET /health`.
+   - **Bridge Network**: Services communicate securely via isolated bridge network `melon-staging-network` using internal container DNS (`http://iot-gateway:3001` and `http://web:3000`).
+3. **Cloud Infrastructure Integration**:
+   - Database remains cloud Supabase PostgreSQL Staging (`scqrbtfilmttqrutynyo`) via Supavisor pooler (port 6543).
+   - MQTT Broker remains EMQX Cloud Staging cluster over TLS (`mqtts://` port 8883 / `wss://` port 8084) using dedicated staging topic hierarchy (`agriculture/staging/...`).
+4. **Prisma Staging Migration Alignment**:
+   - Deployed the two pending additive migrations to Supabase Staging (`scqrbtfilmttqrutynyo`) to synchronize the database schema with the repository:
+     - `20260820000000_add_session_user_active_index` (composite index `sessions_user_active_idx`).
+     - `20260829170000_add_pending_email_to_email_verification_tokens` (nullable `pending_email VARCHAR(320)`).
+   - Confirmed all 10 repository migrations are fully applied on Supabase Staging with zero schema drift.
+5. **Docker Build & Runtime Validation**:
+   - Resolved Docker build layer dependencies: schema copying in `deps` stage ensures `npm ci` executes `prisma generate` cleanly; `scripts/` directory in `builder` stage supports Next.js TypeScript type checking during standalone builds; recursive `.dockerignore` prevents workstation build caches and local node_modules from inflating the build context.
+   - Both Docker images (`web` and `iot-gateway`) built cleanly with exit code 0.
+   - Staging runtime startup verified using `docker compose -f docker-compose.staging.yml up` with `ENABLE_FAUCET_CONTROL=false` strictly enforced and zero committed secrets.
+<!-- TASK-1012 Architecture Reconciled: 2026-09-03 -->

@@ -1,0 +1,69 @@
+# Git & Version Control
+**/.git
+**/.github
+
+# IDE, Agent & Tooling Artifacts
+**/.agents
+**/.gemini
+**/.cursor
+**/.claude
+**/.vscode
+**/.idea
+**/.fleet
+
+# Dependencies
+**/node_modules
+
+# Build & Compilation Outputs
+**/dist
+**/.next
+**/out
+**/build
+**/.turbo
+**/.swc
+**/.vite
+**/*.tsbuildinfo
+**/.eslintcache
+
+# Testing & Coverage Artifacts
+**/coverage
+**/test-results
+**/playwright-report
+**/blob-report
+**/.playwright
+**/.playwright-mcp
+**/.nyc_output
+**/.vitest
+**/.vitest-cache
+e2e
+
+# Secrets, Credentials & Certificates
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.staging.example
+**/*.pem
+**/*.key
+**/*.crt
+**/*.cert
+**/*.pfx
+**/*.p12
+
+# Logs & Debugging
+**/*.log
+**/npm-debug.log*
+**/yarn-debug.log*
+**/pnpm-debug.log*
+
+# Documentation & Orchestration (not bundled in containers)
+docs
+docker-compose*.yml
+
+# OS & Temporary Caches
+**/.DS_Store
+**/Thumbs.db
+**/desktop.ini
+**/.tmp
+**/.cache
+**/tmp
+**/scratch

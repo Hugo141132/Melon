@@ -1,4 +1,9 @@
+import path from 'path';
+import { fileURLToPath } from 'url';
 import createNextIntlPlugin from 'next-intl/plugin';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /** @type {import('next').NextConfig} */
 const isProd = process.env.NODE_ENV === 'production' || process.env.APP_ENV === 'production';
@@ -35,6 +40,8 @@ if (isProd) {
 }
 
 const nextConfig = {
+  output: 'standalone',
+  outputFileTracingRoot: path.join(__dirname, '../../'),
   serverExternalPackages: ['@node-rs/argon2'],
   images: {
     remotePatterns: [

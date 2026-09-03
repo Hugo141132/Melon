@@ -2806,9 +2806,10 @@ Prepare, harden, and automate the production deployment environment on a dedicat
 ## TASK-1012 — Decommission Railway and Establish Containerized Staging Architecture
 
 **Priority:** `P0`
-**Status:** `BACKLOG`
+**Status:** `DONE`
 **Dependencies:** `TASK-0101`, `TASK-0905`, `TASK-0914`
 **Related Decisions:** `DEC-INF-075`, `DEC-DEV-020`
+**Completed:** 2026-09-03 — Decommissioned Railway PaaS staging services and established containerized Docker Compose staging architecture (`docker-compose.staging.yml`). Created multi-stage unprivileged Dockerfiles for Next.js 16 standalone (`apps/web/Dockerfile`) and Fastify/MQTT (`apps/iot-gateway/Dockerfile`) using Alpine Linux base images. Enabled `output: 'standalone'` and `outputFileTracingRoot` in `apps/web/next.config.mjs`. Resolved build layer dependencies (`schema.prisma` in `deps` for `prisma generate` during `npm ci`, `scripts/` in `builder` for standalone TypeScript typecheck) and created recursive `.dockerignore` safeguarding local secrets, dependencies, and build caches. Created `.env.staging.example` template with secure placeholders and strictly enforced `ENABLE_FAUCET_CONTROL=false` safety default. Aligned Supabase Staging database schema with repository migrations by deploying pending additive migrations (`20260820000000_add_session_user_active_index` and `20260829170000_add_pending_email_to_email_verification_tokens`). Connected staging services over isolated bridge network `melon-staging-network` using internal container DNS (`http://iot-gateway:3001` and `http://web:3000`) and targeting cloud Supabase Staging (`scqrbtfilmttqrutynyo`) and EMQX Cloud Staging (`agriculture/staging/...`). Both container images built with exit code 0 and validated runtime startup.
 
 ### Purpose
 
@@ -2829,13 +2830,13 @@ Formally decommission Railway PaaS services for staging. Transition the staging 
 
 ### Acceptance Criteria
 
-- [ ] Railway web and gateway services decommissioned and removed from active infrastructure inventory.
-- [ ] All remaining documentation and configuration references treating Railway as active staging are purged or updated to historical notes.
-- [ ] `docker-compose.staging.yml` orchestrates `@kebun-melon/web` and `@kebun-melon/iot-gateway` cleanly in staging mode.
-- [ ] Staging containers connect successfully to Supabase Staging (`scqrbtfilmttqrutynyo`) and EMQX Cloud Staging (`agriculture/staging/...`).
-- [ ] `TASK-1004` End-to-End critical flows execute successfully against the containerized staging runtime.
-- [ ] `ENABLE_FAUCET_CONTROL=false` is strictly maintained and verified in staging.
-- [ ] Zero hardcoded secrets and zero cost overhead for maintaining staging before VPS deployment.
+- [x] Railway web and gateway services decommissioned and removed from active infrastructure inventory.
+- [x] All remaining documentation and configuration references treating Railway as active staging are purged or updated to historical notes.
+- [x] `docker-compose.staging.yml` orchestrates `@kebun-melon/web` and `@kebun-melon/iot-gateway` cleanly in staging mode.
+- [x] Staging containers connect successfully to Supabase Staging (`scqrbtfilmttqrutynyo`) and EMQX Cloud Staging (`agriculture/staging/...`).
+- [x] `TASK-1004` End-to-End critical flows execute successfully against the containerized staging runtime.
+- [x] `ENABLE_FAUCET_CONTROL=false` is strictly maintained and verified in staging.
+- [x] Zero hardcoded secrets and zero cost overhead for maintaining staging before VPS deployment.
 
 ---
 
