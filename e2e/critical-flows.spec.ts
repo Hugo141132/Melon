@@ -173,7 +173,11 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
     if (createdDeviceByTest && targetDeviceId) {
       await prisma.deviceCapability.deleteMany({ where: { deviceId: targetDeviceId } });
       await prisma.device.deleteMany({ where: { id: targetDeviceId } });
-    } else if (targetDeviceId && originalConnectionStatus && originalConnectionStatus !== 'ONLINE') {
+    } else if (
+      targetDeviceId &&
+      originalConnectionStatus &&
+      originalConnectionStatus !== 'ONLINE'
+    ) {
       await prisma.device.update({
         where: { id: targetDeviceId },
         data: { connectionStatus: originalConnectionStatus as any },

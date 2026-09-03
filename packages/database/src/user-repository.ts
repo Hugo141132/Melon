@@ -281,6 +281,18 @@ export type RejectAdminResult =
       currentStatus?: AccountStatus;
     };
 
+/**
+ * Hardened transaction options for repository interactive transactions.
+ * Configures maxWait=15s and timeout=30s to withstand remote database pool latency
+ * (e.g. Supabase poolers over TLS) across multi-step transactions while preserving
+ * RepeatableRead isolation.
+ */
+const DEFAULT_TRANSACTION_OPTIONS = {
+  isolationLevel: 'RepeatableRead' as const,
+  maxWait: 15000,
+  timeout: 30000,
+};
+
 export class UserRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
@@ -553,132 +565,127 @@ export class UserRepository {
    */
   async approvePendingAdmin(input: ApproveAdminInput): Promise<ApproveAdminResult> {
     try {
-      const txResult = await this.prisma.$transaction(
-        async (tx) => {
-          // 1. Fetch user to verify current state
-          const targetUser = await tx.user.findUnique({
-            where: { id: input.targetUserId },
-            select: {
-              id: true,
-              fullName: true,
-              email: true,
-              username: true,
-              accountStatus: true,
-              emailVerifiedAt: true,
-              createdAt: true,
-              updatedAt: true,
-            },
-          });
+      const txResult = await this.prisma.$transaction(async (tx) => {
+        // 1. Fetch user to verify current state
+        const targetUser = await tx.user.findUnique({
+          where: { id: input.targetUserId },
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            username: true,
+            accountStatus: true,
+            emailVerifiedAt: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        });
 
-          if (!targetUser) {
-            return {
-              success: false as const,
-              error: 'USER_NOT_FOUND' as const,
-              message: `Target user with ID '${input.targetUserId}' does not exist.`,
-            };
-          }
-
-          if (targetUser.accountStatus !== AccountStatus.PENDING_APPROVAL) {
-            return {
-              success: false as const,
-              error: 'INVALID_STATUS' as const,
-              message: `Target user is in status '${targetUser.accountStatus}', not PENDING_APPROVAL. Approval cannot be processed.`,
-              currentStatus: targetUser.accountStatus as AccountStatus,
-            };
-          }
-
-          if (!targetUser.emailVerifiedAt) {
-            return {
-              success: false as const,
-              error: 'INVALID_STATUS' as const,
-              message:
-                'Target user email has not been verified. Approval cannot be processed until email is verified.',
-              currentStatus: targetUser.accountStatus as AccountStatus,
-            };
-          }
-
-          // 2. Update account status to ACTIVE (Owner approval directly activates Admin)
-          const updatedUser = await tx.user.update({
-            where: { id: input.targetUserId },
-            data: { accountStatus: AccountStatus.ACTIVE },
-            select: {
-              id: true,
-              fullName: true,
-              email: true,
-              username: true,
-              accountStatus: true,
-              emailVerifiedAt: true,
-              lastLoginAt: true,
-              suspendedAt: true,
-              deactivatedAt: true,
-              createdAt: true,
-              updatedAt: true,
-              userRoles: {
-                where: { revokedAt: null },
-                select: {
-                  id: true,
-                  userId: true,
-                  roleId: true,
-                  assignedByUserId: true,
-                  assignedAt: true,
-                  revokedAt: true,
-                  role: { select: { code: true } },
-                },
-              },
-            },
-          });
-
-          // 3. Create AccountApproval history entry
-          const approvalRecord = await tx.accountApproval.create({
-            data: {
-              applicantUserId: targetUser.id,
-              decision: 'APPROVE',
-              previousStatus: AccountStatus.PENDING_APPROVAL,
-              newStatus: AccountStatus.ACTIVE,
-              decidedByUserId: input.decidedByUserId,
-              decisionNote: input.decisionNote?.trim() || null,
-            },
-          });
-
-          // 4. Log AuditLog event (strictly no secrets/passwords/tokens)
-          const auditLog = await tx.auditLog.create({
-            data: {
-              eventKey: AuditEventKey.ACCOUNT_APPROVED,
-              actorUserId: input.decidedByUserId,
-              actorRole: ContractUserRole.OWNER,
-              targetType: 'USER',
-              targetId: targetUser.id,
-              result: 'SUCCESS',
-              previousValues: { accountStatus: AccountStatus.PENDING_APPROVAL },
-              newValues: { accountStatus: AccountStatus.ACTIVE },
-              metadata: {
-                decision: 'APPROVE',
-                decisionNote: input.decisionNote?.trim() || null,
-                applicantEmail: targetUser.email,
-                applicantFullName: targetUser.fullName,
-              },
-              requestId: input.requestId || null,
-              ipAddress: input.ipAddress || null,
-              userAgent: input.userAgent || null,
-            },
-          });
-
+        if (!targetUser) {
           return {
-            success: true as const,
-            user: toPublicSafeUserDto(this.mapPrismaUserToRawDbUser(updatedUser)),
-            approvalRecordId: approvalRecord.id,
-            auditLogId: auditLog.id,
-            applicantInfo: {
-              id: targetUser.id,
-              email: targetUser.email,
-              fullName: targetUser.fullName,
-            },
+            success: false as const,
+            error: 'USER_NOT_FOUND' as const,
+            message: `Target user with ID '${input.targetUserId}' does not exist.`,
           };
-        },
-        {
-          isolationLevel: 'RepeatableRead',
         }
-      );
+
+        if (targetUser.accountStatus !== AccountStatus.PENDING_APPROVAL) {
+          return {
+            success: false as const,
+            error: 'INVALID_STATUS' as const,
+            message: `Target user is in status '${targetUser.accountStatus}', not PENDING_APPROVAL. Approval cannot be processed.`,
+            currentStatus: targetUser.accountStatus as AccountStatus,
+          };
+        }
+
+        if (!targetUser.emailVerifiedAt) {
+          return {
+            success: false as const,
+            error: 'INVALID_STATUS' as const,
+            message:
+              'Target user email has not been verified. Approval cannot be processed until email is verified.',
+            currentStatus: targetUser.accountStatus as AccountStatus,
+          };
+        }
+
+        // 2. Update account status to ACTIVE (Owner approval directly activates Admin)
+        const updatedUser = await tx.user.update({
+          where: { id: input.targetUserId },
+          data: { accountStatus: AccountStatus.ACTIVE },
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            username: true,
+            accountStatus: true,
+            emailVerifiedAt: true,
+            lastLoginAt: true,
+            suspendedAt: true,
+            deactivatedAt: true,
+            createdAt: true,
+            updatedAt: true,
+            userRoles: {
+              where: { revokedAt: null },
+              select: {
+                id: true,
+                userId: true,
+                roleId: true,
+                assignedByUserId: true,
+                assignedAt: true,
+                revokedAt: true,
+                role: { select: { code: true } },
+              },
+            },
+          },
+        });
+
+        // 3. Create AccountApproval history entry
+        const approvalRecord = await tx.accountApproval.create({
+          data: {
+            applicantUserId: targetUser.id,
+            decision: 'APPROVE',
+            previousStatus: AccountStatus.PENDING_APPROVAL,
+            newStatus: AccountStatus.ACTIVE,
+            decidedByUserId: input.decidedByUserId,
+            decisionNote: input.decisionNote?.trim() || null,
+          },
+        });
+
+        // 4. Log AuditLog event (strictly no secrets/passwords/tokens)
+        const auditLog = await tx.auditLog.create({
+          data: {
+            eventKey: AuditEventKey.ACCOUNT_APPROVED,
+            actorUserId: input.decidedByUserId,
+            actorRole: ContractUserRole.OWNER,
+            targetType: 'USER',
+            targetId: targetUser.id,
+            result: 'SUCCESS',
+            previousValues: { accountStatus: AccountStatus.PENDING_APPROVAL },
+            newValues: { accountStatus: AccountStatus.ACTIVE },
+            metadata: {
+              decision: 'APPROVE',
+              decisionNote: input.decisionNote?.trim() || null,
+              applicantEmail: targetUser.email,
+              applicantFullName: targetUser.fullName,
+            },
+            requestId: input.requestId || null,
+            ipAddress: input.ipAddress || null,
+            userAgent: input.userAgent || null,
+          },
+        });
+
+        return {
+          success: true as const,
+          user: toPublicSafeUserDto(this.mapPrismaUserToRawDbUser(updatedUser)),
+          approvalRecordId: approvalRecord.id,
+          auditLogId: auditLog.id,
+          applicantInfo: {
+            id: targetUser.id,
+            email: targetUser.email,
+            fullName: targetUser.fullName,
+          },
+        };
+      }, DEFAULT_TRANSACTION_OPTIONS);
 
       if (!txResult.success) {
         return txResult;
@@ -718,132 +725,127 @@ export class UserRepository {
    */
   async rejectPendingAdmin(input: RejectAdminInput): Promise<RejectAdminResult> {
     try {
-      const txResult = await this.prisma.$transaction(
-        async (tx) => {
-          // 1. Fetch user to verify current state
-          const targetUser = await tx.user.findUnique({
-            where: { id: input.targetUserId },
-            select: {
-              id: true,
-              fullName: true,
-              email: true,
-              username: true,
-              accountStatus: true,
-              emailVerifiedAt: true,
-              createdAt: true,
-              updatedAt: true,
-            },
-          });
+      const txResult = await this.prisma.$transaction(async (tx) => {
+        // 1. Fetch user to verify current state
+        const targetUser = await tx.user.findUnique({
+          where: { id: input.targetUserId },
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            username: true,
+            accountStatus: true,
+            emailVerifiedAt: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        });
 
-          if (!targetUser) {
-            return {
-              success: false as const,
-              error: 'USER_NOT_FOUND' as const,
-              message: `Target user with ID '${input.targetUserId}' does not exist.`,
-            };
-          }
-
-          if (targetUser.accountStatus !== AccountStatus.PENDING_APPROVAL) {
-            return {
-              success: false as const,
-              error: 'INVALID_STATUS' as const,
-              message: `Target user is in status '${targetUser.accountStatus}', not PENDING_APPROVAL. Rejection cannot be processed.`,
-              currentStatus: targetUser.accountStatus as AccountStatus,
-            };
-          }
-
-          if (!targetUser.emailVerifiedAt) {
-            return {
-              success: false as const,
-              error: 'INVALID_STATUS' as const,
-              message:
-                'Target user email has not been verified. Rejection cannot be processed until email is verified.',
-              currentStatus: targetUser.accountStatus as AccountStatus,
-            };
-          }
-
-          // 2. Update account status to REJECTED
-          const updatedUser = await tx.user.update({
-            where: { id: input.targetUserId },
-            data: { accountStatus: AccountStatus.REJECTED },
-            select: {
-              id: true,
-              fullName: true,
-              email: true,
-              username: true,
-              accountStatus: true,
-              emailVerifiedAt: true,
-              lastLoginAt: true,
-              suspendedAt: true,
-              deactivatedAt: true,
-              createdAt: true,
-              updatedAt: true,
-              userRoles: {
-                where: { revokedAt: null },
-                select: {
-                  id: true,
-                  userId: true,
-                  roleId: true,
-                  assignedByUserId: true,
-                  assignedAt: true,
-                  revokedAt: true,
-                  role: { select: { code: true } },
-                },
-              },
-            },
-          });
-
-          // 3. Create AccountApproval history entry
-          const approvalRecord = await tx.accountApproval.create({
-            data: {
-              applicantUserId: targetUser.id,
-              decision: 'REJECT',
-              previousStatus: AccountStatus.PENDING_APPROVAL,
-              newStatus: AccountStatus.REJECTED,
-              decidedByUserId: input.decidedByUserId,
-              decisionNote: input.decisionNote?.trim() || null,
-            },
-          });
-
-          // 4. Log AuditLog event (strictly no secrets/passwords/tokens)
-          const auditLog = await tx.auditLog.create({
-            data: {
-              eventKey: AuditEventKey.ACCOUNT_REJECTED,
-              actorUserId: input.decidedByUserId,
-              actorRole: ContractUserRole.OWNER,
-              targetType: 'USER',
-              targetId: targetUser.id,
-              result: 'SUCCESS',
-              previousValues: { accountStatus: AccountStatus.PENDING_APPROVAL },
-              newValues: { accountStatus: AccountStatus.REJECTED },
-              metadata: {
-                decision: 'REJECT',
-                decisionNote: input.decisionNote?.trim() || null,
-                applicantEmail: targetUser.email,
-                applicantFullName: targetUser.fullName,
-              },
-              requestId: input.requestId || null,
-              ipAddress: input.ipAddress || null,
-              userAgent: input.userAgent || null,
-            },
-          });
-
+        if (!targetUser) {
           return {
-            success: true as const,
-            user: toPublicSafeUserDto(this.mapPrismaUserToRawDbUser(updatedUser)),
-            approvalRecordId: approvalRecord.id,
-            auditLogId: auditLog.id,
-            applicantInfo: {
-              id: targetUser.id,
-              email: targetUser.email,
-              fullName: targetUser.fullName,
-            },
+            success: false as const,
+            error: 'USER_NOT_FOUND' as const,
+            message: `Target user with ID '${input.targetUserId}' does not exist.`,
           };
-        },
-        {
-          isolationLevel: 'RepeatableRead',
         }
-      );
+
+        if (targetUser.accountStatus !== AccountStatus.PENDING_APPROVAL) {
+          return {
+            success: false as const,
+            error: 'INVALID_STATUS' as const,
+            message: `Target user is in status '${targetUser.accountStatus}', not PENDING_APPROVAL. Rejection cannot be processed.`,
+            currentStatus: targetUser.accountStatus as AccountStatus,
+          };
+        }
+
+        if (!targetUser.emailVerifiedAt) {
+          return {
+            success: false as const,
+            error: 'INVALID_STATUS' as const,
+            message:
+              'Target user email has not been verified. Rejection cannot be processed until email is verified.',
+            currentStatus: targetUser.accountStatus as AccountStatus,
+          };
+        }
+
+        // 2. Update account status to REJECTED
+        const updatedUser = await tx.user.update({
+          where: { id: input.targetUserId },
+          data: { accountStatus: AccountStatus.REJECTED },
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            username: true,
+            accountStatus: true,
+            emailVerifiedAt: true,
+            lastLoginAt: true,
+            suspendedAt: true,
+            deactivatedAt: true,
+            createdAt: true,
+            updatedAt: true,
+            userRoles: {
+              where: { revokedAt: null },
+              select: {
+                id: true,
+                userId: true,
+                roleId: true,
+                assignedByUserId: true,
+                assignedAt: true,
+                revokedAt: true,
+                role: { select: { code: true } },
+              },
+            },
+          },
+        });
+
+        // 3. Create AccountApproval history entry
+        const approvalRecord = await tx.accountApproval.create({
+          data: {
+            applicantUserId: targetUser.id,
+            decision: 'REJECT',
+            previousStatus: AccountStatus.PENDING_APPROVAL,
+            newStatus: AccountStatus.REJECTED,
+            decidedByUserId: input.decidedByUserId,
+            decisionNote: input.decisionNote?.trim() || null,
+          },
+        });
+
+        // 4. Log AuditLog event (strictly no secrets/passwords/tokens)
+        const auditLog = await tx.auditLog.create({
+          data: {
+            eventKey: AuditEventKey.ACCOUNT_REJECTED,
+            actorUserId: input.decidedByUserId,
+            actorRole: ContractUserRole.OWNER,
+            targetType: 'USER',
+            targetId: targetUser.id,
+            result: 'SUCCESS',
+            previousValues: { accountStatus: AccountStatus.PENDING_APPROVAL },
+            newValues: { accountStatus: AccountStatus.REJECTED },
+            metadata: {
+              decision: 'REJECT',
+              decisionNote: input.decisionNote?.trim() || null,
+              applicantEmail: targetUser.email,
+              applicantFullName: targetUser.fullName,
+            },
+            requestId: input.requestId || null,
+            ipAddress: input.ipAddress || null,
+            userAgent: input.userAgent || null,
+          },
+        });
+
+        return {
+          success: true as const,
+          user: toPublicSafeUserDto(this.mapPrismaUserToRawDbUser(updatedUser)),
+          approvalRecordId: approvalRecord.id,
+          auditLogId: auditLog.id,
+          applicantInfo: {
+            id: targetUser.id,
+            email: targetUser.email,
+            fullName: targetUser.fullName,
+          },
+        };
+      }, DEFAULT_TRANSACTION_OPTIONS);
 
       if (!txResult.success) {
         return txResult;
@@ -891,132 +893,127 @@ export class UserRepository {
     message?: string;
   }> {
     try {
-      const result = await this.prisma.$transaction(
-        async (tx) => {
-          const existingUser = await tx.user.findUnique({
+      const result = await this.prisma.$transaction(async (tx) => {
+        const existingUser = await tx.user.findUnique({
+          where: { id: input.userId },
+          select: {
+            id: true,
+            fullName: true,
+            username: true,
+            email: true,
+            accountStatus: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        });
+
+        if (!existingUser) {
+          return {
+            success: false as const,
+            error: 'USER_NOT_FOUND' as const,
+            message: `User with ID '${input.userId}' not found.`,
+          };
+        }
+
+        const previousValues: Record<string, any> = {};
+        const newValues: Record<string, any> = {};
+        const updateData: Record<string, any> = {};
+
+        if (input.data.fullName !== undefined && input.data.fullName !== existingUser.fullName) {
+          previousValues.fullName = existingUser.fullName;
+          newValues.fullName = input.data.fullName;
+          updateData.fullName = input.data.fullName;
+        }
+
+        if (input.data.username !== undefined && input.data.username !== existingUser.username) {
+          previousValues.username = existingUser.username;
+          newValues.username = input.data.username;
+          updateData.username = input.data.username;
+        }
+
+        let updatedUser;
+        if (Object.keys(updateData).length > 0) {
+          updatedUser = await tx.user.update({
+            where: { id: input.userId },
+            data: updateData,
+            select: {
+              id: true,
+              fullName: true,
+              email: true,
+              username: true,
+              accountStatus: true,
+              emailVerifiedAt: true,
+              lastLoginAt: true,
+              suspendedAt: true,
+              deactivatedAt: true,
+              createdAt: true,
+              updatedAt: true,
+              userRoles: {
+                where: { revokedAt: null },
+                select: {
+                  id: true,
+                  userId: true,
+                  roleId: true,
+                  assignedByUserId: true,
+                  assignedAt: true,
+                  revokedAt: true,
+                  role: { select: { code: true } },
+                },
+              },
+            },
+          });
+
+          // Create AuditLog record (SEC-LOG-001)
+          await tx.auditLog.create({
+            data: {
+              eventKey: 'profile.self.updated',
+              actorUserId: input.userId,
+              targetType: 'USER',
+              targetId: input.userId,
+              result: 'SUCCESS',
+              previousValues,
+              newValues,
+              requestId: input.requestId || null,
+              ipAddress: input.ipAddress || null,
+              userAgent: input.userAgent || null,
+            },
+          });
+        } else {
+          updatedUser = await tx.user.findUnique({
             where: { id: input.userId },
             select: {
               id: true,
               fullName: true,
-              username: true,
               email: true,
+              username: true,
               accountStatus: true,
+              emailVerifiedAt: true,
+              lastLoginAt: true,
+              suspendedAt: true,
+              deactivatedAt: true,
               createdAt: true,
               updatedAt: true,
+              userRoles: {
+                where: { revokedAt: null },
+                select: {
+                  id: true,
+                  userId: true,
+                  roleId: true,
+                  assignedByUserId: true,
+                  assignedAt: true,
+                  revokedAt: true,
+                  role: { select: { code: true } },
+                },
+              },
             },
           });
-
-          if (!existingUser) {
-            return {
-              success: false as const,
-              error: 'USER_NOT_FOUND' as const,
-              message: `User with ID '${input.userId}' not found.`,
-            };
-          }
-
-          const previousValues: Record<string, any> = {};
-          const newValues: Record<string, any> = {};
-          const updateData: Record<string, any> = {};
-
-          if (input.data.fullName !== undefined && input.data.fullName !== existingUser.fullName) {
-            previousValues.fullName = existingUser.fullName;
-            newValues.fullName = input.data.fullName;
-            updateData.fullName = input.data.fullName;
-          }
-
-          if (input.data.username !== undefined && input.data.username !== existingUser.username) {
-            previousValues.username = existingUser.username;
-            newValues.username = input.data.username;
-            updateData.username = input.data.username;
-          }
-
-          let updatedUser;
-          if (Object.keys(updateData).length > 0) {
-            updatedUser = await tx.user.update({
-              where: { id: input.userId },
-              data: updateData,
-              select: {
-                id: true,
-                fullName: true,
-                email: true,
-                username: true,
-                accountStatus: true,
-                emailVerifiedAt: true,
-                lastLoginAt: true,
-                suspendedAt: true,
-                deactivatedAt: true,
-                createdAt: true,
-                updatedAt: true,
-                userRoles: {
-                  where: { revokedAt: null },
-                  select: {
-                    id: true,
-                    userId: true,
-                    roleId: true,
-                    assignedByUserId: true,
-                    assignedAt: true,
-                    revokedAt: true,
-                    role: { select: { code: true } },
-                  },
-                },
-              },
-            });
-
-            // Create AuditLog record (SEC-LOG-001)
-            await tx.auditLog.create({
-              data: {
-                eventKey: 'profile.self.updated',
-                actorUserId: input.userId,
-                targetType: 'USER',
-                targetId: input.userId,
-                result: 'SUCCESS',
-                previousValues,
-                newValues,
-                requestId: input.requestId || null,
-                ipAddress: input.ipAddress || null,
-                userAgent: input.userAgent || null,
-              },
-            });
-          } else {
-            updatedUser = await tx.user.findUnique({
-              where: { id: input.userId },
-              select: {
-                id: true,
-                fullName: true,
-                email: true,
-                username: true,
-                accountStatus: true,
-                emailVerifiedAt: true,
-                lastLoginAt: true,
-                suspendedAt: true,
-                deactivatedAt: true,
-                createdAt: true,
-                updatedAt: true,
-                userRoles: {
-                  where: { revokedAt: null },
-                  select: {
-                    id: true,
-                    userId: true,
-                    roleId: true,
-                    assignedByUserId: true,
-                    assignedAt: true,
-                    revokedAt: true,
-                    role: { select: { code: true } },
-                  },
-                },
-              },
-            });
-          }
-
-          return {
-            success: true as const,
-            user: toPublicSafeUserDto(this.mapPrismaUserToRawDbUser(updatedUser)),
-          };
-        },
-        {
-          isolationLevel: 'RepeatableRead',
         }
-      );
+
+        return {
+          success: true as const,
+          user: toPublicSafeUserDto(this.mapPrismaUserToRawDbUser(updatedUser)),
+        };
+      }, DEFAULT_TRANSACTION_OPTIONS);
 
       return result;
     } catch (error) {
@@ -1084,66 +1081,63 @@ export class UserRepository {
 
       const newHash = await hashPassword(input.newPassword);
 
-      const result = await this.prisma.$transaction(
-        async (tx) => {
-          const updatedUser = await tx.user.update({
-            where: { id: input.userId },
-            data: { passwordHash: newHash },
-            select: {
-              id: true,
-              fullName: true,
-              email: true,
-              username: true,
-              accountStatus: true,
-              emailVerifiedAt: true,
-              lastLoginAt: true,
-              suspendedAt: true,
-              deactivatedAt: true,
-              createdAt: true,
-              updatedAt: true,
-              userRoles: {
-                where: { revokedAt: null },
-                select: {
-                  id: true,
-                  userId: true,
-                  roleId: true,
-                  assignedByUserId: true,
-                  assignedAt: true,
-                  revokedAt: true,
-                  role: { select: { code: true } },
-                },
+      const result = await this.prisma.$transaction(async (tx) => {
+        const updatedUser = await tx.user.update({
+          where: { id: input.userId },
+          data: { passwordHash: newHash },
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            username: true,
+            accountStatus: true,
+            emailVerifiedAt: true,
+            lastLoginAt: true,
+            suspendedAt: true,
+            deactivatedAt: true,
+            createdAt: true,
+            updatedAt: true,
+            userRoles: {
+              where: { revokedAt: null },
+              select: {
+                id: true,
+                userId: true,
+                roleId: true,
+                assignedByUserId: true,
+                assignedAt: true,
+                revokedAt: true,
+                role: { select: { code: true } },
               },
             },
-          });
+          },
+        });
 
-          // Revoke ALL active sessions for the user transactionally
-          const revokedCount = await revokeAllUserSessions(tx, input.userId);
+        // Revoke ALL active sessions for the user transactionally
+        const revokedCount = await revokeAllUserSessions(tx, input.userId);
 
-          // Audit log for password change (strictly without secrets)
-          await tx.auditLog.create({
-            data: {
-              eventKey: AuditEventKey.ACCOUNT_PASSWORD_CHANGED,
-              actorUserId: input.actorUserId,
-              targetType: 'USER',
-              targetId: input.userId,
-              result: 'SUCCESS',
-              previousValues: Prisma.JsonNull,
-              newValues: Prisma.JsonNull,
-              metadata: { revokedSessionsCount: revokedCount },
-              requestId: input.requestId || null,
-              ipAddress: input.ipAddress || null,
-              userAgent: input.userAgent || null,
-            },
-          });
+        // Audit log for password change (strictly without secrets)
+        await tx.auditLog.create({
+          data: {
+            eventKey: AuditEventKey.ACCOUNT_PASSWORD_CHANGED,
+            actorUserId: input.actorUserId,
+            targetType: 'USER',
+            targetId: input.userId,
+            result: 'SUCCESS',
+            previousValues: Prisma.JsonNull,
+            newValues: Prisma.JsonNull,
+            metadata: { revokedSessionsCount: revokedCount },
+            requestId: input.requestId || null,
+            ipAddress: input.ipAddress || null,
+            userAgent: input.userAgent || null,
+          },
+        });
 
-          return {
-            success: true as const,
-            revokedSessionsCount: revokedCount,
-            user: toPublicSafeUserDto(this.mapPrismaUserToRawDbUser(updatedUser)),
-          };
-        },
-        { isolationLevel: 'RepeatableRead' }
-      );
+        return {
+          success: true as const,
+          revokedSessionsCount: revokedCount,
+          user: toPublicSafeUserDto(this.mapPrismaUserToRawDbUser(updatedUser)),
+        };
+      }, DEFAULT_TRANSACTION_OPTIONS);
 
       return result;
     } catch (error) {
@@ -1188,50 +1182,47 @@ export class UserRepository {
       const expiryMinutes = input.expiryMinutes ?? 15;
       const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000);
 
-      await this.prisma.$transaction(
-        async (tx) => {
-          const now = new Date();
-          // Invalidate previous unused reset tokens for this user
-          await tx.passwordResetToken.updateMany({
-            where: {
-              userId: user.id,
-              usedAt: null,
-            },
-            data: {
-              usedAt: now,
-            },
-          });
+      await this.prisma.$transaction(async (tx) => {
+        const now = new Date();
+        // Invalidate previous unused reset tokens for this user
+        await tx.passwordResetToken.updateMany({
+          where: {
+            userId: user.id,
+            usedAt: null,
+          },
+          data: {
+            usedAt: now,
+          },
+        });
 
-          // Create new token record (stores ONLY SHA-256 tokenHash, NEVER raw token)
-          await tx.passwordResetToken.create({
-            data: {
-              tokenHash,
-              userId: user.id,
-              expiresAt,
-            },
-          });
+        // Create new token record (stores ONLY SHA-256 tokenHash, NEVER raw token)
+        await tx.passwordResetToken.create({
+          data: {
+            tokenHash,
+            userId: user.id,
+            expiresAt,
+          },
+        });
 
-          // Audit log (strictly without raw tokens, secrets, or URLs)
-          await tx.auditLog.create({
-            data: {
-              eventKey: AuditEventKey.AUTH_PASSWORD_RESET_REQUESTED,
-              actorUserId: null,
-              targetType: 'USER',
-              targetId: user.id,
-              result: 'SUCCESS',
-              previousValues: Prisma.JsonNull,
-              newValues: Prisma.JsonNull,
-              metadata: {
-                expiresAt: expiresAt.toISOString(),
-              },
-              requestId: input.requestId || null,
-              ipAddress: input.ipAddress || null,
-              userAgent: input.userAgent || null,
+        // Audit log (strictly without raw tokens, secrets, or URLs)
+        await tx.auditLog.create({
+          data: {
+            eventKey: AuditEventKey.AUTH_PASSWORD_RESET_REQUESTED,
+            actorUserId: null,
+            targetType: 'USER',
+            targetId: user.id,
+            result: 'SUCCESS',
+            previousValues: Prisma.JsonNull,
+            newValues: Prisma.JsonNull,
+            metadata: {
+              expiresAt: expiresAt.toISOString(),
             },
-          });
-        },
-        { isolationLevel: 'RepeatableRead' }
-      );
+            requestId: input.requestId || null,
+            ipAddress: input.ipAddress || null,
+            userAgent: input.userAgent || null,
+          },
+        });
+      }, DEFAULT_TRANSACTION_OPTIONS);
 
       return {
         success: true,
@@ -1360,84 +1351,81 @@ export class UserRepository {
 
       const newHash = await hashPassword(input.newPassword);
 
-      const result = await this.prisma.$transaction(
-        async (tx) => {
-          const now = new Date();
+      const result = await this.prisma.$transaction(async (tx) => {
+        const now = new Date();
 
-          // 1. Update user passwordHash (without changing accountStatus or other fields)
-          const updatedUser = await tx.user.update({
-            where: { id: tokenRecord.userId },
-            data: { passwordHash: newHash },
-            select: {
-              id: true,
-              fullName: true,
-              email: true,
-              username: true,
-              accountStatus: true,
-              emailVerifiedAt: true,
-              lastLoginAt: true,
-              suspendedAt: true,
-              deactivatedAt: true,
-              createdAt: true,
-              updatedAt: true,
-              userRoles: {
-                where: { revokedAt: null },
-                select: {
-                  id: true,
-                  userId: true,
-                  roleId: true,
-                  assignedByUserId: true,
-                  assignedAt: true,
-                  revokedAt: true,
-                  role: { select: { code: true } },
-                },
+        // 1. Update user passwordHash (without changing accountStatus or other fields)
+        const updatedUser = await tx.user.update({
+          where: { id: tokenRecord.userId },
+          data: { passwordHash: newHash },
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            username: true,
+            accountStatus: true,
+            emailVerifiedAt: true,
+            lastLoginAt: true,
+            suspendedAt: true,
+            deactivatedAt: true,
+            createdAt: true,
+            updatedAt: true,
+            userRoles: {
+              where: { revokedAt: null },
+              select: {
+                id: true,
+                userId: true,
+                roleId: true,
+                assignedByUserId: true,
+                assignedAt: true,
+                revokedAt: true,
+                role: { select: { code: true } },
               },
             },
-          });
+          },
+        });
 
-          // 2. Consume this reset token
-          await tx.passwordResetToken.update({
-            where: { id: tokenRecord.id },
-            data: { usedAt: now },
-          });
+        // 2. Consume this reset token
+        await tx.passwordResetToken.update({
+          where: { id: tokenRecord.id },
+          data: { usedAt: now },
+        });
 
-          // 3. Invalidate any other active reset tokens for this user
-          await tx.passwordResetToken.updateMany({
-            where: {
-              userId: tokenRecord.userId,
-              usedAt: null,
-            },
-            data: { usedAt: now },
-          });
+        // 3. Invalidate any other active reset tokens for this user
+        await tx.passwordResetToken.updateMany({
+          where: {
+            userId: tokenRecord.userId,
+            usedAt: null,
+          },
+          data: { usedAt: now },
+        });
 
-          // 4. Revoke ALL active sessions for the user transactionally (TASK-0908)
-          const revokedCount = await revokeAllUserSessions(tx, tokenRecord.userId);
+        // 4. Revoke ALL active sessions for the user transactionally (TASK-0908)
+        const revokedCount = await revokeAllUserSessions(tx, tokenRecord.userId);
 
-          // 5. Create audit log for password reset completion (strictly without passwords/tokens)
-          await tx.auditLog.create({
-            data: {
-              eventKey: AuditEventKey.AUTH_PASSWORD_RESET_COMPLETED,
-              actorUserId: null,
-              targetType: 'USER',
-              targetId: tokenRecord.userId,
-              result: 'SUCCESS',
-              previousValues: Prisma.JsonNull,
-              newValues: Prisma.JsonNull,
-              metadata: { revokedSessionsCount: revokedCount },
-              requestId: input.requestId || null,
-              ipAddress: input.ipAddress || null,
-              userAgent: input.userAgent || null,
-            },
-          });
+        // 5. Create audit log for password reset completion (strictly without passwords/tokens)
+        await tx.auditLog.create({
+          data: {
+            eventKey: AuditEventKey.AUTH_PASSWORD_RESET_COMPLETED,
+            actorUserId: null,
+            targetType: 'USER',
+            targetId: tokenRecord.userId,
+            result: 'SUCCESS',
+            previousValues: Prisma.JsonNull,
+            newValues: Prisma.JsonNull,
+            metadata: { revokedSessionsCount: revokedCount },
+            requestId: input.requestId || null,
+            ipAddress: input.ipAddress || null,
+            userAgent: input.userAgent || null,
+          },
+        });
 
-          return {
-            success: true as const,
-            revokedSessionsCount: revokedCount,
-            user: toPublicSafeUserDto(this.mapPrismaUserToRawDbUser(updatedUser)),
-          };
-        },
-        { isolationLevel: 'RepeatableRead' }
-      );
+        return {
+          success: true as const,
+          revokedSessionsCount: revokedCount,
+          user: toPublicSafeUserDto(this.mapPrismaUserToRawDbUser(updatedUser)),
+        };
+      }, DEFAULT_TRANSACTION_OPTIONS);
 
       return result;
     } catch (error) {
@@ -1631,57 +1619,54 @@ export class UserRepository {
         username: targetUser.username,
       };
 
-      const result = await this.prisma.$transaction(
-        async (tx) => {
-          const updated = await tx.user.update({
-            where: { id: input.targetUserId },
-            data: updateData,
-            select: {
-              id: true,
-              fullName: true,
-              email: true,
-              username: true,
-              accountStatus: true,
-              emailVerifiedAt: true,
-              lastLoginAt: true,
-              suspendedAt: true,
-              deactivatedAt: true,
-              createdAt: true,
-              updatedAt: true,
-              userRoles: {
-                where: { revokedAt: null },
-                select: {
-                  id: true,
-                  userId: true,
-                  roleId: true,
-                  assignedByUserId: true,
-                  assignedAt: true,
-                  revokedAt: true,
-                  role: { select: { code: true } },
-                },
+      const result = await this.prisma.$transaction(async (tx) => {
+        const updated = await tx.user.update({
+          where: { id: input.targetUserId },
+          data: updateData,
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            username: true,
+            accountStatus: true,
+            emailVerifiedAt: true,
+            lastLoginAt: true,
+            suspendedAt: true,
+            deactivatedAt: true,
+            createdAt: true,
+            updatedAt: true,
+            userRoles: {
+              where: { revokedAt: null },
+              select: {
+                id: true,
+                userId: true,
+                roleId: true,
+                assignedByUserId: true,
+                assignedAt: true,
+                revokedAt: true,
+                role: { select: { code: true } },
               },
             },
-          });
+          },
+        });
 
-          await tx.auditLog.create({
-            data: {
-              eventKey: 'profile.other.updated',
-              actorUserId: input.actorUserId,
-              targetType: 'USER',
-              targetId: input.targetUserId,
-              result: 'SUCCESS',
-              previousValues,
-              newValues: updateData,
-              requestId: input.requestId || null,
-              ipAddress: input.ipAddress || null,
-              userAgent: input.userAgent || null,
-            },
-          });
+        await tx.auditLog.create({
+          data: {
+            eventKey: 'profile.other.updated',
+            actorUserId: input.actorUserId,
+            targetType: 'USER',
+            targetId: input.targetUserId,
+            result: 'SUCCESS',
+            previousValues,
+            newValues: updateData,
+            requestId: input.requestId || null,
+            ipAddress: input.ipAddress || null,
+            userAgent: input.userAgent || null,
+          },
+        });
 
-          return toPublicSafeUserDto(this.mapPrismaUserToRawDbUser(updated));
-        },
-        { isolationLevel: 'RepeatableRead' }
-      );
+        return toPublicSafeUserDto(this.mapPrismaUserToRawDbUser(updated));
+      }, DEFAULT_TRANSACTION_OPTIONS);
 
       return { success: true, user: result };
     } catch (error) {
@@ -1731,65 +1716,62 @@ export class UserRepository {
 
       const now = new Date();
 
-      const result = await this.prisma.$transaction(
-        async (tx) => {
-          const updated = await tx.user.update({
-            where: { id: input.targetUserId },
-            data: {
-              accountStatus: AccountStatus.SUSPENDED,
-              suspendedAt: now,
-            },
-            select: {
-              id: true,
-              fullName: true,
-              email: true,
-              username: true,
-              accountStatus: true,
-              emailVerifiedAt: true,
-              lastLoginAt: true,
-              suspendedAt: true,
-              deactivatedAt: true,
-              createdAt: true,
-              updatedAt: true,
-              userRoles: {
-                where: { revokedAt: null },
-                select: {
-                  id: true,
-                  userId: true,
-                  roleId: true,
-                  assignedByUserId: true,
-                  assignedAt: true,
-                  revokedAt: true,
-                  role: { select: { code: true } },
-                },
+      const result = await this.prisma.$transaction(async (tx) => {
+        const updated = await tx.user.update({
+          where: { id: input.targetUserId },
+          data: {
+            accountStatus: AccountStatus.SUSPENDED,
+            suspendedAt: now,
+          },
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            username: true,
+            accountStatus: true,
+            emailVerifiedAt: true,
+            lastLoginAt: true,
+            suspendedAt: true,
+            deactivatedAt: true,
+            createdAt: true,
+            updatedAt: true,
+            userRoles: {
+              where: { revokedAt: null },
+              select: {
+                id: true,
+                userId: true,
+                roleId: true,
+                assignedByUserId: true,
+                assignedAt: true,
+                revokedAt: true,
+                role: { select: { code: true } },
               },
             },
-          });
+          },
+        });
 
-          // Soft-revoke all sessions for target user atomically inside transaction
-          await revokeAllUserSessions(tx, input.targetUserId);
+        // Soft-revoke all sessions for target user atomically inside transaction
+        await revokeAllUserSessions(tx, input.targetUserId);
 
-          // Audit log (strictly without secrets)
-          await tx.auditLog.create({
-            data: {
-              eventKey: 'account.suspended',
-              actorUserId: input.actorUserId,
-              targetType: 'USER',
-              targetId: input.targetUserId,
-              result: 'SUCCESS',
-              previousValues: { accountStatus: targetUser.accountStatus },
-              newValues: { accountStatus: AccountStatus.SUSPENDED, suspendedAt: now },
-              metadata: { reason: input.reason?.trim() || null },
-              requestId: input.requestId || null,
-              ipAddress: input.ipAddress || null,
-              userAgent: input.userAgent || null,
-            },
-          });
+        // Audit log (strictly without secrets)
+        await tx.auditLog.create({
+          data: {
+            eventKey: 'account.suspended',
+            actorUserId: input.actorUserId,
+            targetType: 'USER',
+            targetId: input.targetUserId,
+            result: 'SUCCESS',
+            previousValues: { accountStatus: targetUser.accountStatus },
+            newValues: { accountStatus: AccountStatus.SUSPENDED, suspendedAt: now },
+            metadata: { reason: input.reason?.trim() || null },
+            requestId: input.requestId || null,
+            ipAddress: input.ipAddress || null,
+            userAgent: input.userAgent || null,
+          },
+        });
 
-          return toPublicSafeUserDto(this.mapPrismaUserToRawDbUser(updated));
-        },
-        { isolationLevel: 'RepeatableRead' }
-      );
+        return toPublicSafeUserDto(this.mapPrismaUserToRawDbUser(updated));
+      }, DEFAULT_TRANSACTION_OPTIONS);
 
       return { success: true, user: result };
     } catch (error) {
@@ -1878,95 +1860,93 @@ export class UserRepository {
         };
       }
 
-      await this.prisma.$transaction(
-        async (tx) => {
-          const targetId = input.targetUserId;
+      await this.prisma.$transaction(async (tx) => {
+        const targetId = input.targetUserId;
 
-          // 1. Delete all sessions
-          await tx.session.deleteMany({
-            where: { userId: targetId },
+        // 1. Delete all sessions
+        await tx.session.deleteMany({
+          where: { userId: targetId },
+        });
+
+        // 2. Delete user preferences
+        await tx.userPreference.deleteMany({
+          where: { userId: targetId },
+        });
+
+        // 3. Delete user role assignments
+        await tx.userRoleAssignment.deleteMany({
+          where: { userId: targetId },
+        });
+
+        // 4. Delete account approvals (where applicant or decidedBy)
+        await tx.accountApproval.deleteMany({
+          where: {
+            OR: [{ applicantUserId: targetId }, { decidedByUserId: targetId }],
+          },
+        });
+
+        // 5. Delete user device access assignments
+        await tx.userDeviceAccess.deleteMany({
+          where: {
+            OR: [{ userId: targetId }, { assignedByUserId: targetId }],
+          },
+        });
+
+        // 6. Delete faucet commands & command events initiated by target user
+        const userCommands = await tx.faucetCommand.findMany({
+          where: { initiatedByUserId: targetId },
+          select: { id: true },
+        });
+        if (userCommands.length > 0) {
+          const commandIds = userCommands.map((c) => c.id);
+          await tx.faucetCommandEvent.deleteMany({
+            where: { faucetCommandId: { in: commandIds } },
           });
-
-          // 2. Delete user preferences
-          await tx.userPreference.deleteMany({
-            where: { userId: targetId },
-          });
-
-          // 3. Delete user role assignments
-          await tx.userRoleAssignment.deleteMany({
-            where: { userId: targetId },
-          });
-
-          // 4. Delete account approvals (where applicant or decidedBy)
-          await tx.accountApproval.deleteMany({
-            where: {
-              OR: [{ applicantUserId: targetId }, { decidedByUserId: targetId }],
-            },
-          });
-
-          // 5. Delete user device access assignments
-          await tx.userDeviceAccess.deleteMany({
-            where: {
-              OR: [{ userId: targetId }, { assignedByUserId: targetId }],
-            },
-          });
-
-          // 6. Delete faucet commands & command events initiated by target user
-          const userCommands = await tx.faucetCommand.findMany({
+          await tx.faucetCommand.deleteMany({
             where: { initiatedByUserId: targetId },
-            select: { id: true },
           });
-          if (userCommands.length > 0) {
-            const commandIds = userCommands.map((c) => c.id);
-            await tx.faucetCommandEvent.deleteMany({
-              where: { faucetCommandId: { in: commandIds } },
-            });
-            await tx.faucetCommand.deleteMany({
-              where: { initiatedByUserId: targetId },
-            });
-          }
+        }
 
-          // 7. Delete alert acknowledgements by target user
-          await tx.alertAcknowledgement.deleteMany({
-            where: { acknowledgedByUserId: targetId },
-          });
+        // 7. Delete alert acknowledgements by target user
+        await tx.alertAcknowledgement.deleteMany({
+          where: { acknowledgedByUserId: targetId },
+        });
 
-          // 8. Anonymize/nullify audit log actorUserId where target was actor
-          await tx.auditLog.updateMany({
-            where: { actorUserId: targetId },
-            data: { actorUserId: null },
-          });
+        // 8. Anonymize/nullify audit log actorUserId where target was actor
+        await tx.auditLog.updateMany({
+          where: { actorUserId: targetId },
+          data: { actorUserId: null },
+        });
 
-          // 9. Audit log event for permanent deletion (strictly non-PII)
-          await tx.auditLog.create({
-            data: {
-              eventKey: 'account.deleted',
-              actorUserId: input.actorUserId,
-              targetType: 'USER',
-              targetId: targetId,
-              result: 'SUCCESS',
-              previousValues: {
-                accountStatus: targetUser.accountStatus,
-                targetRole: 'ADMIN',
-              },
-              newValues: Prisma.JsonNull,
-              metadata: { reason: input.reason?.trim() || null },
-              requestId: input.requestId || null,
-              ipAddress: input.ipAddress || null,
-              userAgent: input.userAgent || null,
+        // 9. Audit log event for permanent deletion (strictly non-PII)
+        await tx.auditLog.create({
+          data: {
+            eventKey: 'account.deleted',
+            actorUserId: input.actorUserId,
+            targetType: 'USER',
+            targetId: targetId,
+            result: 'SUCCESS',
+            previousValues: {
+              accountStatus: targetUser.accountStatus,
+              targetRole: 'ADMIN',
             },
-          });
+            newValues: Prisma.JsonNull,
+            metadata: { reason: input.reason?.trim() || null },
+            requestId: input.requestId || null,
+            ipAddress: input.ipAddress || null,
+            userAgent: input.userAgent || null,
+          },
+        });
 
-          // 10. Delete the User row itself
-          await tx.user.delete({
-            where: { id: targetId },
-          });
-        },
-        { isolationLevel: 'RepeatableRead' }
-      );
+        // 10. Delete the User row itself
+        await tx.user.delete({
+          where: { id: targetId },
+        });
+      }, DEFAULT_TRANSACTION_OPTIONS);
 
       return { success: true };
     } catch (error) {
+      console.error('[UserRepository.deleteUserPermanently] Error deleting user:', error);
       return {
         success: false,
         error: 'INTERNAL_ERROR',
@@ -2026,63 +2006,60 @@ export class UserRepository {
         };
       }
 
-      const result = await this.prisma.$transaction(
-        async (tx) => {
-          const updated = await tx.user.update({
-            where: { id: input.targetUserId },
-            data: {
-              accountStatus: AccountStatus.ACTIVE,
-              suspendedAt: null,
-              deactivatedAt: null,
-            },
-            select: {
-              id: true,
-              fullName: true,
-              email: true,
-              username: true,
-              accountStatus: true,
-              emailVerifiedAt: true,
-              lastLoginAt: true,
-              suspendedAt: true,
-              deactivatedAt: true,
-              createdAt: true,
-              updatedAt: true,
-              userRoles: {
-                where: { revokedAt: null },
-                select: {
-                  id: true,
-                  userId: true,
-                  roleId: true,
-                  assignedByUserId: true,
-                  assignedAt: true,
-                  revokedAt: true,
-                  role: { select: { code: true } },
-                },
+      const result = await this.prisma.$transaction(async (tx) => {
+        const updated = await tx.user.update({
+          where: { id: input.targetUserId },
+          data: {
+            accountStatus: AccountStatus.ACTIVE,
+            suspendedAt: null,
+            deactivatedAt: null,
+          },
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            username: true,
+            accountStatus: true,
+            emailVerifiedAt: true,
+            lastLoginAt: true,
+            suspendedAt: true,
+            deactivatedAt: true,
+            createdAt: true,
+            updatedAt: true,
+            userRoles: {
+              where: { revokedAt: null },
+              select: {
+                id: true,
+                userId: true,
+                roleId: true,
+                assignedByUserId: true,
+                assignedAt: true,
+                revokedAt: true,
+                role: { select: { code: true } },
               },
             },
-          });
+          },
+        });
 
-          // Audit log (strictly without secrets)
-          await tx.auditLog.create({
-            data: {
-              eventKey: 'account.activated',
-              actorUserId: input.actorUserId,
-              targetType: 'USER',
-              targetId: input.targetUserId,
-              result: 'SUCCESS',
-              previousValues: { accountStatus: targetUser.accountStatus },
-              newValues: { accountStatus: AccountStatus.ACTIVE },
-              metadata: { reason: input.reason?.trim() || null },
-              requestId: input.requestId || null,
-              ipAddress: input.ipAddress || null,
-              userAgent: input.userAgent || null,
-            },
-          });
+        // Audit log (strictly without secrets)
+        await tx.auditLog.create({
+          data: {
+            eventKey: 'account.activated',
+            actorUserId: input.actorUserId,
+            targetType: 'USER',
+            targetId: input.targetUserId,
+            result: 'SUCCESS',
+            previousValues: { accountStatus: targetUser.accountStatus },
+            newValues: { accountStatus: AccountStatus.ACTIVE },
+            metadata: { reason: input.reason?.trim() || null },
+            requestId: input.requestId || null,
+            ipAddress: input.ipAddress || null,
+            userAgent: input.userAgent || null,
+          },
+        });
 
-          return toPublicSafeUserDto(this.mapPrismaUserToRawDbUser(updated));
-        },
-        { isolationLevel: 'RepeatableRead' }
-      );
+        return toPublicSafeUserDto(this.mapPrismaUserToRawDbUser(updated));
+      }, DEFAULT_TRANSACTION_OPTIONS);
 
       return { success: true, user: result };
     } catch (error) {
@@ -2117,64 +2094,59 @@ export class UserRepository {
     };
   }> {
     try {
-      const result = await this.prisma.$transaction(
-        async (tx) => {
-          const user = await tx.user.findUnique({
-            where: { id: input.userId },
-          });
+      const result = await this.prisma.$transaction(async (tx) => {
+        const user = await tx.user.findUnique({
+          where: { id: input.userId },
+        });
 
-          if (!user) {
-            throw new Error('USER_NOT_FOUND');
-          }
+        if (!user) {
+          throw new Error('USER_NOT_FOUND');
+        }
 
-          const existingPref = await tx.userPreference.findUnique({
-            where: { userId: input.userId },
-          });
+        const existingPref = await tx.userPreference.findUnique({
+          where: { userId: input.userId },
+        });
 
-          const updateData: Record<string, any> = {};
-          if (input.preferredLocale !== undefined)
-            updateData.preferredLocale = input.preferredLocale;
-          if (input.timezone !== undefined) updateData.timezone = input.timezone;
-          if (input.defaultDeviceId !== undefined)
-            updateData.defaultDeviceId = input.defaultDeviceId;
+        const updateData: Record<string, any> = {};
+        if (input.preferredLocale !== undefined) updateData.preferredLocale = input.preferredLocale;
+        if (input.timezone !== undefined) updateData.timezone = input.timezone;
+        if (input.defaultDeviceId !== undefined) updateData.defaultDeviceId = input.defaultDeviceId;
 
-          const updated = await tx.userPreference.upsert({
-            where: { userId: input.userId },
-            update: updateData,
-            create: {
-              userId: input.userId,
-              preferredLocale: input.preferredLocale || 'id',
-              timezone: input.timezone || 'Asia/Jakarta',
-              defaultDeviceId: input.defaultDeviceId || null,
-            },
-          });
+        const updated = await tx.userPreference.upsert({
+          where: { userId: input.userId },
+          update: updateData,
+          create: {
+            userId: input.userId,
+            preferredLocale: input.preferredLocale || 'id',
+            timezone: input.timezone || 'Asia/Jakarta',
+            defaultDeviceId: input.defaultDeviceId || null,
+          },
+        });
 
-          await tx.auditLog.create({
-            data: {
-              eventKey: 'profile.self.updated',
-              actorUserId: input.userId,
-              targetType: 'USER',
-              targetId: input.userId,
-              result: 'SUCCESS',
-              previousValues: existingPref
-                ? {
-                    preferredLocale: existingPref.preferredLocale,
-                    timezone: existingPref.timezone,
-                    defaultDeviceId: existingPref.defaultDeviceId,
-                  }
-                : {},
-              newValues: updateData,
-              metadata: {},
-              requestId: input.requestId || null,
-              ipAddress: input.ipAddress || null,
-              userAgent: input.userAgent || null,
-            },
-          });
+        await tx.auditLog.create({
+          data: {
+            eventKey: 'profile.self.updated',
+            actorUserId: input.userId,
+            targetType: 'USER',
+            targetId: input.userId,
+            result: 'SUCCESS',
+            previousValues: existingPref
+              ? {
+                  preferredLocale: existingPref.preferredLocale,
+                  timezone: existingPref.timezone,
+                  defaultDeviceId: existingPref.defaultDeviceId,
+                }
+              : {},
+            newValues: updateData,
+            metadata: {},
+            requestId: input.requestId || null,
+            ipAddress: input.ipAddress || null,
+            userAgent: input.userAgent || null,
+          },
+        });
 
-          return updated;
-        },
-        { isolationLevel: 'RepeatableRead' }
-      );
+        return updated;
+      }, DEFAULT_TRANSACTION_OPTIONS);
 
       return {
         success: true,
@@ -2326,10 +2298,25 @@ export class UserRepository {
 
     while (attempt < MAX_RETRIES) {
       try {
-        const result = await this.prisma.$transaction(
-          async (tx) => {
-            let tokenRecord = await tx.emailVerificationToken.findUnique({
-              where: { tokenHash },
+        const result = await this.prisma.$transaction(async (tx) => {
+          let tokenRecord = await tx.emailVerificationToken.findUnique({
+            where: { tokenHash },
+            include: {
+              user: {
+                include: {
+                  userRoles: {
+                    where: { revokedAt: null },
+                    include: { role: true },
+                  },
+                },
+              },
+            },
+          });
+
+          // If not found by raw hash and a token was provided, try looking up user-scoped hash
+          if (!tokenRecord && input.token) {
+            const allMatchingTokens = await tx.emailVerificationToken.findMany({
+              where: { expiresAt: { gt: new Date() } },
               include: {
                 user: {
                   include: {
@@ -2342,96 +2329,76 @@ export class UserRepository {
               },
             });
 
-            // If not found by raw hash and a token was provided, try looking up user-scoped hash
-            if (!tokenRecord && input.token) {
-              const allMatchingTokens = await tx.emailVerificationToken.findMany({
-                where: { expiresAt: { gt: new Date() } },
-                include: {
-                  user: {
-                    include: {
-                      userRoles: {
-                        where: { revokedAt: null },
-                        include: { role: true },
-                      },
-                    },
-                  },
-                },
-              });
-
-              for (const record of allMatchingTokens) {
-                const computedHash = crypto
-                  .createHash('sha256')
-                  .update(`${record.userId}:${input.token.trim()}`)
-                  .digest('hex');
-                if (computedHash === record.tokenHash) {
-                  tokenRecord = record;
-                  break;
-                }
+            for (const record of allMatchingTokens) {
+              const computedHash = crypto
+                .createHash('sha256')
+                .update(`${record.userId}:${input.token.trim()}`)
+                .digest('hex');
+              if (computedHash === record.tokenHash) {
+                tokenRecord = record;
+                break;
               }
             }
+          }
 
-            if (!tokenRecord) {
-              return {
-                success: false as const,
-                error: 'INVALID_TOKEN' as const,
-                message: 'Invalid or missing email verification code.',
-              };
-            }
+          if (!tokenRecord) {
+            return {
+              success: false as const,
+              error: 'INVALID_TOKEN' as const,
+              message: 'Invalid or missing email verification code.',
+            };
+          }
 
-            if (tokenRecord.expiresAt < new Date()) {
-              await tx.emailVerificationToken.delete({
-                where: { id: tokenRecord.id },
-              });
-              return {
-                success: false as const,
-                error: 'TOKEN_EXPIRED' as const,
-                message: 'Email verification code has expired.',
-              };
-            }
-
-            const updatedUser = await tx.user.update({
-              where: { id: tokenRecord.userId },
-              data: { emailVerifiedAt: new Date() },
-              include: {
-                userRoles: {
-                  where: { revokedAt: null },
-                  include: { role: true },
-                },
-              },
-            });
-
+          if (tokenRecord.expiresAt < new Date()) {
             await tx.emailVerificationToken.delete({
               where: { id: tokenRecord.id },
             });
-
-            await tx.auditLog.create({
-              data: {
-                eventKey: 'account.email.verified',
-                actorUserId: updatedUser.id,
-                actorRole: null,
-                targetType: 'USER',
-                targetId: updatedUser.id,
-                result: 'SUCCESS',
-                previousValues: { emailVerifiedAt: null },
-                newValues: { emailVerifiedAt: updatedUser.emailVerifiedAt },
-                metadata: {
-                  action: 'EMAIL_VERIFICATION',
-                },
-                requestId: input.requestId,
-                ipAddress: input.ipAddress,
-                userAgent: input.userAgent,
-              },
-            });
-
             return {
-              success: true as const,
-              user: toPublicSafeUserDto(this.mapPrismaUserToRawDbUser(updatedUser)),
+              success: false as const,
+              error: 'TOKEN_EXPIRED' as const,
+              message: 'Email verification code has expired.',
             };
-          },
-          {
-            isolationLevel: 'RepeatableRead',
           }
-        );
+
+          const updatedUser = await tx.user.update({
+            where: { id: tokenRecord.userId },
+            data: { emailVerifiedAt: new Date() },
+            include: {
+              userRoles: {
+                where: { revokedAt: null },
+                include: { role: true },
+              },
+            },
+          });
+
+          await tx.emailVerificationToken.delete({
+            where: { id: tokenRecord.id },
+          });
+
+          await tx.auditLog.create({
+            data: {
+              eventKey: 'account.email.verified',
+              actorUserId: updatedUser.id,
+              actorRole: null,
+              targetType: 'USER',
+              targetId: updatedUser.id,
+              result: 'SUCCESS',
+              previousValues: { emailVerifiedAt: null },
+              newValues: { emailVerifiedAt: updatedUser.emailVerifiedAt },
+              metadata: {
+                action: 'EMAIL_VERIFICATION',
+              },
+              requestId: input.requestId,
+              ipAddress: input.ipAddress,
+              userAgent: input.userAgent,
+            },
+          });
+
+          return {
+            success: true as const,
+            user: toPublicSafeUserDto(this.mapPrismaUserToRawDbUser(updatedUser)),
+          };
+        }, DEFAULT_TRANSACTION_OPTIONS);
 
         return result;
       } catch (err: any) {
@@ -2668,112 +2635,107 @@ export class UserRepository {
 
     while (attempt < MAX_RETRIES) {
       try {
-        const result = await this.prisma.$transaction(
-          async (tx) => {
-            const tokenRecord = await tx.emailVerificationToken.findFirst({
-              where: {
-                userId: input.userId,
-                pendingEmail: { not: null },
-              },
-            });
+        const result = await this.prisma.$transaction(async (tx) => {
+          const tokenRecord = await tx.emailVerificationToken.findFirst({
+            where: {
+              userId: input.userId,
+              pendingEmail: { not: null },
+            },
+          });
 
-            if (!tokenRecord || !tokenRecord.pendingEmail) {
-              return {
-                success: false as const,
-                error: 'NO_PENDING_EMAIL_CHANGE' as const,
-                message: 'No pending email change request found.',
-              };
-            }
+          if (!tokenRecord || !tokenRecord.pendingEmail) {
+            return {
+              success: false as const,
+              error: 'NO_PENDING_EMAIL_CHANGE' as const,
+              message: 'No pending email change request found.',
+            };
+          }
 
-            if (tokenRecord.expiresAt < new Date()) {
-              await tx.emailVerificationToken.delete({
-                where: { id: tokenRecord.id },
-              });
-              return {
-                success: false as const,
-                error: 'TOKEN_EXPIRED' as const,
-                message: 'Email verification code has expired. Please request a new code.',
-              };
-            }
-
-            const expectedHash = crypto
-              .createHash('sha256')
-              .update(`${input.userId}:${tokenRecord.pendingEmail}:${input.code.trim()}`)
-              .digest('hex');
-
-            if (expectedHash !== tokenRecord.tokenHash) {
-              return {
-                success: false as const,
-                error: 'INVALID_VERIFICATION_CODE' as const,
-                message: 'Invalid email verification code.',
-              };
-            }
-
-            // Atomic uniqueness re-verification
-            const existingUserWithEmail = await tx.user.findUnique({
-              where: { email: tokenRecord.pendingEmail },
-              select: { id: true },
-            });
-
-            if (existingUserWithEmail && existingUserWithEmail.id !== input.userId) {
-              await tx.emailVerificationToken.delete({
-                where: { id: tokenRecord.id },
-              });
-              return {
-                success: false as const,
-                error: 'DUPLICATE_EMAIL' as const,
-                message: 'The specified email address is already in use by another account.',
-              };
-            }
-
-            const updatedUser = await tx.user.update({
-              where: { id: input.userId },
-              data: {
-                email: tokenRecord.pendingEmail,
-                emailVerifiedAt: new Date(),
-              },
-              include: {
-                userRoles: {
-                  where: { revokedAt: null },
-                  include: { role: true },
-                },
-              },
-            });
-
+          if (tokenRecord.expiresAt < new Date()) {
             await tx.emailVerificationToken.delete({
               where: { id: tokenRecord.id },
             });
-
-            await tx.auditLog.create({
-              data: {
-                eventKey: AuditEventKey.ACCOUNT_EMAIL_CHANGED,
-                actorUserId: input.userId,
-                actorRole: null,
-                targetType: 'USER',
-                targetId: input.userId,
-                result: 'SUCCESS',
-                previousValues: { emailChanged: true },
-                newValues: { emailChanged: true },
-                metadata: {
-                  action: 'EMAIL_CHANGE_VERIFIED',
-                },
-                requestId: input.requestId,
-                ipAddress: input.ipAddress,
-                userAgent: input.userAgent,
-              },
-            });
-
             return {
-              success: true as const,
-              email: tokenRecord.pendingEmail,
-              emailVerifiedAt: updatedUser.emailVerifiedAt!,
-              user: toPublicSafeUserDto(this.mapPrismaUserToRawDbUser(updatedUser)),
+              success: false as const,
+              error: 'TOKEN_EXPIRED' as const,
+              message: 'Email verification code has expired. Please request a new code.',
             };
-          },
-          {
-            isolationLevel: 'RepeatableRead',
           }
-        );
+
+          const expectedHash = crypto
+            .createHash('sha256')
+            .update(`${input.userId}:${tokenRecord.pendingEmail}:${input.code.trim()}`)
+            .digest('hex');
+
+          if (expectedHash !== tokenRecord.tokenHash) {
+            return {
+              success: false as const,
+              error: 'INVALID_VERIFICATION_CODE' as const,
+              message: 'Invalid email verification code.',
+            };
+          }
+
+          // Atomic uniqueness re-verification
+          const existingUserWithEmail = await tx.user.findUnique({
+            where: { email: tokenRecord.pendingEmail },
+            select: { id: true },
+          });
+
+          if (existingUserWithEmail && existingUserWithEmail.id !== input.userId) {
+            await tx.emailVerificationToken.delete({
+              where: { id: tokenRecord.id },
+            });
+            return {
+              success: false as const,
+              error: 'DUPLICATE_EMAIL' as const,
+              message: 'The specified email address is already in use by another account.',
+            };
+          }
+
+          const updatedUser = await tx.user.update({
+            where: { id: input.userId },
+            data: {
+              email: tokenRecord.pendingEmail,
+              emailVerifiedAt: new Date(),
+            },
+            include: {
+              userRoles: {
+                where: { revokedAt: null },
+                include: { role: true },
+              },
+            },
+          });
+
+          await tx.emailVerificationToken.delete({
+            where: { id: tokenRecord.id },
+          });
+
+          await tx.auditLog.create({
+            data: {
+              eventKey: AuditEventKey.ACCOUNT_EMAIL_CHANGED,
+              actorUserId: input.userId,
+              actorRole: null,
+              targetType: 'USER',
+              targetId: input.userId,
+              result: 'SUCCESS',
+              previousValues: { emailChanged: true },
+              newValues: { emailChanged: true },
+              metadata: {
+                action: 'EMAIL_CHANGE_VERIFIED',
+              },
+              requestId: input.requestId,
+              ipAddress: input.ipAddress,
+              userAgent: input.userAgent,
+            },
+          });
+
+          return {
+            success: true as const,
+            email: tokenRecord.pendingEmail,
+            emailVerifiedAt: updatedUser.emailVerifiedAt!,
+            user: toPublicSafeUserDto(this.mapPrismaUserToRawDbUser(updatedUser)),
+          };
+        }, DEFAULT_TRANSACTION_OPTIONS);
 
         return result;
       } catch (err: any) {
