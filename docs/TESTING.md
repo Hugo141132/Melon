@@ -2418,4 +2418,31 @@ Automated unit, integration, and type safety verification for `TASK-0506`:
 - **Translation Completeness:** `npm run i18n:check` passed with 100% key parity across `messages/id.json` and `messages/en.json`.
 - **Prettier Code Style:** `npm run format:check` confirmed all files are 100% compliant.
 <!-- TASK-0506 Testing Reconciled: 2026-09-02 -->
+ 
+---
+
+# 58. Devices Route Authentication Optimization & Loading Transition Verification Suite (Reconciled 2026-09-04)
+
+Automated unit, loading transition, component skeleton parity, and Playwright live browser verification for `/devices`:
+
+### Agent-Executed Automated Tests
+1. **Targeted Devices Auth State & Scoping Test Suite (`apps/web/test/unit/devices-page.test.tsx`):**
+   - **Suite Pass Rate:** **3/3 tests passed (100%)**:
+     1. *Instant Render Without Spinner:* Asserts that `DeviceRegistryPage` renders immediately using `AuthContext` without displaying `"Memeriksa sesi pengguna..."` or `"Checking user session..."`, and triggers `fetch('/api/v1/devices')` immediately on mount.
+     2. *Owner Controls & Identity Visibility:* Asserts canonical monospace `deviceId` and Owner action buttons (`Edit` / `Ubah`, `Deactivate` / `Nonaktifkan Perangkat?`) are visible when user role is `OWNER`.
+     3. *Admin Controls & Identity Concealment:* Asserts Owner action buttons (`Edit`, `Deactivate`) are concealed and canonical `deviceId` is hidden when user role is `ADMIN` per `DEC-DEV-028`.
+2. **Devices Route Loading Transition Test Suite (`apps/web/test/unit/devices-loading-transition.test.tsx`):**
+   - **Suite Pass Rate:** **1/1 test passed (100%)**:
+     1. *Structural Parity & Shell Stability:* Asserts `DevicesLoading` renders the full static page shell with complete layout matching (`devices-loading-shell`, `devices-loading-header`, `devices-loading-filters`, and `devices-loading-grid` with 4 card placeholders).
+3. **Monorepo Static Typecheck:**
+   - `npm run typecheck` returned **0 errors** across all 4 monorepo packages (`@kebun-melon/web`, `@kebun-melon/iot-gateway`, `@kebun-melon/contracts`, `@kebun-melon/database`).
+
+### Playwright MCP Browser Navigation Verification
+1. Booted local Next.js development server on `http://localhost:3000`.
+2. Injected authenticated Owner session cookie in browser.
+3. Navigated between `/` and `/devices`.
+4. Verified that route transition presents the `bg-app-surface` background shell immediately without white screen flashes.
+5. Confirmed that page header, search bar, dropdown filters, and device grid cards render smoothly without layout shifts.
+6. Verified zero regression on Owner and Admin access boundaries.
+<!-- Devices Route Loading & Auth Testing Reconciled: 2026-09-04 -->
 

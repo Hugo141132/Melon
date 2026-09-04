@@ -407,5 +407,26 @@ The following facts are verified in the traceability matrix regarding `TASK-0506
   - Translation parity verified at 100% via `npm run i18n:check`.
   - Monorepo TypeScript type checking passed with 0 errors across 4 workspaces (`tsc --noEmit`).
 <!-- Operational Overview Dashboard Traceability Reconciled: 2026-09-02 -->
+ 
+---
+
+## Devices Route Loading Transition & Auth Optimization Traceability Note (Reconciled 2026-09-04)
+
+The following facts are verified in the traceability matrix regarding the `/devices` route optimization and loading transition improvement:
+- **Traceability Baseline:** Defined under `PRD-FR-020`, `DEC-DEV-028`, `UI_UX.md`, and `FRONTEND_AUDIT.md` to provide immediate, flicker-free presentation of the device management console without redundant client session fetching or blank white screen transitions.
+- **Implementation Status:** Fully implemented and verified:
+  - Created route-level static skeleton shell (`apps/web/app/devices/loading.tsx`) rendering `TopAppBar`, header skeleton (`Cpu` icon and title/subtitle), filter controls skeleton, and a 4-card device grid skeleton in `bg-app-surface text-app-on-surface min-h-dvh pb-24`.
+  - Optimized `apps/web/app/devices/page.tsx` by eliminating client-side `fetch('/api/v1/auth/session')`, `currentUserRole` state, and blocking `"Memeriksa sesi pengguna..."` screen; consumed server-hydrated `useAuth()` hook directly.
+  - Preserved strict Admin canonical `deviceId` concealment (`DEC-DEV-028`) and Owner-only management actions (`Edit`, `Activate/Deactivate`).
+- **Architectural & Security Invariance:**
+  - Zero database schema alterations and zero migrations.
+  - Zero modifications to backend route handlers (`/api/v1/devices/*`), middleware, session verification logic, or RBAC rules.
+  - Kept global `<body>` classes in `apps/web/app/layout.tsx` untouched to avoid styling side-effects on public authentication routes.
+- **Automated Verification:**
+  - `apps/web/test/unit/devices-page.test.tsx`: 3/3 tests passed (100%).
+  - `apps/web/test/unit/devices-loading-transition.test.tsx`: 1/1 test passed (100%).
+  - Monorepo TypeScript type checking passed with 0 errors across 4 workspaces (`tsc --noEmit`).
+  - Playwright live browser navigation verified smooth transition without white flashes.
+<!-- Devices Loading & Auth Optimization Traceability Reconciled: 2026-09-04 -->
 
 

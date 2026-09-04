@@ -1451,4 +1451,26 @@ The root overview dashboard (`/` and `/dashboard`) has been upgraded to a focuse
 - **Zero Emoji Governance:** All emojis are completely banned from UI code and translation dictionaries; professional Lucide icons (`MapPin`, `Droplets`, `Wind`, `Sun`, `Cpu`, `Activity`, `Cloud`, etc.) provide clean visual semantics.
 - **Section Clean-Up:** Removed synthetic 92/100 health score and portal-like sections (System Snapshot, Quick Actions, duplicate domain cards) from the root dashboard.
 <!-- TASK-0506 UI/UX Reconciled: 2026-09-02 -->
+ 
+---
+
+## Devices Route Loading Transition & Auth Optimization UI/UX Note (Reconciled 2026-09-04)
+
+The `/devices` route loading transition and presentation state are reconciled to eliminate flash-of-white transitions and eliminate redundant session loading delays:
+- **Frontend Impact:** `MINOR`
+- **Selected UI Direction:** `Premium Minimal Ops`
+- **Existing Color Template:** `UNCHANGED` (Authoritative MD3 tokens: `app-surface: #f9f9f9`, `app-on-surface: #1a1c1c`, `app-surface-container-lowest: #ffffff`, `app-outline-variant: #bfcaba`)
+- **Selected Motion Effects:** `Skeleton loading`, `Card hover`, `Button hover`
+- **21st.dev MCP:** `NOT REQUIRED` (reuses existing design system tokens and skeleton conventions)
+- **Route-Level Loading Shell (`apps/web/app/devices/loading.tsx`):**
+  - Structural parity: Renders `<TopAppBar />`, header skeleton (`Cpu` icon container with pulsing title and subtitle bars), filter skeleton (search bar input and twin dropdown selects), and a 4-card device grid skeleton.
+  - Viewport-Filling Base: Root element styled with `bg-app-surface text-app-on-surface min-h-dvh pb-24` ensuring zero blank white frame during Next.js App Router streaming.
+  - Layout stability: Eliminates layout shift and visual jarring between route navigation and final content resolution.
+- **Elimination of Blocking Auth Spinner:**
+  - Removed full-page `"Memeriksa sesi pengguna..."` / `"Checking user session..."` blocking spinner.
+  - Authenticated identity (`useAuth()`) is resolved synchronously via SSR hydration from `AuthContext`, rendering the page layout immediately on mount.
+- **Permission & Security Scoping:**
+  - Preserved Owner-only action buttons (`Edit` and `Deactivate/Activate`) and canonical monospace `deviceId` badge.
+  - Preserved strict concealment of canonical `deviceId` from Admin users (`DEC-DEV-028`).
+<!-- Devices Route Loading & Auth UI/UX Reconciled: 2026-09-04 -->
 

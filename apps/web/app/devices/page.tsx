@@ -19,6 +19,7 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { useAuth } from '@/context/AuthContext';
 
 interface PublicSafeDeviceDto {
   id: string;
@@ -51,10 +52,8 @@ interface PaginationMeta {
 export default function DeviceRegistryPage() {
   const tDevices = useTranslations('devices');
   const tCommon = useTranslations('common');
-  const tAuth = useTranslations('auth');
-
-  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
+  const { role } = useAuth();
+  const isOwner = role === 'OWNER';
 
   // List state
   const [devices, setDevices] = useState<PublicSafeDeviceDto[]>([]);
@@ -90,26 +89,6 @@ export default function DeviceRegistryPage() {
   const [activateModalOpen, setActivateModalOpen] = useState(false);
   const [activateSubmitting, setActivateSubmitting] = useState(false);
 
-  // Check auth session
-  useEffect(() => {
-    const fetchSession = async () => {
-      try {
-        const res = await fetch('/api/v1/auth/session');
-        const json = await res.json();
-        if (json.success && json.data?.authenticated && json.data?.user) {
-          setCurrentUserRole(json.data.user.role);
-        } else {
-          setCurrentUserRole(null);
-        }
-      } catch {
-        setCurrentUserRole(null);
-      } finally {
-        setAuthLoading(false);
-      }
-    };
-    fetchSession();
-  }, []);
-
   // Fetch devices
   const fetchDevices = useCallback(
     async (pageToFetch = 1) => {
@@ -144,10 +123,8 @@ export default function DeviceRegistryPage() {
   );
 
   useEffect(() => {
-    if (!authLoading && currentUserRole) {
-      fetchDevices(1);
-    }
-  }, [authLoading, currentUserRole, fetchDevices]);
+    fetchDevices(1);
+  }, [fetchDevices]);
 
   // Handle Edit Device (Owner Only)
   const handleUpdateDevice = async (e: React.FormEvent) => {
@@ -245,19 +222,6 @@ export default function DeviceRegistryPage() {
       setActivateSubmitting(false);
     }
   };
-
-  if (authLoading) {
-    return (
-      <div className="bg-app-surface min-h-dvh flex items-center justify-center p-4">
-        <div className="flex items-center gap-3 text-app-primary">
-          <Loader2 size={24} className="animate-spin" />
-          <span className="font-semibold text-[16px]">{tAuth('checkingSession')}</span>
-        </div>
-      </div>
-    );
-  }
-
-  const isOwner = currentUserRole === 'OWNER';
 
   return (
     <div className="bg-app-surface text-app-on-surface min-h-dvh pb-24">

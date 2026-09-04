@@ -1720,7 +1720,7 @@ The following facts are supported by the verified architecture of `TASK-0806` (`
 
 The following facts are supported by the verified architecture of `TASK-0215` (`AuthContext` and RootLayout SSR Hydration):
 - **Server-to-Client State Hydration:** `RootLayout` (`apps/web/app/layout.tsx`) retrieves session metadata during initial server-side rendering via `getSessionOrNull()` (`apps/web/lib/auth/rbac.ts`). This session data is passed to `AuthProvider` (`apps/web/context/AuthContext.tsx`), rendering authenticated state synchronously across client trees.
-- **Client State Unification:** Eliminates redundant client-side `useEffect` and `fetch('/api/v1/auth/session')` requests on page mount (e.g. on `/` and `/setting`).
+- **Client State Unification:** Eliminates redundant client-side `useEffect` and `fetch('/api/v1/auth/session')` requests on page mount (e.g. on `/`, `/setting`, and `/devices`).
 - **Clean Component Interfaces:** Eliminates prop-drilling of `user` and `role` down through `TopAppBar` into `Sidebar`. Components independently access `{ user, role, isAuthenticated }` using the `useAuth()` hook.
 - **Security & Authorization Boundaries:** Client-side `AuthContext` is restricted to UI presentation and route navigation. Server-side route handlers (`/api/v1/*`) and Server Actions maintain authoritative security checks via `requireSession()`, `requireRole()`, and `requirePermission()`. No secrets or raw tokens are stored in browser storage.
 <!-- TASK-0215 Reconciled: 2026-08-22 -->
@@ -1853,3 +1853,20 @@ The staging environment is formally decoupled from Railway PaaS and transitioned
    - Both Docker images (`web` and `iot-gateway`) built cleanly with exit code 0.
    - Staging runtime startup verified using `docker compose -f docker-compose.staging.yml up` with `ENABLE_FAUCET_CONTROL=false` strictly enforced and zero committed secrets.
 <!-- TASK-1012 Architecture Reconciled: 2026-09-03 -->
+ 
+---
+
+## Devices Loading & Auth Optimization Architecture Note (Reconciled 2026-09-04)
+
+The following architecture facts are supported by the verified implementation of the `/devices` route optimization and loading transition improvement:
+1. **Next.js Route-Level Loading Shell (`apps/web/app/devices/loading.tsx`):**
+   - Supplies Next.js App Router with an instant static page shell matching the structural layout of `/devices` (`TopAppBar`, header skeleton with `Cpu` icon, search and filter bar skeletons, and a 4-card device grid skeleton).
+   - Wrapped in `bg-app-surface text-app-on-surface min-h-dvh pb-24`, eliminating blank white screen transitions during chunk streaming and client navigation.
+   - Preserves style isolation by keeping global `<body>` styling in `apps/web/app/layout.tsx` untouched, avoiding unintended color palette leakage into public authentication screens (`bg-surface`).
+2. **Centralized Auth State Hydration in Device Registry (`apps/web/app/devices/page.tsx`):**
+   - Consumes centralized `useAuth()` state hydrated from SSR (`const { role } = useAuth(); const isOwner = role === 'OWNER';`).
+   - Eliminates redundant client-side `useEffect` call and `fetch('/api/v1/auth/session')` request on mount.
+   - Completely removes the blocking `"Checking user session..."` screen (`tAuth('checkingSession')`), enabling immediate invocation of `fetchDevices(1)` upon mount.
+3. **Preserved Security & Authorization Boundaries:**
+   - Server-side route authorization (`requireSession` in `/api/v1/devices`), RBAC scoping (`device.read`, `device.activate`, `device.deactivate`), and Admin canonical `deviceId` concealment (`DEC-DEV-028`) remain strictly enforced on the server.
+<!-- Devices Loading & Auth Optimization Architecture Reconciled: 2026-09-04 -->

@@ -1055,6 +1055,12 @@ Implement sites if required for version 1.
 - Strictly protected device secrets and credentials, preventing client overrides of server-controlled status/telemetry fields via `.strict()` schema stripping.
 - Documented physical ESP32/NodeMCU firmware reconfiguration and EMQX broker credential/ACL synchronization following a rename as **TBD / BLOCKING** operational automation (`DEC-DEV-028`).
 - Verified 100% test pass rate across unit test suites (`device-repository.test.ts` 12/12, `route.test.ts` 24/24), TypeScript typecheck (0 errors), Next.js production build (37/37 routes), and pre-commit quality gate (`npm run check:quality`).
+- Reconciled and optimized `/devices` client authentication and route transition on 2026-09-04:
+  - Eliminated redundant client-side `fetch('/api/v1/auth/session')` call and blocking `"Memeriksa sesi pengguna..."` / `"Checking user session..."` spinner from `apps/web/app/devices/page.tsx`, directly consuming SSR-hydrated `useAuth()` (`const { role } = useAuth(); const isOwner = role === 'OWNER';`).
+  - Device list fetching (`fetchDevices(1)`) triggers immediately upon mount while strictly preserving server-side auth, RBAC scoping, and Admin canonical `deviceId` concealment (`DEC-DEV-028`).
+  - Implemented route-level loading shell `apps/web/app/devices/loading.tsx` rendering `TopAppBar`, header skeleton with `Cpu` icon, search/filter skeletons, and 4-card device grid skeleton in `bg-app-surface text-app-on-surface min-h-dvh pb-24`, replacing white screen flashes with a seamless loading shell.
+  - Added dedicated unit tests: `apps/web/test/unit/devices-page.test.tsx` (3/3 passed) and `apps/web/test/unit/devices-loading-transition.test.tsx` (1/1 passed).
+  - Verified live route navigation and loading transitions via Playwright MCP with zero regressions.
 
 ### Work
 

@@ -502,4 +502,20 @@ The following frontend components were created, refactored, and audited for `TAS
   - Removed portal-like overview sections (`SystemSnapshot`, `QuickActions`, duplicate domain cards) from the root dashboard.
 - **Zero Emoji Compliance:** All icon representations use Lucide SVG components with zero unicode emoji characters.
 <!-- TASK-0506 Frontend Audit Reconciled: 2026-09-02 -->
+ 
+---
+
+## Devices Route Loading & Auth Optimization Frontend Audit Note (Reconciled 2026-09-04)
+
+The following frontend components were created, refactored, and audited for the `/devices` route optimization:
+- **`apps/web/app/devices/loading.tsx` [NEW]:**
+  - Route-level loading skeleton matching the exact structural layout of `/devices`.
+  - Integrates `TopAppBar`, header skeleton (`Cpu` icon and pulsing title/subtitle), search/filter control skeletons, and a 4-card device grid skeleton in `bg-app-surface text-app-on-surface min-h-dvh pb-24`.
+  - Replaces blank white transitions with a seamless, flicker-free skeleton during App Router streaming and client route transitions.
+- **`apps/web/app/devices/page.tsx` [AUDITED & OPTIMIZED]:**
+  - Removed redundant client-side `fetch('/api/v1/auth/session')`, `currentUserRole` state, and `authLoading` state.
+  - Replaced blocking full-page session spinner (`tAuth('checkingSession')`) with centralized `useAuth()` hook hydrated from SSR (`const { role } = useAuth(); const isOwner = role === 'OWNER';`).
+  - Device list fetching (`fetchDevices(1)`) now triggers immediately upon component mount without waiting for client session roundtrips.
+  - Retained strict Admin canonical `deviceId` concealment (`DEC-DEV-028`) and Owner-only action controls.
+<!-- Devices Loading & Auth Frontend Audit Reconciled: 2026-09-04 -->
 
