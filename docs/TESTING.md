@@ -2446,3 +2446,30 @@ Automated unit, loading transition, component skeleton parity, and Playwright li
 6. Verified zero regression on Owner and Admin access boundaries.
 <!-- Devices Route Loading & Auth Testing Reconciled: 2026-09-04 -->
 
+---
+
+# 59. Users Route Authentication Optimization & Loading Transition Verification Suite (Reconciled 2026-09-04)
+
+Automated unit, loading transition, component skeleton parity, and Playwright live browser verification for `/users`:
+
+### Agent-Executed Automated Tests
+1. **Targeted Users Auth State & RBAC Test Suite (`apps/web/test/unit/users-page.test.tsx`):**
+   - **Suite Pass Rate:** **2/2 tests passed (100%)**:
+     1. *Immediate Render & Fetch for Owner:* Asserts that `UserManagementPage` renders immediately using `AuthContext` without displaying `"Memeriksa sesi pengguna..."` or `"Checking user session..."`, and triggers `fetch('/api/v1/users')` immediately on mount when user role is `OWNER`.
+     2. *Instant 403 Forbidden for Admin:* Asserts that `UserManagementPage` instantly displays `Akses Terbatas (403 Forbidden)` and does not call `fetch('/api/v1/users')` when user role is `ADMIN`, preserving client RBAC guard boundaries.
+2. **Users Route Loading Transition Test Suite (`apps/web/test/unit/users-loading-transition.test.tsx`):**
+   - **Suite Pass Rate:** **1/1 test passed (100%)**:
+     1. *Structural Parity & Shell Stability:* Asserts `UsersLoading` renders the full static page shell with complete layout matching (`users-loading-shell`, `users-loading-header`, `users-loading-filters`, and `users-loading-table` with 5 row placeholders in `bg-app-surface text-app-on-surface min-h-dvh pb-24`).
+3. **Auth-Hydrated Pages Unit Coverage:**
+   - **13/13 tests passed (100%)** across 6 auth-hydrated suites (`users-page.test.tsx`, `users-loading-transition.test.tsx`, `devices-page.test.tsx`, `devices-loading-transition.test.tsx`, `profile-page.test.tsx`, `controls-loading-transition.test.tsx`).
+4. **Monorepo Static Typecheck:**
+   - `npm run typecheck` returned **0 errors** across all 4 monorepo packages (`@kebun-melon/web`, `@kebun-melon/iot-gateway`, `@kebun-melon/contracts`, `@kebun-melon/database`).
+
+### Playwright MCP Browser Navigation Verification
+1. Booted local Next.js development server on port 3001.
+2. Injected authenticated Owner session cookie in browser: navigated to `/users`, verified instant loading without session spinner, with user table, search input, and status filters rendered cleanly (verified via screenshot `users_owner_verified-2026-09-04T14-34-25-166Z.png`).
+3. Injected authenticated Admin session cookie in browser: navigated to `/users`, verified instant `Akses Terbatas (403 Forbidden)` screen displayed without loading spinner (verified via screenshot `users_admin_verified-2026-09-04T14-35-18-413Z.png`).
+4. Cleaned up synthetic database sessions and shut down development server.
+<!-- Users Route Loading & Auth Testing Reconciled: 2026-09-04 -->
+
+

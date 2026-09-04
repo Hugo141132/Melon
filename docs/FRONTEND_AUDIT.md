@@ -519,3 +519,21 @@ The following frontend components were created, refactored, and audited for the 
   - Retained strict Admin canonical `deviceId` concealment (`DEC-DEV-028`) and Owner-only action controls.
 <!-- Devices Loading & Auth Frontend Audit Reconciled: 2026-09-04 -->
 
+---
+
+## Users Route Loading & Auth Optimization Frontend Audit Note (Reconciled 2026-09-04)
+
+The following frontend components were created, refactored, and audited for the `/users` route optimization:
+- **`apps/web/app/users/loading.tsx` [NEW]:**
+  - Route-level loading skeleton matching the exact structural layout of `/users`.
+  - Integrates `TopAppBar`, header skeleton (`Users` icon and pulsing title/subtitle), search and role/status filter skeletons, and a 5-row user table card skeleton in `bg-app-surface text-app-on-surface min-h-dvh pb-24`.
+  - Replaces blank white transitions with a seamless, flicker-free skeleton during App Router streaming and client route transitions.
+- **`apps/web/app/users/page.tsx` [AUDITED & OPTIMIZED]:**
+  - Removed redundant client-side `fetch('/api/v1/auth/session')`, `currentUserRole` state, and `authLoading` state.
+  - Replaced blocking full-page session spinner (`tAuth('checkingSession')`) with centralized `useAuth()` hook hydrated from SSR (`const { role } = useAuth(); const isOwner = role === 'OWNER';`).
+  - Resolved identifier shadowing by renaming user map variable `isOwner` to `isTargetOwner`.
+  - User list fetching (`fetchUsers(1)`) now triggers immediately upon mount for Owner users without waiting for client session roundtrips.
+  - Non-owner users immediately render the 403 Forbidden screen (`Akses Terbatas (403 Forbidden)`) without lingering spinners, backed by strict Next.js route middleware and server-side RBAC guards (`requireRole(['OWNER'])`).
+<!-- Users Loading & Auth Frontend Audit Reconciled: 2026-09-04 -->
+
+

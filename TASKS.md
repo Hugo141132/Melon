@@ -780,6 +780,12 @@ Implemented complete Owner User Management:
 - Anonymization of historical audit log `actorUserId` to NULL and non-PII `account.deleted` audit log event creation.
 - Checkbox + modal UX for account deletion on `/users` with double-submission protection and immediate local state removal.
 - Filter cleanup on `/users` omitting `APPROVED` and `DEACTIVATED`.
+- Reconciled and optimized `/users` client authentication and route transition on 2026-09-04:
+  - Eliminated redundant client-side `fetch('/api/v1/auth/session')` call, `currentUserRole` and `authLoading` state variables, and blocking `"Memeriksa sesi pengguna..."` / `"Checking user session..."` spinner from `apps/web/app/users/page.tsx`, directly consuming SSR-hydrated `useAuth()` (`const { role } = useAuth(); const isOwner = role === 'OWNER';`).
+  - User list fetching (`fetchUsers(1)`) triggers immediately upon mount when `isOwner` is true, while strictly preserving server-side auth, Next.js route middleware, API RBAC checks (`account.read`, etc.), and instant 403 Forbidden screen (`Akses Terbatas (403 Forbidden)`) for non-owner users.
+  - Implemented route-level loading shell `apps/web/app/users/loading.tsx` rendering `TopAppBar`, header skeleton with `Users` icon, search/filter skeletons, and a 5-row user table card skeleton in `bg-app-surface text-app-on-surface min-h-dvh pb-24`, replacing blank transitions with a seamless skeleton shell.
+  - Added dedicated unit tests: `apps/web/test/unit/users-page.test.tsx` (2/2 passed) and `apps/web/test/unit/users-loading-transition.test.tsx` (1/1 passed).
+  - Verified live route navigation and loading transitions via Playwright MCP with zero regressions.
 
 ### Acceptance Criteria
 
@@ -926,7 +932,7 @@ Implemented complete Owner User Management:
 
 - [x] Initial session is hydrated server-side in `RootLayout` with lightweight user/role metadata.
 - [x] Zero UI flashing or delayed role recognition on initial page load across protected routes.
-- [x] Redundant client-side calls to `/api/v1/auth/session` on mount removed from `/`, `/setting`, and `/profileee`.
+- [x] Redundant client-side calls to `/api/v1/auth/session` on mount removed from `/`, `/setting`, and `/profileee` (reconciled on `/devices` and `/users` on 2026-09-04).
 - [x] `TopAppBar` and `Sidebar` consume `useAuth()` without prop-drilling.
 - [x] `OWNER`-only menu items (`/users`, `/approvals`) on `/setting` and `Sidebar` render immediately based on hydrated role state.
 - [x] Security architecture and server-side RBAC enforcement remain unaffected.

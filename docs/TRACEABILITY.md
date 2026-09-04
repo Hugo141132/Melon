@@ -429,4 +429,29 @@ The following facts are verified in the traceability matrix regarding the `/devi
   - Playwright live browser navigation verified smooth transition without white flashes.
 <!-- Devices Loading & Auth Optimization Traceability Reconciled: 2026-09-04 -->
 
+---
+
+## Users Route Loading Transition & Auth Optimization Traceability Note (Reconciled 2026-09-04)
+
+The following facts are verified in the traceability matrix regarding the `/users` route optimization and loading transition improvement:
+- **Traceability Baseline:** Defined under `PRD-FR-004`, `TASK-0212`, `TASK-0215`, `UI_UX.md`, and `FRONTEND_AUDIT.md` to provide immediate, flicker-free presentation of the user management console for Owner users without redundant client session fetching or blank white screen transitions.
+- **Implementation Status:** Fully implemented and verified:
+  - Created route-level static skeleton shell (`apps/web/app/users/loading.tsx`) rendering `TopAppBar`, header skeleton (`Users` icon and title/subtitle), filter controls skeleton, and a 5-row user table card skeleton in `bg-app-surface text-app-on-surface min-h-dvh pb-24`.
+  - Optimized `apps/web/app/users/page.tsx` by eliminating client-side `fetch('/api/v1/auth/session')`, `currentUserRole` state, and blocking `"Memeriksa sesi pengguna..."` / `"Checking user session..."` screen; consumed server-hydrated `useAuth()` hook directly.
+  - Resolved identifier shadowing by renaming user iteration variable `isOwner` to `isTargetOwner`.
+  - Triggered user list fetching (`fetchUsers(1)`) immediately upon mount for Owner users.
+  - Preserved instant client-side 403 Forbidden screen (`Akses Terbatas (403 Forbidden)`) for Admin users, backed by strict server-side middleware and API RBAC enforcement (`requireRole(['OWNER'])`).
+- **Architectural & Security Invariance:**
+  - Zero database schema alterations and zero migrations.
+  - Zero modifications to backend route handlers (`/api/v1/users/*`), Next.js route middleware, session verification logic, or RBAC rules.
+  - Preserved transactional hard-deletion safety, Owner account protection, and non-PII audit logging.
+- **Automated Verification:**
+  - `apps/web/test/unit/users-page.test.tsx`: 2/2 tests passed (100%).
+  - `apps/web/test/unit/users-loading-transition.test.tsx`: 1/1 test passed (100%).
+  - Auth-hydrated page test suites: 13/13 tests passed across 6 suites (100%).
+  - Monorepo TypeScript type checking passed with 0 errors across 4 workspaces (`tsc --noEmit`).
+  - Playwright live browser verification confirmed instant loading without session spinner for Owner and instant 403 Forbidden screen for Admin.
+<!-- Users Loading & Auth Optimization Traceability Reconciled: 2026-09-04 -->
+
+
 

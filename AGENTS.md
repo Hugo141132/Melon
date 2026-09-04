@@ -239,6 +239,18 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
 - 21st.dev MCP: `NOT REQUIRED`
 - Summary: Implemented centralized authentication state hydration to eliminate delayed UI rendering and layout shifts across navigation and protected pages. Added React `AuthContext` (`AuthProvider` / `useAuth()`) in `@kebun-melon/web`, providing unified access to `{ user, role, isAuthenticated }`. Implemented `getSessionOrNull()` server helper in `lib/auth/rbac.ts` for safe, non-throwing session retrieval in the root layout (`RootLayout`) during SSR. Eliminated redundant client-side `useEffect` and `fetch('/api/v1/auth/session')` calls from `/`, `/setting`, `/profileee`, `TopAppBar`, and `Sidebar`. Refactored `Sidebar` and `TopAppBar` to consume `useAuth()` directly, removing unnecessary prop drilling. Refactored `/setting` and `/profileee` to instantaneously render user profileee identity and role-conditional menu items (`/users` and `/approvals` for `OWNER`) without loading spinners. Maintained strict server-side RBAC and route protection. Verified 100% test pass rate across 35 unit test suites (260/260 tests) and 14 E2E critical flows.
 
+#### TASK-0212 Governance Record
+
+`TASK-0212` user management and list status administration record:
+- Status: `DONE` (Completed 2026-08-22; Reconciled 2026-09-04)
+- 2026-09-04 /users Client Auth Optimization & Loading Transition:
+  - Frontend impact: `MINOR`
+  - Selected UI direction: `Premium Minimal Ops`
+  - Existing color template: `UNCHANGED`
+  - Selected motion effects: `Skeleton loading`, `Button hover`
+  - 21st.dev MCP: `NOT REQUIRED`
+  - Summary: Optimized `/users` authentication flow and route transition. Removed redundant client-side `fetch('/api/v1/auth/session')`, `currentUserRole` state, and blocking `"Memeriksa sesi pengguna..."` / `"Checking user session..."` spinner from `apps/web/app/users/page.tsx`, directly consuming server-hydrated `useAuth()` (`const { role } = useAuth(); const isOwner = role === 'OWNER';`). Resolved identifier shadowing by renaming user map variable `isOwner` to `isTargetOwner`. Enabled `fetchUsers(1)` to trigger immediately on component mount for Owner without waiting for redundant client session roundtrips. Preserved instant client-side 403 Forbidden screen (`Akses Terbatas (403 Forbidden)`) for Admin users, backed by strict server-side middleware and API RBAC enforcement (`requireRole(['OWNER'])`). Created route-level static loading skeleton `apps/web/app/users/loading.tsx` rendering `TopAppBar`, header skeleton (`Users` icon container and pulsing title/subtitle), search/filter input skeletons, and 5-row user table skeleton in `bg-app-surface text-app-on-surface min-h-dvh pb-24`, replacing blank transitions with a seamless, flicker-free skeleton during App Router streaming. Added unit test suites `apps/web/test/unit/users-page.test.tsx` (2/2 passed) and `apps/web/test/unit/users-loading-transition.test.tsx` (1/1 passed). Verified 100% test pass rate across all auth-hydrated page suites (13/13 passed), 0 typecheck errors across all 4 monorepo packages, and verified instant transition in browser via Playwright MCP.
+
 #### TASK-0217 Governance Record
 
 `TASK-0217` single active session enforcement and profile security UI record:

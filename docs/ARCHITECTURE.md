@@ -1720,7 +1720,7 @@ The following facts are supported by the verified architecture of `TASK-0806` (`
 
 The following facts are supported by the verified architecture of `TASK-0215` (`AuthContext` and RootLayout SSR Hydration):
 - **Server-to-Client State Hydration:** `RootLayout` (`apps/web/app/layout.tsx`) retrieves session metadata during initial server-side rendering via `getSessionOrNull()` (`apps/web/lib/auth/rbac.ts`). This session data is passed to `AuthProvider` (`apps/web/context/AuthContext.tsx`), rendering authenticated state synchronously across client trees.
-- **Client State Unification:** Eliminates redundant client-side `useEffect` and `fetch('/api/v1/auth/session')` requests on page mount (e.g. on `/`, `/setting`, and `/devices`).
+- **Client State Unification:** Eliminates redundant client-side `useEffect` and `fetch('/api/v1/auth/session')` requests on page mount (e.g. on `/`, `/setting`, `/devices`, and `/users`).
 - **Clean Component Interfaces:** Eliminates prop-drilling of `user` and `role` down through `TopAppBar` into `Sidebar`. Components independently access `{ user, role, isAuthenticated }` using the `useAuth()` hook.
 - **Security & Authorization Boundaries:** Client-side `AuthContext` is restricted to UI presentation and route navigation. Server-side route handlers (`/api/v1/*`) and Server Actions maintain authoritative security checks via `requireSession()`, `requireRole()`, and `requirePermission()`. No secrets or raw tokens are stored in browser storage.
 <!-- TASK-0215 Reconciled: 2026-08-22 -->
@@ -1870,3 +1870,22 @@ The following architecture facts are supported by the verified implementation of
 3. **Preserved Security & Authorization Boundaries:**
    - Server-side route authorization (`requireSession` in `/api/v1/devices`), RBAC scoping (`device.read`, `device.activate`, `device.deactivate`), and Admin canonical `deviceId` concealment (`DEC-DEV-028`) remain strictly enforced on the server.
 <!-- Devices Loading & Auth Optimization Architecture Reconciled: 2026-09-04 -->
+
+---
+
+## Users Loading & Auth Optimization Architecture Note (Reconciled 2026-09-04)
+
+The following architecture facts are supported by the verified implementation of the `/users` route optimization and loading transition improvement:
+1. **Next.js Route-Level Loading Shell (`apps/web/app/users/loading.tsx`):**
+   - Supplies Next.js App Router with an instant static page shell matching the structural layout of `/users` (`TopAppBar`, header skeleton with `Users` icon, search and status filter skeletons, and a 5-row user table card skeleton).
+   - Wrapped in `bg-app-surface text-app-on-surface min-h-dvh pb-24`, eliminating blank white screen transitions during chunk streaming and client navigation.
+   - Preserves style isolation by keeping global `<body>` styling in `apps/web/app/layout.tsx` untouched, avoiding unintended color palette leakage into public authentication screens (`bg-surface`).
+2. **Centralized Auth State Hydration in User Management (`apps/web/app/users/page.tsx`):**
+   - Consumes centralized `useAuth()` state hydrated from SSR (`const { role } = useAuth(); const isOwner = role === 'OWNER';`).
+   - Eliminates redundant client-side `useEffect` call and `fetch('/api/v1/auth/session')` request on mount.
+   - Completely removes the blocking `"Checking user session..."` screen (`tAuth('checkingSession')`), enabling immediate invocation of `fetchUsers(1)` upon mount for Owner accounts.
+   - Renders 403 Forbidden screen (`Akses Terbatas (403 Forbidden)`) instantaneously for non-owner accounts without lingering loading spinners.
+3. **Preserved Security & Authorization Boundaries:**
+   - Server-side route authorization (`requireRole(['OWNER'])`), Next.js Edge Middleware route guards, and fine-grained account action endpoints (`/api/v1/users/*`) remain strictly enforced on the server.
+<!-- Users Loading & Auth Optimization Architecture Reconciled: 2026-09-04 -->
+

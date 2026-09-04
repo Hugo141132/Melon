@@ -47,14 +47,15 @@ interface PaginationMeta {
 }
 
 import { useTranslations } from 'next-intl';
+import { useAuth } from '@/context/AuthContext';
 
 export default function UserManagementPage() {
   const tUsers = useTranslations('users');
   const tCommon = useTranslations('common');
   const tAuth = useTranslations('auth');
 
-  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
+  const { role } = useAuth();
+  const isOwner = role === 'OWNER';
 
   // List state
   const [users, setUsers] = useState<UserDto[]>([]);
@@ -198,30 +199,10 @@ export default function UserManagementPage() {
     });
   }, [availableDevices, userAssignments]);
 
-  // Load session to check Owner role
-  useEffect(() => {
-    const fetchSession = async () => {
-      try {
-        const res = await fetch('/api/v1/auth/session');
-        const json = await res.json();
-        if (json.success && json.data?.authenticated && json.data?.user) {
-          setCurrentUserRole(json.data.user.role);
-        } else {
-          setCurrentUserRole(null);
-        }
-      } catch {
-        setCurrentUserRole(null);
-      } finally {
-        setAuthLoading(false);
-      }
-    };
-    fetchSession();
-  }, []);
-
   // Fetch users list
   const fetchUsers = useCallback(
     async (pageNum = 1) => {
-      if (currentUserRole !== 'OWNER') return;
+      if (!isOwner) return;
       setLoading(true);
       setErrorMsg(null);
 
@@ -250,14 +231,14 @@ export default function UserManagementPage() {
         setLoading(false);
       }
     },
-    [currentUserRole, search, statusFilter, roleFilter, tUsers]
+    [isOwner, search, statusFilter, roleFilter, tUsers]
   );
 
   useEffect(() => {
-    if (currentUserRole === 'OWNER') {
+    if (isOwner) {
       fetchUsers(1);
     }
-  }, [currentUserRole, fetchUsers]);
+  }, [isOwner, fetchUsers]);
 
   // Handle Edit Submission
   const handleSaveEdit = async (e: React.FormEvent) => {
@@ -385,21 +366,8 @@ export default function UserManagementPage() {
     }
   };
 
-  if (authLoading) {
-    return (
-      <div className="bg-app-surface text-app-on-surface min-h-dvh flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 size={32} className="animate-spin text-app-primary" />
-          <p className="text-[14px] text-app-on-surface-variant font-medium">
-            {tAuth('checkingSession')}
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   // 403 Forbidden view if not OWNER
-  if (currentUserRole !== 'OWNER') {
+  if (!isOwner) {
     return (
       <div className="bg-app-surface text-app-on-surface min-h-dvh pb-24">
         <TopAppBar />
@@ -536,7 +504,7 @@ export default function UserManagementPage() {
           ) : (
             <div className="divide-y divide-app-outline-variant/20">
               {users.map((u) => {
-                const isOwner = u.activeRoles.includes('OWNER');
+                const isTargetOwner = u.activeRoles.includes('OWNER');
 
                 return (
                   <div
@@ -546,7 +514,7 @@ export default function UserManagementPage() {
                     <div className="space-y-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="text-[16px] font-bold text-app-on-surface">{u.fullName}</h3>
-                        {isOwner ? (
+                        {isTargetOwner ? (
                           <span className="px-2 py-0.5 text-[11px] font-bold rounded-md bg-purple-100 text-purple-900 border border-purple-300">
                             {tUsers('roleOwnerLabel')}
                           </span>
@@ -583,9 +551,9 @@ export default function UserManagementPage() {
                         <Eye size={14} /> {tCommon('viewDetails')}
                       </button>
 
-                      {!isOwner && (
+                      {!isTargetOwner && (
                         <>
-                          {currentUserRole === 'OWNER' && (
+                          {isOwner && (
                             <button
                               onClick={() => {
                                 setSelectedUser(u);

@@ -1474,3 +1474,25 @@ The `/devices` route loading transition and presentation state are reconciled to
   - Preserved strict concealment of canonical `deviceId` from Admin users (`DEC-DEV-028`).
 <!-- Devices Route Loading & Auth UI/UX Reconciled: 2026-09-04 -->
 
+---
+
+## Users Route Loading Transition & Auth Optimization UI/UX Note (Reconciled 2026-09-04)
+
+The `/users` route loading transition and presentation state are reconciled to eliminate flash-of-white transitions and eliminate redundant session loading delays:
+- **Frontend Impact:** `MINOR`
+- **Selected UI Direction:** `Premium Minimal Ops`
+- **Existing Color Template:** `UNCHANGED` (Authoritative MD3 tokens: `app-surface: #f9f9f9`, `app-on-surface: #1a1c1c`, `app-surface-container-lowest: #ffffff`, `app-outline-variant: #bfcaba`)
+- **Selected Motion Effects:** `Skeleton loading`, `Button hover`
+- **21st.dev MCP:** `NOT REQUIRED` (reuses existing design system tokens and skeleton conventions)
+- **Route-Level Loading Shell (`apps/web/app/users/loading.tsx`):**
+  - Structural parity: Renders `<TopAppBar />`, header skeleton (`Users` icon container with pulsing title and subtitle bars), filter skeleton (search bar input and status dropdown select), and a 5-row user table skeleton card.
+  - Viewport-Filling Base: Root element styled with `bg-app-surface text-app-on-surface min-h-dvh pb-24` ensuring zero blank white frame during Next.js App Router streaming.
+  - Layout stability: Eliminates layout shift and visual jarring between route navigation and final content resolution.
+- **Elimination of Blocking Auth Spinner:**
+  - Removed full-page `"Memeriksa sesi pengguna..."` / `"Checking user session..."` blocking spinner and `authLoading` state.
+  - Authenticated identity (`useAuth()`) is resolved synchronously via SSR hydration from `AuthContext`, rendering the page layout immediately on mount.
+  - For Owner users, `fetchUsers(1)` triggers immediately without waiting for redundant client session roundtrips.
+  - For Admin users, the client-side 403 Forbidden notice (`Akses Terbatas (403 Forbidden)`) displays instantaneously without lingering in a loading spinner, backed by server-side route middleware and API RBAC guards.
+<!-- Users Route Loading & Auth UI/UX Reconciled: 2026-09-04 -->
+
+

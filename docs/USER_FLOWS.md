@@ -2189,3 +2189,19 @@ The operational dashboard user journey is reconciled to guarantee a distraction-
 - **Zero Emoji Experience:** All status badges, headings, and metrics present a clean, professional aesthetic without emojis.
 <!-- TASK-0506 User Flows Reconciled: 2026-09-02 -->
 
+---
+
+## User Management Route Transition & Instant Presentation Note (Reconciled 2026-09-04)
+
+The user management flow on `/users` is reconciled to eliminate client-side auth hesitation:
+- **Immediate Presentation for Owner:**
+  - Upon navigating to `/users`, the layout renders instantaneously via synchronous SSR session hydration from `AuthContext`.
+  - Next.js App Router displays the route-level skeleton shell (`apps/web/app/users/loading.tsx`) during chunk streaming, eliminating flash-of-white page transitions.
+  - The blocking `"Memeriksa sesi pengguna..."` / `"Checking user session..."` spinner is completely eliminated.
+  - User list fetching (`fetchUsers(1)`) initiates immediately upon component mount.
+- **Immediate Enforcement for Non-Owner (Admin):**
+  - If an Admin navigates directly to `/users`, the client-side 403 Forbidden screen (`Akses Terbatas (403 Forbidden)`) renders instantaneously without an intermediate loading spinner.
+  - Next.js Edge route middleware and server-side API authorization (`requireRole(['OWNER'])`) strictly prevent any data leakage.
+<!-- Users Route Transition User Flows Reconciled: 2026-09-04 -->
+
+
