@@ -966,13 +966,12 @@ Implemented complete Owner User Management:
    - Add 100% key-parity translations across `messages/id.json` and `messages/en.json` for single-session rejection, change password modal, and session security UI.
 6. **2026-09-05 Login Performance Optimization & Auth Bug Fixes (`DEC-AUTH-108`):**
    - **Root Cause Analysis:** Investigated ~5–7s perceived login flow from button click to dashboard. Bottlenecks: high WAN latency to Supabase Mumbai (`ap-south-1`, ~240ms per round trip), 3 sequential Prisma queries for user lookup (`users` -> `user_roles` -> `roles`), and 6 round trips inside the `$transaction`.
-   - **Prisma `relationJoins` Optimization:** Enabled `previewFeatures = ["relationJoins"]` in `packages/database/prisma/schema.prisma` and applied `relationLoadStrategy: 'join'` to `prisma.user.findUnique`, compiling user, active roles, and role codes into a single SQL `LEFT JOIN` (reducing user lookup from ~1,800ms to ~400ms).
+   - **Relation Loading Audit & Stability:** Retained Prisma's stable standard relation loader in `prisma.user.findUnique` after finding experimental `relationLoadStrategy: 'join'` triggers an unhandled Rust query-engine panic under concurrent execution (`tokio-runtime-worker panicked at query-engine/core/src/query_document/mod.rs:83:86: called Option::unwrap() on a None value`).
    - **Session Transaction Streamlining:** Replaced unconditional `updateMany` prune sweep with `tx.session.findMany` on unrevoked sessions. For clean logins / logged-out accounts, cleanup write queries are completely skipped inside the transaction (saving ~400ms).
-   - **Non-blocking Informational Updates:** Moved `user.update({ lastLoginAt })` outside the critical `$transaction` into non-blocking asynchronous execution with `.catch(...)` logging, saving ~400ms from the response path.
-   - **Audit Durability Guarantee:** Maintained `tx.auditLog.create` strictly synchronous inside the interactive transaction, ensuring atomicity (no fire-and-forget audit).
+   - **Atomic Updates & Durability Guarantee:** Kept `tx.user.update({ lastLoginAt })` and `tx.auditLog.create` strictly synchronous inside the interactive transaction under the held user row lock (`SELECT id FROM users FOR UPDATE`), preventing read-after-write race conditions and ensuring audit durability.
    - **AuthContext & User Greeting Fix:** Resolved blank user greeting ("Welcome ") after login by removing redundant `router.refresh()` in `login-view.tsx` and guarding `AuthContext` from stale SSR `initialSession=null` clobbering.
    - **Same-Client Session Recovery:** Enabled re-login recovery when `session_token` cookie is deleted/lost on the same browser (via token hash matching or identical IP + User-Agent), while preserving strict 409 rejection of different devices.
-   - **Performance Results:** Expected `POST /api/v1/auth/login` duration drops from ~3.6–4.2s to ~1.2–1.6s (~60–70% latency reduction).
+   - **Performance Results:** Expected `POST /api/v1/auth/login` duration drops from ~3.6–4.2s to ~1.6–2.0s without sacrificing transactional safety or concurrency.
 
 ### Acceptance Criteria
 
@@ -983,9 +982,8 @@ Implemented complete Owner User Management:
 - [x] "Linked Devices" card is completely removed from `/profile`.
 - [x] "Change Password" on `/profile` executes `POST /api/v1/auth/change-password` and redirects to `/login`.
 - [x] All unit, API, and component tests pass (100% pass rate).
-- [x] Prisma user lookup uses `relationLoadStrategy: 'join'` with identical RBAC role loading.
-- [x] Synchronous audit log creation inside `$transaction` is strictly preserved.
-- [x] Non-critical `lastLoginAt` update is safely executed non-blockingly outside the transaction.
+- [x] Prisma user lookup uses thread-safe stable relation loading with identical RBAC role loading.
+- [x] Synchronous audit log creation and `lastLoginAt` update inside `$transaction` are strictly preserved.
 - [x] AuthContext immediately displays authenticated user without blank greeting or layout shift.
 - [x] Same-client recovery succeeds after cookie loss while different-device logins are rejected.
 - [x] Targeted unit tests (`session-service.test.ts` 8/8, `auth-context-hydration.test.tsx` 6/6, `route_protection.test.ts` 13/13) and monorepo typecheck pass with 0 errors.

@@ -478,10 +478,9 @@ ACTIVE_SESSION_EXISTS (HTTP 409 Conflict - single active session policy per DEC-
 
 Server rules & performance profile (`DEC-AUTH-108`):
 
-- **Single Query Lookup**: Uses Prisma `relationLoadStrategy: 'join'` to load user, active assignments, and role codes in 1 single SQL `LEFT JOIN` query (~400ms across WAN).
-- **Interactive Transaction**: Uses advisory row lock (`FOR UPDATE`), checks unrevoked sessions in 1 round trip (`findMany`), creates rotated session, and synchronously commits `AUTH_LOGIN_SUCCESS` audit log (~1,200ms).
-- **Asynchronous Informational Update**: `lastLoginAt` is updated non-blockingly outside the transaction with `.catch(...)` error logging, removing 1 round trip from the response path.
-- **Latency Expectation**: Reduced from ~3.6–4.2s to ~1.2–1.6s.
+- **Thread-Safe Relation Lookup**: Uses Prisma's standard stable relation loader to load user, active assignments, and role codes, avoiding experimental query engine panics under concurrent requests.
+- **Interactive Transaction**: Uses advisory row lock (`FOR UPDATE`), checks unrevoked sessions in 1 round trip (`findMany`), creates rotated session, atomically updates `lastLoginAt`, and synchronously commits `AUTH_LOGIN_SUCCESS` audit log (~1,200ms).
+- **Latency Expectation**: Reduced from ~3.6–4.2s to ~1.6–2.0s without transactional compromises.
 - **Same-Client Recovery**: If client presents an active session with matching `existingToken` or matching IP and User-Agent, previous session is rotated cleanly without 409 conflict. Concurrent logins from different devices remain strictly blocked with HTTP 409.
 
 ---

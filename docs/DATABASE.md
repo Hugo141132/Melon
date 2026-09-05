@@ -519,10 +519,9 @@ Stores active authentication sessions with server-managed revocation and single 
 - **Transactional Row Locking**: Active session queries during login use row locks (`SELECT id FROM users WHERE id = ... FOR UPDATE`) to prevent concurrent race conditions across simultaneous login requests.
 - **Session Revocation on Password Change**: Changing or resetting passwords transactionally sets `revoked_at = NOW()` for all sessions belonging to that `user_id`.
 - **WAN Query Reduction Architecture (`DEC-AUTH-108`)**:
-  - Prisma User & Role Lookup: Uses `relationLoadStrategy: 'join'` to emit a single SQL `LEFT JOIN` query for user and active roles, cutting lookup latency from ~1,800ms to ~400ms across WAN.
+  - Stable Relation Query Loading: Replaced experimental `relationLoadStrategy: 'join'` with Prisma's standard relation loader to prevent query-engine panics under concurrency, backed by covering indexes on foreign keys.
   - Streamlined Active Check: Evaluates unrevoked sessions via `findMany({ where: { userId, revokedAt: null } })`, eliminating blind table writes on clean logins.
-  - Decoupled `lastLoginAt`: `user.update({ lastLoginAt })` executes asynchronously outside the transaction with `.catch(...)` fallback logging, removing 1 database round trip from the critical user path.
-  - Synchronous Audit Integrity: `auditLog.create` remains strictly synchronous inside the transaction; fire-and-forget audit is prohibited.
+  - Synchronous State & Audit Integrity: `user.update({ lastLoginAt })` and `auditLog.create` remain strictly synchronous inside the interactive transaction under the acquired user row lock (`FOR UPDATE`).
   - Same-Client Recovery: Re-authenticates without 409 if session cookie is missing/expired on the same device (matching `existingToken` or IP + User-Agent).
 
 ### Recommended Indexes

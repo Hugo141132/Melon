@@ -462,10 +462,9 @@ The following facts are verified in the traceability matrix regarding the `/user
 The following facts are verified in the traceability matrix regarding `DEC-AUTH-108` (Login Transaction Performance Optimization, Same-Client Session Recovery, and Hydration Stability):
 - **Traceability Baseline:** Defined under `PRD-FR-026`, `DEC-AUTH-108`, `SEC-AUTH-008`, and `ARCHITECTURE.md` to eliminate sequential round-trip query overhead to remote database instances (Supabase Mumbai), allow seamless session re-establishment for identical clients without false-positive single-session lockouts, and eliminate blank UI flashes during App Router navigation.
 - **Implementation Status:** Fully implemented and verified:
-  - Enabled Prisma `previewFeatures = ["relationJoins"]` in `packages/database/prisma/schema.prisma` and applied `relationLoadStrategy: 'join'` in `prisma.user.findUnique`, reducing user and RBAC role retrieval from 3 sequential queries to 1 single SQL `LEFT JOIN`.
+  - Standardized on Prisma's stable relation loader in `prisma.user.findUnique`, resolving experimental `relationLoadStrategy: 'join'` query engine panics under concurrent logins.
   - Streamlined `packages/database/src/session-service.ts` transaction by querying unrevoked sessions with `tx.session.findMany` and skipping write cleanup on normal logins.
-  - Moved `user.update({ lastLoginAt })` outside the critical `$transaction` block as a non-blocking asynchronous call with localized error trapping.
-  - Strictly preserved synchronous `tx.auditLog.create` inside the PostgreSQL advisory lock (`SELECT pg_advisory_xact_lock(...)`).
+  - Preserved atomic `tx.user.update({ lastLoginAt })` and synchronous `tx.auditLog.create` inside the PostgreSQL row lock (`SELECT id FROM users WHERE id = ... FOR UPDATE`), eliminating read-after-write race conditions.
   - Added same-client session recovery: when incoming valid credentials match an existing active session's client fingerprint (`userAgentHash` and `ipAddress`), the stale session is revoked and a new session is issued cleanly.
   - Eliminated redundant `router.refresh()` from `apps/web/app/(auth)/login/login-view.tsx` and protected `AuthContext` from stale SSR `initialSession = null` overwrites, permanently fixing the blank user greeting defect.
 - **Architectural & Security Invariance:**

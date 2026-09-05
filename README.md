@@ -472,7 +472,7 @@ The first Owner shall never be created through public registration.
 
 - **Single Active Session:** Exactly 1 concurrent active session permitted per account across all roles (`DEC-AUTH-107`). Concurrent logins from other clients are rejected with HTTP 409 Conflict (`ACTIVE_SESSION_EXISTS`).
 - **Same-Client Session Recovery:** Same-browser re-authentications automatically revoke expired or orphaned sessions without 409 conflict lockouts (`DEC-AUTH-108`).
-- **Optimized Latency:** Login transactions use Prisma `relationJoins` (`relationLoadStrategy: 'join'`), asynchronous non-blocking `lastLoginAt` tracking, and synchronous audit logging to minimize remote database WAN round trips (~1.2–1.6s API latency).
+- **Optimized Latency:** Login transactions use streamlined unrevoked session evaluation (`tx.session.findMany`), covering relation indexes, atomic user state update, and synchronous audit logging to minimize remote database WAN round trips.
 - **Seamless Hydration:** Frontend `AuthContext` hydrates synchronously from login responses, eliminating full-page server re-renders and blank greeting flashes.
 
 ---

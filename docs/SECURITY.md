@@ -493,9 +493,8 @@ To prevent credential sharing, concurrent operational conflicts, and session hij
 
 Security controls governing the login performance optimization:
 
-- **Prisma `relationLoadStrategy: 'join'`**: Compiles user and role extraction into a single SQL statement. Authorization invariants and RBAC role derivation are strictly preserved.
-- **Synchronous Audit Log Durability**: `tx.auditLog.create` remains strictly synchronous inside the interactive database transaction (`AUTH_LOGIN_SUCCESS`). If audit logging fails, the transaction rolls back, and no session is created. Fire-and-forget or queued audit logging is strictly prohibited.
-- **Non-Blocking Informational Updates**: `user.update({ lastLoginAt })` is decoupled from the transaction and executes non-blockingly with `.catch(...)` error handling. Because `lastLoginAt` is non-authoritative operational metadata, its decoupling does not compromise access control or session integrity.
+- **Stable Relation Query Loading**: Replaced experimental `relationLoadStrategy: 'join'` with Prisma's thread-safe standard relation loader, avoiding Rust query-engine runtime panics under concurrent logins.
+- **Synchronous Audit Log & State Durability**: `tx.auditLog.create` and `tx.user.update({ lastLoginAt })` remain strictly synchronous inside the interactive database transaction (`AUTH_LOGIN_SUCCESS`) under the acquired row lock (`SELECT id FROM users FOR UPDATE`). If audit logging fails, the transaction rolls back, ensuring zero partial state or orphan sessions.
 - **Fail-Closed Session Recovery**: Client environment matching requires both identical IP address and exact User-Agent string. In any ambiguous or mismatched scenario without a valid token hash, the system defaults to fail-closed rejection with HTTP 409.
 
 ---

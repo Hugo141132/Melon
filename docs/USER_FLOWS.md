@@ -530,8 +530,8 @@ flowchart TD
 5. The server checks for existing active sessions (`revokedAt IS NULL`, `< 8h`, idle `< 30m`).
    - If an active session exists on the **same client** (matching `existingToken` hash or matching IP and User-Agent), the server rotates the session safely without 409 conflict (`DEC-AUTH-108`).
    - If an active session exists on a **different client/device**, the server rejects the login attempt with HTTP 409 Conflict (`ACTIVE_SESSION_EXISTS`) and preserves the existing session (`DEC-AUTH-107`).
-6. The server creates a secure session, synchronously logs `auth.login.success` within the transaction, and executes non-blocking `lastLoginAt` updates in the background.
-7. The server loads permissions and active roles in a single joined query (`relationLoadStrategy: 'join'`).
+6. The server creates a secure session, atomically updates `lastLoginAt`, and synchronously logs `auth.login.success` within the transaction under user row lock (`DEC-AUTH-108`).
+7. The server loads permissions and active roles using stable relational mapping.
 8. The frontend receives the response, immediately hydrates `AuthContext` with the authenticated user, and pushes route transition (`router.push('/dashboard')`) without blocking on redundant `router.refresh()`.
 9. The dashboard renders immediately with the user greeting ("Welcome [user]") and displays only permitted navigation items without layout shift or blank states.
 

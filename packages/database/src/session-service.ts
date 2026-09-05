@@ -80,7 +80,6 @@ export async function loginUser(
   const normalised = normaliseEmail(input.email);
 
   const user = await prisma.user.findUnique({
-    relationLoadStrategy: 'join',
     where: { email: normalised },
     include: {
       userRoles: {
@@ -195,7 +194,7 @@ export async function loginUser(
         });
       }
 
-      // 3. Create new session and synchronously write audit log
+      // 3. Create new session, update user lastLoginAt, and synchronously write audit log
       await tx.session.create({
         data: {
           id: sessionId,
@@ -206,6 +205,11 @@ export async function loginUser(
           ipAddress: metadata?.ipAddress ?? null,
           userAgent: metadata?.userAgent ?? null,
         },
+      });
+
+      await tx.user.update({
+        where: { id: user.id },
+        data: { lastLoginAt: now },
       });
 
       await tx.auditLog.create({
@@ -230,18 +234,6 @@ export async function loginUser(
       timeout: 20000,
     }
   );
-
-  // 4. Update lastLoginAt non-blockingly outside the critical login transaction
-  if (prisma.user?.update) {
-    void prisma.user
-      .update({
-        where: { id: user.id },
-        data: { lastLoginAt: now },
-      })
-      .catch((err: any) => {
-        console.error('[loginUser] Non-critical lastLoginAt update failed:', err);
-      });
-  }
 
   const rawUserWithRoles: RawDbUserWithRoles = {
     id: user.id,
