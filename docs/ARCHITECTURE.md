@@ -577,7 +577,29 @@ The system shall support invalidation when:
 - Password changes.
 - Security-sensitive event occurs.
 
-The exact mechanism is `TBD`.
+The exact mechanism is database-driven session revocation (`revoked_at = NOW()`) inside locked transactions (`TASK-0217`, `DEC-AUTH-107`).
+
+### 9.5 Login Transaction & Performance Architecture (DEC-AUTH-108)
+
+To mitigate WAN round-trip latency to the cloud database (Supabase Mumbai, ~240ms round-trip), the authentication pipeline is structured to minimize sequential database network round trips:
+
+```text
+POST /api/v1/auth/login
+  ├── 1. Prisma user lookup (relationLoadStrategy: 'join') ────── 1 round trip (~400ms)
+  │      └── Single SQL LEFT JOIN across users, user_roles, roles
+  ├── 2. Argon2id password verification ──────────────────────── CPU (~4ms)
+  ├── 3. Interactive locked $transaction ──────────────────────── 2-3 round trips (~1,200ms)
+  │      ├── SELECT id FROM users ... FOR UPDATE (row lock)
+  │      ├── tx.session.findMany(unrevoked) -> active vs stale check
+  │      │     (skips updateMany writes for clean logins; revokes if stale)
+  │      ├── tx.session.create (session rotation)
+  │      └── tx.auditLog.create (SYNCHRONOUS durability guarantee)
+  └── 4. Non-blocking user.update({ lastLoginAt }) ────────────── Asynchronous (0ms critical path)
+```
+
+**Frontend Hydration & Recovery:**
+1. **Client AuthContext Hydration:** Upon receiving the login response, `login-view.tsx` immediately updates `AuthContext` with the authenticated user and navigates via `router.push()`. Redundant `router.refresh()` is eliminated, and `AuthContext` guards against stale SSR `initialSession=null` overwriting client-authenticated state, ensuring immediate display of the user greeting ("Welcome [user]").
+2. **Same-Client Session Recovery:** When a browser's `session_token` cookie is cleared or expired on the same client, authentication re-verifies via token hash matching or identical IP and User-Agent, gracefully rotating the session while maintaining strict rejection (HTTP 409) against concurrent logins from different devices (`DEC-AUTH-107`).
 
 ---
 

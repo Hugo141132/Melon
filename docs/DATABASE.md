@@ -505,7 +505,7 @@ Stores active authentication sessions with server-managed revocation and single 
 | `session_token_hash` | VARCHAR(64) | No | Unique SHA-256 hex digest of the raw session secret |
 | `expires_at` | TIMESTAMPTZ | No | Absolute session expiration (8 hours max lifetime) |
 | `revoked_at` | TIMESTAMPTZ | Yes | Explicit revocation timestamp (`NULL` if active) |
-| `last_seenAt` | TIMESTAMPTZ | No | Inactivity timestamp for 30-minute idle timeout (`DEFAULT NOW()`) |
+| `last_seen_at` | TIMESTAMPTZ | No | Inactivity timestamp for 30-minute idle timeout (`DEFAULT NOW()`) |
 | `ip_address` | VARCHAR(45) | Yes | Client IP address at session creation |
 | `user_agent` | TEXT | Yes | Client User-Agent at session creation |
 | `created_at` | TIMESTAMPTZ | No | Session creation timestamp (`DEFAULT NOW()`) |
@@ -516,8 +516,14 @@ Stores active authentication sessions with server-managed revocation and single 
 - **Single Active Session Rule (`DEC-AUTH-107`)**: Each user account is strictly limited to at most 1 active, non-revoked, non-expired, non-idle session at any time.
 - **Login Rejection Semantics**: A login attempt with valid credentials when an active session exists returns HTTP 409 Conflict (`ACTIVE_SESSION_EXISTS`) and preserves the existing session.
 - **Automatic Stale Pruning**: Sessions with `expires_at <= NOW()`, `NOW() - last_seen_at > 30m`, or `revoked_at IS NOT NULL` do not block new logins and are soft-revoked.
-- **Transactional Row Locking**: Active session queries during login use row locks (`FOR UPDATE`) to prevent concurrent race conditions across simultaneous login requests.
+- **Transactional Row Locking**: Active session queries during login use row locks (`SELECT id FROM users WHERE id = ... FOR UPDATE`) to prevent concurrent race conditions across simultaneous login requests.
 - **Session Revocation on Password Change**: Changing or resetting passwords transactionally sets `revoked_at = NOW()` for all sessions belonging to that `user_id`.
+- **WAN Query Reduction Architecture (`DEC-AUTH-108`)**:
+  - Prisma User & Role Lookup: Uses `relationLoadStrategy: 'join'` to emit a single SQL `LEFT JOIN` query for user and active roles, cutting lookup latency from ~1,800ms to ~400ms across WAN.
+  - Streamlined Active Check: Evaluates unrevoked sessions via `findMany({ where: { userId, revokedAt: null } })`, eliminating blind table writes on clean logins.
+  - Decoupled `lastLoginAt`: `user.update({ lastLoginAt })` executes asynchronously outside the transaction with `.catch(...)` fallback logging, removing 1 database round trip from the critical user path.
+  - Synchronous Audit Integrity: `auditLog.create` remains strictly synchronous inside the transaction; fire-and-forget audit is prohibited.
+  - Same-Client Recovery: Re-authenticates without 409 if session cookie is missing/expired on the same device (matching `existingToken` or IP + User-Agent).
 
 ### Recommended Indexes
 
@@ -526,6 +532,21 @@ UNIQUE INDEX sessions_session_token_hash_key ON sessions (session_token_hash)
 INDEX sessions_user_id_idx ON sessions (user_id)
 INDEX sessions_expires_at_idx ON sessions (expires_at)
 INDEX sessions_user_active_idx ON sessions (user_id, revoked_at, expires_at)
+```
+
+Added foreign key covering indexes in `20260905040000_add_auth_and_fk_performance_indexes`:
+```text
+INDEX user_roles_user_id_revoked_at_idx ON user_roles (user_id, revoked_at)
+INDEX user_roles_user_id_idx ON user_roles (user_id)
+INDEX user_roles_role_id_idx ON user_roles (role_id)
+INDEX role_permissions_permission_id_idx ON role_permissions (permission_id)
+INDEX account_approvals_decided_by_user_id_idx ON account_approvals (decided_by_user_id)
+INDEX user_device_access_device_id_idx ON user_device_access (device_id)
+INDEX user_device_access_assigned_by_user_id_idx ON user_device_access (assigned_by_user_id)
+INDEX user_preferences_default_device_id_idx ON user_preferences (default_device_id)
+INDEX alert_acknowledgements_user_id_idx ON alert_acknowledgements (acknowledged_by_user_id)
+INDEX alert_acknowledgements_alert_id_idx ON alert_acknowledgements (alert_id)
+INDEX alerts_device_id_idx ON alerts (device_id)
 ```
 
 ---

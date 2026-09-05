@@ -2009,3 +2009,14 @@ The operational dashboard (`/` and `/dashboard`) maintains complete separation f
 - **Zero Firmware or Broker Impact:** `TASK-0506` introduced zero modifications to ESP32/NodeMCU firmware contracts, REST ingestion endpoints, MQTT 5.0 TLS topics, QoS policies, or gateway schemas.
 <!-- TASK-0506 Device Communication Reconciled: 2026-09-02 -->
 
+---
+
+## 51. Authentication Performance & Session Recovery Device Protocol Independence (DEC-AUTH-108 / Reconciled 2026-09-05)
+
+The login transaction performance optimization, same-client session recovery, and `AuthContext` SSR hydration stabilization (`DEC-AUTH-108`) operate strictly within the human user identity and browser session boundary:
+- **Zero IoT Firmware & Protocol Impact:** No modifications are introduced to ESP32/NodeMCU firmware contracts, REST telemetry ingestion routes (`/api/v1/devices/{deviceId}/telemetry/*`), MQTT 5.0 over TLS brokers, topic trees (`agriculture/{environment}/{siteId}/...`), QoS policies, or gateway schemas.
+- **Strict Boundary Decoupling:** Human user browser sessions (`session_token`) and session transaction optimizations are completely isolated from machine-to-machine authentication (`INTERNAL_SERVICE_TOKEN`) and hardware device authentication.
+- **Actuator Safety Invariant:** Enhancing user session performance and database round-trip efficiency does not alter physical valve state mapping (`OPEN`, `CLOSED`, `UNKNOWN`), command idempotency, or safety gates governing faucet operations.
+<!-- Authentication Performance & Session Recovery Device Protocol Independence Reconciled: 2026-09-05 -->
+
+

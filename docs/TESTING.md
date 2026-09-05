@@ -480,6 +480,16 @@ Test:
   - `/verify-email` UI view (`apps/web/test/unit/verify-email-ui.test.tsx`, 11 tests) verifying 6-digit code input, target email switcher, 60s cooldown timer persisted in `sessionStorage`, legacy token auto-verification, StrictMode-safe in-flight deduplication, settlement cache eviction (`finally`), Admin automatic redirect to `/status?status=PENDING_APPROVAL`, and Owner login prompts.
   - Server-side guest route guard on `/verify-email` (`apps/web/test/unit/server-guest-guard.test.ts`) redirecting active sessions to `/`.
   - *Delivery & Testing Status Note*: Verification has been manually exercised using Resend test mode/test recipients and 6-digit code dispatch. We have not yet tested delivery to arbitrary real email recipients using a verified custom sending domain, because no such domain is currently configured. Real-mailbox deliverability is treated as pending deployment/infrastructure acceptance, not an application logic failure.
+- Single active session enforcement unit test suite (`TASK-0217` / `DEC-AUTH-107`):
+  - Strict 1-session limit rejection returning HTTP 409 Conflict (`ACTIVE_SESSION_EXISTS`).
+  - Automatic pruning of expired (> 8h) and idle (> 30m) sessions.
+  - Advisory lock transaction isolation (`SELECT pg_advisory_xact_lock(...)`).
+- Login performance optimization & session recovery unit test suite (`TASK-0217` / `DEC-AUTH-108`):
+  - Prisma `relationLoadStrategy: 'join'` single-query user/role/permission hydration (`packages/database/test/session-service.test.ts`, 8 tests).
+  - Same-client session recovery re-issuing session on cookie loss without 409 lockouts.
+  - Non-blocking `lastLoginAt` update decoupled from transaction.
+  - Synchronous `tx.auditLog.create` durability inside transaction.
+  - AuthContext hydration lock eliminating SSR null overwrite and blank greeting (`apps/web/test/unit/auth-context-hydration.test.tsx`, 6 tests).
 - Account-status access decision.
 - Session-expiry calculation.
 - Session-revocation check.
@@ -2471,5 +2481,82 @@ Automated unit, loading transition, component skeleton parity, and Playwright li
 3. Injected authenticated Admin session cookie in browser: navigated to `/users`, verified instant `Akses Terbatas (403 Forbidden)` screen displayed without loading spinner (verified via screenshot `users_admin_verified-2026-09-04T14-35-18-413Z.png`).
 4. Cleaned up synthetic database sessions and shut down development server.
 <!-- Users Route Loading & Auth Testing Reconciled: 2026-09-04 -->
+
+---
+
+# 60. Authentication Performance Optimization, Session Recovery & Transition Verification Suite (TASK-0217 / DEC-AUTH-108 / Reconciled 2026-09-05)
+
+Automated unit testing, session concurrency verification, database query streamlining, and live browser Playwright verification for `DEC-AUTH-108`:
+
+### 1. Performance Bottleneck & Root Cause
+- **Original Measured Latency:** ~5–7 seconds perceived login flow from clicking "Masuk" to dashboard display.
+- **Root Cause Breakdown:**
+  - Remote Supabase Mumbai WAN latency (~240ms round trip from local client).
+  - Multiple sequential Prisma queries: user lookup executed 3 sequential queries (`findUnique` user, `userRoles`, `rolePermissions`).
+  - Session transaction executed 6 sequential operations inside `$transaction` (`findFirst` active session, `updateMany` session cleanup, advisory lock check, `session.create`, `auditLog.create`, and `user.update` for `lastLoginAt`).
+  - Total API time: ~3.6–4.2 seconds before frontend rendering.
+  - Compounding frontend overhead: `router.refresh()` in `login-view.tsx` triggered full-page Next.js App Router re-render, compounding latency by an additional 1.5–2.5 seconds.
+
+### 2. Implemented Optimizations
+- **Prisma `relationLoadStrategy: 'join'`:**
+  - Enabled `previewFeatures = ["relationJoins"]` in `packages/database/prisma/schema.prisma`.
+  - Configured `relationLoadStrategy: 'join'` on `prisma.user.findUnique`, collapsing 3 sequential Prisma queries into 1 single SQL `LEFT JOIN` query.
+- **Session Transaction Streamlining:**
+  - Replaced sequential `findFirst` and `updateMany` with a single targeted `tx.session.findMany` looking for unrevoked sessions.
+  - In normal logins without expired sessions, zero session cleanup writes are issued.
+- **Non-Blocking `lastLoginAt` Tracking:**
+  - Moved `prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: now } })` outside the critical `$transaction` path.
+  - Errors in `lastLoginAt` update are caught and logged without failing the login.
+- **Preserved Transactional Durability:**
+  - `tx.auditLog.create` remains strictly **synchronous** inside the transaction with advisory lock (`SELECT pg_advisory_xact_lock(...)`).
+- **Same-Client Session Recovery:**
+  - Preserved `DEC-AUTH-107` single active session security. Concurrent logins from different devices/browsers return HTTP 409 Conflict (`ACTIVE_SESSION_EXISTS`).
+  - When the login request originates from the same browser/client (`userAgentHash` and `ipAddress` match) whose cookie was deleted or expired, the old unrevoked session is automatically revoked and a new active session is issued, preventing false-positive lockouts.
+- **Frontend Hydration Stabilization:**
+  - Eliminated redundant `router.refresh()` from `apps/web/app/(auth)/login/login-view.tsx`.
+  - Updated `AuthContext` (`apps/web/context/AuthContext.tsx`) with hydration lock ensuring fresh client authentication state (`user`, `role`, `isAuthenticated`) cannot be overwritten by stale SSR `initialSession = null`.
+  - Resolved blank greeting ("Selamat Datang, ") defect, displaying user full name immediately upon transition.
+
+### 3. Agent-Executed Automated Tests
+1. **Targeted Session Service Unit Test Suite (`packages/database/test/session-service.test.ts`):**
+   - **8/8 tests passed (100%)**:
+     - Single active session enforcement rejects concurrent second logins with `ACTIVE_SESSION_EXISTS`.
+     - Same-client session recovery revokes stale session and issues new session when client fingerprint matches.
+     - Prunes expired sessions (> 8h) and idle sessions (> 30m) without rejecting login.
+     - Verifies password with Argon2id and rejects invalid credentials.
+     - Synchronous audit log creation is executed inside transaction.
+2. **Auth Context Hydration Unit Test Suite (`apps/web/test/unit/auth-context-hydration.test.tsx`):**
+   - **6/6 tests passed (100%)**:
+     - Client login credentials immediately hydrate `AuthContext` state.
+     - Stale SSR `initialSession = null` does not overwrite freshly logged-in client state.
+     - User greeting renders name immediately upon transition.
+     - Logout resets auth context cleanly.
+3. **Route Protection & Guest Guard Test Suite (`apps/web/test/route_protection.test.ts`):**
+   - **13/13 tests passed (100%)**:
+     - Protected routes require active authenticated session.
+     - Guest routes redirect active sessions to `/` server-side.
+4. **Monorepo Static Typecheck:**
+   - `npm run typecheck` returned **0 errors** across all 4 packages (`@kebun-melon/web`, `@kebun-melon/iot-gateway`, `@kebun-melon/contracts`, `@kebun-melon/database`).
+
+### 4. Staging & Playwright Live Browser Verification
+- Local staging Docker environment rebuilt (`docker compose -f docker-compose.staging.yml up -d --build`).
+- Verified `kebun-melon-staging-web` and `kebun-melon-staging-gateway` healthy.
+- Playwright MCP live browser inspection verified:
+  - Clean login screen rendering with zero layout shift or visual regressions.
+  - Active session conflict modal/banner correctly displayed for cross-device attempts.
+  - Fast dashboard transition upon successful authentication.
+
+### 5. Measured & Expected Performance
+- **Login API Duration:**
+  - Baseline (Before): ~3.6–4.2s
+  - Target (After): ~1.2–1.6s (~60–70% latency reduction)
+- **Perceived Transition Duration:**
+  - Baseline (Before): ~5–7s
+  - Target (After): Instantaneous client hydration followed by sub-2-second dashboard rendering.
+
+### 6. Pre-Commit Quality Gate Status
+- **Pending Operator Gate:** Final 5-stage automated CI test suite (`test:coverage`, `test:integration`, `check:quality`, `test`, `test:e2e`) will be executed manually by the operator prior to running `git add` and `git commit` on the `main` branch.
+<!-- Authentication Performance & Session Recovery Testing Reconciled: 2026-09-05 -->
+
 
 

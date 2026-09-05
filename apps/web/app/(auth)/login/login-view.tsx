@@ -5,11 +5,13 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, Suspense } from 'react';
 import { Mail, Lock, Eye, EyeOff, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { useAuth } from '@/context/AuthContext';
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectPath = searchParams.get('redirect') || '/';
+  const { setUser } = useAuth();
 
   const tAuth = useTranslations('auth');
   const tCommon = useTranslations('common');
@@ -64,8 +66,17 @@ function LoginForm() {
         return;
       }
 
+      if (setUser && json.data?.user) {
+        setUser({
+          id: json.data.user.id,
+          fullName: json.data.user.fullName,
+          email: json.data.user.email,
+          accountStatus: json.data.user.accountStatus,
+          activeRoles: json.data.user.activeRoles || [json.data.user.role],
+        });
+      }
+
       router.push(redirectPath);
-      router.refresh();
     } catch {
       setErrorMessage(tErrors('networkError'));
       setLoading(false);

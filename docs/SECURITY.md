@@ -484,9 +484,19 @@ To prevent credential sharing, concurrent operational conflicts, and session hij
 
 - **Maximum 1 Active Session**: Each user account is permitted exactly one valid active session at any given time.
 - **Denial & Preservation Semantics**: When valid credentials (`email` + `password`) are provided during `POST /api/v1/auth/login`, if an active session already exists (where `revokedAt IS NULL`, `NOW() < expiresAt`, and `NOW() - lastSeenAt <= 30m`), the login request is rejected with HTTP 409 Conflict (`ACTIVE_SESSION_EXISTS`).
-- **Existing Session Integrity**: The existing valid active session is NEVER revoked, invalidated, or downgraded by the rejected concurrent login attempt.
+- **Existing Session Integrity**: The existing valid active session is NEVER revoked, invalidated, or downgraded by the rejected concurrent login attempt from a different device.
+- **Same-Client Session Recovery**: When a legitimate client attempts to re-login after local cookie clearance or expiration on the same browser, the session service verifies identity via `existingToken` hash comparison or matching client environment (`ipAddress` + `userAgent`). Upon match, previous sessions are rotated safely without triggering an HTTP 409 lock-out.
 - **Automatic Stale Session Cleanup**: Expired (`NOW() >= expiresAt`), idle-timed-out (`NOW() - lastSeenAt > 30m`), or revoked sessions are soft-revoked inside the transaction and do not block subsequent logins.
-- **Database Concurrency Guarantee**: Single active session checks are executed atomically inside a PostgreSQL/Prisma transaction using user row locking and indexed lookups on `sessions(user_id, revoked_at, expires_at)`.
+- **Database Concurrency Guarantee**: Single active session checks are executed atomically inside a PostgreSQL/Prisma transaction using user row locking (`SELECT id FROM users ... FOR UPDATE`) and indexed lookups on `sessions(user_id, revoked_at, expires_at)`.
+
+### 9.7 Login Transaction Atomicity, Audit Durability & WAN Latency Optimization (DEC-AUTH-108)
+
+Security controls governing the login performance optimization:
+
+- **Prisma `relationLoadStrategy: 'join'`**: Compiles user and role extraction into a single SQL statement. Authorization invariants and RBAC role derivation are strictly preserved.
+- **Synchronous Audit Log Durability**: `tx.auditLog.create` remains strictly synchronous inside the interactive database transaction (`AUTH_LOGIN_SUCCESS`). If audit logging fails, the transaction rolls back, and no session is created. Fire-and-forget or queued audit logging is strictly prohibited.
+- **Non-Blocking Informational Updates**: `user.update({ lastLoginAt })` is decoupled from the transaction and executes non-blockingly with `.catch(...)` error handling. Because `lastLoginAt` is non-authoritative operational metadata, its decoupling does not compromise access control or session integrity.
+- **Fail-Closed Session Recovery**: Client environment matching requires both identical IP address and exact User-Agent string. In any ambiguous or mismatched scenario without a valid token hash, the system defaults to fail-closed rejection with HTTP 409.
 
 ---
 

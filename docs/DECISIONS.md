@@ -35,7 +35,7 @@
 
 | Subsystem | Decision IDs | Status | Approved Policy |
 |---|---|---|---|
-| **Authentication** | `DEC-AUTH-001` to `DEC-AUTH-012`, `DEC-AUTH-102` to `DEC-AUTH-107` | **APPROVED** | HTTP-only secure cookies (`HttpOnly`, `Secure`, `SameSite=Strict`), PostgreSQL session table, 30m idle / 8h absolute maximum lifetime, CLI Owner seed, no public Owner creation, mandatory 6-digit email verification, 15m password recovery, verified self-email change, and single active session enforcement. |
+| **Authentication** | `DEC-AUTH-001` to `DEC-AUTH-012`, `DEC-AUTH-102` to `DEC-AUTH-108` | **APPROVED** | HTTP-only secure cookies (`HttpOnly`, `Secure`, `SameSite=Strict`), PostgreSQL session table, 30m idle / 8h absolute maximum lifetime, CLI Owner seed, no public Owner creation, mandatory 6-digit email verification, 15m password recovery, verified self-email change, single active session enforcement, and Prisma relationLoadStrategy WAN login latency optimization. |
 | **RBAC** | `DEC-RBAC-013` to `DEC-RBAC-019` | **APPROVED** | Owner has global device visibility. Admins have mandatory per-device assignments; device assignment automatically grants both monitoring and faucet control. Owners manage assignments. No separate per-user-device `canControl` permission in v1. |
 | **Devices** | `DEC-DEV-020` to `DEC-DEV-030` | **APPROVED** | Multi-protocol architecture: Soil & Water quality monitoring telemetry via REST API over Wi-Fi (no MQTT broker). Water Tank monitoring (tank volume & flow rate) via MQTT through an EMQX broker (MQTT 5.0 over TLS via IoT Gateway). Shared INA219 electrical monitoring via REST/Wi-Fi. Per-device credentials/ACLs, no anonymous access, no direct browser-to-MQTT. Offline threshold: **TBD**. Stale threshold: **TBD**. In-app device creation / Add Device removed (`DEC-DEV-027`). External `deviceId` editable by OWNER only; internal DB UUID immutable; canonical `deviceId` strictly hidden from ADMIN in UI & API (`DEC-DEV-028`). Previously/last-accessed device history & persistent restoration removed while preserving all telemetry/command/assignment/audit history (`DEC-DEV-029`). Hard delete of devices permanently removed in favor of `DEACTIVATED` / `ACTIVE` lifecycle (`DEC-DEV-030`). |
 | **Monitoring** | `DEC-MON-036` to `DEC-MON-050` | **APPROVED** | Three distinct monitoring domains: 1) Soil monitoring (NPK, Temp, Moisture, pH, EC in `µS/cm`, status), 2) Water Quality monitoring (pH, TDS in ppm, EC in `µS/cm`, status), 3) Water Tank monitoring (Tank Vol in `L`, Flow in `m³/h`, status). Canonical display unit for EC is `µS/cm` (values in `mS/cm` converted at presentation boundary via `×1000`). Control capabilities (Solenoid Valve, Relay) are actuators, not monitoring sensors. INA219 electrical monitoring tracks system electrical consumption (voltage, current, power) as device health/power telemetry, not as a battery percentage or primary agronomic measurement. 90-day raw telemetry retention TTL with chunked batch maintenance (`DEC-MON-048` / `TASK-0913`). Sensor precision and valid ranges: **TBD**. |
@@ -137,6 +137,34 @@
      - Environment variables remain available for operational configuration with these approved values as defaults.
   6. **Single-Use, Invalidation & Session Revocation**: When a token is created, any prior unused tokens for the user are invalidated. Once consumed, the token is marked `used_at = NOW()` and cannot be replayed. Successful password reset transactionally revokes all active user sessions across devices per `TASK-0908`.
   7. **Account Status Policy**: Password recovery is permitted for any existing user account with an email. Password reset MUST NEVER activate, approve, or alter the `accountStatus` of an account (e.g. `PENDING_APPROVAL` or `SUSPENDED` accounts remain unchanged). Normal login status checks continue to enforce system access control.
+
+---
+
+#### DEC-AUTH-107: Single Active Session Policy & Account Security Management
+* **Related Task IDs**: `TASK-0217`
+* **Related Documentation**: `docs/SECURITY.md` §9.2, `docs/DATABASE.md` §3.4, `docs/API.md`, `TASKS.md`
+* **Status**: **APPROVED BY USER**
+* **Approved Decision**:
+  1. **Strict 1-Session Policy**: Each user account is permitted exactly one active, non-expired, non-idle, non-revoked session across devices (`SEC-AUTH-007`).
+  2. **Conflict Denial Over Invalidation**: Incoming valid authentication attempts while another device holds an active session are rejected with HTTP 409 Conflict (`ACTIVE_SESSION_EXISTS`). Pre-existing live sessions are preserved intact and are NOT invalidated by unauthorized login attempts.
+  3. **Atomic Evaluation**: Active session checking occurs within a locked PostgreSQL transaction (`SELECT id FROM users WHERE id = ... FOR UPDATE`) using composite index `sessions_user_active_idx(user_id, revoked_at, expires_at)`.
+  4. **Idle & Expiry Invalidation**: Sessions idle for >30 minutes or exceeding 8-hour maximum lifetime are automatically soft-revoked during login and do not trigger conflict.
+
+---
+
+#### DEC-AUTH-108: Login Latency Optimization & WAN Query Reduction Architecture
+* **Related Task IDs**: `TASK-0217`, `TASK-0215`
+* **Related Documentation**: `docs/ARCHITECTURE.md`, `docs/DATABASE.md`, `docs/API.md`, `docs/PERFORMANCE.md`
+* **Status**: **APPROVED BY USER**
+* **Root Cause**: Measured high perceived login latency (~5–7s) caused by sequential WAN round trips over high-latency connections to Supabase Mumbai (`ap-south-1`, ~240ms TCP round trip), including 3 sequential Prisma queries for user lookup and 6 sequential statements inside the interactive login transaction.
+* **Approved Decision**:
+  1. **Prisma Relation Joins**: Enabled `previewFeatures = ["relationJoins"]` in Prisma Client and applied `relationLoadStrategy: 'join'` in `prisma.user.findUnique`. Compiles user, userRoles, and role lookup into a single SQL statement with `LEFT JOIN`s, reducing user lookup from ~1,800ms (3 round trips) to ~400ms (1 round trip) while preserving 100% identical RBAC role loading.
+  2. **Session Pruning Streamlining**: Streamlined session transaction by replacing unconditional `updateMany` sweeps with an indexed `tx.session.findMany` on unrevoked sessions. For clean logins (no active/stale sessions), table updates are bypassed completely, saving 1 full WAN round trip (~400ms).
+  3. **Decoupled Informational Updates**: Moved non-critical `user.update({ lastLoginAt })` outside the critical login transaction to run non-blockingly with `.catch(...)` error logging, eliminating 1 database round trip from the HTTP response path without compromising session consistency.
+  4. **Strict Audit Durability Guarantee**: `tx.auditLog.create` remains strictly synchronous inside the interactive transaction; if audit insertion fails, the entire transaction rolls back and no session is created. Fire-and-forget audit logging is forbidden.
+  5. **Same-Client Session Recovery**: Enabled same-client recovery when `session_token` cookie is deleted or expired on the same browser (matched via `existingToken` hash or identical IP + User-Agent), allowing legitimate users to re-login while strictly denying concurrent logins from different devices (HTTP 409).
+  6. **AuthContext Hydration Guard**: Removed redundant `router.refresh()` in `login-view.tsx` and guarded `AuthContext` against stale SSR `initialSession=null` overwriting client-authenticated user state, eliminating the blank greeting ("Welcome ") bug.
+  7. **Performance Targets**: Expected login API duration reduced from ~3.6–4.2s to ~1.2–1.6s (~60–70% latency improvement).
 
 ---
 

@@ -202,7 +202,11 @@ Static client mock data imported from `lib/constants.ts`. No TanStack Query, SWR
 Native HTML inputs managed with local React `useState`. No React Hook Form, Zod, Yup, or Formik installed.
 
 ### 10. Existing Authentication and Session Implementation
-Simulated client-side `useState` form submission handlers in `/login`, `/register`, `/forgot-password`. No HTTP endpoints, password hashing, JWT/session tokens, cookies, or server-side auth checks exist.
+Production authentication architecture implemented under Phase 2 (`TASK-0204`, `TASK-0215`, `TASK-0217`, `DEC-AUTH-108`):
+* **HTTP-Only Session Management**: Secured via `session_token` cookie (`HttpOnly`, `Secure`, `SameSite=Strict`, 30m idle timeout, 8h absolute lifetime).
+* **Centralized AuthContext Hydration**: React `AuthContext` (`AuthProvider` / `useAuth()`) provides unified access to `{ user, role, isAuthenticated }`. `RootLayout` SSR retrieves the initial session via `getSessionOrNull()` without throwing.
+* **Instant Login Transition (`DEC-AUTH-108`)**: `login-view.tsx` populates `AuthContext` directly from the `POST /api/v1/auth/login` response and navigates via `router.push()`. Redundant `router.refresh()` calls were removed to eliminate blocking server re-fetches. `AuthContext` guards against stale SSR `initialSession=null` clobbering freshly authenticated client state, eliminating the blank greeting ("Welcome ") bug.
+* **Single Active Session & Same-Client Recovery**: Enforces 1 active session per user (`DEC-AUTH-107`). If cookies are cleared on the same device, re-login transparently recovers via token hash or IP + User-Agent matching, while strictly denying concurrent logins from different devices (HTTP 409).
 
 ### 11. Existing Role or Permission Logic
 Static profileee string `"Pemilik Lahan"` in `USER_profileeE` constant (`lib/constants.ts`). No RBAC middleware, role checking functions, or permission guards exist in the application code.

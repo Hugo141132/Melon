@@ -1291,3 +1291,23 @@ The operational overview dashboard (`/` and `/dashboard`) adheres strictly to se
 - **Environmental Weather Isolation:** The weather panel is an environmental metric component bound to static farm coordinates (`King Agrowisata`), completely decoupled from individual device authorization or role permissions.
 <!-- TASK-0506 RBAC Reconciled: 2026-09-02 -->
 
+---
+
+## Login Performance Optimization & Role Loading RBAC Invariance Note (DEC-AUTH-108 / Reconciled 2026-09-05)
+
+The login performance optimization and session recovery mechanism (`DEC-AUTH-108`) maintains 100% fidelity to the established RBAC specification:
+- **Role Loading Integrity via Prisma `relationJoins`:**
+  - `prisma.user.findUnique` utilizes `relationLoadStrategy: 'join'` to eagerly fetch `userRoles` and `rolePermissions` within a single SQL statement.
+  - The resulting role extraction (`activeRoles = user.userRoles.map(...)`) and permission evaluation logic remain strictly identical to previous multi-query Prisma behavior.
+  - Zero permissions, roles, or permission inheritance graphs are modified.
+- **Universal Single Active Session Enforcement (`DEC-AUTH-107`):**
+  - The single active session limit continues to bind `OWNER` and `ADMIN` roles equally.
+  - Concurrent logins from separate devices or distinct user agents are rejected with HTTP 409 Conflict (`ACTIVE_SESSION_EXISTS`) regardless of whether the user possesses `OWNER` or `ADMIN` authority.
+- **Same-Client Session Recovery Scoping:**
+  - Same-client recovery (automatic revocation of stale sessions on the same browser upon credential re-entry) preserves existing role mapping and account statuses.
+  - Re-establishing a session on the same device never elevates privileges, reactivates inactive accounts, or alters device assignments.
+- **Active Account Invariant:**
+  - Accounts with `accountStatus` in `PENDING_APPROVAL`, `REJECTED`, `SUSPENDED`, or `DEACTIVATED` remain blocked from login and session issuance prior to entering any transaction path.
+<!-- Login Optimization & Role Loading RBAC Reconciled: 2026-09-05 -->
+
+

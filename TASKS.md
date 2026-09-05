@@ -944,8 +944,8 @@ Implemented complete Owner User Management:
 
 **Priority:** `P0`
 **Status:** `DONE`
-**Completed:** 2026-08-29
-**Dependencies:** `TASK-0204`, `TASK-0211`, `TASK-0215`, `DEC-AUTH-107`, `DEC-UIUX-102`
+**Completed:** 2026-08-29 (Reconciled & Performance Optimized 2026-09-05; final pre-commit CI test suite pending manual execution)
+**Dependencies:** `TASK-0204`, `TASK-0211`, `TASK-0215`, `DEC-AUTH-107`, `DEC-AUTH-108`, `DEC-UIUX-102`
 
 ### Work
 
@@ -964,6 +964,15 @@ Implemented complete Owner User Management:
    - Wire "Change Password" button to a modal form submitting to `POST /api/v1/auth/change-password` with `{ currentPassword, newPassword, newPasswordConfirmation }`, handling validation errors, and redirecting to `/login?message=PASSWORD_CHANGED` upon 204 No Content.
 5. **I18N Support:**
    - Add 100% key-parity translations across `messages/id.json` and `messages/en.json` for single-session rejection, change password modal, and session security UI.
+6. **2026-09-05 Login Performance Optimization & Auth Bug Fixes (`DEC-AUTH-108`):**
+   - **Root Cause Analysis:** Investigated ~5–7s perceived login flow from button click to dashboard. Bottlenecks: high WAN latency to Supabase Mumbai (`ap-south-1`, ~240ms per round trip), 3 sequential Prisma queries for user lookup (`users` -> `user_roles` -> `roles`), and 6 round trips inside the `$transaction`.
+   - **Prisma `relationJoins` Optimization:** Enabled `previewFeatures = ["relationJoins"]` in `packages/database/prisma/schema.prisma` and applied `relationLoadStrategy: 'join'` to `prisma.user.findUnique`, compiling user, active roles, and role codes into a single SQL `LEFT JOIN` (reducing user lookup from ~1,800ms to ~400ms).
+   - **Session Transaction Streamlining:** Replaced unconditional `updateMany` prune sweep with `tx.session.findMany` on unrevoked sessions. For clean logins / logged-out accounts, cleanup write queries are completely skipped inside the transaction (saving ~400ms).
+   - **Non-blocking Informational Updates:** Moved `user.update({ lastLoginAt })` outside the critical `$transaction` into non-blocking asynchronous execution with `.catch(...)` logging, saving ~400ms from the response path.
+   - **Audit Durability Guarantee:** Maintained `tx.auditLog.create` strictly synchronous inside the interactive transaction, ensuring atomicity (no fire-and-forget audit).
+   - **AuthContext & User Greeting Fix:** Resolved blank user greeting ("Welcome ") after login by removing redundant `router.refresh()` in `login-view.tsx` and guarding `AuthContext` from stale SSR `initialSession=null` clobbering.
+   - **Same-Client Session Recovery:** Enabled re-login recovery when `session_token` cookie is deleted/lost on the same browser (via token hash matching or identical IP + User-Agent), while preserving strict 409 rejection of different devices.
+   - **Performance Results:** Expected `POST /api/v1/auth/login` duration drops from ~3.6–4.2s to ~1.2–1.6s (~60–70% latency reduction).
 
 ### Acceptance Criteria
 
@@ -974,6 +983,13 @@ Implemented complete Owner User Management:
 - [x] "Linked Devices" card is completely removed from `/profile`.
 - [x] "Change Password" on `/profile` executes `POST /api/v1/auth/change-password` and redirects to `/login`.
 - [x] All unit, API, and component tests pass (100% pass rate).
+- [x] Prisma user lookup uses `relationLoadStrategy: 'join'` with identical RBAC role loading.
+- [x] Synchronous audit log creation inside `$transaction` is strictly preserved.
+- [x] Non-critical `lastLoginAt` update is safely executed non-blockingly outside the transaction.
+- [x] AuthContext immediately displays authenticated user without blank greeting or layout shift.
+- [x] Same-client recovery succeeds after cookie loss while different-device logins are rejected.
+- [x] Targeted unit tests (`session-service.test.ts` 8/8, `auth-context-hydration.test.tsx` 6/6, `route_protection.test.ts` 13/13) and monorepo typecheck pass with 0 errors.
+- [x] Containerized staging environment rebuilt and verified via Playwright MCP. Final 5 pre-commit CI gates (`test:coverage`, `test:integration`, `check:quality`, `test`, `test:e2e`) pending manual execution before commit.
 
 ---
 

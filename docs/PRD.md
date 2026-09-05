@@ -201,7 +201,7 @@ The initial Owner account is provisioned via CLI seed (`scripts/seed-owner.ts`).
 - Login and session issuance remain blocked server-side with `EMAIL_NOT_VERIFIED` (HTTP 403) until the Owner verifies email ownership (`emailVerifiedAt IS NOT NULL`).
 - The provisioning process outputs a secure email verification link or dispatches verification via Resend.
 
-### 6.5 Login Behaviour (PRD-FR-019 / PRD-FR-025)
+### 6.5 Login Behaviour (PRD-FR-019 / PRD-FR-025 / PRD-FR-026)
 
 The login page shall:
 
@@ -211,8 +211,15 @@ The login page shall:
 - Prevent access for invalid credentials.
 - Prevent access with HTTP 403 `EMAIL_NOT_VERIFIED` for unverified accounts (`emailVerifiedAt IS NULL`).
 - Prevent access for `PENDING_APPROVAL`, `REJECTED`, `SUSPENDED`, or `DEACTIVATED` accounts.
-- Enforce single active session policy (`PRD-FR-025` / `DEC-AUTH-107`): if valid credentials are submitted while the account already has an active, non-expired, non-idle, non-revoked session, reject the login with HTTP 409 Conflict (`ACTIVE_SESSION_EXISTS`) and preserve the existing active session.
+- Enforce single active session policy (`PRD-FR-025` / `DEC-AUTH-107`): if valid credentials are submitted while the account already has an active, non-expired, non-idle, non-revoked session on another client, reject the login with HTTP 409 Conflict (`ACTIVE_SESSION_EXISTS`) and preserve the existing active session.
 - Automatically prune expired (`> 8h`), idle-timed-out (`> 30m`), or revoked sessions without blocking login.
+- Provide same-client session recovery (`PRD-FR-026` / `DEC-AUTH-108`): if a user re-authenticates on the same browser (identical `userAgentHash` and `ipAddress`) where the session cookie was cleared or expired, automatically revoke the orphaned session and issue a new valid session without throwing 409 Conflict.
+- Maintain operational performance standards (`DEC-AUTH-108`):
+  - Login API target duration: $\le 1.6\text{s}$ (down from $\sim 3.6 - 4.2\text{s}$ baseline latency caused by sequential remote database queries to Supabase Mumbai).
+  - Use Prisma `relationLoadStrategy: 'join'` to collapse user and role lookups into a single SQL join query.
+  - Decouple non-critical `lastLoginAt` updates from the critical transaction path.
+  - Strictly preserve synchronous `auditLog.create` inside the transaction with PostgreSQL advisory locks.
+  - Eliminate redundant `router.refresh()` calls to ensure instant, seamless client transition to `/` without blank greeting flashes.
 - Display an appropriate account-status message without exposing sensitive system information.
 - Redirect an approved and active user to the appropriate authenticated landing page (`/`).
 - Record successful and failed login attempts according to the security policy.

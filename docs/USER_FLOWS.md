@@ -527,15 +527,18 @@ flowchart TD
 2. The server loads canonical role and status.
 3. The server verifies status `ACTIVE`.
 4. The server verifies `emailVerifiedAt IS NOT NULL` (returns HTTP 403 `EMAIL_NOT_VERIFIED` if null).
-5. The server checks for existing active sessions (`revokedAt IS NULL`, `< 8h`, idle `< 30m`). If an active session exists, the server rejects the login attempt with HTTP 409 Conflict (`ACTIVE_SESSION_EXISTS`) and preserves the existing session (`DEC-AUTH-107`).
-6. The server creates a secure session and rotates session tokens.
-7. The server loads permissions and assigned devices.
-8. The frontend redirects to `/`.
-9. The interface displays only permitted navigation items.
+5. The server checks for existing active sessions (`revokedAt IS NULL`, `< 8h`, idle `< 30m`).
+   - If an active session exists on the **same client** (matching `existingToken` hash or matching IP and User-Agent), the server rotates the session safely without 409 conflict (`DEC-AUTH-108`).
+   - If an active session exists on a **different client/device**, the server rejects the login attempt with HTTP 409 Conflict (`ACTIVE_SESSION_EXISTS`) and preserves the existing session (`DEC-AUTH-107`).
+6. The server creates a secure session, synchronously logs `auth.login.success` within the transaction, and executes non-blocking `lastLoginAt` updates in the background.
+7. The server loads permissions and active roles in a single joined query (`relationLoadStrategy: 'join'`).
+8. The frontend receives the response, immediately hydrates `AuthContext` with the authenticated user, and pushes route transition (`router.push('/dashboard')`) without blocking on redundant `router.refresh()`.
+9. The dashboard renders immediately with the user greeting ("Welcome [user]") and displays only permitted navigation items without layout shift or blank states.
 
 **Alternative flows:**
 
 - No devices are assigned; dashboard opens with a no-assigned-devices state.
+- Legitimate same-client re-login after cookie expiration or browser data clearance automatically recovers without requiring manual logout from the previous session.
 
 **Error flows:**
 
@@ -543,6 +546,10 @@ flowchart TD
 - Active session already exists on another client: displays localized conflict error (*"Akun sedang aktif di perangkat lain"* / *"Account is currently active in another session"*); existing session remains active.
 - Authentication service failure.
 - Account changed to suspended before session creation.
+
+**Performance Characteristics (`DEC-AUTH-108`):**
+- Login API execution: ~1.2–1.6s (reduced from ~3.6–4.2s).
+- Perceived client transition: immediate upon response receipt with instant greeting rendering.
 
 **Postconditions:** Admin has an authenticated session with current permissions.
 **Required permissions:** None beyond active account eligibility.

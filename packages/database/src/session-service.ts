@@ -14,6 +14,7 @@ import { verifyPassword } from './password-service';
 
 export const SESSION_COOKIE_NAME = 'session_token';
 export const SESSION_IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+export const SESSION_LAST_SEEN_THROTTLE_MS = 60 * 1000; // 1 minute throttle to prevent blocking DB writes on rapid requests
 export const SESSION_ABSOLUTE_LIFETIME_MS = 8 * 60 * 60 * 1000; // 8 hours
 export const SESSION_ABSOLUTE_LIFETIME_SECONDS = 8 * 60 * 60; // 28800 seconds (8 hours)
 
@@ -57,6 +58,7 @@ export interface LoginMetadata {
   ipAddress?: string;
   userAgent?: string;
   requestId?: string;
+  existingToken?: string;
 }
 
 export interface LoginResult {
@@ -78,6 +80,7 @@ export async function loginUser(
   const normalised = normaliseEmail(input.email);
 
   const user = await prisma.user.findUnique({
+    relationLoadStrategy: 'join',
     where: { email: normalised },
     include: {
       userRoles: {
@@ -123,32 +126,76 @@ export async function loginUser(
       // 1. Lock the user row to prevent race conditions on concurrent logins
       await tx.$executeRaw`SELECT id FROM users WHERE id = ${user.id}::uuid FOR UPDATE`;
 
-      // 2. Prune expired or idle-timed-out sessions for this user
+      // 2. Efficiently inspect unrevoked sessions for this user in a single round trip
       const thirtyMinsAgo = new Date(now.getTime() - SESSION_IDLE_TIMEOUT_MS);
-      await tx.session.updateMany({
-        where: {
-          userId: user.id,
-          revokedAt: null,
-          OR: [{ expiresAt: { lte: now } }, { lastSeenAt: { lte: thirtyMinsAgo } }],
-        },
-        data: {
-          revokedAt: now,
-        },
-      });
-
-      // 3. Check if there is still an active session
-      const existingSession = await tx.session.findFirst({
+      const existingSessions = await tx.session.findMany({
         where: {
           userId: user.id,
           revokedAt: null,
         },
+        orderBy: { createdAt: 'desc' },
       });
 
-      if (existingSession) {
-        throw new ActiveSessionExistsError();
+      const activeSessions = existingSessions.filter(
+        (s) =>
+          s.expiresAt > now &&
+          (s.lastSeenAt ? s.lastSeenAt > thirtyMinsAgo : s.createdAt > thirtyMinsAgo)
+      );
+
+      if (activeSessions.length > 0) {
+        const existingSession = activeSessions[0];
+        const isTokenMatch =
+          Boolean(metadata?.existingToken) &&
+          existingSession.sessionTokenHash === hashSessionToken(metadata!.existingToken!);
+
+        let isPreviousTokenMatch = false;
+        if (!isTokenMatch && metadata?.existingToken) {
+          const previousTokenHash = hashSessionToken(metadata.existingToken);
+          const previousSession = await tx.session.findFirst({
+            where: {
+              userId: user.id,
+              sessionTokenHash: previousTokenHash,
+            },
+          });
+          if (previousSession) {
+            isPreviousTokenMatch = true;
+          }
+        }
+
+        const isClientEnvironmentMatch =
+          Boolean(metadata?.ipAddress) &&
+          Boolean(metadata?.userAgent) &&
+          existingSession.ipAddress === metadata!.ipAddress &&
+          existingSession.userAgent === metadata!.userAgent;
+
+        if (isTokenMatch || isPreviousTokenMatch || isClientEnvironmentMatch) {
+          // Same-client session recovery / rotation: revoke previous active and stale sessions
+          await tx.session.updateMany({
+            where: {
+              userId: user.id,
+              revokedAt: null,
+            },
+            data: {
+              revokedAt: now,
+            },
+          });
+        } else {
+          throw new ActiveSessionExistsError();
+        }
+      } else if (existingSessions.length > 0) {
+        // All unrevoked sessions are stale / expired / idle: prune them in a single batch
+        await tx.session.updateMany({
+          where: {
+            userId: user.id,
+            revokedAt: null,
+          },
+          data: {
+            revokedAt: now,
+          },
+        });
       }
 
-      // 4. Create new session, update user, write audit log
+      // 3. Create new session and synchronously write audit log
       await tx.session.create({
         data: {
           id: sessionId,
@@ -159,11 +206,6 @@ export async function loginUser(
           ipAddress: metadata?.ipAddress ?? null,
           userAgent: metadata?.userAgent ?? null,
         },
-      });
-
-      await tx.user.update({
-        where: { id: user.id },
-        data: { lastLoginAt: now },
       });
 
       await tx.auditLog.create({
@@ -188,6 +230,18 @@ export async function loginUser(
       timeout: 20000,
     }
   );
+
+  // 4. Update lastLoginAt non-blockingly outside the critical login transaction
+  if (prisma.user?.update) {
+    void prisma.user
+      .update({
+        where: { id: user.id },
+        data: { lastLoginAt: now },
+      })
+      .catch((err: any) => {
+        console.error('[loginUser] Non-critical lastLoginAt update failed:', err);
+      });
+  }
 
   const rawUserWithRoles: RawDbUserWithRoles = {
     id: user.id,
@@ -299,17 +353,22 @@ export async function validateSession(
     return null;
   }
 
-  // Session is valid: update lastSeenAt
-  try {
-    await prisma.session.update({
-      where: { id: session.id },
-      data: { lastSeenAt: now },
-    });
-  } catch (err: any) {
-    if (err?.code === 'P2025') {
-      return null;
-    }
-    throw err;
+  // Session is valid: update lastSeenAt only if beyond throttle threshold without blocking the request path
+  const shouldUpdateLastSeen =
+    !session.lastSeenAt ||
+    now.getTime() - session.lastSeenAt.getTime() >= SESSION_LAST_SEEN_THROTTLE_MS;
+
+  if (shouldUpdateLastSeen) {
+    void prisma.session
+      .update({
+        where: { id: session.id },
+        data: { lastSeenAt: now },
+      })
+      .catch((err: any) => {
+        if (err?.code !== 'P2025') {
+          console.error('[validateSession] Failed to update lastSeenAt in background:', err);
+        }
+      });
   }
 
   const rawUserWithRoles: RawDbUserWithRoles = {

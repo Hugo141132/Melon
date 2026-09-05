@@ -24,7 +24,12 @@ export function AuthProvider({
   const [session, setSession] = useState<AuthenticatedUserSession | null>(initialSession);
 
   useEffect(() => {
-    setSession(initialSession);
+    // Only synchronize if initialSession is provided;
+    // do not allow stale initialSession=null from background layout passes
+    // to overwrite an already authenticated client state.
+    if (initialSession !== null) {
+      setSession(initialSession);
+    }
   }, [initialSession]);
 
   const setUser = (newUser: AuthenticatedUserSession | null) => {

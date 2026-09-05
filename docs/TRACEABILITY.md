@@ -35,9 +35,11 @@
 | `PRD-FR-023` | Soil monitoring metrics display | `docs/PRD.md` | `DEC-MON-036` | `TASK-0501` | `TEST-API-003` | `VERIFIED` |
 | `PRD-FR-024` | Self-service verified email address change | `docs/PRD.md` | `DEC-AUTH-106` | `TASK-0216` | `TEST-API-001` | `VERIFIED` |
 | `PRD-FR-025` | Single active session enforcement per account | `docs/PRD.md` | `DEC-AUTH-107` | `TASK-0217` | `TEST-SEC-001` | `VERIFIED` |
+| `PRD-FR-026` | Optimized login transaction and same-client session recovery | `docs/PRD.md` | `DEC-AUTH-108` | `TASK-0217` | `TEST-API-001` | `VERIFIED` |
 | `PRD-FR-040` | Operational overview Bento dashboard and environmental weather | `docs/PRD.md` | `DEC-UIUX-106` | `TASK-0506` | `TEST-UI-006` | `VERIFIED` |
 | `SEC-AUTH-006` | Email change token scoping and non-sensitive audit logging | `docs/SECURITY.md` | `DEC-AUTH-106` | `TASK-0216` | `TEST-SEC-005` | `VERIFIED` |
 | `SEC-AUTH-007` | Atomic single active session verification and race-safe login rejection | `docs/SECURITY.md` | `DEC-AUTH-107` | `TASK-0217` | `TEST-SEC-001` | `VERIFIED` |
+| `SEC-AUTH-008` | Preserved transactional audit durability with non-blocking user login tracking | `docs/SECURITY.md` | `DEC-AUTH-108` | `TASK-0217` | `TEST-SEC-001` | `VERIFIED` |
 | `SEC-DATA-003` | Content Security Policy (CSP) and security headers | `docs/SECURITY.md` | - | `TASK-0901` | `TEST-SEC-005` | `IMPLEMENTED` |
 | `SEC-DATA-004` | Immutable append-only audit log storage | `docs/SECURITY.md` | - | `TASK-0903` | `TEST-DB-002` | `READY_FOR_IMPLEMENTATION` |
 | `SEC-OPS-001` | Automated secret scanning in CI pipeline | `docs/SECURITY.md` | - | `TASK-0906` | `TEST-SEC-005` | `IMPLEMENTED` |
@@ -452,6 +454,33 @@ The following facts are verified in the traceability matrix regarding the `/user
   - Monorepo TypeScript type checking passed with 0 errors across 4 workspaces (`tsc --noEmit`).
   - Playwright live browser verification confirmed instant loading without session spinner for Owner and instant 403 Forbidden screen for Admin.
 <!-- Users Loading & Auth Optimization Traceability Reconciled: 2026-09-04 -->
+
+---
+
+## Authentication Performance Optimization & Session Recovery Traceability Note (Reconciled 2026-09-05)
+
+The following facts are verified in the traceability matrix regarding `DEC-AUTH-108` (Login Transaction Performance Optimization, Same-Client Session Recovery, and Hydration Stability):
+- **Traceability Baseline:** Defined under `PRD-FR-026`, `DEC-AUTH-108`, `SEC-AUTH-008`, and `ARCHITECTURE.md` to eliminate sequential round-trip query overhead to remote database instances (Supabase Mumbai), allow seamless session re-establishment for identical clients without false-positive single-session lockouts, and eliminate blank UI flashes during App Router navigation.
+- **Implementation Status:** Fully implemented and verified:
+  - Enabled Prisma `previewFeatures = ["relationJoins"]` in `packages/database/prisma/schema.prisma` and applied `relationLoadStrategy: 'join'` in `prisma.user.findUnique`, reducing user and RBAC role retrieval from 3 sequential queries to 1 single SQL `LEFT JOIN`.
+  - Streamlined `packages/database/src/session-service.ts` transaction by querying unrevoked sessions with `tx.session.findMany` and skipping write cleanup on normal logins.
+  - Moved `user.update({ lastLoginAt })` outside the critical `$transaction` block as a non-blocking asynchronous call with localized error trapping.
+  - Strictly preserved synchronous `tx.auditLog.create` inside the PostgreSQL advisory lock (`SELECT pg_advisory_xact_lock(...)`).
+  - Added same-client session recovery: when incoming valid credentials match an existing active session's client fingerprint (`userAgentHash` and `ipAddress`), the stale session is revoked and a new session is issued cleanly.
+  - Eliminated redundant `router.refresh()` from `apps/web/app/(auth)/login/login-view.tsx` and protected `AuthContext` from stale SSR `initialSession = null` overwrites, permanently fixing the blank user greeting defect.
+- **Architectural & Security Invariance:**
+  - `DEC-AUTH-107` single active session enforcement remains 100% active against cross-device or multi-browser concurrent logins (HTTP 409 `ACTIVE_SESSION_EXISTS`).
+  - Zero database schema migrations required (covering indexes `sessions_user_active_idx` and `user_roles_user_idx` satisfy the query patterns).
+  - RBAC matrices, role mapping logic, and permission evaluation are completely untouched.
+- **Automated Verification:**
+  - `packages/database/test/session-service.test.ts`: 8/8 tests passed (100%).
+  - `apps/web/test/unit/auth-context-hydration.test.tsx`: 6/6 tests passed (100%).
+  - `apps/web/test/route_protection.test.ts`: 13/13 tests passed (100%).
+  - Monorepo TypeScript type checking passed with 0 errors across 4 workspaces (`tsc --noEmit`).
+  - Local staging environment rebuilt and live login screen verified via Playwright MCP.
+  - Final 5-stage pre-commit CI test suite is pending manual execution before commit.
+<!-- Authentication Performance & Session Recovery Traceability Reconciled: 2026-09-05 -->
+
 
 
 

@@ -3,7 +3,8 @@
 // Database: PostgreSQL
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["relationJoins"]
 }
 
 datasource db {
@@ -148,6 +149,9 @@ model UserRoleAssignment {
   user User @relation(fields: [userId], references: [id], onDelete: Restrict)
   role Role @relation(fields: [roleId], references: [id], onDelete: Restrict)
 
+  @@index([userId], map: "user_roles_user_id_idx")
+  @@index([userId, revokedAt], map: "user_roles_user_id_revoked_at_idx")
+  @@index([roleId], map: "user_roles_role_id_idx")
   @@map("user_roles")
 }
 
@@ -161,6 +165,7 @@ model RolePermission {
   permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
 
   @@unique([roleId, permissionId])
+  @@index([permissionId], map: "role_permissions_permission_id_idx")
   @@map("role_permissions")
 }
 
@@ -179,6 +184,7 @@ model AccountApproval {
   decidedBy User @relation("ApprovalDecidedBy", fields: [decidedByUserId], references: [id], onDelete: Restrict)
 
   @@index([applicantUserId, decidedAt(sort: Desc)], map: "account_approvals_applicant_idx")
+  @@index([decidedByUserId], map: "account_approvals_decided_by_user_id_idx")
   @@map("account_approvals")
 }
 
@@ -268,6 +274,8 @@ model UserDeviceAccess {
   device     Device @relation(fields: [deviceId], references: [id], onDelete: Restrict)
   assignedBy User   @relation("UserDeviceAccessAssignedBy", fields: [assignedByUserId], references: [id], onDelete: Restrict)
 
+  @@index([deviceId], map: "user_device_access_device_id_idx")
+  @@index([assignedByUserId], map: "user_device_access_assigned_by_user_id_idx")
   @@map("user_device_access")
 }
 
@@ -473,6 +481,7 @@ model Alert {
   device           Device?                @relation(fields: [deviceId], references: [id], onDelete: SetNull)
   acknowledgements AlertAcknowledgement[]
 
+  @@index([deviceId], map: "alerts_device_id_idx")
   @@map("alerts")
 }
 
@@ -487,6 +496,8 @@ model AlertAcknowledgement {
   alert          Alert @relation(fields: [alertId], references: [id], onDelete: Cascade)
   acknowledgedBy User  @relation(fields: [acknowledgedByUserId], references: [id], onDelete: Restrict)
 
+  @@index([acknowledgedByUserId], map: "alert_acknowledgements_user_id_idx")
+  @@index([alertId], map: "alert_acknowledgements_alert_id_idx")
   @@map("alert_acknowledgements")
 }
 
@@ -506,6 +517,7 @@ model UserPreference {
   user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   defaultDevice Device? @relation(fields: [defaultDeviceId], references: [id], onDelete: SetNull)
 
+  @@index([defaultDeviceId], map: "user_preferences_default_device_id_idx")
   @@map("user_preferences")
 }
 
@@ -523,6 +535,7 @@ model Session {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId], map: "sessions_user_id_idx")
   @@index([userId, revokedAt, expiresAt], map: "sessions_user_active_idx")
   @@map("sessions")
 }

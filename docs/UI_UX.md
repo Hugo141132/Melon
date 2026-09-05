@@ -967,6 +967,16 @@ The UI should:
 
 Performance targets shall be defined in `SYSTEM_REQUIREMENTS.md` or `PRD.md`, not invented here.
 
+### 22.1 Login Transition & Hydration Performance (DEC-AUTH-108)
+
+To provide an instantaneous, flicker-free authentication experience:
+
+- **Elimination of Blocking Server Refreshes**: The login flow removes redundant `router.refresh()` calls, preventing unneeded full-page SSR re-renders that previously contributed to 5–7 second transitions.
+- **Immediate Reactive Hydration**: `login-view.tsx` populates `AuthContext` immediately upon receiving the successful login response, before invoking `router.push('/dashboard')`.
+- **Greeting Continuity**: `AuthContext` guards against stale SSR `initialSession=null` states overwriting client-authenticated data, guaranteeing that the user greeting ("Welcome [user]") renders instantly without a blank title flash.
+- **Active Session Conflict Messaging**: When rejected under `DEC-AUTH-107`, the UI displays a clear, localized inline warning banner (*"Akun sedang aktif di perangkat lain"* / *"Account is currently active in another session"*) without revoking or interfering with the live session on the other device.
+- **Design Compliance**: Adheres strictly to `Premium Minimal Ops` with subtle button loading spinners and clean error alert banners.
+
 ---
 
 ## 23. Analytics and Audit Visibility

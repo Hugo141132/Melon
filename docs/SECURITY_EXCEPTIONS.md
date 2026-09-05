@@ -95,6 +95,7 @@ All exceptions must be recorded in `scripts/security-exceptions.json` using the 
 - **TASK-0302 / Device Lifecycle Audit (2026-08-23):** Confirmed zero secret exceptions and zero dependency exceptions introduced; device activation and deactivation endpoints enforce strict Owner RBAC authorization (`device.activate` / `device.deactivate`), eliminate hard deletion, and log audit events with zero security exceptions.
 - **TASK-0914 Audit (2026-08-26):** Confirmed zero secret exceptions and zero dependency exceptions introduced; direct EMQX Cloud TLS connectivity and dynamic simulator identity strictly adhere to `SEC-OPS-001` (zero unapproved secrets) with runtime credential parsing, strict log redaction, and no hardcoded canonical hardware identities in source code.
 - **Controls Loading & Header Centering Audit (2026-08-27):** Confirmed zero secret exceptions and zero dependency exceptions introduced; route loading shell, structural skeletons, and header CSS grid layout enforce presentation safety and zero fabricated sensor data with zero security exceptions.
+- **TASK-0217 / Login Performance Optimization Audit (2026-09-05):** Confirmed zero secret exceptions and zero dependency exceptions introduced; login performance optimization and same-client recovery preserve single active session security (`DEC-AUTH-107`), maintain strictly synchronous audit log creation inside the interactive database transaction, and introduce zero secrets with zero security exceptions.
 
 ---
 
@@ -258,4 +259,17 @@ The approved specifications for single active session enforcement (`TASK-0217`) 
 ### 4. Fleet Overview Scoping & Canonical Concealment
 - **RBAC Enforcement:** Dashboard metrics derive strictly from `DeviceContext` backed by `GET /api/v1/devices`, honoring `requirePermission(session, 'device.read')` and active account status.
 - **Admin Canonical Identifier Concealment:** In accordance with `DEC-DEV-028`, Admin users receive only masked display labels without canonical `deviceId` exposure in DOM or payloads.
+
+---
+
+## TASK-0217 / DEC-AUTH-108: Login Performance Optimization & Session Recovery Security Baseline (Recorded: 2026-09-05)
+
+The verified implementation of `DEC-AUTH-108` (Login Transaction Optimization, Same-Client Session Recovery, and Hydration Stability) introduced zero security exceptions, zero new secrets, and zero new dependencies:
+- **Zero Security Exceptions:** Adheres strictly to `SEC-OPS-001` (zero unapproved secrets) and `SEC-OPS-004` (zero unapproved high vulnerabilities). `scripts/security-exceptions.json` remains completely empty and unmodified.
+- **Synchronous Audit Durability:** The proposal to make audit logging asynchronous or fire-and-forget was explicitly rejected. `tx.auditLog.create` executes synchronously within the PostgreSQL interactive transaction under an exclusive advisory lock (`SELECT pg_advisory_xact_lock(...)`), guaranteeing tamper-evident audit trails.
+- **Strict Single-Session Invariant (`DEC-AUTH-107`):** Cross-device or cross-browser concurrent logins continue to be rejected with HTTP 409 Conflict (`ACTIVE_SESSION_EXISTS`), preserving active sessions without invalidation.
+- **Constrained Same-Client Recovery:** Session recovery without conflict is granted only when the incoming request matches the exact SHA-256 hash of the `User-Agent` and the client IP address of the pre-existing unrevoked session. Stale unrevoked sessions are terminated before the new session is issued.
+- **Client Data Minimization:** Non-blocking `lastLoginAt` update decoupled from transaction path operates with localized error catching and exposes zero client PII or credentials.
+<!-- Login Performance & Session Recovery Security Exceptions Reconciled: 2026-09-05 -->
+
 

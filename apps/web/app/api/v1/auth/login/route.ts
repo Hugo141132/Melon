@@ -18,6 +18,7 @@ import {
   applyRateLimitToResponse,
 } from '@/lib/rate-limit';
 import { validateServerEnv } from '@/lib/env/server';
+import { extractSessionTokenFromRequest } from '@/lib/auth/rbac';
 
 export async function POST(request: Request) {
   const requestId = `req-${Date.now()}`;
@@ -37,8 +38,14 @@ export async function POST(request: Request) {
   }
 
   try {
+    const existingToken = await extractSessionTokenFromRequest(request);
     const body = LoginInputSchema.parse(await request.json().catch(() => ({})));
-    const result = await loginUser(prisma, body, { ipAddress, userAgent, requestId });
+    const result = await loginUser(prisma, body, {
+      ipAddress,
+      userAgent,
+      requestId,
+      existingToken,
+    });
 
     const primaryRole = result.user.activeRoles[0] ?? 'ADMIN';
 
@@ -51,6 +58,7 @@ export async function POST(request: Request) {
             fullName: result.user.fullName,
             email: result.user.email,
             role: primaryRole,
+            activeRoles: result.user.activeRoles,
             accountStatus: result.user.accountStatus,
             preferredLocale: 'id',
           },
