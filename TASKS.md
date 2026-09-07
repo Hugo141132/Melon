@@ -2517,6 +2517,69 @@ Apply to:
 - [x] Safety defaults (`ENABLE_FAUCET_CONTROL=false`) remain strictly enforced.
 - [x] Unit, integration, and config tests pass with 100% success rate.
 
+---
+
+## TASK-0915 — Real-Time Faucet Command History Synchronization
+
+**Priority:** `P0`
+**Status:** `DONE`
+**Dependencies:** `TASK-0505`, `TASK-0803`, `TASK-0905`
+**Completed:** 2026-09-01 — Resolved real-time event delivery failure for faucet command history updates across `@kebun-melon/web`. Identified root cause: Next.js edge middleware was blocking backend-to-backend internal webhook `POST /api/v1/internal/realtime/publish` with HTTP 401 UNAUTHENTICATED due to missing client `session_token` cookie. Added `/api/v1/internal/` to `PUBLIC_PATH_PREFIXES` in Next.js middleware, allowing machine-to-machine `INTERNAL_SERVICE_TOKEN` bearer validation to govern the internal publish route. Verified that faucet command state transitions (`QUEUED` → `SENT` → `ACKNOWLEDGED` → `IN_PROGRESS` → `COMPLETED`) automatically update in `FaucetHistoryTable` via Server-Sent Events (SSE) without requiring manual browser page refreshes. Documented in `docs/TRACEABILITY.md` and `docs/API.md`.
+
+### Acceptance Criteria
+
+- [x] Faucet command state updates propagate to frontend table via SSE in real time.
+- [x] Machine-to-machine internal publish endpoint authenticated via `INTERNAL_SERVICE_TOKEN`.
+- [x] Next.js middleware allows internal machine-to-machine paths without user session cookie.
+- [x] Zero regressions to user-facing session authentication or RBAC route guards.
+
+---
+
+## TASK-0916 — Migrate Development and Staging Supabase Databases to Singapore (ap-southeast-1)
+
+**Priority:** `P0`
+**Status:** `BLOCKED`
+**Dependencies:** `TASK-0104`, `TASK-0905`, `TASK-0914`, Local Restore Rehearsal Execution, Migration Maintenance Window Approval
+**Related Runbook:** `docs/SUPABASE_MIGRATION_RUNBOOK.md`
+**Blocking & Prerequisite Analysis:**
+- `TASK-0909` (automated offsite backup pipeline to R2/S3) does NOT block execution; point-in-time encrypted migration snapshots (`pg_dump` with symmetric AES-256 GPG encryption, SHA-256 checksums, and verified isolated restore rehearsal) satisfy point-in-time recovery independently.
+- Execution is governed under a **Free-plan-only migration design with planned downtime** (zero paid upgrades, adhering strictly to the account-wide 2-active-project limit via sequential project pausing).
+- Local restore rehearsals on PostgreSQL 17 (`postgres:17-alpine`, port 5433) have been **EXECUTED SUCCESSFULLY** for both Dev (exit code 0) and Staging (exit code 0), verifying 26 tables, 28 foreign keys with 0 orphans, 100% snapshot manifest parity, and Staging local catch-up (`20260905040000_add_auth_and_fk_performance_indexes` with 13 performance indexes).
+- Execution remains **BLOCKED** on remaining operational prerequisites:
+  1. Operator manual execution of the five pre-commit CI gates (`npm run test:coverage`, `npm run test:integration`, `npm run check:quality`, `npm run test`, `npm run test:e2e`).
+  2. Operator scheduling of the planned downtime maintenance window, confirmation of project capacity, and provision of target Singapore credentials.
+  3. Pre-cutover write freeze, non-terminal faucet command drain, fresh cutover backups, Singapore provisioning/cutover, and Mumbai retirement.
+
+### Work
+
+- Audit and document source Mumbai (`ap-south-1`) Supabase project identities and configurations (`xjsencdgfcbkzdzqcnqx` for Dev; `scqrbtfilmttqrutynyo` for Staging).
+- Plan separate environment mappings to dedicated Singapore (`ap-southeast-1`) projects, preserving strict environment isolation (Dev → Dev; Staging → Staging).
+- Design sequential cutover adhering to Free-plan account-wide 2-project cap via planned maintenance downtime and sequential project pausing.
+- Formulate, verify, and maintain concrete migration runbook (`docs/SUPABASE_MIGRATION_RUNBOOK.md`) covering:
+  - Cryptographically encrypted backups (`pg_dump` with `--section=pre-data`, `--section=data`, `--section=post-data` + GPG/AES256), consistent snapshot table manifest, and verified isolated restore rehearsal on an isolated local database prior to cutover.
+  - Complete inventory of schema, 26 tables, custom UUID primary keys (0 integer sequences), 5 extensions (`plpgsql`, `uuid-ossp`, `pgcrypto`, `pg_stat_statements`, `supabase_vault`), 0 custom roles, standard Supabase grants, and `_prisma_migrations` history (reconciling staging's pending 11th migration `20260905040000_add_auth_and_fk_performance_indexes` with 13 performance indexes).
+  - Explicit security hardening script (`scripts/rehearsal/02_post_restore_security.sql`) ensuring `postgres` table ownership, revoking public table grants from `anon`, `authenticated`, and `PUBLIC`, and enforcing RLS on all tables without relying on target default privileges.
+  - Pre-cutover write/telemetry-ingestion freeze, documenting gateway coupling limitations, requiring non-terminal command drain (`QUEUED`, `SENT`, `ACKNOWLEDGED`, `IN_PROGRESS`) and physical actuator reconciliation, preserving audit history and maintaining strict `ENABLE_FAUCET_CONTROL=false` invariance.
+  - Session/direct connection string retrieval from Supabase dashboard (port 5432) for dump, restore, and migrations, avoiding transaction pooler limitations (port 6543).
+  - PowerShell-compatible, credential-redacted commands utilizing interactive secure strings (`scripts/backup/export_source_snapshot.ps1`) to eliminate secrets in command-line arguments and logs.
+  - Immediate rebuild and redeployment of containerized staging (`docker compose -f docker-compose.staging.yml build --no-cache && docker compose -f docker-compose.staging.yml up -d`).
+  - Strict 5-gate post-migration verification (snapshot manifest parity, health probes, auth latency & RBAC, telemetry ingestion, SSE streaming).
+  - Quota-aware rollback procedures for Free plan (pausing Singapore project to release slot before unpausing Mumbai, establishing Fix-Forward priority, and addressing delta data loss realities).
+  - Operational proposal for a 72-hour soak period (with Mumbai paused) and verified offline recovery backup before Mumbai project deletion.
+
+### Acceptance Criteria
+
+- [ ] Supabase account plan and project capacity confirmed by operator.
+- [x] GPG/AES256-encrypted point-in-time backups taken, SHA-256 checksums verified, and decryption tested for both Dev and Staging.
+- [x] Isolated restore rehearsal executed successfully on an isolated database verifying schema, foreign keys, and data integrity before cutover (Dev: 11 migrations; Staging baseline: 10 migrations, local catch-up to 11 verified).
+- [ ] Schema, all 26 tables, constraints, foreign keys, grants, and Prisma migration histories restored with zero row loss and verified against the consistent snapshot manifest on Singapore.
+- [ ] Staging's pending 11th migration (`20260905040000_add_auth_and_fk_performance_indexes`) deployed and verified on Singapore.
+- [ ] Strict environment isolation preserved between Dev and Staging (distinct Singapore project refs).
+- [ ] Ingestion/write freeze executed; all non-terminal faucet commands (`QUEUED`, `SENT`, `ACKNOWLEDGED`, `IN_PROGRESS`) reconciled cleanly with audit events; `ENABLE_FAUCET_CONTROL=false` enforced.
+- [ ] Session/direct pooler connection strings (port 5432) retrieved from dashboard and updated in `.env`, `.env.staging`, and `mcp_config.json`.
+- [ ] Staging Docker containers rebuilt and verified healthy (`/health` and `/ready` return HTTP 200).
+- [ ] Post-migration verification gates pass: login transaction latency reduced, REST telemetry ingestion verified, SSE live stream verified.
+- [ ] Mumbai projects retained in standby state during agreed soak period; deleted only after verified cutover, independent offline recovery backup, and operator sign-off.
 
 ---
 

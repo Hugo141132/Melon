@@ -153,6 +153,15 @@ flowchart LR
 - **Safety Defaults:** `ENABLE_FAUCET_CONTROL=false` is enforced across all environments.
 - **Verification Status:** Live gateway/EMQX/canonical-device runtime ingestion passed. Staging runs via containerized Docker Compose (`docker-compose.staging.yml`) connected to cloud Supabase Staging and EMQX Cloud Staging.
 
+#### 4.1.2 Persistence Layer Infrastructure & Regional Colocation Architecture (TASK-0916)
+
+- **Authoritative Live Systems:** Live persistence continues to operate on Supabase PostgreSQL in AWS Mumbai (`ap-south-1`): Development (`xjsencdgfcbkzdzqcnqx`) and Staging (`scqrbtfilmttqrutynyo`).
+- **Planned Regional Colocation:** AWS Singapore (`ap-southeast-1`) is the planned migration destination governed by `DEC-INF-095`. Moving databases to Singapore co-locates persistence with the project's EMQX Cloud MQTT broker (`asia-southeast1`), reducing WAN round-trip latency.
+- **Free-Plan Sequential Migration Architecture:** Adheres strictly to Supabase Free plan constraints (account-wide cap of 2 active projects). Projects will be sequentially paused during an approved maintenance window with planned downtime, avoiding paid Pro upgrades or multi-tenant coupling.
+- **Rehearsal & Isolation Architecture:** Phased restore rehearsals were conducted locally on port `5433` using `postgres:17-alpine` (`kebun-melon-rehearsal-db`). Live staging containers (`kebun-melon-staging-web`, `kebun-melon-staging-gateway` on port `5432`) remained preserved and untouched.
+- **Schema & Integrity Verification:** Confirmed 26 public tables, 28 foreign keys with 0 orphan rows, 100% snapshot manifest parity, and staging local migration catch-up (`20260905040000_add_auth_and_fk_performance_indexes` with 13 performance indexes and 0 application row alterations).
+- **Security Hardening Verification:** Explicit post-restore security script (`02_post_restore_security.sql`) was verified locally (table ownership to `postgres`, RLS enabled on 26 tables, 0 unauthorized grants to `anon`/`authenticated`/`PUBLIC`). Cloud RLS and live application behavior were not changed.
+- **Operational Status:** `TASK-0916` remains `BLOCKED` awaiting operator execution of the five pre-commit CI gates and maintenance window approval. Reference: `docs/DATABASE.md` §2.2, `docs/TESTING.md` §35, and `docs/SUPABASE_MIGRATION_RUNBOOK.md`.
 
 ---
 

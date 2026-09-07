@@ -27,6 +27,9 @@ The application must preserve the existing frontend design. New pages, component
 ### 2.1 Technical Reconciliation & Gateway Topology (TASK-0914)
 `TASK-0914` established direct EMQX Cloud TLS connectivity as the standard development path for `apps/iot-gateway`, eliminating local dependency on Mosquitto containers and bypassing Railway as an MQTT proxy. Topic namespaces (`agriculture/development/...` vs `agriculture/staging/...`) and client IDs remain strictly segregated. Hardware simulator identities are resolved dynamically at runtime via CLI/env rather than hardcoded. `ENABLE_FAUCET_CONTROL=false` remains the mandatory safety baseline.
 
+### 2.2 Persistence Colocation & Infrastructure Strategy (TASK-0916)
+`TASK-0916` establishes the strategic migration of the Supabase PostgreSQL database tier from Mumbai (`ap-south-1`) to Singapore (`ap-southeast-1`) governed by `DEC-INF-095`. The primary objective is to eliminate cross-region WAN network latency between the web/IoT applications and the database tier, bringing query round-trips from ~240ms down to sub-50ms within Southeast Asia. Operational continuity is guaranteed by maintaining active Mumbai Dev and Staging instances during preparation and rehearsal phases. Relocation to Singapore will execute sequentially across environments within Supabase free-tier project quotas (2 active projects maximum) during a scheduled maintenance window with explicit write-freeze and rollback safeguards. Full rehearsal validation across Dev and Staging schemas, constraints, and indexes has been completed locally with zero impact on live application functionality.
+
 ---
 
 

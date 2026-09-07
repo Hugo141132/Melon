@@ -62,6 +62,9 @@ This specification does not define:
 ### 3.1 TASK-0914 Infrastructure Reconciliation
 `TASK-0914` (direct EMQX Cloud TLS connectivity for `apps/iot-gateway`) operates strictly at the backend messaging and gateway infrastructure boundary. All user-level RBAC enforcement, `OWNER` global visibility, `ADMIN` device assignment scoping, canonical `deviceId` concealment for Admin users (`DEC-DEV-028`), and `ENABLE_FAUCET_CONTROL=false` safety policies remain unchanged.
 
+### 3.2 TASK-0916 Database Relocation & Rehearsal Reconciliation
+`TASK-0916` (Supabase database migration preparation and rehearsal from Mumbai to Singapore) introduces **zero changes** to the application RBAC model, permissions, role definitions (`OWNER`, `ADMIN`), account statuses, or authorization logic. All authentication and authorization tables (`users`, `roles`, `user_roles`, `permissions`, `role_permissions`, `sessions`, `user_device_access`) were restored and verified locally with 100% snapshot row-count and relational integrity parity across Dev and Staging. Local security hardening verified table ownership transfer to `postgres`, RLS activation across all 26 public tables, and zero unauthorized grants (`f|f|t|t`). Live cloud database security policies and application middleware enforcement remain untouched and authoritative.
+
 - Final MQTT topic structure.
 - Final device communication protocol.
 - Agronomic or water-quality thresholds.

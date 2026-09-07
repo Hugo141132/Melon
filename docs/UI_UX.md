@@ -23,6 +23,16 @@ This document defines presentation and interaction behaviour. It does not define
 ### 1.1 TASK-0914 Boundary & UI Status Note
 `TASK-0914` (direct EMQX Cloud TLS connectivity for `apps/iot-gateway`) is a backend gateway and simulator hardening task (`Frontend impact: NONE`). The approved visual UI layouts, design tokens, and components remain unaltered. Monitoring UI smoke testing was intentionally deferred/skipped during backend gateway verification.
 
+### 1.2 TASK-0916 Governance & UI Impact Note
+`TASK-0916` (Supabase database migration preparation and rehearsal from Mumbai to Singapore) is an operational database and persistence verification task:
+- **Frontend impact:** `NONE`
+- **Selected UI direction:** `N/A`
+- **Existing color template:** `UNCHANGED`
+- **Selected motion effects:** `None`
+- **21st.dev MCP:** `NOT REQUIRED`
+
+All Next.js App Router layouts, operational views, cards, modals, controls, and Tailwind tokens remain completely untouched. Rehearsals were conducted strictly against local isolated Docker database containers on port 5433 with zero UI interaction or regression risk. Documentation-only updates require no staging container redeploy.
+
 ---
 
 

@@ -94,5 +94,10 @@ docker/mosquitto/config/pwfile
 docker/mosquitto/data/
 docker/mosquitto/log/
 
+# Database Backups & Migration Snapshots (do NOT track)
+backups/
+*.dump
+*.sql.gpg
+
 #Additional
-Command (Melon).txt
+Command (Melon).txt

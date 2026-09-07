@@ -42,6 +42,18 @@ The database shall be the durable system of record for application state.
 - **Environment Isolation:** Local development connects to its configured local database (`DATABASE_URL`), while staging connects to the dedicated Supabase PostgreSQL database (`scqrbtfilmttqrutynyo`) (formerly hosted on Railway, transitioning to containerized staging per `TASK-1012`). Staging database records and canonical identities remain intact and unmodified.
 - **Dynamic Device Identity:** Canonical device strings (`devices.device_id`) are managed as environment data and resolved dynamically at runtime by simulation tools via CLI/environment variables, with no hardcoded device ID assumptions in source code.
 
+### 2.2 TASK-0916 Migration Preparation & Restore Rehearsal Reconciliation
+`TASK-0916` governs the database migration preparation from AWS Mumbai (`ap-south-1`) to AWS Singapore (`ap-southeast-1`):
+- **Live Database State:** The live production system of record continues to run on Supabase AWS Mumbai: Dev (`xjsencdgfcbkzdzqcnqx`) and Staging (`scqrbtfilmttqrutynyo`). Destination AWS Singapore (`ap-southeast-1`) remains the planned target under `DEC-INF-095` to co-locate persistence with the EMQX Cloud broker (`asia-southeast1`).
+- **PostgreSQL 17 Tooling & Schema Inventory:** Rehearsals utilized PostgreSQL 17 tooling (`postgres:17-alpine`, port 5433). Validated complete schema inventory: 26 public tables, custom UUID primary keys (0 integer sequences), 5 extensions (`plpgsql`, `uuid-ossp`, `pgcrypto`, `pg_stat_statements`, `supabase_vault`), and standard Supabase grant structures.
+- **Dev Local Rehearsal:** Successfully executed on isolated port 5433 with exit code 0. Verified 26 tables, 28 foreign keys with 0 orphan rows, 11 Prisma migrations, and 100% per-table snapshot manifest parity against `dev_manifest.tsv`.
+- **Staging Local Baseline & Catch-up:** Phased execution on port 5433 completed with exit code 0:
+  - *Phase A (Baseline):* Restored 26 tables, 28 FKs with 0 orphans, verified 10 Prisma migrations recorded in the snapshot, and verified 100% per-table parity against `staging_manifest.tsv`.
+  - *Phase B (Local Catch-up):* Confirmed only `20260905040000_add_auth_and_fk_performance_indexes` was pending; deployed it locally via `npx prisma migrate deploy`; verified applied migration count = 11; verified all 13 expected performance indexes; confirmed application data row counts remained invariant (reported as row-count evidence, not byte-for-byte equality).
+  - *Phase C (Local Hardening):* Verified table ownership to `postgres`, RLS enabled on 26 tables, 0 unauthorized grants to `anon`/`authenticated`/`PUBLIC`, and full access for `postgres` and `service_role`. Cloud RLS/grants and live data remain untouched.
+  - *Phase D (Secure Cleanup):* Deterministic try-finally cleanup verified removal of unencrypted dumps (`staging_data.sql`, `dev_data.sql`) while retaining encrypted `.gpg` archives.
+- **Operational Status:** Free-plan sequential migration remains planned; `TASK-0916` remains `BLOCKED` awaiting operator CI gates and maintenance window scheduling. Detailed verification evidence is maintained in `docs/TESTING.md` §35 and `docs/SUPABASE_MIGRATION_RUNBOOK.md`.
+
 ---
 
 

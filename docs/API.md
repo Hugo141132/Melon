@@ -42,6 +42,9 @@ Note: Water tank telemetry (volume & flow rate) is ingested separately via MQTT/
 ### 2.1 TASK-0914 Architectural Reconciliation
 REST Soil and Water Quality telemetry ingestion endpoints (`POST /api/v1/devices/{deviceId}/telemetry/soil` and `.../water`) remain unchanged by `TASK-0914`. Direct EMQX Cloud TLS connectivity applies exclusively to the MQTT reservoir telemetry and faucet-control boundary handled by `apps/iot-gateway`. REST API interfaces, endpoints, error responses, and `ENABLE_FAUCET_CONTROL=false` safety defaults remain untouched.
 
+### 2.2 TASK-0916 Database Relocation & Rehearsal Reconciliation
+Operational database migration preparation and rehearsal activities under `TASK-0916` (Mumbai `ap-south-1` to Singapore `ap-southeast-1` colocation governed by `DEC-INF-095`) introduce **zero changes** to public or internal REST API contracts, schemas, DTOs, endpoint routes, query parameters, or response payloads. Live development and staging environments continue serving live API traffic against their active Mumbai Supabase instances. Local restore rehearsals (validating 26 public tables, 28 foreign key constraints, Prisma migration parity, and performance index catch-up) were executed in strict containerized isolation on port 5433 with zero impact on active API runtime behavior. All application endpoints, rate limiting, and RBAC enforcement remain authoritative and unchanged. Full rehearsal evidence and operational procedures are documented in [`docs/TESTING.md`](file:///c:/Users/Puroh/Documents/Melon/docs/TESTING.md#35-task-0916-supabase-database-migration-preparation--rehearsal-verification) and [`docs/SUPABASE_MIGRATION_RUNBOOK.md`](file:///c:/Users/Puroh/Documents/Melon/docs/SUPABASE_MIGRATION_RUNBOOK.md).
+
 ---
 
 The API shall not expose:

@@ -180,6 +180,15 @@ MQTT 3.1.1
 
 When MQTT 3.1.1 is used, MQTT 5 features such as reason codes and message expiry properties shall be represented in the JSON payload or handled by the gateway.
 
+### 4.5 Database Relocation & Rehearsal Impact (TASK-0916)
+
+Operational preparation and local rehearsal for the Supabase PostgreSQL migration (Mumbai `ap-south-1` to Singapore `ap-southeast-1` colocation governed by `DEC-INF-095`) introduce **zero changes** to device communication protocols, MQTT 5.0/3.1.1 topic hierarchies, device identities, telemetry schemas, or REST ingestion endpoints.
+
+- **Broker & Ingress Unaffected:** Direct TLS connectivity to EMQX Cloud (`apps/iot-gateway`) and REST ingestion endpoints (`POST /api/v1/devices/{deviceId}/telemetry/*`) continue operating as specified.
+- **Latency Optimization:** Colocating database persistence in Singapore alongside target compute regions reduces query and transactional write round-trip latency from gateway and web backend services upon eventual cutover.
+- **Pre-Cutover Command Freeze:** During planned live migration cutover, a write-freeze window will be enforced on faucet-control dispatch (`ENABLE_FAUCET_CONTROL=false` safety lock) to prevent in-flight command dispatch or partial state persistence across database instances.
+- **Rehearsal Isolation:** Local restore rehearsals (validating 26 tables, 28 foreign keys, and snapshot parity) were executed completely isolated from live device traffic, with zero live device or broker connections.
+
 ---
 
 ## 5. Communication Components

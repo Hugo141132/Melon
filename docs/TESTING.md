@@ -2558,5 +2558,163 @@ Automated unit testing, session concurrency verification, database query streaml
 - **Pending Operator Gate:** Final 5-stage automated CI test suite (`test:coverage`, `test:integration`, `check:quality`, `test`, `test:e2e`) will be executed manually by the operator prior to running `git add` and `git commit` on the `main` branch.
 <!-- Authentication Performance & Session Recovery Testing Reconciled: 2026-09-05 -->
 
+---
+
+# 35. TASK-0916 Database Migration Restore Rehearsal & Verification Evidence
+
+**Task Reference:** `TASK-0916 — Migrate Development and Staging Supabase Databases to Singapore (ap-southeast-1)`  
+**Status:** `BLOCKED` (Local restore rehearsals passed with exit code 0; pending operator 5 pre-commit CI gates, maintenance window scheduling, and target Singapore credentials)  
+**Related Runbook:** `docs/SUPABASE_MIGRATION_RUNBOOK.md`  
+**Reconciled Date:** 2026-09-08  
+
+---
+
+## 35.1 Rehearsal Scope & Target Isolation
+
+The database migration preparation and local restore rehearsals were conducted strictly under an isolated local runtime architecture to validate database restore fidelity, schema constraints, migration history, foreign key integrity, and security hardening without risking production, staging, or development cloud environments.
+
+* **Tooling Compatibility:** Verified PostgreSQL 17-compatible container tooling (`postgres:17-alpine`) matching modern Supabase PostgreSQL engine standards.
+* **Port & Container Isolation:**
+  * Rehearsal instance bound exclusively to host port `5433` in Docker container `kebun-melon-rehearsal-db`.
+  * Preserved live containerized staging environment (`kebun-melon-staging-web`, `kebun-melon-staging-gateway` on port `5432`) without service disruption or container recreation.
+  * Reset flag (`-Clean`) was confirmed to affect only `kebun-melon-rehearsal-db`, preserving all encrypted backups, Dev evidence, and external Docker volumes.
+* **Datasource Scoping & Fail-Closed Guard:**
+  * Installed Prisma CLI and Client version: `5.22.0`.
+  * Datasource configuration in `packages/database/prisma/schema.prisma` reads `env("DATABASE_URL")`.
+  * Rehearsal scripts dynamically scoped `DATABASE_URL` and `DIRECT_URL` strictly to `postgresql://postgres:rehearsal_isolated_pass_123@127.0.0.1:5433/postgres?sslmode=disable`.
+  * Fail-closed check actively rejected any URL resolving to `supabase.co` or `pooler.supabase.com`. Original process environment variables were cleanly restored in the `finally` block.
+* **Zero External Network Access:** Rehearsal container ran on default bridge network with zero connectivity to live MQTT brokers, IoT hardware devices, email providers (Resend), or cloud databases.
+
+---
+
+## 35.2 Development (`dev`) Local Restore Rehearsal Evidence
+
+* **Snapshot Export (`scripts/backup/export_source_snapshot.ps1 -Environment dev`):**
+  * Exported from Mumbai Dev project (`xjsencdgfcbkzdzqcnqx`).
+  * Cryptographic checksums and encrypted archives generated:
+    * `dev_pre_data.sql`: 20,735 bytes
+    * `dev_data.sql.gpg`: 119,667 bytes (Symmetric AES-256 GPG encrypted)
+    * `dev_post_data.sql`: 31,937 bytes
+    * `dev_schema.sql`: 61,663 bytes
+    * `dev_manifest.tsv`: 502 bytes (26 tables)
+    * `dev_checksums.sha256`: 711 bytes (SHA-256 verified)
+* **Restore Execution (`scripts/rehearsal/run_local_rehearsal.ps1 -Environment dev -Port 5433 -Clean`):**
+  * **Exit Code:** `0`
+  * **Tables Restored:** 26 / 26 public tables.
+  * **Foreign Key Referential Integrity:** 28 foreign keys checked via dynamic JOIN scan; **0 orphaned rows** detected.
+  * **Prisma Migrations Applied:** Exactly **11** migrations verified in `_prisma_migrations`.
+  * **Snapshot Manifest Parity:** 100% row-count parity across all 26 tables against `dev_manifest.tsv`.
+* **Proposed Security Hardening:**
+  * Applied `scripts/rehearsal/02_post_restore_security.sql`.
+  * Verified table ownership: 26 tables owned by `postgres`.
+  * Verified Row Level Security (RLS): enabled on all 26 tables (`relrowsecurity = true`).
+  * Verified effective privileges: 0 unauthorized grants to `anon`, `authenticated`, or `PUBLIC`; full privileges confirmed for `postgres` and `service_role` (`f|f|t|t`).
+* **Plaintext Cleanup:** Temporary file `dev_data.sql` deleted and verified removed (`Test-Path: False`). Encrypted archive `dev_data.sql.gpg` retained.
+
+---
+
+## 35.3 Staging (`staging`) Local Restore Rehearsal Evidence
+
+* **Snapshot Export (`scripts/backup/export_source_snapshot.ps1 -Environment staging`):**
+  * Exported from Mumbai Staging project (`scqrbtfilmttqrutynyo`).
+  * Cryptographic checksums and encrypted archives generated:
+    * `staging_pre_data.sql`: 19,470 bytes
+    * `staging_data.sql.gpg`: 21,778 bytes (Symmetric AES-256 GPG encrypted)
+    * `staging_post_data.sql`: 20,324 bytes
+    * `staging_schema.sql`: 46,432 bytes
+    * `staging_manifest.tsv`: 500 bytes (26 tables)
+    * `staging_checksums.sha256`: 711 bytes (SHA-256 verified)
+* **Restore Execution (`scripts/rehearsal/run_local_rehearsal.ps1 -Environment staging -Port 5433 -Clean`):**
+  * **Exit Code:** `0`
+
+### Phase A: Baseline Source Fidelity & Snapshot Parity
+* **Public Tables Restored:** 26 / 26 public tables.
+* **Foreign Key Integrity:** 28 foreign keys checked; **0 orphaned rows** detected across all constraints.
+* **Baseline Prisma Migrations:** Exactly **10** migrations verified in `_prisma_migrations`, matching the exported staging snapshot.
+* **Snapshot Manifest 1:1 Parity Table:**
+
+| Table Name | Manifest Expected Count | Rehearsal Restored Count | Status | Parity |
+|---|---|---|---|---|
+| `_prisma_migrations` | 10 | 10 | **PASS** | 100% |
+| `account_approvals` | 2 | 2 | **PASS** | 100% |
+| `alert_acknowledgements` | 0 | 0 | **PASS** | 100% |
+| `alerts` | 0 | 0 | **PASS** | 100% |
+| `audit_logs` | 104 | 104 | **PASS** | 100% |
+| `device_capabilities` | 5 | 5 | **PASS** | 100% |
+| `device_status_events` | 0 | 0 | **PASS** | 100% |
+| `devices` | 3 | 3 | **PASS** | 100% |
+| `email_verification_tokens` | 0 | 0 | **PASS** | 100% |
+| `faucet_command_events` | 0 | 0 | **PASS** | 100% |
+| `faucet_commands` | 0 | 0 | **PASS** | 100% |
+| `integration_errors` | 0 | 0 | **PASS** | 100% |
+| `password_reset_tokens` | 6 | 6 | **PASS** | 100% |
+| `permissions` | 38 | 38 | **PASS** | 100% |
+| `reservoir_water_readings` | 0 | 0 | **PASS** | 100% |
+| `role_permissions` | 56 | 56 | **PASS** | 100% |
+| `roles` | 2 | 2 | **PASS** | 100% |
+| `sensor_battery_readings` | 0 | 0 | **PASS** | 100% |
+| `sessions` | 55 | 55 | **PASS** | 100% |
+| `sites` | 0 | 0 | **PASS** | 100% |
+| `soil_readings` | 0 | 0 | **PASS** | 100% |
+| `user_device_access` | 1 | 1 | **PASS** | 100% |
+| `user_preferences` | 0 | 0 | **PASS** | 100% |
+| `user_roles` | 3 | 3 | **PASS** | 100% |
+| `users` | 3 | 3 | **PASS** | 100% |
+| `water_readings` | 0 | 0 | **PASS** | 100% |
+
+### Phase B: Local Migration Catch-up
+* **Status Check:** `npx prisma migrate status` detected exactly one pending migration: `20260905040000_add_auth_and_fk_performance_indexes`. Zero unexpected migrations found.
+* **Deployment:** `npx prisma migrate deploy` applied cleanly to the isolated target.
+* **Applied Migration Count:** Updated from 10 to **11** in `_prisma_migrations`.
+* **Verified Performance Indexes (13/13):**
+  1. `sessions_user_active_idx`
+  2. `sessions_user_id_idx`
+  3. `user_roles_user_id_idx`
+  4. `user_roles_user_id_revoked_at_idx`
+  5. `user_roles_role_id_idx`
+  6. `role_permissions_permission_id_idx`
+  7. `account_approvals_decided_by_user_id_idx`
+  8. `user_device_access_device_id_idx`
+  9. `user_device_access_assigned_by_user_id_idx`
+  10. `user_preferences_default_device_id_idx`
+  11. `alert_acknowledgements_user_id_idx`
+  12. `alert_acknowledgements_alert_id_idx`
+  13. `alerts_device_id_idx`
+* **Application Data Invariance:** Row counts across all 25 application tables were re-asserted against `staging_manifest.tsv`. Confirmed **0 application rows altered** by index creation. *(Note: Reported as row-count evidence, not byte-for-byte data equality).*
+
+### Phase C: Proposed Security Hardening
+* **Script Execution:** Applied `scripts/rehearsal/02_post_restore_security.sql`.
+* **Automated Audit Results (`scripts/rehearsal/03_verify_integrity.sql`):**
+
+| Verification Check Name | Expected Value | Actual Value | Evaluation Status |
+|---|---|---|---|
+| Public Tables Count | 26 | 26 | **PASS** |
+| Tables Owned by `postgres` | 26 | 26 | **PASS** |
+| Tables with RLS Enabled | 26 | 26 | **PASS** |
+| Unauthorized Public/Anon Grants | 0 | 0 | **PASS** |
+| Application Role Privileges (`postgres` & `service_role`) | 0 missing | 0 missing | **PASS** |
+| Prisma Migrations Applied | >= 10 | 11 | **PASS** |
+| Foreign Key Referential Integrity | 0 orphaned rows (28 FKs) | 0 orphaned rows | **PASS** |
+
+### Phase D: Secure Cleanup
+* **Plaintext Destruction:** Temporary unencrypted dump `backups/rehearsal/staging_data.sql` was deleted and verified removed (`Test-Path: False`).
+* **Try-Finally Hardening:** Ensured that cleanup executes deterministically on both success and error paths.
+* **Encrypted Retention:** Symmetric encrypted backup `staging_data.sql.gpg` (21,778 bytes) and SHA-256 checksums remain intact in `backups/rehearsal/`.
+
+---
+
+## 35.4 Rehearsal vs Cloud Invariance
+
+1. **Live Cloud Unchanged:** Mumbai Dev (`xjsencdgfcbkzdzqcnqx`) and Staging (`scqrbtfilmttqrutynyo`) remain the live authoritative databases. No remote database mutations, project pause/delete actions, or network cutover occurred.
+2. **Cloud RLS & Grants Unchanged:** Proposed security hardening was evaluated exclusively inside the isolated local container. Cloud RLS and table privileges on Mumbai databases remain unaltered.
+3. **Application & Service Stability:** Live staging containers (`kebun-melon-staging-web`, `kebun-melon-staging-gateway`) remained up and healthy throughout all rehearsal phases. Zero staging redeployment was required.
+4. **Remaining Cutover Prerequisites:**
+   - Operator execution of the 5 pre-commit CI gates.
+   - Operator approval and scheduling of the planned downtime maintenance window.
+   - Provisioning of target Singapore projects (`ap-southeast-1`) via sequential pausing on the Free plan.
+   - Final pre-cutover write freeze, command drain, fresh encrypted backups, and verification gates.
+<!-- TASK-0916 Testing Evidence Reconciled: 2026-09-08 -->
+
+
 
 

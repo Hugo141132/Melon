@@ -49,6 +49,7 @@ The following rules apply to all flows:
 12. Unresolved behaviour is marked `TBD`.
 13. Sensor thresholds, units, refresh intervals, hardware execution rules, and alert limits must not be invented by the frontend.
 14. Direct EMQX Cloud TLS connectivity for `apps/iot-gateway` (`TASK-0914`) preserves all user-facing monitoring and control flows without modifying client UX or authorization paths.
+15. Operational database relocation preparation and local rehearsals (`TASK-0916`) preserve all user-facing journeys, authentication flows, and authorization checks without modification. Live production and staging operations continue serving users uninterrupted from active Mumbai Supabase instances until the scheduled Singapore cutover window.
 
 ---
 

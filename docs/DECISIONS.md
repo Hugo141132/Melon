@@ -24,6 +24,7 @@
 | `DEC-CTRL-067` | Production Feature Flag | **APPROVED** | `ENABLE_FAUCET_CONTROL=false` by default; requires dual written Owner & Hardware Lead sign-off before production activation | Feature flag in `TASK-0103`; faucet code may be built and tested behind flag; production activation blocked until dual sign-off recorded |
 | `DEC-INF-078` | Web-to-Gateway Internal Health & Readiness Probe | **APPROVED** | Internal HTTP probe with mandatory `Authorization: Bearer <INTERNAL_SERVICE_TOKEN>`, 2000ms default timeout | Implemented in `TASK-0905` |
 | `DEC-INF-088` | Production VPS & Containerized Staging Architecture | **APPROVED** | Production on dedicated Linux VPS with Docker Compose and automated HTTPS reverse proxy (`TASK-1011`); staging environment containerized (`TASK-1012`), completely decoupled from Railway | Implement in `TASK-1011` and `TASK-1012` |
+| `DEC-INF-095` | Sequential Free-Plan Migration Strategy and Local Rehearsal Verification | **APPROVED** | Free-plan sequential migration with planned downtime to respect 2-project quota; encrypted snapshots, verified PostgreSQL 17 local restore rehearsal on port 5433, explicit security hardening | Rehearsal completed in `TASK-0916`; cutover pending maintenance window |
 
 > **Direct EMQX Cloud Development Connectivity Note (TASK-0914):** Local `apps/iot-gateway` and simulator scripts connect directly to EMQX Cloud over TLS (`mqtts://` / `wss://`) as the standard development path, eliminating Railway intermediary dependencies and local Docker Mosquitto runtime requirements (Mosquitto is retained as an optional fallback only). Topic namespaces (`agriculture/development/...` vs `agriculture/staging/...`) and unique client IDs remain strictly segregated. Hardware simulator identities are resolved dynamically via CLI/env without hardcoded hardware IDs.
 
@@ -781,4 +782,18 @@ The following facts are supported by the verified decisions governance of `TASK-
   5. **Zero-Emoji Policy:** Banned all unicode emojis across UI components and translation dictionaries in favor of standard Lucide SVG icons.
   6. **Overview Scope Boundaries:** Detailed telemetry charts and sensor fleet directories remain dedicated to `/sensor`, `/soil`, `/water`, and `/controls`.
 <!-- TASK-0506 Reconciled: 2026-09-02 -->
+
+---
+
+## DEC-INF-095: Sequential Free-Plan Migration Strategy and Local Rehearsal Verification
+- **Status:** APPROVED
+- **Context:** To reduce latency by co-locating Supabase PostgreSQL persistence with the project's EMQX Cloud MQTT broker (`asia-southeast1`), Dev and Staging databases must migrate from AWS Mumbai (`ap-south-1`) to AWS Singapore (`ap-southeast-1`). Operations must adhere to the Supabase Free plan quota (2 active projects per account) without paid Pro upgrades or multi-tenant coupling.
+- **Decision:**
+  1. **Free-Plan-Only Sequential Migration Architecture:** Migrate sequentially with planned downtime during an approved maintenance window. Source projects will be paused sequentially in the Supabase Dashboard to release active project slots before creating destination projects in Singapore.
+  2. **Consistent Snapshot Exports & Encrypted Storage:** Exports must use `pg_dump` with separate `--section=pre-data`, `--section=data`, and `--section=post-data` sections and generate an atomic table row-count manifest (`${Environment}_manifest.tsv`) from the exact same consistent snapshot. Plaintext table dumps must be symmetrically encrypted via AES-256 GPG (`.sql.gpg`) with SHA-256 checksums. Unencrypted dumps must be deterministically deleted on both success and failure paths.
+  3. **PostgreSQL 17 Tooling & Local Rehearsal Verification:** Local restore rehearsals must be executed against an isolated target (`postgres:17-alpine`, port 5433) before cloud cutover. Rehearsal must verify schema (26 tables), foreign key referential integrity (28 FKs with 0 orphans), 100% snapshot manifest parity, and Staging local migration catch-up (`20260905040000_add_auth_and_fk_performance_indexes` with 13 performance indexes and 0 application row alterations). Unchanged rows must be reported as row-count evidence, not byte-for-byte equality.
+  4. **Explicit Post-Restore Security Hardening:** Never rely on target default privileges. Rehearsal must apply and verify explicit security hardening (`02_post_restore_security.sql`): table ownership set to `postgres`, RLS enabled on all 26 tables, and direct table privileges revoked from `anon`, `authenticated`, and `PUBLIC`. Cloud RLS and live application behavior remain unchanged until real cutover.
+  5. **Authoritative Systems & Operational Gates:** Mumbai Dev (`xjsencdgfcbkzdzqcnqx`) and Staging (`scqrbtfilmttqrutynyo`) remain the authoritative live systems of record. `TASK-0916` remains `BLOCKED` awaiting operator execution of 5 pre-commit CI gates and maintenance window approval.
+<!-- TASK-0916 Rehearsal Decision Reconciled: 2026-09-08 -->
+
 

@@ -96,6 +96,7 @@ All exceptions must be recorded in `scripts/security-exceptions.json` using the 
 - **TASK-0914 Audit (2026-08-26):** Confirmed zero secret exceptions and zero dependency exceptions introduced; direct EMQX Cloud TLS connectivity and dynamic simulator identity strictly adhere to `SEC-OPS-001` (zero unapproved secrets) with runtime credential parsing, strict log redaction, and no hardcoded canonical hardware identities in source code.
 - **Controls Loading & Header Centering Audit (2026-08-27):** Confirmed zero secret exceptions and zero dependency exceptions introduced; route loading shell, structural skeletons, and header CSS grid layout enforce presentation safety and zero fabricated sensor data with zero security exceptions.
 - **TASK-0217 / Login Performance Optimization Audit (2026-09-05):** Confirmed zero secret exceptions and zero dependency exceptions introduced; login performance optimization and same-client recovery preserve single active session security (`DEC-AUTH-107`), maintain strictly synchronous audit log creation inside the interactive database transaction, and introduce zero secrets with zero security exceptions.
+- **TASK-0916 / Database Migration Preparation & Rehearsal Audit (2026-09-08):** Confirmed zero secret exceptions and zero dependency exceptions introduced; migration export and rehearsal scripts utilize interactive secure strings for passphrases/passwords, enforce symmetric AES-256 GPG encryption for data archives with SHA-256 checksums, guarantee deterministic temporary plaintext deletion via try-finally blocks on all paths, and enforce strict fail-closed guards preventing connections to cloud endpoints during rehearsal with zero security exceptions.
 
 ---
 
@@ -271,5 +272,18 @@ The verified implementation of `DEC-AUTH-108` (Login Transaction Optimization, S
 - **Constrained Same-Client Recovery:** Session recovery without conflict is granted only when the incoming request matches the exact SHA-256 hash of the `User-Agent` and the client IP address of the pre-existing unrevoked session. Stale unrevoked sessions are terminated before the new session is issued.
 - **Client Data Minimization:** Non-blocking `lastLoginAt` update decoupled from transaction path operates with localized error catching and exposes zero client PII or credentials.
 <!-- Login Performance & Session Recovery Security Exceptions Reconciled: 2026-09-05 -->
+
+---
+
+## TASK-0916 / DEC-INF-095: Database Migration Preparation & Restore Rehearsal Security Baseline (Recorded: 2026-09-08)
+
+The verified implementation of `TASK-0916` (Database Migration Preparation, Consistent Snapshot Export, and Phased Local Restore Rehearsal) introduced zero security exceptions, zero new secrets, and zero new dependencies:
+- **Zero Security Exceptions:** Adheres strictly to `SEC-OPS-001` (zero unapproved secrets) and `SEC-OPS-004` (zero unapproved high vulnerabilities). `scripts/security-exceptions.json` remains completely empty and unmodified.
+- **Credential Protection & Memory Scoping:** Password and GPG passphrase ingestion in `scripts/backup/export_source_snapshot.ps1` and `scripts/rehearsal/run_local_rehearsal.ps1` strictly utilize interactive secure memory pointers (`Read-Host -AsSecureString` / `System.Runtime.InteropServices.Marshal`). Credentials are zeroized immediately after consumption and never written to disk, script arguments, or environment variables.
+- **Fail-Closed Network Guard:** `run_local_rehearsal.ps1` actively guards Prisma `DATABASE_URL` and `DIRECT_URL` during local migration testing, failing closed immediately (`throw`) if any connection string contains `supabase.co` or `pooler.supabase.com`.
+- **Deterministic Plaintext Lifecycle:** Unencrypted database dumps (`staging_data.sql`, `dev_data.sql`) are extracted strictly for local container processing and deleted inside `try ... finally` blocks on both success and error execution paths. Verified complete deletion (`Test-Path: False`).
+- **Explicit Database Role Hardening:** Rehearsal scripts enforced explicit database role boundaries (`02_post_restore_security.sql`), revoking direct privileges on public tables from `anon`, `authenticated`, and `PUBLIC` (`f|f|t|t`). Live cloud database permissions and RLS policies on Mumbai remain untouched.
+<!-- Database Migration Preparation & Rehearsal Security Exceptions Reconciled: 2026-09-08 -->
+
 
 

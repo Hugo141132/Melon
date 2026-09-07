@@ -2059,3 +2059,28 @@ The following facts are supported by the current implementation regarding device
 - No IoT Gateway deployment required.
 - No MQTT configuration changes required.
 - Staging environments must update the `web` service to reflect the middleware change.
+
+---
+
+## TASK-0916 Governance & Rehearsal Implementation Record
+
+`TASK-0916` database migration preparation & local restore rehearsal record:
+- **Status:** `BLOCKED` (Rehearsal executed with exit code 0; pending operator 5 pre-commit CI gates, maintenance window scheduling, and target Singapore credentials)
+- **Frontend impact:** `NONE`
+- **Selected UI direction:** `N/A`
+- **Existing color template:** `UNCHANGED`
+- **Selected motion effects:** `None`
+- **21st.dev MCP:** `NOT REQUIRED`
+- **Summary:** Verified migration preparation and executed phased local restore rehearsals for the Supabase PostgreSQL database migration from AWS Mumbai (`ap-south-1`) to AWS Singapore (`ap-southeast-1`) governed by `DEC-INF-095` and `docs/SUPABASE_MIGRATION_RUNBOOK.md`.
+  - **Live State & Destination:** Mumbai Dev (`xjsencdgfcbkzdzqcnqx`) and Staging (`scqrbtfilmttqrutynyo`) remain the authoritative live Supabase databases. AWS Singapore (`ap-southeast-1`) remains the planned destination for regional colocation with EMQX Cloud broker (`asia-southeast1`).
+  - **Tooling & Backup Integrity:** Validated PostgreSQL 17-compatible client and container tooling (`postgres:17-alpine`, port 5433). Synchronized read-only snapshot exports (`scripts/backup/export_source_snapshot.ps1`) generated consistent table row-count manifests (`${Environment}_manifest.tsv`), SHA-256 checksums, and symmetric AES-256 GPG-encrypted data archives (`.sql.gpg`).
+  - **Dev Local Rehearsal:** Successfully restored to isolated container on port 5433 (exit code 0). Verified 26 public tables, 28 foreign keys with 0 orphan rows, 11 applied Prisma migrations, and 100% per-table snapshot manifest parity.
+  - **Staging Local Rehearsal:** Successfully executed phased restore on port 5433 (exit code 0):
+    - *Phase A (Baseline Fidelity):* Verified 26 public tables, 28 foreign keys with 0 orphan rows, 10 applied Prisma migrations recorded in the snapshot, and 100% per-table snapshot manifest parity.
+    - *Phase B (Local Migration Catch-up):* Verified only `20260905040000_add_auth_and_fk_performance_indexes` was pending; applied it locally via `npx prisma migrate deploy`; verified applied migration count = 11; verified all 13 expected performance indexes; confirmed application data row counts remained invariant (reported as row-count evidence, not byte-for-byte equality). Scoped `DATABASE_URL` and `DIRECT_URL` locally with fail-closed cloud URL rejection and clean restoration in `finally`.
+    - *Phase C (Proposed Security Hardening):* Verified table ownership (`postgres`), RLS enabled on 26 tables, 0 unauthorized grants to `anon`, `authenticated`, or `PUBLIC`, and full access for `postgres` and `service_role` (`f|f|t|t`). Security hardening was tested strictly locally; cloud RLS/grants and live application behavior were not changed.
+    - *Phase D (Secure Cleanup):* Guaranteed deterministic deletion of temporary unencrypted data dumps (`staging_data.sql`, `dev_data.sql`) via `try ... finally` blocks on both success and failure paths; verified removal (`Test-Path: False`); encrypted backups preserved.
+  - **Remaining Pre-Cutover Tasks:** Free-plan sequential migration remains planned (planned maintenance downtime and sequential project pausing to respect the account-wide 2-project quota). Final write freeze, fresh cutover backups, faucet command reconciliation, quota-aware rollback, Singapore provisioning/cutover, and Mumbai retirement remain outstanding.
+  - **Operator CI Gates:** The five pre-commit CI gates (`npm run test:coverage`, `npm run test:integration`, `npm run check:quality`, `npm run test`, `npm run test:e2e`) have not yet been reported as passed and will be executed by the operator.
+<!-- TASK-0916 Rehearsal Reconciled: 2026-09-08 -->
+

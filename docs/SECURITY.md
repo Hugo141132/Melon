@@ -1739,3 +1739,17 @@ The following security and privacy controls are verified for `TASK-0506` (`/` an
 - **Zero Ingestion of Synthetic Claims:** The synthetic 92/100 health score is permanently deleted, eliminating fabricated system health representations.
 <!-- TASK-0506 Security Reconciled: 2026-09-02 -->
 
+---
+
+## Database Migration Security & Cryptographic Rehearsal Controls Note (TASK-0916 / Reconciled 2026-09-08)
+
+The following security controls and cryptographic procedures were verified during the database migration preparation and local restore rehearsals for `TASK-0916`:
+- **Encrypted Data Backups & Cryptographic Integrity:** All database data exports are encrypted symmetrically using AES-256 via GPG (`.sql.gpg`) with SHA-256 transport checksums. Passphrases and passwords are provided interactively via secure memory buffers (`Read-Host -AsSecureString`), never stored on disk, passed as command-line flags, or logged in CI/console output (`SEC-OPS-001`).
+- **Deterministic Plaintext Lifecycle & Cleanup:** Temporary plaintext data files (`staging_data.sql`, `dev_data.sql`) are extracted strictly for local restore processing and deleted deterministically inside `try ... finally` blocks on both success and failure paths. Removal is cryptographically and filesystem-verified (`Test-Path: False`). Only encrypted `.gpg` archives remain stored.
+- **Fail-Closed Network Isolation:** Rehearsals run on local Docker container `kebun-melon-rehearsal-db` (port `5433`). The rehearsal runner enforces automated regex validation on `DATABASE_URL` and `DIRECT_URL`, failing closed (`throw`) if any migration connection resolves to `supabase.co` or `pooler.supabase.com`. Zero contact was made with live MQTT brokers, IoT hardware devices, email services, or cloud databases.
+- **Explicit Post-Restore Security Hardening:** Evaluated `scripts/rehearsal/02_post_restore_security.sql` locally, establishing explicit table ownership to `postgres`, enabling Row Level Security (RLS) on all 26 public tables, revoking direct table privileges from `anon`, `authenticated`, and `PUBLIC`, and granting explicit access only to `postgres` and `service_role`.
+- **Cloud Invariance & Scope:** Mumbai Dev and Staging remain the authoritative live databases. Security hardening was tested strictly locally; cloud RLS policies, table grants, and application behavior in Mumbai were NOT modified.
+- **Operational Status:** `TASK-0916` remains `BLOCKED` awaiting operator execution of the five pre-commit CI gates and maintenance window approval.
+<!-- TASK-0916 Security Reconciled: 2026-09-08 -->
+
+

@@ -480,6 +480,28 @@ The following facts are verified in the traceability matrix regarding `DEC-AUTH-
   - Final 5-stage pre-commit CI test suite is pending manual execution before commit.
 <!-- Authentication Performance & Session Recovery Traceability Reconciled: 2026-09-05 -->
 
+---
+
+## Database Migration Preparation & Restore Rehearsal Traceability Note (TASK-0916 / Reconciled 2026-09-08)
+
+The following facts are verified in the traceability matrix regarding `TASK-0916` (Database Migration Preparation, Free-Plan Sequential Architecture, and Local Restore Rehearsal Verification):
+- **Traceability Baseline:** Defined under `TASK-0916`, `DEC-INF-075`, `DEC-INF-076`, `DEC-INF-095`, `docs/TESTING.md` §35, and `docs/SUPABASE_MIGRATION_RUNBOOK.md` to eliminate latency bottlenecks via planned Singapore regional colocation, ensure disaster recovery readiness, and validate schema/data fidelity locally without cloud disruption.
+- **Implementation Status:** Fully implemented and verified:
+  - Validated PostgreSQL 17-compatible container tooling (`postgres:17-alpine`) on isolated port `5433` (`kebun-melon-rehearsal-db`).
+  - Generated consistent table manifests (`${Environment}_manifest.tsv`), SHA-256 checksums, and symmetric AES-256 GPG-encrypted archives (`.sql.gpg`).
+  - Executed Dev local rehearsal with exit code 0: verified 26 public tables, 28 foreign keys with 0 orphan rows, 11 Prisma migrations, and 100% snapshot manifest parity.
+  - Executed Staging local rehearsal with exit code 0: verified 26 public tables, 28 foreign keys with 0 orphan rows, 10 Prisma migrations recorded in snapshot, and 100% snapshot manifest parity.
+  - Applied pending Staging migration `20260905040000_add_auth_and_fk_performance_indexes` locally: migration count updated to 11, verified 13 performance indexes, and confirmed 0 application rows altered (reported as row-count evidence, not byte-for-byte data equality).
+  - Verified explicit post-restore security hardening (`02_post_restore_security.sql`): table ownership set to `postgres`, RLS enabled on all 26 tables, and direct table privileges revoked from `anon`, `authenticated`, and `PUBLIC` (`f|f|t|t`).
+  - Verified deterministic deletion of unencrypted dumps (`staging_data.sql`, `dev_data.sql`) via try-finally blocks (`Test-Path: False`).
+- **Architectural & Security Invariance:**
+  - Mumbai Dev and Staging remain the authoritative live databases; Singapore remains the planned destination.
+  - Cloud RLS policies and table grants were NOT altered.
+  - Zero API, UI, I18N, or user-flow behavioral changes.
+  - Free-plan sequential migration remains planned; `TASK-0916` remains `BLOCKED` awaiting operator execution of the five pre-commit CI gates and maintenance window approval.
+<!-- Database Migration Preparation & Rehearsal Traceability Reconciled: 2026-09-08 -->
+
+
 
 
 

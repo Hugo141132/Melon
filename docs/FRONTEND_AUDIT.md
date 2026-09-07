@@ -5,7 +5,8 @@
 > **Source of Truth Rule:** The existing frontend design and visual layout remain the visual source of truth.
 >
 > **Reconciliation Note (TASK-0914):** `TASK-0914` (EMQX Cloud direct connectivity) is a backend gateway and simulator hardening task (`Frontend impact: NONE`). Frontend UI layouts, components, charts, and styling are preserved without modification. Monitoring UI smoke testing was intentionally deferred/skipped during backend gateway verification.
-
+>
+> **Reconciliation Note (TASK-0916):** `TASK-0916` (Supabase database migration preparation and rehearsal) is an infrastructure and persistence verification task (`Frontend impact: NONE`). Selected UI direction: `N/A`. Existing color template: `UNCHANGED`. Selected motion effects: `None`. 21st.dev MCP: `NOT REQUIRED`. All Next.js App Router frontend layouts, pages, components, and Tailwind styling are preserved with zero modifications. Documentation-only changes require no staging container redeploy.
 
 ---
 

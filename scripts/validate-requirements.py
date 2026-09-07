@@ -9,13 +9,14 @@ import re
 import os
 from collections import Counter
 
-VALID_DEC = {
-    'DEC-AUD-101','DEC-AUTH-001','DEC-AUTH-006','DEC-AUTH-010','DEC-AUTH-012',
-    'DEC-CTRL-051','DEC-CTRL-067','DEC-DEV-020','DEC-DEV-026','DEC-DEV-035',
-    'DEC-I18N-068','DEC-I18N-074','DEC-INF-075','DEC-INF-076','DEC-INF-077',
-    'DEC-INF-088','DEC-MON-036','DEC-MON-048','DEC-MON-050','DEC-RBAC-013',
-    'DEC-RBAC-015','DEC-RBAC-016','DEC-RBAC-019','DEC-TST-089','DEC-TST-100'
-}
+def load_valid_decs():
+    dec_path = 'docs/DECISIONS.md'
+    if not os.path.exists(dec_path):
+        return set()
+    with open(dec_path, 'r', encoding='utf-8') as f:
+        return set(re.findall(r'DEC-[A-Z0-9-]+', f.read()))
+
+VALID_DEC = load_valid_decs()
 
 INVALID_STATUS = {'BLOCKED', 'BACKLOG', 'READY', 'DONE'}
 VALID_STATUS = {
