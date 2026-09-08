@@ -49,7 +49,7 @@ The following rules apply to all flows:
 12. Unresolved behaviour is marked `TBD`.
 13. Sensor thresholds, units, refresh intervals, hardware execution rules, and alert limits must not be invented by the frontend.
 14. Direct EMQX Cloud TLS connectivity for `apps/iot-gateway` (`TASK-0914`) preserves all user-facing monitoring and control flows without modifying client UX or authorization paths.
-15. Operational database relocation preparation and local rehearsals (`TASK-0916`) preserve all user-facing journeys, authentication flows, and authorization checks without modification. Live production and staging operations continue serving users uninterrupted from active Mumbai Supabase instances until the scheduled Singapore cutover window.
+15. Operational database relocation and Singapore Dev cutover (`TASK-0916`) preserve all user-facing journeys, authentication flows, and authorization checks without modification. Genuine Owner login (`POST /api/v1/auth/login`), single active session enforcement (`DEC-AUTH-107`), REST telemetry ingestion, and subscriber-side real-time SSE delivery (`telemetry.soil.updated`) were verified end-to-end against Singapore Dev (`unbyxlkrzqlafolxcypi`). Staging operations continue serving users uninterrupted from active Mumbai Supabase instances pending the scheduled maintenance window. Full details in [`docs/SUPABASE_MIGRATION_RUNBOOK.md`](file:///c:/Users/Puroh/Documents/Melon/docs/SUPABASE_MIGRATION_RUNBOOK.md).
 
 ---
 

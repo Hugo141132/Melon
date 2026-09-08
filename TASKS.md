@@ -2538,17 +2538,28 @@ Apply to:
 ## TASK-0916 — Migrate Development and Staging Supabase Databases to Singapore (ap-southeast-1)
 
 **Priority:** `P0`
-**Status:** `BLOCKED`
+**Status:** `IN_PROGRESS`
 **Dependencies:** `TASK-0104`, `TASK-0905`, `TASK-0914`, Local Restore Rehearsal Execution, Migration Maintenance Window Approval
 **Related Runbook:** `docs/SUPABASE_MIGRATION_RUNBOOK.md`
 **Blocking & Prerequisite Analysis:**
 - `TASK-0909` (automated offsite backup pipeline to R2/S3) does NOT block execution; point-in-time encrypted migration snapshots (`pg_dump` with symmetric AES-256 GPG encryption, SHA-256 checksums, and verified isolated restore rehearsal) satisfy point-in-time recovery independently.
 - Execution is governed under a **Free-plan-only migration design with planned downtime** (zero paid upgrades, adhering strictly to the account-wide 2-active-project limit via sequential project pausing).
 - Local restore rehearsals on PostgreSQL 17 (`postgres:17-alpine`, port 5433) have been **EXECUTED SUCCESSFULLY** for both Dev (exit code 0) and Staging (exit code 0), verifying 26 tables, 28 foreign keys with 0 orphans, 100% snapshot manifest parity, and Staging local catch-up (`20260905040000_add_auth_and_fk_performance_indexes` with 13 performance indexes).
-- Execution remains **BLOCKED** on remaining operational prerequisites:
-  1. Operator manual execution of the five pre-commit CI gates (`npm run test:coverage`, `npm run test:integration`, `npm run check:quality`, `npm run test`, `npm run test:e2e`).
-  2. Operator scheduling of the planned downtime maintenance window, confirmation of project capacity, and provision of target Singapore credentials.
-  3. Pre-cutover write freeze, non-terminal faucet command drain, fresh cutover backups, Singapore provisioning/cutover, and Mumbai retirement.
+- **Singapore Dev Cutover (COMPLETED 2026-09-08):**
+  - Schema, data, and RLS restored to Singapore Dev (`unbyxlkrzqlafolxcypi`, AWS `ap-southeast-1`).
+  - Migrations deployed via `scripts/cutover/deploy_singapore_dev_migrations.ps1` with exit code 0.
+  - **Frozen Pre-Write Baseline Parity:** 100% bit-for-bit row count parity across all 25 non-migration application tables against immutable `backups/cutover/dev_20260908_025808/dev_manifest.tsv` (which recorded 11 migration history rows; deployment produced 13), SHA-256 checksum match on all 11 applied repository migrations, all 13 performance indexes valid (`indisvalid=true`) and ready (`indisready=true`). Original cutover manifest file preserved unmodified at its actual path.
+  - **Verified Post-Cutover Mutations (Recorded Separately from Baseline):**
+    1. Migration history: Exactly 13 rows in `_prisma_migrations` (11 applied + 2 historical rollbacks).
+    2. Owner authentication: Genuine interactive login executed; active session confirmed in PostgreSQL catalog (`public.sessions` = 1 active session `de8a9c04-5829-44bb-875a-eca4edbf5a88` for `hugo@resend.dev`), single active session invariant (`DEC-AUTH-107`) enforced.
+    3. Telemetry persistence: 3 controlled synthetic soil readings persisted (`soil_readings` count 0 $\rightarrow$ 3).
+    4. Device metadata: `soil-node-jvbkdbv` updated atomically (`last_seen_at`, `last_message_at`).
+    5. Command isolation: `faucet_commands` strictly 0 (`ENABLE_FAUCET_CONTROL=false` strictly enforced).
+  - **Token Rotation & Probes:** Internal service token rotated using 32-byte hex CSPRNG across `.env`, `apps/web/.env`, and `apps/iot-gateway/.env`. Probes (`/health`, `/ready`) confirmed HTTP 200.
+  - **Real-Time SSE Delivery:** Internal publish webhook dispatch (HTTP 200), stream heartbeat, and subscriber-side receipt of uniquely identified telemetry payload (`cutover-sse-subscriber-20260908-03` as `event: telemetry.soil.updated`) verified under active session.
+- **Singapore Staging Cutover Status (PENDING MAINTENANCE WINDOW):**
+  - Cloud Staging database (`scqrbtfilmttqrutynyo`) remains on Mumbai (AWS `ap-south-1`) untouched and independent.
+  - Staging cutover will proceed during the operator's scheduled downtime maintenance window after Dev checkpoint approval.
 
 ### Work
 
@@ -2569,16 +2580,18 @@ Apply to:
 
 ### Acceptance Criteria
 
-- [ ] Supabase account plan and project capacity confirmed by operator.
+- [x] Supabase account plan and project capacity confirmed by operator.
 - [x] GPG/AES256-encrypted point-in-time backups taken, SHA-256 checksums verified, and decryption tested for both Dev and Staging.
 - [x] Isolated restore rehearsal executed successfully on an isolated database verifying schema, foreign keys, and data integrity before cutover (Dev: 11 migrations; Staging baseline: 10 migrations, local catch-up to 11 verified).
-- [ ] Schema, all 26 tables, constraints, foreign keys, grants, and Prisma migration histories restored with zero row loss and verified against the consistent snapshot manifest on Singapore.
-- [ ] Staging's pending 11th migration (`20260905040000_add_auth_and_fk_performance_indexes`) deployed and verified on Singapore.
+- [x] Singapore Dev restored, migrations deployed, 100% manifest row-parity verified on frozen baseline, and post-cutover mutations verified.
+- [ ] Schema, all 26 tables, constraints, foreign keys, grants, and Prisma migration histories restored with zero row loss and verified against the consistent snapshot manifest on Singapore Staging.
+- [ ] Staging's pending 11th migration (`20260905040000_add_auth_and_fk_performance_indexes`) deployed and verified on Singapore Staging.
 - [ ] Strict environment isolation preserved between Dev and Staging (distinct Singapore project refs).
-- [ ] Ingestion/write freeze executed; all non-terminal faucet commands (`QUEUED`, `SENT`, `ACKNOWLEDGED`, `IN_PROGRESS`) reconciled cleanly with audit events; `ENABLE_FAUCET_CONTROL=false` enforced.
-- [ ] Session/direct pooler connection strings (port 5432) retrieved from dashboard and updated in `.env`, `.env.staging`, and `mcp_config.json`.
+- [x] Ingestion/write freeze executed for Dev cutover; `ENABLE_FAUCET_CONTROL=false` strictly enforced.
+- [ ] Staging ingestion freeze and non-terminal command drain executed during Staging maintenance window.
+- [x] Session/direct pooler connection strings (port 5432) retrieved and configured for Dev; Staging pending creation.
 - [ ] Staging Docker containers rebuilt and verified healthy (`/health` and `/ready` return HTTP 200).
-- [ ] Post-migration verification gates pass: login transaction latency reduced, REST telemetry ingestion verified, SSE live stream verified.
+- [ ] Post-migration verification gates pass: login transaction latency reduced, REST telemetry ingestion verified, SSE live stream verified (Dev: login, telemetry, token rotation, heartbeat, and subscriber-side SSE verified; Staging: pending).
 - [ ] Mumbai projects retained in standby state during agreed soak period; deleted only after verified cutover, independent offline recovery backup, and operator sign-off.
 
 ---

@@ -1,7 +1,7 @@
 # Supabase Migration Runbook: Mumbai (`ap-south-1`) to Singapore (`ap-southeast-1`)
 
 > **Task Reference:** `TASK-0916`  
-> **Status:** BLOCKED (Local Restore Rehearsals PASSED; Pending Operator CI Gates, Maintenance Window Scheduling, Write Freeze, and Sequential Singapore Cutover)  
+> **Status:** IN PROGRESS / DEV CUTOVER VERIFIED (Dev Cutover Completed & Verified in Singapore; Staging Migration Pending Maintenance Window)  
 > **Architecture:** Free-Plan-Only Sequential Migration with Planned Downtime (Zero Paid Upgrades)  
 > **Target Environments:** Development (`dev`) and Staging (`staging`)  
 > **Source Region:** AWS Mumbai (`ap-south-1`)  
@@ -170,6 +170,31 @@ SELECT count(*) AS missing_app_privilege_count FROM missing_app_privileges;
 -- EXPECTED: 0
 ```
 
+### 3.3 Cloud Platform Object & Event Trigger Compatibility Exception
+1. **Internal Platform Event Triggers (`ensure_rls`):**
+   - In Supabase-managed PostgreSQL instances (including Singapore Dev `unbyxlkrzqlafolxcypi`), Supabase provisions platform-owned event triggers by default. Specifically, event trigger `ensure_rls` (owned by `postgres`, event `ddl_command_end`, tags `CREATE TABLE`, `CREATE TABLE AS`, `SELECT INTO`) automatically invokes `public.rls_auto_enable()` to enforce RLS on newly created public tables.
+2. **Conflict with `--clean` DDL Dumps:**
+   - Standard `pg_dump --clean` dumps include `DROP FUNCTION IF EXISTS public.rls_auto_enable();` followed by `CREATE FUNCTION public.rls_auto_enable() ...`.
+   - Executing `DROP FUNCTION public.rls_auto_enable()` fails immediately with PostgreSQL error `2BP01: cannot drop function public.rls_auto_enable() because other objects depend on it (event trigger ensure_rls depends on function public.rls_auto_enable())`.
+3. **Mandatory Sanitization Policy & Safety Invariance:**
+   - The restore pipeline in `scripts/cutover/restore_singapore_dev.ps1` implements a fail-closed parser that automatically filters out:
+     - `DROP FUNCTION public.rls_auto_enable()`
+     - Multiline `CREATE FUNCTION public.rls_auto_enable()` body down to its terminating `$$;`
+     - Any associated `ALTER`, `COMMENT`, `GRANT`, or `REVOKE` statements targeting `public.rls_auto_enable`
+     - Platform-level public schema modifications (`DROP SCHEMA IF EXISTS public;`, `CREATE SCHEMA public;`, `COMMENT ON SCHEMA public`).
+   - The platform trigger `ensure_rls` and function `public.rls_auto_enable()` on the target database remain completely preserved and untouched (no `CASCADE`, no `CREATE OR REPLACE`, no trigger disabling/dropping).
+   - Application tables, foreign keys, and custom enums are completely preserved, and `--single-transaction` with `ON_ERROR_STOP=1` guarantees 100% atomic rollback on any failure.
+
+### 3.4 UTF-8 Encoding & Direct Multi-File Transport Policy
+1. **UTF-8 Byte Order Mark (BOM) Elimination:**
+   - In Windows PowerShell environments, default file-writing cmdlets (`Out-File -Encoding utf8`, `Set-Content`) emit a 3-byte UTF-8 Byte Order Mark (`0xEF, 0xBB, 0xBF`).
+   - Standard PostgreSQL clients (`psql`) running in default client encodings read these bytes prior to the initial comment on line 1 as literal character tokens `∩╗┐` (CP437 interpretation of the UTF-8 BOM), resulting in immediate fatal syntax errors (`ERROR: syntax error at or near "∩╗┐"`).
+   - Temporary SQL files must be generated strictly as UTF-8 without BOM using `.NET` `New-Object System.Text.UTF8Encoding($false)`. Leading BOMs from decrypted archives are stripped via raw binary buffer copy (`Remove-LeadingBom`) without string re-encoding or arbitrary character stripping, preserving exact bit-for-bit application data and non-ASCII characters (e.g. Indonesian diacritics, accented letters, emoji, and mathematical symbols).
+2. **Multi-File Transport & Client Encoding:**
+   - Rather than shell piping or stream concatenation, temporary files (`clean_pre_data.tmp.sql`, `dev_data.tmp.sql`, `clean_post_data.tmp.sql`) are mounted directly into an isolated PostgreSQL 17 Docker container and passed to a single `psql` invocation using repeated `-f` arguments:
+     `-v ON_ERROR_STOP=1 --single-transaction --quiet -f /backup/clean_pre_data.tmp.sql -f /backup/dev_data.tmp.sql -f /backup/clean_post_data.tmp.sql`
+   - Explicit client encoding `PGCLIENTENCODING=UTF8` and PowerShell process encoding `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8` are enforced across all operations, completely eliminating implicit OEM/ANSI conversions.
+
 ---
 
 ## 4. Faucet Command Shutdown Ordering & Architectural Constraints
@@ -315,27 +340,97 @@ Because of the 2-active-project limit, execution proceeds sequentially:
 
 ### Step 1: Development Migration Window
 1. Verify Dev writer freeze (no local gateway or dev web servers running).
-2. Take secure export of Mumbai Dev (`kebun_melon_dev_schema.sql`, `kebun_melon_dev_data.sql.gpg`).
+2. Take secure export of Mumbai Dev: snapshot saved in `backups/cutover/dev_20260908_025808/` with matching SHA-256 checksums and GPG-encrypted data payload.
 3. In Supabase Dashboard: Navigate to `xjsencdgfcbkzdzqcnqx` $\rightarrow$ **Settings** $\rightarrow$ **General** $\rightarrow$ **Pause project** (Frees 1 project slot; active project count = 1).
-4. Create Singapore Dev Project (`ap-southeast-1`): Record `[NEW_DEV_REF]` and retrieve Session connection string (port 5432).
-5. Restore Schema & Data to Singapore Dev:
-   ```powershell
-   $secPass = Read-Host -Prompt "Enter Singapore Dev Database Password" -AsSecureString
-   $bstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($secPass)
-   $env:PGPASSWORD = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr)
-   [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
-   $secPass = $null
-
-   psql -h "[NEW_DEV_SESSION_HOST]" -p 5432 -U "postgres.[NEW_DEV_REF]" -d "postgres" -v ON_ERROR_STOP=1 -f "kebun_melon_dev_schema.sql"
-   psql -h "[NEW_DEV_SESSION_HOST]" -p 5432 -U "postgres.[NEW_DEV_REF]" -d "postgres" -v ON_ERROR_STOP=1 -c "SET session_replication_role = replica;" -f "kebun_melon_dev_data.sql"
-   psql -h "[NEW_DEV_SESSION_HOST]" -p 5432 -U "postgres.[NEW_DEV_REF]" -d "postgres" -v ON_ERROR_STOP=1 -f "post_restore_security.sql"
-
-   $env:PGPASSWORD = $null
-   ```
-6. Verify Dev data parity and update `.env`.
+4. Create Singapore Dev Project (`ap-southeast-1`): Recorded reference `unbyxlkrzqlafolxcypi` and Session connection string (`aws-0-ap-southeast-1.pooler.supabase.com:5432`).
+5. Restore & Verify Singapore Dev using Target-Locked Script:
+   - The operator executes the target-locked, single-transaction atomic restoration script:
+     ```powershell
+     powershell -File scripts/cutover/restore_singapore_dev.ps1
+     ```
+   - **Automated Workflow:**
+     - Pre-validates cryptographic SHA-256 checksums of all dump artifacts.
+     - Acquires database credentials and executes a **fail-closed preflight check** (`SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name != '_prisma_migrations';`) ensuring target is clean before asking for GPG passphrase, decrypting data, or executing DDL.
+     - Decrypts `dev_data.sql.gpg` via standard input without exposing passphrase in process table.
+     - Sanitizes pre-data DDL to preserve Supabase public schema ownership and exclude `rls_auto_enable()` to prevent conflict with active `ensure_rls` event trigger (§3.3).
+     - Restores pre-data, table data, and post-data atomically (`--single-transaction`, `-v ON_ERROR_STOP=1`) through containerized PostgreSQL 17 client.
+     - Validates baseline: 26 public tables, 11 Prisma migrations, 28 foreign key constraints (0 orphans), and 100% row-count parity against `dev_manifest.tsv`.
+     - Deterministically removes temporary plaintext files in a `finally` block and purges process credentials.
+   - **Dedicated Read-Only Verification Entry Point:**
+     - If restoration has already committed and only baseline verification needs to be run (without decrypting backups or executing DDL), execute the dedicated, strictly read-only verification script:
+       ```powershell
+       powershell -File scripts/cutover/verify_singapore_dev.ps1
+       ```
+       *(or `powershell -File scripts/cutover/restore_singapore_dev.ps1 -VerifyOnly`)*.
+6. **Verified Dev Baseline Evidence (`unbyxlkrzqlafolxcypi`):**
+   - **Status:** `Dev baseline restored and verified; application cutover pending.`
+   - **Restore Fidelity vs Application Migration Readiness:**
+   - **Restore Fidelity (Snapshot Parity):** 100% exact parity against Mumbai Dev cutover snapshot (`backups/cutover/dev_20260908_025808/`).
+     - Public Tables: 26 (100% row-count parity against `dev_manifest.tsv`, zero missing tables).
+     - Foreign Key Constraints: 28 valid constraints, 0 orphaned rows detected across all relations.
+     - Database History Records: 11 rows in `_prisma_migrations` restored identically from snapshot.
+     - Platform Triggers & Functions: `ensure_rls` event trigger active, `rls_auto_enable()` intact.
+     - Plaintext Cleanup: Verified 0 plaintext dump files remain on disk.
+     - **Prisma Migration History Reconciliation:**
+        - Total rows in `_prisma_migrations`: **11 rows** (Pre-deploy baseline).
+        - Distinct applied migrations: **9 successful migrations** (`finished_at IS NOT NULL AND rolled_back_at IS NULL`), verified bit-for-bit against repository SHA-256 checksums (`0_init`, `20260730140756`, `20260731001600`, `20260731170000`, `20260802170000`, `20260817000000`, `20260817082153`, `20260819000000`, `20260829170000`).
+        - Historical rolled-back records: **2 attempts** (`20260817082153_add_email_verification_tokens` and `20260819000000_task_0802_faucet_command_action`), both having corresponding successful replacement applied records in the database.
+        - Unresolved failed migrations: **0 records** (`finished_at IS NULL AND rolled_back_at IS NULL`).
+        - Unapplied repository migrations: **2 pending migrations** (`20260820000000_add_session_user_active_index` and `20260905040000_add_auth_and_fk_performance_indexes`).
+        - Physical Performance Indexes & Pre-Deploy Reconciliation:
+          - All **13 performance indexes** declared in the pending migrations (`sessions_user_active_idx`, `sessions_user_id_idx`, `user_roles_user_id_idx`, `user_roles_user_id_revoked_at_idx`, `user_roles_role_id_idx`, `role_permissions_permission_id_idx`, `account_approvals_decided_by_user_id_idx`, `user_device_access_device_id_idx`, `user_device_access_assigned_by_user_id_idx`, `user_preferences_default_device_id_idx`, `alert_acknowledgements_user_id_idx`, `alert_acknowledgements_alert_id_idx`, `alerts_device_id_idx`) were restored physically from the Mumbai snapshot.
+          - Migration `20260820000000` executes `CREATE INDEX "sessions_user_active_idx"` without `IF NOT EXISTS`. Running raw `prisma migrate deploy` directly against Singapore Dev would fail with PostgreSQL error `42P07: relation "sessions_user_active_idx" already exists`.
+          - Modifying `20260820000000/migration.sql` in git is prohibited because it was applied on Staging (`scqrbtfilmttqrutynyo`) on 2026-09-03 with checksum `aae0ceb0a605ae1061e837a6a79a0001976eb60e352e9592390600c49c9636fe`.
+          - **Reconciling `prisma migrate status` vs Physical Schema Drift:**
+            - Running `npx prisma migrate status` reports `"Database schema is up to date!"` alongside listing the two unapplied migrations. This message indicates *only* that the Prisma schema file (`schema.prisma`) has no diffs against the local migrations directory (`packages/database/prisma/migrations/`). It does **not** indicate zero schema drift against the physical database, nor does it guarantee physical schema equivalence.
+            - Conversely, `_prisma_migrations` rows verify migration application history, but do not prove physical index validity or readiness. Physical schema verification requires querying PostgreSQL system catalogs (`pg_index`, `pg_class`, `pg_am`, `pg_get_indexdef`) for `indisvalid = true` and `indisready = true`. A `pg_indexes` name count alone is insufficient.
+          - **Execution Timing & Bounded Lock Control:**
+            - Speculative or unsupported execution time claims (e.g. "<1 ms") are excluded from operational procedures. Actual DDL lock acquisition and execution times are workload-dependent.
+            - Instead, safety is enforced deterministically by applying a bounded lock timeout (`SET lock_timeout = '5s';`) without `CASCADE` while application writers remain strictly stopped.
+          - **Deployment Wrapper Architecture (`scripts/cutover/deploy_singapore_dev_migrations.ps1`):**
+            1. **Pre-Deploy History & Schema Assessment:** Checks `_prisma_migrations` for unresolved failures (aborts if count > 0). If both migrations (`20260820000000`, `20260905040000`) are already applied, verifies physical schema matches history (`indisvalid=true, indisready=true` on all 13 indexes) and runs verification only without dropping objects. If history and physical schema disagree, halts immediately with a specific diagnosis rather than modifying history or deleting objects.
+            2. **Targeted Conditional Drop:** Drops `sessions_user_active_idx` *only* when migration `20260820000000` is genuinely pending, 0 unresolved failures exist, and the existing index definition matches the approved definition (`btree` on `sessions(user_id, revoked_at, expires_at)`, non-unique, valid, ready). Never drops when `20260820000000` is already applied.
+            3. **Separate Bounded Lock Execution:** Executes `SET lock_timeout = '5s'; DROP INDEX public.sessions_user_active_idx;` as an independent operation prior to Prisma invocation.
+            4. **Diagnostic Deploy Failure Handling:** Executes `npx prisma migrate deploy`. If deployment fails after drop, inspects post-failure migration state (`failed_migrations`, `applied_migrations`) and index existence, keeps application writers stopped, performs zero blind retries, and outputs structured recovery action guidance.
+            5. **Post-Deploy Validation:** Validates 13 total migration records, 11 applied migrations, 2 preserved historical rollbacks, 0 unresolved failures, all 13 individual performance indexes verified for definition match, `indisvalid=true`, and `indisready=true`, bit-for-bit checksum parity across all 11 applied migrations against local files, and 100% unchanged application table row counts vs `dev_manifest.tsv`.
+7. **Execute Singapore Dev Migration Deployment (COMPLETED 2026-09-08):**
+   - The operator executed the target-locked deploy wrapper:
+     ```powershell
+     powershell -File scripts/cutover/deploy_singapore_dev_migrations.ps1
+     ```
+   - **Deployment Result:** Exit Code `0`. Successfully deployed migrations `20260820000000_add_session_user_active_index` and `20260905040000_add_auth_and_fk_performance_indexes`.
+   - **Post-Deploy Verification & Manifest Baseline Comparison:**
+     - **Original Cutover Manifest Baseline (`backups/cutover/dev_20260908_025808/dev_manifest.tsv`):** Recorded exactly **11** migration history records in `_prisma_migrations` prior to deployment. The original cutover manifest path and file remain strictly preserved and immutable.
+     - **Migration Deployment Output:** Applying the two pending migrations (`20260820000000` and `20260905040000`) produced exactly **13** records in `_prisma_migrations` (11 applied migrations matching local repository SHA-256 checksums bit-for-bit, 2 preserved historical rollbacks from 2026-08-20, 0 unresolved failures).
+     - **Pre-Write Schema & Index Parity:** All 13 performance indexes confirmed valid (`indisvalid=true`), ready (`indisready=true`), non-unique, with exact definition string match.
+     - **Pre-Write Application Table Parity:** All 25 non-migration application tables confirmed 100% row-count match vs the original cutover manifest (`backups/cutover/dev_20260908_025808/dev_manifest.tsv`) prior to resuming live application traffic.
+8. **Dev Application Services & Live Cutover Validation (IN PROGRESS 2026-09-08):**
+   - **RLS & Data API Assessment:** RLS is enabled on all 26 public tables with 0 policies, enforcing complete denial of PostgREST / Data API access for `anon` and `authenticated` roles (`rolbypassrls = false`). Supabase security linter flags `rls_auto_enable()` as a `SECURITY DEFINER` function with default public execution grants. System catalog inspection (`pg_proc`) confirms `public.rls_auto_enable()` returns `event_trigger` for DDL trigger automation and cannot be executed as a standard RPC outside DDL trigger context. Per governance policy, zero silent hardening was applied.
+   - **Prisma & Gateway Connectivity:** Web (`http://localhost:3000`) and IoT Gateway (`http://localhost:3001`) connected to Singapore Dev (`unbyxlkrzqlafolxcypi`) pooler (port 6543, `?pgbouncer=true`).
+   - **Service Health Probes & Token Rotation:**
+     - Web `/health`: HTTP 200 (`{ "status": "ok" }`).
+     - Web `/ready`: HTTP 200 (`{ "status": "ready", "dependencies": { "database": "up", "gateway": "up", "broker": "up" } }`).
+     - Gateway `/health`: HTTP 200 (`{ "status": "pass", "service": "iot-gateway" }`).
+     - Gateway `/internal/v1/ready`: HTTP 200 (`{ "status": "ready", "dependencies": { "database": "up", "broker": "up" } }`).
+     - **Internal Service Token Rotation (COMPLETED 2026-09-08):** Operator executed `rotate_dev_internal_token.js` generating a 32-byte hex CSPRNG token across `.env`, `apps/web/.env`, and `apps/iot-gateway/.env` (pre-validated, zero credentials printed). Dev services restarted and validated via `verify_token_rotation.js`: Gateway `/internal/v1/ready` confirmed rejecting missing and stale tokens (HTTP 401) and accepting the new rotated token (HTTP 200), and Web `/ready` confirmed returning HTTP 200 with gateway status `up`. Staging was preserved untouched.
+   - **Expected Post-Cutover Data Mutations (Recorded Separately from Baseline):**
+     - **Session State:** Exactly 1 active session in `public.sessions` (`de8a9c04-5829-44bb-875a-eca4edbf5a88` for Owner `hugo@resend.dev`, created at `2026-09-08 02:37:28.567 UTC`); previous test session revoked (`revoked_at = 2026-09-08 02:14:00 UTC`). Single active session invariant (`DEC-AUTH-107`) confirmed active.
+     - **Telemetry Persistence:** `soil_readings` count changed from 0 (manifest baseline) $\rightarrow$ 3 (post-cutover).
+       - First Write: `POST /api/v1/devices/soil-node-jvbkdbv/telemetry/soil` (Message ID: `cutover-synthetic-telemetry-20260908-01`, Reading ID: `902f6f4e-fcad-4bba-9f05-d56eafb62a5c`, timestamp: `2026-09-08 01:48:09.319 UTC`).
+       - Second Write: `POST /api/v1/devices/soil-node-jvbkdbv/telemetry/soil` (Message ID: `cutover-sse-telemetry-20260908-02`, Reading ID: `681f5441-47a7-4825-9b6b-35223f63ee26`, timestamp: `2026-09-08 02:38:09.070 UTC`).
+       - Third Write: `POST /api/v1/devices/soil-node-jvbkdbv/telemetry/soil` (Message ID: `cutover-sse-subscriber-20260908-03`, Reading ID: `04bafee1-4ea7-4999-a223-2d497cbeafbc`, timestamp: `2026-09-08 03:10:02.111 UTC`).
+       - Sensor values persisted: Nitrogen 16.0, Phosphorus 10.2, Potassium 19.1, Temp 26.8°C, Moisture 69.5%, pH 6.7, EC 1.6, Status NORMAL.
+     - **Device Metadata:** `soil-node-jvbkdbv` updated atomically (`last_seen_at` and `last_message_at` refreshed to ingestion timestamp).
+     - **Migration History:** Exactly 13 rows in `_prisma_migrations` (11 applied + 2 historical rollbacks).
+     - **Command Isolation:** `public.faucet_commands` remains strictly **0** (`ENABLE_FAUCET_CONTROL=false` strictly maintained across all services).
+   - **Real-Time Telemetry-Event SSE Delivery Status:**
+     - Webhook Dispatch (VERIFIED): Event dispatched to Realtime Event Hub via internal webhook `POST /api/v1/internal/realtime/publish` using rotated `INTERNAL_SERVICE_TOKEN` (HTTP 200).
+     - SSE Transport & Heartbeat (VERIFIED): `GET /api/v1/realtime/stream` establishes connection, emits `event: connected`, and delivers periodic `event: ping` heartbeats under authenticated session (`test_sse_stream.ts`).
+     - Subscriber Receipt of Telemetry Chunk (VERIFIED): Uniquely identified payload `cutover-sse-subscriber-20260908-03` received on authorized browser EventSource subscriber client as `event: telemetry.soil.updated` matching payload and Singapore Dev DB record (`04bafee1-4ea7-4999-a223-2d497cbeafbc`), test stream closed cleanly.
+   - **MUMBAI DEV STALENESS NOTICE:** Because live writes have resumed in Singapore Dev, the paused Mumbai Dev database (`xjsencdgfcbkzdzqcnqx`) is now **STALE**. A simple connection-string rollback to Mumbai is unsupported and prohibited (§9.2).
 
 ### Step 2: Staging Migration Window
-1. Execute Faucet Shutdown Protocol (§4.3) and stop `kebun-melon-staging-gateway` and `kebun-melon-staging-web`.
+1. Enforce Faucet Shutdown Protocol (§4.3) and ensure staging application services remain stopped. (Docker inspection confirms `kebun-melon-staging-web` and `kebun-melon-staging-gateway` have been in `exited` status since 2026-09-05; the cloud Supabase Staging project `scqrbtfilmttqrutynyo` remains active on Mumbai).
 2. Take secure export of Mumbai Staging (`kebun_melon_staging_schema.sql`, `kebun_melon_staging_data.sql.gpg`).
 3. In Supabase Dashboard: Navigate to `scqrbtfilmttqrutynyo` $\rightarrow$ **Settings** $\rightarrow$ **General** $\rightarrow$ **Pause project** (Frees 1 project slot; active project count = 1).
 4. Create Singapore Staging Project (`ap-southeast-1`): Record `[NEW_STAGING_REF]` and retrieve Session connection string (port 5432).
@@ -374,7 +469,7 @@ Because of the 2-active-project limit, execution proceeds sequentially:
 
 ## 8. Post-Migration Verification Gates
 
-1. **Gate 1 (Schema & Row Parity):** Verify row counts on Singapore match the consistent snapshot manifest (`${Environment}_manifest.tsv`) 100%. Verify both Dev and Staging report 11 migrations, 26 tables with RLS enabled, and 0 orphaned foreign keys.
+1. **Gate 1 (Schema & Row Parity):** Verify row counts on Singapore match the consistent snapshot manifest (`${Environment}_manifest.tsv`) 100%. Verify Singapore target reports 26 tables with RLS enabled, 28 foreign keys with 0 orphaned rows, 13 performance indexes, and reconciled Prisma migration history (0 unresolved failures, all rolled-back attempts resolved, and baseline applied migrations verified).
 2. **Gate 2 (Service Health Probes):** Verify `http://localhost:3000/health` (HTTP 200), `http://localhost:3000/ready` (HTTP 200), `http://localhost:3001/health` (HTTP 200), `http://localhost:3001/ready` (HTTP 200).
 3. **Gate 3 (Auth & RBAC):** Verify user login via `/api/v1/auth/login`, active session recognition, and audit log generation.
 4. **Gate 4 (Telemetry Ingestion):** Verify `POST /api/v1/telemetry/soil` persists to `soil_readings` and MQTT telemetry persists to `reservoir_water_readings`.

@@ -1,19 +1,26 @@
 import { test, expect } from '@playwright/test';
 import { PrismaClient } from '@prisma/client';
 import { hashPassword } from '../packages/database/src/password-service';
+import { validateTestDatabaseUrl } from '../packages/database/src/owner-provisioning';
 
-const dbUrl =
-  process.env.E2E_DATABASE_URL || process.env.TEST_DATABASE_URL || process.env.DATABASE_URL;
+const rawDbUrl = process.env.E2E_DATABASE_URL || process.env.TEST_DATABASE_URL;
+const dbUrl = rawDbUrl ? validateTestDatabaseUrl(rawDbUrl) : undefined;
 
-const prisma = new PrismaClient({
-  datasources: {
-    db: {
-      url: dbUrl,
-    },
-  },
-});
+const prisma = dbUrl
+  ? new PrismaClient({
+      datasources: {
+        db: {
+          url: dbUrl,
+        },
+      },
+    })
+  : (null as unknown as PrismaClient);
 
 test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
+  test.skip(
+    !dbUrl,
+    'Safety check: TEST_DATABASE_URL or E2E_DATABASE_URL environment variable is required for test execution.'
+  );
   const timestamp = Date.now();
   const testAdminEmail = `e2e_admin_${timestamp}@example.com`;
   const testAdminPassword = 'E2eAdminPassword123!';
@@ -41,6 +48,7 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
   }
 
   test.beforeAll(async () => {
+    if (!prisma) return;
     // 0. Clean up previous test admin and owner users and their relations to allow fresh test run
     const existingTestUsers = await prisma.user.findMany({
       where: {
@@ -140,6 +148,7 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
   });
 
   test.afterAll(async () => {
+    if (!prisma) return;
     const userIdsToClean = [adminUserId, ownerUserId].filter(Boolean);
     if (userIdsToClean.length > 0) {
       const fcIds = (

@@ -26,10 +26,13 @@ function run(cmd: string, env: Record<string, string> = {}) {
   });
 }
 
+import { validateTestDatabaseUrl } from '../src/owner-provisioning';
+
 async function main() {
-  const existingUrl = process.env.TEST_DATABASE_URL || process.env.DATABASE_URL;
+  const existingUrl = process.env.TEST_DATABASE_URL;
   if (existingUrl) {
-    console.log('[INIT] Using existing test database URL from environment.');
+    validateTestDatabaseUrl(existingUrl);
+    console.log('[INIT] Using validated test database URL from environment.');
     console.log('[SEED] Running RBAC seed on existing test database...');
     run(`npx tsx prisma/seed.ts`, { DATABASE_URL: existingUrl, TEST_DATABASE_URL: existingUrl });
     run(`npx vitest run --config vitest.integration.config.mts`, {

@@ -482,24 +482,23 @@ The following facts are verified in the traceability matrix regarding `DEC-AUTH-
 
 ---
 
-## Database Migration Preparation & Restore Rehearsal Traceability Note (TASK-0916 / Reconciled 2026-09-08)
+## Database Migration, Singapore Dev Cutover & E2E Isolation Traceability Note (TASK-0916 / Reconciled 2026-09-08)
 
-The following facts are verified in the traceability matrix regarding `TASK-0916` (Database Migration Preparation, Free-Plan Sequential Architecture, and Local Restore Rehearsal Verification):
-- **Traceability Baseline:** Defined under `TASK-0916`, `DEC-INF-075`, `DEC-INF-076`, `DEC-INF-095`, `docs/TESTING.md` §35, and `docs/SUPABASE_MIGRATION_RUNBOOK.md` to eliminate latency bottlenecks via planned Singapore regional colocation, ensure disaster recovery readiness, and validate schema/data fidelity locally without cloud disruption.
-- **Implementation Status:** Fully implemented and verified:
-  - Validated PostgreSQL 17-compatible container tooling (`postgres:17-alpine`) on isolated port `5433` (`kebun-melon-rehearsal-db`).
-  - Generated consistent table manifests (`${Environment}_manifest.tsv`), SHA-256 checksums, and symmetric AES-256 GPG-encrypted archives (`.sql.gpg`).
-  - Executed Dev local rehearsal with exit code 0: verified 26 public tables, 28 foreign keys with 0 orphan rows, 11 Prisma migrations, and 100% snapshot manifest parity.
-  - Executed Staging local rehearsal with exit code 0: verified 26 public tables, 28 foreign keys with 0 orphan rows, 10 Prisma migrations recorded in snapshot, and 100% snapshot manifest parity.
-  - Applied pending Staging migration `20260905040000_add_auth_and_fk_performance_indexes` locally: migration count updated to 11, verified 13 performance indexes, and confirmed 0 application rows altered (reported as row-count evidence, not byte-for-byte data equality).
-  - Verified explicit post-restore security hardening (`02_post_restore_security.sql`): table ownership set to `postgres`, RLS enabled on all 26 tables, and direct table privileges revoked from `anon`, `authenticated`, and `PUBLIC` (`f|f|t|t`).
-  - Verified deterministic deletion of unencrypted dumps (`staging_data.sql`, `dev_data.sql`) via try-finally blocks (`Test-Path: False`).
-- **Architectural & Security Invariance:**
-  - Mumbai Dev and Staging remain the authoritative live databases; Singapore remains the planned destination.
-  - Cloud RLS policies and table grants were NOT altered.
-  - Zero API, UI, I18N, or user-flow behavioral changes.
-  - Free-plan sequential migration remains planned; `TASK-0916` remains `BLOCKED` awaiting operator execution of the five pre-commit CI gates and maintenance window approval.
-<!-- Database Migration Preparation & Rehearsal Traceability Reconciled: 2026-09-08 -->
+The following facts are verified in the traceability matrix regarding `TASK-0916` (Database Migration, Singapore Dev Cutover, and E2E Isolation Hardening):
+- **Traceability Baseline:** Defined under `TASK-0916`, `DEC-INF-075`, `DEC-INF-076`, `DEC-INF-095`, `docs/TESTING.md` §35, and [`docs/SUPABASE_MIGRATION_RUNBOOK.md`](file:///c:/Users/Puroh/Documents/Melon/docs/SUPABASE_MIGRATION_RUNBOOK.md) to eliminate latency bottlenecks via planned Singapore regional colocation, ensure disaster recovery readiness, and validate end-to-end telemetry streaming.
+- **Implementation & Cutover Status:** Fully implemented and verified:
+  - Validated PostgreSQL 17 tooling and isolated restore rehearsals on port 5433 (`kebun-melon-rehearsal-db`).
+  - Restored Singapore Dev (`unbyxlkrzqlafolxcypi`, AWS `ap-southeast-1`) with 100% bit-for-bit row parity across all 25 non-migration tables against immutable cutover manifest [`backups/cutover/dev_20260908_025808/dev_manifest.tsv`](file:///c:/Users/Puroh/Documents/Melon/backups/cutover/dev_20260908_025808/dev_manifest.tsv) (which recorded 11 migration history rows; deployment produced 13), 28 foreign keys with 0 orphan rows, and 0 unresolved failures.
+  - Executed migration deployment wrapper `deploy_singapore_dev_migrations.ps1` applying `20260820000000` and `20260905040000` with bounded lock timeout (`SET lock_timeout = '5s'`). Produced exactly 13 rows in `_prisma_migrations` (11 applied matching local repository SHA-256 checksums bit-for-bit + 2 historical rollbacks). Physically verified all 13 performance indexes (`indisvalid=true`, `indisready=true`).
+  - Rotated `INTERNAL_SERVICE_TOKEN` using 32-byte hex CSPRNG across `.env`, `apps/web/.env`, and `apps/iot-gateway/.env`. Verified machine-to-machine authentication: Gateway `/internal/v1/ready` rejects unauthorized calls (HTTP 401) and validates with rotated token (HTTP 200); Web internal publish webhook (`POST /api/v1/internal/realtime/publish`) verifies Bearer authentication (HTTP 200).
+  - Executed genuine interactive Owner login (`POST /api/v1/auth/login`). Confirmed exactly 1 active session in `public.sessions` (`de8a9c04-5829-44bb-875a-eca4edbf5a88` for `hugo@resend.dev`), single active session invariant (`DEC-AUTH-107`) enforced.
+  - Ingested 3 synthetic soil telemetry writes (`soil_readings` count 0 $\rightarrow$ 3: `902f6f4e`, `681f5441`, and `04bafee1`), atomically updating device `soil-node-jvbkdbv` timestamps.
+  - Realtime SSE delivery verified: EventSource client (`GET /api/v1/realtime/stream`) received `event: telemetry.soil.updated` matching payload `cutover-sse-subscriber-20260908-03` and database record `04bafee1-4ea7-4999-a223-2d497cbeafbc`; stream closed cleanly. `public.faucet_commands` remains strictly 0 (`ENABLE_FAUCET_CONTROL=false`).
+  - Pinned Playwright test runner to dedicated port `3005` (`baseURL: http://localhost:3005`), `reuseExistingServer: false`, and enforced fail-closed `validateTestDatabaseUrl` guards across `playwright.config.ts`, `e2e/critical-flows.spec.ts`, and `packages/database/scripts/run-docker-integration-test.ts`.
+- **Environment Status & Staleness:**
+  - Mumbai Dev (`xjsencdgfcbkzdzqcnqx`) is paused and permanently stale.
+  - Cloud Staging database (`scqrbtfilmttqrutynyo`) remains active on Mumbai and containerized staging services remain exited; Staging cutover, container redeployment, soak period, and retirement remain pending maintenance window. `TASK-0916` status remains `IN_PROGRESS`.
+<!-- TASK-0916 Dev Cutover Traceability Reconciled: 2026-09-08 -->
 
 
 

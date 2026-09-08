@@ -1,8 +1,14 @@
 import { defineConfig, devices } from '@playwright/test';
 import dotenv from 'dotenv';
 import path from 'path';
+import { ensureTestDatabase } from './e2e/test-environment';
 
 dotenv.config({ path: path.resolve(__dirname, '.env') });
+
+const testPort = process.env.PLAYWRIGHT_TEST_PORT || '3005';
+const baseURL = process.env.PLAYWRIGHT_TEST_BASE_URL || `http://localhost:${testPort}`;
+
+const validatedDbUrl = ensureTestDatabase();
 
 export default defineConfig({
   testDir: './e2e',
@@ -12,8 +18,9 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   reporter: 'list',
+  globalTeardown: require.resolve('./e2e/global-teardown'),
   use: {
-    baseURL: process.env.PLAYWRIGHT_TEST_BASE_URL || 'http://localhost:3000',
+    baseURL,
     headless: true,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
@@ -29,15 +36,14 @@ export default defineConfig({
   ],
   webServer: {
     command: 'npm run dev',
-    url: 'http://127.0.0.1:3000',
-    reuseExistingServer: true,
+    url: `http://127.0.0.1:${testPort}`,
+    reuseExistingServer: false,
     timeout: 120000,
     env: {
       ...process.env,
+      PORT: testPort,
       ENABLE_FAUCET_CONTROL: 'true',
-      ...(process.env.E2E_DATABASE_URL || process.env.TEST_DATABASE_URL
-        ? { DATABASE_URL: process.env.E2E_DATABASE_URL || process.env.TEST_DATABASE_URL }
-        : {}),
+      ...(validatedDbUrl ? { DATABASE_URL: validatedDbUrl } : {}),
     },
   },
 });

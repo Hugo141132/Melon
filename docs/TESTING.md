@@ -2703,16 +2703,46 @@ The database migration preparation and local restore rehearsals were conducted s
 
 ---
 
-## 35.4 Rehearsal vs Cloud Invariance
+## 35.4 Rehearsal vs Cloud Invariance (Baseline Historical Record)
 
-1. **Live Cloud Unchanged:** Mumbai Dev (`xjsencdgfcbkzdzqcnqx`) and Staging (`scqrbtfilmttqrutynyo`) remain the live authoritative databases. No remote database mutations, project pause/delete actions, or network cutover occurred.
-2. **Cloud RLS & Grants Unchanged:** Proposed security hardening was evaluated exclusively inside the isolated local container. Cloud RLS and table privileges on Mumbai databases remain unaltered.
-3. **Application & Service Stability:** Live staging containers (`kebun-melon-staging-web`, `kebun-melon-staging-gateway`) remained up and healthy throughout all rehearsal phases. Zero staging redeployment was required.
-4. **Remaining Cutover Prerequisites:**
-   - Operator execution of the 5 pre-commit CI gates.
-   - Operator approval and scheduling of the planned downtime maintenance window.
-   - Provisioning of target Singapore projects (`ap-southeast-1`) via sequential pausing on the Free plan.
-   - Final pre-cutover write freeze, command drain, fresh encrypted backups, and verification gates.
+1. **Rehearsal Invariance:** Initial restore rehearsals were conducted strictly against local isolated containers on port 5433 with zero remote mutations.
+2. **Post-Rehearsal Execution:** Rehearsal procedures validated the deployment scripts (`deploy_singapore_dev_migrations.ps1`) and preflight validations executed during the subsequent Singapore Dev cutover.
+
+---
+
+## 35.5 TASK-0916 Singapore Dev Cutover & Verification Results (2026-09-08)
+
+The following verification gates were executed and passed for Singapore Dev (`unbyxlkrzqlafolxcypi`, AWS `ap-southeast-1`):
+
+### Gate 1: Baseline Restoration & Pre-Write Parity
+- **Target Restoration:** Restored via containerized PostgreSQL 17 client with fail-closed preflight check ensuring clean target state.
+- **Application Table Parity:** Confirmed 100% bit-for-bit row count parity across all 25 non-migration application tables against the immutable cutover manifest [`backups/cutover/dev_20260908_025808/dev_manifest.tsv`](file:///c:/Users/Puroh/Documents/Melon/backups/cutover/dev_20260908_025808/dev_manifest.tsv) (which recorded 11 migration history rows; deployment produced 13).
+- **Referential Integrity:** 28 foreign key constraints verified with exactly 0 orphaned referential rows.
+- **Migration History Reconciliation:** Executed `deploy_singapore_dev_migrations.ps1` with bounded lock timeout (`SET lock_timeout = '5s'`), applying `20260820000000` and `20260905040000`. Produced exactly 13 rows in `_prisma_migrations` (11 applied matching local repository SHA-256 checksums bit-for-bit + 2 historical rollbacks, 0 unresolved failures).
+- **Performance Index Verification:** Physically verified all 13 performance indexes (`sessions_user_active_idx`, `sessions_user_id_idx`, `user_roles_user_id_idx`, `user_roles_user_id_revoked_at_idx`, `user_roles_role_id_idx`, `role_permissions_permission_id_idx`, `account_approvals_decided_by_user_id_idx`, `user_device_access_device_id_idx`, `user_device_access_assigned_by_user_id_idx`, `user_preferences_default_device_id_idx`, `alert_acknowledgements_user_id_idx`, `alert_acknowledgements_alert_id_idx`, `alerts_device_id_idx`) for `indisvalid=true` and `indisready=true`.
+
+### Gate 2: Service Probes & Internal Token Rotation
+- **Token Rotation:** Rotated `INTERNAL_SERVICE_TOKEN` using 32-byte hex CSPRNG across `.env`, `apps/web/.env`, and `apps/iot-gateway/.env`.
+- **Gateway Validation:** Gateway `/internal/v1/ready` confirmed rejecting missing/stale tokens (HTTP 401) and accepting new rotated token (HTTP 200).
+- **Web Validation:** Web `/ready` returns HTTP 200 with gateway and database dependencies reported as `up`.
+
+### Gate 3: Genuine Owner Authentication
+- **Login Verification:** Genuine interactive Owner login verified (`POST /api/v1/auth/login`).
+- **Catalog Session Verification:** Exactly 1 active session confirmed in PostgreSQL catalog (`public.sessions`: `de8a9c04-5829-44bb-875a-eca4edbf5a88` for `hugo@resend.dev`), single active session invariant (`DEC-AUTH-107`) enforced.
+
+### Gate 4: Telemetry Ingestion & Subscriber SSE Delivery
+- **REST Telemetry Ingestion:** Persisted 3 synthetic soil telemetry readings via `POST /api/v1/devices/soil-node-jvbkdbv/telemetry/soil` (`soil_readings` count 0 $\rightarrow$ 3: `902f6f4e`, `681f5441`, and `04bafee1`), atomically refreshing device `last_seen_at` and `last_message_at` timestamps.
+- **Subscriber SSE Delivery:** EventSource client (`GET /api/v1/realtime/stream`) verified receiving `event: telemetry.soil.updated` matching payload `cutover-sse-subscriber-20260908-03` and database record `04bafee1-4ea7-4999-a223-2d497cbeafbc`; stream closed cleanly.
+- **Actuator Invariance:** `public.faucet_commands` remains strictly 0 (`ENABLE_FAUCET_CONTROL=false`).
+
+### Gate 5: Complete E2E Test Isolation Hardening
+- **Port Isolation:** Playwright test port pinned to `3005` (`baseURL: http://localhost:3005`), completely separated from Dev server on port `3000`.
+- **Server Reuse Disabled:** `reuseExistingServer: false` enforced.
+- **Fail-Closed DB Guards:** `validateTestDatabaseUrl` enforced across `playwright.config.ts`, `e2e/critical-flows.spec.ts`, and `packages/database/scripts/run-docker-integration-test.ts`, rejecting missing or non-test database URLs.
+
+### Environment Status
+- **Mumbai Dev:** Paused and permanently stale.
+- **Staging:** Cloud Staging database (`scqrbtfilmttqrutynyo`) remains active on Mumbai and containerized staging services remain exited; Staging cutover, container redeployment, soak period, and retirement remain pending maintenance window. `TASK-0916` status remains `IN_PROGRESS`. Full execution details in [`docs/SUPABASE_MIGRATION_RUNBOOK.md`](file:///c:/Users/Puroh/Documents/Melon/docs/SUPABASE_MIGRATION_RUNBOOK.md).
 <!-- TASK-0916 Testing Evidence Reconciled: 2026-09-08 -->
 
 
