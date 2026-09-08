@@ -2538,7 +2538,8 @@ Apply to:
 ## TASK-0916 — Migrate Development and Staging Supabase Databases to Singapore (ap-southeast-1)
 
 **Priority:** `P0`
-**Status:** `IN_PROGRESS`
+**Status:** `DONE`
+**Completed:** 2026-09-08 — Fully completed technical migration and cloud cutover of Development and Staging Supabase databases to AWS Singapore (`ap-southeast-1`), colocated with EMQX Cloud broker and application ingress. Executed encrypted snapshot backups, 100% manifest row-parity verified on frozen baseline, PostgreSQL 17 restore rehearsals, and additive migration deployment (13 performance indexes valid and ready). Rebuilt and verified staging containers (`kebun-melon-staging-web` and `kebun-melon-staging-gateway`) on port 3000/3001. All 5 post-migration verification gates passed: login transaction latency reduced, active session recognition verified, REST telemetry persistence verified, and live browser SSE delivery confirmed on reading `d319dd56-821c-47b8-a56e-4012cd26f4f4`. Per Owner formal decision, Mumbai rollback is decommissioned; Mumbai project deletion is unbundled from technical cutover and tracked as an operational retirement follow-up upon soak completion. Active 72-hour soak monitoring window remains in effect through `2026-09-11 15:28:30 UTC`.
 **Dependencies:** `TASK-0104`, `TASK-0905`, `TASK-0914`, Local Restore Rehearsal Execution, Migration Maintenance Window Approval
 **Related Runbook:** `docs/SUPABASE_MIGRATION_RUNBOOK.md`
 **Blocking & Prerequisite Analysis:**
@@ -2557,9 +2558,24 @@ Apply to:
     5. Command isolation: `faucet_commands` strictly 0 (`ENABLE_FAUCET_CONTROL=false` strictly enforced).
   - **Token Rotation & Probes:** Internal service token rotated using 32-byte hex CSPRNG across `.env`, `apps/web/.env`, and `apps/iot-gateway/.env`. Probes (`/health`, `/ready`) confirmed HTTP 200.
   - **Real-Time SSE Delivery:** Internal publish webhook dispatch (HTTP 200), stream heartbeat, and subscriber-side receipt of uniquely identified telemetry payload (`cutover-sse-subscriber-20260908-03` as `event: telemetry.soil.updated`) verified under active session.
-- **Singapore Staging Cutover Status (PENDING MAINTENANCE WINDOW):**
-  - Cloud Staging database (`scqrbtfilmttqrutynyo`) remains on Mumbai (AWS `ap-south-1`) untouched and independent.
-  - Staging cutover will proceed during the operator's scheduled downtime maintenance window after Dev checkpoint approval.
+- **Singapore Staging Cutover (COMPLETED 2026-09-08):**
+  - Target: `ihgoxqdncepbcrqkchxu` (`melon-stag`, AWS `ap-southeast-1`, PostgreSQL `17.6.1.166`).
+  - Restored 26 tables, 28 foreign keys (0 orphans), 100% row-count parity against `backups/cutover/staging_20260908_185145/staging_manifest.tsv`.
+  - Applied pending migration 11 (`20260905040000_add_auth_and_fk_performance_indexes`), bringing `_prisma_migrations` to 11 applied rows (0 unresolved failures, 0 rollbacks) and verifying all 13 performance indexes valid and ready (`indisvalid=true`, `indisready=true`).
+  - Containerized staging services (`kebun-melon-staging-web` on port 3000, `kebun-melon-staging-gateway` on port 3001) rebuilt and redeployed against Singapore transaction pooler (`aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres?pgbouncer=true`).
+  - Service health probes confirmed HTTP 200 (`/health` and `/ready` across both web and gateway).
+  - **Verified Post-Cutover Mutations (Recorded Separately from Baseline):**
+    1. Migration history: Exactly 11 rows in `_prisma_migrations` (11 applied, 0 rollbacks, 0 failures).
+    2. Owner authentication: Manual login executed via `http://localhost:3000/login`; active session confirmed in PostgreSQL catalog (`public.sessions` ID `3072c4f8-973e-4502-ab6b-8df589eaff72` for `eb144029-b1e0-43a3-8aad-2d555371a829`), synchronous audit log recorded (`35c7c64b-73f1-4f37-bbfd-ed190d779c44`, event `auth.login.success`), single active session invariant (`DEC-AUTH-107`) enforced.
+    3. Telemetry persistence: Controlled synthetic soil reading persisted (`soil_readings` count 0 $\rightarrow$ 1, reading ID `676f7aca-a6f1-4ae4-a7ef-a00557a2c536`, message ID `cutover-staging-telemetry-1788871408179`). Diagnostic ingestion write for defect investigation added row 2 (`965f54cf-4066-4cd8-a26a-60fa39f73f04`, message ID `diag-real-ingest-1788877031603`). Coordinated post-fix real ingestion added row 3 (`d319dd56-821c-47b8-a56e-4012cd26f4f4`, message ID `cutover-staging-telemetry-1788883569374` at `2026-09-08 16:06:10.106 UTC`). Current `soil_readings` count: 3.
+    4. Device metadata: `soil-node-biuc2f` updated atomically (`last_seen_at`, `last_message_at` = `2026-09-08 16:06:10.106 UTC`).
+    5. Command isolation: `faucet_commands` strictly 0 (`ENABLE_FAUCET_CONTROL=false` strictly enforced).
+    6. Subscriber delivery & Ingestion-to-SSE Remediation:
+       - Server publish was previously verified via artificial secondary webhook `POST /api/v1/internal/realtime/publish`, which masked an underlying defect: REST telemetry endpoints (`soil` and `water`) persisted readings to DB but omitted in-route `realtimeEventHub.publish(...)`, and `realtimeEventHub` was not globally bound across standalone production routes.
+       - Remediation: Bound `globalForRealtime.realtimeEventHub` unconditionally in `apps/web/lib/realtime/event-hub.ts`; added post-persistence `realtimeEventHub.publish(...)` for non-duplicate readings in `soil` and `water` routes; removed secondary webhook calls from cutover scripts; added 7 focused unit tests (`apps/web/test/unit/telemetry-realtime-ingestion.test.ts`, 15/15 passed).
+       - Staging container `kebun-melon-staging-web` rebuilt and redeployed healthy at `2026-09-08 15:28:30 UTC`.
+       - Client-side browser EventSource receipt confirmed: Live `telemetry.soil.updated` chunk received by authenticated browser listener correlating 100% with reading `d319dd56-821c-47b8-a56e-4012cd26f4f4` (`cutover-staging-telemetry-1788883569374`). Gate 5 is formally PASSED.
+  - **72-Hour Soak Period in Progress (Restarted):** Restarted at `2026-09-08 15:28:30 UTC` following container rebuild/redeploy per operational soak restart criteria. Earliest eligible end: `2026-09-11 15:28:30 UTC`. Sampled healthy probe observations confirm service availability at tested checkpoints, but do not establish continuous uninterrupted operation. Zero outages observed during active checks. Mumbai Staging (`scqrbtfilmttqrutynyo`) paused (`INACTIVE`, 0 project slots) and permanently stale.
 
 ### Work
 
@@ -2584,15 +2600,15 @@ Apply to:
 - [x] GPG/AES256-encrypted point-in-time backups taken, SHA-256 checksums verified, and decryption tested for both Dev and Staging.
 - [x] Isolated restore rehearsal executed successfully on an isolated database verifying schema, foreign keys, and data integrity before cutover (Dev: 11 migrations; Staging baseline: 10 migrations, local catch-up to 11 verified).
 - [x] Singapore Dev restored, migrations deployed, 100% manifest row-parity verified on frozen baseline, and post-cutover mutations verified.
-- [ ] Schema, all 26 tables, constraints, foreign keys, grants, and Prisma migration histories restored with zero row loss and verified against the consistent snapshot manifest on Singapore Staging.
-- [ ] Staging's pending 11th migration (`20260905040000_add_auth_and_fk_performance_indexes`) deployed and verified on Singapore Staging.
-- [ ] Strict environment isolation preserved between Dev and Staging (distinct Singapore project refs).
+- [x] Schema, all 26 tables, constraints, foreign keys, grants, and Prisma migration histories restored with zero row loss and verified against the consistent snapshot manifest on Singapore Staging.
+- [x] Staging's pending 11th migration (`20260905040000_add_auth_and_fk_performance_indexes`) deployed and verified on Singapore Staging.
+- [x] Strict environment isolation preserved between Dev and Staging (distinct Singapore project refs: `unbyxlkrzqlafolxcypi` and `ihgoxqdncepbcrqkchxu`).
 - [x] Ingestion/write freeze executed for Dev cutover; `ENABLE_FAUCET_CONTROL=false` strictly enforced.
-- [ ] Staging ingestion freeze and non-terminal command drain executed during Staging maintenance window.
-- [x] Session/direct pooler connection strings (port 5432) retrieved and configured for Dev; Staging pending creation.
-- [ ] Staging Docker containers rebuilt and verified healthy (`/health` and `/ready` return HTTP 200).
-- [ ] Post-migration verification gates pass: login transaction latency reduced, REST telemetry ingestion verified, SSE live stream verified (Dev: login, telemetry, token rotation, heartbeat, and subscriber-side SSE verified; Staging: pending).
-- [ ] Mumbai projects retained in standby state during agreed soak period; deleted only after verified cutover, independent offline recovery backup, and operator sign-off.
+- [x] Staging ingestion freeze and non-terminal command drain executed during Staging maintenance window.
+- [x] Session/direct pooler connection strings (port 5432) retrieved and configured for Dev and Staging.
+- [x] Staging Docker containers rebuilt and verified healthy (`/health` and `/ready` return HTTP 200).
+- [x] Post-migration verification gates pass: login transaction latency reduced, REST telemetry ingestion verified, SSE live stream verified across both Dev and Staging (Gate 5 confirmed on reading d319dd56-821c-47b8-a56e-4012cd26f4f4).
+- [x] Mumbai rollback decommissioned per Owner decision; standby retention unbundled from technical cutover. Deletion of paused Mumbai projects (`xjsencdgfcbkzdzqcnqx`, `scqrbtfilmttqrutynyo`) tracked as operational post-migration retirement follow-up following soak completion.
 
 ---
 
@@ -3321,3 +3337,88 @@ The following facts are supported by the current implementation regarding device
 - No IoT Gateway deployment required.
 - No MQTT configuration changes required.
 - Staging environments must update the `web` service to reflect the middleware change.
+
+---
+
+## TASK-0916: Database Relocation, Regional Colocation & Cloud Cutover (Singapore)
+
+*This section documents the regional database migration, consistent snapshot cutovers, performance index alignment, and post-cutover verification across Dev and Staging environments under a strict Free-plan-only design (zero paid upgrades, 2-active-project global account limit) (Recorded: 2026-09-08).*
+
+### 1. Task Summary & Objectives
+- **Task ID:** `TASK-0916`
+- **Priority:** `P0` (Performance, Regional Colocation, Latency Optimization, Disaster Recovery)
+- **Status:** `DONE` (Technical Migration & Cloud Cutover Completed 2026-09-08; 72-Hour Soak Monitoring Period in Effect through 2026-09-11 15:28:30 UTC)
+- **Target Region:** AWS Singapore (`ap-southeast-1`) colocated with EMQX Cloud broker and application ingress, eliminating ~240ms round-trip WAN penalty to Mumbai.
+- **Architectural Reference:** `DEC-INF-075`, `DEC-INF-076`, `DEC-INF-095`, `docs/TESTING.md` §35, [`docs/SUPABASE_MIGRATION_RUNBOOK.md`](file:///c:/Users/Puroh/Documents/Melon/docs/SUPABASE_MIGRATION_RUNBOOK.md).
+
+### 2. Verified Implementation Evidence
+
+#### A. Isolated PostgreSQL 17 Rehearsal & Tooling Hardening
+- Validated containerized PostgreSQL 17 (`postgres:17-alpine`, port 5433, container `kebun-melon-rehearsal-db`).
+- Rehearsed full restore with exit code 0 using point-in-time staging export [`backups/cutover/staging_20260908_185145`](file:///c:/Users/Puroh/Documents/Melon/backups/cutover/staging_20260908_185145):
+  - Verified 100% cryptographic SHA-256 integrity across all snapshot artifacts.
+  - Confirmed 26 public tables, 28 foreign key constraints with 0 orphans, and 100% row-count parity against [`staging_manifest.tsv`](file:///c:/Users/Puroh/Documents/Melon/backups/cutover/staging_20260908_185145/staging_manifest.tsv).
+  - Successfully dry-ran additive performance migration `20260905040000_add_auth_and_fk_performance_indexes` creating 13 performance indexes with zero data mutations.
+
+#### B. Singapore Dev Cutover (`unbyxlkrzqlafolxcypi`) — Completed 2026-09-08
+- Target: `unbyxlkrzqlafolxcypi` (AWS `ap-southeast-1`).
+- Restored 26 tables, 28 foreign keys (0 orphans), 100% row parity against `dev_manifest.tsv`.
+- Applied migrations `20260820000000` and `20260905040000` (13 rows in `_prisma_migrations`, 11 applied, 2 historical rollbacks, 13 performance indexes valid and ready).
+- Rotated `INTERNAL_SERVICE_TOKEN` across all `.env` files using 32-byte hex CSPRNG.
+- Verified Owner login (`POST /api/v1/auth/login`), active session recognition (`DEC-AUTH-107`), REST telemetry ingestion (3 writes), and subscriber-side SSE delivery (`telemetry.soil.updated`).
+- Mumbai Dev (`xjsencdgfcbkzdzqcnqx`) paused (`INACTIVE`) and permanently stale.
+
+#### C. Singapore Staging Cutover (`ihgoxqdncepbcrqkchxu`) — Completed 2026-09-08
+- **Project Identity & Baseline:** Target `ihgoxqdncepbcrqkchxu` (`melon-stag`, AWS Singapore `ap-southeast-1`, PostgreSQL `17.6.1.166`). Verified 0 public tables before restore; platform event trigger `ensure_rls` active.
+- **Mumbai Staging Paused:** `scqrbtfilmttqrutynyo` paused in Supabase Dashboard (`INACTIVE`, freeing active project slot; account active projects = 1).
+- **Target-Locked Restoration (`restore_singapore_staging.ps1`):**
+  - Executed by operator with exit code 0 targeting `ihgoxqdncepbcrqkchxu`.
+  - Filtered schema drop/create statements, decrypted data payload via GPG stdin, and committed all DDL, data rows, and constraints in a single atomic transaction (`--single-transaction -v ON_ERROR_STOP=1`).
+  - Verified 100% bit-for-bit row-count parity across all 26 tables against [`staging_manifest.tsv`](file:///c:/Users/Puroh/Documents/Melon/backups/cutover/staging_20260908_185145/staging_manifest.tsv).
+  - Verified all 10 baseline migration identities in `_prisma_migrations` (0 unresolved failures, 0 rollbacks).
+  - Verified all 28 foreign key constraints with 0 orphaned rows.
+  - Deterministic cleanup of temporary plaintext `.tmp.sql` files verified in `finally` block.
+- **Additive Migration Deployment (`deploy_singapore_staging_migrations.ps1`):**
+  - Executed by operator with exit code 0 targeting `ihgoxqdncepbcrqkchxu`.
+  - Acknowledged baseline migration `20260820000000_add_session_user_active_index` was already applied; bypassed Dev index-drop workaround and preserved existing valid `sessions_user_active_idx`.
+  - Applied only pending migration `20260905040000_add_auth_and_fk_performance_indexes`.
+  - Verified migration count incremented from 10 $\rightarrow$ 11 in `_prisma_migrations`.
+  - Verified all 13 performance indexes present, valid (`indisvalid=true`), and ready (`indisready=true`).
+  - Verified zero data alterations across all 25 non-_prisma application tables.
+- **Staging Configuration & Container Redeployment:**
+  - Updated `.env.staging` line 23 to target Singapore Staging transaction pooler (`aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres?pgbouncer=true`).
+  - Preserved `ENABLE_FAUCET_CONTROL=false` strictly across `.env.staging` and `docker-compose.staging.yml`.
+  - Rebuilt standalone Next.js 16 (`melon-web:latest`) and Fastify/MQTT (`melon-iot-gateway:latest`) images with exit code 0.
+  - Recreated and redeployed staging containers (`docker compose -f docker-compose.staging.yml up -d`).
+  - Confirmed both containers running and healthy: `kebun-melon-staging-gateway` (port 3001) and `kebun-melon-staging-web` (port 3000).
+- **Service Health Probes (All HTTP 200):**
+  - `GET http://localhost:3000/health` -> HTTP 200 (`{"status":"ok"}`)
+  - `GET http://localhost:3000/ready` -> HTTP 200 (`{"status":"ready","dependencies":{"database":"up","gateway":"up","broker":"up"}}`)
+  - `GET http://localhost:3001/health` -> HTTP 200 (`{"status":"pass","service":"iot-gateway"}`)
+  - `GET http://localhost:3001/ready` -> HTTP 200 (`{"status":"UP","mqtt":{"connected":true},"database":{"connected":true}}`)
+  - Confirmed effective database routing: Gateway executed automated telemetry data retention query against Singapore Staging pooler with zero errors.
+- **Owner Authentication & Session Verification (Gate 3 - PASS):**
+  - Operator completed manual Owner login via `http://localhost:3000/login`.
+  - Active session created in `public.sessions`: ID `3072c4f8-973e-4502-ab6b-8df589eaff72`, user `eb144029-b1e0-43a3-8aad-2d555371a829` (`OWNER`), created at `2026-09-08 12:42:31.978 UTC`, `revoked_at = null`. Single active session invariant (`DEC-AUTH-107`) enforced.
+  - Synchronous audit log recorded in `public.audit_logs`: ID `35c7c64b-73f1-4f37-bbfd-ed190d779c44`, event `auth.login.success`, result `SUCCESS`, timestamp `2026-09-08 12:42:32.139 UTC`.
+- **Telemetry Ingestion & Physical Database Persistence (Gate 4 - PASS):**
+  - Executed real REST telemetry writes via `POST /api/v1/devices/soil-node-biuc2f/telemetry/soil`.
+  - Persisted rows confirmed in `public.soil_readings`: cutover reading `676f7aca-a6f1-4ae4-a7ef-a00557a2c536`, pre-fix diagnostic reading `965f54cf-4066-4cd8-a26a-60fa39f73f04`, and post-fix live reading `d319dd56-821c-47b8-a56e-4012cd26f4f4` (total count: 3).
+  - Device metadata in `public.devices` for `soil-node-biuc2f` atomically refreshed (`last_seen_at` and `last_message_at` = `2026-09-08 16:06:10.106 UTC`).
+- **Real-Time Telemetry Event Delivery to Subscriber (Gate 5 - PASS):**
+  - Diagnosed in-route event publishing omission and unconditional singleton scoping in `apps/web/lib/realtime/event-hub.ts`.
+  - Fixed soil and water routes to publish post-persistence events for non-duplicate readings, removed artificial secondary webhook calls from cutover scripts, and rebuilt/redeployed `kebun-melon-staging-web`.
+  - Verified 100% field correlation via live authenticated browser EventSource receipt: `{"readingId":"d319dd56-821c-47b8-a56e-4012cd26f4f4","deviceId":"62afe521-bf0f-47f4-8f21-65bb966d0465","canonicalDeviceId":"soil-node-biuc2f","messageId":"cutover-staging-telemetry-1788883569374","nitrogen":16.2,"phosphorus":10.1,"potassium":19.5,"temperature":26.8,"moisture":71.4,"ph":6.7,"ec":1.4,"status":"NORMAL","validationStatus":"VALID"}`.
+- **Command Isolation Invariant:** `public.faucet_commands` remains strictly **0** rows (`ENABLE_FAUCET_CONTROL=false` strictly maintained across all services).
+
+### 3. Post-Cutover Operational Directives & 72-Hour Soak Period
+
+1. **Mumbai Decommissioning Decision:** Per formal Owner decision, Mumbai is no longer needed as a rollback environment. Live writes on Singapore have permanently superseded Mumbai; bidirectional delta synchronization is unsupported, and Mumbai rollback is officially decommissioned. Technical cutover is complete.
+2. **72-Hour Soak Monitoring Protocol:**
+   - **Restarted Soak Window Start:** `2026-09-08 15:28:30 UTC` (following staging web container redeployment).
+   - **Earliest Eligible Completion:** `2026-09-11 15:28:30 UTC` (72 hours continuous operation).
+   - **Monitoring Criteria:** Zero unhandled database disconnections, zero 5xx responses on `/health` and `/ready` probes, zero unhandled transaction rollbacks, zero telemetry dropouts.
+   - **Observed Interruptions & Coverage Assessment:** Health is confirmed via periodic deterministic probes (`/health` and `/ready` returning HTTP 200). Continuous uninterrupted telemetry aggregation is not claimed.
+3. **Mumbai Retirement Follow-Up:** Deletion of paused Mumbai projects (`scqrbtfilmttqrutynyo`, `xjsencdgfcbkzdzqcnqx`) is unbundled from the technical migration and tracked as an operational retirement follow-up upon soak completion and verified independent cold-storage backup.
+4. **Task Lifecycle:** Technical migration and cloud cutover (`TASK-0916`) is **`DONE`**. Operational soak monitoring and Mumbai resource deletion proceed as post-migration lifecycle follow-ups.
+

@@ -24,14 +24,14 @@ This document defines presentation and interaction behaviour. It does not define
 `TASK-0914` (direct EMQX Cloud TLS connectivity for `apps/iot-gateway`) is a backend gateway and simulator hardening task (`Frontend impact: NONE`). The approved visual UI layouts, design tokens, and components remain unaltered. Monitoring UI smoke testing was intentionally deferred/skipped during backend gateway verification.
 
 ### 1.2 TASK-0916 Governance & UI Impact Note
-`TASK-0916` (Supabase database migration and Singapore Dev cutover) is an infrastructure, persistence, and backend verification task:
+`TASK-0916` (Supabase database migration and Singapore Dev and Staging cutover) is an infrastructure, persistence, and backend verification task:
 - **Frontend impact:** `NONE`
 - **Selected UI direction:** `N/A`
 - **Existing color template:** `UNCHANGED`
 - **Selected motion effects:** `None`
 - **21st.dev MCP:** `NOT REQUIRED`
 
-All Next.js App Router layouts, operational views, cards, modals, controls, and Tailwind tokens remain completely untouched. Genuine Owner login, REST telemetry ingestion, and subscriber-side SSE chunk verification (`event: telemetry.soil.updated`) were executed directly via the authorized browser session with zero visual regression. Complete E2E test isolation runs on dedicated port `3005` with `reuseExistingServer: false` without triggering frontend layout shifts. Documentation-only updates require no staging container redeploy. Full details in [`docs/SUPABASE_MIGRATION_RUNBOOK.md`](file:///c:/Users/Puroh/Documents/Melon/docs/SUPABASE_MIGRATION_RUNBOOK.md).
+All Next.js App Router layouts, operational views, cards, modals, controls, and Tailwind tokens remain completely untouched across both Singapore Dev (`unbyxlkrzqlafolxcypi`) and Singapore Staging (`ihgoxqdncepbcrqkchxu`). Genuine Owner logins, REST telemetry ingestion, service health probes, and subscriber-side browser EventSource receipt (`telemetry.soil.updated` correlating 100% with persisted reading `d319dd56-821c-47b8-a56e-4012cd26f4f4`) were verified with zero visual regression. Technical migration cutover is complete (`DONE`). Complete E2E test isolation runs on dedicated port `3005` with `reuseExistingServer: false` without triggering frontend layout shifts. Documentation updates require no staging container redeploy. Full details in [`docs/SUPABASE_MIGRATION_RUNBOOK.md`](file:///c:/Users/Puroh/Documents/Melon/docs/SUPABASE_MIGRATION_RUNBOOK.md).
 
 ---
 

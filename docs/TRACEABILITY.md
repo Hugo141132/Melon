@@ -497,8 +497,11 @@ The following facts are verified in the traceability matrix regarding `TASK-0916
   - Pinned Playwright test runner to dedicated port `3005` (`baseURL: http://localhost:3005`), `reuseExistingServer: false`, and enforced fail-closed `validateTestDatabaseUrl` guards across `playwright.config.ts`, `e2e/critical-flows.spec.ts`, and `packages/database/scripts/run-docker-integration-test.ts`.
 - **Environment Status & Staleness:**
   - Mumbai Dev (`xjsencdgfcbkzdzqcnqx`) is paused and permanently stale.
-  - Cloud Staging database (`scqrbtfilmttqrutynyo`) remains active on Mumbai and containerized staging services remain exited; Staging cutover, container redeployment, soak period, and retirement remain pending maintenance window. `TASK-0916` status remains `IN_PROGRESS`.
-<!-- TASK-0916 Dev Cutover Traceability Reconciled: 2026-09-08 -->
+  - Mumbai Staging (`scqrbtfilmttqrutynyo`) is paused (`INACTIVE`) and permanently stale after resumed writes landed in Singapore Staging (`ihgoxqdncepbcrqkchxu`).
+  - Singapore Staging (`ihgoxqdncepbcrqkchxu`, AWS `ap-southeast-1`) cutover completed: restored 26 tables with 100% manifest parity, deployed migration 11 (`20260905040000_add_auth_and_fk_performance_indexes`), verified 13 performance indexes valid/ready, redeployed containerized staging (`kebun-melon-staging-web` and `kebun-melon-staging-gateway`), verified all health probes (HTTP 200), verified manual Owner login (`auth.login.success` audit log + active session `3072c4f8-973e-4502-ab6b-8df589eaff72`), verified telemetry write to `soil_readings` (`676f7aca`, `965f54cf`, `d319dd56`), and verified live browser EventSource delivery correlating with persisted reading `d319dd56-821c-47b8-a56e-4012cd26f4f4` (Gate 5 PASS).
+  - Per Owner decision, Mumbai rollback is decommissioned and unbundled from cutover criteria. Technical cutover (`TASK-0916`) is **`DONE`**.
+  - Restarted 72-hour soak monitoring window active from `2026-09-08 15:28:30 UTC` through `2026-09-11 15:28:30 UTC` (sample probe health validated; continuous monitoring gap disclosed). Deletion of paused Mumbai projects tracked as post-migration retirement follow-up upon soak completion.
+<!-- TASK-0916 Staging Cutover Traceability Reconciled: 2026-09-08 -->
 
 
 

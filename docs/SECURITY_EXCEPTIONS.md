@@ -98,6 +98,7 @@ All exceptions must be recorded in `scripts/security-exceptions.json` using the 
 - **TASK-0217 / Login Performance Optimization Audit (2026-09-05):** Confirmed zero secret exceptions and zero dependency exceptions introduced; login performance optimization and same-client recovery preserve single active session security (`DEC-AUTH-107`), maintain strictly synchronous audit log creation inside the interactive database transaction, and introduce zero secrets with zero security exceptions.
 - **TASK-0916 / Database Migration Preparation & Rehearsal Audit (2026-09-08):** Confirmed zero secret exceptions and zero dependency exceptions introduced; migration export and rehearsal scripts utilize interactive secure strings for passphrases/passwords, enforce symmetric AES-256 GPG encryption for data archives with SHA-256 checksums, guarantee deterministic temporary plaintext deletion via try-finally blocks on all paths, and enforce strict fail-closed guards preventing connections to cloud endpoints during rehearsal with zero security exceptions.
 - **TASK-0916 / Singapore Dev Cutover & E2E Isolation Audit (2026-09-08):** Confirmed zero secret exceptions and zero dependency exceptions introduced; internal service token rotation executed using 32-byte hex CSPRNG without credential printing; automated secret scanning passed (`npx tsx scripts/scan-secrets.ts`); dependency vulnerability scan passed (`npm run scan:deps`); fail-closed test database guards enforced in `playwright.config.ts`, `e2e/critical-flows.spec.ts`, and `packages/database/scripts/run-docker-integration-test.ts` preventing test runs against Singapore Dev; real `.env` files, `apps/*/.env`, `packages/*/.env`, and `backups/` verified 100% ignored in git with zero security exceptions.
+- **TASK-0916 / Singapore Staging Cutover & Baseline Fidelity Audit (2026-09-08):** Confirmed zero secret exceptions and zero dependency exceptions introduced; immutable staging baseline manifest verified (SHA-256 `BC03C209639942BEA678B1353D382C4E354C7A800082187E60807ADD8E43A9FB`); staging database connection string and credentials scoped exclusively via environment variables; automated secret scan passed (`npx tsx scripts/scan-secrets.ts`); container redeployment verified healthy without token leakage; `ENABLE_FAUCET_CONTROL=false` strictly preserved (`faucet_commands` = 0); zero security exceptions registered in `scripts/security-exceptions.json`.
 
 ---
 
@@ -286,5 +287,15 @@ The verified implementation of `TASK-0916` (Database Migration Preparation, Cons
 - **Explicit Database Role Hardening:** Rehearsal scripts enforced explicit database role boundaries (`02_post_restore_security.sql`), revoking direct privileges on public tables from `anon`, `authenticated`, and `PUBLIC` (`f|f|t|t`). Live cloud database permissions and RLS policies on Mumbai remain untouched.
 <!-- Database Migration Preparation & Rehearsal Security Exceptions Reconciled: 2026-09-08 -->
 
+---
 
+## TASK-0916 / DEC-INF-095: Singapore Staging Cutover Security Baseline (Recorded: 2026-09-08)
 
+The verified implementation of `TASK-0916` (Singapore Staging Restoration, Migration Deployment, Container Redeployment, and Cutover Verification) introduced zero security exceptions, zero new secrets, and zero new dependencies:
+- **Zero Security Exceptions:** Adheres strictly to `SEC-OPS-001` (zero unapproved secrets) and `SEC-OPS-004` (zero unapproved high vulnerabilities). `scripts/security-exceptions.json` remains completely empty and unmodified.
+- **Independent Secret Isolation:** Staging database credentials and 48-byte `INTERNAL_SERVICE_TOKEN` are managed strictly via `.env.staging`, verified git-ignored, and isolated from Dev configuration.
+- **Fail-Closed Target Guards:** Target restoration script `restore_singapore_staging.ps1` enforces clean-target validation prior to archive decryption and atomic single-transaction DDL restoration (`--single-transaction -v ON_ERROR_STOP=1`).
+- **Bounded Lock DDL:** Migration deployment wrapper `deploy_singapore_staging_migrations.ps1` enforced bounded lock timeouts (`SET lock_timeout = '5s'`) without `CASCADE` for applying `20260905040000_add_auth_and_fk_performance_indexes`.
+- **Actuator Invariance:** `ENABLE_FAUCET_CONTROL=false` strictly preserved across staging environment (`public.faucet_commands` = 0).
+- **Audit Durability & Single Active Session:** Authenticated Owner login enforced single active session invariant (`DEC-AUTH-107`) and durable synchronous audit logging (`auth.login.success`).
+<!-- Singapore Staging Cutover Security Exceptions Reconciled: 2026-09-08 -->

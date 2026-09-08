@@ -62,10 +62,10 @@ This specification does not define:
 ### 3.1 TASK-0914 Infrastructure Reconciliation
 `TASK-0914` (direct EMQX Cloud TLS connectivity for `apps/iot-gateway`) operates strictly at the backend messaging and gateway infrastructure boundary. All user-level RBAC enforcement, `OWNER` global visibility, `ADMIN` device assignment scoping, canonical `deviceId` concealment for Admin users (`DEC-DEV-028`), and `ENABLE_FAUCET_CONTROL=false` safety policies remain unchanged.
 
-### 3.2 TASK-0916 Database Relocation & Singapore Dev Cutover Reconciliation
-`TASK-0916` (Supabase database migration and Singapore Dev cutover) introduces **zero changes** to the application RBAC model, canonical permissions, role definitions (`OWNER`, `ADMIN`), account statuses, or authorization logic:
-- All authentication and authorization tables (`users`, `roles`, `user_roles`, `permissions`, `role_permissions`, `sessions`, `user_device_access`) were restored to Singapore Dev (`unbyxlkrzqlafolxcypi`) with 100% snapshot row-count and referential integrity parity (0 orphaned foreign key rows).
-- Genuine interactive Owner login was executed and verified (`POST /api/v1/auth/login`). An active session was confirmed in the PostgreSQL catalog (`public.sessions` = 1 active session `de8a9c04-5829-44bb-875a-eca4edbf5a88` for `hugo@resend.dev`), and the single active session invariant (`DEC-AUTH-107`) was confirmed active.
+### 3.2 TASK-0916 Database Relocation, Singapore Dev & Staging Cutover Reconciliation
+`TASK-0916` (Supabase database migration, Singapore Dev, and Singapore Staging cutovers) introduces **zero changes** to the application RBAC model, canonical permissions, role definitions (`OWNER`, `ADMIN`), account statuses, or authorization logic:
+- All authentication and authorization tables (`users`, `roles`, `user_roles`, `permissions`, `role_permissions`, `sessions`, `user_device_access`) were restored to both Singapore Dev (`unbyxlkrzqlafolxcypi`) and Singapore Staging (`ihgoxqdncepbcrqkchxu`) with 100% snapshot row-count and referential integrity parity (0 orphaned foreign key rows across 28 constraints).
+- Genuine interactive Owner logins were verified on both environments (`POST /api/v1/auth/login`). Single active session invariant (`DEC-AUTH-107`) is actively enforced in PostgreSQL on Dev (session `de8a9c04-5829-44bb-875a-eca4edbf5a88`) and Staging (session `3072c4f8-973e-4502-ab6b-8df589eaff72`, synchronous audit log `35c7c64b-73f1-4f37-bbfd-ed190d779c44`).
 - Server-side RBAC scoping (`OWNER` global device visibility, `ADMIN` assignment scoping with canonical `deviceId` concealment per `DEC-DEV-028`) remains authoritative. Full details in [`docs/SUPABASE_MIGRATION_RUNBOOK.md`](file:///c:/Users/Puroh/Documents/Melon/docs/SUPABASE_MIGRATION_RUNBOOK.md).
 
 - Final MQTT topic structure.

@@ -6,6 +6,8 @@ import {
   DeviceInactiveError,
 } from '@kebun-melon/database';
 import { SoilTelemetryPayloadSchema } from '@kebun-melon/contracts';
+import { logger } from '@/lib/observability/logger';
+import { realtimeEventHub } from '@/lib/realtime/event-hub';
 
 /**
  * HTTPS REST API Soil Telemetry Ingestion Endpoint
@@ -104,6 +106,38 @@ export async function POST(request: Request, props: { params: Promise<{ deviceId
       ec: parseResult.data.data.ec,
       status: parseResult.data.data.status,
     });
+
+    // 6. Publish to Realtime Event Hub for connected SSE subscribers (only for new, non-duplicate readings)
+    if (!result.isDuplicate) {
+      try {
+        realtimeEventHub.publish({
+          name: 'telemetry.soil.updated',
+          deviceId: result.canonicalDeviceId || pathDeviceId,
+          data: {
+            readingId: result.readingId,
+            deviceId: result.deviceId,
+            canonicalDeviceId: result.canonicalDeviceId,
+            messageId: result.messageId,
+            recordedAt: result.recordedAt ? result.recordedAt.toISOString() : null,
+            receivedAt: result.receivedAt.toISOString(),
+            nitrogen: parseResult.data.data.nitrogen,
+            phosphorus: parseResult.data.data.phosphorus,
+            potassium: parseResult.data.data.potassium,
+            temperature: parseResult.data.data.temperature,
+            moisture: parseResult.data.data.moisture,
+            ph: parseResult.data.data.ph,
+            ec: parseResult.data.data.ec,
+            status: parseResult.data.data.status,
+            validationStatus: result.validationStatus,
+          },
+        });
+      } catch (publishError: any) {
+        logger.error('Failed to publish soil telemetry event to realtime event hub', publishError, {
+          deviceId: pathDeviceId,
+          readingId: result.readingId,
+        });
+      }
+    }
 
     const statusCode = result.isDuplicate ? 200 : 201;
 

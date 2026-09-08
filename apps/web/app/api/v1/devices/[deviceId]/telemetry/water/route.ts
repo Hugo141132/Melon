@@ -6,6 +6,8 @@ import {
   DeviceInactiveError,
 } from '@kebun-melon/database';
 import { WaterTelemetryPayloadSchema } from '@kebun-melon/contracts';
+import { logger } from '@/lib/observability/logger';
+import { realtimeEventHub } from '@/lib/realtime/event-hub';
 
 /**
  * HTTPS REST API Water Telemetry Ingestion Endpoint
@@ -103,6 +105,38 @@ export async function POST(request: Request, props: { params: Promise<{ deviceId
       ec: parseResult.data.data.ec,
       status: parseResult.data.data.status,
     });
+
+    // 6. Publish to Realtime Event Hub for connected SSE subscribers (only for new, non-duplicate readings)
+    if (!result.isDuplicate) {
+      try {
+        realtimeEventHub.publish({
+          name: 'telemetry.water.updated',
+          deviceId: result.canonicalDeviceId || pathDeviceId,
+          data: {
+            readingId: result.readingId,
+            deviceId: result.deviceId,
+            canonicalDeviceId: result.canonicalDeviceId,
+            messageId: result.messageId,
+            recordedAt: result.recordedAt ? result.recordedAt.toISOString() : null,
+            receivedAt: result.receivedAt.toISOString(),
+            ph: parseResult.data.data.ph,
+            tds: parseResult.data.data.tds,
+            ec: parseResult.data.data.ec,
+            status: parseResult.data.data.status,
+            validationStatus: result.validationStatus,
+          },
+        });
+      } catch (publishError: any) {
+        logger.error(
+          'Failed to publish water telemetry event to realtime event hub',
+          publishError,
+          {
+            deviceId: pathDeviceId,
+            readingId: result.readingId,
+          }
+        );
+      }
+    }
 
     const statusCode = result.isDuplicate ? 200 : 201;
 

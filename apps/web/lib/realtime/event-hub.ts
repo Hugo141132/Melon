@@ -56,6 +56,4 @@ const globalForRealtime = globalThis as unknown as {
 
 export const realtimeEventHub = globalForRealtime.realtimeEventHub || new RealtimeEventHub();
 
-if (process.env.NODE_ENV !== 'production') {
-  globalForRealtime.realtimeEventHub = realtimeEventHub;
-}
+globalForRealtime.realtimeEventHub = realtimeEventHub;

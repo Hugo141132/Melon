@@ -430,40 +430,54 @@ Because of the 2-active-project limit, execution proceeds sequentially:
    - **MUMBAI DEV STALENESS NOTICE:** Because live writes have resumed in Singapore Dev, the paused Mumbai Dev database (`xjsencdgfcbkzdzqcnqx`) is now **STALE**. A simple connection-string rollback to Mumbai is unsupported and prohibited (§9.2).
 
 ### Step 2: Staging Migration Window
-1. Enforce Faucet Shutdown Protocol (§4.3) and ensure staging application services remain stopped. (Docker inspection confirms `kebun-melon-staging-web` and `kebun-melon-staging-gateway` have been in `exited` status since 2026-09-05; the cloud Supabase Staging project `scqrbtfilmttqrutynyo` remains active on Mumbai).
-2. Take secure export of Mumbai Staging (`kebun_melon_staging_schema.sql`, `kebun_melon_staging_data.sql.gpg`).
-3. In Supabase Dashboard: Navigate to `scqrbtfilmttqrutynyo` $\rightarrow$ **Settings** $\rightarrow$ **General** $\rightarrow$ **Pause project** (Frees 1 project slot; active project count = 1).
-4. Create Singapore Staging Project (`ap-southeast-1`): Record `[NEW_STAGING_REF]` and retrieve Session connection string (port 5432).
-5. Restore Schema, Data, and Security to Singapore Staging:
-   ```powershell
-   $secPass = Read-Host -Prompt "Enter Singapore Staging Database Password" -AsSecureString
-   $bstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($secPass)
-   $env:PGPASSWORD = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr)
-   [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
-   $secPass = $null
-
-   psql -h "[NEW_STAGING_SESSION_HOST]" -p 5432 -U "postgres.[NEW_STAGING_REF]" -d "postgres" -v ON_ERROR_STOP=1 -f "kebun_melon_staging_schema.sql"
-   psql -h "[NEW_STAGING_SESSION_HOST]" -p 5432 -U "postgres.[NEW_STAGING_REF]" -d "postgres" -v ON_ERROR_STOP=1 -c "SET session_replication_role = replica;" -f "kebun_melon_staging_data.sql"
-   psql -h "[NEW_STAGING_SESSION_HOST]" -p 5432 -U "postgres.[NEW_STAGING_REF]" -d "postgres" -v ON_ERROR_STOP=1 -f "post_restore_security.sql"
-
-   $env:PGPASSWORD = $null
-   ```
-6. **Reconcile Staging Migration 11:**
-   - Migration `20260905040000_add_auth_and_fk_performance_indexes` adds 13 performance indexes across `sessions`, `user_roles`, `role_permissions`, `account_approvals`, `user_device_access`, `user_preferences`, `alert_acknowledgements`, and `alerts`.
-   - Run Prisma migration deployment:
-     ```powershell
-     $env:DATABASE_URL = "postgresql://postgres.[NEW_STAGING_REF]:[PASSWORD]@[NEW_STAGING_SESSION_HOST]:5432/postgres"
-     npm run db:migrate:deploy
-     $env:DATABASE_URL = $null
-     ```
-   - Verify `_prisma_migrations` count = **11**.
-7. Update `.env.staging` with new Singapore connection strings.
-8. Rebuild and redeploy staging containers:
-   ```powershell
-   docker compose -f docker-compose.staging.yml build --no-cache
-   docker compose -f docker-compose.staging.yml up -d
-   ```
-9. Verify all 5 post-migration quality gates (§8).
+1. **Enforce Faucet Shutdown Protocol (§4.3):** Confirmed `ENABLE_FAUCET_CONTROL=false` across `.env`, `.env.staging`, and `docker-compose.staging.yml`. Confirmed 0 nonterminal commands.
+2. **Consistent Cutover Export:** Exported point-in-time staging snapshot to `backups/cutover/staging_20260908_185145` with cryptographic SHA-256 validation across all artifacts (`staging_pre_data.sql`, `staging_data.sql.gpg`, `staging_post_data.sql`, `staging_manifest.tsv`, `staging_schema.sql`).
+3. **Isolated PostgreSQL 17 Rehearsal:** Executed rehearsal on `kebun-melon-rehearsal-db` (port 5433) with exit code 0: 26 tables, 100% manifest row parity, 28 foreign keys with 0 orphans, and clean deployment of pending migration 11 (`20260905040000_add_auth_and_fk_performance_indexes`).
+4. **Pause Mumbai Staging:** In Supabase Dashboard, Mumbai Staging project `scqrbtfilmttqrutynyo` was paused (`INACTIVE`, freeing 1 active project slot; account active projects = 1).
+5. **Singapore Staging Project Identity & Baseline:** Recorded reference `ihgoxqdncepbcrqkchxu` (`melon-stag`, AWS Singapore `ap-southeast-1`, PostgreSQL `17.6.1.166`). Verified empty baseline (0 tables in `public`, active `ensure_rls` event trigger).
+6. **Execute Target-Locked Restoration (`restore_singapore_staging.ps1`):**
+   - Operator executed `powershell -File scripts/cutover/restore_singapore_staging.ps1 -TargetRef ihgoxqdncepbcrqkchxu` (Exit code 0).
+   - Sanitized schema drop/create statements, decrypted data via GPG stdin, and executed atomic single-transaction restoration (`--single-transaction -v ON_ERROR_STOP=1`).
+   - Verified 100% bit-for-bit row parity across all 26 tables against `staging_manifest.tsv`, 28 foreign keys (0 orphans), and 10 baseline migration identities.
+7. **Deploy Pending Staging Migration 11 (`deploy_singapore_staging_migrations.ps1`):**
+   - Operator executed `powershell -File scripts/cutover/deploy_singapore_staging_migrations.ps1 -TargetRef ihgoxqdncepbcrqkchxu` (Exit code 0).
+   - Bypassed Dev index-drop workaround (preserved existing valid `sessions_user_active_idx`).
+   - Deployed `20260905040000_add_auth_and_fk_performance_indexes`.
+   - Verified 11 applied migrations in `_prisma_migrations`, 0 unresolved failures, 0 rollbacks, all 13 performance indexes valid and ready, and 0 data alterations across 25 non-_prisma tables.
+8. **Update Staging Environment & Redeploy Containers:**
+   - Updated `DATABASE_URL` in `.env.staging` to `postgresql://postgres.ihgoxqdncepbcrqkchxu:[PASSWORD]@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres?pgbouncer=true`.
+   - Rebuilt container images `melon-web:latest` and `melon-iot-gateway:latest` with exit code 0.
+   - Recreated and redeployed staging services (`docker compose -f docker-compose.staging.yml up -d`).
+   - Verified both containers running and healthy: `kebun-melon-staging-web` (port 3000) and `kebun-melon-staging-gateway` (port 3001).
+   - Verified health probes:
+     - Web `/health`: HTTP 200 (`{ "status": "ok" }`).
+     - Web `/ready`: HTTP 200 (`{ "status": "ready", "dependencies": { "database": "up", "gateway": "up", "broker": "up" } }`).
+     - Gateway `/health`: HTTP 200 (`{ "status": "pass", "service": "iot-gateway" }`).
+     - Gateway `/ready`: HTTP 200 (`{ "status": "UP", "mqtt": { "connected": true }, "database": { "connected": true } }`).
+9. **Observed Staging Verification Evidence (`ihgoxqdncepbcrqkchxu` - COMPLETED 2026-09-08):**
+   - **Gate 1 (Schema, Performance Indexes & Row Parity):** PASS. Exactly 26 public tables, 11 applied migrations, 0 unresolved failures, 0 rollbacks. 13 performance indexes valid and ready (`indisvalid=true`, `indisready=true`). All 25 non-_prisma tables matched `staging_manifest.tsv` baseline prior to resumed writes.
+   - **Gate 2 (Service Health Probes):** PASS. Web `/health` (HTTP 200), Web `/ready` (HTTP 200 with database/gateway/broker up), Gateway `/health` (HTTP 200), Gateway `/ready` (HTTP 200 with MQTT and DB connected).
+   - **Gate 3 (Authentication & Single Active Session):** PASS. Manual Owner login verified at `http://localhost:3000/login`. Active session established (`3072c4f8-973e-4502-ab6b-8df589eaff72`, user `eb144029-b1e0-43a3-8aad-2d555371a829`, created at `2026-09-08 12:42:31.978 UTC`, `revoked_at = null`). Synchronous audit log recorded in `public.audit_logs` (`35c7c64b-73f1-4f37-bbfd-ed190d779c44`, event `auth.login.success`, result `SUCCESS`, timestamp `2026-09-08 12:42:32.139 UTC`).
+   - **Gate 4 (Telemetry Persistence):** PASS. First resumed telemetry write ingested at `2026-09-08 12:43:28.513 UTC` via `POST /api/v1/devices/soil-node-biuc2f/telemetry/soil`. Persisted to `public.soil_readings` (Reading ID: `676f7aca-a6f1-4ae4-a7ef-a00557a2c536`, Message ID: `cutover-staging-telemetry-1788871408179`, Nitrogen 16.2, Phosphorus 10.1, Potassium 19.5, Temp 26.8°C, Moisture 71.4%, pH 6.7, EC 1.4, status NORMAL). Device metadata in `public.devices` for `soil-node-biuc2f` atomically refreshed (`last_seen_at` and `last_message_at` = `2026-09-08 12:43:28.513 UTC`).
+   - **Gate 5 (Real-Time SSE Event Delivery & Ingestion-to-SSE Remediation):** PASS.
+     - *Defect Identified (2026-09-08):* During post-cutover live subscriber verification on Singapore Staging, diagnostic ingestion (`messageId: diag-real-ingest-1788877031603`, reading `965f54cf-4066-4cd8-a26a-60fa39f73f04` persisted at `2026-09-08 14:17:11.916 UTC`) confirmed that the REST ingestion endpoints (`soil` and `water`) persisted readings to PostgreSQL but lacked in-route calls to `realtimeEventHub.publish(...)`. Earlier test scripts masked this by performing a secondary HTTP POST to `/api/v1/internal/realtime/publish`. Furthermore, `realtimeEventHub` only bound `globalForRealtime.realtimeEventHub` in non-production environments.
+     - *Remediation Implemented:*
+       1. Bound `globalForRealtime.realtimeEventHub` unconditionally in `apps/web/lib/realtime/event-hub.ts`.
+       2. Added in-route `realtimeEventHub.publish(...)` after successful persistence for non-duplicate readings in `apps/web/app/api/v1/devices/[deviceId]/telemetry/soil/route.ts` and `water/route.ts`, with fail-safe logging without secrets.
+       3. Updated `scripts/cutover/send_staging_telemetry.js` and `scripts/cutover/verify_staging_sse_subscriber.js` to rely exclusively on real REST ingestion, eliminating artificial secondary webhook calls.
+       4. Added regression test suite `apps/web/test/unit/telemetry-realtime-ingestion.test.ts` (7 tests, 15 combined with `realtime-stream.test.ts` passing).
+       5. Rebuilt and redeployed staging web container (`kebun-melon-staging-web`) at `2026-09-08 15:28:30 UTC`. Health probes verified (`/health` HTTP 200, `/ready` HTTP 200).
+      - *Empirical Browser Evidence Confirmed:* Authenticated staging browser listener connected to `GET /api/v1/realtime/stream` received the live `telemetry.soil.updated` SSE chunk following real ingestion of Reading ID `d319dd56-821c-47b8-a56e-4012cd26f4f4` (Message ID: `cutover-staging-telemetry-1788883569374`, received at `2026-09-08T16:06:10.106Z`) with 100% field correlation:
+        `{"readingId":"d319dd56-821c-47b8-a56e-4012cd26f4f4","deviceId":"62afe521-bf0f-47f4-8f21-65bb966d0465","canonicalDeviceId":"soil-node-biuc2f","messageId":"cutover-staging-telemetry-1788883569374","nitrogen":16.2,"phosphorus":10.1,"potassium":19.5,"temperature":26.8,"moisture":71.4,"ph":6.7,"ec":1.4,"status":"NORMAL","validationStatus":"VALID"}`.
+        This provides concrete production browser verification completely distinct from automated unit-test mocks. All 5 post-migration gates are now formally PASSED on Singapore Staging (`ihgoxqdncepbcrqkchxu`).
+   - **Test Data Deltas on Singapore Staging (`ihgoxqdncepbcrqkchxu`):**
+     - `soil_readings` count = 3:
+       1. `676f7aca-a6f1-4ae4-a7ef-a00557a2c536` (`cutover-staging-telemetry-1788871408179` from cutover verification).
+       2. `965f54cf-4066-4cd8-a26a-60fa39f73f04` (`diag-real-ingest-1788877031603` from pre-fix defect diagnosis).
+       3. `d319dd56-821c-47b8-a56e-4012cd26f4f4` (`cutover-staging-telemetry-1788883569374` from post-fix coordinated live ingestion at `2026-09-08 16:06:10.106 UTC`).
+   - **Safety Invariant:** `ENABLE_FAUCET_CONTROL=false` strictly maintained; `public.faucet_commands` row count remains strictly **0**.
+   - **MUMBAI STAGING STALENESS NOTICE:** Because live writes have officially landed in Singapore Staging (`ihgoxqdncepbcrqkchxu`), Mumbai Staging (`scqrbtfilmttqrutynyo`) is now **STALE**. Simple connection-string rollback to Mumbai is prohibited and unsupported (§9.2). Fix-forward priority applies.
+   - **72-Hour Soak Period (Restarted):** In accordance with runbook operational criteria, application container redeployment restarts the soak period. Restarted at `2026-09-08 15:28:30 UTC`. Earliest eligible completion: `2026-09-11 15:28:30 UTC`. Mumbai Staging remains paused (`INACTIVE`, 0 project slots). Resource deletion deferred until soak completion.
 
 ---
 
@@ -510,13 +524,33 @@ Because of the 2-active-project limit, rollback requires releasing an active slo
   6. Revert configuration back to Mumbai project refs and redeploy services.
   7. Confirm health probes return HTTP 200 on Mumbai.
 
+### 9.3 Mumbai Rollback Decommissioning Decision (Approved 2026-09-08)
+Per formal Owner decision, Mumbai is no longer needed or retained as an operational rollback target. Live writes (Owner authentication sessions, audit logs, and REST telemetry readings) have landed in Singapore Dev (`unbyxlkrzqlafolxcypi`) and Singapore Staging (`ihgoxqdncepbcrqkchxu`), permanently superseding Mumbai. Bidirectional delta synchronization is unsupported. Therefore:
+1. Rollback to Mumbai is formally decommissioned.
+2. Fix-Forward in Singapore is the sole operational recovery directive.
+3. Core technical migration and cloud cutover (`TASK-0916`) is complete (`DONE`).
+4. Paused Mumbai projects (`xjsencdgfcbkzdzqcnqx`, `scqrbtfilmttqrutynyo`) are retained purely as non-blocking standby resources pending soak completion and cold-storage backup verification before physical deletion.
+
 ---
 
-## 10. Proposed 72-Hour Soak Period & Mumbai Deletion Gate
+## 10. Active 72-Hour Soak Period & Mumbai Deletion Gate
 
-1. **Soak Proposal:** A 72-hour soak period is proposed. During this period, Mumbai projects remain in a **paused** state (occupying 0 active project slots) to serve as a zero-cost safety fallback.
-2. **Mandatory Deletion Gates:** Mumbai projects (`xjsencdgfcbkzdzqcnqx`, `scqrbtfilmttqrutynyo`) shall **NOT** be deleted until:
-   - Singapore operates cleanly for the agreed soak duration with zero database errors.
-   - An independent, encrypted recovery backup of Singapore is verified in cold storage.
+1. **Lifecycle Track Separation & Operational Timeline:**
+   - **Technical Migration Cutover:** **COMPLETE / DONE** (all 5 post-migration verification gates passed; live browser SSE verified).
+   - **Original Soak Window Start:** `2026-09-08 12:42:32 UTC` (marked by first post-cutover live transaction: Owner authentication session `3072c4f8-973e-4502-ab6b-8df589eaff72` on Singapore Staging).
+   - **Restarted Soak Window Start:** `2026-09-08 15:28:30 UTC` (restarted per operational criteria upon staging web container rebuild and redeployment following the ingestion-to-SSE bug fix).
+   - **Earliest Eligible Completion:** `2026-09-11 15:28:30 UTC` (72 hours elapsed from redeployment).
+   - **Soak Monitoring State:** ACTIVE / IN PROGRESS.
+2. **Monitoring Criteria:**
+   - **Database Connectivity & Pool Stability:** Zero unhandled database connection timeouts, zero pool exhaustion errors, and zero TLS handshake failures against `aws-0-ap-southeast-1.pooler.supabase.com:6543`.
+   - **Service Health Probes:** Continuous HTTP 200 responses on `/health` and `/ready` endpoints across both Next.js Web (`http://localhost:3000`) and Fastify IoT Gateway (`http://localhost:3001`).
+   - **Transaction Durability:** Zero unhandled transaction rollbacks, query panics, or constraint violations in application and database logs.
+   - **Telemetry Ingestion & Streaming Integrity:** Zero telemetry dropouts during scheduled device transmissions, with real-time SSE stream events delivered to authenticated clients.
+3. **Observed Interruptions & Operational Incidents:**
+   - **2026-09-08 14:17 UTC (Application Defect Remediation & Container Redeploy):** Ingestion-to-SSE defect diagnosed where REST telemetry endpoints omitted `realtimeEventHub.publish(...)`. Fix applied, container rebuilt, and `kebun-melon-staging-web` successfully redeployed healthy at `2026-09-08 15:28:30 UTC`. In accordance with soak restart rules, the 72-hour soak clock was reset to `2026-09-08 15:28:30 UTC`. Zero database downtime or transaction corruption occurred.
+   - *Evidence Policy & Explicit Gap Disclosure:* Health is verified via periodic deterministic health probes and database catalog verification. Continuous uninterrupted monitoring across the 72-hour window is not claimed without automated telemetry aggregation or dedicated log capture.
+4. **Mandatory Deletion Gates (Operational Retirement Follow-Up):** Mumbai projects (`xjsencdgfcbkzdzqcnqx`, `scqrbtfilmttqrutynyo`) remain in a **paused** state (`INACTIVE`, occupying 0 active project slots) and shall **NOT** be deleted until:
+   - Singapore operates cleanly through `2026-09-11 15:28:30 UTC` with zero database or service errors.
+   - An independent, encrypted cold-storage backup of Singapore is verified.
    - The project Owner signs off in writing.
-3. **Deletion Action:** Once approved, delete Mumbai projects via Supabase Dashboard Settings and archive documentation references.
+5. **Deletion Action:** Once all gates are formally satisfied, delete Mumbai projects via Supabase Dashboard Settings and archive documentation references. Projects shall NOT be deleted in this turn.
