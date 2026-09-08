@@ -345,7 +345,12 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
 - Provisioned Staging Database: Supabase PostgreSQL (`scqrbtfilmttqrutynyo`) via Supavisor Session Pooler (`aws-0-ap-south-1.pooler.supabase.com:6543`)
 - Provisioned Staging MQTT Broker: EMQX Cloud Serverless (`wss://` TLS active, password-authenticated gateway service, per-device topic ACLs)
 - Safety Configuration: `ENABLE_FAUCET_CONTROL=false` strictly enforced
-- Verification Results: 11/12 flows verified (Flow 7 Language switch verified passing under Phase 6 `TASK-0604`; Flows 8-10 safely blocked by feature flag)
+- Verification Results: 12/12 flows verified (Flow 7 Language switch verified passing under Phase 6 `TASK-0604`; Flows 8-10 safely blocked by feature flag)
+- 2026-09-08 CI Registration E2E & Test Database Initialization Hardening:
+  - Root Cause Diagnosed: In GitHub Actions Ubuntu CI run 34214214283 (commit `5b332da`), service container `kebun_melon_test` was supplied as an existing database. `e2e/test-environment.ts` took the existing-database branch and returned `DATABASE_URL` directly without ensuring migrations or RBAC seed data were loaded. As a result, the `ADMIN` role was missing from the database, causing `/api/v1/auth/register` to throw `MissingRoleError` (HTTP 503 "System role configuration error. Please contact system administrator.") and preventing navigation from `/register` to `/verify-email`.
+  - Fix Implemented: Added `initializeTestDatabase(dbUrl)` in `e2e/test-environment.ts` invoked for BOTH supplied existing databases (`TEST_DATABASE_URL` / `E2E_DATABASE_URL` / CI `DATABASE_URL`) and newly provisioned Docker containers. Runs `prisma migrate deploy` and `packages/database/prisma/seed.ts` (deterministic, idempotent upserts for roles, permissions, and canonical devices, with 0 demo users, 0 external emails, and 0 cloud calls) scoped strictly to the validated disposable test database.
+  - Defense in Depth: Added `faucetCommandEvent` deletion before `faucetCommand` in `e2e/critical-flows.spec.ts` `beforeAll` to guarantee clean repeat test runs without foreign key violations.
+  - Verification: Locally reproduced failure on unseeded DB; verified Flow 1 passed in 11.3s with fix; verified setup-repeat check produced 0 duplicate fixtures (roles: 2, permissions: 39, rolePermissions: 58, devices: 3); verified full 12/12 flows passed in `critical-flows.spec.ts` (1.4m, exit code 0); verified typecheck 0 errors across 4 monorepo packages.
 
 #### TASK-0408 Governance & Simulator Record
 

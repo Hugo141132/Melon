@@ -66,7 +66,15 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
         },
       });
       await prisma.session.deleteMany({ where: { userId: { in: userIds } } });
-      await prisma.faucetCommand.deleteMany({ where: { initiatedByUserId: { in: userIds } } });
+      const danglingCmds = await prisma.faucetCommand.findMany({
+        where: { initiatedByUserId: { in: userIds } },
+        select: { id: true },
+      });
+      if (danglingCmds.length > 0) {
+        const cmdIds = danglingCmds.map((c) => c.id);
+        await prisma.faucetCommandEvent.deleteMany({ where: { faucetCommandId: { in: cmdIds } } });
+        await prisma.faucetCommand.deleteMany({ where: { id: { in: cmdIds } } });
+      }
       await prisma.user.deleteMany({ where: { id: { in: userIds } } });
     }
 

@@ -52,11 +52,50 @@ export function teardownTestDatabase(): void {
   }
 }
 
+/**
+ * Idempotently applies Prisma migrations and canonical RBAC / device seed data
+ * to the target test database. Strictly enforces test database safety validation
+ * and scopes subprocess environments to the target database.
+ */
+export function initializeTestDatabase(dbUrl: string): void {
+  const validated = validateTestDatabaseUrl(dbUrl);
+  const schemaPath = path.resolve(__dirname, '../packages/database/prisma/schema.prisma');
+  const seedPath = path.resolve(__dirname, '../packages/database/prisma/seed.ts');
+
+  const scopedEnv = {
+    ...process.env,
+    DATABASE_URL: validated,
+    TEST_DATABASE_URL: validated,
+    E2E_DATABASE_URL: validated,
+  };
+
+  // 1. Run migrations idempotently
+  execSync(`npx prisma migrate deploy --schema="${schemaPath}"`, {
+    stdio: 'pipe',
+    env: scopedEnv,
+  });
+
+  // 2. Seed deterministic, idempotent canonical RBAC fixtures & devices
+  execSync(`npx tsx "${seedPath}"`, {
+    stdio: 'pipe',
+    env: scopedEnv,
+  });
+}
+
 export function ensureTestDatabase(): string | undefined {
   const existing = getExistingTestDbUrl();
   if (existing) {
-    process.env.E2E_DATABASE_URL = existing;
-    return existing;
+    console.log('[E2E DB] Using supplied test database:', existing.replace(/:[^:@]+@/, ':***@'));
+    try {
+      initializeTestDatabase(existing);
+      process.env.DATABASE_URL = existing;
+      process.env.E2E_DATABASE_URL = existing;
+      process.env.TEST_DATABASE_URL = existing;
+      return existing;
+    } catch (err: any) {
+      console.error('[E2E DB] Failed to initialize supplied test database:', err.message);
+      throw err;
+    }
   }
 
   // Check if Docker is available locally
@@ -110,22 +149,11 @@ export function ensureTestDatabase(): string | undefined {
       throw new Error('Disposable PostgreSQL container failed to become ready in time.');
     }
 
-    const schemaPath = path.resolve(__dirname, '../packages/database/prisma/schema.prisma');
-    const seedPath = path.resolve(__dirname, '../packages/database/prisma/seed.ts');
+    initializeTestDatabase(testDbUrl);
 
-    // Run migrations
-    execSync(`npx prisma migrate deploy --schema="${schemaPath}"`, {
-      stdio: 'pipe',
-      env: { ...process.env, DATABASE_URL: testDbUrl },
-    });
-
-    // Seed RBAC
-    execSync(`npx tsx "${seedPath}"`, {
-      stdio: 'pipe',
-      env: { ...process.env, DATABASE_URL: testDbUrl },
-    });
-
+    process.env.DATABASE_URL = testDbUrl;
     process.env.E2E_DATABASE_URL = testDbUrl;
+    process.env.TEST_DATABASE_URL = testDbUrl;
     return testDbUrl;
   } catch (err: any) {
     console.error('[E2E DB] Failed to provision disposable test database:', err.message);
