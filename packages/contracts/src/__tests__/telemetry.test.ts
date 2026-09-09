@@ -4,6 +4,8 @@ import {
   SoilTelemetryPayloadSchema,
   WaterTelemetryDataSchema,
   WaterTelemetryPayloadSchema,
+  ReservoirTelemetryDataSchema,
+  ReservoirTelemetryPayloadSchema,
   SoilMonitoringResponseDtoSchema,
   WaterMonitoringResponseDtoSchema,
   LatestMonitoringSnapshotDtoSchema,
@@ -231,6 +233,68 @@ describe('Soil & Water Telemetry Contract Schemas', () => {
     });
   });
 
+  describe('ReservoirTelemetryDataSchema & ReservoirTelemetryPayloadSchema (DEC-MON-089)', () => {
+    it('parses canonical reservoir data with tankVolume and status', () => {
+      const input = {
+        tankVolume: 450.5,
+        status: 'NORMAL',
+      };
+
+      const result = ReservoirTelemetryDataSchema.parse(input);
+      expect(result.tankVolume).toBe(450.5);
+      expect(result.status).toBe(MonitoringStatus.NORMAL);
+      expect((result as any).flowRate).toBeUndefined();
+    });
+
+    it('PRESERVES NUMERIC 0 for tankVolume', () => {
+      const input = {
+        tankVolume: 0,
+        status: 'NORMAL',
+      };
+
+      const result = ReservoirTelemetryDataSchema.parse(input);
+      expect(result.tankVolume).toBe(0);
+      expect(result.status).toBe(MonitoringStatus.NORMAL);
+    });
+
+    it('PRESERVES NULL tankVolume and allows status-only telemetry', () => {
+      const input = {
+        tankVolume: null,
+        status: 'NORMAL',
+      };
+
+      const result = ReservoirTelemetryDataSchema.parse(input);
+      expect(result.tankVolume).toBeNull();
+      expect(result.status).toBe(MonitoringStatus.NORMAL);
+    });
+
+    it('proves legacy payload compatibility by gracefully parsing and stripping legacy flowRate', () => {
+      const legacyPayload = {
+        schemaVersion: '1.0',
+        messageId: 'res-msg-legacy-001',
+        deviceId: 'water-tank-001',
+        siteId: 'site-01',
+        sequence: 12,
+        recordedAt: '2026-08-10T10:00:00Z',
+        sentAt: '2026-08-10T10:00:01Z',
+        firmwareVersion: '1.0.0',
+        data: {
+          tankVolume: 520.0,
+          flowRate: 14.5, // Legacy field transmitted by older producers/firmware
+          status: 'NORMAL',
+        },
+      };
+
+      const result = ReservoirTelemetryPayloadSchema.parse(legacyPayload);
+      expect(result.schemaVersion).toBe('1.0');
+      expect(result.deviceId).toBe('water-tank-001');
+      expect(result.data.tankVolume).toBe(520.0);
+      expect(result.data.status).toBe(MonitoringStatus.NORMAL);
+      // flowRate must be safely stripped and absent from parsed data
+      expect((result.data as any).flowRate).toBeUndefined();
+    });
+  });
+
   describe('SoilMonitoringResponseDtoSchema', () => {
     it('parses valid soil monitoring response DTO', () => {
       const dto = {
@@ -269,7 +333,6 @@ describe('Soil & Water Telemetry Contract Schemas', () => {
           tds: 420,
           ec: 1.5,
           tankVolume: 450,
-          flowRate: 12.5,
           status: MonitoringStatus.NORMAL,
         },
       };
@@ -293,7 +356,6 @@ describe('Soil & Water Telemetry Contract Schemas', () => {
           tds: 0,
           ec: 0,
           tankVolume: 0,
-          flowRate: 0,
           status: 'NORMAL',
         },
       };
@@ -303,7 +365,6 @@ describe('Soil & Water Telemetry Contract Schemas', () => {
       expect(result.data.tds).toBe(0);
       expect(result.data.ec).toBe(0);
       expect(result.data.tankVolume).toBe(0);
-      expect(result.data.flowRate).toBe(0);
     });
   });
 
@@ -325,7 +386,6 @@ describe('Soil & Water Telemetry Contract Schemas', () => {
             tds: 350,
             ec: 1.2,
             tankVolume: 500,
-            flowRate: 10.0,
             status: 'NORMAL',
           },
         },

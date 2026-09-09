@@ -429,10 +429,11 @@ For the selected device, the application shall support display of water quality 
 
 For the selected device, water tank monitoring is a distinct domain supporting:
 
-- Water tank volume (canonical unit: L).
-- Water flow rate (canonical unit: m³/h).
-- Water tank status.
+- Water tank volume (canonical unit: L; operational UI scale: **0 L–2200 L** governed by constant `WATER_TANK_MAX_CAPACITY = 2200` in `apps/web/lib/constants.ts`, clamped between 0% and 100% with `0 L` and `2200 L` markers).
+- Water tank status (Water flow rate deleted per `DEC-MON-089`).
 - Control capabilities: Solenoid Valve (irrigation control actuator) and Relay (ON/OFF switch).
+- Presentation geometry: Single full-width responsive column (`grid-cols-1 gap-4`), resolving former desktop half-width card layout.
+- State preservation: Explicit zero volume (`0 L`), null/unknown volume (`- L`), status-only telemetry, loading skeleton, and error alert states.
 
 Water tank monitoring is separate from general water-quality monitoring.
 

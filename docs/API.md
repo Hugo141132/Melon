@@ -37,7 +37,7 @@ The API shall support:
 - Real-time update endpoints.
 - Health and readiness checks.
 
-Note: Water tank telemetry (volume & flow rate) is ingested separately via MQTT/EMQX through the IoT Gateway service, not through the REST API. Electrical monitoring (voltage, current, power) via INA219 is sent via REST over Wi-Fi.
+Note: Water tank telemetry (volume & status, with flow rate deleted per `DEC-MON-089` / `TASK-0410`) is ingested separately via MQTT/EMQX through the IoT Gateway service, not through the REST API. Electrical monitoring (voltage, current, power) via INA219 is sent via REST over Wi-Fi.
 
 ### 2.1 TASK-0914 Architectural Reconciliation
 REST Soil and Water Quality telemetry ingestion endpoints (`POST /api/v1/devices/{deviceId}/telemetry/soil` and `.../water`) remain unchanged by `TASK-0914`. Direct EMQX Cloud TLS connectivity applies exclusively to the MQTT reservoir telemetry and faucet-control boundary handled by `apps/iot-gateway`. REST API interfaces, endpoints, error responses, and `ENABLE_FAUCET_CONTROL=false` safety defaults remain untouched.
@@ -1854,7 +1854,7 @@ Response:
 > - **Data Retention Guarantee:** Raw telemetry is retained for 90 days (`DEC-MON-048` / `TASK-0913`), ensuring all allowable queries within the 31-day window are fully preserved and performant.
 > - **Pagination:** Default `pageSize = 20`, Maximum `pageSize = 100`. `pageSize > 100` returns HTTP 400 (`VALIDATION_ERROR`). Default `page = 1`.
 > - **Raw Bounded Query Contract:** API endpoints return raw bounded historical telemetry series without server-side downsampling. Client-side grouping (e.g. 1-hour interval bucket aggregation per `DEC-UIUX-104`) is executed purely at the presentation layer for chart visualization stability.
-> - **Telemetry Isolation:** Water-quality history (`ph`, `tds`, `ec`) is separate from reservoir telemetry (`tankVolume`, `flowRate`).
+> - **Telemetry Isolation:** Water-quality history (`ph`, `tds`, `ec`) is separate from reservoir telemetry (`tankVolume`; `flowRate` deleted per `DEC-MON-089`).
 > - **Identifier Resolution:** `{deviceId}` parameter accepts both canonical string `deviceId` (e.g. `soil-node-001`) and database UUID `id`.
 > - **Empty History Response:** Queries matching zero records return HTTP `200 OK` with an empty `series: []` array and `totalRecords: 0`, NOT a 404 error or fabricated zero records.
 > - **EC Unit Contract:** EC telemetry values in API contracts are stored and transmitted in source units (`mS/cm`). The web UI converts values to `µS/cm` (×1000) for presentation.

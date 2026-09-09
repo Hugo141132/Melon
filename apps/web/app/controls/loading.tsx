@@ -31,8 +31,8 @@ export default function ControlsLoading() {
             </div>
           </div>
 
-          {/* 2-col Metric Card Grid Skeleton */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Metric Card Grid Skeleton */}
+          <div className="grid grid-cols-1 gap-4">
             {/* Tank Volume Skeleton */}
             <div className="bg-app-surface-container-lowest rounded-xl p-5 soft-elevation-lg border border-app-outline-variant/30 flex flex-col justify-between animate-pulse">
               <div>
@@ -45,23 +45,9 @@ export default function ControlsLoading() {
               <div className="mt-4">
                 <div className="h-2 w-full rounded-full bg-app-surface-container" />
                 <div className="flex justify-between mt-1">
-                  <span className="text-[10px] font-bold text-app-on-surface-variant">0L</span>
-                  <span className="text-[10px] font-bold text-app-on-surface-variant">600L</span>
+                  <span className="text-[10px] font-bold text-app-on-surface-variant">0 L</span>
+                  <span className="text-[10px] font-bold text-app-on-surface-variant">2200 L</span>
                 </div>
-              </div>
-            </div>
-
-            {/* Flow Rate Skeleton */}
-            <div className="bg-app-surface-container-lowest rounded-xl p-5 soft-elevation-lg border border-app-outline-variant/30 flex flex-col justify-between animate-pulse">
-              <div>
-                <div className="h-4 w-24 bg-app-surface-container rounded mb-2" />
-                <div className="flex items-baseline gap-1">
-                  <div className="h-9 w-16 bg-app-surface-container rounded my-0.5" />
-                  <span className="text-[12px] text-app-on-surface-variant">m³/h</span>
-                </div>
-              </div>
-              <div className="mt-4 flex items-center gap-1">
-                <div className="h-4 w-24 bg-app-surface-container rounded" />
               </div>
             </div>
           </div>

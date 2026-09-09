@@ -98,11 +98,14 @@ export function ensureTestDatabase(): string | undefined {
     }
   }
 
-  // Check if Docker is available locally
+  // Check if Docker daemon is available and responsive locally
   try {
-    execSync('docker --version', { stdio: 'pipe' });
+    execSync('docker info', { stdio: 'pipe', timeout: 5000 });
   } catch {
-    console.warn('[E2E DB] Docker is not available and no TEST_DATABASE_URL was provided.');
+    console.warn(
+      '[E2E DB] Docker daemon is not running or unreachable, and no TEST_DATABASE_URL was provided.\n' +
+        '[E2E DB] To execute the 12 end-to-end critical flows, please start Docker Desktop or supply a validated TEST_DATABASE_URL.'
+    );
     return undefined;
   }
 

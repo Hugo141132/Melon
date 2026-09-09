@@ -2074,7 +2074,7 @@ The following facts are verified in the user flow implementations regarding `TAS
 
 The following facts are verified in the user flow implementations regarding `TASK-0807`, `TASK-0502`, and `TASK-0306` (`/controls` Loading & Header Stability):
 - **Immediate Structural Visibility on `/controls`:** When a user navigates to `/controls` via client links or direct URL, the route-level instant loading shell renders the complete page composition immediately without blank box collapse or layout jumping.
-- **Stable Component Telemetry Hydration:** While live reservoir telemetry, auth state, and device capabilities resolve, `WaterTankMonitoringCard` renders structured metric cards (Volume & Flow Rate) and `FaucetHistoryTable` renders structured table skeleton rows without flashing unselected device alert boxes.
+- **Stable Component Telemetry Hydration:** While live reservoir telemetry, auth state, and device capabilities resolve, `WaterTankMonitoringCard` renders a structured single full-width metric card (Volume; Flow Rate deleted per `DEC-MON-089`) and `FaucetHistoryTable` renders structured table skeleton rows without flashing unselected device alert boxes.
 - **Seamless Responsive Header Interaction:** The global `DeviceSelector` in `TopAppBar` remains centered in the exact 50% horizontal center across desktop, tablet, and mobile; opening the selector displays the search and device list centered directly under the trigger and bounded within the viewport.
 - **User Flows Invariants:** All functional workflows, permission gates, safety warnings, and offline states remain preserved and unchanged.
 <!-- Controls Loading & Header Centering User Flows Reconciled: 2026-08-27 -->
@@ -2212,4 +2212,19 @@ The user management flow on `/users` is reconciled to eliminate client-side auth
   - Next.js Edge route middleware and server-side API authorization (`requireRole(['OWNER'])`) strictly prevent any data leakage.
 <!-- Users Route Transition User Flows Reconciled: 2026-09-04 -->
 
+---
 
+## Water Tank Monitoring UI & Volume Scale User Flows Note (DEC-MON-089 / TASK-0410 / Reconciled 2026-09-09)
+
+The water-tank monitoring and control flow on `/controls` is reconciled:
+- **Full-Width Card Perception:**
+  - Upon navigating to `/controls`, the user views the Tank Water Volume card spanning the complete available content width, eliminating the previous asymmetric half-width layout.
+  - On desktop and tablet viewports, the single-column full-width container (`grid-cols-1 gap-4`) presents a clean, unified dashboard layout.
+  - On mobile devices ($390\text{px}$), the card stacks seamlessly with zero horizontal overflow.
+- **Authoritative Volume Gauge & Boundary Markers:**
+  - The volume gauge clearly communicates agricultural reservoir capacity across **0 L to 2200 L**, anchored by explicit `0 L` and `2200 L` bounding labels.
+  - The progress fill strictly reflects percentage based on `WATER_TANK_MAX_CAPACITY = 2200`, clamped between 0% and 100%.
+- **State Invariance:**
+  - When the reservoir is empty, `0 L` is explicitly displayed with a 0% progress fill.
+  - When telemetry is resolving or unavailable, clean placeholder and skeleton states display without fabricating flow rates or actuator movements.
+<!-- Water Tank UI User Flows Reconciled: 2026-09-09 -->

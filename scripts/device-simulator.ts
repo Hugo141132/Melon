@@ -375,7 +375,6 @@ export class DeviceSimulator {
       firmwareVersion: payloadOverrides?.firmwareVersion || '1.0.0',
       data: {
         tankVolume: 75.0,
-        flowRate: 2.3,
         status: MonitoringStatus.NORMAL,
         ...customData,
       },
@@ -869,7 +868,7 @@ export class DeviceSimulator {
               schemaVersion: '1.0',
               messageId: `msg-nan-${Date.now()}`,
               deviceId: tankId,
-              data: { tankVolume: 'NaN', flowRate: Infinity },
+              data: { tankVolume: 'NaN' },
             };
             break;
           case 'TOPIC_DEVICE_MISMATCH':

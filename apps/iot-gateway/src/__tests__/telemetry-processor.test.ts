@@ -24,7 +24,6 @@ describe('TelemetryProcessor', () => {
     firmwareVersion: '1.0.0',
     data: {
       tankVolume: 85.5,
-      flowRate: 3.2,
       status: 'NORMAL',
     },
   };
@@ -88,7 +87,60 @@ describe('TelemetryProcessor', () => {
       sequenceNumber: 1,
       recordedAt: '2026-08-09T12:00:00.000Z',
       tankVolume: 85.5,
-      flowRate: 3.2,
+      status: 'NORMAL',
+    });
+  });
+
+  it('proves legacy payload compatibility: gracefully strips incoming flowRate and ingests remaining telemetry', async () => {
+    const legacyPayload = {
+      ...validPayload,
+      messageId: 'msg-sim-legacy-999',
+      data: {
+        tankVolume: 92.0,
+        flowRate: 3.5, // Legacy field sent by older producer/firmware
+        status: 'NORMAL',
+      },
+    };
+
+    const rawBuffer = Buffer.from(JSON.stringify(legacyPayload));
+    const result = await processor.processTelemetryMessage(validTopic, rawBuffer);
+
+    expect(result.success).toBe(true);
+    expect(mockTelemetryRepo.ingestReservoirReading).toHaveBeenCalledWith({
+      deviceId: 'device-uuid-001',
+      messageId: 'msg-sim-legacy-999',
+      schemaVersion: '1.0',
+      sequenceNumber: 1,
+      recordedAt: '2026-08-09T12:00:00.000Z',
+      tankVolume: 92.0,
+      status: 'NORMAL',
+    });
+    // Verify flowRate was completely stripped and not passed to persistence
+    const calledArg = mockTelemetryRepo.ingestReservoirReading.mock.calls[0][0];
+    expect(calledArg.flowRate).toBeUndefined();
+  });
+
+  it('preserves status-only telemetry when tankVolume is null', async () => {
+    const statusOnlyPayload = {
+      ...validPayload,
+      messageId: 'msg-status-only-001',
+      data: {
+        tankVolume: null,
+        status: 'NORMAL',
+      },
+    };
+
+    const rawBuffer = Buffer.from(JSON.stringify(statusOnlyPayload));
+    const result = await processor.processTelemetryMessage(validTopic, rawBuffer);
+
+    expect(result.success).toBe(true);
+    expect(mockTelemetryRepo.ingestReservoirReading).toHaveBeenCalledWith({
+      deviceId: 'device-uuid-001',
+      messageId: 'msg-status-only-001',
+      schemaVersion: '1.0',
+      sequenceNumber: 1,
+      recordedAt: '2026-08-09T12:00:00.000Z',
+      tankVolume: null,
       status: 'NORMAL',
     });
   });

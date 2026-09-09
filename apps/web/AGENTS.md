@@ -19,8 +19,7 @@ This document specifies operational guidelines and system boundaries for coding 
 - **Soil Monitoring (`SOIL_NODE`)**: Nitrogen, Phosphorus, Potassium (`mg/kg`), Temperature (`°C`), Moisture (`%`), pH (unitless), Electrical Conductivity (`mS/cm`), Soil Status. (Battery `BAT` removed per `DEC-MON-086`).
 - **Water Quality Monitoring (`WATER_QUALITY_NODE`)**: pH (unitless), TDS (`ppm`), EC (`mS/cm`), Water Status. (Battery `BAT`, `latitude`, and `longitude` deleted per `DEC-MON-086`).
 - **Battery Parameter (`BAT`)**: `BAT` monitoring parameter is completely removed from soil and water quality monitoring domains (`DEC-MON-086`, superseding `DEC-MON-085`).
-- **Deleted Parameters**: `battery`, `latitude`, and `longitude` are **DELETED** from Soil & Water Quality telemetry monitoring and shall not be displayed or processed.
-- **Water Tank Monitoring (`WATER_TANK_NODE`)**: Tank Volume (`L`), Flow Rate (`m³/h`), Tank Status.
+- **Water Tank Monitoring (`WATER_TANK_NODE`)**: Tank Volume (`L`), Tank Status. (Flow Rate deleted per `DEC-MON-089`).
 
 ---
 
@@ -84,6 +83,13 @@ This document specifies operational guidelines and system boundaries for coding 
   - Direction: `Premium Minimal Ops`
   - Palette: `UNCHANGED`
   - Motion: `Modal`, `Button hover`, `KPI refresh`
+- **TASK-0410 UI Governance**:
+  - Impact: `MINOR`
+  - Direction: `Premium Minimal Ops`
+  - Palette: `UNCHANGED`
+  - Motion: `Card hover`, `Skeleton loading`
+  - 21st.dev MCP: `NOT REQUIRED`
+  - Scope: Reconciled water-tank volume scale to authoritative 0 L–2200 L capacity (`WATER_TANK_MAX_CAPACITY = 2200`), progress clamping (0%–100%), visual scale labels (`0 L`, `2200 L`), single full-width column responsive grid (`grid-cols-1 gap-4`), and explicit zero/null/unknown/loading state preservation following Flow Rate removal (`DEC-MON-089`).
 - **TASK-1004 Staging Infrastructure**:
   - Web Hosting: Railway PaaS (`melon-monitor.up.railway.app`)
   - Database: Supabase PostgreSQL (`aws-0-ap-south-1.pooler.supabase.com:6543`)

@@ -33,18 +33,19 @@ describe('Device Capabilities Contracts', () => {
     expect(caps).not.toContain('SOIL_PH');
   });
 
-  it('WATER_TANK_NODE canonical capability set is correct', () => {
+  it('WATER_TANK_NODE canonical capability set is correct (DEC-MON-089)', () => {
     const caps = getCanonicalCapabilitiesForDeviceType(DeviceType.WATER_TANK_NODE);
     expect(caps).toContain('WATER_TANK_VOLUME');
-    expect(caps).toContain('WATER_FLOW_RATE');
+    expect(caps).not.toContain('WATER_FLOW_RATE');
     expect(caps).toContain('FAUCET_CONTROL');
-    expect(caps).toHaveLength(3);
+    expect(caps).toHaveLength(2);
   });
 
-  it('WATER_TANK_NODE does NOT expose RELAY_CONTROL or SOLENOID_VALVE_CONTROL as product capabilities', () => {
+  it('WATER_TANK_NODE does NOT expose RELAY_CONTROL, SOLENOID_VALVE_CONTROL, or WATER_FLOW_RATE as product capabilities', () => {
     const caps = getCanonicalCapabilitiesForDeviceType(DeviceType.WATER_TANK_NODE);
     expect(caps).not.toContain('RELAY_CONTROL');
     expect(caps).not.toContain('SOLENOID_VALVE_CONTROL');
+    expect(caps).not.toContain('WATER_FLOW_RATE');
     expect(WATER_TANK_NODE_CONTROL_CAPABILITIES).toEqual(['FAUCET_CONTROL']);
   });
 
@@ -52,13 +53,12 @@ describe('Device Capabilities Contracts', () => {
     expect(getCapabilityCategory('SOIL_PH')).toBe(CapabilityCategory.MONITORING);
     expect(getCapabilityCategory('WATER_TDS')).toBe(CapabilityCategory.MONITORING);
     expect(getCapabilityCategory('WATER_TANK_VOLUME')).toBe(CapabilityCategory.MONITORING);
-    expect(getCapabilityCategory('WATER_FLOW_RATE')).toBe(CapabilityCategory.MONITORING);
     expect(getCapabilityCategory('FAUCET_CONTROL')).toBe(CapabilityCategory.CONTROL);
   });
 
   it('supportsCapability feature detection helper works for string array DTOs', () => {
     const device = {
-      capabilities: ['WATER_TANK_VOLUME', 'WATER_FLOW_RATE', 'FAUCET_CONTROL'],
+      capabilities: ['WATER_TANK_VOLUME', 'FAUCET_CONTROL'],
     };
     expect(supportsCapability(device, 'FAUCET_CONTROL')).toBe(true);
     expect(supportsCapability(device, 'WATER_TANK_VOLUME')).toBe(true);

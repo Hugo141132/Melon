@@ -362,7 +362,7 @@ export async function seedCanonicalDevices(prisma: PrismaClient) {
       deviceId: 'water-tank-node-zi37gz',
       deviceType: DeviceType.WATER_TANK_NODE,
       name: 'Water Tank',
-      capabilities: ['WATER_TANK_VOLUME', 'WATER_FLOW_RATE', 'FAUCET_CONTROL'],
+      capabilities: ['WATER_TANK_VOLUME', 'FAUCET_CONTROL'],
     },
   ];
 

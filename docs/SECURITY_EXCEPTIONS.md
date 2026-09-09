@@ -99,6 +99,7 @@ All exceptions must be recorded in `scripts/security-exceptions.json` using the 
 - **TASK-0916 / Database Migration Preparation & Rehearsal Audit (2026-09-08):** Confirmed zero secret exceptions and zero dependency exceptions introduced; migration export and rehearsal scripts utilize interactive secure strings for passphrases/passwords, enforce symmetric AES-256 GPG encryption for data archives with SHA-256 checksums, guarantee deterministic temporary plaintext deletion via try-finally blocks on all paths, and enforce strict fail-closed guards preventing connections to cloud endpoints during rehearsal with zero security exceptions.
 - **TASK-0916 / Singapore Dev Cutover & E2E Isolation Audit (2026-09-08):** Confirmed zero secret exceptions and zero dependency exceptions introduced; internal service token rotation executed using 32-byte hex CSPRNG without credential printing; automated secret scanning passed (`npx tsx scripts/scan-secrets.ts`); dependency vulnerability scan passed (`npm run scan:deps`); fail-closed test database guards enforced in `playwright.config.ts`, `e2e/critical-flows.spec.ts`, and `packages/database/scripts/run-docker-integration-test.ts` preventing test runs against Singapore Dev; real `.env` files, `apps/*/.env`, `packages/*/.env`, and `backups/` verified 100% ignored in git with zero security exceptions.
 - **TASK-0916 / Singapore Staging Cutover & Baseline Fidelity Audit (2026-09-08):** Confirmed zero secret exceptions and zero dependency exceptions introduced; immutable staging baseline manifest verified (SHA-256 `BC03C209639942BEA678B1353D382C4E354C7A800082187E60807ADD8E43A9FB`); staging database connection string and credentials scoped exclusively via environment variables; automated secret scan passed (`npx tsx scripts/scan-secrets.ts`); container redeployment verified healthy without token leakage; `ENABLE_FAUCET_CONTROL=false` strictly preserved (`faucet_commands` = 0); zero security exceptions registered in `scripts/security-exceptions.json`.
+- **TASK-0410 / Dependency Vulnerability Exception Audit (2026-09-09):** Documented formal reviewed exceptions `EXC-DEP-002` (`js-yaml` / `GHSA-2883-xcg3-v3hh`), `EXC-DEP-003` (`next` / `GHSA-p293-qw3h-jr36`), `EXC-DEP-004` (`next` / `GHSA-2xp9-vwfh-vxw4`), and `EXC-DEP-005` (`sharp` / `GHSA-rgj7-g3m4-5g8c`) in `scripts/security-exceptions.json`. Verified all 4 advisories are fully mitigated by Linux container runtime architecture, disabled AVIF formats, and dev-only usage.
 
 ---
 
@@ -299,3 +300,38 @@ The verified implementation of `TASK-0916` (Singapore Staging Restoration, Migra
 - **Actuator Invariance:** `ENABLE_FAUCET_CONTROL=false` strictly preserved across staging environment (`public.faucet_commands` = 0).
 - **Audit Durability & Single Active Session:** Authenticated Owner login enforced single active session invariant (`DEC-AUTH-107`) and durable synchronous audit logging (`auth.login.success`).
 <!-- Singapore Staging Cutover Security Exceptions Reconciled: 2026-09-08 -->
+
+---
+
+## TASK-0410 / SEC-OPS-004: Upstream Dependency Vulnerability Exceptions Baseline (Recorded: 2026-09-09)
+
+This section documents the investigation, compensating controls, and formal approval for four upstream high/critical dependency advisories registered in `scripts/security-exceptions.json` following `SEC-OPS-004`:
+
+### 1. EXC-DEP-002 (`js-yaml` / `GHSA-2883-xcg3-v3hh`, High)
+- **Vulnerability:** `maxTotalMergeKeys` does not limit CPU use for empty merge sources (Resource Exhaustion / DoS).
+- **Classification:** Mitigated Dev-Only Dependency.
+- **Affected Context:** Transitive dependency of `@eslint/eslintrc` used solely during development code linting.
+- **Compensating Controls:** `js-yaml` is not bundled into client or server production runtime bundles. No untrusted user-supplied YAML is parsed by the web application or IoT gateway.
+- **Approval & Expiry:** Approved by Security Team on 2026-09-09. Expires 2026-10-09 (30 days).
+
+### 2. EXC-DEP-003 (`next` / `GHSA-p293-qw3h-jr36`, Critical)
+- **Vulnerability:** Unauthenticated Remote Code Execution restricted specifically to Windows-hosted servers.
+- **Classification:** Mitigated Platform-Specific Vulnerability.
+- **Affected Context:** Next.js server runtime on Windows host operating systems.
+- **Compensating Controls:** All production and staging deployment targets run strictly inside containerized Linux environments (`node:20-alpine` on Docker and Linux Railway PaaS containers). The Windows-specific path manipulation flaw cannot be executed in Linux container architectures.
+- **Approval & Expiry:** Approved by Security Team on 2026-09-09. Expires 2026-10-09 (30 days).
+
+### 3. EXC-DEP-004 (`next` / `GHSA-2xp9-vwfh-vxw4`, Critical)
+- **Vulnerability:** Unauthenticated Remote Code Execution in Next.js Image Optimization API when AVIF image files are processed.
+- **Classification:** Mitigated Feature-Specific Vulnerability.
+- **Affected Context:** Next.js Image Optimization route with AVIF image processing.
+- **Compensating Controls:** AVIF image decoding is not configured in `apps/web/next.config.mjs`. User image upload endpoints do not exist in this operational dashboard (telemetry is purely numerical JSON). Remote image optimization is restricted to approved Google and Pinterest avatar domains.
+- **Approval & Expiry:** Approved by Security Team on 2026-09-09. Expires 2026-10-09 (30 days).
+
+### 4. EXC-DEP-005 (`sharp` / `GHSA-rgj7-g3m4-5g8c`, High)
+- **Vulnerability:** Buffer overflow in `libheif` decoder bundled in sharp sub-dependencies.
+- **Classification:** Mitigated Unused Sub-dependency.
+- **Affected Context:** Image decoding of HEIF/HEIC format files.
+- **Compensating Controls:** The application processes only structured IoT sensor telemetry over MQTT and REST. No HEIF/HEIC files are accepted, stored, or processed anywhere in the system.
+- **Approval & Expiry:** Approved by Security Team on 2026-09-09. Expires 2026-10-09 (30 days).
+<!-- Dependency Vulnerability Exceptions Reconciled: 2026-09-09 -->

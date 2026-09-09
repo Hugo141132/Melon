@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, cleanup } from '@testing-library/react';
 import { WaterTankMonitoringCard } from '@/components/monitoring/WaterTankMonitoringCard';
 import { DeviceProvider, AuthorisedDevice } from '@/context/DeviceContext';
 
@@ -26,6 +26,11 @@ describe('WaterTankMonitoringCard Component Tests', () => {
     vi.restoreAllMocks();
   });
 
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
   it('renders loading skeleton when fetching latest monitoring data', async () => {
     global.fetch = vi.fn().mockImplementation(
       () => new Promise(() => {}) // pending promise for loading state
@@ -40,10 +45,16 @@ describe('WaterTankMonitoringCard Component Tests', () => {
       </DeviceProvider>
     );
 
-    expect(screen.getByTestId('water-tank-skeleton')).toBeInTheDocument();
+    const skeletonElement = screen.getByTestId('water-tank-skeleton');
+    expect(skeletonElement).toBeInTheDocument();
+    const skeletonGrid = skeletonElement.querySelector('.grid');
+    expect(skeletonGrid?.className).toContain('grid-cols-1');
+    expect(skeletonGrid?.className).not.toContain('sm:grid-cols-2');
+    expect(screen.getByText('0 L')).toBeInTheDocument();
+    expect(screen.getByText('2200 L')).toBeInTheDocument();
   });
 
-  it('renders live tank volume (L) and flow rate (m³/h) when data is present', async () => {
+  it('renders live tank volume (L) and status badge when data is present', async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
@@ -54,7 +65,6 @@ describe('WaterTankMonitoringCard Component Tests', () => {
             recordedAt: '2026-08-04T10:00:00Z',
             data: {
               tankVolume: 450.5,
-              flowRate: 2.4,
               status: 'NORMAL',
             },
           },
@@ -73,10 +83,202 @@ describe('WaterTankMonitoringCard Component Tests', () => {
 
     expect(await screen.findByText('450.5')).toBeInTheDocument();
     expect(screen.getByText('Volume Air Tangki')).toBeInTheDocument();
-    expect(screen.getByText('Debit Air')).toBeInTheDocument();
+    expect(screen.getByText('NORMAL')).toBeInTheDocument();
     expect(screen.getByText('L')).toBeInTheDocument();
-    expect(screen.getByText('2.4')).toBeInTheDocument();
-    expect(screen.getByText('m³/h')).toBeInTheDocument();
+    expect(screen.getByText('0 L')).toBeInTheDocument();
+    expect(screen.getByText('2200 L')).toBeInTheDocument();
+    expect(screen.queryByText('Debit Air')).not.toBeInTheDocument();
+    expect(screen.queryByText('m³/h')).not.toBeInTheDocument();
+
+    const metricGrid = screen.getByText('Volume Air Tangki').closest('.grid');
+    expect(metricGrid?.className).toContain('grid-cols-1');
+    expect(metricGrid?.className).not.toContain('sm:grid-cols-2');
+
+    const progressBar = screen.getByRole('progressbar');
+    expect(progressBar).toHaveAttribute('aria-valuemin', '0');
+    expect(progressBar).toHaveAttribute('aria-valuemax', '2200');
+    expect(progressBar).toHaveAttribute('aria-valuenow', '450.5');
+  });
+
+  it('correctly calculates 0% progress bar and ARIA attributes for 0 L', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        success: true,
+        data: {
+          water: {
+            recordedAt: '2026-08-04T10:00:00Z',
+            data: {
+              tankVolume: 0,
+              status: 'EMPTY',
+            },
+          },
+        },
+      }),
+    } as Response);
+
+    render(
+      <DeviceProvider
+        initialDevices={[mockWaterTankDevice]}
+        initialSelectedDeviceId="water-tank-001"
+      >
+        <WaterTankMonitoringCard />
+      </DeviceProvider>
+    );
+
+    expect(await screen.findByText('0')).toBeInTheDocument();
+    expect(screen.getByText('Volume Air Tangki')).toBeInTheDocument();
+    expect(screen.getByText('EMPTY')).toBeInTheDocument();
+    expect(screen.queryByText('—')).not.toBeInTheDocument();
+    expect(screen.getByText('0 L')).toBeInTheDocument();
+    expect(screen.getByText('2200 L')).toBeInTheDocument();
+
+    const progressBar = screen.getByRole('progressbar');
+    expect(progressBar).toHaveAttribute('aria-valuemin', '0');
+    expect(progressBar).toHaveAttribute('aria-valuemax', '2200');
+    expect(progressBar).toHaveAttribute('aria-valuenow', '0');
+
+    const fillBar = screen.getByTestId('tank-volume-progress-bar');
+    expect(fillBar).toHaveStyle({ width: '0%' });
+  });
+
+  it('correctly calculates 50% progress bar and ARIA attributes for 1100 L (~50%)', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        success: true,
+        data: {
+          water: {
+            recordedAt: '2026-08-04T10:00:00Z',
+            data: {
+              tankVolume: 1100,
+              status: 'HALF',
+            },
+          },
+        },
+      }),
+    } as Response);
+
+    render(
+      <DeviceProvider
+        initialDevices={[mockWaterTankDevice]}
+        initialSelectedDeviceId="water-tank-001"
+      >
+        <WaterTankMonitoringCard />
+      </DeviceProvider>
+    );
+
+    expect(await screen.findByText('1100')).toBeInTheDocument();
+    const progressBar = screen.getByRole('progressbar');
+    expect(progressBar).toHaveAttribute('aria-valuenow', '1100');
+
+    const fillBar = screen.getByTestId('tank-volume-progress-bar');
+    expect(fillBar).toHaveStyle({ width: '50%' });
+  });
+
+  it('correctly calculates 100% progress bar and ARIA attributes for 2200 L (100%)', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        success: true,
+        data: {
+          water: {
+            recordedAt: '2026-08-04T10:00:00Z',
+            data: {
+              tankVolume: 2200,
+              status: 'FULL',
+            },
+          },
+        },
+      }),
+    } as Response);
+
+    render(
+      <DeviceProvider
+        initialDevices={[mockWaterTankDevice]}
+        initialSelectedDeviceId="water-tank-001"
+      >
+        <WaterTankMonitoringCard />
+      </DeviceProvider>
+    );
+
+    expect(await screen.findByText('2200')).toBeInTheDocument();
+    const progressBar = screen.getByRole('progressbar');
+    expect(progressBar).toHaveAttribute('aria-valuenow', '2200');
+
+    const fillBar = screen.getByTestId('tank-volume-progress-bar');
+    expect(fillBar).toHaveStyle({ width: '100%' });
+  });
+
+  it('clamps values above 2200 L to 100% and aria-valuenow to 2200', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        success: true,
+        data: {
+          water: {
+            recordedAt: '2026-08-04T10:00:00Z',
+            data: {
+              tankVolume: 2500,
+              status: 'OVERFLOW',
+            },
+          },
+        },
+      }),
+    } as Response);
+
+    render(
+      <DeviceProvider
+        initialDevices={[mockWaterTankDevice]}
+        initialSelectedDeviceId="water-tank-001"
+      >
+        <WaterTankMonitoringCard />
+      </DeviceProvider>
+    );
+
+    expect(await screen.findByText('2500')).toBeInTheDocument();
+    const progressBar = screen.getByRole('progressbar');
+    expect(progressBar).toHaveAttribute('aria-valuenow', '2200');
+
+    const fillBar = screen.getByTestId('tank-volume-progress-bar');
+    expect(fillBar).toHaveStyle({ width: '100%' });
+  });
+
+  it('supports status-only telemetry when tankVolume is null without falling back to smoothFlow', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        success: true,
+        data: {
+          water: {
+            recordedAt: '2026-08-04T10:00:00Z',
+            data: {
+              tankVolume: null,
+              status: 'FILLING',
+            },
+          },
+        },
+      }),
+    } as Response);
+
+    render(
+      <DeviceProvider
+        initialDevices={[mockWaterTankDevice]}
+        initialSelectedDeviceId="water-tank-001"
+      >
+        <WaterTankMonitoringCard />
+      </DeviceProvider>
+    );
+
+    expect(await screen.findByText('—')).toBeInTheDocument();
+    expect(screen.getByText('FILLING')).toBeInTheDocument();
+    expect(screen.queryByText('Aliran Lancar')).not.toBeInTheDocument();
+    expect(screen.queryByText('Smooth Flow')).not.toBeInTheDocument();
   });
 
   it('renders metric cards with — placeholder and Belum ada data when telemetry is null/unavailable', async () => {
@@ -90,7 +292,6 @@ describe('WaterTankMonitoringCard Component Tests', () => {
             recordedAt: null,
             data: {
               tankVolume: null,
-              flowRate: null,
               status: null,
             },
           },
@@ -108,12 +309,19 @@ describe('WaterTankMonitoringCard Component Tests', () => {
     );
 
     const dashes = await screen.findAllByText('—');
-    expect(dashes.length).toBe(2);
+    expect(dashes.length).toBe(1);
     expect(screen.getByText('Volume Air Tangki')).toBeInTheDocument();
-    expect(screen.getByText('Debit Air')).toBeInTheDocument();
     expect(screen.getByText('L')).toBeInTheDocument();
-    expect(screen.getByText('m³/h')).toBeInTheDocument();
+    expect(screen.getByText('0 L')).toBeInTheDocument();
+    expect(screen.getByText('2200 L')).toBeInTheDocument();
+    expect(screen.queryByText('Debit Air')).not.toBeInTheDocument();
+    expect(screen.queryByText('m³/h')).not.toBeInTheDocument();
     expect(screen.getAllByText('Belum ada data').length).toBeGreaterThan(0);
+
+    const progressBar = screen.getByRole('progressbar');
+    expect(progressBar).not.toHaveAttribute('aria-valuenow');
+    const fillBar = screen.getByTestId('tank-volume-progress-bar');
+    expect(fillBar).toHaveStyle({ width: '0%' });
   });
 
   it('renders error state and handles retry button', async () => {
@@ -154,7 +362,6 @@ describe('WaterTankMonitoringCard Component Tests', () => {
             isStale: true,
             data: {
               tankVolume: 300,
-              flowRate: 0,
               status: 'STALE',
             },
           },

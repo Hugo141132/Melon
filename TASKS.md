@@ -1497,6 +1497,69 @@ Metrics:
 
 ---
 
+## TASK-0410 — Remove Unused Water-Tank Flow-Rate Parameter & Reconcile Water-Tank UI Scale
+
+**Priority:** `P1`
+**Status:** `DONE`
+**Dependencies:** `TASK-0404`, `TASK-0406`, `DEC-MON-089`
+**Completed:** 2026-09-09 — Completely removed the unused water-tank flow-rate parameter (`flowRate`, `flow_rate`, `WATER_FLOW_RATE`, `m³/h`, `Debit Air`) from `WATER_TANK_NODE` end-to-end across database schema, shared contracts, IoT gateway MQTT ingestion/validation, REST API/SSE responses, web UI/cards/skeletons, translations (`en.json`, `id.json`), simulators, fixtures, and tests. Applied database migration `20260909010000_remove_reservoir_flow_rate` purging scoped capabilities and dropping column `flow_rate` on Dev and Staging databases with zero data loss. Verified backward compatibility with legacy payloads, explicit zero tank volume, status-only telemetry, full monorepo typecheck (0 errors across 4 workspaces), web production build, container health, and browser UI via Playwright MCP.
+**Water-Tank UI Scale & Responsive Layout Reconciliation (2026-09-09):** Reconciled the water-tank monitoring card and loading transitions adhering strictly to `Premium Minimal Ops`:
+- **Operational Scale (0 L–2200 L):** Updated the operational volume scale from the former 0 L–600 L range to the authoritative 0 L–2200 L agricultural reservoir capacity.
+- **Authoritative Constant:** Exported and bound `WATER_TANK_MAX_CAPACITY = 2200` in `apps/web/lib/constants.ts` as the single source of truth.
+- **Clamped Progress Calculation:** Progress percentage calculates against the 2200 L maximum and clamps values strictly between 0% and 100%: $\text{clamp}((\text{tankVolume} / 2200) \times 100, 0, 100)$.
+- **Visual Scale Labels:** Rendered explicit minimum and maximum scale boundary markers displaying `0 L` and `2200 L`.
+- **Responsive Layout Geometry (Single Full-Width Column):** Diagnosed that the previous half-width desktop layout was caused by a residual two-column CSS grid (`sm:grid-cols-2`) remaining after Flow Rate card removal. Corrected the grid definition to a single full-width column (`grid-cols-1 gap-4`) in `WaterTankMonitoringCard.tsx`, `/controls/loading.tsx`, and `MonitoringDashboard.tsx` (`grid-cols-1 gap-3`), ensuring the card fills the available dashboard width on desktop while adapting responsively on mobile without horizontal overflow.
+- **State Preservation Invariants:** Explicit zero volume (`0 L`), null or unknown volume (`- L`), status-only telemetry, loading skeleton, and error alert states strictly preserved. Faucet control presets (Phase 1: 0.3 L, Phase 2: 1.0 L, Phase 3: 1.5 L), confirmation modals, and `ENABLE_FAUCET_CONTROL=false` safety flag remain untouched.
+
+### Work
+
+- Removed `flowRate` from contracts: `WaterMonitoringResponseDtoSchema`, `ReservoirTelemetryDataSchema`, `IngestReservoirTelemetryInput`.
+- Removed `WATER_FLOW_RATE` from `WATER_TANK_NODE_MONITORING_PARAMETERS` and seed definitions.
+- Updated IoT gateway `TelemetryProcessor` to omit `flowRate` while gracefully parsing and stripping legacy incoming payloads.
+- Updated database repository `telemetry-repository.ts` and created migration `20260909010000_remove_reservoir_flow_rate` with scoped capability deletion.
+- Updated REST API routes: `/api/v1/devices/[deviceId]/monitoring/latest` and `/monitoring/water/latest`.
+- Removed `flowRate` card and skeleton from `WaterTankMonitoringCard.tsx` and `controls/loading.tsx`; embedded status badge cleanly without fallback to `smoothFlow`.
+- Preserved explicit zero tank volume (`0L`), status-only telemetry, and null/unknown states.
+- Cleaned translation keys in `id.json` and `en.json` (100% parity verified via `npm run i18n:check`).
+- Reconciled UI volume scale to 0 L–2200 L with authoritative constant `WATER_TANK_MAX_CAPACITY = 2200`.
+- Corrected responsive grid from residual two-column to single full-width column (`grid-cols-1 gap-4`).
+- Deployed compatible containers to staging, verified `/health`, `/ready`, MQTT connection, and recorded soak restart.
+
+### Verification Evidence & Tiering
+
+- **Automated Verification (PASSED):**
+  - Focused UI unit test suite: **22/22 tests passed (100%)** across 3 test suites:
+    - `apps/web/test/unit/water-tank-monitoring-card.test.tsx` (8/8 passed: 0 L, 1100 L 50%, 2200 L 100%, clamped >2200 L 100%, null volume, status badge, loading skeleton).
+    - `apps/web/test/unit/monitoring-dashboard.test.tsx` (8/8 passed: 1-column grid layout, status presentation, suppression).
+    - `apps/web/test/unit/controls-loading-transition.test.tsx` (6/6 passed: 1-column grid shell, 0 L and 2200 L markers).
+  - Monorepo TypeScript typecheck: **0 errors** across 4 workspaces (`npm run typecheck`).
+  - Next.js web production build: **41/41 routes** compiled successfully (`npm run build --prefix apps/web`).
+  - Container health probes: Staging web and gateway healthy (`/health` and `/ready` HTTP 200, `ENABLE_FAUCET_CONTROL=false`).
+  - Visual validation via Playwright: Desktop ($1280\times 800$) verified full-width card layout without right-side empty space; Mobile ($390\times 844$) verified zero horizontal overflow.
+- **Credential-Dependent Checks (Reserved for Operator):**
+  - Database credential rotation and production connection string updates.
+  - Live Resend custom-domain email deliverability acceptance.
+- **Physical Firmware Checks (Unverified):**
+  - Physical ESP32/NodeMCU firmware reconfiguration and field hardware sensor calibration remain unverified until physical field deployment.
+- **Pre-Commit Quality Gates Notice:**
+  - The five mandatory pre-commit quality gates (`npm run test:coverage`, `npm run test:integration`, `npm run check:quality`, `npm run test`, `npm run test:e2e`) are reserved for personal execution by the operator and are not claimed as passed in this record.
+
+### Acceptance Criteria
+
+- [x] `flowRate` / `flow_rate` completely absent from database, API responses, and web UI.
+- [x] Scoped capability deletion targets only `WATER_TANK_NODE` devices.
+- [x] Legacy payloads with `flowRate` parse cleanly and are stripped without error.
+- [x] Water-tank UI volume scale operates on authoritative 0 L–2200 L range.
+- [x] Authoritative UI constant `WATER_TANK_MAX_CAPACITY = 2200` exported and bound.
+- [x] Progress calculation clamped between 0% and 100% with `0 L` and `2200 L` markers displayed.
+- [x] Responsive layout uses single full-width column, resolving desktop half-width layout.
+- [x] Status-only telemetry and explicit 0 volume are preserved.
+- [x] Zero regressions on faucet control presets, actuator commands, or RBAC (`ENABLE_FAUCET_CONTROL=false`).
+- [x] 100% test pass rate across focused unit test suites (22/22 passed).
+- [x] Monorepo typecheck and production build pass with 0 errors.
+
+---
+
 # 13. Phase 5 — Monitoring and History
 
 ## TASK-0501 — Implement Latest Monitoring API
@@ -2124,6 +2187,11 @@ EXPIRED
 - Updated `FaucetControlPanel.tsx` to render `<FaucetPresetSelectorSkeleton />` during `isDeviceLoading`, completely eliminating the premature flashing of the disabled banner ("Silakan pilih perangkat tandon air") while device context resolves.
 - Refactored `apps/web/app/controls/loading.tsx` to reuse `FaucetPresetSelectorSkeleton`, avoiding markup duplication while preserving the Next.js route-level loading fallback for slow-network bundle delivery.
 - Updated `apps/web/test/unit/controls-loading-transition.test.tsx` to verify component-level skeleton rendering without warning banners (5/5 tests passed). Verified full unit suite (36 files, 288/288 passed) and monorepo TypeScript typecheck (0 errors across 4 workspaces).
+**Water Tank Card & Layout Alignment Reconciliation (2026-09-09 per TASK-0410 / DEC-MON-089):** Reconciled the water tank card and loading skeleton layout on `/controls`:
+- Following the complete removal of Flow Rate (`DEC-MON-089`), updated the structural skeleton in `WaterTankMonitoringCard` and `apps/web/app/controls/loading.tsx` to a single full-width column (`grid-cols-1 gap-4`), eliminating the empty right-side half-width desktop area caused by the residual 2-column grid.
+- Updated gauge shell and volume markers from the previous 0L–600L range to the authoritative 0 L–2200 L operational capacity (`WATER_TANK_MAX_CAPACITY = 2200`), with progress clamped between 0% and 100%.
+- Preserved explicit zero volume (`0 L`), null/unknown volume (`- L`), status-only telemetry, loading skeleton, and error alert states.
+- Verified 100% test pass rate on updated unit test suites (`controls-loading-transition.test.tsx` 6/6, `water-tank-monitoring-card.test.tsx` 8/8) and Playwright desktop/mobile visual checks.
 
 
 ### Acceptance Criteria

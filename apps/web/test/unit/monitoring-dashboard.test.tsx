@@ -93,7 +93,6 @@ const mockWaterQualitySnapshot: LatestMonitoringSnapshotDto = {
       tds: 450,
       ec: 1.9,
       tankVolume: null,
-      flowRate: null,
       status: 'NORMAL',
     },
   },
@@ -115,7 +114,6 @@ const mockWaterTankSnapshot: LatestMonitoringSnapshotDto = {
       tds: null,
       ec: null,
       tankVolume: 1250,
-      flowRate: 14.2,
       status: 'NORMAL',
     },
   },
@@ -201,7 +199,7 @@ describe('TASK-0502 — Real-Time Monitoring Dashboard Integration Tests', () =>
     expect(screen.getByText('1900')).toBeInTheDocument(); // EC in µS/cm (1.9 * 1000)
   });
 
-  it('4. Render Canonical WATER TANK Metrics (Volume, Flow Rate) without Reservoir terminology', async () => {
+  it('4. Render Canonical WATER TANK Metrics (Volume) without Reservoir terminology', async () => {
     global.fetch = vi.fn().mockImplementation((url: string) => {
       if (url.includes('/api/v1/devices')) {
         return Promise.resolve({
@@ -227,8 +225,7 @@ describe('TASK-0502 — Real-Time Monitoring Dashboard Integration Tests', () =>
     });
 
     expect(screen.getByText('1250')).toBeInTheDocument(); // Volume
-    expect(screen.getByText('14.2')).toBeInTheDocument(); // Flow rate
-    expect(screen.getByText('m³/h')).toBeInTheDocument(); // Canonical Flow Rate Unit
+    expect(screen.queryByText('m³/h')).not.toBeInTheDocument();
 
     // Prohibition Checks: Verify NO reservoir terminology or battery/GPS/MQTT mentions
     expect(screen.queryByText(/reservoir/i)).toBeNull();

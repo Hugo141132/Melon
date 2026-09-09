@@ -503,7 +503,38 @@ The following facts are verified in the traceability matrix regarding `TASK-0916
   - Restarted 72-hour soak monitoring window active from `2026-09-08 15:28:30 UTC` through `2026-09-11 15:28:30 UTC` (sample probe health validated; continuous monitoring gap disclosed). Deletion of paused Mumbai projects tracked as post-migration retirement follow-up upon soak completion.
 <!-- TASK-0916 Staging Cutover Traceability Reconciled: 2026-09-08 -->
 
+---
 
+## Water-Tank Flow-Rate Telemetry Parameter Removal & UI Scale Traceability Note (TASK-0410 / DEC-MON-089 / Reconciled 2026-09-09)
 
-
-
+The following facts are verified in the traceability matrix regarding `TASK-0410` and `DEC-MON-089` (Complete End-to-End Removal of Water-Tank Flow-Rate Telemetry Parameter & Water-Tank UI Scale Alignment):
+- **Traceability Baseline:** Governed by `DEC-MON-089`, `TASK-0410`, `docs/DEVICE_COMMUNICATION.md`, `docs/DATABASE.md`, `docs/API.md`, and `docs/UI_UX.md`. Completely removes the unused `flowRate` / `flow_rate` / `WATER_FLOW_RATE` telemetry parameter from `WATER_TANK_NODE`.
+- **Implementation Status:** Fully implemented and verified:
+  - `@kebun-melon/contracts`: Removed `flowRate` from `WaterMonitoringResponseDtoSchema`, `ReservoirTelemetryDataSchema`, and `IngestReservoirTelemetryInput`. Removed `'WATER_FLOW_RATE'` from `WATER_TANK_NODE_MONITORING_PARAMETERS`. Maintained legacy payload stripping in parser (`passthrough()` with canonical mapping).
+  - `apps/iot-gateway`: Removed `flowRate` parameter mapping and validation from `ingestReservoirReading` in `apps/iot-gateway/src/telemetry/processor.ts`.
+  - `scripts/device-simulator.ts`: Removed `flowRate` default (2.3) and dynamic generation.
+  - `packages/database`: Removed `flow_rate` column from `schema.prisma` (`ReservoirWaterReading`), regenerated Prisma client, updated `telemetry-repository.ts` and `seed.ts` (removed `'WATER_FLOW_RATE'` capability).
+  - Database Migrations: Created migration `20260909010000_remove_reservoir_flow_rate` with bounded lock timeout (`5s`). Dropped `flow_rate` from `reservoir_water_readings`, scoped deletion of `WATER_FLOW_RATE` from `device_capabilities` strictly to water tank devices. Applied and verified on Singapore DEV (`unbyxlkrzqlafolxcypi`) and Singapore STAGING (`ihgoxqdncepbcrqkchxu`).
+  - `apps/web`: Removed `flowRate` from latest monitoring REST endpoints (`GET /api/v1/devices/[deviceId]/monitoring/latest` and `water/latest`), `WATER_DATA` constant, `WaterTankMonitoringCard.tsx` (removed flow rate card and skeleton), `MonitoringDashboard.tsx` (`WaterTankSectionProps`), and `/controls` loading transition skeleton (`apps/web/app/controls/loading.tsx`). Preserved explicit zero `tankVolume`, status-only telemetry, and null states without falling back to `smoothFlow`.
+  - Translations: Cleaned dictionary keys `flowRate`, `flowSmooth`, `smoothFlow` from `messages/id.json` and `messages/en.json` with 100% key parity verified via `npm run i18n:check`.
+  - UI Volume Scale Alignment (0 L–2200 L): Reconciled operational volume scale to 0 L–2200 L with authoritative constant `WATER_TANK_MAX_CAPACITY = 2200` in `apps/web/lib/constants.ts`. Bounding markers display `0 L` and `2200 L`. Progress percentage is derived against the 2200 L maximum and clamped between 0% and 100%: $\text{clamp}((\text{tankVolume} / 2200) \times 100, 0, 100)$.
+  - Responsive Layout Geometry: Corrected residual two-column CSS grid (`sm:grid-cols-2`) left over from Flow Rate removal to a single full-width column (`grid-cols-1 gap-4`) in `WaterTankMonitoringCard.tsx`, `apps/web/app/controls/loading.tsx`, and `MonitoringDashboard.tsx` (`grid-cols-1 gap-3`), resolving the half-width desktop layout while adapting responsively on mobile ($390\text{px}$) with zero horizontal overflow.
+  - Staging Environment Synchronization: Staging Docker containers (`kebun-melon-staging-web` and `kebun-melon-staging-gateway`) rebuilt, redeployed, and healthy (`/health`, `/ready` HTTP 200). `ENABLE_FAUCET_CONTROL=false` verified. Soak window restarted at `2026-09-09 01:04:46 UTC` with earliest completion at `2026-09-12 01:04:46 UTC`.
+- **Verification Evidence & Tiering:**
+  - *Automated Verification (PASSED):*
+    - Contracts unit tests: 112/112 passed across 12 suites (100%).
+    - Database repository tests: 24/24 passed across 2 suites (100%).
+    - IoT Gateway tests: 236/236 passed across 12 suites (100%).
+    - Web UI & route tests: 47/47 passed across 8 focused suites (100%).
+    - Water-tank focused UI suites: 22/22 passed across 3 suites (`water-tank-monitoring-card.test.tsx` 8/8, `monitoring-dashboard.test.tsx` 8/8, `controls-loading-transition.test.tsx` 6/6).
+    - Monorepo typecheck: 0 errors across 4 workspaces (`npm run typecheck`).
+    - Next.js production build: 41/41 routes compiled successfully.
+    - Playwright desktop/mobile visual checks confirmed full-width cards and zero horizontal overflow.
+  - *Credential-Dependent Checks (Reserved for Operator):*
+    - Database credential rotation and production connection string updates.
+    - Live Resend custom-domain email deliverability acceptance.
+  - *Physical Firmware Checks (Unverified):*
+    - Physical ESP32/NodeMCU firmware reconfiguration and field hardware sensor calibration remain unverified until physical field deployment.
+  - *Pre-Commit Quality Gates Notice:*
+    - The five mandatory pre-commit quality gates (`npm run test:coverage`, `npm run test:integration`, `npm run check:quality`, `npm run test`, `npm run test:e2e`) are reserved for personal execution by the operator and are not claimed as passed in this record.
+<!-- TASK-0410 Traceability Reconciled: 2026-09-09 -->

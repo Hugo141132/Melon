@@ -880,7 +880,7 @@ Stores general water-quality telemetry.
 
 ## 8.4 `reservoir_water_readings` (DB-TEL-003)
 
-Stores reservoir-water volume and flow rate telemetry independently from general water-quality.
+Stores reservoir-water volume and status telemetry independently from general water-quality. Flow rate (`flow_rate`) parameter was completely removed per `DEC-MON-089` (`TASK-0410`).
 
 | Column | Type | Nullable | Notes |
 |---|---|---:|---|
@@ -892,7 +892,6 @@ Stores reservoir-water volume and flow rate telemetry independently from general
 | `recorded_at` | TIMESTAMPTZ | Yes | |
 | `received_at` | TIMESTAMPTZ | No | |
 | `tank_volume` | NUMERIC | Yes | Unit `L` (Liters) |
-| `flow_rate` | NUMERIC | Yes | Unit `m³/h` (Cubic meters per hour) |
 | `status` | VARCHAR(30) | Yes | Canonical status |
 | `validation_status` | VARCHAR(30) | No | |
 | `created_at` | TIMESTAMPTZ | No | |
@@ -1400,16 +1399,15 @@ latitude  NUMERIC(9,6)
 longitude NUMERIC(9,6)
 ```
 
-### 14.3 Tank and Flow
+### 14.3 Tank Volume
 
 Recommended provisional types:
 
 ```text
 tank_volume NUMERIC(12,3)
-flow_rate   NUMERIC(12,3)
 ```
 
-Final units remain `TBD`.
+Note: `flow_rate` parameter was completely removed per `DEC-MON-089` (`TASK-0410`).
 
 ### 14.4 JSONB
 

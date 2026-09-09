@@ -291,7 +291,6 @@ function WaterQualitySection({ data, recordedAt }: WaterQualitySectionProps) {
 interface WaterTankSectionProps {
   data: {
     tankVolume: number | null;
-    flowRate: number | null;
     status: string | null;
   };
   recordedAt: string | null;
@@ -326,18 +325,12 @@ function WaterTankSection({ data, recordedAt }: WaterTankSectionProps) {
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3">
         <MetricItem
           label={tWater('tankVolume')}
           value={formatMetricValue(data.tankVolume, 1)}
           unit="L"
           icon={<Database size={16} />}
-        />
-        <MetricItem
-          label={tWater('flowRate')}
-          value={formatMetricValue(data.flowRate, 1)}
-          unit="m³/h"
-          icon={<Activity size={16} />}
         />
       </div>
     </section>
@@ -415,10 +408,10 @@ export default function MonitoringDashboard() {
     (snapshot.water.data.ph !== null ||
       snapshot.water.data.tds !== null ||
       snapshot.water.data.ec !== null);
-  const hasWaterTankData =
-    snapshot?.water &&
-    snapshot.water.data &&
-    (snapshot.water.data.tankVolume !== null || snapshot.water.data.flowRate !== null);
+  const hasWaterTankData = Boolean(
+    snapshot?.water?.data &&
+    (snapshot.water.data.tankVolume !== null || Boolean(snapshot.water.data.status))
+  );
 
   const hasAnyData = hasSoilData || hasWaterQualityData || hasWaterTankData;
 

@@ -135,7 +135,6 @@ export async function GET(request: Request, props: { params: Promise<{ deviceId:
         tds: toNumberOrNull(waterReading?.tds),
         ec: toNumberOrNull(waterReading?.ec),
         tankVolume: toNumberOrNull(reservoirReading?.tankVolume),
-        flowRate: toNumberOrNull(reservoirReading?.flowRate),
         status: reservoirReading?.status || waterReading?.status || null,
       },
     };

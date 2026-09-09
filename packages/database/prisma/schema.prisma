@@ -362,7 +362,6 @@ model ReservoirWaterReading {
   recordedAt       DateTime? @map("recorded_at") @db.Timestamptz
   receivedAt       DateTime  @default(now()) @map("received_at") @db.Timestamptz
   tankVolume       Decimal?  @map("tank_volume") @db.Decimal
-  flowRate         Decimal?  @map("flow_rate") @db.Decimal
   status           String?   @db.VarChar(30)
   validationStatus String    @default("VALID") @map("validation_status") @db.VarChar(30)
   createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz

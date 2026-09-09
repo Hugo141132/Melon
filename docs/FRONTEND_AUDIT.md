@@ -133,7 +133,7 @@ Routing is managed strictly by the Next.js App Router (`app/` directory).
 | `/reset-password` | `app/(auth)/reset-password/page.tsx` | Server Component | **Reset Password**: Server-side guest guard wrapper rendering `ResetPasswordView`. Consumes raw token from query params, enforces password complexity, handles invalid/expired token banners, resets password via Argon2id. Inaccessible to active sessions. |
 | `/verify-email` | `app/(auth)/verify-email/page.tsx` | Server Component | **Email Verification**: Server-side guest guard wrapper rendering `VerifyEmailView`. Clean layout without decorative image, token extraction from query params, StrictMode-safe in-flight request deduplication with settlement cache eviction, automatic redirect to `/status?status=PENDING_APPROVAL` for Admin applicants, success view for Owners, and public resend form with countdown cooldown. Inaccessible to active sessions. |
 | `/soil` | `app/soil/page.tsx` | Client Component | **NPK Soil Monitoring (`/soil`)**: Real-time soil metrics, latest sensor status, historical telemetry chart (`NPKChart`, `HistoricalChartControls`), 24h default range, metric selection, raw pagination. |
-| `/water` | `app/water/page.tsx` | Client Component | **Water Quality & Reservoir Monitoring (`/water`)**: Real-time water metrics (pH, TDS, EC converted to `µS/cm`), historical telemetry chart (`WaterNutrientChart`, `HistoricalChartControls`), reservoir tank & flow metrics, 3-phase faucet preset UI. |
+| `/water` | `app/water/page.tsx` | Client Component | **Water Quality & Reservoir Monitoring (`/water`)**: Real-time water metrics (pH, TDS, EC converted to `µS/cm`), historical telemetry chart (`WaterNutrientChart`, `HistoricalChartControls`), reservoir tank volume (0 L–2200 L scale; flow rate deleted per `DEC-MON-089`), 3-phase faucet preset UI. |
 | `/tanah` & `/air` | Legacy paths | Not Found | **Legacy Routes**: Superseded by canonical `/soil` and `/water` routes. Requests return 404 Not Found. |
 | `/notifikasi` | `app/notifikasi/page.tsx` | Server Component | **Notifikasi**: Sensor alert cards categorized by severity (error/kritis, warning/peringatan), target range comparisons, resolved alerts log. |
 | `/setting` | `app/setting/page.tsx` | Server Component | **setting**: Settings menu with user profileee header card, navigation links to profileee, Notifications, Sensor Config, and Support. |
@@ -540,5 +540,29 @@ The following frontend components were created, refactored, and audited for the 
   - User list fetching (`fetchUsers(1)`) now triggers immediately upon mount for Owner users without waiting for client session roundtrips.
   - Non-owner users immediately render the 403 Forbidden screen (`Akses Terbatas (403 Forbidden)`) without lingering spinners, backed by strict Next.js route middleware and server-side RBAC guards (`requireRole(['OWNER'])`).
 <!-- Users Loading & Auth Frontend Audit Reconciled: 2026-09-04 -->
+
+---
+
+## Water Tank Monitoring UI Layout & Volume Scale Frontend Audit Note (Reconciled 2026-09-09)
+
+The following frontend components were audited, refactored, and verified for `TASK-0410` (Flow-Rate Removal, 0 L–2200 L Volume Scale Alignment, and Responsive Layout Reconciliation):
+- **`apps/web/components/monitoring/WaterTankMonitoringCard.tsx` [AUDITED & RECONCILED]:**
+  - Flow rate card and skeleton removed following `DEC-MON-089`.
+  - Refactored layout from residual two-column CSS grid (`sm:grid-cols-2`) to a single full-width column (`grid-cols-1 gap-4`), resolving the desktop defect where the card previously occupied only half the available content width.
+  - Sourced authoritative maximum capacity from `WATER_TANK_MAX_CAPACITY = 2200` (`apps/web/lib/constants.ts`), updating operational scale from 0 L–600 L to 0 L–2200 L.
+  - Updated visual bounding markers to `0 L` and `2200 L`.
+  - Derived progress percentage using 2200 L max, clamped between 0% and 100%: $\text{clamp}((\text{tankVolume} / 2200) \times 100, 0, 100)$.
+  - Preserved explicit zero volume (`0 L` with 0% fill), null or unknown telemetry (`- L` with 0% fill), status-only telemetry, loading skeleton, and error alert states.
+  - Preserved full accessibility: `role="progressbar"`, `aria-valuenow`, `aria-valuemin="0"`, `aria-valuemax="2200"`.
+- **`apps/web/app/controls/loading.tsx` [AUDITED & RECONCILED]:**
+  - Updated structural loading skeleton to single full-width column (`grid-cols-1 gap-4`) and matching `0 L` / `2200 L` scale labels.
+- **`apps/web/components/monitoring/MonitoringDashboard.tsx` [AUDITED & RECONCILED]:**
+  - Updated responsive grid container for water tank section to single full-width column (`grid-cols-1 gap-3`).
+- **`apps/web/lib/constants.ts` [AUDITED & RECONCILED]:**
+  - Exported authoritative constant `WATER_TANK_MAX_CAPACITY = 2200`.
+- **Verification:**
+  - 22/22 unit tests passed across `water-tank-monitoring-card.test.tsx` (8/8), `monitoring-dashboard.test.tsx` (8/8), and `controls-loading-transition.test.tsx` (6/6).
+  - Playwright visual tests confirmed full-width cards on desktop ($1280\times 800$) and zero horizontal overflow on mobile ($390\times 844$).
+<!-- Water Tank UI Frontend Audit Reconciled: 2026-09-09 -->
 
 

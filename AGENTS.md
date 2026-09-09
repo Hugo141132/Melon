@@ -37,7 +37,7 @@ The system monitors:
 
 ### Reservoir-Water Monitoring (MQTT 5.0 over TLS via EMQX Broker)
 
-- Reservoir water volume, Reservoir water flow rate, Reservoir status.
+- Reservoir water volume, Reservoir status (Flow rate deleted per `DEC-MON-089`).
 
 ### Sensor Battery (`BAT`)
 
@@ -415,6 +415,27 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
   - **Session Resilience**: Hardened transaction timeout in `packages/database/src/session-service.ts` to `{ maxWait: 15000, timeout: 20000 }` to avoid Prisma transaction aborts during remote database pool latency while strictly preserving atomic single active session row locks (`SELECT ... FOR UPDATE`).
   - **Verification**: Verified 100% test pass rate in `apps/web/test/unit/dashboard-page.test.tsx` (6/6 passing including automated emoji scan), 100% translation key parity (`npm run i18n:check`), Prettier code style (`npm run format:check`), and monorepo TypeScript typecheck (0 errors across 4 workspaces).
 
+#### TASK-0410 Governance Record
+
+`TASK-0410` water-tank flow-rate removal & volume scale reconciliation record:
+- Status: `DONE` (Completed & Reconciled 2026-09-09)
+- Frontend impact: `MINOR`
+- Selected UI direction: `Premium Minimal Ops`
+- Existing color template: `UNCHANGED` (Agricultural green `#0d631b`, container surfaces, semantic status badges)
+- Selected motion effects: `Card hover`, `Skeleton loading`
+- 21st.dev MCP: `NOT REQUIRED` (reuses existing design tokens, progressbar patterns, and skeleton primitives)
+- Summary: Reconciled the water-tank monitoring card and loading transitions following the complete end-to-end removal of the unused flow-rate parameter (`flowRate`, `flow_rate`, `WATER_FLOW_RATE`, `m³/h`, `Debit Air`) per `DEC-MON-089`.
+  - **Operational Scale (0 L–2200 L)**: Updated the operational volume scale from the former 0 L–600 L range to the authoritative 0 L–2200 L agricultural reservoir capacity. Defined authoritative constant `WATER_TANK_MAX_CAPACITY = 2200` in `apps/web/lib/constants.ts` as the single source of truth. Rendered scale boundary markers `0 L` and `2200 L`.
+  - **Clamped Progress Calculation**: Gauge percentage strictly calculates against the 2200 L maximum and clamps values between 0% and 100%: $\text{clamp}((\text{tankVolume} / 2200) \times 100, 0, 100)$, preventing gauge bar overruns.
+  - **Responsive Layout Geometry**: Diagnosed and resolved the desktop half-width card bug. The previous half-width layout was caused by a remaining two-column grid (`sm:grid-cols-2`) after Flow Rate removal. Corrected layout to a single full-width column (`grid-cols-1 gap-4`) in `WaterTankMonitoringCard.tsx`, `apps/web/app/controls/loading.tsx`, and `MonitoringDashboard.tsx` (`grid-cols-1 gap-3`), spanning the full dashboard width on desktop while maintaining zero horizontal overflow on mobile ($390\text{px}$).
+  - **State Preservation**: Explicit zero volume (`0 L` with 0% fill), null or unknown telemetry (`- L` with 0% fill), status-only telemetry, loading skeleton, and error alert states strictly preserved without falling back to `smoothFlow`. Faucet control presets (Phase 1: 0.3 L, Phase 2: 1.0 L, Phase 3: 1.5 L), confirmation modal, and `ENABLE_FAUCET_CONTROL=false` safety flag remain untouched.
+  - **Verification Evidence & Tiering**:
+    - *Automated Checks (Passed)*: 22/22 unit tests passed across 3 suites (`water-tank-monitoring-card.test.tsx` 8/8, `monitoring-dashboard.test.tsx` 8/8, `controls-loading-transition.test.tsx` 6/6), monorepo TypeScript typecheck (0 errors across 4 workspaces), Next.js web production build (41/41 routes), staging container health probes (`/health`, `/ready` HTTP 200), and Playwright desktop/mobile visual checks confirmed full-width cards and zero horizontal overflow.
+    - *Credential-Dependent Checks (Reserved for Operator)*: Database credential rotation and production connection string updates.
+    - *Physical Firmware Checks (Unverified)*: Physical ESP32/NodeMCU firmware reconfiguration and field hardware sensor calibration remain unverified until physical field deployment.
+    - *Pre-Commit Quality Gates*: The five mandatory pre-commit quality gates (`npm run test:coverage`, `npm run test:integration`, `npm run check:quality`, `npm run test`, `npm run test:e2e`) are reserved for personal execution by the operator.
+
+
 #### TASK-0601 Governance Record
 
 `TASK-0601` I18N infrastructure & configuration record:
@@ -685,6 +706,17 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
 - Selected motion effects: `Skeleton loading`
 - 21st.dev MCP: `NOT REQUIRED`
 - Summary: Improved Faucet Control page loading strategy by separating initial page shell rendering from asynchronous device, telemetry, and command fetching. Extracted `apps/web/components/controls/FaucetPresetSelectorSkeleton.tsx` to serve as a reusable component-level skeleton matching exact layout tokens. Updated `FaucetControlPanel.tsx` to render this skeleton while `isDeviceLoading` is true, completely eliminating the flash of premature disabled error states ("Silakan pilih perangkat tandon air") and layout jumping during initial device context hydration. Refactored `apps/web/app/controls/loading.tsx` to reuse `FaucetPresetSelectorSkeleton`, avoiding markup duplication while preserving the Next.js route-level loading fallback for slow-network bundle delivery. Verified 100% test pass rate across `controls-loading-transition.test.tsx` (5/5), `faucet-control-ui.test.tsx` (27/27), full web unit suite (36 files, 288/288 tests), and workspace typecheck (0 errors across 4 monorepo packages).
+
+#### TASK-0410 Governance Record
+
+`TASK-0410` water-tank flow rate parameter complete removal record:
+- Status: `DONE` (Completed 2026-09-09)
+- Frontend impact: `MINOR`
+- Selected UI direction: `Premium Minimal Ops`
+- Existing color template: `UNCHANGED`
+- Selected motion effects: `Card hover`, `Skeleton loading`
+- 21st.dev MCP: `NOT REQUIRED`
+- Summary: Completely removed unused water-tank flow rate telemetry parameter (`flowRate`, `flow_rate`, `WATER_FLOW_RATE`) across contracts, database schema, IoT gateway MQTT ingestion, REST API/SSE responses, web UI, translations, simulators, fixtures, and tests governed by `DEC-MON-089`. Scoped capability removal strictly to water tank devices. Verified legacy payload backward compatibility: payloads with or without `flowRate` validate cleanly, stripping `flowRate` at ingestion without data corruption or rejection. Removed flow rate card and skeleton from `WaterTankMonitoringCard` and `/controls` loading view, preserving explicit zero `tankVolume`, status-only telemetry, and null states without fallback to `smoothFlow`. Applied versioned migration `20260909010000_remove_reservoir_flow_rate` on Supabase DEV and STAGING. Verified staging containers `/health` and `/ready` (200 OK, `ENABLE_FAUCET_CONTROL=false`). Verified 100% test pass rate across all monorepo unit/integration suites and 0 typecheck errors.
 
 ---
 

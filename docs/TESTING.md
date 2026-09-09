@@ -152,7 +152,7 @@ Physical faucet-control testing shall begin with:
 - profilee management.
 - Device assignment.
 - Telemetry ingestion via **REST API over Wi-Fi** (soil payload validation, water quality payload validation, invalid payload rejection, unauthorized device rejection, shared BAT placement verification).
-- Telemetry ingestion via **MQTT/EMQX** (reservoir volume telemetry, reservoir flow rate telemetry, invalid topic/payload rejection, per-device ACL enforcement, broker reconnects, duplicate handling, gateway validation).
+- Telemetry ingestion via **MQTT/EMQX** (reservoir volume telemetry, invalid topic/payload rejection, per-device ACL enforcement, broker reconnects, duplicate handling, gateway validation; reservoir flow rate telemetry deleted per `DEC-MON-089`).
 - Internationalisation.
 - API.
 - Database.
@@ -989,15 +989,31 @@ status
 
 *Note:* `battery` (`BAT`), `latitude`, and `longitude` are deleted parameters per `DEC-MON-086`.
 
-## 17.2.1 Reservoir Water Telemetry (MQTT per DEC-DEV-020 & TASK-0408)
+## 17.2.1 Reservoir Water Telemetry (MQTT per DEC-DEV-020, TASK-0408, & DEC-MON-089)
 
 Verify fields (`WATER_TANK_NODE`):
 
 ```text
 tankVolume
-flowRate
 status
 ```
+
+*Note:* `flowRate` (`WATER_FLOW_RATE`) is permanently deleted per `DEC-MON-089` / `TASK-0410`.
+
+## 17.2.2 Water Tank Monitoring UI & Volume Scale (TASK-0410 / DEC-MON-089)
+
+Verify UI components (`WaterTankMonitoringCard.tsx`, `/controls/loading.tsx`, `MonitoringDashboard.tsx`):
+- Operational volume scale displays and calculates across **0 L to 2200 L**.
+- Authoritative constant `WATER_TANK_MAX_CAPACITY = 2200` in `apps/web/lib/constants.ts` is enforced.
+- Progress percentage: $\text{clamp}((\text{tankVolume} / 2200) \times 100, 0, 100)$.
+  - `0 L` $\rightarrow$ 0% fill.
+  - `1100 L` $\rightarrow$ 50% fill.
+  - `2200 L` $\rightarrow$ 100% fill.
+  - `> 2200 L` $\rightarrow$ clamped to 100% fill.
+  - Negative values $\rightarrow$ clamped to 0% fill.
+- Visual scale boundary markers display `0 L` and `2200 L`.
+- Preserves explicit zero volume (`0 L`), null/unknown volume (`- L`), status-only telemetry, loading skeleton, and error alert states.
+- Responsive layout uses single full-width column (`grid-cols-1 gap-4`), resolving the former half-width desktop layout caused by residual `sm:grid-cols-2`.
 
 ## 17.3 Data States
 
@@ -2788,3 +2804,63 @@ The following verification gates were executed and evaluated for Singapore Stagi
 - **Retirement Follow-Up:** Deletion of paused Mumbai project (`scqrbtfilmttqrutynyo`) is tracked as post-migration operational follow-up upon soak completion and verified cold-storage backup.
 - **Task Status:** Technical cutover `TASK-0916` is **`DONE`**. Full execution details in [`docs/SUPABASE_MIGRATION_RUNBOOK.md`](file:///c:/Users/Puroh/Documents/Melon/docs/SUPABASE_MIGRATION_RUNBOOK.md).
 <!-- TASK-0916 Staging Testing Evidence Reconciled: 2026-09-08 -->
+
+---
+
+## 35.7 TASK-0410 / DEC-MON-089 Water Tank Monitoring UI & Volume Scale Verification Results (2026-09-09)
+
+The following verification gates were executed and evaluated for `TASK-0410` (Flow-Rate Removal, Water-Tank 0 L–2200 L Volume Scale, and Responsive Layout Alignment):
+
+### 1. Automated Unit & Integration Tests (PASSED)
+- **Focused UI Unit Test Suite (22/22 passed across 3 test files, 100%):**
+  - `apps/web/test/unit/water-tank-monitoring-card.test.tsx` (8/8 passed):
+    - Renders tank volume with 2200 L maximum capacity gauge markers (`0 L` and `2200 L`).
+    - Calculates exact 0% progress fill for `tankVolume = 0`.
+    - Calculates exact 50% progress fill for `tankVolume = 1100`.
+    - Calculates exact 100% progress fill for `tankVolume = 2200`.
+    - Clamps over-capacity values (`tankVolume = 2500`) safely to 100%.
+    - Handles null/undefined volume gracefully without crash (displays `"- L"` and 0% fill).
+    - Preserves tank status badge without falling back to flow rate.
+    - Renders structural skeleton card during loading state.
+  - `apps/web/test/unit/monitoring-dashboard.test.tsx` (8/8 passed):
+    - Verifies full-width responsive grid container (`grid-cols-1 gap-3`).
+    - Verifies telemetry freshness, status presentation, and stale suppression.
+  - `apps/web/test/unit/controls-loading-transition.test.tsx` (6/6 passed):
+    - Verifies route-level skeleton shell rendering matching loaded layout.
+    - Verifies single full-width column skeleton (`grid-cols-1 gap-4`) and `0 L` / `2200 L` markers.
+- **Monorepo TypeScript Typecheck:** `npm run typecheck` passed with **0 errors** across all 4 monorepo workspaces (`@kebun-melon/contracts`, `@kebun-melon/database`, `@kebun-melon/iot-gateway`, `@kebun-melon/web`).
+- **Next.js Web Production Build:** `npm run build --prefix apps/web` passed with **41/41 routes** compiled successfully.
+- **Code Formatting:** `npm run format:check` passed with **0 warnings/errors** across all project files.
+- **Internationalization Parity:** `npm run i18n:check` passed with **100% key parity** between `messages/id.json` and `messages/en.json`.
+
+### 2. Browser & Visual Layout Verification via Playwright (PASSED)
+- **Desktop Viewport ($1280\times 800$):**
+  - Verified `WaterTankMonitoringCard` occupies the complete available dashboard content width.
+  - Confirmed the elimination of the empty right-side half-width void previously caused by the residual `sm:grid-cols-2` CSS grid class.
+  - Gauge bar and progress indicator display smooth fill with `0 L` and `2200 L` bounding labels.
+- **Mobile Viewport ($390\times 844$):**
+  - Verified single-column stacked layout with fluid scaling and zero horizontal overflow (`scrollWidth === clientWidth`).
+  - Progress bar, labels, and status badges remain legible and touch-accessible.
+
+### 3. Staging Infrastructure & Container Health (PASSED)
+- Staging Docker containers (`kebun-melon-staging-web` and `kebun-melon-staging-gateway`) verified running and healthy.
+- Web `/health` returns HTTP 200 (`{ "status": "ok" }`).
+- Web `/ready` returns HTTP 200 with database `up`, gateway `up`, broker `up`.
+- Gateway `/health` returns HTTP 200 (`{ "status": "pass" }`).
+- Faucet safety invariant strictly maintained: `ENABLE_FAUCET_CONTROL=false`.
+
+### 4. Verification Check Tiering & Boundary Summary
+- **Tier 1: Automated Checks (Executed & Verified):**
+  - 22/22 unit tests passed.
+  - 0 TypeScript errors.
+  - Web production build passed.
+  - Container health/readiness probes returned HTTP 200.
+  - Playwright visual checks passed on desktop and mobile.
+- **Tier 2: Credential-Dependent Checks (Reserved for Operator):**
+  - Database credential rotation and production connection string updates.
+  - Live Resend custom-domain email deliverability acceptance.
+- **Tier 3: Physical Firmware Checks (Unverified):**
+  - Physical ESP32/NodeMCU firmware reconfiguration and field hardware sensor calibration remain unverified until physical field deployment.
+- **Mandatory Pre-Commit Quality Gates Notice:**
+  - The five mandatory pre-commit quality gates (`npm run test:coverage`, `npm run test:integration`, `npm run check:quality`, `npm run test`, `npm run test:e2e`) are reserved for personal execution by the operator and are not claimed as passed in this record.
+<!-- TASK-0410 Testing Evidence Reconciled: 2026-09-09 -->

@@ -189,7 +189,6 @@ export class TelemetryProcessor {
         sequenceNumber: payload.sequence,
         recordedAt: payload.recordedAt,
         tankVolume: payload.data.tankVolume,
-        flowRate: payload.data.flowRate,
         status: payload.data.status,
       });
 

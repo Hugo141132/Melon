@@ -234,7 +234,6 @@ describe('API Integration Test Suite — Monitoring Schema & Data Semantics (TAS
       });
       mockGetLatestWaterTankReading.mockResolvedValueOnce({
         tankVolume: 12000,
-        flowRate: 500,
         status: MonitoringStatus.NORMAL,
         recordedAt: new Date('2026-08-07T10:00:00Z'),
         receivedAt: new Date('2026-08-07T10:00:00Z'),
@@ -253,6 +252,7 @@ describe('API Integration Test Suite — Monitoring Schema & Data Semantics (TAS
       expect(json.data.soil.data.nitrogen).toBe(50);
       expect(json.data.water.data.ph).toBe(7.1);
       expect(json.data.water.data.tankVolume).toBe(12000);
+      expect(json.data.water.data.flowRate).toBeUndefined();
     });
   });
 });

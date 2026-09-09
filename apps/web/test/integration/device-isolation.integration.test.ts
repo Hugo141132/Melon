@@ -125,7 +125,6 @@ describe('API Integration Test Suite — Device Isolation & Authorization (TASK-
       });
       mockGetLatestWaterTankReading.mockResolvedValueOnce({
         tankVolume: 5000,
-        flowRate: 120,
         recordedAt: new Date(),
         receivedAt: new Date(),
       });
@@ -143,6 +142,7 @@ describe('API Integration Test Suite — Device Isolation & Authorization (TASK-
       expect(json.success).toBe(true);
       expect(json.data.soil.data.nitrogen).toBe(45);
       expect(json.data.water.data.tankVolume).toBe(5000);
+      expect(json.data.water.data.flowRate).toBeUndefined();
     });
 
     it('allows Admin to execute faucet command on assigned controllable device', async () => {

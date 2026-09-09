@@ -469,8 +469,6 @@ export default function DeviceRegistryPage() {
                               return 'Irrigation Valve Control';
                             case 'WATER_TANK_VOLUME':
                               return 'Water Tank Volume (L)';
-                            case 'WATER_FLOW_RATE':
-                              return 'Water Flow Rate (m³/h)';
                             case 'WATER_TDS':
                               return 'Water TDS (ppm)';
                             default:

@@ -223,7 +223,6 @@ export class TelemetryRepository {
             recordedAt: recordedAtDate,
             receivedAt: serverReceivedAt,
             tankVolume: toDecimal(input.tankVolume),
-            flowRate: toDecimal(input.flowRate),
             status: input.status || null,
             validationStatus: input.validationStatus || TelemetryValidationStatus.VALID,
           },

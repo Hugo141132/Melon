@@ -211,7 +211,7 @@ describe('Latest Monitoring API Endpoints (TASK-0501 & TASK-0504 Repairs)', () =
   });
 
   describe('GET /api/v1/devices/[deviceId]/monitoring/water/latest', () => {
-    it('returns 200 for Owner, returning only tankVolume and flowRate for WATER_TANK_NODE with ph/tds/ec as null and no GPS coords', async () => {
+    it('returns 200 for Owner, returning only tankVolume for WATER_TANK_NODE with ph/tds/ec as null and no flowRate/GPS coords', async () => {
       mockOwnerSession();
       mockGetDeviceByCanonicalId.mockResolvedValue(dummyWaterTankDevice);
       mockGetLatestWaterTankReading.mockResolvedValue({
@@ -220,7 +220,6 @@ describe('Latest Monitoring API Endpoints (TASK-0501 & TASK-0504 Repairs)', () =
         recordedAt: new Date('2026-08-02T17:59:00Z'),
         receivedAt: new Date('2026-08-02T18:00:00Z'),
         tankVolume: 850.5,
-        flowRate: 0,
         status: 'NORMAL',
       });
 
@@ -238,7 +237,7 @@ describe('Latest Monitoring API Endpoints (TASK-0501 & TASK-0504 Repairs)', () =
       expect(json.data.data.tds).toBeNull();
       expect(json.data.data.ec).toBeNull();
       expect(json.data.data.tankVolume).toBe(850.5);
-      expect(json.data.data.flowRate).toBe(0);
+      expect(json.data.data.flowRate).toBeUndefined();
       expect(json.data.data.latitude).toBeUndefined();
       expect(json.data.data.longitude).toBeUndefined();
     });
@@ -253,7 +252,6 @@ describe('Latest Monitoring API Endpoints (TASK-0501 & TASK-0504 Repairs)', () =
         recordedAt: new Date('2026-08-02T17:59:00Z'),
         receivedAt: new Date('2026-08-02T18:00:00Z'),
         tankVolume: 1200.0,
-        flowRate: 15.2,
         status: 'NORMAL',
       });
 
@@ -270,7 +268,7 @@ describe('Latest Monitoring API Endpoints (TASK-0501 & TASK-0504 Repairs)', () =
       expect(json.success).toBe(true);
       expect(json.data.deviceId).toBe('water-tank-node-3uufzi');
       expect(json.data.data.tankVolume).toBe(1200.0);
-      expect(json.data.data.flowRate).toBe(15.2);
+      expect(json.data.data.flowRate).toBeUndefined();
     });
   });
 
@@ -351,7 +349,6 @@ describe('Latest Monitoring API Endpoints (TASK-0501 & TASK-0504 Repairs)', () =
         recordedAt: new Date('2026-08-02T17:59:00Z'),
         receivedAt: new Date('2026-08-02T18:00:00Z'),
         tankVolume: 450,
-        flowRate: 2.5,
         status: 'NORMAL',
       });
 
@@ -369,7 +366,7 @@ describe('Latest Monitoring API Endpoints (TASK-0501 & TASK-0504 Repairs)', () =
       expect(json.data.deviceType).toBe(DeviceType.WATER_TANK_NODE);
       expect(json.data.water).not.toBeNull();
       expect(json.data.water.data.tankVolume).toBe(450);
-      expect(json.data.water.data.flowRate).toBe(2.5);
+      expect(json.data.water.data.flowRate).toBeUndefined();
     });
 
     it('returns 200 when querying latest endpoint using internal UUID (dev-uuid-1)', async () => {

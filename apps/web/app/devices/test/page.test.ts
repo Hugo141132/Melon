@@ -152,13 +152,13 @@ describe('Device Registry UI Component & Schema Contract Tests (TASK-0302)', () 
       createdAt: new Date(),
       updatedAt: new Date(),
       deactivatedAt: null,
-      capabilities: ['WATER_TANK_VOLUME', 'WATER_FLOW_RATE', 'FAUCET_CONTROL'],
+      capabilities: ['WATER_TANK_VOLUME', 'FAUCET_CONTROL'],
     };
 
     const parsed = PublicSafeDeviceDtoSchema.parse(tankDevice);
     expect(parsed.capabilities).toContain('WATER_TANK_VOLUME');
-    expect(parsed.capabilities).toContain('WATER_FLOW_RATE');
     expect(parsed.capabilities).toContain('FAUCET_CONTROL');
+    expect(parsed.capabilities).not.toContain('WATER_FLOW_RATE');
     expect(parsed.capabilities).not.toContain('RELAY_CONTROL');
     expect(parsed.capabilities).not.toContain('SOLENOID_VALVE_CONTROL');
   });

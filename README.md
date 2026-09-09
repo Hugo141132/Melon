@@ -36,7 +36,8 @@ Transmitted via **REST API over Wi-Fi** directly to the web backend:
 
 Transmitted via **MQTT 5.0 over TLS through EMQX broker** to backend IoT Gateway:
 
-- Tank water volume, Tank water flow rate, Reservoir status.
+- Tank water volume (operational scale: 0 L–2200 L, authoritative constant `WATER_TANK_MAX_CAPACITY = 2200`), Reservoir status (Flow rate deleted per `DEC-MON-089`).
+- Presentation: single full-width responsive column (`grid-cols-1 gap-4`) with clamped progress fill (0%–100%) and `0 L` / `2200 L` markers.
 
 ### 1.4 Shared Sensor/Tool Battery Monitoring (`BAT`)
 

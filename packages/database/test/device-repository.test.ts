@@ -320,7 +320,7 @@ describe('DeviceRepository Unit Tests (TASK-0302)', () => {
   });
 
   describe('reconcileDeviceCapabilities & updateDevice', () => {
-    it('reconciles WATER_TANK_NODE to exactly WATER_TANK_VOLUME, WATER_FLOW_RATE, and FAUCET_CONTROL', async () => {
+    it('reconciles WATER_TANK_NODE to exactly WATER_TANK_VOLUME and FAUCET_CONTROL (DEC-MON-089)', async () => {
       const mockDevice = {
         id: 'tank-device-id',
         deviceId: 'water-tank-001',
@@ -328,32 +328,27 @@ describe('DeviceRepository Unit Tests (TASK-0302)', () => {
         capabilities: [
           { id: 'c1', capability: 'RELAY_CONTROL', enabled: true },
           { id: 'c2', capability: 'SOLENOID_VALVE_CONTROL', enabled: true },
-          { id: 'c3', capability: 'WATER_TANK_VOLUME', enabled: true },
+          { id: 'c3', capability: 'WATER_FLOW_RATE', enabled: true },
+          { id: 'c4', capability: 'WATER_TANK_VOLUME', enabled: true },
         ],
       };
 
       mockPrisma.device.findUnique.mockResolvedValue(mockDevice);
       mockPrisma.deviceCapability = {
-        deleteMany: vi.fn().mockResolvedValue({ count: 2 }),
-        createMany: vi.fn().mockResolvedValue({ count: 2 }),
+        deleteMany: vi.fn().mockResolvedValue({ count: 3 }),
+        createMany: vi.fn().mockResolvedValue({ count: 1 }),
       };
 
       await repo.reconcileDeviceCapabilities('tank-device-id');
 
-      // Obsolete RELAY_CONTROL and SOLENOID_VALVE_CONTROL should be deleted
+      // Obsolete RELAY_CONTROL, SOLENOID_VALVE_CONTROL, and WATER_FLOW_RATE should be deleted
       expect(mockPrisma.deviceCapability.deleteMany).toHaveBeenCalledWith({
-        where: { id: { in: ['c1', 'c2'] } },
+        where: { id: { in: ['c1', 'c2', 'c3'] } },
       });
 
-      // Missing WATER_FLOW_RATE and FAUCET_CONTROL should be created
+      // Missing FAUCET_CONTROL should be created
       expect(mockPrisma.deviceCapability.createMany).toHaveBeenCalledWith({
         data: expect.arrayContaining([
-          {
-            deviceId: 'tank-device-id',
-            capability: 'WATER_FLOW_RATE',
-            enabled: true,
-            source: 'PROVISIONED',
-          },
           {
             deviceId: 'tank-device-id',
             capability: 'FAUCET_CONTROL',

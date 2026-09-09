@@ -14,6 +14,9 @@ import {
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { cn, formatDeviceDisplayName } from '@/lib/utils';
+import { WATER_TANK_MAX_CAPACITY } from '@/lib/constants';
+
+export { WATER_TANK_MAX_CAPACITY };
 
 // Helper to format numeric values nicely or return placeholder
 function formatMetricValue(val: number | null | undefined, decimals = 1, fallback = '—'): string {
@@ -105,8 +108,8 @@ export function WaterTankMonitoringCard() {
           </div>
         </div>
 
-        {/* 2-col Metric Card Grid Skeleton */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Metric Card Grid Skeleton */}
+        <div className="grid grid-cols-1 gap-4">
           {/* Tank Volume Card Skeleton */}
           <div className="bg-app-surface-container-lowest rounded-xl p-5 soft-elevation-lg border border-app-outline-variant/30 flex flex-col justify-between animate-pulse">
             <div>
@@ -121,25 +124,9 @@ export function WaterTankMonitoringCard() {
             <div className="mt-4">
               <div className="h-2 w-full rounded-full bg-app-surface-container" />
               <div className="flex justify-between mt-1">
-                <span className="text-[10px] font-bold text-app-on-surface-variant">0L</span>
-                <span className="text-[10px] font-bold text-app-on-surface-variant">600L</span>
+                <span className="text-[10px] font-bold text-app-on-surface-variant">0 L</span>
+                <span className="text-[10px] font-bold text-app-on-surface-variant">2200 L</span>
               </div>
-            </div>
-          </div>
-
-          {/* Flow Rate Card Skeleton */}
-          <div className="bg-app-surface-container-lowest rounded-xl p-5 soft-elevation-lg border border-app-outline-variant/30 flex flex-col justify-between animate-pulse">
-            <div>
-              <h3 className="text-[14px] font-semibold text-app-on-surface-variant mb-2">
-                {tWater('flowRate')}
-              </h3>
-              <div className="flex items-baseline gap-1">
-                <div className="h-9 w-16 bg-app-surface-container rounded my-0.5" />
-                <span className="text-[12px] text-app-on-surface-variant">m³/h</span>
-              </div>
-            </div>
-            <div className="mt-4 flex items-center gap-1">
-              <div className="h-4 w-24 bg-app-surface-container rounded" />
             </div>
           </div>
         </div>
@@ -174,16 +161,14 @@ export function WaterTankMonitoringCard() {
 
   const waterData = snapshot?.water?.data;
   const volumeVal = waterData?.tankVolume;
-  const flowVal = waterData?.flowRate;
   const isVolumeNull = volumeVal === null || volumeVal === undefined;
-  const isFlowNull = flowVal === null || flowVal === undefined;
 
   const isOnline = connectionStatus === 'ONLINE';
   const isOffline = connectionStatus === 'OFFLINE';
   const isStaleStatus = connectionStatus === 'STALE' || isStale;
 
-  // Max capacity calculation for visual bar fill
-  const maxCapacity = 600;
+  // Max capacity calculation for visual bar fill (0 - 2200 L)
+  const maxCapacity = WATER_TANK_MAX_CAPACITY;
   const volumePercent = !isVolumeNull
     ? Math.min(100, Math.max(0, (volumeVal / maxCapacity) * 100))
     : 0;
@@ -260,14 +245,22 @@ export function WaterTankMonitoringCard() {
         </div>
       )}
 
-      {/* 2-col Original Metric Card Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-fade-in">
+      {/* Metric Card Grid */}
+      <div className="grid grid-cols-1 gap-4 animate-fade-in">
         {/* Tank Volume Card (Exact Original UI) */}
         <div className="bg-app-surface-container-lowest rounded-xl p-5 soft-elevation-lg border border-app-outline-variant/30 flex flex-col justify-between">
           <div>
-            <h3 className="text-[14px] font-semibold text-app-on-surface-variant mb-2">
-              {tWater('tankVolume')}
-            </h3>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-[14px] font-semibold text-app-on-surface-variant">
+                {tWater('tankVolume')}
+              </h3>
+              {waterData?.status && (
+                <div className="flex items-center gap-1 text-app-primary">
+                  <Waves size={14} />
+                  <span className="text-[12px] font-semibold">{waterData.status}</span>
+                </div>
+              )}
+            </div>
             <div className="flex items-baseline gap-1">
               <span className="text-[28px] font-bold text-app-on-surface">
                 {formatMetricValue(volumeVal, 1)}
@@ -281,42 +274,26 @@ export function WaterTankMonitoringCard() {
             )}
           </div>
           <div className="mt-4">
-            <div className="h-2 w-full rounded-full bg-app-surface-container relative overflow-hidden">
+            <div
+              role="progressbar"
+              aria-label={tWater('tankVolume')}
+              aria-valuemin={0}
+              aria-valuemax={maxCapacity}
+              aria-valuenow={
+                !isVolumeNull ? Math.min(maxCapacity, Math.max(0, volumeVal)) : undefined
+              }
+              className="h-2 w-full rounded-full bg-app-surface-container relative overflow-hidden"
+            >
               <div
+                data-testid="tank-volume-progress-bar"
                 className="absolute top-0 left-0 bottom-0 bg-app-primary rounded-full transition-all duration-700"
                 style={{ width: `${volumePercent}%` }}
               />
             </div>
             <div className="flex justify-between mt-1">
-              <span className="text-[10px] font-bold text-app-on-surface-variant">0L</span>
-              <span className="text-[10px] font-bold text-app-on-surface-variant">600L</span>
+              <span className="text-[10px] font-bold text-app-on-surface-variant">0 L</span>
+              <span className="text-[10px] font-bold text-app-on-surface-variant">2200 L</span>
             </div>
-          </div>
-        </div>
-
-        {/* Flow Rate Card (Exact Original UI) */}
-        <div className="bg-app-surface-container-lowest rounded-xl p-5 soft-elevation-lg border border-app-outline-variant/30 flex flex-col justify-between">
-          <div>
-            <h3 className="text-[14px] font-semibold text-app-on-surface-variant mb-2">
-              {tWater('flowRate')}
-            </h3>
-            <div className="flex items-baseline gap-1">
-              <span className="text-[28px] font-bold text-app-on-surface">
-                {formatMetricValue(flowVal, 1)}
-              </span>
-              <span className="text-[12px] text-app-on-surface-variant">m³/h</span>
-            </div>
-            {isFlowNull && (
-              <p className="text-[11px] text-app-on-surface-variant/70 mt-0.5 font-medium">
-                {tCommon('noDataAvailable')}
-              </p>
-            )}
-          </div>
-          <div className="mt-4 flex items-center gap-1 text-app-primary">
-            <Waves size={14} />
-            <span className="text-[12px] font-semibold">
-              {waterData?.status || tWater('smoothFlow')}
-            </span>
           </div>
         </div>
       </div>

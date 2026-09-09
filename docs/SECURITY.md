@@ -1657,7 +1657,7 @@ The following security controls are active and verified for `TASK-0215` (Central
 ## Controls Loading & Header Device Selector Security Controls Implementation Note (Reconciled 2026-08-27)
 
 The following security controls are active and verified regarding `TASK-0807`, `TASK-0502`, and `TASK-0306` (`/controls` Loading & Header Stability):
-- **Zero Fabricated State:** Skeletons and placeholder states in `WaterTankMonitoringCard` and `FaucetControlPanel` never fabricate sensor measurements (e.g. tank volume, flow rate) or physical actuator states (`OPEN` / `CLOSED`) during loading.
+- **Zero Fabricated State:** Skeletons and placeholder states in `WaterTankMonitoringCard` and `FaucetControlPanel` never fabricate sensor measurements (e.g. tank volume; flow rate deleted per `DEC-MON-089`) or physical actuator states (`OPEN` / `CLOSED`) during loading.
 - **Admin Device ID Concealment:** The centered header `DeviceSelector` and controls views strictly preserve canonical `deviceId` concealment for Admin accounts (`DEC-DEV-028`).
 <!-- Controls Loading & Header Centering Security Reconciled: 2026-08-27 -->
 
@@ -1752,4 +1752,13 @@ The following security controls and cryptographic procedures were verified durin
 - **Environment Status & Staleness:** Both Mumbai Dev (`xjsencdgfcbkzdzqcnqx`) and Mumbai Staging (`scqrbtfilmttqrutynyo`) are paused (`INACTIVE`, 0 active project slots) and permanently stale. Per Owner decision, Mumbai rollback is decommissioned and technical cutover is complete (`DONE`). Restarted 72-hour soak period active from `2026-09-08 15:28:30 UTC` through `2026-09-11 15:28:30 UTC`. Sampled observations confirm healthy service at tested points, with the gap between periodic sample probes and continuous telemetry aggregation explicitly disclosed. Paused Mumbai project deletion tracked as post-migration retirement follow-up upon soak completion. Full execution evidence in [`docs/SUPABASE_MIGRATION_RUNBOOK.md`](file:///c:/Users/Puroh/Documents/Melon/docs/SUPABASE_MIGRATION_RUNBOOK.md).
 <!-- TASK-0916 Security Reconciled: 2026-09-08 -->
 
+---
 
+## Water Tank Monitoring UI & Volume Scale Security Controls Note (DEC-MON-089 / TASK-0410 / Reconciled 2026-09-09)
+
+The following security and integrity controls govern the water-tank monitoring interface:
+- **Surface Area Minimization:** Completely eliminated the unused flow rate parameter (`flowRate`, `flow_rate`, `WATER_FLOW_RATE`) across schema, contracts, APIs, and UI, eliminating dead telemetry ingestion pathways and unused input surface area.
+- **Strict Mathematical Clamping:** Volume progress percentage calculation strictly enforces upper and lower boundary clamping: $\text{clamp}((\text{tankVolume} / 2200) \times 100, 0, 100)$, preventing CSS buffer/percentage overflow, division-by-zero, or NaN/Infinity injection attacks in client presentation components.
+- **Fail-Safe Telemetry Handling:** Explicit zero volumes (`0 L`), missing/null telemetry (`- L`), and offline sensor states render safely without crashing React component trees or fabricating active flow/pressure.
+- **Actuator Invariance:** Faucet control safety flag `ENABLE_FAUCET_CONTROL=false` remains strictly enforced across all environments.
+<!-- Water Tank UI Security Reconciled: 2026-09-09 -->

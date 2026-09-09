@@ -124,13 +124,13 @@ describe('TASK-0408: DeviceSimulator Unit & Scenario Verification', () => {
       expect(dataObj.longitude).toBeUndefined();
     });
 
-    it('generates canonical Reservoir Telemetry MQTT payload', () => {
-      const payload = simulator.buildReservoirTelemetryPayload({ tankVolume: 82.5, flowRate: 3.1 });
+    it('generates canonical Reservoir Telemetry MQTT payload without flowRate (DEC-MON-089)', () => {
+      const payload = simulator.buildReservoirTelemetryPayload({ tankVolume: 82.5 });
 
       expect(payload.schemaVersion).toBe('1.0');
       expect(payload.deviceId).toBe('water-tank-node-test-001');
       expect(payload.data.tankVolume).toBe(82.5);
-      expect(payload.data.flowRate).toBe(3.1);
+      expect((payload.data as any).flowRate).toBeUndefined();
       expect(payload.data.status).toBe('NORMAL');
     });
   });

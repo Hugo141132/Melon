@@ -92,7 +92,6 @@ export const WaterMonitoringResponseDtoSchema = z.object({
     tds: z.number().nullable(),
     ec: z.number().nullable(),
     tankVolume: z.number().nullable(),
-    flowRate: z.number().nullable(),
     status: z.string().nullable(),
   }),
 });
@@ -120,7 +119,7 @@ export type LatestMonitoringSnapshotDto = z.infer<typeof LatestMonitoringSnapsho
  * Water-Quality monitoring domain (REST API over Wi-Fi).
  * BAT parameter is removed per DEC-MON-086 (superseding DEC-MON-085).
  * Latitude and Longitude parameters are deleted and must not be reintroduced.
- * Reservoir tankVolume and flowRate parameters remain on the MQTT/IoT Gateway path (WATER_TANK_NODE).
+ * Reservoir tankVolume parameter remains on the MQTT/IoT Gateway path (WATER_TANK_NODE, flowRate removed per DEC-MON-089).
  */
 export const WaterTelemetryDataSchema = z.object({
   ph: z.number().finite().nullable().optional().default(null),
@@ -176,11 +175,12 @@ export interface WaterTelemetryIngestionResult {
 
 /**
  * Shared Reservoir-Water Telemetry Data Schema & Type (Water Tank Node)
- * Source of truth: docs/DEVICE_COMMUNICATION.md §14.1
+ * Source of truth: docs/DEVICE_COMMUNICATION.md §14.1, DEC-MON-089
+ * Note: flowRate parameter is completely removed per DEC-MON-089.
+ * Zod object strips any incoming legacy flowRate without rejecting remaining telemetry.
  */
 export const ReservoirTelemetryDataSchema = z.object({
   tankVolume: z.number().finite().nullable().optional().default(null),
-  flowRate: z.number().finite().nullable().optional().default(null),
   status: z.nativeEnum(MonitoringStatus).nullable().optional().default(null),
 });
 
@@ -213,7 +213,6 @@ export interface IngestReservoirTelemetryInput {
   sequenceNumber?: bigint | number | null;
   recordedAt?: Date | string | null;
   tankVolume?: number | null;
-  flowRate?: number | null;
   status?: string | null;
   validationStatus?: TelemetryValidationStatus | string;
 }

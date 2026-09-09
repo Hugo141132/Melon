@@ -1919,3 +1919,27 @@ The following architecture facts are supported by the verified implementation of
    - Server-side route authorization (`requireRole(['OWNER'])`), Next.js Edge Middleware route guards, and fine-grained account action endpoints (`/api/v1/users/*`) remain strictly enforced on the server.
 <!-- Users Loading & Auth Optimization Architecture Reconciled: 2026-09-04 -->
 
+---
+
+## Water Tank Monitoring UI Layout & Volume Scale Architecture Note (DEC-MON-089 / TASK-0410 / Reconciled 2026-09-09)
+
+The following architecture specifications govern the reconciled water-tank monitoring interface and loading transitions:
+1. **Flow-Rate Telemetry Removal (`DEC-MON-089` / `TASK-0410`):**
+   - Telemetry flow-rate parameter (`flowRate`, `flow_rate`, `WATER_FLOW_RATE`) is permanently eliminated across shared contracts, database schema (`reservoir_water_readings`), IoT Gateway ingestion pipelines, REST/SSE APIs, and UI cards/skeletons.
+   - Legacy payload compatibility is maintained at the ingestion boundary by safely stripping incoming `flowRate` fields without throwing validation errors.
+2. **Authoritative Volume Scale & Capacity Constant:**
+   - The operational volume scale for agricultural water tanks is standardized to **0 L–2200 L**.
+   - `WATER_TANK_MAX_CAPACITY = 2200` exported from `apps/web/lib/constants.ts` acts as the single source of truth across UI components, skeletons, and calculation utilities.
+   - Visual scale markers display explicit boundaries: `0 L` (minimum) and `2200 L` (maximum).
+3. **Clamped Progress Calculation:**
+   - Tank fill percentage is derived against the 2200 L maximum and strictly clamped between 0% and 100%: $\text{clamp}((\text{tankVolume} / 2200) \times 100, 0, 100)$.
+   - Values exceeding 2200 L clamp to 100%; negative values clamp to 0%; invalid or missing numbers resolve to 0%.
+4. **Responsive Layout Geometry (Single Full-Width Column):**
+   - Corrected the responsive grid definition from a residual two-column layout (`sm:grid-cols-2`) to a single full-width column (`grid-cols-1 gap-4`) in `WaterTankMonitoringCard.tsx`, `apps/web/app/controls/loading.tsx`, and `MonitoringDashboard.tsx` (`grid-cols-1 gap-3`).
+   - Resolves the desktop defect where the card previously occupied only half the available content width.
+   - Adapts responsively on mobile ($390\text{px}$) with zero horizontal overflow.
+5. **State Preservation & Security Invariants:**
+   - Explicit zero volume (`0 L`), null or unknown telemetry (`- L`), status-only telemetry, loading skeleton, and error alert states remain strictly preserved.
+   - Actuator control presets (Phase 1: 0.3 L, Phase 2: 1.0 L, Phase 3: 1.5 L), confirmation modal workflow, and `ENABLE_FAUCET_CONTROL=false` safety flag remain untouched.
+<!-- Water Tank UI Architecture Reconciled: 2026-09-09 -->
+

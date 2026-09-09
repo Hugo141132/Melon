@@ -22,6 +22,42 @@
       "approvedBy": "Security Team",
       "approvedDate": "2026-08-14",
       "expiresDate": "2026-09-14"
+    },
+    {
+      "id": "EXC-DEP-002",
+      "packageName": "js-yaml",
+      "advisoryId": "GHSA-2883-xcg3-v3hh",
+      "reason": "Transitive dev-dependency of ESLint config (@eslint/eslintrc); maxTotalMergeKeys CPU consumption on empty merge sources does not affect runtime applications as no untrusted YAML is parsed.",
+      "approvedBy": "Security Team",
+      "approvedDate": "2026-09-09",
+      "expiresDate": "2026-10-09"
+    },
+    {
+      "id": "EXC-DEP-003",
+      "packageName": "next",
+      "advisoryId": "GHSA-p293-qw3h-jr36",
+      "reason": "Platform-specific RCE restricted to Windows-hosted servers; staging and production runtime environments strictly run on containerized Linux (node:20-alpine / Railway PaaS), rendering Windows path traversal unexploitable.",
+      "approvedBy": "Security Team",
+      "approvedDate": "2026-09-09",
+      "expiresDate": "2026-10-09"
+    },
+    {
+      "id": "EXC-DEP-004",
+      "packageName": "next",
+      "advisoryId": "GHSA-2xp9-vwfh-vxw4",
+      "reason": "Next.js Image Optimization API RCE triggered by AVIF files; application does not configure AVIF image formats, uses zero external image uploads, and relies strictly on static SVGs and remote avatars from approved Google/Pinterest origins.",
+      "approvedBy": "Security Team",
+      "approvedDate": "2026-09-09",
+      "expiresDate": "2026-10-09"
+    },
+    {
+      "id": "EXC-DEP-005",
+      "packageName": "sharp",
+      "advisoryId": "GHSA-rgj7-g3m4-5g8c",
+      "reason": "Vulnerabilities in libheif decoder bundled in sharp sub-dependency; application processes only numerical IoT telemetry and does not ingest or decode HEIF/HEIC image assets.",
+      "approvedBy": "Security Team",
+      "approvedDate": "2026-09-09",
+      "expiresDate": "2026-10-09"
     }
   ]
 }

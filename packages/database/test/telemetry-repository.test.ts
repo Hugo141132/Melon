@@ -353,7 +353,6 @@ describe('TelemetryRepository Unit Tests (TASK-0405)', () => {
         id: 'reading-tank-1',
         deviceId: '33333333-3333-3333-3333-333333333333',
         tankVolume: new Prisma.Decimal(1500),
-        flowRate: new Prisma.Decimal(25.5),
         status: 'NORMAL',
       });
 

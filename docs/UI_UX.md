@@ -418,7 +418,7 @@ The dashboard shall present information in this order:
 2. Critical alerts or warnings
 3. Soil monitoring summary
 4. Water monitoring summary
-5. Tank volume and flow rate
+5. Tank volume (Flow rate deleted per `DEC-MON-089`)
 6. Faucet control
 7. Historical trends
 8. Device location
@@ -529,8 +529,7 @@ The water section shall display:
 - Water TDS
 - Water EC
 - Water status
-- Tank volume
-- Water flow rate
+- Tank volume (Water flow rate deleted per `DEC-MON-089`)
 
 ### 11.1 Equipment Battery (BAT)
 
@@ -549,28 +548,21 @@ Where a map is included, it shall provide:
 - an unavailable-location state;
 - no fabricated position when coordinates are missing or invalid.
 
-### 11.3 Tank Volume
+### 11.3 Tank Volume (`DEC-MON-089`, `TASK-0410`)
 
-The tank-volume component shall show:
+The tank-volume component (`WaterTankMonitoringCard.tsx`) shall show:
 
-- current volume;
-- confirmed unit;
-- tank capacity when available;
-- percentage only when both volume and capacity are known;
-- low-volume warning where provided by the backend;
-- last update.
+- current volume with confirmed unit (`L`);
+- operational volume scale spanning **0 L to 2200 L**;
+- authoritative constant `WATER_TANK_MAX_CAPACITY = 2200` defined in `apps/web/lib/constants.ts`;
+- progress gauge calculation using the 2200 L maximum, clamped between 0% and 100%: $\text{clamp}((\text{tankVolume} / 2200) \times 100, 0, 100)$;
+- bounding scale markers displaying `0 L` and `2200 L`;
+- explicit zero volume (`0 L`), null or unknown volume (`- L`), status-only telemetry, loading skeleton, and error states strictly preserved;
+- responsive single full-width column layout (`grid-cols-1 gap-4`) across mobile and desktop viewports, resolving the previous half-width desktop layout caused by a residual two-column (`sm:grid-cols-2`) grid left over after Flow Rate removal.
 
-Do not calculate a percentage using an assumed tank capacity.
+### 11.4 Water Flow Rate (DELETED per `DEC-MON-089` / `TASK-0410`)
 
-### 11.4 Flow Rate
-
-The flow-rate component shall show:
-
-- current flow rate;
-- unit from the data contract;
-- active or inactive indication;
-- trend or recent history where useful;
-- no-flow, unavailable, and invalid states.
+The water flow-rate parameter (`flowRate`, `flow_rate`, `WATER_FLOW_RATE`, `m³/h`, `Debit Air`) is **PERMANENTLY DELETED** from `WATER_TANK_NODE` telemetry contracts, database schema, API/SSE responses, and frontend UI components (`DEC-MON-089`, `TASK-0410`). It shall not be rendered in any monitoring card, dashboard grid, or loading skeleton.
 
 ### 11.5 Historical Telemetry Charts (`DEC-MON-088`, `DEC-UIUX-104`)
 
@@ -1515,4 +1507,28 @@ The `/users` route loading transition and presentation state are reconciled to e
   - For Admin users, the client-side 403 Forbidden notice (`Akses Terbatas (403 Forbidden)`) displays instantaneously without lingering in a loading spinner, backed by server-side route middleware and API RBAC guards.
 <!-- Users Route Loading & Auth UI/UX Reconciled: 2026-09-04 -->
 
+---
 
+## Water Tank Monitoring UI Layout & Volume Scale Reconciliation UI/UX Note (DEC-MON-089 / TASK-0410 / Reconciled 2026-09-09)
+
+The water-tank monitoring interface on `/controls` and monitoring dashboard components are reconciled following flow-rate removal and volume scale alignment:
+- **Frontend Impact:** `MINOR`
+- **Selected UI Direction:** `Premium Minimal Ops`
+- **Existing Color Template:** `UNCHANGED` (Brand palette: agricultural green `#0d631b`, amber `#884200`, container surface tokens preserved)
+- **Selected Motion Effects:** `Card hover`, `Skeleton loading`
+- **21st.dev MCP:** `NOT REQUIRED` (reuses existing design tokens, progressbar patterns, and skeleton primitives)
+- **Operational Volume Scale (0 L–2200 L):**
+  - Updated the operational range from the previous 0 L–600 L scale to the authoritative 0 L–2200 L agricultural reservoir capacity.
+  - Sourced from authoritative constant `WATER_TANK_MAX_CAPACITY = 2200` in `apps/web/lib/constants.ts`.
+  - Display scale markers render clean boundary labels: `0 L` (min) and `2200 L` (max).
+  - Gauge progress percentage formula uses the 2200 L maximum, clamped safely between 0% and 100%: $\text{clamp}((\text{tankVolume} / 2200) \times 100, 0, 100)$.
+- **Responsive Layout Geometry (Single Full-Width Column):**
+  - Identified root cause of the previous half-width desktop layout: the container retained a two-column grid definition (`sm:grid-cols-2`) after the Flow Rate metric card was deleted.
+  - Corrected layout grid to a single full-width column (`grid-cols-1 gap-4`) in `WaterTankMonitoringCard.tsx`, `apps/web/app/controls/loading.tsx`, and `MonitoringDashboard.tsx` (`grid-cols-1 gap-3`).
+  - On desktop, the card spans the complete available content area without empty right-side gaps.
+  - On mobile ($390\text{px}$), the card adapts fluidly with zero horizontal overflow.
+- **State Preservation Invariants:**
+  - Explicit zero volume (`0 L` with 0% fill), null or unknown telemetry (`- L` placeholder with 0% fill), status-only telemetry, loading skeleton, and error alert states remain strictly preserved.
+  - Accessibility: `role="progressbar"`, `aria-valuenow`, `aria-valuemin="0"`, `aria-valuemax="2200"`, `aria-label` fully maintained.
+  - Faucet control preset behavior (Phase 1: 0.3 L, Phase 2: 1.0 L, Phase 3: 1.5 L), confirmation modal, and `ENABLE_FAUCET_CONTROL=false` safety flag remain untouched.
+<!-- Water Tank UI Layout & Scale Reconciled: 2026-09-09 -->

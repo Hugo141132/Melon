@@ -50,10 +50,10 @@ describe('Controls Page Loading & Layout Stability Tests', () => {
     // Tank monitoring skeleton section
     expect(screen.getByTestId('controls-loading-tank')).toBeInTheDocument();
     expect(screen.getByText('WATER_TANK_NODE')).toBeInTheDocument();
-    expect(screen.getByText('0L')).toBeInTheDocument();
-    expect(screen.getByText('600L')).toBeInTheDocument();
+    expect(screen.getByText('0 L')).toBeInTheDocument();
+    expect(screen.getByText('2200 L')).toBeInTheDocument();
     expect(screen.getByText('L')).toBeInTheDocument();
-    expect(screen.getByText('m³/h')).toBeInTheDocument();
+    expect(screen.queryByText('m³/h')).not.toBeInTheDocument();
 
     // Preset selector skeleton section
     expect(screen.getByTestId('controls-loading-presets')).toBeInTheDocument();
@@ -62,7 +62,7 @@ describe('Controls Page Loading & Layout Stability Tests', () => {
     expect(screen.getByTestId('controls-loading-history')).toBeInTheDocument();
   });
 
-  it('WaterTankMonitoringCard renders structured skeleton matching 2-column layout during loading without fabricated numbers', () => {
+  it('WaterTankMonitoringCard renders structured skeleton during loading without fabricated numbers', () => {
     global.fetch = vi.fn().mockImplementation(
       () => new Promise(() => {}) // pending loading
     );
@@ -80,11 +80,11 @@ describe('Controls Page Loading & Layout Stability Tests', () => {
     expect(skeleton).toBeInTheDocument();
     // Labels are present immediately
     expect(screen.getByText('Volume Air Tangki')).toBeInTheDocument();
-    expect(screen.getByText('Debit Air')).toBeInTheDocument();
-    expect(screen.getByText('0L')).toBeInTheDocument();
-    expect(screen.getByText('600L')).toBeInTheDocument();
+    expect(screen.queryByText('Debit Air')).not.toBeInTheDocument();
+    expect(screen.getByText('0 L')).toBeInTheDocument();
+    expect(screen.getByText('2200 L')).toBeInTheDocument();
     expect(screen.getByText('L')).toBeInTheDocument();
-    expect(screen.getByText('m³/h')).toBeInTheDocument();
+    expect(screen.queryByText('m³/h')).not.toBeInTheDocument();
 
     // Device header is displayed with device info
     expect(screen.getByText('Tangki Utama Kebun')).toBeInTheDocument();
@@ -92,7 +92,6 @@ describe('Controls Page Loading & Layout Stability Tests', () => {
 
     // Telemetry numbers are not fabricated
     expect(screen.queryByText('450.5')).not.toBeInTheDocument();
-    expect(screen.queryByText('2.4')).not.toBeInTheDocument();
   });
 
   it('FaucetControlPanel retains stable FaucetHistoryTable during device loading without flashing unselected box', () => {

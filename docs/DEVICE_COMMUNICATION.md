@@ -324,10 +324,10 @@ SOIL_TELEMETRY
 WATER_TELEMETRY
 LOCATION
 TANK_MONITORING
-FLOW_MONITORING
 FAUCET_CONTROL
-BATTERY_MONITORING
 ```
+
+*Note:* `FLOW_MONITORING` is permanently removed per `DEC-MON-089` (`TASK-0410`). `BATTERY_MONITORING` is removed per `DEC-MON-086`.
 
 Example:
 
@@ -338,9 +338,7 @@ Example:
     "WATER_TELEMETRY",
     "LOCATION",
     "TANK_MONITORING",
-    "FLOW_MONITORING",
-    "FAUCET_CONTROL",
-    "BATTERY_MONITORING"
+    "FAUCET_CONTROL"
   ]
 }
 ```
@@ -359,12 +357,12 @@ Communication protocol routing (`REST API over Wi-Fi` vs `MQTT over TLS through 
 |---|---|---|---|
 | `SOIL_NODE` | `SOIL_TELEMETRY` | REST API over Wi-Fi (HTTPS) | Web Backend REST Ingestion Endpoint |
 | `WATER_QUALITY_NODE` | `WATER_TELEMETRY` | REST API over Wi-Fi (HTTPS) | Web Backend REST Ingestion Endpoint |
-| `WATER_TANK_NODE` | `TANK_MONITORING` / `FLOW_MONITORING` | MQTT 5.0 over TLS | EMQX Broker → IoT Gateway Service |
+| `WATER_TANK_NODE` | `TANK_MONITORING` | MQTT 5.0 over TLS | EMQX Broker → IoT Gateway Service |
 | `WATER_TANK_NODE` | `FAUCET_CONTROL` | MQTT 5.0 over TLS | EMQX Broker ← IoT Gateway Service |
 
 Rules:
 - Devices sending general soil and water quality telemetry use **REST API over Wi-Fi**.
-- Devices with `TANK_MONITORING`, `FLOW_MONITORING`, or `FAUCET_CONTROL` capabilities connect via **MQTT 5.0 over TLS** to the **EMQX Broker**.
+- Devices with `TANK_MONITORING` or `FAUCET_CONTROL` capabilities connect via **MQTT 5.0 over TLS** to the **EMQX Broker** (`FLOW_MONITORING` deleted per `DEC-MON-089`).
 - The existing `DeviceType` enum values (`SOIL_NODE`, `WATER_QUALITY_NODE`, `WATER_TANK_NODE`) are sufficient and unambiguous when evaluated together with registered device capabilities. No schema enum modification is required.
 
 ---
@@ -693,11 +691,13 @@ Recommended payload:
   "recordedAt": "2026-07-27T13:45:00+07:00",
   "data": {
     "tankVolume": 75.0,
-    "flowRate": 2.3,
     "status": "NORMAL"
   }
 }
 ```
+
+> **Note (`DEC-MON-089` / `TASK-0410`):** `flowRate` parameter is deleted from water-tank telemetry. The IoT Gateway validates and strips legacy `flowRate` fields for backward compatibility with older physical firmware or simulators.
+
 
 ### 14.2 Shared Sensor/Tool Battery Telemetry Payload (Proposed Domain)
 
@@ -1826,7 +1826,7 @@ This specification is satisfied when:
 8. Heartbeat interval.
 9. Offline threshold.
 10. Stale-data threshold.
-11. Exact units for N, P, K, temperature, moisture, EC, TDS, battery, tank volume, and flow rate.
+11. Exact units for N, P, K, temperature, moisture, EC, TDS, battery, and tank volume (flow rate deleted per `DEC-MON-089`).
 12. ~~Final meaning of `Water BAT`.~~ **RESOLVED** — `BAT` parameter is completely removed from soil and water quality monitoring domains (`DEC-MON-086`, superseding `DEC-MON-085`).
 13. Device clock synchronisation.
 14. Maximum message size.
