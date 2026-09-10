@@ -36,6 +36,7 @@
 | `PRD-FR-024` | Self-service verified email address change | `docs/PRD.md` | `DEC-AUTH-106` | `TASK-0216` | `TEST-API-001` | `VERIFIED` |
 | `PRD-FR-025` | Single active session enforcement per account | `docs/PRD.md` | `DEC-AUTH-107` | `TASK-0217` | `TEST-SEC-001` | `VERIFIED` |
 | `PRD-FR-026` | Optimized login transaction and same-client session recovery | `docs/PRD.md` | `DEC-AUTH-108` | `TASK-0217` | `TEST-API-001` | `VERIFIED` |
+| `DEV-MQTT-001` | Permanent hardware MQTT topic reconciliation and gateway ingress mapping boundary | `docs/DEVICE_COMMUNICATION.md` | `DEC-DEV-031` | `TASK-0411` | `TEST-MQTT-001` | `BLOCKED` |
 | `PRD-FR-040` | Operational overview Bento dashboard and environmental weather | `docs/PRD.md` | `DEC-UIUX-106` | `TASK-0506` | `TEST-UI-006` | `VERIFIED` |
 | `SEC-AUTH-006` | Email change token scoping and non-sensitive audit logging | `docs/SECURITY.md` | `DEC-AUTH-106` | `TASK-0216` | `TEST-SEC-005` | `VERIFIED` |
 | `SEC-AUTH-007` | Atomic single active session verification and race-safe login rejection | `docs/SECURITY.md` | `DEC-AUTH-107` | `TASK-0217` | `TEST-SEC-001` | `VERIFIED` |
@@ -538,3 +539,35 @@ The following facts are verified in the traceability matrix regarding `TASK-0410
   - *Pre-Commit Quality Gates Notice:*
     - The five mandatory pre-commit quality gates (`npm run test:coverage`, `npm run test:integration`, `npm run check:quality`, `npm run test`, `npm run test:e2e`) are reserved for personal execution by the operator and are not claimed as passed in this record.
 <!-- TASK-0410 Traceability Reconciled: 2026-09-09 -->
+
+---
+
+## Permanent Hardware MQTT Topic Reconciliation & Ingress Mapping Traceability Note (TASK-0411 / DEC-DEV-031 / Reconciled 2026-09-10)
+
+The following facts are verified in the traceability matrix regarding `TASK-0411` and `DEC-DEV-031` (Permanent External Hardware MQTT Topics & Gateway Ingress Mapping Boundary):
+- **Traceability Baseline:** Governed by `DEC-DEV-031`, `TASK-0411`, `docs/DEVICE_COMMUNICATION.md` §8.4, `docs/ARCHITECTURE.md` §4.1, and `docs/SECURITY.md`. Establishes permanent external hardware MQTT topic strings (`irigasi/melon/sensor/volume`, `irigasi/melon/kontrol/valve`, `irigasi/melon/setting/otomasi`) without requiring firmware renaming, maintaining a persistent translation adapter in `apps/iot-gateway`.
+- **Status & Blocking Prerequisites:** `TASK-0411` status is **`BLOCKED`**. While topic naming is authoritatively resolved, physical valve actuation and end-to-end integration remain blocked pending:
+  1. Telemetry wire payload schema specification (JSON vs raw float, key names, units, calibration).
+  2. Timestamps, clock synchronization, and unique `messageId` transmission.
+  3. Trusted device identity / correlation on flat topics lacking `{siteId}` and `{deviceId}`.
+  4. Valve wire command syntax (`ON`/`OFF` vs `OPEN`/`CLOSE` vs structured JSON) and feedback channels (`ack`/`event`).
+  5. Irrigation setting operational semantics (`{ mode: "AUTO", target_liter }` vs one-shot dispense vs autonomous schedule).
+  6. Actuator broadcast control isolation mechanism on flat topics (Option 1: payload filtering, Option 2: broker mountpoints, Option 3: single actuator).
+  7. Hardware fail-safe watchdog/timeout (`DEC-CTRL-090`).
+- **Implementation Status:**
+  - Gateway Ingress Mapping: Implemented `apps/iot-gateway/src/mqtt/hardware-reconciliation.ts` with permanent topic constants, whitespace detection/audit, context mapping to `agriculture/{env}/{siteId}/{deviceId}/telemetry/reservoir`, broadcast isolation evaluation, and anti-republish loop guard.
+  - Contract Separation: Canonical valve `OPEN`/`CLOSE` commands strictly omit `targetVolumeMl`, `phase`, and `plantCount` (`CreateFaucetCommandInputSchema`), keeping platform contracts separated from unconfirmed hardware wire formats.
+  - EMQX Infrastructure: Topics require no advance creation in EMQX Cloud (dynamic topic tree); deployment ACLs, subscriptions, and routing readiness are unconfirmed and broker config was not modified.
+  - Safety Invariants: `ENABLE_FAUCET_CONTROL=false` strictly preserved. Direct browser valve publishing identified as critical security and RBAC violation.
+  - Excluded Changes: Unrelated `packages/database/src/client.ts` modification remains excluded and unstaged.
+- **Verification Evidence & Tiering:**
+  - *Automated Verification (PASSED):*
+    - Focused Vitest test suites: 74/74 passed across 4 files (28 reconciliation tests + 46 connectivity/telemetry/router tests, 100%, exit code 0).
+    - Monorepo static typecheck: 0 errors across 4 workspaces (`contracts`, `database`, `iot-gateway`, `web`), exit code 0.
+    - Candidate dependency setup: Clean `npm ci` without overlay (725 packages), local Prisma generation, and workspace builds completed successfully.
+    - Staging validation: Container `kebun-melon-staging-gateway` rebuilt from candidate image (`sha256:9476329863cb28e429eca9972dd876ec1fa4aa6d414e332c2740f6435a68e91b`), healthy, `/health` HTTP 200, `/ready` HTTP 200, `ENABLE_FAUCET_CONTROL=false`.
+  - *Operator CI Gates (PENDING):*
+    - Five mandatory pre-commit quality gates (`npm run test:coverage`, `npm run test:integration`, `npm run check:quality`, `npm run test`, `npm run test:e2e`) are reserved for personal execution by the operator.
+  - *Physical Field Checks (Unperformed & BLOCKED):*
+    - No live hardware valve actuation or physical ESP32 field transmission has been executed.
+<!-- TASK-0411 Traceability Reconciled: 2026-09-10 -->

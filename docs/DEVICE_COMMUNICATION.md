@@ -418,6 +418,145 @@ agriculture/{environment}/{siteId}/{deviceId}/ack/config
 - Production commands shall not use retained MQTT messages.
 - Topic structure changes require a versioned migration plan.
 
+### 8.4 Hardware Team MQTT Reconciliation & Topic Mapping (TASK-0411)
+
+#### 8.4.1 Hardware Team Proposed Parameters
+
+The hardware team provided the following water-tank MQTT parameters:
+
+```text
+broker = broker.emqx.io
+WebSocket TLS port = 8084 (wss://broker.emqx.io:8084/mqtt)
+topicVolume = "irigasi/melon/sensor/volume"
+topicValve = "irigasi/melon/kontrol/valve"
+topicOtomasi = "irigasi/melon/setting/otomasi"
+```
+
+#### 8.4.2 Architectural & Security Conflict Analysis
+
+1. **Public Broker vs Private Isolated Broker (`SEC-DEV-002`):**
+   `broker.emqx.io` is EMQX's public, shared demo broker accessible to anyone globally without credentials or topic ACL isolation. Connecting production or staging workloads to a public broker violates mandatory tenant isolation and security policies, enabling malicious third parties to inspect telemetry or publish spoofed valve commands. The canonical platform requires dedicated EMQX Cloud Serverless or private Mosquitto brokers with username/password authentication, per-device ACLs, and strict TLS certificate verification.
+2. **Missing Environment Isolation (`DEV-TOPIC-001`):**
+   Hardware topics omit the `{environment}` namespace (`development`, `staging`, `production`). Deploying hardware with these topics will cause immediate crosstalk and data corruption across local development, staging containers, and production.
+3. **Missing Site & Device Identity (`DEV-TOPIC-003`, `DEV-ID-001`):**
+   The hardware topics are flat and omit `{siteId}` and `{deviceId}`.
+   - *Telemetry Collision:* If more than one reservoir device connects, all devices publish to `irigasi/melon/sensor/volume`, causing race conditions and clobbering readings.
+   - *Broadcast Control Hazard:* Publishing valve actuation commands to `irigasi/melon/kontrol/valve` acts as an unaddressed broadcast to every device subscribed. Faucet commands must strictly target exactly one device (`agriculture/{env}/{siteId}/{deviceId}/command/faucet`).
+4. **Non-Canonical Categories & Language Constraints (`DEV-TOPIC-003`):**
+   - Canonical reservoir telemetry is structured under `telemetry/reservoir`, whereas hardware uses `sensor/volume`.
+   - Topics must be in English and lowercase without translated words (`kontrol` and `otomasi` violate `DEV-TOPIC-003`).
+5. **Out-of-Scope Autonomous Actuation (`topicOtomasi`):**
+   `irigasi/melon/setting/otomasi` suggests autonomous device-side automation rules. No autonomous physical actuation is supported or permitted in this release. All faucet commands require human initiation by an authenticated Owner or assigned Admin through backend RBAC, durable audit logging, and `ENABLE_FAUCET_CONTROL=false` safety locks.
+6. **Missing Lifecycle & Feedback Channels:**
+   The hardware proposal defines no topics for:
+   - Device command acknowledgement (`ack/faucet` - `ACCEPTED` / `REJECTED`).
+   - Physical execution progress and completion events (`event/faucet` - `IN_PROGRESS`, `COMPLETED`, `FAILED`).
+   - Device availability and Last Will and Testament (`status` - `ONLINE`, `OFFLINE`).
+
+#### 8.4.3 Permanent Hardware Contract & Maintained Ingress Mapping Boundary (DEC-DEV-031)
+
+Per user-approved decision `DEC-DEV-031`, the hardware topic names are **PERMANENT** and must remain unchanged through production:
+- `irigasi/melon/sensor/volume` (Telemetry: Reservoir water volume)
+- `irigasi/melon/kontrol/valve` (Control: Faucet/valve actuation)
+- `irigasi/melon/setting/otomasi` (Automation: Automated irrigation settings)
+
+The hardware team is **NOT** required to rename these topics. The system adopts a strict boundary architecture:
+- **Permanent External Contract:** ESP32 hardware devices publish/subscribe solely to the flat `irigasi/melon/...` topics.
+- **Maintained Gateway Ingress Mapping Boundary:** The IoT Gateway (`apps/iot-gateway/src/mqtt/hardware-reconciliation.ts`) maintains a persistent bidirectional adapter translating between flat external topics and the internal canonical namespace (`agriculture/{environment}/{siteId}/{deviceId}/...`).
+- **Canonical Internal Contracts Remain Immutable:** The core database schema, Prisma models, shared contracts (`@kebun-melon/contracts`), Web APIs, SSE streams, and frontend remain strictly bound to canonical multi-tenant routing.
+- **Explicit Context Requirement & Isolation:** Ingress telemetry on `irigasi/melon/sensor/volume` is mapped to canonical `telemetry/reservoir` only when authenticated publisher identity (username/client certificate) maps deterministically to `{ environment, siteId, deviceId }`. Bare, unauthenticated, or unmapped messages are rejected fail-closed.
+- **Anti-Republish Loop Protection:** The gateway checks ingress message origins to prevent infinite forwarding loops between external and internal topics.
+- **Safety Lock Enforced:** Retaining `topicValve` and `topicOtomasi` names does NOT authorize activating them. `ENABLE_FAUCET_CONTROL=false` safety defaults remain active. All valve actuation requires backend RBAC, durable database command records, and audit logging.
+
+#### 8.4.4 Hardware Team Browser Prototype Security & Architectural Audit
+
+The hardware team provided a client-side browser prototype demonstrating water-tank monitoring and valve actuation using Paho MQTT directly over WebSocket TLS (`wss://broker.emqx.io:8084/mqtt`).
+
+The prototype:
+- Subscribes to `irigasi/melon/sensor/volume`.
+- Directly publishes primitive string commands (`"ON"` / `"OFF"`) to `irigasi/melon/kontrol/valve` with **QoS 0**.
+- Publishes automation settings JSON (`{ mode: "AUTO", target_liter }`) to `irigasi/melon/setting/otomasi`.
+- Contains references or potential topics for flow measurement (`irigasi/melon/sensor/debit`, `irigasi/melon/sensor/liter_keluar`).
+
+An audit of this prototype against system specifications identifies the following mandatory findings:
+
+1. **Direct Browser Valve Publishing is Incompatible with System Architecture (`ARCHITECTURE.md` §3.2, `SECURITY.md` §13):**
+   - Direct browser-to-broker connections are strictly prohibited (`DEVICE_COMMUNICATION.md` §3).
+   - In the prototype, any web visitor can open developer tools or click UI buttons to actuate physical valves with **zero authentication**, **zero role authorization**, and **zero device assignment verification**.
+   - Direct publishing completely bypasses the server-side safety flag `ENABLE_FAUCET_CONTROL=false`, creating immediate physical hazard.
+   - It bypasses PostgreSQL transaction durability: no audit log is created, no command record is queued, and no operator attribution is recorded.
+   - It has no idempotency or replay protection: multiple button clicks or network retries will execute uncontrolled repeated actuations.
+2. **Conflict with Completed Flow-Rate Removal (`TASK-0410`, `DEC-MON-089`):**
+   - The parameters `flowRate`, `flow_rate`, `WATER_FLOW_RATE`, `m³/h`, and `Debit Air` were completely purged across database schemas, Prisma models, shared contracts, REST APIs, and UI cards in `TASK-0410`.
+   - Reintroducing flow rate (`topicDebit`) or dispensed liters (`topicLiterKeluar`) as telemetry topics directly conflicts with approved architecture. Faucet dispensed volume is tracked solely per command lifecycle via `faucet_command_events.volume_dispensed_ml`.
+3. **`topicOtomasi` Requires Formal Product Decision (`DECISION REQUIRED`):**
+   - The platform currently has zero product specifications, database schemas, or permission matrices for autonomous irrigation scheduling or threshold watering.
+   - Implementing automated actuation without backend RBAC, audit logging, and hardware fail-safe timeouts (`DEC-CTRL-090`) is unsafe and blocked pending a formal product decision in `docs/DECISIONS.md`.
+4. **Missing QoS, Retain Policy, and Feedback Channels:**
+   - **QoS 0 is Unacceptable for Actuators:** QoS 0 provides fire-and-forget delivery with no guarantee that the valve received the command. Canonical specification mandates **QoS 1** coupled with application `commandId` deduplication.
+   - **Retain Flag:** Must be strictly `retain = false`.
+   - **Missing Lifecycle Channels:** The prototype provides no topics for device acknowledgement (`ack/faucet` - `ACCEPTED` / `REJECTED`), execution events (`event/faucet` - `IN_PROGRESS`, `COMPLETED`, `FAILED`), or device availability (`status` - LWT).
+
+#### 8.4.5 Actionable Technical Requirements for the Hardware Team (Preserving Permanent Topics)
+
+While the topic names are permanent, the hardware team must satisfy the following operational requirements:
+
+1. **Authoritative Exact Topic String & Whitespace Resolution:**
+   - The permanent external MQTT topic strings are authoritatively confirmed with strictly **NO** leading or trailing whitespace:
+     - `irigasi/melon/sensor/volume`
+     - `irigasi/melon/kontrol/valve`
+     - `irigasi/melon/setting/otomasi`
+   - Topic naming and the trailing-space question are **RESOLVED** by user decision. No further firmware evidence is required to approve these names.
+   - Any conflicting firmware or prototype literal (e.g. trailing space `"irigasi/melon/kontrol/valve "`) is an implementation defect/mismatch to report, not an unresolved naming decision.
+   - The gateway rejects mismatched topics fail-closed. In accordance with system policy, the system will **NEVER** silently trim whitespace, subscribe to alternate variants, or require hardware to adopt `agriculture/...` topics. The internal gateway mapping boundary is permanently preserved.
+2. **Confirmed Purpose vs Unconfirmed Payload Semantics:**
+   - **`irigasi/melon/sensor/volume` (Confirmed: Tank water-volume telemetry):**
+     - Sensor calibration must report calibrated Liters ($0 - 2200 \text{ L}$).
+     - Structured JSON envelope must be used:
+       ```json
+       {
+         "schemaVersion": "1.0",
+         "messageId": "<uuid-or-unique-string>",
+         "deviceId": "water-tank-node-zi37gz",
+         "data": {
+           "tankVolume": 1200,
+           "status": "NORMAL"
+         }
+       }
+       ```
+   - **`irigasi/melon/kontrol/valve` (Confirmed: Valve OPEN/CLOSE commands):**
+     - Confirmed behavioral intent is opening and closing the physical valve.
+     - *Unconfirmed wire payload syntax:* does firmware parse primitive `"ON"`/`"OFF"`, `"OPEN"`/`"CLOSE"`, integer `1`/`0`, or structured JSON `{"commandId": "...", "action": "OPEN"}`?
+     - *Unconfirmed command idempotency:* does firmware parse a unique `commandId` to prevent replay and duplicate execution under QoS 1?
+     - *Unconfirmed feedback channel:* does the valve publish execution acknowledgements (`ack`) or completion events upon reaching terminal states?
+   - **`irigasi/melon/setting/otomasi` (Confirmed: Irrigation):**
+     - Confirmed functional purpose is irrigation.
+     - *Unconfirmed operational semantics:* does the message configure persistent threshold settings, initiate a single target-volume dispensing cycle, or enable unmonitored autonomous scheduling?
+     - *Unconfirmed parameters:* prototype uses `{ mode: "AUTO", target_liter }`. What modes exist besides `"AUTO"`? What are the units and precision of `target_liter`?
+     - *Unconfirmed lifecycle:* how is an in-progress irrigation stopped or aborted over this topic? Does the device publish a completion event when `target_liter` is reached?
+     - *Safety constraint:* This topic **MUST NOT** be equated with canonical `DISPENSE` or invent platform-level scheduling without formal backend approval.
+3. **Device Isolation on Flat Control Topic (`irigasi/melon/kontrol/valve`):**
+   - In MQTT, credentials alone do NOT prevent multiple subscribers on the same topic from receiving broadcast messages.
+   - For future control actuation, one of the following 3 isolation strategies must be implemented:
+     - **Option 1 (Firmware Payload Filtering - Recommended):** Command payload includes explicit `targetDeviceId`. The ESP32 firmware checks this field and ignores commands intended for other nodes.
+     - **Option 2 (EMQX Mountpoints / Topic Rewriting):** The broker maps each client's credentials to a private virtual mountpoint while firmware uses un-prefixed topics.
+     - **Option 3 (Single Actuator Per Environment):** Deploy strictly one physical valve actuator per environment.
+4. **Valve Command Protocol & QoS (Platform Contract vs Unconfirmed Wire Format):**
+   - In canonical platform architecture, discrete valve actions (`OPEN`, `CLOSE`) explicitly **forbid** `targetVolumeMl` / `phase` / `plantCount` (`CreateFaucetCommandInputSchema`), whereas `DISPENSE` operations require a positive `targetVolumeMl`.
+   - Firmware must subscribe with **QoS 1** to `irigasi/melon/kontrol/valve`.
+   - If/when valve control is activated via the gateway mapping boundary, the platform publishes structured JSON conforming to the action:
+     - For discrete valve commands: `{"commandId": "...", "action": "OPEN" | "CLOSE"}` (strictly **omitting** `targetVolumeMl`).
+     - For volume dispensing: `{"commandId": "...", "action": "DISPENSE", "targetVolumeMl": ...}`.
+   - The hardware team must state whether firmware can parse this structured JSON or if firmware currently requires a specific wire format.
+5. **Private Broker & TLS Authentication:**
+   - ESP32 must connect to the private EMQX Cloud cluster (`mqtts://...:8883` or `wss://...:8084`) using dedicated username/password credentials. Public `broker.emqx.io` is strictly forbidden for production/staging.
+6. **Fail-Safe Mechanism (`DEC-CTRL-090`):**
+   - Firmware must enforce a hardware safety watchdog/timeout: if Wi-Fi or MQTT disconnects while the valve is open, the valve must automatically close.
+7. **EMQX Dynamic Topic Creation vs Deployment Readiness:**
+   - MQTT topics require **no advance creation** or static pre-registration in EMQX Cloud; topics are instantiated dynamically in the broker topic tree upon initial publication or subscription.
+   - Dynamic broker topic creation must be clearly distinguished from deployment-level ACLs, client credentials, gateway subscriptions, and routing rules, whose production readiness must NOT be claimed without direct deployment verification.
+   - Zero changes to EMQX Cloud broker configuration were made during `TASK-0411`.
+
 ---
 
 ## 9. MQTT Quality of Service

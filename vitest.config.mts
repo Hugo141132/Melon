@@ -39,6 +39,7 @@ export default defineConfig({
       '**/.next/**',
       '**/coverage/**',
       '**/e2e/**',
+      '**/.tmp/**',
       ...dbIntegrationPatterns,
     ],
     coverage: {
@@ -50,6 +51,7 @@ export default defineConfig({
         '**/.next/**',
         '**/coverage/**',
         '**/e2e/**',
+        '**/.tmp/**',
         '**/test/**',
         '**/tests/**',
         '**/__tests__/**',

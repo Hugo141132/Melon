@@ -1560,6 +1560,57 @@ Metrics:
 
 ---
 
+## TASK-0411 — Reconcile Hardware MQTT Contract and Topic Mapping
+
+**Priority:** `P1`
+**Status:** `BLOCKED`
+**Dependencies:** `TASK-0403`, `TASK-0404`, `TASK-0410`, Hardware Team Technical Specification
+**Blocked Reason:** Topic naming and whitespace are authoritatively **RESOLVED** (`DEC-DEV-031`). The task remains **`BLOCKED`** pending official hardware team specification of: (1) telemetry wire payload schemas (envelope format, numeric scale/unit, timestamp, unique messageId); (2) device identity/correlation declaration on flat topics; (3) valve wire command semantics (distinguishing canonical platform OPEN/CLOSE contracts from unconfirmed hardware wire formats); (4) irrigation operational semantics (`{ mode: "AUTO", target_liter }` vs one-shot dispense vs autonomous schedule); (5) QoS 1 and retain flag adherence; (6) private EMQX broker TLS authentication credentials; and (7) actuator broadcast isolation selection (Option 1: payload filtering, Option 2: broker mountpoints, or Option 3: single actuator). Physical actuation and end-to-end hardware validation remain strictly unperformed, five operator CI quality gates remain pending, and unrelated `client.ts` remains excluded.
+
+### Work
+
+- Formally adopt permanent external hardware topic names per user-approved decision `DEC-DEV-031`:
+  - Telemetry Volume Topic: `irigasi/melon/sensor/volume` (tank water-volume telemetry).
+  - Valve Control Topic: `irigasi/melon/kontrol/valve` (valve OPEN/CLOSE behavior).
+  - Automation Setting Topic: `irigasi/melon/setting/otomasi` (irrigation).
+  - External hardware topics are **PERMANENT** and must remain unchanged through production; firmware is **NOT** required to rename them.
+  - Topics require no advance creation in EMQX Cloud (dynamic topic tree); deployment ACLs, subscriptions, and routing readiness remain unconfirmed (EMQX config untouched).
+- Establish a maintained gateway ingress mapping boundary in `apps/iot-gateway/src/mqtt/hardware-reconciliation.ts`:
+  - Translates flat external volume telemetry into the canonical multi-tenant namespace (`agriculture/{environment}/{siteId}/{deviceId}/telemetry/reservoir`).
+  - Evaluates publisher isolation: requires authenticated publisher identity mapped to `{ environment, siteId, deviceId }`.
+  - Implements anti-republish loop guard preventing circular message forwarding.
+  - Documents broadcast control constraint on flat MQTT topics: credentials alone authorize connections but do not partition multiple subscribers on `irigasi/melon/kontrol/valve`. Evaluates 3 feasible isolation options preserving permanent topic names.
+  - Documents confirmed functional purposes separately from unconfirmed wire payload semantics (`CONFIRMED_HARDWARE_TOPIC_PURPOSES` and `auditTopicSemantics`).
+  - Enforces strict string integrity (`auditTrailingWhitespace`): byte-exact MQTT topic matching, rejecting silent trimming or duplicate subscriptions if trailing whitespace exists.
+  - Distinguishes canonical valve commands (where `OPEN` and `CLOSE` strictly omit `targetVolumeMl`, `phase`, and `plantCount`) from unconfirmed hardware wire formats.
+- Perform architectural and security audit of the hardware team's Paho MQTT browser prototype:
+  - Flagged 6 critical violations of direct browser valve publishing (bypasses session auth, RBAC `device.control.dispense`, audit logging, idempotency, transaction durability, and `ENABLE_FAUCET_CONTROL=false` safety locks).
+  - Strictly rejected flow-rate topics (`irigasi/melon/sensor/debit`, `irigasi/melon/sensor/liter_keluar`) per `TASK-0410` and `DEC-MON-089`.
+  - Flagged unapproved automation (`irigasi/melon/setting/otomasi`) as requiring formal product approval before backend activation.
+- Implement comprehensive contract, negative, and audit test suite in `apps/iot-gateway/src/__tests__/hardware-topic-reconciliation.test.ts`.
+- Reconcile `docs/DECISIONS.md` (`DEC-DEV-031`), `docs/DEVICE_COMMUNICATION.md` (§8.4), `docs/ARCHITECTURE.md`, `docs/TESTING.md` (§35.8), `docs/TRACEABILITY.md`, and `AGENTS.md`.
+
+### Acceptance Criteria
+
+- [x] Permanent external hardware topic names recorded in `docs/DECISIONS.md` (`DEC-DEV-031`).
+- [x] Gateway ingress mapping boundary translates flat telemetry to canonical multi-tenant namespace.
+- [x] Anti-republish loop guard prevents circular forwarding.
+- [x] Broadcast control isolation limitation proved and 3 feasible options documented.
+- [x] Confirmed topic purposes recorded separately from unconfirmed wire payload semantics.
+- [x] Permanent exact topic strings resolved authoritatively with strictly NO whitespace (`DEC-DEV-031`).
+- [x] Trailing whitespace and byte-exact string integrity audit implemented and tested (mismatches rejected fail-closed).
+- [x] Direct browser MQTT publishing identified as critical security and RBAC violation.
+- [x] Reintroduction of flow-rate (`debit` / `liter_keluar`) strictly rejected, preserving `TASK-0410` and `DEC-MON-089`.
+- [x] Telemetry payload schemas enforce explicit `deviceId` matching and finite numeric values.
+- [x] Canonical valve commands strictly omit `targetVolumeMl` for `OPEN`/`CLOSE`, separated from hardware wire formats.
+- [x] EMQX dynamic topic creation documented vs unconfirmed ACLs/routing readiness.
+- [x] Faucet control remains disabled (`ENABLE_FAUCET_CONTROL=false`) with zero unaddressed broadcast valve publishing.
+- [x] Unit test suite verifying permanent contract, broadcast isolation, loop protection, prototype audit, string whitespace audit, and contextual mapping passes 100% (28/28 tests; 74/74 focused tests total).
+- [x] Unrelated `client.ts` modification remains strictly excluded and unstaged.
+- [ ] Hardware team responds to requirements with JSON payload schemas, device identifier transmission, QoS 1, private broker credentials, and actuator isolation selection.
+
+---
+
 # 13. Phase 5 — Monitoring and History
 
 ## TASK-0501 — Implement Latest Monitoring API

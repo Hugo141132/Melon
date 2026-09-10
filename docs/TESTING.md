@@ -2864,3 +2864,85 @@ The following verification gates were executed and evaluated for `TASK-0410` (Fl
 - **Mandatory Pre-Commit Quality Gates Notice:**
   - The five mandatory pre-commit quality gates (`npm run test:coverage`, `npm run test:integration`, `npm run check:quality`, `npm run test`, `npm run test:e2e`) are reserved for personal execution by the operator and are not claimed as passed in this record.
 <!-- TASK-0410 Testing Evidence Reconciled: 2026-09-09 -->
+
+---
+
+## 35.8 TASK-0411 Hardware MQTT Topic Reconciliation Verification & Staging Evidence (2026-09-10)
+
+The following verification gates, test results, and staging deployment evidence were evaluated for `TASK-0411` (Permanent Hardware MQTT Topic Reconciliation, Ingress Mapping Boundary, and Whitespace Audit):
+
+### 1. Specification & Contract Boundaries
+- **Permanent Topic Strings (DEC-DEV-031):**
+  - `irigasi/melon/sensor/volume` — Tank water-volume telemetry.
+  - `irigasi/melon/kontrol/valve` — Valve OPEN/CLOSE behavioral control.
+  - `irigasi/melon/setting/otomasi` — Irrigation.
+  - Topics are byte-exact strings with strictly **NO** leading or trailing whitespace.
+- **Topic Naming Status:** **RESOLVED** by user decision. No further firmware evidence or topic rename is required.
+- **Unresolved Hardware Scope (BLOCKING):**
+  - Telemetry wire payload schemas (envelope vs raw float, key names, units, and calibration).
+  - Timestamps, RTC synchronization, and unique `messageId` generation.
+  - Trusted device identity / correlation (flat topics omit `{siteId}` and `{deviceId}`).
+  - Valve wire payload semantics (`ON`/`OFF` vs `OPEN`/`CLOSE` vs structured JSON) and command feedback (`ack`/`event`).
+  - Irrigation settings operational semantics (`{ mode: "AUTO", target_liter }` vs one-shot dispense vs autonomous schedule).
+  - Actuator multi-client broadcast isolation mechanism (Option 1 payload filter, Option 2 mountpoints, Option 3 single actuator).
+  - Hardware fail-safe timeout / watchdog (`DEC-CTRL-090`).
+- **EMQX Infrastructure Boundary:**
+  - MQTT topics are instantiated dynamically upon publication/subscription in EMQX Cloud and require **no advance manual topic creation**.
+  - Dynamic topic creation is strictly distinguished from deployment ACLs, client credentials, gateway subscriptions, and routing rules, whose readiness must not be claimed without direct deployment verification.
+  - Zero modifications to EMQX Cloud broker configuration were made during this task.
+- **Implementation & Canonical Command Boundary:**
+  - Audit helpers (`auditTrailingWhitespace`) detect string defects.
+  - Broker matching: MQTT 5.0 brokers route byte-exact matches; messages published with whitespace are not delivered to clean-topic subscribers.
+  - Application ingress: Ingress routes match topics strictly; mismatched topics are rejected fail-closed without silent trimming or alternate subscriptions.
+  - Canonical valve commands: `OPEN` and `CLOSE` discrete actions strictly **forbid** `targetVolumeMl`, `phase`, and `plantCount` (`CreateFaucetCommandInputSchema`); volume is required solely for `DISPENSE` operations. Platform command lifecycle is decoupled from unconfirmed hardware wire formats.
+- **Unrelated Modification Boundary:**
+  - Unrelated changes to `packages/database/src/client.ts` predating this task remain strictly excluded from `TASK-0411` commits and unstaged.
+
+### 2. Evidence-Backed Automated Test Results
+- **Focused Vitest Test Suites (74/74 passed across 4 test files, 100%, exit code 0):**
+  - `apps/iot-gateway/src/__tests__/hardware-topic-reconciliation.test.ts` (28/28 passed):
+    - Authoritative permanent topic names without whitespace.
+    - Audit of whitespace: detection, broker exact-match non-delivery, and gateway fail-closed rejection.
+    - Prototype audit findings: direct browser publishing rejection, flow-rate topic rejection (`TASK-0410` / `DEC-MON-089`), and unapproved automation flagging.
+    - Contextual mapping of flat volume telemetry to canonical `agriculture/{env}/{siteId}/{deviceId}/telemetry/reservoir`.
+    - Broadcast control limitation analysis and anti-republish loop guard.
+  - `apps/iot-gateway/src/__tests__/emqx-connectivity.test.ts` (7/7 passed):
+    - EMQX client lifecycle, connection state machine, `/ready` transitions between 503 and 200.
+  - `apps/iot-gateway/src/__tests__/telemetry-processor.test.ts` (7/7 passed):
+    - Ingestion, validation, and transformation of reservoir telemetry payloads.
+  - `apps/iot-gateway/src/__tests__/topic-router.test.ts` (32/32 passed):
+    - Canonical topic validation, environment isolation, wildcard parsing, and extraction.
+- **Execution Context & Traceability:**
+  - *Initial execution:* Executed on working tree (reused 14 connectivity/telemetry tests, then confirmed all 46 related tests).
+  - *Candidate verification execution:* Re-executed from scratch inside the isolated candidate directory (`.tmp/task-0411-candidate`) after clean `npm ci` and workspace builds without dependency overlay. All 74 tests passed in 30.44s (exit code 0).
+- **Monorepo Static Typecheck:** `npm run typecheck` returned **0 errors** across all 4 monorepo packages (`@kebun-melon/contracts`, `@kebun-melon/database`, `@kebun-melon/iot-gateway`, `@kebun-melon/web`), exit code 0.
+- **Clean Dependency Installation:** Completed clean `npm ci` from `package-lock.json` in candidate directory (725 packages, 0 failures, exit code 0), followed by explicit local Prisma generate and workspace builds (`packages/contracts`, `packages/database`, `apps/iot-gateway`).
+
+### 3. Staging Infrastructure & Container Health Evidence
+- **Container Name:** `kebun-melon-staging-gateway` (Port 3001).
+- **Image Identity:** `melon-iot-gateway:latest` built from candidate source.
+  - `Container .Image`: `sha256:9476329863cb28e429eca9972dd876ec1fa4aa6d414e332c2740f6435a68e91b`
+  - `Rebuilt Image .Id`: `sha256:9476329863cb28e429eca9972dd876ec1fa4aa6d414e332c2740f6435a68e91b`
+  - Zero mismatch between container runtime and candidate image build.
+- **Health & Readiness Endpoints:**
+  - `GET http://localhost:3001/health` → HTTP 200 (`{"status":"pass","service":"iot-gateway",...}`).
+  - `GET http://localhost:3001/ready` → HTTP 200 (`{"status":"UP","mqtt":{"connected":true},"database":{"connected":true}}`).
+- **Safety Invariant:** `ENABLE_FAUCET_CONTROL=false` verified active in container environment.
+- **Web Service:** `kebun-melon-staging-web` verified healthy on Port 3000.
+
+### 4. Verification Boundary & Operator CI Gates
+- **Tier 1: Automated Unit & Type Checks (Executed & Verified):**
+  - 74/74 focused Vitest tests passed.
+  - 0 TypeScript typecheck errors across 4 workspaces.
+  - Staging gateway rebuilt, recreated, and verified healthy/ready.
+- **Tier 2: Five Operator CI Quality Gates (PENDING):**
+  - `npm run test:coverage` (Pending manual operator execution).
+  - `npm run test:integration` (Pending manual operator execution with isolated test DB).
+  - `npm run check:quality` (Pending manual operator execution).
+  - `npm run test` (Pending manual operator execution).
+  - `npm run test:e2e` (Pending manual operator execution).
+- **Tier 3: Physical Field Validation (Unperformed & BLOCKED):**
+  - No physical ESP32 hardware transmission or live valve actuation has been performed.
+  - End-to-end physical actuation is NOT claimed.
+  - `TASK-0411` remains strictly **`BLOCKED`** pending technical responses from the hardware team.
+<!-- TASK-0411 Testing Evidence Reconciled: 2026-09-10 -->

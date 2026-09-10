@@ -1943,3 +1943,35 @@ The following architecture specifications govern the reconciled water-tank monit
    - Actuator control presets (Phase 1: 0.3 L, Phase 2: 1.0 L, Phase 3: 1.5 L), confirmation modal workflow, and `ENABLE_FAUCET_CONTROL=false` safety flag remain untouched.
 <!-- Water Tank UI Architecture Reconciled: 2026-09-09 -->
 
+---
+
+## Permanent Hardware MQTT Topics & Ingress Mapping Boundary Architecture Note (DEC-DEV-031 / Reconciled 2026-09-10)
+
+The following architecture specifications govern the permanent external hardware MQTT contract and the gateway ingress mapping boundary:
+1. **Permanent External Topic Names (`DEC-DEV-031`):**
+   - The hardware topic names are **PERMANENT** and must remain unchanged through production:
+     - `irigasi/melon/sensor/volume` (Telemetry: Reservoir water volume)
+     - `irigasi/melon/kontrol/valve` (Control: Faucet/valve actuation)
+     - `irigasi/melon/setting/otomasi` (Automation: Automated irrigation settings)
+   - Firmware is **NOT** required to rename these topics.
+2. **Maintained Gateway Ingress Mapping Boundary:**
+   - The IoT Gateway (`apps/iot-gateway/src/mqtt/hardware-reconciliation.ts`) maintains a persistent bidirectional adapter translating between flat external topics and the internal canonical namespace (`agriculture/{environment}/{siteId}/{deviceId}/...`).
+   - Canonical multi-tenant routing, database schemas, Prisma models, shared contracts (`@kebun-melon/contracts`), Web APIs, SSE streams, and UI cards remain strictly immutable and canonical.
+3. **Publisher Isolation & Broadcast Control Constraint:**
+   - Ingress telemetry on `irigasi/melon/sensor/volume` is mapped to canonical `telemetry/reservoir` only when authenticated publisher identity (username/client certificate) maps deterministically to `{ environment, siteId, deviceId }`.
+   - On flat MQTT topics, broker credentials authorize clients to connect, but do NOT isolate multiple subscribers from broadcast messages. For future valve actuation, actuator isolation must be achieved via firmware payload device-filtering (Option 1), EMQX mountpoints / topic rewriting (Option 2), or single-actuator deployment per environment (Option 3).
+4. **Anti-Republish Loop Protection:**
+   - The gateway maintains origin tracking to guarantee that mapped internal messages are never re-forwarded to external topics, preventing circular message loops.
+5. **Confirmed Purpose vs Unconfirmed Semantics**:
+   - `sensor/volume`: Confirmed tank water volume telemetry. Calibration and envelope structure remain to be verified on physical node.
+   - `kontrol/valve`: Confirmed valve OPEN/CLOSE commands (behavioral intent). Wire syntax, commandId parsing, QoS 1, and feedback events remain unconfirmed.
+   - `setting/otomasi`: Confirmed "irrigation". Unconfirmed whether setting config, 1-shot dispense, or unmonitored autonomous scheduling. Must not be equated with canonical DISPENSE.
+6. **Authoritative Exact Topic String & Whitespace Resolution**:
+   - MQTT topics are byte-exact strings. The exact strings are authoritatively confirmed with strictly NO leading or trailing whitespace: `irigasi/melon/sensor/volume`, `irigasi/melon/kontrol/valve`, `irigasi/melon/setting/otomasi`.
+   - Naming and whitespace questions are RESOLVED. Any incoming topic with whitespace is an implementation defect/mismatch rejected fail-closed, not an unresolved naming decision. The gateway will never silently trim whitespace or subscribe to alternate variants.
+7. **Safety Invariants Maintained:**
+   - Preserving valve/automation topic names does not authorize activating those features.
+   - `ENABLE_FAUCET_CONTROL=false` safety flag remains locked.
+   - `TASK-0411` remains in status `BLOCKED` until all physical hardware prerequisites are met.
+<!-- Hardware MQTT Architecture Reconciled: 2026-09-10 -->
+
