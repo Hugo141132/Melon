@@ -17,6 +17,7 @@ import { mqttTopicRouter, AllowedEnvironment } from '../mqtt/router';
 import { logger } from '../observability/logger';
 import { metricsCollector } from '../observability/metrics';
 import { publishRealtimeEvent } from '../events/webhook';
+import { HardwareMqttAdapter } from '../mqtt/hardware-adapter';
 
 export interface CommandPublisherOptions {
   env?: GatewayEnv;
@@ -24,6 +25,7 @@ export interface CommandPublisherOptions {
   prisma?: PrismaClient;
   faucetCommandRepo?: FaucetCommandRepository;
   deviceRepo?: DeviceRepository;
+  hardwareAdapter?: HardwareMqttAdapter;
 }
 
 export interface PublishResult {
@@ -38,6 +40,7 @@ export class CommandPublisher {
   private faucetCommandRepo: FaucetCommandRepository | null;
   private deviceRepo: DeviceRepository | null;
   private mqttClient: GatewayMqttClient | null;
+  private hardwareAdapter: HardwareMqttAdapter | null;
   private env: GatewayEnv | null;
   private pollIntervalTimer: NodeJS.Timeout | null = null;
   private isProcessing = false;
@@ -45,6 +48,7 @@ export class CommandPublisher {
   constructor(options: CommandPublisherOptions = {}) {
     this.env = options.env || null;
     this.mqttClient = options.mqttClient || null;
+    this.hardwareAdapter = options.hardwareAdapter || null;
     this.prisma = options.prisma ?? defaultPrisma;
     this.faucetCommandRepo =
       options.faucetCommandRepo ?? (this.prisma ? new FaucetCommandRepository(this.prisma) : null);
@@ -55,9 +59,16 @@ export class CommandPublisher {
   /**
    * Binds gateway environment and MQTT client if not provided during constructor.
    */
-  public bind(env: GatewayEnv, mqttClient: GatewayMqttClient): void {
+  public bind(
+    env: GatewayEnv,
+    mqttClient: GatewayMqttClient,
+    hardwareAdapter?: HardwareMqttAdapter
+  ): void {
     this.env = env;
     this.mqttClient = mqttClient;
+    if (hardwareAdapter) {
+      this.hardwareAdapter = hardwareAdapter;
+    }
   }
 
   /**
@@ -109,7 +120,8 @@ export class CommandPublisher {
 
     const topic = mqttTopicRouter.buildTopic(envName, siteId, deviceId, 'command', 'faucet');
 
-    const action = commandPayload.action || FaucetCommandAction.DISPENSE;
+    const action =
+      (commandPayload.action as FaucetCommandAction | string) || FaucetCommandAction.DISPENSE;
     const payloadObj: Record<string, any> = {
       schemaVersion: '1.0',
       commandId,
@@ -128,11 +140,43 @@ export class CommandPublisher {
 
     const payloadBuffer = Buffer.from(JSON.stringify(payloadObj));
 
-    // Faucet commands must never be retained (retain = false), QoS = 1
+    // 1. Direct publication to canonical hardware MQTT topics per DEC-DEV-032
+    if (this.hardwareAdapter && this.hardwareAdapter.isConfigured()) {
+      const hwRes = await this.hardwareAdapter.dispatchHardwareCommand({
+        action,
+        targetVolumeMl: commandPayload.targetVolumeMl as number | undefined,
+        phase: commandPayload.phase as string | undefined,
+        plantCount: commandPayload.plantCount as number | undefined,
+        deviceId,
+      });
+
+      if (hwRes.published) {
+        metricsCollector.incrementCommandsPublished();
+        logger.info('Faucet command published directly to hardware topic', {
+          deviceId,
+          commandId,
+          topic: hwRes.translated?.topic,
+          action,
+        });
+        return { published: true };
+      }
+
+      // If hardware dispatch rejected because ENABLE_FAUCET_CONTROL is false, do not fallback
+      if (hwRes.reason === 'ENABLE_FAUCET_CONTROL_DISABLED') {
+        metricsCollector.incrementCommandFailures();
+        logger.warn('Faucet command rejected by safety lock (ENABLE_FAUCET_CONTROL=false)', {
+          deviceId,
+          commandId,
+        });
+        return { published: false };
+      }
+    }
+
+    // 2. Legacy fallback for multi-tenant simulation if adapter not available
     await mqttClient.publish(topic, payloadBuffer, 1, false);
     metricsCollector.incrementCommandsPublished();
 
-    logger.info('Faucet command published', {
+    logger.info('Faucet command published to fallback topic', {
       deviceId,
       commandId,
       topic,
@@ -312,14 +356,44 @@ export class CommandPublisher {
 
         // 10. Publish over MQTT (QoS 1, retain false)
         try {
-          await this.mqttClient.publish(topic, payloadBuffer, 1, false);
+          let publishedDirectly = false;
+          let publishedTopic = topic;
+
+          if (this.hardwareAdapter && this.env?.HARDWARE_ADAPTER_ENABLED) {
+            const hwRes = await this.hardwareAdapter.dispatchHardwareCommand({
+              action: cmd.action,
+              targetVolumeMl: cmd.targetVolumeMl,
+              phase: cmd.phase,
+              plantCount: cmd.plantCount,
+              deviceId: device.deviceId,
+            });
+
+            if (hwRes.published) {
+              publishedDirectly = true;
+              publishedTopic = hwRes.translated?.topic || topic;
+            } else if (hwRes.reason === 'ENABLE_FAUCET_CONTROL_DISABLED') {
+              logger.warn(
+                'Queued faucet command rejected by safety lock (ENABLE_FAUCET_CONTROL=false)',
+                {
+                  commandId: cmd.commandId,
+                  deviceId: device.deviceId,
+                }
+              );
+              result.skippedCount++;
+              continue;
+            }
+          }
+
+          if (!publishedDirectly) {
+            await this.mqttClient.publish(topic, payloadBuffer, 1, false);
+          }
 
           // 11. Mark SENT, append event, & record metrics ONLY after successful publish
           const messageId = `msg-${crypto.randomUUID()}`;
           await this.faucetCommandRepo.updateCommandStatus(cmd.id, FaucetCommandStatus.SENT, {
             messageId,
             metadata: {
-              topic,
+              topic: publishedTopic,
               publishedAt: new Date().toISOString(),
             },
           });
@@ -328,7 +402,7 @@ export class CommandPublisher {
           logger.info('Faucet command successfully published to MQTT broker', {
             commandId: cmd.commandId,
             deviceId: device.deviceId,
-            topic,
+            topic: publishedTopic,
             qos: 1,
             retain: false,
           });

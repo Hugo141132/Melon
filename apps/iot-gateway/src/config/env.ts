@@ -55,6 +55,17 @@ export const gatewayEnvSchema = z.object({
   RATE_LIMIT_WINDOW_MS: z
     .preprocess((val) => (val ? parseInt(String(val), 10) : 60000), z.number().int().min(1000))
     .default(60000),
+  HARDWARE_ADAPTER_ENABLED: z
+    .preprocess((val) => {
+      if (val === undefined || val === null || val === '') return true;
+      if (val === 'true' || val === '1') return true;
+      if (val === 'false' || val === '0') return false;
+      return val;
+    }, z.boolean().default(true))
+    .default(true),
+  HARDWARE_MQTT_BROKER_URL: z.string().optional(),
+  HARDWARE_TARGET_DEVICE_ID: z.string().default('water-tank-node-zi37gz'),
+  WATER_TANK_DEVICE_ID: z.string().optional(),
   RETENTION_ENABLED: z
     .preprocess((val) => {
       if (val === undefined || val === null || val === '') return true;

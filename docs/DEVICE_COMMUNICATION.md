@@ -65,22 +65,27 @@ Backend Ingestion Boundary (Web Backend)
     └── Stream live updates to authenticated web frontend
 ```
 
-### Path B — MQTT through EMQX Broker (Water Tank Monitoring & Faucet Control)
+### Path B — MQTT through Dedicated EMQX Cloud Broker (Water Tank Monitoring & Faucet Control, DEC-DEV-032)
 
 ```text
-Water Tank Monitoring & Control Equipment
+Water Tank Node (ESP32)
     │
-    │ MQTT 5.0 over TLS
+    │ MQTT 5.0 over WSS / TLS (Canonical Hardware Topics, Port 8084, Path /mqtt)
+    │ Telemetry Publish: irigasi/melon/sensor/volume
+    │ Valve Actuation Subscribe: irigasi/melon/kontrol/valve
+    │ Automation Setting Subscribe: irigasi/melon/setting/otomasi
     ▼
-EMQX MQTT Broker
+Dedicated EMQX Cloud Broker (wss://<cluster-host>:8084/mqtt)
     │
     ▼
-IoT Gateway / Integration Service
+IoT Gateway (apps/iot-gateway)
     │
-    ├── Validate message schema & topic permissions
-    ├── Persist water tank telemetry to PostgreSQL database
-    ├── Publish faucet control commands & process acknowledgements
-    └── Send live updates to the web backend
+    ├── Ingest telemetry directly from irigasi/melon/sensor/volume over WSS
+    ├── Deterministically resolve single database WATER_TANK_NODE entity
+    ├── Validate payload schema (numeric/JSON volume, finite >= 0)
+    ├── Persist water tank telemetry to PostgreSQL database (reservoir_water_readings)
+    ├── Dispatch valve/automation commands directly over MQTT (QoS 1, retain: false)
+    └── Send live SSE updates to the web backend
              │
              ▼
       Web Application
@@ -468,6 +473,24 @@ The hardware team is **NOT** required to rename these topics. The system adopts 
 - **Anti-Republish Loop Protection:** The gateway checks ingress message origins to prevent infinite forwarding loops between external and internal topics.
 - **Safety Lock Enforced:** Retaining `topicValve` and `topicOtomasi` names does NOT authorize activating them. `ENABLE_FAUCET_CONTROL=false` safety defaults remain active. All valve actuation requires backend RBAC, durable database command records, and audit logging.
 
+#### 8.4.5 Direct 2-Tier Canonical Hardware MQTT Contract (DEC-DEV-032)
+
+Per user-approved decision `DEC-DEV-032`, the system formally supersedes the intermediate re-publishing adapter boundary in favor of a direct 2-tier gateway architecture for the single water tank node:
+
+1. **Canonical Topics for Water Tank Domain**:
+   - `irigasi/melon/sensor/volume`: Ingested directly by `apps/iot-gateway` (`TelemetryProcessor`). Normalizes raw numeric, string, or JSON (`{ volume }`) values into `reservoir_water_readings`.
+   - `irigasi/melon/kontrol/valve`: Dispatched directly by `apps/iot-gateway` (`CommandPublisher`) for manual valve commands (`OPEN` -> `"ON"`, `CLOSE` -> `"OFF"` with QoS 1, retain: false).
+   - `irigasi/melon/setting/otomasi`: Dispatched directly by `apps/iot-gateway` (`CommandPublisher`) for automated dispensing commands (`DISPENSE` -> `{ mode: "AUTO", target_liter: n }` with QoS 1, retain: false).
+2. **Retirement of Hierarchical Topics for Reservoir**:
+   The multi-tenant topic hierarchy (`agriculture/{environment}/{siteId}/{deviceId}/...`) is formally retired for the reservoir domain, eliminating redundant serialization, intermediate broker hops, and loop-detection overhead.
+3. **Deterministic Device Binding**:
+   Because flat topics lack embedded device IDs, the gateway binds directly to the single active `WATER_TANK_NODE` in the database, resolved via `WATER_TANK_DEVICE_ID` environment configuration with database query fallback (`SELECT id, device_id FROM devices WHERE device_type = 'WATER_TANK_NODE' AND account_status = 'ACTIVE' LIMIT 1`).
+4. **Safety & Security Invariants**:
+   - `ENABLE_FAUCET_CONTROL=false` default safety lock remains strictly active.
+   - Dual written sign-off (Project Owner + Hardware Lead) remains mandatory before physical control activation in production.
+   - REST API flows for Soil Quality and Water Quality remain 100% untouched.
+   - Database schema, user RBAC, session authentication, and transactional audit logging remain 100% unchanged.
+
 #### 8.4.4 Hardware Team Browser Prototype Security & Architectural Audit
 
 The hardware team provided a client-side browser prototype demonstrating water-tank monitoring and valve actuation using Paho MQTT directly over WebSocket TLS (`wss://broker.emqx.io:8084/mqtt`).
@@ -556,6 +579,105 @@ While the topic names are permanent, the hardware team must satisfy the followin
    - MQTT topics require **no advance creation** or static pre-registration in EMQX Cloud; topics are instantiated dynamically in the broker topic tree upon initial publication or subscription.
    - Dynamic broker topic creation must be clearly distinguished from deployment-level ACLs, client credentials, gateway subscriptions, and routing rules, whose production readiness must NOT be claimed without direct deployment verification.
    - Zero changes to EMQX Cloud broker configuration were made during `TASK-0411`.
+
+#### 8.4.6 Dedicated EMQX Cloud Configuration & WSS Transport (DEC-DEV-032)
+
+The system utilizes a dedicated, enterprise-grade EMQX Cloud deployment (Singapore `asia-southeast1`) as its single production MQTT broker:
+
+1. **Dedicated Deployment Architecture:**
+   - **Endpoint & Clustering:** Hosted on EMQX Cloud dedicated infrastructure (`he100b10.ala.asia-southeast1.emqxsl.com`).
+   - **Environment-Based Configuration:** Broker URL, ports, credentials, and client identifiers are injected exclusively via environment variables (`MQTT_BROKER_URL`, `MQTT_GATEWAY_CLIENT_ID`, `MQTT_GATEWAY_USERNAME`, `MQTT_GATEWAY_PASSWORD`).
+   - **Standard URL Format:**
+     ```env
+     MQTT_BROKER_URL=wss://he100b10.ala.asia-southeast1.emqxsl.com:8084/mqtt
+     ```
+   - **Prohibition of `broker.emqx.io`:** The public sandbox broker (`broker.emqx.io:8084`) is an unauthenticated, public testbed without SLA or security isolation. It is strictly **FORBIDDEN** from being used or documented as a production endpoint. Any reference to `broker.emqx.io` in earlier prototypes is classified strictly as an integration testbed, not production infrastructure.
+
+2. **WSS (WebSocket Secure) Protocol Standard:**
+   - **Transport:** WebSocket over TLS (`wss://`).
+   - **Port:** `8084` (standard EMQX TLS WebSocket listener `ws:default`).
+   - **Path:** `/mqtt`.
+   - **Benefits:** Penetrates restrictive egress firewalls, proxies, and corporate networks seamlessly while maintaining end-to-end TLS encryption matching web application standards.
+
+#### 8.4.7 MQTT Client Identity Separation & EMQX Access Control Lists (ACL)
+
+To enforce least-privilege security and prevent cross-client interference, the system strictly separates client identities and enforces broker-level ACLs:
+
+1. **Client Identity Separation Matrix:**
+
+| Dimension | IoT Gateway Client | Hardware Device Client |
+|---|---|---|
+| **Role** | Ingestion & Command Dispatcher | Physical Reservoir Sensing & Actuation |
+| **Username** | `Test_gateway` | `Test_Device` |
+| **Client ID Convention** | `gateway-kebun-melon-<env>-<instance>` or `Test_Gateway` | `water-tank-node-<mac-or-unique>` |
+| **Allowed Actions** | • **Subscribe:** Sensor telemetry (`irigasi/melon/sensor/volume`)<br>• **Publish:** Valve commands (`irigasi/melon/kontrol/valve`)<br>• **Publish:** Automation commands (`irigasi/melon/setting/otomasi`) | • **Publish:** Sensor volume (`irigasi/melon/sensor/volume`)<br>• **Subscribe:** Valve commands (`irigasi/melon/kontrol/valve`)<br>• **Subscribe:** Automation commands (`irigasi/melon/setting/otomasi`) |
+| **Forbidden Actions** | • Direct physical valve manipulation without API mediation | • Publishing valve or automation commands<br>• Subscribing to telemetry of other nodes |
+| **Credential Protection** | **CONFIDENTIAL:** Gateway credentials shall **NEVER** be shared with or embedded into hardware firmware. | Provisioned securely to hardware team out-of-band. |
+
+2. **EMQX Broker ACL Policy Configuration:**
+
+The EMQX Cloud broker enforces the following mandatory Access Control List (ACL) rules:
+
+```text
+# Rule 1: IoT Gateway Service (Full access to irrigation namespace)
+User: Test_gateway
+  - Action: Pub/Sub
+  - Topic:  irigasi/melon/#
+  - Effect: Allow
+
+# Rule 2: Physical Water Tank Hardware Node (Least-privilege telemetry publish & command subscribe)
+User: Test_Device
+  - Action: Publish
+  - Topic:  irigasi/melon/sensor/volume
+  - Effect: Allow
+
+  - Action: Subscribe
+  - Topic:  irigasi/melon/kontrol/valve
+  - Effect: Allow
+
+  - Action: Subscribe
+  - Topic:  irigasi/melon/setting/otomasi
+  - Effect: Allow
+
+# Rule 3: Default Deny Policy
+User: *
+  - Action: All
+  - Topic:  #
+  - Effect: Deny
+```
+
+#### 8.4.8 Hardware Team Onboarding & Deployment Specification
+
+This section provides the authoritative operational guide for the hardware engineering team to configure the ESP32 Water Tank Node firmware:
+
+1. **Connection Parameters:**
+   - **Host / Endpoint:** `he100b10.ala.asia-southeast1.emqxsl.com` *(obtain exact active cluster endpoint from Project Owner)*
+   - **Protocol:** `WSS` (WebSocket Secure over TLS)
+   - **Port:** `8084`
+   - **Path:** `/mqtt`
+   - **Full Connection URI:** `wss://<cluster-host>:8084/mqtt`
+   - **TLS Verification:** Enabled (server-authenticated using public root CAs, e.g. Let's Encrypt / ISRG Root X1)
+
+2. **Authentication & Identity:**
+   - **Username:** `Test_Device`
+   - **Password:** *(Supplied securely out-of-band by Project Owner; never committed to git)*
+   - **Client ID Format:** `water-tank-node-<mac-address>` (e.g. `water-tank-node-30AEA4070FE0`). Must be unique across all connections to prevent broker connection eviction.
+   - **Clean Session:** `true` (recommended for standard operational state).
+   - **Keep Alive:** `60` seconds.
+
+3. **Topic & Payload Contracts:**
+
+| Function | Canonical Topic | Direction | QoS | Retain | Wire Payload Format |
+|---|---|---|:---:|:---:|---|
+| **Volume Telemetry** | `irigasi/melon/sensor/volume` | Device $\rightarrow$ Broker | 0 or 1 | `false` | Raw number (`"125.5"` or `125.5`) or JSON: `{"volume": 125.5}` |
+| **Manual Valve** | `irigasi/melon/kontrol/valve` | Broker $\rightarrow$ Device | 1 | `false` | String: `"ON"` (Open valve) or `"OFF"` (Close valve) |
+| **Automation** | `irigasi/melon/setting/otomasi` | Broker $\rightarrow$ Device | 1 | `false` | JSON: `{"mode": "AUTO", "target_liter": 1.5}` |
+
+4. **Firmware Safety Mandatory Requirements:**
+   - **Watchdog / Disconnect Auto-Close:** If Wi-Fi or MQTT connection drops while the valve is open, the ESP32 firmware **MUST** automatically close the valve within 5 seconds to prevent tank overflow or flooding.
+   - **Single-Node Invariant:** Production deployment operates strictly with **one** physical water tank node.
+   - **Zero Retain:** Hardware shall never publish with `retain: true`.
+
 
 ---
 

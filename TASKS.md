@@ -1299,6 +1299,7 @@ Create long-running service with:
 **Status:** `DONE`
 **Dependencies:** `TASK-0401`
 **Completed:** 2026-07-31 — Implemented full MQTT topic parsing, structural validation, environment isolation, device-payload matching (`isTopicPayloadMatch`), wildcard rejection, and subscription topic pattern helpers (`getSubscriptionPattern`, `getCategorySubscriptionPattern`, `buildTopic`) per `docs/DEVICE_COMMUNICATION.md` §8. Added comprehensive unit test suite in `apps/iot-gateway/src/__tests__/topic-router.test.ts`.
+**Architecture Revision (2026-09-11 per DEC-DEV-032):** Per approved decision `DEC-DEV-032`, the multi-tenant hierarchical MQTT topic structure (`agriculture/{environment}/{siteId}/{deviceId}/...`) is formally retired for the single-device Water Tank domain. The canonical MQTT contract directly adopts flat hardware topics (`irigasi/melon/sensor/volume`, `irigasi/melon/kontrol/valve`, `irigasi/melon/setting/otomasi`). The router utilities remain available for internal/legacy reference, while active gateway routing for the water tank shifts to direct topic binding.
 
 ### Work
 
@@ -1317,6 +1318,7 @@ message subtype
 - Topic and payload device mismatch is rejected.
 - Unknown topic patterns are rejected.
 - Production and test namespaces remain separate.
+- Water tank domain recognizes canonical `irigasi/melon/...` topics per `DEC-DEV-032`.
 
 ---
 
@@ -1326,6 +1328,7 @@ message subtype
 **Status:** `DONE`
 **Dependencies:** `TASK-0403`
 **Completed:** 2026-08-01 — Extended MessageValidator scaffold (`apps/iot-gateway/src/validation/validator.ts`) to validate payload byte size limits (default 64 KB, returning `MESSAGE_TOO_LARGE`), JSON parsing (`INVALID_JSON`), non-null object payload (`INVALID_SCHEMA`), schemaVersion 1.0 (`UNSUPPORTED_SCHEMA_VERSION`), envelope fields (UUID messageId, deviceId, ISO timestamp, sequence), topic/payload device ID mismatch (`TOPIC_DEVICE_MISMATCH`), and recursive non-finite numeric checks (`INVALID_VALUE`). Added comprehensive unit test suite in `apps/iot-gateway/src/__tests__/message-validator.test.ts`.
+**Architecture Revision (2026-09-11 per DEC-DEV-032):** Updated acceptance criteria to support raw float, string, and JSON payload normalization directly for `irigasi/melon/sensor/volume` without requiring synthetic `{environment}/{siteId}/{deviceId}` topic envelopes. Telemetry binds deterministically to the database `WATER_TANK_NODE` entity via `WATER_TANK_DEVICE_ID` environment configuration and active database lookup.
 
 ### Work
 
@@ -1560,54 +1563,58 @@ Metrics:
 
 ---
 
-## TASK-0411 — Reconcile Hardware MQTT Contract and Topic Mapping
+## TASK-0411 — Reconcile Hardware MQTT Contract and Implement Direct Gateway Migration
 
 **Priority:** `P1`
-**Status:** `BLOCKED`
+**Status:** `DONE`
 **Dependencies:** `TASK-0403`, `TASK-0404`, `TASK-0410`, Hardware Team Technical Specification
-**Blocked Reason:** Topic naming and whitespace are authoritatively **RESOLVED** (`DEC-DEV-031`). The task remains **`BLOCKED`** pending official hardware team specification of: (1) telemetry wire payload schemas (envelope format, numeric scale/unit, timestamp, unique messageId); (2) device identity/correlation declaration on flat topics; (3) valve wire command semantics (distinguishing canonical platform OPEN/CLOSE contracts from unconfirmed hardware wire formats); (4) irrigation operational semantics (`{ mode: "AUTO", target_liter }` vs one-shot dispense vs autonomous schedule); (5) QoS 1 and retain flag adherence; (6) private EMQX broker TLS authentication credentials; and (7) actuator broadcast isolation selection (Option 1: payload filtering, Option 2: broker mountpoints, or Option 3: single actuator). Physical actuation and end-to-end hardware validation remain strictly unperformed, five operator CI quality gates remain pending, and unrelated `client.ts` remains excluded.
+**Completed:** 2026-09-10 — Implemented the bidirectional Hardware MQTT Compatibility Adapter Layer in `apps/iot-gateway`. Hardware topics (`irigasi/melon/...`) are consumed and normalized into canonical `ReservoirTelemetryPayload` for transactional ingestion via `TelemetryProcessor`. Outbound backend faucet commands (`OPEN`, `CLOSE`, `DISPENSE`) are translated into hardware valve (`ON`/`OFF` on `irigasi/melon/kontrol/valve`) and automation (`{ mode: "AUTO", target_liter }` on `irigasi/melon/setting/otomasi`) topics, wired through `CommandPublisher` with strict enforcement of `ENABLE_FAUCET_CONTROL=false` safety locks. Monorepo TypeScript typecheck (0 errors across 4 workspaces) and all 283 unit tests across 21 test files in `apps/iot-gateway` passed 100%.
+**Superseded / Architecture Revision (2026-09-11 per DEC-DEV-032):** The intermediate re-publishing adapter tier is formally superseded by the 2-tier direct gateway model. The external hardware topics `irigasi/melon/...` become the canonical MQTT contract, directly handled by `TelemetryProcessor` and `CommandPublisher`, retiring the intermediate `agriculture/...` topic hop for the single-tank reservoir domain while preserving database schema, RBAC, and safety invariants. All production MQTT communication connects to a dedicated EMQX Cloud deployment using WSS transport (`wss://<host>:8084/mqtt`). `broker.emqx.io` is strictly barred from production. Client credentials and ACL permissions are strictly separated between `Test_gateway` (pub/sub on `irigasi/melon/#`) and `Test_Device` (pub volume, sub valve and automation).
 
 ### Work
 
-- Formally adopt permanent external hardware topic names per user-approved decision `DEC-DEV-031`:
-  - Telemetry Volume Topic: `irigasi/melon/sensor/volume` (tank water-volume telemetry).
-  - Valve Control Topic: `irigasi/melon/kontrol/valve` (valve OPEN/CLOSE behavior).
-  - Automation Setting Topic: `irigasi/melon/setting/otomasi` (irrigation).
-  - External hardware topics are **PERMANENT** and must remain unchanged through production; firmware is **NOT** required to rename them.
-  - Topics require no advance creation in EMQX Cloud (dynamic topic tree); deployment ACLs, subscriptions, and routing readiness remain unconfirmed (EMQX config untouched).
-- Establish a maintained gateway ingress mapping boundary in `apps/iot-gateway/src/mqtt/hardware-reconciliation.ts`:
-  - Translates flat external volume telemetry into the canonical multi-tenant namespace (`agriculture/{environment}/{siteId}/{deviceId}/telemetry/reservoir`).
-  - Evaluates publisher isolation: requires authenticated publisher identity mapped to `{ environment, siteId, deviceId }`.
-  - Implements anti-republish loop guard preventing circular message forwarding.
-  - Documents broadcast control constraint on flat MQTT topics: credentials alone authorize connections but do not partition multiple subscribers on `irigasi/melon/kontrol/valve`. Evaluates 3 feasible isolation options preserving permanent topic names.
-  - Documents confirmed functional purposes separately from unconfirmed wire payload semantics (`CONFIRMED_HARDWARE_TOPIC_PURPOSES` and `auditTopicSemantics`).
-  - Enforces strict string integrity (`auditTrailingWhitespace`): byte-exact MQTT topic matching, rejecting silent trimming or duplicate subscriptions if trailing whitespace exists.
-  - Distinguishes canonical valve commands (where `OPEN` and `CLOSE` strictly omit `targetVolumeMl`, `phase`, and `plantCount`) from unconfirmed hardware wire formats.
-- Perform architectural and security audit of the hardware team's Paho MQTT browser prototype:
-  - Flagged 6 critical violations of direct browser valve publishing (bypasses session auth, RBAC `device.control.dispense`, audit logging, idempotency, transaction durability, and `ENABLE_FAUCET_CONTROL=false` safety locks).
-  - Strictly rejected flow-rate topics (`irigasi/melon/sensor/debit`, `irigasi/melon/sensor/liter_keluar`) per `TASK-0410` and `DEC-MON-089`.
-  - Flagged unapproved automation (`irigasi/melon/setting/otomasi`) as requiring formal product approval before backend activation.
-- Implement comprehensive contract, negative, and audit test suite in `apps/iot-gateway/src/__tests__/hardware-topic-reconciliation.test.ts`.
-- Reconcile `docs/DECISIONS.md` (`DEC-DEV-031`), `docs/DEVICE_COMMUNICATION.md` (§8.4), `docs/ARCHITECTURE.md`, `docs/TESTING.md` (§35.8), `docs/TRACEABILITY.md`, and `AGENTS.md`.
+- **Inbound Hardware Telemetry Normalization (`HardwareMqttAdapter`):**
+  - Created `HardwareMqttAdapter` (`apps/iot-gateway/src/mqtt/hardware-adapter.ts`).
+  - Subscribes to canonical hardware topic `irigasi/melon/sensor/volume`.
+  - Normalizes raw primitive strings (`"120.5"`), numbers (`120.5`), and JSON envelopes (`{"volume": 120.5}`, `{"tankVolume": 120.5}`, `{"liter": 120.5}`).
+  - Validates finite, non-negative numbers ($0 \le \text{volume} \le 100000$).
+  - Dynamically binds telemetry to target canonical device (`HARDWARE_TARGET_DEVICE_ID`, default `water-tank-node-zi37gz`).
+  - Constructs `ReservoirTelemetryPayload` matching schema (`schemaVersion: '1.0'`, `messageId: hw-vol-<uuid>`, `sequence`, `status: MonitoringStatus.NORMAL`).
+  - Delegates normalized payload to `TelemetryProcessor.processTelemetryMessage(...)`, ensuring atomic PostgreSQL persistence in `reservoir_water_readings`, timestamp updates, real-time SSE dispatch, and audit logging with zero database schema alterations.
+  - Implements anti-loop protection (`checkRepublishLoopGuard`) preventing circular message routing.
+- **Outbound Command Translation & Faucet Safety:**
+  - Integrated with `CommandPublisher` (`apps/iot-gateway/src/commands/publisher.ts`).
+  - Dispatches `OPEN` action directly to `"ON"` on `irigasi/melon/kontrol/valve` (QoS 1, retain: false).
+  - Dispatches `CLOSE` action directly to `"OFF"` on `irigasi/melon/kontrol/valve` (QoS 1, retain: false).
+  - Dispatches `DISPENSE` action directly to `{ mode: "AUTO", target_liter: targetLiter }` on `irigasi/melon/setting/otomasi` (QoS 1, retain: false).
+  - Strictly enforces `ENABLE_FAUCET_CONTROL=false` safety guard before dispatching hardware valve/automation actuation.
+- **Configurable Dedicated Broker and Transport:**
+  - Added `HARDWARE_ADAPTER_ENABLED` (boolean, default true), `HARDWARE_MQTT_BROKER_URL` (optional), and `HARDWARE_TARGET_DEVICE_ID` (default `water-tank-node-zi37gz`) to `gatewayEnvSchema` in `apps/iot-gateway/src/config/env.ts`.
+  - Enforced environment-based WSS transport (`wss://<host>:8084/mqtt`) to dedicated EMQX Cloud deployment; public `broker.emqx.io` is strictly documented as an insecure testbed and prohibited in production.
+  - Enforced client credential and ACL isolation between IoT Gateway (`Test_gateway`) and physical device (`Test_Device`).
+- **Service Integration & Lifecycle:**
+  - Registered `HardwareMqttAdapter` in `apps/iot-gateway/src/app.ts` (`buildApp`) and bound to `CommandPublisher`.
+  - Integrated start/stop lifecycle in `apps/iot-gateway/src/index.ts` with graceful shutdown on `SIGINT`/`SIGTERM`.
+- **Testing & Verification:**
+  - Added unit test suite `apps/iot-gateway/src/__tests__/hardware-adapter.test.ts` (19 tests covering parsing, normalization, canonical routing, command translation, safety locks, and lifecycle).
+  - Verified 100% test pass rate across all 21 test files in `apps/iot-gateway` (283/283 tests passed).
+  - Verified monorepo TypeScript typecheck (0 errors across 4 workspaces).
 
 ### Acceptance Criteria
 
-- [x] Permanent external hardware topic names recorded in `docs/DECISIONS.md` (`DEC-DEV-031`).
-- [x] Gateway ingress mapping boundary translates flat telemetry to canonical multi-tenant namespace.
-- [x] Anti-republish loop guard prevents circular forwarding.
-- [x] Broadcast control isolation limitation proved and 3 feasible options documented.
-- [x] Confirmed topic purposes recorded separately from unconfirmed wire payload semantics.
-- [x] Permanent exact topic strings resolved authoritatively with strictly NO whitespace (`DEC-DEV-031`).
-- [x] Trailing whitespace and byte-exact string integrity audit implemented and tested (mismatches rejected fail-closed).
-- [x] Direct browser MQTT publishing identified as critical security and RBAC violation.
-- [x] Reintroduction of flow-rate (`debit` / `liter_keluar`) strictly rejected, preserving `TASK-0410` and `DEC-MON-089`.
-- [x] Telemetry payload schemas enforce explicit `deviceId` matching and finite numeric values.
-- [x] Canonical valve commands strictly omit `targetVolumeMl` for `OPEN`/`CLOSE`, separated from hardware wire formats.
-- [x] EMQX dynamic topic creation documented vs unconfirmed ACLs/routing readiness.
-- [x] Faucet control remains disabled (`ENABLE_FAUCET_CONTROL=false`) with zero unaddressed broadcast valve publishing.
-- [x] Unit test suite verifying permanent contract, broadcast isolation, loop protection, prototype audit, string whitespace audit, and contextual mapping passes 100% (28/28 tests; 74/74 focused tests total).
-- [x] Unrelated `client.ts` modification remains strictly excluded and unstaged.
-- [ ] Hardware team responds to requirements with JSON payload schemas, device identifier transmission, QoS 1, private broker credentials, and actuator isolation selection.
+- [x] Hardware topics (`irigasi/melon/sensor/volume`) can be consumed directly by IoT Gateway.
+- [x] Hardware volume payloads normalized into existing reservoir telemetry contract and persisted to PostgreSQL `reservoir_water_readings`.
+- [x] Faucet commands from backend dispatched directly to hardware valve (`irigasi/melon/kontrol/valve`) and automation (`irigasi/melon/setting/otomasi`) topics.
+- [x] Direct gateway 2-tier architecture (`DEC-DEV-032`) retires multi-tenant `agriculture/...` hierarchy for single Water Tank domain.
+- [x] Dedicated EMQX Cloud deployment using WSS transport (`wss://<host>:8084/mqtt`) documented as production standard; `broker.emqx.io` strictly prohibited in production.
+- [x] MQTT client identity separation documented: `Test_gateway` (gateway pub/sub on `irigasi/melon/#`) and `Test_Device` (hardware pub volume, sub valve/automation); gateway credentials never shared with hardware team.
+- [x] EMQX ACL rules documented with default-deny baseline.
+- [x] Hardware team onboarding specifications documented (endpoint, port 8084, WSS path `/mqtt`, credentials, client ID pattern, topics, payloads).
+- [x] Existing REST API contracts, database schema, RBAC, frontend presentation, and audit flow remain 100% unchanged.
+- [x] `ENABLE_FAUCET_CONTROL=false` safety lock strictly enforced.
+- [x] Broker and target device configurable via environment variables (`MQTT_BROKER_URL`, `HARDWARE_TARGET_DEVICE_ID`).
+- [x] Unit test suite added and passing (19/19 adapter tests, 283/283 gateway tests total).
+- [x] Monorepo typecheck passes with 0 errors across 4 workspaces.
 
 ---
 
@@ -2124,6 +2131,7 @@ POST /devices/{deviceId}/faucet-commands
 **Dependencies:** `TASK-0401`, `TASK-0803`
 **Historical Completion:** 2026-08-03 — Implemented `CommandPublisher` in `@kebun-melon/iot-gateway` to publish eligible, unexpired `QUEUED` faucet commands for `WATER_TANK_NODE` devices over MQTT (QoS 1, retain = false). Enforced target device type validation, phase/volume mapping, dynamic canonical topic routing (`agriculture/{environment}/{siteId}/{deviceId}/command/faucet`), payload formatting, and atomic DB state transition to `SENT` with `FaucetCommandEvent` creation. Fixed `.env` loading and non-UUID `commandId` detail API query handling.
 **Revision Note (2026-08-20):** Status set to `DONE`. Verified duplicate logic removed for `targetVolumeMl` recalculation, allowing persistent pass-through. Added dedicated testing and formatting for `OPEN` / `CLOSE` payloads ensuring they carry NO fabricated volume or phase attributes. Confirmed 100% path coverage for publisher command routing (10/10 publisher unit tests, 42/42 gateway contract tests). Completed safe local simulated performance sanity tests on mocked/in-memory infrastructure (1,000 direct calls ~68.3 ops/s with p95 20.08 ms, 500 burst commands ~67.0 cmds/s, 2,000 soak commands ~66.7 cmds/s with zero memory leak and safe reconnect recovery). All 17 project docs fully reconciled.
+**Architecture Revision (2026-09-11 per DEC-DEV-032):** `CommandPublisher` in `@kebun-melon/iot-gateway` directly dispatches faucet commands to the canonical hardware topic contract: manual valve actuation (`OPEN` -> `"ON"`, `CLOSE` -> `"OFF"`) to `irigasi/melon/kontrol/valve` and automated dispensing (`DISPENSE` -> `{ mode: "AUTO", target_liter }`) to `irigasi/melon/setting/otomasi` (QoS 1, retain = false). The intermediate publication to `agriculture/{environment}/{siteId}/{deviceId}/command/faucet` is permanently retired for the single-tank domain. Direct dispatch remains strictly locked behind `ENABLE_FAUCET_CONTROL=false` safety guards and transactionally logged to `faucet_command_events`.
 
 ### Acceptance Criteria
 

@@ -88,6 +88,82 @@ describe('TASK-0804: CommandPublisher (Gateway Command Publisher)', () => {
       expect(mockDisconnectedClient.publish).not.toHaveBeenCalled();
       expect(metricsCollector.getSnapshot().commands.failuresTotal).toBe(1);
     });
+
+    it('publishes directly to hardware topics when hardwareAdapter is configured and ENABLE_FAUCET_CONTROL is true (DEC-DEV-032)', async () => {
+      const mockHardwareAdapter = {
+        isConfigured: () => true,
+        dispatchHardwareCommand: vi.fn().mockResolvedValue({
+          published: true,
+          translated: { topic: 'irigasi/melon/kontrol/valve', payload: 'ON' },
+        }),
+      };
+
+      const mockMqttClient = {
+        isConnected: () => true,
+        publish: vi.fn(),
+      } as unknown as GatewayMqttClient;
+
+      const publisher = new CommandPublisher({
+        env,
+        mqttClient: mockMqttClient,
+        hardwareAdapter: mockHardwareAdapter as any,
+      });
+
+      const res = await publisher.publishCommand(
+        mockMqttClient,
+        'water-tank-001',
+        'cmd-hw-001',
+        { action: FaucetCommandAction.OPEN },
+        'site-01'
+      );
+
+      expect(res.published).toBe(true);
+      expect(mockHardwareAdapter.dispatchHardwareCommand).toHaveBeenCalledWith({
+        action: FaucetCommandAction.OPEN,
+        deviceId: 'water-tank-001',
+        targetVolumeMl: undefined,
+        phase: undefined,
+        plantCount: undefined,
+      });
+      // Verify no fallback publishing to internal topic
+      expect(mockMqttClient.publish).not.toHaveBeenCalled();
+      expect(metricsCollector.getSnapshot().commands.publishedTotal).toBe(1);
+    });
+
+    it('rejects publishing and records failure when hardwareAdapter rejects due to ENABLE_FAUCET_CONTROL=false (DEC-DEV-032)', async () => {
+      const mockHardwareAdapter = {
+        isConfigured: () => true,
+        dispatchHardwareCommand: vi.fn().mockResolvedValue({
+          published: false,
+          reason: 'ENABLE_FAUCET_CONTROL_DISABLED',
+        }),
+      };
+
+      const mockMqttClient = {
+        isConnected: () => true,
+        publish: vi.fn(),
+      } as unknown as GatewayMqttClient;
+
+      const publisher = new CommandPublisher({
+        env,
+        mqttClient: mockMqttClient,
+        hardwareAdapter: mockHardwareAdapter as any,
+      });
+
+      const res = await publisher.publishCommand(
+        mockMqttClient,
+        'water-tank-001',
+        'cmd-hw-002',
+        { action: FaucetCommandAction.OPEN },
+        'site-01'
+      );
+
+      expect(res.published).toBe(false);
+      expect(mockHardwareAdapter.dispatchHardwareCommand).toHaveBeenCalled();
+      // Verify fail-closed: no fallback publishing
+      expect(mockMqttClient.publish).not.toHaveBeenCalled();
+      expect(metricsCollector.getSnapshot().commands.failuresTotal).toBe(1);
+    });
   });
 
   describe('processQueuedCommands DB lifecycle processing', () => {

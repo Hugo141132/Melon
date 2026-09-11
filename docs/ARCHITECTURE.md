@@ -120,7 +120,7 @@ flowchart LR
     G[IoT Gateway]
     M[EMQX MQTT Broker]
     D_Soil[Soil / Water Sensors REST]
-    D_Res[Reservoir Sensor MQTT]
+    D_Res[Water Tank Node MQTT]
     DB[(PostgreSQL)]
     O[Logs and Metrics]
 
@@ -129,7 +129,7 @@ flowchart LR
     D_Soil -->|REST API over Wi-Fi| W
     W --> DB
     G --> DB
-    G --> M
+    G <-->|irigasi/melon/...| M
     M <--> D_Res
     G --> R
     R --> U
@@ -140,18 +140,24 @@ flowchart LR
 
 ### 4.1 Ingress Paths by Domain
 
-1. **Soil & Water Quality Telemetry**: Equipment sends REST API calls over Wi-Fi directly to backend REST endpoints (`W`), which validate, persist (`DB`), and emit real-time updates (`R`).
-2. **Reservoir-Water Telemetry & Control**: Reservoir nodes connect via MQTT 5.0 over TLS to the EMQX broker (`M`). The IoT Gateway (`G`) ingests messages, validates payloads, persists to PostgreSQL (`DB`), and handles faucet commands.
+1. **Soil & Water Quality Telemetry (Path A - REST)**: Equipment sends REST API calls over Wi-Fi directly to backend REST endpoints (`W`), which validate, persist (`DB`), and emit real-time updates (`R`). Zero MQTT involvement.
+2. **Reservoir-Water Telemetry & Faucet Control (Path B - Direct MQTT Gateway, DEC-DEV-032)**: The single Water Tank node connects via MQTT 5.0 over TLS to the EMQX broker (`M`) using canonical hardware topics (`irigasi/melon/...`). The IoT Gateway (`G`) ingests telemetry directly from `irigasi/melon/sensor/volume`, validates payloads, binds deterministically to the database `WATER_TANK_NODE` entity, persists to PostgreSQL (`DB`), emits real-time updates (`R`), and publishes valve/automation commands directly to `irigasi/melon/kontrol/valve` and `irigasi/melon/setting/otomasi` under strict `ENABLE_FAUCET_CONTROL=false` safety locks. The intermediate `agriculture/...` topic hop is permanently retired for the reservoir domain.
 
-#### 4.1.1 Gateway Connectivity Topology & Runtime Isolation (TASK-0914, TASK-1012)
+#### 4.1.1 Gateway Connectivity Topology, EMQX Cloud & Runtime Isolation (TASK-0914, TASK-1012, DEC-DEV-032)
 
-- **Direct EMQX Cloud TLS Connectivity:** Both local development gateways (`APP_ENV=development`) and containerized staging gateways (`APP_ENV=staging`, `TASK-1012`) connect **directly to EMQX Cloud** over TLS (`mqtts://` port 8883 / `wss://` port 8084). Railway PaaS is formally decommissioned and is neither an MQTT proxy nor a hosting platform for the system.
-- **Environment & Topic Namespace Isolation:** Topics are strictly partitioned by environment namespace (`agriculture/development/...` vs `agriculture/staging/...` vs `agriculture/production/...`).
-- **Client ID Isolation:** Development gateway defaults to `gateway-kebun-melon-dev-local-01` and staging uses `gateway-kebun-melon-staging-*`; development simulators use `sim-${tankDeviceId}-${random}`, preventing broker session takeover or disconnect collisions with physical hardware.
-- **Simulator Dynamic Identity:** Simulator device IDs are resolved at runtime via CLI flags (`--tank-device-id`, `--device-id`) or environment variables (`MQTT_TANK_DEVICE_ID`, `MQTT_DEVICE_ID`). No canonical device IDs are hardcoded in source code. Topic `deviceId` and payload `deviceId` strictly match.
+- **Dedicated EMQX Cloud Deployment & WSS Transport:** Both local development gateways (`APP_ENV=development`) and containerized staging gateways (`APP_ENV=staging`, `TASK-1012`) connect **directly to a dedicated EMQX Cloud deployment** over WebSocket Secure (`wss://<cluster-host>:8084/mqtt`). Broker configuration is injected exclusively via environment variables (`MQTT_BROKER_URL`). The public sandbox broker `broker.emqx.io` is strictly an unauthenticated demonstration testbed and is **NEVER** to be used or documented as production infrastructure.
+- **Canonical Hardware Contract for Water Tank (`DEC-DEV-032`):** `apps/iot-gateway` communicates directly on canonical hardware topics (`irigasi/melon/...`) for the single reservoir node, removing multi-tenant dynamic topic segments (`{environment}/{siteId}/{deviceId}`) for MQTT while retaining logical device scoping in PostgreSQL.
+- **Client Identity Separation & Confidentiality:**
+  - **IoT Gateway Client:** Username `Test_gateway`. Subscribes to telemetry (`irigasi/melon/sensor/volume`) and publishes actuation/automation commands (`irigasi/melon/kontrol/valve`, `irigasi/melon/setting/otomasi`). Gateway credentials are confidential backend secrets and shall **NEVER** be shared with or embedded into hardware devices.
+  - **Hardware Device Client:** Username `Test_Device`. Publishes sensor volume (`irigasi/melon/sensor/volume`) and subscribes to commands (`irigasi/melon/kontrol/valve`, `irigasi/melon/setting/otomasi`).
+- **EMQX Broker Access Control Lists (ACL):**
+  - `Test_gateway`: Granted Pub/Sub permissions on `irigasi/melon/#`.
+  - `Test_Device`: Granted Publish on `irigasi/melon/sensor/volume`, Subscribe on `irigasi/melon/kontrol/valve` and `irigasi/melon/setting/otomasi`. All other topics denied.
+- **Client ID Isolation:** Development gateway defaults to `Test_Gateway` or `gateway-kebun-melon-dev-local-01` and staging uses `gateway-kebun-melon-staging-*`; hardware devices use unique MAC-derived client IDs (`water-tank-node-<mac>`), preventing broker session takeover or disconnect collisions.
+- **Simulator Dynamic Identity:** Simulator device IDs are resolved at runtime via CLI flags (`--tank-device-id`, `--device-id`) or environment variables (`MQTT_TANK_DEVICE_ID`, `MQTT_DEVICE_ID`). No canonical device IDs are hardcoded in source code.
 - **Offline Fallback:** Local Docker Eclipse Mosquitto is retained as an explicit, optional offline development fallback only.
 - **Safety Defaults:** `ENABLE_FAUCET_CONTROL=false` is enforced across all environments.
-- **Verification Status:** Live gateway/EMQX/canonical-device runtime ingestion passed. Staging runs via containerized Docker Compose (`docker-compose.staging.yml`) connected to cloud Supabase Staging and EMQX Cloud Staging.
+- **Verification Status:** Live gateway/EMQX/canonical-device runtime ingestion passed over WSS. Staging runs via containerized Docker Compose (`docker-compose.staging.yml`) connected to cloud Supabase Staging and dedicated EMQX Cloud.
 
 #### 4.1.2 Persistence Layer Infrastructure & Regional Colocation Architecture (TASK-0916)
 

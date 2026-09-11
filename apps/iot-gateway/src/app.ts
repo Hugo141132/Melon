@@ -18,18 +18,26 @@ import {
   telemetryProcessor as defaultTelemetryProcessor,
 } from './telemetry/processor';
 import { RetentionScheduler } from './maintenance/retention-scheduler';
+import {
+  HardwareMqttAdapter,
+  hardwareMqttAdapter as defaultHardwareMqttAdapter,
+} from './mqtt/hardware-adapter';
 import { registerHealthRoutes, DbChecker } from './routes/health';
 import { logger } from './observability/logger';
+import { DeviceRepository, prisma as defaultPrisma } from '@kebun-melon/database';
 
 export interface AppOptions {
   env: GatewayEnv;
   mqttClient?: GatewayMqttClient;
+  hardwareMqttClient?: GatewayMqttClient;
   dbChecker?: DbChecker;
   commandPublisher?: CommandPublisher;
   acknowledgementProcessor?: AcknowledgementProcessor;
   faucetEventProcessor?: FaucetEventProcessor;
   telemetryProcessor?: TelemetryProcessor;
   retentionScheduler?: RetentionScheduler;
+  hardwareAdapter?: HardwareMqttAdapter;
+  deviceRepo?: DeviceRepository;
 }
 
 // In-memory rate limit store for gateway HTTP endpoints
@@ -78,17 +86,30 @@ function checkGatewayRateLimit(
 export function buildApp(options: AppOptions): {
   app: FastifyInstance;
   mqttClient: GatewayMqttClient;
+  hardwareMqttClient?: GatewayMqttClient;
   commandPublisher: CommandPublisher;
   acknowledgementProcessor: AcknowledgementProcessor;
   faucetEventProcessor: FaucetEventProcessor;
   telemetryProcessor: TelemetryProcessor;
   retentionScheduler: RetentionScheduler;
+  hardwareAdapter: HardwareMqttAdapter;
 } {
   const app = Fastify({
     logger: false, // We use our structured logger module with secret redaction
   });
 
   const mqttClient = options.mqttClient ?? new GatewayMqttClient(options.env);
+  const hardwareMqttClient =
+    options.hardwareMqttClient ??
+    (options.env.HARDWARE_MQTT_BROKER_URL &&
+    options.env.HARDWARE_MQTT_BROKER_URL !== options.env.MQTT_BROKER_URL
+      ? new GatewayMqttClient({
+          ...options.env,
+          MQTT_BROKER_URL: options.env.HARDWARE_MQTT_BROKER_URL,
+          MQTT_GATEWAY_CLIENT_ID: `${options.env.MQTT_GATEWAY_CLIENT_ID || 'gateway'}-hw-${Date.now()}`,
+        })
+      : undefined);
+
   const commandPublisher = options.commandPublisher ?? defaultCommandPublisher;
   const acknowledgementProcessor =
     options.acknowledgementProcessor ?? defaultAcknowledgementProcessor;
@@ -96,8 +117,12 @@ export function buildApp(options: AppOptions): {
   const telemetryProcessor = options.telemetryProcessor ?? defaultTelemetryProcessor;
   const retentionScheduler =
     options.retentionScheduler ?? new RetentionScheduler({ env: options.env });
+  const hardwareAdapter = options.hardwareAdapter ?? defaultHardwareMqttAdapter;
+  const deviceRepo =
+    options.deviceRepo ?? (defaultPrisma ? new DeviceRepository(defaultPrisma) : undefined);
 
-  commandPublisher.bind(options.env, mqttClient);
+  hardwareAdapter.bind(options.env, mqttClient, hardwareMqttClient, deviceRepo);
+  commandPublisher.bind(options.env, mqttClient, hardwareAdapter);
   acknowledgementProcessor.bind(options.env, mqttClient);
   faucetEventProcessor.bind(options.env, mqttClient);
   telemetryProcessor.bind(options.env, mqttClient);
@@ -174,10 +199,12 @@ export function buildApp(options: AppOptions): {
   return {
     app,
     mqttClient,
+    hardwareMqttClient,
     commandPublisher,
     acknowledgementProcessor,
     faucetEventProcessor,
     telemetryProcessor,
     retentionScheduler,
+    hardwareAdapter,
   };
 }

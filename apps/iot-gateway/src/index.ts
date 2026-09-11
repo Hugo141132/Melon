@@ -22,11 +22,13 @@ async function startServer() {
     const {
       app,
       mqttClient,
+      hardwareMqttClient,
       commandPublisher,
       acknowledgementProcessor,
       faucetEventProcessor,
       telemetryProcessor,
       retentionScheduler,
+      hardwareAdapter,
     } = buildApp({ env });
 
     // Connect to MQTT Broker asynchronously (non-blocking server start)
@@ -43,6 +45,11 @@ async function startServer() {
           telemetryProcessor.subscribeToTelemetry().catch((err) => {
             logger.error('Failed to subscribe to telemetry after MQTT connection', err);
           });
+          if (!hardwareMqttClient && env.HARDWARE_ADAPTER_ENABLED) {
+            hardwareAdapter.start().catch((err) => {
+              logger.error('Failed to start hardware adapter after MQTT connection', err);
+            });
+          }
         })
         .catch((err) => {
           logger.warn('Initial MQTT connection attempt failed, will auto-retry', {
@@ -51,6 +58,22 @@ async function startServer() {
         });
     } else {
       logger.warn('MQTT_BROKER_URL not configured. Running gateway in HTTP-only standby mode.');
+    }
+
+    // Connect dedicated hardware MQTT broker if configured separately
+    if (hardwareMqttClient && env.HARDWARE_ADAPTER_ENABLED) {
+      hardwareMqttClient
+        .connect()
+        .then(() => {
+          hardwareAdapter.start().catch((err) => {
+            logger.error('Failed to start hardware adapter on dedicated broker', err);
+          });
+        })
+        .catch((err) => {
+          logger.warn('Initial hardware MQTT connection attempt failed, will auto-retry', {
+            error: err.message,
+          });
+        });
     }
 
     // Start command publisher polling worker if DB and MQTT are configured
@@ -75,9 +98,13 @@ async function startServer() {
         acknowledgementProcessor.stop();
         faucetEventProcessor.stop();
         telemetryProcessor.stop();
+        hardwareAdapter.stop();
         retentionScheduler.stop();
         await app.close();
         await mqttClient.disconnect();
+        if (hardwareMqttClient) {
+          await hardwareMqttClient.disconnect();
+        }
         logger.info('IoT Gateway Service shutdown complete.');
         process.exit(0);
       } catch (err) {
