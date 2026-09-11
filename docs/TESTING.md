@@ -2974,3 +2974,41 @@ The following verification gates, test results, and staging deployment evidence 
   - End-to-end physical actuation is NOT claimed.
   - `TASK-0411` remains strictly **`BLOCKED`** pending technical responses from the hardware team.
 <!-- TASK-0411 Testing Evidence Reconciled: 2026-09-10 -->
+
+---
+
+## 35.9 TASK-0411 End-to-End Telemetry Flow, Freshness Lifecycle & UI Status Synchronization Evidence (2026-09-11)
+
+The following verification gates, test results, and frontend evidence were evaluated for `TASK-0411` (Hardware Telemetry Flow, Time-Based Stale Detection, UI Status Synchronization, and Stale/Offline Volume Placeholder):
+
+### 1. Telemetry Ingestion & Freshness Pipeline
+- **Verified Flow:** Physical Hardware Sensor Node (`irigasi/melon/sensor/volume`) → EMQX MQTT Broker (Port 8084 WSS) → IoT Gateway (`HardwareMqttAdapter` & `TelemetryProcessor`) → PostgreSQL Database (`reservoir_water_readings` & `devices.last_seen_at`) → Web API (`/monitoring/latest`, `/water/latest`, `/devices`) → Frontend Web UI (`useLatestMonitoring` & `DeviceContext`).
+- **Telemetry Freshness Invariant:** Defined `TELEMETRY_STALE_THRESHOLD_MS = 60 * 1000` (60 seconds) in `apps/web/lib/constants.ts`. Dynamic calculation computes `effectiveStatus = 'STALE'` when active device telemetry is older than 60 seconds without prematurely mutating database records.
+- **UI Status Synchronization:** `DeviceContext` provides `updateDeviceStatus` to sync selected device and list in memory; `useLatestMonitoring` synchronizes snapshot freshness into `DeviceContext`.
+- **Display Behavior:** Live numeric volume formatted to 2 decimals when `ONLINE`; numerical volume hidden with placeholder (`— L` in card, `- L` in dashboard) and 0% gauge fill when `STALE` or `OFFLINE`; automatic restoration to `ONLINE` when telemetry resumes (<60s).
+
+### 2. Evidence-Backed Automated Test Results
+- **Focused Vitest Unit Test Suites (53/53 passed across web monitoring and route files, 100%, exit code 0):**
+  - `apps/web/test/unit/water-tank-monitoring-card.test.tsx` (11/11 passed):
+    - Real-time online volume rendering with 2 decimal precision.
+    - Placeholder rendering (`— L`) and 0% gauge fill when stale or offline.
+    - Stale notice banner and last seen timestamp display.
+  - `apps/web/test/unit/monitoring-dashboard.test.tsx` (8/8 passed):
+    - Synchronized stale state passing to WaterTankSection.
+    - Placeholder rendering (`- L`) when stale or offline.
+  - `apps/web/app/api/v1/devices/[deviceId]/monitoring/test/latest.test.ts` (16/16 passed):
+    - Dynamic STALE calculation when `now - lastSeenAt > 60s`.
+    - Preserved OFFLINE / INACTIVE statuses without overwriting.
+    - Proper schema structure and error handling.
+  - Full IoT Gateway test suite: 305/305 tests passed across 22 test files.
+- **Monorepo Static Typecheck:** `npm run typecheck` returned **0 errors** across all 4 monorepo packages (`@kebun-melon/contracts`, `@kebun-melon/database`, `@kebun-melon/iot-gateway`, `@kebun-melon/web`), exit code 0.
+- **Manual Verification:** Verified in browser via developer testbed that offline device transitions to amber `STALE` with placeholder volume, and seamlessly restores to `ONLINE` upon incoming telemetry.
+
+### 3. Preserved Project Constraints
+- Inbound MQTT telemetry subscription and normalization logic remain unchanged.
+- Hardware payload format processing remains unchanged.
+- Staging environment remains completely untouched.
+- Dedicated production EMQX Cloud broker remains completely untouched.
+- No environment files (`.env`) were modified.
+- Actuator physical valve control remains strictly locked under `ENABLE_FAUCET_CONTROL=false`.
+<!-- TASK-0411 Testing Evidence Reconciled: 2026-09-11 -->

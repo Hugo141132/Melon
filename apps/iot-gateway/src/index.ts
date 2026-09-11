@@ -2,7 +2,7 @@ import { validateGatewayEnv, redactSecrets } from './config/env';
 import { buildApp } from './app';
 import { logger } from './observability/logger';
 
-async function startServer() {
+export async function startServer() {
   try {
     const env = validateGatewayEnv(process.env);
 

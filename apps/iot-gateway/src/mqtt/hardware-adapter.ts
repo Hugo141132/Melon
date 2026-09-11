@@ -85,9 +85,10 @@ export class HardwareMqttAdapter {
     if (deviceRepo) {
       this.deviceRepo = deviceRepo;
     }
-    const resolvedEnvId = env.WATER_TANK_DEVICE_ID || env.HARDWARE_TARGET_DEVICE_ID;
-    if (resolvedEnvId) {
-      this.targetDeviceId = resolvedEnvId;
+    if (env.WATER_TANK_DEVICE_ID) {
+      this.targetDeviceId = env.WATER_TANK_DEVICE_ID;
+    } else if (!this.deviceRepo && env.HARDWARE_TARGET_DEVICE_ID) {
+      this.targetDeviceId = env.HARDWARE_TARGET_DEVICE_ID;
     }
   }
 
@@ -96,10 +97,9 @@ export class HardwareMqttAdapter {
       return this.targetDeviceId;
     }
 
-    // 1. Explicit environment variable check
-    const envDeviceId = this.env?.WATER_TANK_DEVICE_ID || this.env?.HARDWARE_TARGET_DEVICE_ID;
-    if (envDeviceId && envDeviceId.trim().length > 0) {
-      this.targetDeviceId = envDeviceId.trim();
+    // 1. Explicit WATER_TANK_DEVICE_ID environment variable check
+    if (this.env?.WATER_TANK_DEVICE_ID && this.env.WATER_TANK_DEVICE_ID.trim().length > 0) {
+      this.targetDeviceId = this.env.WATER_TANK_DEVICE_ID.trim();
       return this.targetDeviceId;
     }
 
@@ -130,6 +130,15 @@ export class HardwareMqttAdapter {
       } catch (err) {
         logger.error('Failed to resolve WATER_TANK_NODE from database, using cached fallback', err);
       }
+    }
+
+    // 3. Fallback to HARDWARE_TARGET_DEVICE_ID env config if set, or default
+    if (
+      this.env?.HARDWARE_TARGET_DEVICE_ID &&
+      this.env.HARDWARE_TARGET_DEVICE_ID.trim().length > 0
+    ) {
+      this.targetDeviceId = this.env.HARDWARE_TARGET_DEVICE_ID.trim();
+      return this.targetDeviceId;
     }
 
     return this.targetDeviceId;
@@ -268,6 +277,9 @@ export class HardwareMqttAdapter {
       };
     }
 
+    // Resolve target device ID and site ID before building context and canonical topic
+    await this.resolveTargetDeviceId();
+
     const rawEnv = this.env?.APP_ENV || process.env.APP_ENV || 'development';
     const envName: AllowedEnvironment =
       rawEnv === 'production' ? 'production' : rawEnv === 'staging' ? 'staging' : 'development';
@@ -308,9 +320,6 @@ export class HardwareMqttAdapter {
         reason: loopCheck.reason || 'LOOP_DETECTED',
       };
     }
-
-    // Resolve target device ID (env config with database fallback)
-    await this.resolveTargetDeviceId();
 
     // Build canonical ReservoirTelemetryPayload
     const messageId = `hw-vol-${crypto.randomUUID()}`;

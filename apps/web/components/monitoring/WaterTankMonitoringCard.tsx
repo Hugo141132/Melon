@@ -31,15 +31,16 @@ function formatTimestamp(
 ): string {
   if (!isoString) return fallbackText;
   try {
-    const date = new Date(isoString);
-    if (isNaN(date.getTime())) return fallbackText;
-    return date.toLocaleTimeString('id-ID', {
+    return new Intl.DateTimeFormat('id-ID', {
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',
-    });
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    }).format(new Date(isoString));
   } catch {
-    return fallbackText;
+    return isoString;
   }
 }
 
@@ -160,17 +161,21 @@ export function WaterTankMonitoringCard() {
   }
 
   const waterData = snapshot?.water?.data;
-  const volumeVal = waterData?.tankVolume;
-  const isVolumeNull = volumeVal === null || volumeVal === undefined;
+  const rawVolumeVal = waterData?.tankVolume;
 
   const isOnline = connectionStatus === 'ONLINE';
   const isOffline = connectionStatus === 'OFFLINE';
   const isStaleStatus = connectionStatus === 'STALE' || isStale;
 
+  // Requirement: ONLINE shows current tank volume; STALE/OFFLINE hides tank volume value and shows placeholder ('- L')
+  const shouldShowVolume = isOnline && !isStaleStatus && !isOffline;
+  const displayVolume = shouldShowVolume ? rawVolumeVal : null;
+  const isVolumeNull = displayVolume === null || displayVolume === undefined;
+
   // Max capacity calculation for visual bar fill (0 - 2200 L)
   const maxCapacity = WATER_TANK_MAX_CAPACITY;
   const volumePercent = !isVolumeNull
-    ? Math.min(100, Math.max(0, (volumeVal / maxCapacity) * 100))
+    ? Math.min(100, Math.max(0, (displayVolume / maxCapacity) * 100))
     : 0;
 
   return (
@@ -247,14 +252,14 @@ export function WaterTankMonitoringCard() {
 
       {/* Metric Card Grid */}
       <div className="grid grid-cols-1 gap-4 animate-fade-in">
-        {/* Tank Volume Card (Exact Original UI) */}
+        {/* Tank Volume Card */}
         <div className="bg-app-surface-container-lowest rounded-xl p-5 soft-elevation-lg border border-app-outline-variant/30 flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-[14px] font-semibold text-app-on-surface-variant">
                 {tWater('tankVolume')}
               </h3>
-              {waterData?.status && (
+              {waterData?.status && shouldShowVolume && (
                 <div className="flex items-center gap-1 text-app-primary">
                   <Waves size={14} />
                   <span className="text-[12px] font-semibold">{waterData.status}</span>
@@ -263,7 +268,7 @@ export function WaterTankMonitoringCard() {
             </div>
             <div className="flex items-baseline gap-1">
               <span className="text-[28px] font-bold text-app-on-surface">
-                {formatMetricValue(volumeVal, 1)}
+                {formatMetricValue(displayVolume, 2)}
               </span>
               <span className="text-[12px] text-app-on-surface-variant">L</span>
             </div>
@@ -280,7 +285,7 @@ export function WaterTankMonitoringCard() {
               aria-valuemin={0}
               aria-valuemax={maxCapacity}
               aria-valuenow={
-                !isVolumeNull ? Math.min(maxCapacity, Math.max(0, volumeVal)) : undefined
+                !isVolumeNull ? Math.min(maxCapacity, Math.max(0, displayVolume)) : undefined
               }
               className="h-2 w-full rounded-full bg-app-surface-container relative overflow-hidden"
             >
@@ -290,9 +295,9 @@ export function WaterTankMonitoringCard() {
                 style={{ width: `${volumePercent}%` }}
               />
             </div>
-            <div className="flex justify-between mt-1">
-              <span className="text-[10px] font-bold text-app-on-surface-variant">0 L</span>
-              <span className="text-[10px] font-bold text-app-on-surface-variant">2200 L</span>
+            <div className="flex justify-between items-center mt-2 text-[11px] text-app-on-surface-variant font-medium">
+              <span>0 L</span>
+              <span>{maxCapacity} L</span>
             </div>
           </div>
         </div>

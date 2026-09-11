@@ -5,6 +5,7 @@ import {
   IngestWaterTelemetryInput,
   WaterTelemetryIngestionResult,
   TelemetryValidationStatus,
+  DeviceConnectionStatus,
 } from '@kebun-melon/contracts';
 import { DeviceNotFoundError, DeviceInactiveError } from './device-repository';
 
@@ -115,6 +116,7 @@ export class TelemetryRepository {
           data: {
             lastSeenAt: serverReceivedAt,
             lastMessageAt: serverReceivedAt,
+            connectionStatus: DeviceConnectionStatus.ONLINE,
           },
         });
 
@@ -233,6 +235,7 @@ export class TelemetryRepository {
           data: {
             lastSeenAt: serverReceivedAt,
             lastMessageAt: serverReceivedAt,
+            connectionStatus: DeviceConnectionStatus.ONLINE,
           },
         });
 
@@ -355,6 +358,7 @@ export class TelemetryRepository {
           data: {
             lastSeenAt: serverReceivedAt,
             lastMessageAt: serverReceivedAt,
+            connectionStatus: DeviceConnectionStatus.ONLINE,
           },
         });
 

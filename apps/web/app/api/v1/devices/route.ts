@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server';
 import { prisma, DeviceRepository } from '@kebun-melon/database';
-import { DeviceQueryInputSchema, UserRole } from '@kebun-melon/contracts';
+import { DeviceQueryInputSchema, UserRole, DeviceConnectionStatus } from '@kebun-melon/contracts';
 import {
   requireSession,
   requirePermission,
   computeDevicePermissions,
   AuthorizationError,
 } from '../../../../lib/auth/rbac';
+import { TELEMETRY_STALE_THRESHOLD_MS } from '@/lib/constants';
 
 export async function GET(request: Request) {
   const requestId = `req-${Date.now()}`;
@@ -61,20 +62,31 @@ export async function GET(request: Request) {
 
     const result = await deviceRepo.getDevices(parseResult.data, authorizedDeviceIds);
 
-    // Role-based projection per DEC-DEV-028:
-    // OWNER: receives full device object including canonical deviceId.
-    // ADMIN: canonical deviceId is strictly concealed (omitted).
+    const now = Date.now();
     const itemsWithPermissions = result.items.map((device) => {
-      const permissions = computeDevicePermissions(session, device, true);
+      const isStale =
+        device.connectionStatus === DeviceConnectionStatus.ONLINE &&
+        (!device.lastSeenAt ||
+          now - new Date(device.lastSeenAt).getTime() > TELEMETRY_STALE_THRESHOLD_MS);
+      const effectiveConnectionStatus = isStale
+        ? DeviceConnectionStatus.STALE
+        : (device.connectionStatus as DeviceConnectionStatus);
+
+      const deviceWithEffectiveStatus = {
+        ...device,
+        connectionStatus: effectiveConnectionStatus,
+      };
+
+      const permissions = computeDevicePermissions(session, deviceWithEffectiveStatus, true);
       if (!isOwner) {
-        const { deviceId: _concealed, ...adminDevice } = device;
+        const { deviceId: _concealed, ...adminDevice } = deviceWithEffectiveStatus;
         return {
           ...adminDevice,
           permissions,
         };
       }
       return {
-        ...device,
+        ...deviceWithEffectiveStatus,
         permissions,
       };
     });

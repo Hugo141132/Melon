@@ -2,6 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TelemetryProcessor } from '../telemetry/processor';
 import { DeviceType } from '@kebun-melon/contracts';
 import { GatewayEnv } from '../config/env';
+import { publishRealtimeEvent } from '../events/webhook';
+
+vi.mock('../events/webhook', () => ({
+  publishRealtimeEvent: vi.fn().mockResolvedValue(undefined),
+}));
 
 describe('TelemetryProcessor', () => {
   let processor: TelemetryProcessor;
@@ -29,6 +34,7 @@ describe('TelemetryProcessor', () => {
   };
 
   beforeEach(() => {
+    vi.clearAllMocks();
     mockTelemetryRepo = {
       ingestReservoirReading: vi.fn().mockResolvedValue({
         readingId: 'reading-uuid-001',
@@ -89,6 +95,33 @@ describe('TelemetryProcessor', () => {
       tankVolume: 85.5,
       status: 'NORMAL',
     });
+
+    expect(publishRealtimeEvent).toHaveBeenCalledWith(
+      mockEnv,
+      'telemetry.water.updated',
+      {
+        readingId: 'reading-uuid-001',
+        deviceId: 'device-uuid-001',
+        canonicalDeviceId: validDeviceId,
+        messageId: 'msg-sim-000001',
+        recordedAt: '2026-08-09T12:00:00.000Z',
+        tankVolume: 85.5,
+        status: 'NORMAL',
+      },
+      validDeviceId
+    );
+
+    expect(publishRealtimeEvent).toHaveBeenCalledWith(
+      mockEnv,
+      'device.status.updated',
+      {
+        deviceId: 'device-uuid-001',
+        canonicalDeviceId: validDeviceId,
+        connectionStatus: 'ONLINE',
+        lastSeenAt: '2026-08-09T12:00:01.000Z',
+      },
+      validDeviceId
+    );
   });
 
   it('proves legacy payload compatibility: gracefully strips incoming flowRate and ingests remaining telemetry', async () => {
@@ -199,5 +232,6 @@ describe('TelemetryProcessor', () => {
 
     expect(result.success).toBe(true);
     expect(result.isDuplicate).toBe(true);
+    expect(publishRealtimeEvent).not.toHaveBeenCalled();
   });
 });

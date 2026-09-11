@@ -110,9 +110,9 @@ export default function DeviceSelector({ className }: DeviceSelectorProps) {
       case 'ONLINE':
         return 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]';
       case 'OFFLINE':
-        return 'bg-amber-500';
+        return 'bg-rose-500';
       case 'STALE':
-        return 'bg-amber-400';
+        return 'bg-amber-500';
       case 'INACTIVE':
         return 'bg-gray-400';
       default:

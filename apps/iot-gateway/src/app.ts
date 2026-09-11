@@ -107,6 +107,12 @@ export function buildApp(options: AppOptions): {
           ...options.env,
           MQTT_BROKER_URL: options.env.HARDWARE_MQTT_BROKER_URL,
           MQTT_GATEWAY_CLIENT_ID: `${options.env.MQTT_GATEWAY_CLIENT_ID || 'gateway'}-hw-${Date.now()}`,
+          MQTT_GATEWAY_USERNAME: options.env.HARDWARE_MQTT_BROKER_URL.includes('broker.emqx.io')
+            ? undefined
+            : options.env.MQTT_GATEWAY_USERNAME,
+          MQTT_GATEWAY_PASSWORD: options.env.HARDWARE_MQTT_BROKER_URL.includes('broker.emqx.io')
+            ? undefined
+            : options.env.MQTT_GATEWAY_PASSWORD,
         })
       : undefined);
 

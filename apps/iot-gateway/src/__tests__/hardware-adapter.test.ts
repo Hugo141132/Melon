@@ -355,27 +355,56 @@ describe('HardwareMqttAdapter (TASK-0411 / Hardware Compatibility Layer)', () =>
       });
     });
 
-    it('falls back gracefully to cached fallback if database lookup fails', async () => {
-      const envWithoutIds = {
+    it('resolves active WATER_TANK_NODE from database even when HARDWARE_TARGET_DEVICE_ID default is present', async () => {
+      const envWithDefaultHardwareId = {
         ...mockEnv,
         WATER_TANK_DEVICE_ID: undefined,
-        HARDWARE_TARGET_DEVICE_ID: undefined,
+        HARDWARE_TARGET_DEVICE_ID: 'water-tank-node-zi37gz',
       } as unknown as GatewayEnv;
 
-      const mockFailingDeviceRepo = {
-        getDevices: vi.fn().mockRejectedValue(new Error('DB Connection Timeout')),
+      const mockDeviceRepo = {
+        getDevices: vi.fn().mockResolvedValue({
+          items: [
+            {
+              id: 'd1926a3e-1a79-447e-8167-3a2d39426508',
+              deviceId: 'water-tank-uqiwue',
+              siteId: 'd31b05fb-5cb9-4120-96d8-3c04dfff1c56',
+              deviceType: 'WATER_TANK_NODE',
+              accountStatus: 'ACTIVE',
+            },
+          ],
+          total: 1,
+        }),
       };
 
-      const fallbackAdapter = new HardwareMqttAdapter({
-        env: envWithoutIds,
+      const dbAdapter = new HardwareMqttAdapter({
+        env: envWithDefaultHardwareId,
         mqttClient: mockInternalClient,
         hardwareMqttClient: mockHardwareClient,
         telemetryProcessor: mockTelemetryProcessor,
-        deviceRepo: mockFailingDeviceRepo as any,
+        deviceRepo: mockDeviceRepo as any,
       });
 
-      const resolved = await fallbackAdapter.resolveTargetDeviceId();
-      expect(resolved).toBe('water-tank-node-zi37gz');
+      const resolved = await dbAdapter.resolveTargetDeviceId();
+      expect(resolved).toBe('water-tank-uqiwue');
+      expect(dbAdapter.getTargetDeviceId()).toBe('water-tank-uqiwue');
+
+      // Now verify handleInboundHardwareVolume uses resolved device and site
+      const result = await dbAdapter.handleInboundHardwareVolume('165.5');
+      expect(result.success).toBe(true);
+
+      expect(mockTelemetryProcessor.processTelemetryMessage).toHaveBeenCalledTimes(1);
+      const [calledTopic, calledPayloadBuf] =
+        mockTelemetryProcessor.processTelemetryMessage.mock.calls[0];
+
+      expect(calledTopic).toBe(
+        'agriculture/staging/d31b05fb-5cb9-4120-96d8-3c04dfff1c56/water-tank-uqiwue/telemetry/reservoir'
+      );
+
+      const parsedPayload = JSON.parse(calledPayloadBuf.toString('utf-8'));
+      expect(parsedPayload.deviceId).toBe('water-tank-uqiwue');
+      expect(parsedPayload.siteId).toBe('d31b05fb-5cb9-4120-96d8-3c04dfff1c56');
+      expect(parsedPayload.data.tankVolume).toBe(165.5);
     });
   });
 });

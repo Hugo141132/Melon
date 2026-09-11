@@ -7,6 +7,7 @@ import {
 } from '@kebun-melon/database';
 import { SoilMonitoringResponseDto } from '@kebun-melon/contracts';
 import { requireSession, requireDeviceViewAccess, AuthorizationError } from '@/lib/auth/rbac';
+import { TELEMETRY_STALE_THRESHOLD_MS } from '@/lib/constants';
 
 const toNumberOrNull = (val: any): number | null => {
   if (val === null || val === undefined) return null;
@@ -81,7 +82,10 @@ export async function GET(request: Request, props: { params: Promise<{ deviceId:
       device.connectionStatus === 'STALE' ||
       device.connectionStatus === 'OFFLINE' ||
       device.connectionStatus === 'UNKNOWN' ||
-      device.connectionStatus === 'INACTIVE';
+      device.connectionStatus === 'INACTIVE' ||
+      (soilReading.receivedAt
+        ? Date.now() - soilReading.receivedAt.getTime() > TELEMETRY_STALE_THRESHOLD_MS
+        : true);
 
     const responseData: SoilMonitoringResponseDto = {
       deviceId: device.deviceId,

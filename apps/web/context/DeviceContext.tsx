@@ -38,6 +38,11 @@ export interface DeviceContextType {
   refetchDevices: () => Promise<void>;
   clearSelectedDevice: () => void;
   dismissRevokedNotice: () => void;
+  updateDeviceStatus: (
+    deviceId: string,
+    status: AuthorisedDevice['connectionStatus'],
+    lastSeenAt?: string | null
+  ) => void;
 }
 
 const DeviceContext = createContext<DeviceContextType | undefined>(undefined);
@@ -292,6 +297,53 @@ export function DeviceProvider({
     setRevokedDeviceId(null);
   }, []);
 
+  const updateDeviceStatus = useCallback(
+    (
+      deviceId: string,
+      status: AuthorisedDevice['connectionStatus'],
+      lastSeenAt?: string | null
+    ) => {
+      setDevices((prevDevices) =>
+        prevDevices.map((d) => {
+          if (d.id === deviceId || d.deviceId === deviceId) {
+            if (
+              d.connectionStatus === status &&
+              (lastSeenAt === undefined || d.lastSeenAt === lastSeenAt)
+            ) {
+              return d;
+            }
+            return {
+              ...d,
+              connectionStatus: status,
+              lastSeenAt: lastSeenAt !== undefined ? lastSeenAt : d.lastSeenAt,
+            };
+          }
+          return d;
+        })
+      );
+
+      setSelectedDevice((prevSelected) => {
+        if (prevSelected && (prevSelected.id === deviceId || prevSelected.deviceId === deviceId)) {
+          if (
+            prevSelected.connectionStatus === status &&
+            (lastSeenAt === undefined || prevSelected.lastSeenAt === lastSeenAt)
+          ) {
+            return prevSelected;
+          }
+          const updated = {
+            ...prevSelected,
+            connectionStatus: status,
+            lastSeenAt: lastSeenAt !== undefined ? lastSeenAt : prevSelected.lastSeenAt,
+          };
+          selectedDeviceRef.current = updated;
+          return updated;
+        }
+        return prevSelected;
+      });
+    },
+    []
+  );
+
   const currentPath = pathname || (typeof window !== 'undefined' ? window.location.pathname : '');
   const isAuthRoute = ['/login', '/register', '/forgot-password', '/status'].includes(currentPath);
   const effectiveIsLoading = isLoading || (!hasFetched && !isAuthRoute && !initialDevices);
@@ -310,6 +362,7 @@ export function DeviceProvider({
         refetchDevices,
         clearSelectedDevice,
         dismissRevokedNotice,
+        updateDeviceStatus,
       }}
     >
       {children}

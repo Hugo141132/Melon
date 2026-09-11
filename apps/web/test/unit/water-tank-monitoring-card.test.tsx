@@ -81,7 +81,7 @@ describe('WaterTankMonitoringCard Component Tests', () => {
       </DeviceProvider>
     );
 
-    expect(await screen.findByText('450.5')).toBeInTheDocument();
+    expect(await screen.findByText('450.50')).toBeInTheDocument();
     expect(screen.getByText('Volume Air Tangki')).toBeInTheDocument();
     expect(screen.getByText('NORMAL')).toBeInTheDocument();
     expect(screen.getByText('L')).toBeInTheDocument();
@@ -345,7 +345,7 @@ describe('WaterTankMonitoringCard Component Tests', () => {
     expect(screen.getByRole('button', { name: /Coba Lagi/i })).toBeInTheDocument();
   });
 
-  it('renders stale data alert banner when connection is STALE', async () => {
+  it('renders stale data alert banner when connection is STALE and hides tank volume', async () => {
     const staleDevice: AuthorisedDevice = {
       ...mockWaterTankDevice,
       connectionStatus: 'STALE',
@@ -357,6 +357,8 @@ describe('WaterTankMonitoringCard Component Tests', () => {
       json: async () => ({
         success: true,
         data: {
+          connectionStatus: 'STALE',
+          lastSeenAt: '2026-08-04T10:00:00Z',
           water: {
             recordedAt: '2026-08-04T10:00:00Z',
             isStale: true,
@@ -375,6 +377,65 @@ describe('WaterTankMonitoringCard Component Tests', () => {
       </DeviceProvider>
     );
 
+    // Stale status badge
     expect(await screen.findByText(/Data Usang \(Stale\)/i)).toBeInTheDocument();
+    // Stale warning notice banner
+    expect(
+      screen.getByText(/Data pemantauan tangki air saat ini tidak diperbarui/i)
+    ).toBeInTheDocument();
+    // Last seen timestamp remains visible
+    expect(screen.getByText(/Terakhir Terlihat/i)).toBeInTheDocument();
+    // Tank volume number is hidden; placeholder is shown
+    expect(screen.queryByText('300')).not.toBeInTheDocument();
+    expect(screen.queryByText('300.00')).not.toBeInTheDocument();
+    expect(screen.getByText('—')).toBeInTheDocument();
+    // Progress bar fill is 0%
+    const fillBar = screen.getByTestId('tank-volume-progress-bar');
+    expect(fillBar).toHaveStyle({ width: '0%' });
+  });
+
+  it('hides tank volume and displays placeholder when connection is OFFLINE', async () => {
+    const offlineDevice: AuthorisedDevice = {
+      ...mockWaterTankDevice,
+      connectionStatus: 'OFFLINE',
+    };
+
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        success: true,
+        data: {
+          connectionStatus: 'OFFLINE',
+          lastSeenAt: '2026-08-04T09:00:00Z',
+          water: {
+            recordedAt: '2026-08-04T09:00:00Z',
+            isStale: true,
+            data: {
+              tankVolume: 500,
+              status: 'OFFLINE',
+            },
+          },
+        },
+      }),
+    } as Response);
+
+    render(
+      <DeviceProvider initialDevices={[offlineDevice]} initialSelectedDeviceId="water-tank-001">
+        <WaterTankMonitoringCard />
+      </DeviceProvider>
+    );
+
+    // Offline badge
+    expect(await screen.findByText(/Terputus \(Offline\)/i)).toBeInTheDocument();
+    // Last seen timestamp remains visible
+    expect(screen.getByText(/Terakhir Terlihat/i)).toBeInTheDocument();
+    // Tank volume number is hidden; placeholder is shown
+    expect(screen.queryByText('500')).not.toBeInTheDocument();
+    expect(screen.queryByText('500.00')).not.toBeInTheDocument();
+    expect(screen.getByText('—')).toBeInTheDocument();
+    // Progress bar fill is 0%
+    const fillBar = screen.getByTestId('tank-volume-progress-bar');
+    expect(fillBar).toHaveStyle({ width: '0%' });
   });
 });

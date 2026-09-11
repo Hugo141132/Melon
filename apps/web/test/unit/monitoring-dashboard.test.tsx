@@ -274,6 +274,56 @@ describe('TASK-0502 — Real-Time Monitoring Dashboard Integration Tests', () =>
     });
   });
 
+  it('5b. Water Tank Section hides tank volume and renders placeholder when STALE or OFFLINE', async () => {
+    const staleWaterTankDevice: AuthorisedDevice = {
+      ...mockWaterTankDevice,
+      connectionStatus: DeviceConnectionStatus.STALE as DeviceConnectionStatus,
+    };
+
+    const staleWaterSnapshot: LatestMonitoringSnapshotDto = {
+      ...mockWaterTankSnapshot,
+      connectionStatus: DeviceConnectionStatus.STALE as DeviceConnectionStatus,
+      water: {
+        ...mockWaterTankSnapshot.water!,
+        isStale: true,
+      },
+    };
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/v1/devices')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ success: true, data: staleWaterSnapshot }),
+        });
+      }
+      return Promise.reject(new Error('Unknown URL'));
+    });
+
+    render(
+      <DeviceProvider
+        initialDevices={[staleWaterTankDevice]}
+        initialSelectedDeviceId="water-tank-003"
+      >
+        <MonitoringDashboard />
+      </DeviceProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Data Usang (Stale)')).toBeInTheDocument();
+      expect(
+        screen.getByText(/Perhatian: Data pemantauan saat ini tidak diperbarui/i)
+      ).toBeInTheDocument();
+    });
+
+    // Numerical volume (1250) must NOT be displayed
+    expect(screen.queryByText('1250')).not.toBeInTheDocument();
+    // Placeholder '-' must be displayed
+    expect(screen.getByText('-')).toBeInTheDocument();
+    // Unit 'L' must remain visible
+    expect(screen.getByText('L')).toBeInTheDocument();
+  });
+
   it('6. Empty Telemetry State Handling (Device has no readings yet)', async () => {
     const emptySnapshot: LatestMonitoringSnapshotDto = {
       deviceId: 'soil-node-001',

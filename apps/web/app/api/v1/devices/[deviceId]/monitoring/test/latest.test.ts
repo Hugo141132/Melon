@@ -175,11 +175,12 @@ describe('Latest Monitoring API Endpoints (TASK-0501 & TASK-0504 Repairs)', () =
       mockAdminSession();
       mockGetDeviceByCanonicalId.mockResolvedValue(dummySoilDevice);
       mockFindFirstUserDeviceAccess.mockResolvedValue({ id: 'access-1' });
+      const now = Date.now();
       mockGetLatestSoilReading.mockResolvedValue({
         id: 'reading-1',
         deviceId: 'dev-uuid-1',
-        recordedAt: new Date('2026-08-02T17:59:00Z'),
-        receivedAt: new Date('2026-08-02T18:00:00Z'),
+        recordedAt: new Date(now - 6000),
+        receivedAt: new Date(now - 5000),
         nitrogen: 0,
         phosphorus: 15,
         potassium: null,
@@ -207,6 +208,40 @@ describe('Latest Monitoring API Endpoints (TASK-0501 & TASK-0504 Repairs)', () =
       expect(json.data.data.potassium).toBeNull();
       expect(json.data.data.temperature).toBe(25.5);
       expect(json.data.data.status).toBe('NORMAL');
+    });
+
+    it('marks soil telemetry as stale when receivedAt exceeds 60-second threshold', async () => {
+      mockAdminSession();
+      mockGetDeviceByCanonicalId.mockResolvedValue(dummySoilDevice);
+      mockFindFirstUserDeviceAccess.mockResolvedValue({ id: 'access-1' });
+      const oldTime = new Date(Date.now() - 75000); // 75 seconds ago (> 60s)
+      mockGetLatestSoilReading.mockResolvedValue({
+        id: 'reading-stale',
+        deviceId: 'dev-uuid-1',
+        recordedAt: oldTime,
+        receivedAt: oldTime,
+        nitrogen: 120,
+        phosphorus: 40,
+        potassium: 180,
+        temperature: 25.0,
+        moisture: 50.0,
+        ph: 6.5,
+        ec: 1.5,
+        status: 'NORMAL',
+      });
+
+      const res = await GET_SOIL_LATEST(
+        new Request(
+          'http://localhost/api/v1/devices/DEV-SOIL-001/monitoring/soil/latest',
+          AUTH_HEADERS
+        ),
+        { params: Promise.resolve({ deviceId: 'DEV-SOIL-001' }) }
+      );
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.success).toBe(true);
+      expect(json.data.isStale).toBe(true);
+      expect(json.data.data.nitrogen).toBe(120);
     });
   });
 
@@ -269,6 +304,60 @@ describe('Latest Monitoring API Endpoints (TASK-0501 & TASK-0504 Repairs)', () =
       expect(json.data.deviceId).toBe('water-tank-node-3uufzi');
       expect(json.data.data.tankVolume).toBe(1200.0);
       expect(json.data.data.flowRate).toBeUndefined();
+    });
+
+    it('marks water telemetry as stale when receivedAt exceeds 60-second threshold', async () => {
+      mockOwnerSession();
+      mockGetDeviceByCanonicalId.mockResolvedValue(dummyWaterTankDevice);
+      const oldDate = new Date(Date.now() - 90000); // 90s ago (>60s)
+      mockGetLatestWaterTankReading.mockResolvedValue({
+        id: 'res-stale',
+        deviceId: 'dev-uuid-3',
+        recordedAt: oldDate,
+        receivedAt: oldDate,
+        tankVolume: 793.0,
+        status: 'NORMAL',
+      });
+
+      const res = await GET_WATER_LATEST(
+        new Request(
+          'http://localhost/api/v1/devices/water-tank-node-3uufzi/monitoring/water/latest',
+          AUTH_HEADERS
+        ),
+        { params: Promise.resolve({ deviceId: 'water-tank-node-3uufzi' }) }
+      );
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.success).toBe(true);
+      expect(json.data.isStale).toBe(true);
+      expect(json.data.data.tankVolume).toBe(793.0);
+    });
+
+    it('marks water telemetry as fresh when receivedAt is within 60-second threshold', async () => {
+      mockOwnerSession();
+      mockGetDeviceByCanonicalId.mockResolvedValue(dummyWaterTankDevice);
+      const freshDate = new Date(Date.now() - 10000); // 10s ago (<60s)
+      mockGetLatestWaterTankReading.mockResolvedValue({
+        id: 'res-fresh',
+        deviceId: 'dev-uuid-3',
+        recordedAt: freshDate,
+        receivedAt: freshDate,
+        tankVolume: 821.0,
+        status: 'NORMAL',
+      });
+
+      const res = await GET_WATER_LATEST(
+        new Request(
+          'http://localhost/api/v1/devices/water-tank-node-3uufzi/monitoring/water/latest',
+          AUTH_HEADERS
+        ),
+        { params: Promise.resolve({ deviceId: 'water-tank-node-3uufzi' }) }
+      );
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.success).toBe(true);
+      expect(json.data.isStale).toBe(false);
+      expect(json.data.data.tankVolume).toBe(821.0);
     });
   });
 
@@ -398,6 +487,69 @@ describe('Latest Monitoring API Endpoints (TASK-0501 & TASK-0504 Repairs)', () =
       const json = await res.json();
       expect(json.success).toBe(false);
       expect(json.error.code).toBe('DEVICE_NOT_FOUND');
+    });
+
+    it('evaluates effective connectionStatus as STALE when device is ONLINE in DB but latest reading exceeds 60s, preserving volume', async () => {
+      mockAdminSession();
+      // Device is marked ONLINE in DB:
+      mockGetDeviceByCanonicalId.mockResolvedValue(dummyWaterTankDevice);
+      mockFindFirstUserDeviceAccess.mockResolvedValue({ id: 'access-5' });
+      const oldTime = new Date(Date.now() - 120000); // 2 minutes ago
+      mockGetLatestWaterTankReading.mockResolvedValue({
+        id: 'reading-stale-tank',
+        deviceId: 'dev-uuid-3',
+        recordedAt: oldTime,
+        receivedAt: oldTime,
+        tankVolume: 7.93,
+        status: 'NORMAL',
+      });
+
+      const res = await GET_LATEST(
+        new Request(
+          'http://localhost/api/v1/devices/water-tank-node-3uufzi/monitoring/latest',
+          AUTH_HEADERS
+        ),
+        { params: Promise.resolve({ deviceId: 'water-tank-node-3uufzi' }) }
+      );
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.success).toBe(true);
+      expect(json.data.deviceId).toBe('water-tank-node-3uufzi');
+      expect(json.data.connectionStatus).toBe(DeviceConnectionStatus.STALE);
+      expect(json.data.water).not.toBeNull();
+      expect(json.data.water.isStale).toBe(true);
+      expect(json.data.water.data.tankVolume).toBe(7.93);
+    });
+
+    it('restores effective connectionStatus to ONLINE when fresh reading (<60s) arrives', async () => {
+      mockAdminSession();
+      mockGetDeviceByCanonicalId.mockResolvedValue(dummyWaterTankDevice);
+      mockFindFirstUserDeviceAccess.mockResolvedValue({ id: 'access-6' });
+      const freshTime = new Date(Date.now() - 5000); // 5 seconds ago
+      mockGetLatestWaterTankReading.mockResolvedValue({
+        id: 'reading-fresh-tank',
+        deviceId: 'dev-uuid-3',
+        recordedAt: freshTime,
+        receivedAt: freshTime,
+        tankVolume: 8.21,
+        status: 'NORMAL',
+      });
+
+      const res = await GET_LATEST(
+        new Request(
+          'http://localhost/api/v1/devices/water-tank-node-3uufzi/monitoring/latest',
+          AUTH_HEADERS
+        ),
+        { params: Promise.resolve({ deviceId: 'water-tank-node-3uufzi' }) }
+      );
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.success).toBe(true);
+      expect(json.data.deviceId).toBe('water-tank-node-3uufzi');
+      expect(json.data.connectionStatus).toBe(DeviceConnectionStatus.ONLINE);
+      expect(json.data.water).not.toBeNull();
+      expect(json.data.water.isStale).toBe(false);
+      expect(json.data.water.data.tankVolume).toBe(8.21);
     });
   });
 });

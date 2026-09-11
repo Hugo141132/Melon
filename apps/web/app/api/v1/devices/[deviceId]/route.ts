@@ -5,7 +5,7 @@ import {
   DeviceNotFoundError,
   DeviceConflictError,
 } from '@kebun-melon/database';
-import { UpdateDeviceInputSchema, UserRole } from '@kebun-melon/contracts';
+import { UpdateDeviceInputSchema, UserRole, DeviceConnectionStatus } from '@kebun-melon/contracts';
 import {
   requireSession,
   requirePermission,
@@ -13,6 +13,7 @@ import {
   computeDevicePermissions,
   AuthorizationError,
 } from '../../../../../lib/auth/rbac';
+import { TELEMETRY_STALE_THRESHOLD_MS } from '@/lib/constants';
 
 export async function GET(request: Request, props: { params: Promise<{ deviceId: string }> }) {
   const params = await props.params;
@@ -70,7 +71,21 @@ export async function GET(request: Request, props: { params: Promise<{ deviceId:
       },
     });
 
-    const permissions = computeDevicePermissions(session, device, true);
+    const now = Date.now();
+    const isStale =
+      device.connectionStatus === DeviceConnectionStatus.ONLINE &&
+      (!device.lastSeenAt ||
+        now - new Date(device.lastSeenAt).getTime() > TELEMETRY_STALE_THRESHOLD_MS);
+    const effectiveConnectionStatus = isStale
+      ? DeviceConnectionStatus.STALE
+      : (device.connectionStatus as DeviceConnectionStatus);
+
+    const deviceWithEffectiveStatus = {
+      ...device,
+      connectionStatus: effectiveConnectionStatus,
+    };
+
+    const permissions = computeDevicePermissions(session, deviceWithEffectiveStatus, true);
     const isOwner = session.activeRoles.includes(UserRole.OWNER);
 
     // Role-based projection per DEC-DEV-028:
@@ -78,10 +93,10 @@ export async function GET(request: Request, props: { params: Promise<{ deviceId:
     // ADMIN: canonical deviceId is strictly concealed (omitted).
     const projectedDevice = !isOwner
       ? (() => {
-          const { deviceId: _concealed, ...adminDevice } = device;
+          const { deviceId: _concealed, ...adminDevice } = deviceWithEffectiveStatus;
           return { ...adminDevice, permissions };
         })()
-      : { ...device, permissions };
+      : { ...deviceWithEffectiveStatus, permissions };
 
     return NextResponse.json(
       {

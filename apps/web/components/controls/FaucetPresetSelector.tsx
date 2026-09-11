@@ -189,7 +189,9 @@ export default function FaucetPresetSelector({
                 'w-2 h-2 rounded-full',
                 selectedDevice.connectionStatus === 'ONLINE'
                   ? 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)] animate-pulse'
-                  : 'bg-amber-500'
+                  : selectedDevice.connectionStatus === 'STALE'
+                    ? 'bg-amber-500'
+                    : 'bg-rose-500'
               )}
             />
             <span className="font-semibold text-app-on-surface">{selectedDevice.deviceName}</span>

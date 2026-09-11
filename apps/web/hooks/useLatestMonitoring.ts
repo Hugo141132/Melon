@@ -15,7 +15,7 @@ export interface UseLatestMonitoringResult {
 }
 
 export function useLatestMonitoring(): UseLatestMonitoringResult {
-  const { selectedDeviceId, selectedDevice } = useDeviceContext();
+  const { selectedDeviceId, selectedDevice, updateDeviceStatus } = useDeviceContext();
   const [snapshot, setSnapshot] = useState<LatestMonitoringSnapshotDto | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isRevalidating, setIsRevalidating] = useState<boolean>(false);
@@ -114,20 +114,40 @@ export function useLatestMonitoring(): UseLatestMonitoringResult {
     };
   }, [selectedDeviceId, fetchLatestSnapshot]);
 
-  const isStale =
-    snapshot?.soil?.isStale ||
-    snapshot?.water?.isStale ||
-    selectedDevice?.connectionStatus === 'STALE' ||
-    false;
+  const rawStatus = snapshot?.connectionStatus || selectedDevice?.connectionStatus || null;
 
-  const connectionStatus = selectedDevice?.connectionStatus || snapshot?.connectionStatus || null;
+  const isStale =
+    snapshot?.soil?.isStale || snapshot?.water?.isStale || rawStatus === 'STALE' || false;
+
+  const effectiveConnectionStatus =
+    rawStatus === 'OFFLINE' || rawStatus === 'INACTIVE'
+      ? rawStatus
+      : isStale
+        ? 'STALE'
+        : rawStatus || null;
+
+  useEffect(() => {
+    if (effectiveConnectionStatus && selectedDeviceId && updateDeviceStatus) {
+      updateDeviceStatus(
+        selectedDeviceId,
+        effectiveConnectionStatus as any,
+        snapshot?.lastSeenAt || selectedDevice?.lastSeenAt
+      );
+    }
+  }, [
+    effectiveConnectionStatus,
+    selectedDeviceId,
+    snapshot?.lastSeenAt,
+    selectedDevice?.lastSeenAt,
+    updateDeviceStatus,
+  ]);
 
   return {
     snapshot,
     isLoading,
     isRevalidating,
     isStale,
-    connectionStatus,
+    connectionStatus: effectiveConnectionStatus,
     error,
     refetch: () => fetchLatestSnapshot(false),
   };

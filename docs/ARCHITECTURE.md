@@ -1977,9 +1977,11 @@ The following architecture specifications govern the permanent external hardware
 6. **Authoritative Exact Topic String & Whitespace Resolution**:
    - MQTT topics are byte-exact strings. The exact strings are authoritatively confirmed with strictly NO leading or trailing whitespace: `irigasi/melon/sensor/volume`, `irigasi/melon/kontrol/valve`, `irigasi/melon/setting/otomasi`.
    - Naming and whitespace questions are RESOLVED. Any incoming topic with whitespace is an implementation defect/mismatch rejected fail-closed, not an unresolved naming decision. The gateway will never silently trim whitespace or subscribe to alternate variants.
-7. **Safety Invariants Maintained:**
+7. **Safety Invariants & Telemetry Freshness Lifecycle (DEC-DEV-032 / Reconciled 2026-09-11):**
    - Preserving valve/automation topic names does not authorize activating those features.
    - `ENABLE_FAUCET_CONTROL=false` safety flag remains locked.
-   - `TASK-0411` remains in status `BLOCKED` until all physical hardware prerequisites are met.
-<!-- Hardware MQTT Architecture Reconciled: 2026-09-10 -->
+   - The end-to-end telemetry pipeline (Hardware Sensor $\rightarrow$ EMQX WSS Broker $\rightarrow$ IoT Gateway $\rightarrow$ PostgreSQL $\rightarrow$ Web API $\rightarrow$ Frontend UI) is implemented and verified in development.
+   - Freshness lifecycle: Authoritative 60-second stale threshold (`TELEMETRY_STALE_THRESHOLD_MS = 60 * 1000`) dynamically computes `STALE` status across monitoring and device routes when `now - lastSeenAt > 60s`, synchronizing with `DeviceContext` and rendering placeholders (`— L`) with 0% fill while suppressing misleading historical numbers. Status automatically restores to `ONLINE` upon incoming telemetry.
+   - Physical valve actuation and dispensing remain blocked pending physical hardware deployment.
+<!-- Hardware MQTT Architecture Reconciled: 2026-09-11 -->
 

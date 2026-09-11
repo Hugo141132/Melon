@@ -6,6 +6,7 @@ export const NPK_DATA = {
 };
 
 export const WATER_TANK_MAX_CAPACITY = 2200;
+export const TELEMETRY_STALE_THRESHOLD_MS = 60 * 1000; // 60 seconds (1 minute)
 
 // ─── Water / Nutrisi Data ─────────────────────────────────
 export const WATER_DATA = {

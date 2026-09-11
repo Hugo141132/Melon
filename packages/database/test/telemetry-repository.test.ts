@@ -2,7 +2,11 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Prisma } from '@prisma/client';
 import { TelemetryRepository } from '../src/telemetry-repository';
 import { DeviceNotFoundError } from '../src/device-repository';
-import { TelemetryValidationStatus, MonitoringStatus } from '@kebun-melon/contracts';
+import {
+  TelemetryValidationStatus,
+  MonitoringStatus,
+  DeviceConnectionStatus,
+} from '@kebun-melon/contracts';
 
 describe('TelemetryRepository Unit Tests (TASK-0405)', () => {
   let mockPrisma: any;
@@ -111,6 +115,9 @@ describe('TelemetryRepository Unit Tests (TASK-0405)', () => {
       // Verify atomic device update call
       expect(mockPrisma.device.update).toHaveBeenCalledTimes(1);
       expect(mockPrisma.device.update.mock.calls[0][0].where).toEqual({ id: mockDevice.id });
+      expect(mockPrisma.device.update.mock.calls[0][0].data.connectionStatus).toBe(
+        DeviceConnectionStatus.ONLINE
+      );
     });
 
     it('PRESERVES NULL values for missing/null numeric parameters', async () => {
@@ -257,6 +264,9 @@ describe('TelemetryRepository Unit Tests (TASK-0405)', () => {
 
       // Verify atomic device update call
       expect(mockPrisma.device.update).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.device.update.mock.calls[0][0].data.connectionStatus).toBe(
+        DeviceConnectionStatus.ONLINE
+      );
     });
 
     it('PRESERVES NUMERIC 0 values and NULL for omitted parameters', async () => {
@@ -344,6 +354,56 @@ describe('TelemetryRepository Unit Tests (TASK-0405)', () => {
       };
 
       await expect(repo.ingestWaterReading(input)).rejects.toThrow(DeviceNotFoundError);
+    });
+  });
+
+  describe('ingestReservoirReading', () => {
+    it('successfully ingests valid reservoir reading and updates device connectionStatus to ONLINE', async () => {
+      const mockDevice = {
+        id: 'reservoir-dev-uuid-1',
+        deviceId: 'water-tank-001',
+        accountStatus: 'ACTIVE',
+      };
+
+      const mockCreatedReading = {
+        id: 'reservoir-reading-uuid-1',
+        deviceId: mockDevice.id,
+        messageId: 'msg-res-001',
+        sequenceNumber: BigInt(5),
+        schemaVersion: '1.0',
+        recordedAt: new Date('2026-08-01T08:00:00Z'),
+        receivedAt: new Date('2026-08-01T08:00:01Z'),
+        tankVolume: new Prisma.Decimal(9.79),
+        status: MonitoringStatus.NORMAL,
+        validationStatus: TelemetryValidationStatus.VALID,
+      };
+
+      mockPrisma.device.findFirst.mockResolvedValue(mockDevice);
+      mockPrisma.reservoirWaterReading.create.mockResolvedValue(mockCreatedReading);
+      mockPrisma.device.update.mockResolvedValue({ ...mockDevice, lastSeenAt: new Date() });
+
+      const input = {
+        deviceId: 'water-tank-001',
+        messageId: 'msg-res-001',
+        schemaVersion: '1.0',
+        sequenceNumber: 5,
+        recordedAt: '2026-08-01T08:00:00Z',
+        tankVolume: 9.79,
+        status: MonitoringStatus.NORMAL,
+      };
+
+      const result = await repo.ingestReservoirReading(input);
+
+      expect(result.readingId).toBe(mockCreatedReading.id);
+      expect(result.deviceId).toBe(mockDevice.id);
+      expect(result.isDuplicate).toBe(false);
+
+      expect(mockPrisma.reservoirWaterReading.create).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.device.update).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.device.update.mock.calls[0][0].where).toEqual({ id: mockDevice.id });
+      expect(mockPrisma.device.update.mock.calls[0][0].data.connectionStatus).toBe(
+        DeviceConnectionStatus.ONLINE
+      );
     });
   });
 

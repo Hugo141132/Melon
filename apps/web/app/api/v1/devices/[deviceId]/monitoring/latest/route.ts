@@ -13,6 +13,7 @@ import {
   LatestMonitoringSnapshotDto,
 } from '@kebun-melon/contracts';
 import { requireSession, requireDeviceViewAccess, AuthorizationError } from '@/lib/auth/rbac';
+import { TELEMETRY_STALE_THRESHOLD_MS } from '@/lib/constants';
 
 const toNumberOrNull = (val: any): number | null => {
   if (val === null || val === undefined) return null;
@@ -84,12 +85,17 @@ export async function GET(request: Request, props: { params: Promise<{ deviceId:
     const waterReading = await telemetryRepo.getLatestWaterReading(device.id);
     const reservoirReading = await telemetryRepo.getLatestWaterTankReading(device.id);
 
+    const now = Date.now();
+
     const isSoilStale =
       !soilReading ||
       device.connectionStatus === 'STALE' ||
       device.connectionStatus === 'OFFLINE' ||
       device.connectionStatus === 'UNKNOWN' ||
-      device.connectionStatus === 'INACTIVE';
+      device.connectionStatus === 'INACTIVE' ||
+      (soilReading.receivedAt
+        ? now - soilReading.receivedAt.getTime() > TELEMETRY_STALE_THRESHOLD_MS
+        : true);
 
     const soilDto: SoilMonitoringResponseDto = {
       deviceId: device.deviceId,
@@ -123,7 +129,8 @@ export async function GET(request: Request, props: { params: Promise<{ deviceId:
       device.connectionStatus === 'STALE' ||
       device.connectionStatus === 'OFFLINE' ||
       device.connectionStatus === 'UNKNOWN' ||
-      device.connectionStatus === 'INACTIVE';
+      device.connectionStatus === 'INACTIVE' ||
+      now - latestWaterReceivedAt.getTime() > TELEMETRY_STALE_THRESHOLD_MS;
 
     const waterDto: WaterMonitoringResponseDto = {
       deviceId: device.deviceId,
@@ -146,10 +153,16 @@ export async function GET(request: Request, props: { params: Promise<{ deviceId:
       !!waterReading ||
       !!reservoirReading;
 
+    const isDeviceStale = (includeWater && isWaterStale) || (includeSoil && isSoilStale);
+    const effectiveStatus: DeviceConnectionStatus =
+      device.connectionStatus === DeviceConnectionStatus.ONLINE && isDeviceStale
+        ? DeviceConnectionStatus.STALE
+        : (device.connectionStatus as DeviceConnectionStatus);
+
     const snapshotDto: LatestMonitoringSnapshotDto = {
       deviceId: device.deviceId,
       deviceType: device.deviceType as DeviceType,
-      connectionStatus: device.connectionStatus as DeviceConnectionStatus,
+      connectionStatus: effectiveStatus,
       lastSeenAt: device.lastSeenAt ? device.lastSeenAt.toISOString() : null,
       soil: includeSoil ? soilDto : null,
       water: includeWater ? waterDto : null,

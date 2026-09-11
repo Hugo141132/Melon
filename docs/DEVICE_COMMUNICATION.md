@@ -686,6 +686,124 @@ This section provides the authoritative operational guide for the hardware engin
    - **Single-Node Invariant:** Production deployment operates strictly with **one** physical water tank node.
    - **Zero Retain:** Hardware shall never publish with `retain: true`.
 
+#### 8.4.9 Temporary Development & Integration Testbed (`broker.emqx.io:8084`)
+
+For initial hardware bench-testing and integration verification prior to production onboarding, the development environment supports temporary verification against EMQX's public testbed:
+
+1. **Development Testbed Parameters:**
+   - **Endpoint:** `wss://broker.emqx.io:8084/mqtt`
+   - **Protocol:** `WSS` (WebSocket Secure over TLS)
+   - **Port:** `8084`
+   - **Path:** `/mqtt`
+   - **Authentication:** Anonymous (no username or password required)
+   - **Client ID:** Any unique development string (e.g. `dev-node-<mac-or-random>`)
+   - **Clean Session:** `true`
+
+2. **Supported Wire Payload Contracts:**
+   - **Volume Telemetry (`irigasi/melon/sensor/volume`):**
+     - Primitive numeric string: `"145.8"`
+     - Structured JSON envelope: `{"volume": 145.8}` or `{"tankVolume": 145.8}`
+     - Valid range: $0 \le \text{volume} \le 100,000 \text{ L}$ (calibrated Liters)
+   - **Valve Actuation (`irigasi/melon/kontrol/valve`):**
+     - `"ON"` (Open valve)
+     - `"OFF"` (Close valve)
+     - QoS 1, Retain `false`
+   - **Automated Dispensing (`irigasi/melon/setting/otomasi`):**
+     - `{"mode": "AUTO", "target_liter": 1.5}`
+     - QoS 1, Retain `false`
+
+3. **Automated Verification Runner:**
+   Developers can verify connectivity, round-trip pub/sub, canonical telemetry reception, gateway normalization via `HardwareMqttAdapter`, and command translation/safety locks with:
+   ```bash
+   npm run mqtt:verify:hw
+   ```
+
+4. **Security Invariants & Production Transition:**
+   - `broker.emqx.io` is strictly an unauthenticated development sandbox and is **NEVER** permitted in production or staging environments.
+   - The IoT Gateway retains its server-side safety flag `ENABLE_FAUCET_CONTROL=false`, rejecting physical actuation attempts until formally activated.
+   - Before deploying hardware to production, the hardware team must switch firmware configuration from `broker.emqx.io:8084` to the dedicated EMQX Cloud cluster (`he100b10.ala.asia-southeast1.emqxsl.com:8084`), configure credentials (`Test_Device`), and adhere to the broker ACLs specified in §8.4.7–8.4.8.
+
+#### 8.4.10 End-to-End Telemetry Pipeline, Freshness Lifecycle & UI Reconciliation
+
+During development verification with live hardware transmissions on `irigasi/melon/sensor/volume`, the end-to-end telemetry and freshness lifecycle was fully reconciled across backend, API, and frontend presentation tiers.
+
+##### 1. End-to-End Telemetry Pipeline Architecture
+
+```text
+[ Physical Sensor Node ] (ESP32 / NodeMCU)
+       │
+       │ MQTT Publish (WSS, Port 8084, QoS 0/1)
+       ▼ Topic: irigasi/melon/sensor/volume
+[ EMQX MQTT Broker ] (broker.emqx.io in Dev / Dedicated EMQX Cloud in Prod)
+       │
+       │ WSS Subscription
+       ▼ Topic: irigasi/melon/sensor/volume
+[ IoT Gateway ] (apps/iot-gateway)
+       │ • HardwareMqttAdapter: Normalize primitive/JSON volume, range check (0-100,000 L)
+       │ • TelemetryProcessor: Deduplicate, validate schema, resolve target device entity
+       ▼
+[ PostgreSQL Database ] (Supabase DEV / Staging / Production)
+       │ • Atomic INSERT into reservoir_water_readings (tank_volume, recorded_at, received_at)
+       │ • Atomic UPDATE devices SET connection_status = 'ONLINE', last_seen_at = now()
+       ▼
+[ Web Application Backend & API ] (apps/web)
+       │ • GET /api/v1/devices/[deviceId]/monitoring/latest & /water/latest
+       │ • GET /api/v1/devices & GET /api/v1/devices/[deviceId]
+       │ • Freshness calculation: now() - lastSeenAt > 60s ? 'STALE' : 'ONLINE'
+       ▼
+[ Authenticated Frontend Web UI ] (apps/web)
+       │ • useLatestMonitoring: SWR / interval polling + realtime webhook updates
+       │ • DeviceContext: In-memory device state synchronized via updateDeviceStatus
+       │ • WaterTankMonitoringCard & MonitoringDashboard: Unified indicator + volume placeholder
+       │ • DeviceSelector, FaucetPresetSelector & FaucetConfirmationModal: Aligned status dots
+```
+
+##### 2. Root Causes Discovered
+
+1. **Hardware Value Mismatch Clarification:**
+   - Initial hardware team reports indicated water volume changes were not appearing on the web dashboard.
+   - In-depth investigation proved that the web was correctly displaying persisted telemetry records from the database. The perceived mismatch was caused by hardware transmission intervals and sensor polling states, with zero data loss or translation corruption in the gateway or database.
+2. **Missing Time-Based Stale Detection:**
+   - In the database, `devices.connection_status` remained statically `ONLINE` after physical hardware stopped publishing or went offline.
+   - Without dynamic time-based decay, offline devices falsely appeared active, and the last known telemetry value remained displayed indefinitely.
+3. **UI Component Status Inconsistency:**
+   - `WaterTankMonitoringCard` evaluated freshness dynamically from the monitoring endpoint snapshot (`isStale`).
+   - `DeviceSelector`, `FaucetPresetSelector`, and `FaucetConfirmationModal` consumed `selectedDevice.connectionStatus` cached from the initial device list (`GET /api/v1/devices`), causing conflicting UI indicators (e.g. emerald "ONLINE" dot while the card displayed an amber "Data Kedaluwarsa" notice).
+4. **Misleading Volume Display:**
+   - Both `WaterTankMonitoringCard` and `MonitoringDashboard` continued rendering the last known numeric volume (e.g. `7.93 L`) even when telemetry was stale or offline, which could lead operators to make incorrect water availability assumptions.
+
+##### 3. Implemented Fixes
+
+1. **Authoritative 60-Second Stale Threshold:**
+   - Defined `TELEMETRY_STALE_THRESHOLD_MS = 60 * 1000` (60 seconds) in `apps/web/lib/constants.ts` as the single system-wide threshold for telemetry freshness.
+2. **Dynamic STALE Status Calculation:**
+   - Updated monitoring routes (`/monitoring/latest`, `/water/latest`, `/soil/latest`) and device routes (`GET /api/v1/devices`, `GET /api/v1/devices/[deviceId]`) to calculate `effectiveStatus = 'STALE'` when `now - lastSeenAt > 60s` for active nodes.
+   - Preserves the database as an immutable source of telemetry facts without performing premature database update writes.
+3. **DeviceContext In-Memory Synchronization:**
+   - Added `updateDeviceStatus` to `DeviceContext`.
+   - Updated `useLatestMonitoring` to synchronize telemetry freshness with in-memory device state, dynamically updating `selectedDevice.connectionStatus` and the authorized devices list while strictly preserving true `OFFLINE` and `INACTIVE` database states.
+4. **Unified Connection Status Indicator Language:**
+   - Standardized semantic status indicators across all components (`DeviceSelector`, `WaterTankMonitoringCard`, `MonitoringDashboard`, `FaucetPresetSelector`, `FaucetConfirmationModal`):
+     - `ONLINE`: Emerald pulsing dot (`bg-emerald-500`)
+     - `STALE`: Amber dot (`bg-amber-500`) and amber badge (`bg-amber-50 text-amber-700 border-amber-200`)
+     - `OFFLINE`: Rose dot (`bg-rose-500`)
+5. **Volume Value Hiding & Placeholder Rendering:**
+   - **ONLINE:** Renders live water volume formatted to 2 decimal places (`formatMetricValue(volumeVal, 2)`), matching hardware sensor precision.
+   - **STALE / OFFLINE:** Hides numeric volume, displays placeholder (`— L` in `WaterTankMonitoringCard`, `- L` in `MonitoringDashboard`), and sets progress gauge bar to `0%`, while keeping the amber Stale Alert notice and `lastSeen` timestamp visible.
+6. **Automatic Online Restoration:**
+   - When hardware resumes publishing and fresh telemetry arrives ($< 60\text{s}$), the system automatically transitions back to `ONLINE`, clears stale banners, and restores live volume rendering across all UI elements.
+
+##### 4. Verification Evidence & Preserved Invariants
+
+- **Automated Unit Tests:** 100% pass across all unit test suites (`water-tank-monitoring-card.test.tsx` 11/11, `monitoring-dashboard.test.tsx` 8/8, `latest.test.ts` 16/16, full telemetry suites 53/53 passed).
+- **Monorepo Typecheck:** `npm run typecheck` returned 0 errors across all 4 packages (`@kebun-melon/iot-gateway`, `@kebun-melon/web`, `@kebun-melon/contracts`, `@kebun-melon/database`).
+- **Manual Verification:** Verified in browser that stale simulation displays synchronized amber indicators and volume placeholders, and automatically recovers to `ONLINE` upon receiving fresh telemetry.
+- **Preserved Project Constraints:**
+  - Inbound MQTT telemetry subscription and normalization logic remain unchanged.
+  - Hardware payload format processing remains unchanged.
+  - Staging environment remains completely untouched.
+  - Dedicated production EMQX Cloud broker remains completely untouched.
+  - No environment files (`.env`) were modified.
 
 ---
 

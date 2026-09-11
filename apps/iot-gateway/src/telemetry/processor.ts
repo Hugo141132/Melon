@@ -14,6 +14,7 @@ import { GatewayEnv } from '../config/env';
 import { mqttTopicRouter } from '../mqtt/router';
 import { logger } from '../observability/logger';
 import { metricsCollector } from '../observability/metrics';
+import { publishRealtimeEvent } from '../events/webhook';
 
 export interface TelemetryProcessorOptions {
   env?: GatewayEnv;
@@ -197,6 +198,35 @@ export class TelemetryProcessor {
         readingId: ingestionResult.readingId,
         isDuplicate: ingestionResult.isDuplicate,
       });
+
+      if (!ingestionResult.isDuplicate) {
+        await publishRealtimeEvent(
+          this.env,
+          'telemetry.water.updated',
+          {
+            readingId: ingestionResult.readingId,
+            deviceId: device.id,
+            canonicalDeviceId: device.deviceId,
+            messageId: payload.messageId,
+            recordedAt: payload.recordedAt,
+            tankVolume: payload.data.tankVolume,
+            status: payload.data.status,
+          },
+          device.deviceId
+        );
+
+        await publishRealtimeEvent(
+          this.env,
+          'device.status.updated',
+          {
+            deviceId: device.id,
+            canonicalDeviceId: device.deviceId,
+            connectionStatus: 'ONLINE',
+            lastSeenAt: ingestionResult.receivedAt.toISOString(),
+          },
+          device.deviceId
+        );
+      }
 
       return {
         success: true,

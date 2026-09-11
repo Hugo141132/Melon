@@ -294,11 +294,14 @@ interface WaterTankSectionProps {
     status: string | null;
   };
   recordedAt: string | null;
+  isStale?: boolean;
 }
 
-function WaterTankSection({ data, recordedAt }: WaterTankSectionProps) {
+function WaterTankSection({ data, recordedAt, isStale }: WaterTankSectionProps) {
   const tWater = useTranslations('water');
   const tCommon = useTranslations('common');
+
+  const displayVolume = isStale ? null : data.tankVolume;
 
   return (
     <section className="bg-app-surface-container-lowest rounded-2xl p-5 border border-app-outline-variant/30 soft-elevation-lg space-y-4">
@@ -318,7 +321,7 @@ function WaterTankSection({ data, recordedAt }: WaterTankSectionProps) {
             </p>
           </div>
         </div>
-        {data.status && (
+        {data.status && !isStale && (
           <span className="text-[12px] leading-4 font-semibold px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-700">
             {data.status}
           </span>
@@ -328,7 +331,7 @@ function WaterTankSection({ data, recordedAt }: WaterTankSectionProps) {
       <div className="grid grid-cols-1 gap-3">
         <MetricItem
           label={tWater('tankVolume')}
-          value={formatMetricValue(data.tankVolume, 1)}
+          value={formatMetricValue(displayVolume, 2, '-')}
           unit="L"
           icon={<Database size={16} />}
         />
@@ -528,7 +531,11 @@ export default function MonitoringDashboard() {
 
       {/* 3. WATER TANK */}
       {hasWaterTankData && (
-        <WaterTankSection data={snapshot!.water!.data} recordedAt={snapshot!.water!.recordedAt} />
+        <WaterTankSection
+          data={snapshot!.water!.data}
+          recordedAt={snapshot!.water!.recordedAt}
+          isStale={isStaleStatus || isOffline}
+        />
       )}
     </div>
   );

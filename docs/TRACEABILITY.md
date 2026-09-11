@@ -36,7 +36,7 @@
 | `PRD-FR-024` | Self-service verified email address change | `docs/PRD.md` | `DEC-AUTH-106` | `TASK-0216` | `TEST-API-001` | `VERIFIED` |
 | `PRD-FR-025` | Single active session enforcement per account | `docs/PRD.md` | `DEC-AUTH-107` | `TASK-0217` | `TEST-SEC-001` | `VERIFIED` |
 | `PRD-FR-026` | Optimized login transaction and same-client session recovery | `docs/PRD.md` | `DEC-AUTH-108` | `TASK-0217` | `TEST-API-001` | `VERIFIED` |
-| `DEV-MQTT-001` | Permanent hardware MQTT topic reconciliation and gateway ingress mapping boundary | `docs/DEVICE_COMMUNICATION.md` | `DEC-DEV-031` | `TASK-0411` | `TEST-MQTT-001` | `BLOCKED` |
+| `DEV-MQTT-001` | Permanent hardware MQTT topic reconciliation and gateway ingress mapping boundary | `docs/DEVICE_COMMUNICATION.md` | `DEC-DEV-031` | `TASK-0411` | `TEST-MQTT-001` | `IMPLEMENTED` |
 | `PRD-FR-040` | Operational overview Bento dashboard and environmental weather | `docs/PRD.md` | `DEC-UIUX-106` | `TASK-0506` | `TEST-UI-006` | `VERIFIED` |
 | `SEC-AUTH-006` | Email change token scoping and non-sensitive audit logging | `docs/SECURITY.md` | `DEC-AUTH-106` | `TASK-0216` | `TEST-SEC-005` | `VERIFIED` |
 | `SEC-AUTH-007` | Atomic single active session verification and race-safe login rejection | `docs/SECURITY.md` | `DEC-AUTH-107` | `TASK-0217` | `TEST-SEC-001` | `VERIFIED` |
@@ -546,35 +546,33 @@ The following facts are verified in the traceability matrix regarding `TASK-0410
 
 ---
 
-## Permanent Hardware MQTT Topic Reconciliation & Ingress Mapping Traceability Note (TASK-0411 / DEC-DEV-031 / Reconciled 2026-09-10)
+## Permanent Hardware MQTT Topic Reconciliation & Ingress Mapping Traceability Note (TASK-0411 / DEC-DEV-031 / DEC-DEV-032 / Reconciled 2026-09-11)
 
-The following facts are verified in the traceability matrix regarding `TASK-0411` and `DEC-DEV-031` (Permanent External Hardware MQTT Topics & Gateway Ingress Mapping Boundary):
-- **Traceability Baseline:** Governed by `DEC-DEV-031`, `TASK-0411`, `docs/DEVICE_COMMUNICATION.md` §8.4, `docs/ARCHITECTURE.md` §4.1, and `docs/SECURITY.md`. Establishes permanent external hardware MQTT topic strings (`irigasi/melon/sensor/volume`, `irigasi/melon/kontrol/valve`, `irigasi/melon/setting/otomasi`) without requiring firmware renaming, maintaining a persistent translation adapter in `apps/iot-gateway`.
-- **Status & Blocking Prerequisites:** `TASK-0411` status is **`BLOCKED`**. While topic naming is authoritatively resolved, physical valve actuation and end-to-end integration remain blocked pending:
-  1. Telemetry wire payload schema specification (JSON vs raw float, key names, units, calibration).
-  2. Timestamps, clock synchronization, and unique `messageId` transmission.
-  3. Trusted device identity / correlation on flat topics lacking `{siteId}` and `{deviceId}`.
-  4. Valve wire command syntax (`ON`/`OFF` vs `OPEN`/`CLOSE` vs structured JSON) and feedback channels (`ack`/`event`).
-  5. Irrigation setting operational semantics (`{ mode: "AUTO", target_liter }` vs one-shot dispense vs autonomous schedule).
-  6. Actuator broadcast control isolation mechanism on flat topics (Option 1: payload filtering, Option 2: broker mountpoints, Option 3: single actuator).
-  7. Hardware fail-safe watchdog/timeout (`DEC-CTRL-090`).
-- **Implementation Status:**
-  - Gateway Ingress Mapping: Implemented `apps/iot-gateway/src/mqtt/hardware-reconciliation.ts` with permanent topic constants, whitespace detection/audit, context mapping to `agriculture/{env}/{siteId}/{deviceId}/telemetry/reservoir`, broadcast isolation evaluation, and anti-republish loop guard.
-  - Contract Separation: Canonical valve `OPEN`/`CLOSE` commands strictly omit `targetVolumeMl`, `phase`, and `plantCount` (`CreateFaucetCommandInputSchema`), keeping platform contracts separated from unconfirmed hardware wire formats.
-  - EMQX Infrastructure: Topics require no advance creation in EMQX Cloud (dynamic topic tree); deployment ACLs, subscriptions, and routing readiness are unconfirmed and broker config was not modified.
-  - Safety Invariants: `ENABLE_FAUCET_CONTROL=false` strictly preserved. Direct browser valve publishing identified as critical security and RBAC violation.
-  - Excluded Changes: Unrelated `packages/database/src/client.ts` modification remains excluded and unstaged.
+The following facts are verified in the traceability matrix regarding `TASK-0411`, `DEC-DEV-031`, and `DEC-DEV-032` (Permanent External Hardware MQTT Topics, Direct 2-Tier Gateway Model & Telemetry Freshness Reconciliation):
+- **Traceability Baseline:** Governed by `DEC-DEV-031`, `DEC-DEV-032`, `TASK-0411`, `docs/DEVICE_COMMUNICATION.md` §8.4, `docs/ARCHITECTURE.md` §4.1, and `docs/SECURITY.md`. Establishes permanent external hardware MQTT topic strings (`irigasi/melon/sensor/volume`, `irigasi/melon/kontrol/valve`, `irigasi/melon/setting/otomasi`) without requiring firmware renaming, directly handled by `apps/iot-gateway`.
+- **Status & Blocking Prerequisites:** Telemetry ingestion, normalization, database persistence, API serving, dynamic stale calculation, and frontend status synchronization are **`IMPLEMENTED`** and verified in development. Physical valve actuation remains blocked pending:
+  1. Physical ESP32 field deployment and hardware team valve wiring verification.
+  2. Valve wire command syntax (`ON`/`OFF` vs `OPEN`/`CLOSE` vs structured JSON) and feedback channels (`ack`/`event`).
+  3. Irrigation setting operational semantics (`{ mode: "AUTO", target_liter }` vs one-shot dispense vs autonomous schedule).
+  4. Actuator broadcast control isolation mechanism on flat topics (Option 1: payload filtering, Option 2: broker mountpoints, Option 3: single actuator).
+  5. Hardware fail-safe watchdog/timeout (`DEC-CTRL-090`).
+- **Telemetry Flow & Implementation Status:**
+  - *End-to-End Pipeline:* Physical Sensor Node (`irigasi/melon/sensor/volume`) → EMQX MQTT Broker (Port 8084 WSS) → IoT Gateway (`HardwareMqttAdapter` & `TelemetryProcessor`) → PostgreSQL Database (`reservoir_water_readings` & `devices.last_seen_at`) → Web API (`/monitoring/latest`, `/water/latest`, `/devices`) → Frontend Web UI (`useLatestMonitoring` & `DeviceContext`).
+  - *Direct 2-Tier Architecture (DEC-DEV-032):* Intermediate multi-tenant topic hierarchy retired for single-reservoir domain; gateway directly consumes `irigasi/melon/sensor/volume` and binds to active `WATER_TANK_NODE`.
+  - *Freshness & Stale Detection:* Authoritative 60-second stale threshold (`TELEMETRY_STALE_THRESHOLD_MS = 60 * 1000`); dynamic `connectionStatus: STALE` computed on monitoring and device routes when `now - lastSeenAt > 60s` without mutating DB facts prematurely.
+  - *UI Status Synchronization:* Added `updateDeviceStatus` to `DeviceContext`, synchronizing freshness in `useLatestMonitoring` in memory across `DeviceSelector`, `WaterTankMonitoringCard`, `MonitoringDashboard`, and faucet modals.
+  - *Volume Display Policy:* Live 2-decimal volume (`formatMetricValue(volumeVal, 2)`) rendered when `ONLINE`; numerical volume hidden with placeholder (`— L` / `- L`) and 0% gauge fill when `STALE` or `OFFLINE`, while keeping stale notice banner and last seen timestamp visible.
+  - *Automatic Online Restoration:* Restores `ONLINE` status and displays live volume automatically as soon as fresh telemetry arrives (<60s).
 - **Verification Evidence & Tiering:**
   - *Automated Verification (PASSED):*
-    - Focused Vitest test suites: 74/74 passed across 4 files (28 reconciliation tests + 46 connectivity/telemetry/router tests, 100%, exit code 0).
-    - Monorepo static typecheck: 0 errors across 4 workspaces (`contracts`, `database`, `iot-gateway`, `web`), exit code 0.
-    - Candidate dependency setup: Clean `npm ci` without overlay (725 packages), local Prisma generation, and workspace builds completed successfully.
-    - Staging validation: Container `kebun-melon-staging-gateway` rebuilt from candidate image (`sha256:9476329863cb28e429eca9972dd876ec1fa4aa6d414e332c2740f6435a68e91b`), healthy, `/health` HTTP 200, `/ready` HTTP 200, `ENABLE_FAUCET_CONTROL=false`.
+    - Focused Vitest test suites: 100% pass across all unit tests (`water-tank-monitoring-card.test.tsx` 11/11, `monitoring-dashboard.test.tsx` 8/8, `latest.test.ts` 16/16, full telemetry suites 53/53 passed, gateway suites 305/305 passed).
+    - Monorepo static typecheck: 0 errors across all 4 workspaces (`contracts`, `database`, `iot-gateway`, `web`).
+    - Manual verification: Browser testing verified synchronized amber indicators and volume placeholders during stale simulation, and instant automatic recovery on telemetry resumption.
   - *Operator CI Gates (PENDING):*
     - Five mandatory pre-commit quality gates (`npm run test:coverage`, `npm run test:integration`, `npm run check:quality`, `npm run test`, `npm run test:e2e`) are reserved for personal execution by the operator.
-  - *Physical Field Checks (Unperformed & BLOCKED):*
-    - No live hardware valve actuation or physical ESP32 field transmission has been executed.
-<!-- TASK-0411 Traceability Reconciled: 2026-09-10 -->
+  - *Physical Field Actuation (Unperformed & BLOCKED):*
+    - Physical valve actuation and field dispensing remain strictly locked under `ENABLE_FAUCET_CONTROL=false`.
+<!-- TASK-0411 Traceability Reconciled: 2026-09-11 -->
 
 ---
 

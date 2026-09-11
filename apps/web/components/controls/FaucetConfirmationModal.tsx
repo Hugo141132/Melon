@@ -209,14 +209,18 @@ export default function FaucetConfirmationModal({
                 className={`inline-flex items-center gap-1 font-semibold ${
                   selectedDevice.connectionStatus === 'ONLINE'
                     ? 'text-emerald-600'
-                    : 'text-amber-600'
+                    : selectedDevice.connectionStatus === 'STALE'
+                      ? 'text-amber-600'
+                      : 'text-rose-600'
                 }`}
               >
                 <span
                   className={`w-1.5 h-1.5 rounded-full ${
                     selectedDevice.connectionStatus === 'ONLINE'
                       ? 'bg-emerald-500 animate-pulse'
-                      : 'bg-amber-500'
+                      : selectedDevice.connectionStatus === 'STALE'
+                        ? 'bg-amber-500'
+                        : 'bg-rose-500'
                   }`}
                 />
                 {selectedDevice.connectionStatus}
