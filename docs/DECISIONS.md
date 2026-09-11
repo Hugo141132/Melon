@@ -737,7 +737,8 @@ The following facts are supported by the verified decisions governance of `TASK-
   3. **Change Password Integration:** The "Change Password" action triggers an accessible modal dialog submitting directly to the existing backend endpoint `POST /api/v1/auth/change-password`. Upon successful password change (HTTP 204), all active sessions are revoked and the user is redirected to `/login?message=PASSWORD_CHANGED`.
   4. **Change Email Integration:** A "Change Email" modal provides a 2-step flow: current password verification + new email entry, followed by 6-digit verification code entry with a 60-second cooldown timer.
   5. **Visual Governance:** Conforms strictly to `Premium Minimal Ops` with `globals.css` color tokens unchanged.
-<!-- TASK-0217 Reconciled: 2026-08-29 -->
+  6. **Change Email Action Placement (Refined 2026-09-11):** Eliminated duplicate "Change Email" trigger on `/profile`. The trigger button is positioned exclusively next to the read-only email input in the personal info form (`Email (Read-Only with Change Email Action)`), while the Email Verification Status card under Account & Session Security strictly presents read-only status (*"Terverifikasi"* / *"Verified"*).
+<!-- TASK-0217 Reconciled: 2026-08-29; Refined: 2026-09-11 -->
 
 ---
 

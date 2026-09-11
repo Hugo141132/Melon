@@ -445,7 +445,8 @@ The following frontend changes are audited and verified for `TASK-0217` (Profile
 - **Approved Future Frontend Scope (`TASK-0216`):**
   - **Change Email Modal:** Implement a 2-step modal dialog for current password confirmation + new email entry, followed by 6-digit numeric verification code entry with 60-second cooldown timer.
 - **Visual Governance:** Conforms strictly to `Premium Minimal Ops`, motion effects `Modal` and `Button hover`, with color tokens `UNCHANGED`.
-<!-- Profile Security Frontend Audit Reconciled: 2026-08-29 -->
+- **Change Email Action Deduplication (Audited 2026-09-11):** Audited `/profile` for redundant action buttons. Resolved duplicate "Change Email" action introduced during `TASK-0216` by keeping the trigger button exclusively in the Personal Info form adjacent to the read-only email input field (`{/* Email (Read-Only with Change Email Action) */}`), and removing the redundant button from the Email Verification Status card. Security cards strictly display status badges, maintaining clean separation of concerns.
+<!-- Profile Security Frontend Audit Reconciled: 2026-08-29; Refined 2026-09-11 -->
 
 
 ---

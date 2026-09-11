@@ -281,7 +281,11 @@ The following facts are verified in the traceability matrix regarding `TASK-0216
   - `TASK-0216` added migration `20260829170000_add_pending_email_to_email_verification_tokens` for nullable `pending_email` on `email_verification_tokens`. Applied and verified on DEV database; Supabase staging remains pending migration.
   - `TASK-0217` added migration `20260820000000_add_session_user_active_index` for composite index `sessions_user_active_idx` on `sessions(user_id, revoked_at, expires_at)`.
    - Containerized staging web service (`TASK-1012`) will require deployment following branch merge; IoT Gateway requires zero redeployment.
-<!-- TASK-0216 and TASK-0217 Traceability Reconciled: 2026-08-30 -->
+- **Profile UI Action Deduplication Refinement (2026-09-11):**
+  - Traced to `DEC-UIUX-102` and `FLOW-AUTH-027` (`USER_FLOWS.md`).
+  - Resolved duplicated "Change Email" action labels on `/profile`. Action button retained exclusively beside the Email field in personal info form; removed from Email Verification Status card in Account & Session Security.
+  - Verified via unit test suite (`profile-page.test.tsx` 4/4 passed, asserting exactly 1 button in DOM for ID and EN), static typecheck (0 errors), containerized staging web rebuild (healthy on port 3000), and Playwright verification.
+<!-- TASK-0216 and TASK-0217 Traceability Reconciled: 2026-08-30; Refined 2026-09-11 -->
 
 ---
 

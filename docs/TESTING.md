@@ -2365,8 +2365,12 @@ All five final pre-commit validation commands were executed and verified **PASS*
   2. `packages/database/test/user-repository-email-change.test.ts`: **13/13 tests passed** (Enforcing current password check, 6-digit CSPRNG generation, `pending_email` and `sha256(userId:newEmail:code)` storage, candidate email collision check against existing users and pending tokens, atomic promotion with session preservation, token deletion, non-sensitive audit logging, and `P2034` write conflict backoff retries).
   3. `apps/web/test/unit/email-change-routes.test.ts`: **14/14 tests passed** (`POST /api/v1/me/email/request` and `POST /api/v1/me/email/verify` session validation, `profilee.self.update` permission check, 3 req/min and 5 req/min rate limiters, Resend email dispatch, and HTTP error envelopes).
   4. `apps/web/test/unit/email-change-ui.test.tsx`: **7/7 tests passed** (`EmailChangeModal` step 1 password & new email input, step 2 6-digit code entry, 60s cooldown timer persisted in `sessionStorage`, reactive UI error presentation, and zero-reload `AuthContext` state update).
-  5. `apps/web/test/unit/profile-page.test.tsx`: **4/4 tests passed** (Profile page integration, Change Email button wiring, Account & Session Security card rendering, zero layout shift).
+  5. `apps/web/test/unit/profile-page.test.tsx`: **4/4 tests passed** (Profile page integration, Change Email button wiring, Account & Session Security card rendering, zero layout shift; hardened on 2026-09-11 asserting exactly one Change Email button exists in DOM for ID and EN locales without duplication in security cards).
   6. `apps/web/test/unit/i18n-completeness.test.ts`: **7/7 tests passed** (100% translation key parity across Indonesian `messages/id.json` and English `messages/en.json`).
+- **Profile UI Deduplication Verification (2026-09-11):**
+  - Updated `apps/web/app/profile/page.tsx` to remove redundant `<button>{tProfile('changeEmail')}</button>` from the Email Verification Status card under Account & Session Security, preserving the trigger strictly adjacent to the read-only Email field.
+  - Added assertions in `apps/web/test/unit/profile-page.test.tsx` verifying `expect(screen.getAllByRole('button', { name: 'Ubah Email' })).toHaveLength(1)` (ID) and `expect(screen.getAllByRole('button', { name: 'Change Email' })).toHaveLength(1)` (EN).
+  - Verified 100% test pass rate in `apps/web/test/unit/profile-page.test.tsx` (4/4 passed) and `apps/web/test/unit/email-change-ui.test.tsx` (7/7 passed), 0 errors in `npm run typecheck` across 4 packages, rebuilt staging web container (`kebun-melon-staging-web`) healthy on port 3000, and verified via Playwright health check.
 - **Test-Isolation & Regression Hardening (Resolved 2026-08-30):**
   - Investigated pre-commit test-isolation bugs: (1) an incomplete glob pattern in `packages/database/vitest.config.ts` allowed top-level database integration tests (`approvals.service.integration.test.ts`) to execute during unit/coverage runs without test DB safety guards; (2) `apps/web/test/unit/rate-limit-routes.test.ts` called `registerPOST` without mocking `@kebun-melon/database` or `@/lib/email/resend`, executing live registration writes against Supabase DEV; (3) `e2e/critical-flows.spec.ts` used `test.beforeAll()` to upsert a hardcoded Owner account using ambient `DATABASE_URL`, writing persistent data to Supabase DEV.
   - Hardened exclude patterns (`**/*.integration.test.ts`, `test/*.integration.test.ts`, `test/**/*.integration.test.ts`) in `vitest.config.ts` and added fail-closed `validateTestDatabaseUrl` guards across all database integration test suites.
@@ -2378,7 +2382,7 @@ All five final pre-commit validation commands were executed and verified **PASS*
 - **Static Typecheck:** `npm run typecheck` returned **0 errors** across all 4 monorepo packages (`@kebun-melon/web`, `@kebun-melon/iot-gateway`, `@kebun-melon/contracts`, `@kebun-melon/database`).
 - **Database Schema Validation:** `npm run db:validate` confirmed schema is valid and synchronized with DEV database.
 - **Manual Authenticated End-to-End Verification:** **PASSED** (Successfully verified 2-step email change modal, current password re-authentication, candidate email validation, Resend 6-digit verification code delivery, 60s cooldown timer, code verification, atomic database update, immediate zero-reload `AuthContext` update, and preserved active session without logout).
-<!-- Testing Specifications Reconciled: 2026-08-30 -->
+<!-- Testing Specifications Reconciled: 2026-08-30; Refined 2026-09-11 -->
 
 ---
 

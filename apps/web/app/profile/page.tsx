@@ -382,13 +382,6 @@ export default function ProfilePage() {
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsEmailModalOpen(true)}
-                className="text-[13px] font-semibold text-app-primary hover:underline px-2 py-1 rounded-lg hover:bg-app-surface-container cursor-pointer transition-colors"
-              >
-                {tProfile('changeEmail')}
-              </button>
             </div>
 
             {/* Password */}

@@ -135,6 +135,10 @@ describe('ProfilePage Auth State Hydration and I18N', () => {
     // 3. Client PII (IP address, user agent) is omitted from DOM
     expect(container.textContent).not.toMatch(/127\.0\.0\.1|192\.168\./i);
     expect(container.textContent).not.toMatch(/Mozilla|Chrome|Safari|User-Agent/i);
+
+    // 4. Exactly one "Ubah Email" action exists on the page (near Email field, no duplication in Security section)
+    const changeEmailButtons = screen.getAllByRole('button', { name: 'Ubah Email' });
+    expect(changeEmailButtons).toHaveLength(1);
   });
 
   it('verifies Linked Devices is absent, Account & Session Security is present, and client PII is omitted in EN', async () => {
@@ -171,5 +175,9 @@ describe('ProfilePage Auth State Hydration and I18N', () => {
     // 3. Client PII (IP address, user agent) is omitted from DOM
     expect(container.textContent).not.toMatch(/127\.0\.0\.1|192\.168\./i);
     expect(container.textContent).not.toMatch(/Mozilla|Chrome|Safari|User-Agent/i);
+
+    // 4. Exactly one "Change Email" action exists on the page (near Email field, no duplication in Security section)
+    const changeEmailButtons = screen.getAllByRole('button', { name: 'Change Email' });
+    expect(changeEmailButtons).toHaveLength(1);
   });
 });
