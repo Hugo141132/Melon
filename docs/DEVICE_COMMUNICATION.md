@@ -646,6 +646,14 @@ User: *
   - Effect: Deny
 ```
 
+3. **Production ACL Artifact & Automated Verification (TASK-0907):**
+The authoritative ACL rules are version-controlled in `docker/emqx/acl.conf`.
+Security compliance across all 6 criteria (anonymous disabled, TLS enabled, credential uniqueness, device topic isolation, gateway permissions, revoked device rejection) is verified automatically via:
+```bash
+npm run mqtt:verify:prod
+```
+and deterministically unit-tested via `apps/iot-gateway/src/__tests__/production-mqtt-security.test.ts`.
+
 #### 8.4.8 Hardware Team Onboarding & Deployment Specification
 
 This section provides the authoritative operational guide for the hardware engineering team to configure the ESP32 Water Tank Node firmware:

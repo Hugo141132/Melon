@@ -1386,13 +1386,15 @@ Sensitive values shall not be logged.
 - Account-status checks.
 - Optional multi-factor authentication in later phases.
 
-### 28.2 Device Authentication
+### 28.2 Device Authentication & Production MQTT Security (TASK-0907 / DEC-DEV-032)
 
-- Unique device identity.
-- Unique password or certificate.
-- Topic ACL.
-- Revocable credentials.
-- TLS.
+- Unique device identity (`water-tank-node-<mac>`).
+- Unique password credentials segregated from gateway service credentials (`Test_Device` vs `Test_gateway`).
+- Mandatory TLS transport (`wss://...:8084/mqtt` or `mqtts://...:8883`) with strict certificate verification (`rejectUnauthorized: true`).
+- Anonymous access globally disabled.
+- Topic ACL isolation enforcing least-privilege default-deny baseline (`docker/emqx/acl.conf`).
+- Revocable credentials with immediate fail-closed reconnection rejection.
+- Automated security audit suite (`npm run mqtt:verify:prod` / `apps/iot-gateway/src/__tests__/production-mqtt-security.test.ts`).
 
 ### 28.3 Application Authorisation
 

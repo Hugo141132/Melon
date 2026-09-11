@@ -2481,17 +2481,18 @@ Apply to:
 ## TASK-0907 — Configure Production MQTT TLS and ACLs
 
 **Priority:** `P0`
-**Status:** `READY`
+**Status:** `DONE`
 **Dependencies:** `TASK-0402`, Production EMQX Cluster Provisioning
+**Completed:** 2026-09-11 — Configured and verified production MQTT TLS security, credential uniqueness, and topic Access Control Lists (ACLs) for the dedicated EMQX Cloud cluster (`he100b10.ala.asia-southeast1.emqxsl.com`) per `docs/DEVICE_COMMUNICATION.md` §8.4.6–8.4.7 and `DEC-DEV-032`. Created authoritative version-controlled EMQX v5 ACL configuration file `docker/emqx/acl.conf` defining Rule 1 (`Test_gateway` pub/sub on `irigasi/melon/#`), Rule 2 (`Test_Device` pub volume telemetry, sub valve/automation commands), and Rule 3 (default-deny baseline). Implemented standalone verification runner script `scripts/verify-production-mqtt.ts` (`npm run mqtt:verify:prod`) testing live and static security controls. Created automated Vitest security suite `apps/iot-gateway/src/__tests__/production-mqtt-security.test.ts` (15/15 passed) validating production environment validation, TLS certificate validation (`rejectUnauthorized: true`), credential segregation, non-retained command policies (`retain: false`), and least-privilege topic isolation. Verified live EMQX Cloud cluster: anonymous connections rejected (`Connection refused: Bad username or password`), TLS transport enforced, cross-topic device publishes/subscribes denied fail-closed with MQTT 5.0 `0x87 Not authorized`, gateway pub/sub permitted, and unauthorized/revoked credentials rejected (`Connection refused: Not authorized`). Verified staging container (`kebun-melon-staging-gateway` healthy, passing `/health` HTTP 200 on port 3001). Verified zero secrets via secret scanner.
 
 ### Acceptance Criteria
 
-- Anonymous access disabled.
-- TLS enabled.
-- Device credentials unique.
-- Topic ACL isolates each device.
-- Gateway has only required permissions.
-- Revoked device cannot reconnect.
+- [x] Anonymous access disabled.
+- [x] TLS enabled.
+- [x] Device credentials unique.
+- [x] Topic ACL isolates each device.
+- [x] Gateway has only required permissions.
+- [x] Revoked device cannot reconnect.
 
 ---
 

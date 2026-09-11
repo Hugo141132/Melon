@@ -571,3 +571,30 @@ The following facts are verified in the traceability matrix regarding `TASK-0411
   - *Physical Field Checks (Unperformed & BLOCKED):*
     - No live hardware valve actuation or physical ESP32 field transmission has been executed.
 <!-- TASK-0411 Traceability Reconciled: 2026-09-10 -->
+
+---
+
+## Production MQTT TLS and ACLs Traceability Note (TASK-0907 / Reconciled 2026-09-11)
+
+The following facts are verified in the traceability matrix regarding `TASK-0907` (Configure Production MQTT TLS and ACLs):
+- **Traceability Baseline:** Governed by `TASK-0907`, `DEC-DEV-020`, `DEC-DEV-032`, `docs/DEVICE_COMMUNICATION.md` §8.4.6–8.4.7, `docs/SECURITY.md`, `docs/ARCHITECTURE.md` §28.2, and `docs/TESTING.md` §19.6. Formally establishes, tests, and verifies production-grade MQTT TLS encryption, client credential isolation, and topic Access Control Lists (ACLs) on the dedicated EMQX Cloud cluster (`he100b10.ala.asia-southeast1.emqxsl.com`).
+- **Implementation Status:** Fully implemented and verified:
+  - Version-Controlled ACL Specification: Created `docker/emqx/acl.conf` defining least-privilege topic isolation (Rule 1: `Test_gateway` pub/sub on `irigasi/melon/#`, Rule 2: `Test_Device` volume telemetry publish and valve/setting command subscribe, Rule 3: default-deny baseline).
+  - Automated Verification Runner: Created `scripts/verify-production-mqtt.ts` (`npm run mqtt:verify:prod`) testing live broker reachability, TLS transport, anonymous access rejection, credential segregation, and least-privilege topic isolation.
+  - Automated Vitest Test Suite: Created `apps/iot-gateway/src/__tests__/production-mqtt-security.test.ts` (15/15 passed) validating production environment validation, TLS certificate validation (`rejectUnauthorized: true`), credential segregation, command publisher non-retained policy (`retain: false`), and topic ACL matrix invariants.
+  - Staging Environment Synchronization: Staging Docker container `kebun-melon-staging-gateway` is healthy and passing `/health` HTTP 200 on port 3001. Safety flag `ENABLE_FAUCET_CONTROL=false` remains strictly enforced.
+- **Verification Evidence & Tiering:**
+  - *Automated Verification (PASSED):*
+    - Live Production MQTT Audit (`npm run mqtt:verify:prod`): 7/7 checks passed (`ALL CRITERIA SATISFIED`).
+    - Dedicated Vitest Security Suite: 15/15 passed across 1 suite (100%).
+    - Full IoT Gateway Test Suite: 22 test files passed, 305/305 tests passed (100%).
+    - Secret scanning: 0 hardcoded secrets detected (`npm run scan:secrets`).
+    - Prettier code style: 100% compliant (`npm run format:check`).
+    - ESLint: 0 errors across all workspaces (`npm run lint`).
+    - Monorepo static typecheck: 0 errors across 4 workspaces (`contracts`, `database`, `iot-gateway`, `web`).
+  - *Operator Pre-Commit Quality Gates (PENDING):*
+    - The five mandatory pre-commit quality gates (`npm run test:coverage`, `npm run test:integration`, `npm run check:quality`, `npm run test`, `npm run test:e2e`) are reserved for personal execution by the operator.
+  - *Credential-Dependent Operator Checks (Optional):*
+    - Visual inspection of the live Authorization list via the EMQX Cloud Web Console using operator credentials.
+<!-- TASK-0907 Traceability Reconciled: 2026-09-11 -->
+

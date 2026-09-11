@@ -587,6 +587,17 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
 - 21st.dev MCP: `NOT REQUIRED`
 - Summary: Implemented health and readiness endpoints across `@kebun-melon/contracts`, `@kebun-melon/web`, and `@kebun-melon/iot-gateway` conforming to `docs/API.md` §23/§24 and `DEC-INF-078`. Defined `LivenessResponseDto` and `ReadinessResponseDto` in `@kebun-melon/contracts`. Created public `GET /health` (liveness independent of dependencies) and `GET /ready` in `@kebun-melon/web` checking database and internal IoT Gateway reachability via authenticated internal probe. Added `GET /internal/v1/health` and `GET /internal/v1/ready` to `@kebun-melon/iot-gateway` with mandatory `Authorization: Bearer <INTERNAL_SERVICE_TOKEN>` verification, evaluating database and broker connectivity. Enforced strict environment configuration in production/staging (`INTERNAL_GATEWAY_URL`, `INTERNAL_SERVICE_TOKEN`, `INTERNAL_GATEWAY_TIMEOUT_MS=2000`) and verified zero credential or stack trace leakage in responses and logs across all failure modes.
 
+#### TASK-0907 Governance Record
+
+`TASK-0907` production MQTT TLS and ACLs configuration and security verification record:
+- Status: `DONE` (Completed 2026-09-11)
+- Frontend impact: `NONE`
+- Selected UI direction: `N/A`
+- Existing color template: `UNCHANGED`
+- Selected motion effects: `None`
+- 21st.dev MCP: `NOT REQUIRED`
+- Summary: Configured and verified production MQTT TLS security, client credential isolation, and topic Access Control Lists (ACLs) for the dedicated EMQX Cloud cluster (`he100b10.ala.asia-southeast1.emqxsl.com`) per `docs/DEVICE_COMMUNICATION.md` §8.4.6–8.4.7 and `DEC-DEV-032`. Created authoritative version-controlled EMQX v5 ACL configuration file `docker/emqx/acl.conf` defining Rule 1 (`Test_gateway` pub/sub on `irigasi/melon/#`), Rule 2 (`Test_Device` pub volume telemetry, sub valve/automation commands), and Rule 3 (default-deny baseline). Implemented standalone verification runner script `scripts/verify-production-mqtt.ts` (`npm run mqtt:verify:prod`) validating all 6 acceptance criteria against the live broker or mock environments: anonymous access rejection (`Connection refused: Bad username or password`), mandatory TLS transport validation (`rejectUnauthorized: true`), unique credential enforcement, topic ACL isolation (allowing volume pub and valve/setting sub while denying cross-topic actions with MQTT 5.0 `0x87 Not authorized`), gateway least-privilege permissions, non-retained command policy (`retain: false` on commands), and revoked/unauthorized client rejection (`Connection refused: Not authorized`). Created automated Vitest test suite `apps/iot-gateway/src/__tests__/production-mqtt-security.test.ts` (15/15 passed) validating production environment validation, TLS certificate validation, credential segregation, command publisher non-retained policy, and topic ACL matrix invariants. Rebuilt and verified staging Docker container (`kebun-melon-staging-gateway` healthy, passing `/health` HTTP 200 on port 3001). Confirmed zero secrets introduced via secret scanner (`npm run scan:secrets`).
+
 #### TASK-0213 Governance Record
 
 `TASK-0213` password recovery and email reset flow record:

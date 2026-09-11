@@ -1136,6 +1136,30 @@ Verify:
 - Telemetry resumes.
 - Expired command does not execute.
 
+## 19.6 Production MQTT TLS and ACL Security Verification (TASK-0907)
+
+Automated security verification for production MQTT is enforced across two complementary layers:
+
+### 1. Deterministic Vitest Security Suite (`apps/iot-gateway/src/__tests__/production-mqtt-security.test.ts`)
+- **Execution**: `npx vitest run apps/iot-gateway/src/__tests__/production-mqtt-security.test.ts`
+- **Scope**: 15 unit/security tests validating:
+  - Strict rejection of unencrypted schemes (`mqtt://`, `ws://`) when `NODE_ENV=production` or `APP_ENV=production`.
+  - Mandatory TLS options in `GatewayMqttClient` (`rejectUnauthorized: true`, `clean: true`).
+  - Production ACL rule specification in `docker/emqx/acl.conf` matching least-privilege matrix.
+  - Invariant that hardware device cannot publish commands (`kontrol/valve`, `setting/otomasi`) or subscribe to telemetry (`sensor/volume`, `#`).
+  - Non-retained command policy (`retain: false`) enforced across `CommandPublisher` and `HardwareMqttAdapter`.
+  - Credential uniqueness and segregation between Gateway and Device identities.
+
+### 2. Live Production Broker Audit Runner (`scripts/verify-production-mqtt.ts`)
+- **Execution**: `npm run mqtt:verify:prod`
+- **Scope**: Audits the active dedicated EMQX Cloud broker against all 6 acceptance criteria:
+  1. *Anonymous Access Disabled:* Confirms connection without credentials fails (`Connection refused: Bad username or password`).
+  2. *TLS Enabled:* Confirms TLS encryption handshake over `wss://...:8084/mqtt` with strict certificate verification.
+  3. *Device Credentials Unique:* Confirms gateway and device credentials do not collide.
+  4. *Topic ACL Isolation:* Tests that device client successfully subscribes to `kontrol/valve` and `setting/otomasi` and publishes to `sensor/volume`, while forbidden actions (publishing to `kontrol/valve` or subscribing to `sensor/volume`/`#`) return MQTT 5.0 `0x87 Not authorized`.
+  5. *Gateway Permissions:* Tests that gateway client publishes commands with `retain: false` and subscribes to `irigasi/melon/#`.
+  6. *Revoked Device Reconnection Rejection:* Confirms unauthorized/revoked credentials fail with `Connection refused: Not authorized`.
+
 ---
 
 # 20. Faucet-Control Testing (TEST-CTRL-001..TEST-CTRL-005)

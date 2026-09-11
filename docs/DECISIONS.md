@@ -322,7 +322,7 @@
      Topic naming and the trailing-space question are **RESOLVED** by user decision. No further firmware evidence is required to approve these names. Any conflicting firmware or prototype literal (e.g. trailing space) is an implementation defect/mismatch to report, not an unresolved naming question. The gateway rejects mismatched topics fail-closed and will NEVER silently trim whitespace, subscribe to alternate variants, or require hardware to adopt `agriculture/...` topics. The internal gateway mapping boundary is permanently preserved.
 
 #### DEC-DEV-032: Direct 2-Tier Canonical MQTT Contract for Single Water Tank Node
-* **Related Task IDs**: `TASK-0403`, `TASK-0404`, `TASK-0411`, `TASK-0804`
+* **Related Task IDs**: `TASK-0403`, `TASK-0404`, `TASK-0411`, `TASK-0804`, `TASK-0907`
 * **Related Documentation**: `docs/DEVICE_COMMUNICATION.md` §3, §8.4; `docs/ARCHITECTURE.md` §4.1; `docs/DECISIONS.md` §2.3 (`DEC-DEV-031`)
 * **Status**: **APPROVED BY USER (2026-09-11)**
 * **Context**:

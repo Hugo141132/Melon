@@ -14,7 +14,7 @@ The system is designed to:
 - Support English and Bahasa Indonesia.
 - Communicate with hardware through a backend-managed MQTT gateway.
 
-> **Current project status:** `TASK-0101` through `TASK-0402` (Repository Foundation, Auth & RBAC, Device Registry & Access Assignments, IoT Gateway Service, and Development MQTT Broker Configuration) are complete (`TASK-0402` status: `DONE`). Eclipse Mosquitto dockerized MQTT broker configuration (`docker-compose.yml`, `mosquitto.conf`, `acl.conf`, `pwfile`), PBKDF2-SHA512 password hashing generator, anonymous access rejection, per-device topic isolation, gateway permissions, non-retained command policy enforcement, and verification scripts are verified.
+> **Current project status:** `TASK-0101` through `TASK-0402` and production security hardening `TASK-0907` (Repository Foundation, Auth & RBAC, Device Registry & Access Assignments, IoT Gateway Service, Development MQTT Broker Configuration, and Production MQTT TLS and ACLs) are complete (`TASK-0907` status: `DONE`). Eclipse Mosquitto dockerized MQTT broker configuration and production EMQX Cloud Serverless TLS & ACL security (`docker/emqx/acl.conf`, `npm run mqtt:verify:prod`), anonymous access rejection, per-device topic isolation, gateway permissions, non-retained command policy enforcement, and verification scripts are verified.
 
 ---
 
@@ -878,9 +878,8 @@ Production release remains blocked until:
 - [ ] Authentication and session strategy are approved.
 - [ ] First Owner provisioning is approved.
 - [ ] Owner/Admin permissions are final.
-- [ ] Device access rules are implemented.
-- [ ] MQTT broker and device authentication are selected.
-- [ ] Production MQTT TLS and ACLs are verified.
+- [x] MQTT broker and device authentication are selected (`DEC-DEV-020`, `DEC-DEV-032`).
+- [x] Production MQTT TLS and ACLs are verified (`TASK-0907`, `npm run mqtt:verify:prod`).
 - [ ] Telemetry units are confirmed.
 - [x] Battery (`BAT`) parameter identity & scope clarified (`DEC-MON-085`).
 - [ ] Offline and stale thresholds are approved.

@@ -50,6 +50,7 @@
     "env:check:gateway": "tsx scripts/check-env.ts gateway",
     "env:test": "tsx scripts/test-env.ts",
     "mqtt:pwfile": "tsx scripts/generate-mqtt-pwfile.ts",
+    "mqtt:verify:prod": "tsx scripts/verify-production-mqtt.ts",
     "sim:esp32-001": "tsx scripts/esp32-simulator.ts",
     "sim:reservoir": "tsx scripts/device-simulator.ts --scenario=reservoir-telemetry",
     "sim:device": "tsx scripts/device-simulator.ts",

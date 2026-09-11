@@ -1762,3 +1762,18 @@ The following security and integrity controls govern the water-tank monitoring i
 - **Fail-Safe Telemetry Handling:** Explicit zero volumes (`0 L`), missing/null telemetry (`- L`), and offline sensor states render safely without crashing React component trees or fabricating active flow/pressure.
 - **Actuator Invariance:** Faucet control safety flag `ENABLE_FAUCET_CONTROL=false` remains strictly enforced across all environments.
 <!-- Water Tank UI Security Reconciled: 2026-09-09 -->
+
+---
+
+## Production MQTT TLS & ACL Security Controls Note (TASK-0907 / Reconciled 2026-09-11)
+
+The following security controls govern MQTT communication across staging and production environments:
+- **Anonymous Connection Rejection:** Unauthenticated connections are globally disabled on the production EMQX Cloud cluster; anonymous connection attempts are rejected fail-closed with `Connection refused: Bad username or password`.
+- **Mandatory TLS Transport:** All production MQTT traffic operates over TLS (`wss://...:8084/mqtt` or `mqtts://...:8883`) with strict certificate verification (`rejectUnauthorized: true`). Unencrypted transport schemes (`mqtt://`, `ws://`) are rejected by environment validation guards.
+- **Client Identity & Credential Segregation:** Gateway client (`Test_gateway`) and hardware device node (`Test_Device`) use disjoint usernames, passwords, and client ID namespaces. Gateway credentials shall never be embedded in physical hardware firmware.
+- **Topic ACL Least-Privilege Matrix:** Enforces default-deny topic isolation defined in `docker/emqx/acl.conf`. Water tank hardware nodes are restricted to publishing volume telemetry (`irigasi/melon/sensor/volume`) and subscribing to operational commands (`irigasi/melon/kontrol/valve`, `irigasi/melon/setting/otomasi`). Hardware attempts to publish commands or subscribe to telemetry are denied fail-closed with MQTT 5.0 `0x87 Not authorized`.
+- **Gateway Permission Boundary & Non-Retained Policy:** Gateway holds pub/sub access to the irrigation namespace with a strict non-retained message policy (`retain: false` on commands) to prevent stale command execution upon device reconnection.
+- **Revoked Device Access Termination:** Revoked or unauthorized credentials are rejected fail-closed (`Connection refused: Not authorized`). Compromised or decommissioned devices can be disconnected dynamically via EMQX client management API/MCP tools (`disconnect_client`).
+- **Automated Verification:** Verified via automated runner `npm run mqtt:verify:prod` (`scripts/verify-production-mqtt.ts`) and Vitest test suite `apps/iot-gateway/src/__tests__/production-mqtt-security.test.ts`.
+<!-- TASK-0907 Security Reconciled: 2026-09-11 -->
+
