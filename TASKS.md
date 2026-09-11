@@ -2481,7 +2481,7 @@ Apply to:
 ## TASK-0907 — Configure Production MQTT TLS and ACLs
 
 **Priority:** `P0`
-**Status:** `BLOCKED`
+**Status:** `READY`
 **Dependencies:** `TASK-0402`, Production EMQX Cluster Provisioning
 
 ### Acceptance Criteria
