@@ -1032,7 +1032,7 @@ Location data shall be exposed only to authorised users.
    - Compliance and security audit logs (`audit_logs`) are strictly exempt from telemetry purges and retained indefinitely.
    - Actuator commands and lifecycle state transitions (`faucet_commands`, `faucet_command_events`) are retained permanently for physical accountability and safety auditing.
    - Account approvals and rejection history (`account_approvals`) are retained permanently.
-3. **Immutability Enforcement:** The database service layer ([`RetentionService`](file:///c:/Users/Puroh/Documents/Melon/packages/database/src/retention-service.ts)) enforces a strict whitelist (`APPROVED_RETENTION_TABLES`). Any programmatic attempt to invoke retention deletion against protected tables throws `UnapprovedRetentionTableError`.
+3. **Immutability Enforcement:** The database service layer ([`RetentionService`](../packages/database/src/retention-service.ts)) enforces a strict whitelist (`APPROVED_RETENTION_TABLES`). Any programmatic attempt to invoke retention deletion against protected tables throws `UnapprovedRetentionTableError`.
 
 ---
 
@@ -1612,7 +1612,8 @@ The following security controls are active and verified across monitoring endpoi
 - **Admin Identifier Concealment (`DEC-DEV-028`):** Admin users receive only user-facing device names and metadata; canonical `deviceId` strings are strictly concealed across UI, list, and detail API payloads. Safe immutable UUIDs (`devices.id`) are used for frontend routing.
 - **Strict Query Range Boundaries (`DEC-MON-087`):** Historical telemetry queries enforce maximum date range limits (31 days) and page size limits (max 100), rejecting abusive ranges with HTTP 400 (`DATE_RANGE_EXCEEDED`).
 - **Empty Result Integrity:** Zero-matching telemetry queries safely return HTTP 200 with empty series, preventing data leakage or confusion with missing device 404 errors.
-< ! - -   T A S K - 0 8 0 2   R e c o n c i l e d :   2 0 2 6 - 0 8 - 1 9   - - >  
+< ! - -   T A S K - 0 8 0 2   R e c o n c i l e d :   2 0 2 6 - 0 8 - 1 9   - - > 
+ 
  
 ---
 
