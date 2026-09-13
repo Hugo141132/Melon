@@ -44,38 +44,46 @@ Kebun Melon is designed to manage agricultural sensor networks and irrigation in
 
 ## 2. Core Architecture & Communication Topologies
 
-```
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                              SYSTEM ARCHITECTURE                             │
-└──────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph Hardware["Field Hardware & Sensors"]
+        SoilNode["ESP32 Soil Quality Node"]
+        WaterNode["ESP32 Water Quality Node"]
+        TankNode["ESP32 Reservoir Tank Node"]
+        SolenoidValve["Physical Solenoid Valve"]
+    end
 
- 1. Soil & Water Quality Ingress (REST API over Wi-Fi)
-   [ESP32 / NodeMCU Nodes] ──(HTTPS/HTTP REST POST)──► [Next.js Web API (apps/web)]
-                                                              │
-                                                              ▼
-                                                     [(PostgreSQL Database)]
+    subgraph Broker["Message Broker & Transport"]
+        EMQX["EMQX Cloud Broker (Port 8084 WSS)"]
+    end
 
- 2. Reservoir Water Tank Ingress (MQTT over TLS)
-   [Physical Tank Node] ──(MQTT WSS:8084)──► [EMQX Cloud Broker]
-                                                    │
-                                                    ▼
-                                            [IoT Gateway (apps/iot-gateway)]
-                                                    │
-                                                    ▼
-                                           [(PostgreSQL Database)]
+    subgraph Backend["Application Services & Persistence"]
+        Gateway["IoT Gateway Service (apps/iot-gateway)"]
+        WebAPI["Next.js Web Application & API (apps/web)"]
+        Postgres[("PostgreSQL Database (Supabase)")]
+    end
 
- 3. Realtime UI & Faucet Actuation (SSE + Internal API)
-   [Next.js Web UI] ◄──(Server-Sent Events)─── [Next.js Realtime Stream]
-          │                                            ▲
-          │ (User Dispense Request)                    │ (Status Events)
-          ▼                                            │
-   [Next.js Web API] ──(HTTP Bearer Token)──► [IoT Gateway (Fastify:3001)]
-                                                       │
-                                                       ▼ (irigasi/melon/...)
-                                              [EMQX Cloud Broker]
-                                                       │
-                                                       ▼
-                                              [Physical Solenoid Valve]
+    subgraph Client["Client Tier"]
+        Browser["User Web Browser (OWNER / PIC & ADMIN)"]
+    end
+
+    %% Ingress 1: Soil & Water Quality via REST API
+    SoilNode -->|"REST POST /telemetry/soil (Wi-Fi)"| WebAPI
+    WaterNode -->|"REST POST /telemetry/water (Wi-Fi)"| WebAPI
+    WebAPI -->|"Prisma ORM"| Postgres
+
+    %% Ingress 2: Water Tank via MQTT
+    TankNode -->|"MQTT Pub: irigasi/melon/sensor/volume"| EMQX
+    EMQX -->|"MQTT Sub: irigasi/melon/sensor/volume"| Gateway
+    Gateway -->|"Persist Telemetry & Prune Retention"| Postgres
+
+    %% Faucet Control & Realtime
+    Browser -->|"HTTPS Operations & Dispense Requests"| WebAPI
+    WebAPI -->|"Server-Sent Events (SSE)"| Browser
+    WebAPI -->|"Internal Service HTTP: Bearer Token"| Gateway
+    Gateway -->|"MQTT Pub: irigasi/melon/kontrol/valve"| EMQX
+    Gateway -->|"MQTT Pub: irigasi/melon/setting/otomasi"| EMQX
+    EMQX -->|"Actuation Commands"| SolenoidValve
 ```
 
 ### Communication Principles
