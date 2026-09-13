@@ -1,1036 +1,366 @@
 # Soil and Water Monitoring and Faucet Control System
 
-A web-based, multi-device monitoring and control platform for ESP32/NodeMCU hardware.
+A web-based, multi-device monitoring and control platform for ESP32/NodeMCU hardware in agricultural environments.
 
-The system is designed to:
-
-- Monitor soil conditions.
-- Monitor water conditions.
-- Track multiple devices.
-- Display current and historical telemetry.
-- Manage Owner and Admin access.
-- Require Owner approval for Admin registrations.
-- Provide controlled faucet-dispensing presets.
-- Support English and Bahasa Indonesia.
-- Communicate with hardware through a backend-managed MQTT gateway.
-
-> **Current project status:** `TASK-0101` through `TASK-0402` and production security hardening `TASK-0907` (Repository Foundation, Auth & RBAC, Device Registry & Access Assignments, IoT Gateway Service, Development MQTT Broker Configuration, and Production MQTT TLS and ACLs) are complete (`TASK-0907` status: `DONE`). Eclipse Mosquitto dockerized MQTT broker configuration and production EMQX Cloud Serverless TLS & ACL security (`docker/emqx/acl.conf`, `npm run mqtt:verify:prod`), anonymous access rejection, per-device topic isolation, gateway permissions, non-retained command policy enforcement, and verification scripts are verified.
+The platform provides end-to-end telemetry ingestion, water reservoir tracking, role-based user management, audited lifecycle administration, multi-lingual support, and safety-interlocked physical irrigation valve control.
 
 ---
 
-## 1. Core Features
+## 1. Project Overview
 
-### 1.1 Soil Monitoring
+Kebun Melon is designed to manage agricultural sensor networks and irrigation infrastructure across three distinct monitoring and control domains:
 
-Transmitted via **REST API over Wi-Fi** directly to the web backend:
+1. **Soil Quality Monitoring (REST API over Wi-Fi):**
+   - Ingests Nitrogen (N), Phosphorus (P), Potassium (K), Soil Temperature (°C), Moisture (%), pH, Electrical Conductivity (EC in `µS/cm`), and Soil Status.
+   - Transmitted directly from ESP32 field nodes to the Next.js Web API via HTTP POST.
 
-- Nitrogen, Phosphorus, Potassium, Temperature, Moisture, pH, EC, Soil status.
+2. **Water Quality Monitoring (REST API over Wi-Fi):**
+   - Ingests pH, Total Dissolved Solids (TDS in `ppm`), Electrical Conductivity (EC in `µS/cm`), and Water Status.
+   - Transmitted directly from ESP32 field nodes to the Next.js Web API via HTTP POST.
 
-### 1.2 Water Monitoring (General Water Quality)
+3. **Reservoir Water Tank Monitoring (MQTT 5.0 over TLS via EMQX Broker):**
+   - Ingests Tank Water Volume (0 L–2,200 L operational scale, authoritative maximum capacity constant `WATER_TANK_MAX_CAPACITY = 2200`) and Reservoir Status.
+   - Uses dedicated MQTT topics:
+     - Telemetry Ingestion: `irigasi/melon/sensor/volume`
+     - Manual Valve Control: `irigasi/melon/kontrol/valve`
+     - Automated Dispensing: `irigasi/melon/setting/otomasi`
 
-Transmitted via **REST API over Wi-Fi** directly to the web backend:
+4. **Faucet Control & Irrigation Presets:**
+   - Preset irrigation phases mapped deterministically on the server:
+     - **Phase 1:** 300 mL (UI: 0.3 L)
+     - **Phase 2:** 1,000 mL (UI: 1.0 L)
+     - **Phase 3:** 1,500 mL (UI: 1.5 L)
+   - Mandatory server-side safety flag: `ENABLE_FAUCET_CONTROL=false` by default. Dual written sign-off (Owner + Hardware Lead) is required before production physical activation.
 
-- pH, TDS, EC, Latitude, Longitude, Water status.
-
-### 1.3 Reservoir-Water Monitoring
-
-Transmitted via **MQTT 5.0 over TLS through EMQX broker** to backend IoT Gateway:
-
-- Tank water volume (operational scale: 0 L–2200 L, authoritative constant `WATER_TANK_MAX_CAPACITY = 2200`), Reservoir status (Flow rate deleted per `DEC-MON-089`).
-- Presentation: single full-width responsive column (`grid-cols-1 gap-4`) with clamped progress fill (0%–100%) and `0 L` / `2200 L` markers.
-
-### 1.4 Shared Sensor/Tool Battery Monitoring (`BAT`)
-
-Transmitted via **REST API over Wi-Fi** along with soil & water equipment power supply:
-
-- Battery level / power supply status (exact REST JSON payload placement `TBD`). Not a water-quality or reservoir parameter.
-
-### Faucet Control
-
-The approved preset phases are:
-
-| Phase   | Target volume |
-| ------- | ------------: |
-| Phase 1 |        300 mL |
-| Phase 2 |      1,000 mL |
-| Phase 3 |      1,500 mL |
-
-The web browser selects a phase only.
-
-The backend is responsible for mapping the selected phase to the approved target volume.
-
-### User Roles
-
-The initial system contains exactly two roles:
-
-```text
-OWNER
-ADMIN
-```
-
-Public registration creates:
-
-```text
-role = ADMIN
-accountStatus = PENDING_APPROVAL
-```
-
-An Owner must approve the registration before protected application access is allowed.
+5. **User Roles & Account Governance:**
+   - Exactly two system roles: `OWNER / PIC` (Person in Charge / Penanggung Jawab) and `ADMIN`.
+   - Public registration creates only `ADMIN` accounts in `PENDING_APPROVAL` status.
+   - Owner approval required before protected application access is granted.
+   - Owner protection invariants: Owner accounts cannot be selected, suspended, deactivated, or deleted.
+   - Bulk permanent deletion supported for Admins (`POST /api/v1/users/bulk-delete`).
+   - Single active session enforcement per account (`DEC-AUTH-107`) rejecting concurrent logins with HTTP 409 Conflict (`ACTIVE_SESSION_EXISTS`).
 
 ---
 
-## 2. Project Principles
+## 2. Core Architecture & Communication Topologies
 
-The implementation shall follow these principles:
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                              SYSTEM ARCHITECTURE                             │
+└──────────────────────────────────────────────────────────────────────────────┘
 
-1. Preserve the existing frontend design and source code where practical.
-2. Enforce all permissions on the server.
-3. Enforce mandatory per-device access assignment for Admins (`Active ADMIN + assigned device access + active and controllable device = faucet-control permission`).
-4. Scope every device operation by `deviceId`.
-5. Prevent the browser from communicating directly with MQTT.
-6. Keep canonical API, database, and MQTT values untranslated.
-7. Preserve the distinction between zero, null, missing, stale, and invalid telemetry.
-8. Persist faucet commands before publishing them to a device.
-9. Prevent duplicate physical execution through application-level idempotency.
-10. Never report a faucet command as completed before valid final confirmation.
-11. Treat unresolved physical-control decisions as blockers.
-12. Keep production physical control disabled until security, hardware, and UAT approval are complete.
+ 1. Soil & Water Quality Ingress (REST API over Wi-Fi)
+   [ESP32 / NodeMCU Nodes] ──(HTTPS/HTTP REST POST)──► [Next.js Web API (apps/web)]
+                                                              │
+                                                              ▼
+                                                     [(PostgreSQL Database)]
+
+ 2. Reservoir Water Tank Ingress (MQTT over TLS)
+   [Physical Tank Node] ──(MQTT WSS:8084)──► [EMQX Cloud Broker]
+                                                    │
+                                                    ▼
+                                            [IoT Gateway (apps/iot-gateway)]
+                                                    │
+                                                    ▼
+                                           [(PostgreSQL Database)]
+
+ 3. Realtime UI & Faucet Actuation (SSE + Internal API)
+   [Next.js Web UI] ◄──(Server-Sent Events)─── [Next.js Realtime Stream]
+          │                                            ▲
+          │ (User Dispense Request)                    │ (Status Events)
+          ▼                                            │
+   [Next.js Web API] ──(HTTP Bearer Token)──► [IoT Gateway (Fastify:3001)]
+                                                       │
+                                                       ▼ (irigasi/melon/...)
+                                              [EMQX Cloud Broker]
+                                                       │
+                                                       ▼
+                                              [Physical Solenoid Valve]
+```
+
+### Communication Principles
+
+- **Ingress Segregation:** REST API over Wi-Fi handles Soil and Water Quality sensors. MQTT 5.0 over TLS/WSS handles the Water Tank and actuator commands.
+- **No Direct Browser MQTT:** Browsers never connect directly to the MQTT broker or receive broker credentials.
+- **Fail-Closed Security:** All unauthorized requests, missing device access, expired sessions, or disabled feature flags fail closed.
+- **Idempotent Control:** Faucet commands require client-generated idempotency keys, atomic database reservation, and single-command concurrency per device.
 
 ---
 
-## 3. Proposed Architecture
+## 3. Technology Stack
 
-```mermaid
-flowchart LR
-    U[Owner / Admin Browser]
-    W[Web Application]
-    A[Application API]
-    DB[(PostgreSQL)]
-    G[IoT Gateway]
-    M[MQTT Broker]
-    D1[ESP32 / NodeMCU 1]
-    D2[ESP32 / NodeMCU 2]
-    DN[ESP32 / NodeMCU N]
-
-    U -->|HTTPS| W
-    W --> A
-    A --> DB
-    A --> G
-    G --> DB
-    G <--> M
-    M <--> D1
-    M <--> D2
-    M <--> DN
-```
-
-### Monitoring Flow
-
-```text
-ESP32 / NodeMCU
-→ MQTT Broker
-→ IoT Gateway
-→ PostgreSQL
-→ Application API
-→ Web Interface
-```
-
-### Faucet-Control Flow
-
-```text
-User confirmation
-→ Authenticated API request
-→ RBAC validation
-→ Device-access validation
-→ Command persistence
-→ IoT Gateway
-→ MQTT Broker
-→ Selected device
-→ Device acknowledgement
-→ Device final event
-→ Command status update
-→ Web interface
-```
-
-The browser shall never receive:
-
-- MQTT broker administrator credentials.
-- Device passwords.
-- Private keys.
-- Direct unrestricted publish permissions.
+| Layer                        | Technology                                    | Purpose / Configuration                                                    |
+| ---------------------------- | --------------------------------------------- | -------------------------------------------------------------------------- |
+| **Monorepo Management**      | npm Workspaces                                | Multi-package repository (`apps/*`, `packages/*`)                          |
+| **Web Frontend & API**       | Next.js 15 (App Router), React 19, TypeScript | Server Components, Server-side RBAC, SSR AuthContext hydration             |
+| **Styling & UI Components**  | Tailwind CSS, Radix UI Dialog, Lucide React   | Clean, accessible dashboard adhering to `Premium Minimal Ops` direction    |
+| **Form & Schema Validation** | React Hook Form, Zod                          | Runtime validation for forms, API endpoints, and MQTT contracts            |
+| **IoT Gateway Service**      | Node.js 20, Fastify 5, TypeScript             | Standalone microservice bridging MQTT broker to PostgreSQL and Web API     |
+| **MQTT Client & Broker**     | MQTT.js 5, EMQX Cloud Serverless (Dedicated)  | TLS/WSS on port 8084 (`wss://<cluster-host>:8084/mqtt`), ACL isolation     |
+| **Database & ORM**           | PostgreSQL 17 (Supabase), Prisma ORM          | Relational persistence, Supavisor connection pooling, transaction locks    |
+| **Transactional Email**      | Resend API (`@resend/node`)                   | Verification codes, password resets, account lifecycle notifications       |
+| **Internationalisation**     | Custom lightweight JSON catalog (`id`, `en`)  | Cookie-based routing (`id` default, `en` fallback), zero URL pollution     |
+| **Testing Framework**        | Vitest 4, Playwright 1.41, v8 Coverage        | Unit, integration, route, component, E2E, and quality gate test suites     |
+| **Containerization**         | Docker, Docker Compose, Alpine Linux          | Multi-stage production and staging builds (`apps/web`, `apps/iot-gateway`) |
 
 ---
 
-## 4. Recommended Technology Stack
-
-The final technology stack depends on the existing frontend audit.
-
-### Web Application
-
-Recommended when compatible with the existing codebase:
+## 4. Repository Structure
 
 ```text
-Next.js (App Router)
-React
-TypeScript
-AuthContext (SSR Hydration via RootLayout)
-Tailwind CSS
-Existing UI components
-Zod
-React Hook Form
-TanStack Query
-Recharts
-MapLibre GL JS
-```
-
-### IoT Gateway
-
-Recommended:
-
-```text
-Node.js
-TypeScript
-Fastify or equivalent
-MQTT.js
-Zod or JSON Schema
-```
-
-### Data and Infrastructure
-
-Recommended:
-
-```text
-PostgreSQL
-Prisma or equivalent ORM
-Mosquitto for development
-EMQX as a production broker candidate
-Redis only when justified
-Docker
-```
-
-These are recommendations, not confirmed selections.
-
-The existing frontend framework must first be confirmed through `TASK-0001`.
-
----
-
-## 5. Documentation
-
-The repository documentation is authoritative and shall be read before implementation.
-
-### Product and Interface
-
-| Document                 | Purpose                                                                       |
-| ------------------------ | ----------------------------------------------------------------------------- |
-| `docs/FRONTEND_AUDIT.md` | Existing frontend structure, technology, reusable components, and constraints |
-| `docs/UI_UX.md`          | Visual behaviour, interface states, layouts, and design requirements          |
-| `docs/PRD.md`            | Product requirements and scope                                                |
-| `docs/RBAC.md`           | Roles, permissions, account states, and resource access                       |
-| `docs/USER_FLOWS.md`     | End-to-end user flows and error states                                        |
-| `docs/I18N.md`           | English and Bahasa Indonesia requirements                                     |
-
-### Technical Design
-
-| Document                       | Purpose                                                                            |
-| ------------------------------ | ---------------------------------------------------------------------------------- |
-| `docs/DEVICE_COMMUNICATION.md` | MQTT topics, telemetry contracts, commands, acknowledgements, and device security  |
-| `docs/ARCHITECTURE.md`         | System components, boundaries, data flows, deployment, and scalability             |
-| `docs/DATABASE.md`             | PostgreSQL entities, relationships, constraints, indexes, and migrations           |
-| `docs/API.md`                  | REST endpoints, request and response contracts, errors, and real-time API          |
-| `docs/SECURITY.md`             | Threat model, authentication, authorisation, secrets, MQTT, and incident response  |
-| `docs/TESTING.md`              | Unit, integration, E2E, MQTT, hardware, security, performance, and release testing |
-
-### Execution
-
-| Document    | Purpose                                                                             |
-| ----------- | ----------------------------------------------------------------------------------- |
-| `TASKS.md`  | Prioritised implementation backlog, blockers, dependencies, and acceptance criteria |
-| `AGENTS.md` | Coding-agent operating rules, hard stops, reporting, and Definition of Done         |
-| `README.md` | Project entry point and setup overview                                              |
-
----
-
-## 6. Documentation Precedence
-
-When requirements conflict, use this order:
-
-1. `PRD.md`
-2. `RBAC.md`
-3. `USER_FLOWS.md`
-4. `SECURITY.md`
-5. `DEVICE_COMMUNICATION.md`
-6. `API.md`
-7. `DATABASE.md`
-8. `ARCHITECTURE.md`
-9. `I18N.md`
-10. `UI_UX.md`
-11. `FRONTEND_AUDIT.md`
-12. `TESTING.md`
-13. `TASKS.md`
-14. `AGENTS.md`
-
-Do not silently resolve conflicts.
-
-Report the conflict and follow the higher-ranked document.
-
----
-
-## 7. Proposed Repository Structure
-
-```text
-soil-water-monitoring/
+kebun-melon/
 ├── apps/
-│   ├── web/
-│   │   ├── src/
-│   │   │   ├── app/
-│   │   │   ├── components/
-│   │   │   ├── features/
-│   │   │   ├── hooks/
-│   │   │   ├── lib/
-│   │   │   ├── messages/
-│   │   │   └── styles/
-│   │   └── package.json
+│   ├── web/                           # Next.js 15 Web Application & REST API
+│   │   ├── app/                       # App Router routes, layouts, and API handlers
+│   │   │   ├── (auth)/                # Login, register, forgot-password, verify-email
+│   │   │   ├── api/v1/                # REST endpoints (/auth, /users, /devices, etc.)
+│   │   │   ├── dashboard/             # Aggregated operational monitoring view
+│   │   │   ├── devices/               # Device registry, configuration, status
+│   │   │   ├── users/                 # Owner-only user lifecycle administration
+│   │   │   ├── approvals/             # Owner-only admin registration approval queue
+│   │   │   ├── profile/               # User profile, password change, email update
+│   │   │   └── setting/               # Application settings, locale switcher
+│   │   ├── components/                # Reusable UI components & dialogs
+│   │   ├── contexts/                  # React Contexts (AuthContext, DeviceContext)
+│   │   ├── lib/                       # Server-side auth, RBAC, session, email utilities
+│   │   ├── messages/                  # Localization strings (id.json, en.json)
+│   │   └── Dockerfile                 # Standalone multi-stage production Dockerfile
 │   │
-│   └── iot-gateway/
+│   └── iot-gateway/                   # Standalone Fastify IoT Gateway Microservice
 │       ├── src/
-│       │   ├── mqtt/
-│       │   ├── telemetry/
-│       │   ├── devices/
-│       │   ├── commands/
-│       │   ├── acknowledgements/
-│       │   ├── realtime/
-│       │   ├── validation/
-│       │   └── observability/
-│       └── package.json
+│       │   ├── app.ts                 # Fastify server composition, hooks, rate limiting
+│       │   ├── index.ts               # Server startup, MQTT connection, graceful shutdown
+│       │   ├── commands/              # Outbound faucet command polling & dispatching
+│       │   ├── config/                # Environment schema and secret redaction
+│       │   ├── maintenance/           # Automated telemetry retention scheduler
+│       │   ├── mqtt/                  # GatewayMqttClient & HardwareMqttAdapter
+│       │   ├── observability/         # Structured logger with secret redaction
+│       │   └── telemetry/             # Reservoir telemetry processor & DB persistence
+│       └── Dockerfile                 # Multi-stage production Dockerfile
 │
 ├── packages/
-│   ├── contracts/
-│   ├── database/
-│   ├── authorization/
-│   ├── config/
-│   ├── observability/
-│   └── ui/
+│   ├── contracts/                     # Shared TypeScript interfaces, types, and Zod schemas
+│   │   └── src/                       # User, device, telemetry, command, and auth contracts
+│   └── database/                      # Prisma ORM schema, client, migrations, repositories
+│       ├── prisma/                    # schema.prisma and SQL migration history
+│       └── src/                       # UserRepository, DeviceRepository, Prisma client
 │
-├── docs/
-│   ├── FRONTEND_AUDIT.md
-│   ├── UI_UX.md
-│   ├── PRD.md
-│   ├── RBAC.md
-│   ├── USER_FLOWS.md
-│   ├── I18N.md
-│   ├── DEVICE_COMMUNICATION.md
-│   ├── ARCHITECTURE.md
-│   ├── DATABASE.md
-│   ├── API.md
-│   ├── SECURITY.md
-│   └── TESTING.md
+├── docs/                              # 17 Authoritative Architecture & Specification Documents
+│   ├── PRD.md                         # Product intent, scope, and domain invariants
+│   ├── RBAC.md                        # Roles, permissions, access matrices, and lifecycle
+│   ├── USER_FLOWS.md                  # Detailed user journeys, UX flows, and error handling
+│   ├── SECURITY.md                    # Threat model, auth, encryption, and rate limiting
+│   ├── DEVICE_COMMUNICATION.md        # Hardware topics, telemetry schemas, and MQTT policy
+│   ├── API.md                         # REST API endpoint specifications and contracts
+│   ├── DATABASE.md                    # Database schema, entities, indexes, and retention
+│   ├── ARCHITECTURE.md                # System topology, boundaries, and components
+│   ├── I18N.md                        # Multilingual behavior, terminology, and formatting
+│   ├── UI_UX.md                       # Design directions, motion effects, and governance
+│   ├── FRONTEND_AUDIT.md              # Historical codebase inspection and component inventory
+│   ├── TESTING.md                     # Verification strategies, quality gates, and E2E rules
+│   └── DECISIONS.md                   # Formal architectural and product decision register
 │
-├── TASKS.md
-├── AGENTS.md
-├── README.md
-├── package.json
-├── pnpm-workspace.yaml
-└── docker-compose.yml
+├── scripts/                           # Maintenance, seeding, testing, and simulation scripts
+│   ├── run-dev-gateway-hw.ts          # Local gateway runner connected to hardware testbed
+│   ├── device-simulator.ts            # ESP32 and MQTT telemetry/command simulator
+│   ├── seed-owner.ts                  # Interactive CLI first Owner provisioning script
+│   ├── cleanup-retention.ts           # Telemetry retention batch execution script
+│   ├── check-translations.ts          # Translation key parity verification tool
+│   └── scan-secrets.ts                # Repository secret pattern detection scanner
+│
+├── docker-compose.staging.yml         # Containerized staging deployment configuration
+├── docker-compose.yml                 # Local development Mosquitto MQTT broker configuration
+├── TASKS.md                           # Master implementation backlog and execution status
+└── AGENTS.md                          # Operating rules and coding agent governance
 ```
-
-This structure is proposed.
-
-Do not migrate the current frontend into this structure until the frontend audit confirms it is appropriate.
 
 ---
 
-## 8. Local Development
+## 5. Getting Started (Local Development)
 
-The exact setup commands are `TBD` until the existing frontend technology is confirmed.
+### Prerequisites
 
-The expected local services are:
+- **Node.js:** `v20.x` or higher (LTS recommended)
+- **npm:** `v10.x` or higher
+- **Docker & Docker Compose:** For containerized local broker and staging deployment
+- **PostgreSQL / Supabase Database:** Configured database instance with connection pooling
 
-```text
-Web application
-IoT gateway
-PostgreSQL
-MQTT broker
-Optional Redis
-Device simulator
-```
-
-### Expected Prerequisites
-
-Provisional prerequisites:
-
-- Node.js.
-- A supported package manager.
-- Docker and Docker Compose.
-- PostgreSQL client tools, optional.
-- Git.
-
-Exact versions shall be documented after `TASK-0001`.
-
-### Expected Setup Flow
+### 1. Clone & Install Dependencies
 
 ```bash
-# 1. Clone the repository
-git clone <repository-url>
-cd <repository-directory>
+git clone https://github.com/Hugo141132/Melon.git
+cd Melon
+npm install
+```
 
-# 2. Install dependencies
-<package-manager> install
+### 2. Environment Configuration
 
-# 3. Create local environment files
+Copy the development environment templates:
+
+```bash
 cp .env.example .env
-
-# 4. Start infrastructure
-docker compose up -d
-
-# 5. Run database migrations
-<database-migration-command>
-
-# 6. Seed roles, permissions, and the approved first Owner
-<seed-command>
-
-# 7. Start the web application
-<web-development-command>
-
-# 8. Start the IoT gateway
-<gateway-development-command>
 ```
 
-Do not replace placeholders until the actual project commands are confirmed.
+Populate the `.env` file with genuine development credentials:
+
+- `DATABASE_URL`: PostgreSQL connection string (Supabase with connection pooling).
+- `AUTH_SECRET`: Minimum 32-byte hexadecimal random string.
+- `INTERNAL_SERVICE_TOKEN`: Minimum 16-character machine-to-machine authentication token.
+- `MQTT_BROKER_URL`: EMQX Cloud broker endpoint (`wss://<host>:8084/mqtt`).
+- `MQTT_GATEWAY_USERNAME` & `MQTT_GATEWAY_PASSWORD`: Gateway MQTT credentials.
+- `RESEND_API_KEY`: API key for email delivery via Resend.
+- `ENABLE_FAUCET_CONTROL=false`: Enforce safety lock during development.
+
+### 3. Generate Database Client & Seed First Owner
+
+```bash
+# Generate Prisma Client
+npm run db:generate
+
+# Apply migrations to development database
+npm run db:migrate:dev
+
+# Provision the first Owner account (interactive CLI)
+npm run seed:owner
+```
+
+### 4. Running the Development Services
+
+Run services in separate terminal windows:
+
+#### Terminal 1 — Web Application (Next.js)
+
+```bash
+# Starts Next.js development server at http://localhost:3000
+npm run dev:web
+# or
+npm run dev
+```
+
+#### Terminal 2 — IoT Gateway (Choose Mode)
+
+- **Standard Gateway (Development DB & primary broker):**
+  ```bash
+  npm run dev:gateway
+  ```
+- **Hardware Testbed Gateway (Connects to public `broker.emqx.io` testbed for ESP32 bench testing):**
+  ```bash
+  npm run dev:gateway:hw
+  ```
 
 ---
 
-## 9. Environment Variables
+## 6. Running with Docker (Staging Environment)
 
-Expected variables include:
+The staging environment runs containerized services decoupled from external PaaS dependencies.
 
-```text
-APP_ENV
-DATABASE_URL
-AUTH_SECRET
+### Build and Start Staging Containers
 
-MQTT_BROKER_URL
-MQTT_GATEWAY_CLIENT_ID
-MQTT_GATEWAY_USERNAME
-MQTT_GATEWAY_PASSWORD
-
-DEFAULT_LOCALE
-FALLBACK_LOCALE
-REALTIME_TRANSPORT
+```bash
+docker compose -f docker-compose.staging.yml up -d --build
 ```
 
-Mutual TLS deployments may also require:
+### Verify Container Health
 
-```text
-MQTT_CA_CERT_PATH
-MQTT_CLIENT_CERT_PATH
-MQTT_CLIENT_KEY_PATH
+```bash
+# Check running containers
+docker ps --filter "name=kebun-melon-staging"
+
+# Probe Web Service Health & Readiness
+curl -i http://localhost:3000/health
+curl -i http://localhost:3000/ready
+
+# Probe IoT Gateway Health
+curl -i http://localhost:3001/health
 ```
 
-### Rules
+### Gateway Behavior in Docker
 
-- Do not commit production values.
-- Do not expose server secrets through frontend-prefixed environment variables.
-- Validate required values at startup.
-- Reject insecure development defaults in production.
-- Keep `.env.example` limited to placeholders.
+- The containerized gateway (`kebun-melon-staging-gateway`) runs the unified, production-ready IoT Gateway build.
+- By default, it connects securely to the dedicated Staging EMQX Cloud cluster defined in `.env.staging` over TLS/WSS.
+- It automatically subscribes to canonical hardware topics (`irigasi/melon/sensor/volume`), handles telemetry persistence, runs scheduled 90-day retention pruning, and exposes protected health probes.
 
 ---
 
-## 10. Authentication and Account Lifecycle
+## 7. Available Scripts
 
-### Public Registration
-
-```text
-Unauthenticated applicant
-→ Register
-→ ADMIN role
-→ PENDING_APPROVAL
-→ Owner reviews
-→ Approved or rejected
-```
-
-Only active accounts may use protected functionality.
-
-### Canonical Account Statuses
-
-```text
-PENDING_APPROVAL
-APPROVED
-ACTIVE
-REJECTED
-SUSPENDED
-DEACTIVATED
-```
-
-The distinction between `APPROVED` and `ACTIVE` remains `TBD`.
-
-### First Owner
-
-The first Owner shall be provisioned through an approved secure administrative process.
-
-The first Owner shall never be created through public registration.
-
-### Session Security & Performance (DEC-AUTH-107 / DEC-AUTH-108)
-
-- **Single Active Session:** Exactly 1 concurrent active session permitted per account across all roles (`DEC-AUTH-107`). Concurrent logins from other clients are rejected with HTTP 409 Conflict (`ACTIVE_SESSION_EXISTS`).
-- **Same-Client Session Recovery:** Same-browser re-authentications automatically revoke expired or orphaned sessions without 409 conflict lockouts (`DEC-AUTH-108`).
-- **Optimized Latency:** Login transactions use streamlined unrevoked session evaluation (`tx.session.findMany`), covering relation indexes, atomic user state update, and synchronous audit logging to minimize remote database WAN round trips.
-- **Seamless Hydration:** Frontend `AuthContext` hydrates synchronously from login responses, eliminating full-page server re-renders and blank greeting flashes.
+| Command                      | Description                                                                                 |
+| ---------------------------- | ------------------------------------------------------------------------------------------- |
+| `npm run dev`                | Starts the Next.js web application (`apps/web`) in development mode                         |
+| `npm run dev:gateway`        | Starts the IoT Gateway (`apps/iot-gateway`) in development mode                             |
+| `npm run dev:gateway:hw`     | Starts the IoT Gateway bound to the public hardware testbed broker                          |
+| `npm run build`              | Builds contracts, database package, and Next.js web application                             |
+| `npm run build:gateway`      | Builds contracts, database package, and IoT Gateway                                         |
+| `npm run test`               | Executes all Vitest unit and integration test suites                                        |
+| `npm run test:coverage`      | Generates full test coverage report across all workspaces                                   |
+| `npm run test:e2e`           | Executes Playwright end-to-end integration tests                                            |
+| `npm run check:quality`      | Full quality gate: typecheck, lint, format check, i18n check, secret scan, dep check, build |
+| `npm run format`             | Automatically formats all codebase files using Prettier                                     |
+| `npm run format:check`       | Verifies code formatting compliance without modifying files                                 |
+| `npm run lint`               | Runs ESLint across all workspaces                                                           |
+| `npm run typecheck`          | Validates TypeScript types across all 4 monorepo packages                                   |
+| `npm run i18n:check`         | Verifies 100% translation key parity between `id.json` and `en.json`                        |
+| `npm run scan:secrets`       | Scans workspace files for leaked API keys, tokens, or private secrets                       |
+| `npm run db:generate`        | Generates Prisma Client from schema                                                         |
+| `npm run db:migrate:dev`     | Runs database migrations in development                                                     |
+| `npm run seed:owner`         | Secure CLI script to provision the initial `OWNER / PIC` account                            |
+| `npm run mqtt:verify:hw`     | Verifies hardware testbed broker connectivity and payload parsing                           |
+| `npm run mqtt:verify:ingest` | Verifies end-to-end hardware telemetry ingestion and DB persistence                         |
+| `npm run sim:reservoir`      | Simulates reservoir telemetry publishing to MQTT                                            |
+| `npm run sim:esp32-001`      | Simulates ESP32 field device transmitting sensor data                                       |
 
 ---
 
-## 11. Device Communication
+## 8. Authentication & User Administration
 
-The proposed application protocol is:
+### Role Structure
 
-```text
-MQTT 5.0 over TLS
-```
+- **`OWNER / PIC`**: Person in Charge. Full administrative authority, global device visibility, user approvals, user lifecycle management (suspend, reactivate, bulk delete), device settings, and faucet control.
+- **`ADMIN`**: Operational role. Manages assigned devices, monitors telemetry, and triggers irrigation commands for assigned devices. Cannot manage users, approve accounts, or alter global device configurations.
 
-Recommended production port:
+### Key Security & Governance Features
 
-```text
-8883
-```
-
-MQTT 3.1.1 may be supported as a compatibility fallback.
-
-### Topic Pattern
-
-```text
-agriculture/{environment}/{siteId}/{deviceId}
-```
-
-Example topics:
-
-```text
-agriculture/production/site-01/water-node-001/telemetry/water
-agriculture/production/site-01/water-node-001/status
-agriculture/production/site-01/water-node-001/heartbeat
-agriculture/production/site-01/water-node-001/command/faucet
-agriculture/production/site-01/water-node-001/ack/faucet
-agriculture/production/site-01/water-node-001/event/faucet
-```
-
-Faucet commands shall never be retained.
-
-Each device shall have isolated broker permissions.
+- **6-Digit Verification Codes (`TASK-0214`):** Email verification and password resets utilize CSPRNG-generated 6-digit numeric codes with 15-minute expiry and `sha256(userId:code)` database token hashing.
+- **Single Active Session (`DEC-AUTH-107`, `TASK-0217`):** Enforces exactly 1 active session per user account. Concurrent login attempts from different devices are rejected with HTTP 409 Conflict (`ACTIVE_SESSION_EXISTS`).
+- **Verified Email Change (`DEC-AUTH-106`, `TASK-0216`):** Self-service email updates require password confirmation and candidate email verification code before altering persistent records.
+- **Owner Invariant Protection (`TASK-0212`):** Owner accounts cannot be selected, suspended, deactivated, or deleted. Checkboxes are disabled with clear protection tooltips.
+- **Bulk Permanent Deletion (`TASK-0212`):** Owners can permanently delete multiple Admin accounts simultaneously via `POST /api/v1/users/bulk-delete` with audit logging and notification emails.
+- **Automated Default Action Reasons:** When an Owner performs account actions without typing an optional reason, the system provides standard audited attribution:
+  - _"Account suspended by OWNER / PIC."_
+  - _"Account reactivated by OWNER / PIC."_
+  - _"Account permanently deleted by OWNER / PIC."_
 
 ---
 
-## 12. Canonical Values
+## 9. Safety Invariants & Release Governance
 
-These values remain stable in APIs, the database, MQTT, and audit records.
-
-### Roles
-
-```text
-OWNER
-ADMIN
-```
-
-### Device Statuses
-
-```text
-ONLINE
-OFFLINE
-STALE
-UNKNOWN
-INACTIVE
-```
-
-### Monitoring Statuses
-
-```text
-NORMAL
-WARNING
-CRITICAL
-UNKNOWN
-UNAVAILABLE
-INVALID
-```
-
-### Faucet Command Statuses
-
-```text
-QUEUED
-SENT
-ACKNOWLEDGED
-IN_PROGRESS
-COMPLETED
-FAILED
-CANCELLED
-TIMEOUT
-EXPIRED
-```
-
-Do not store translated values as canonical state.
+1. **Physical Faucet Safety Lock:**
+   - `ENABLE_FAUCET_CONTROL=false` is enforced across all environments by default.
+   - Dual written authorization from both the **Owner** and **Hardware Lead** is strictly required before enabling physical actuation in production.
+2. **Untranslated Canonical Values:**
+   - Database enums, API fields, MQTT topic paths, audit event keys, raw measurements, and scientific symbols (`N`, `P`, `K`, `pH`, `EC`, `TDS`, `ESP32`, `NodeMCU`, `MQTT`, `mL`, `L`, `°C`, `ppm`, `µS/cm`) are never translated or localized.
+3. **No Direct Browser MQTT Connection:**
+   - Web clients communicate strictly over HTTPS and Server-Sent Events (SSE). MQTT credentials and broker topology remain confidential to the backend gateway.
+4. **Append-Only Audit Trails:**
+   - All authentication, approval, lifecycle, access assignment, and faucet command events are permanently recorded to PostgreSQL audit tables.
 
 ---
 
-## 13. API Overview
-
-Recommended base path:
-
-```text
-/api/v1
-```
-
-Primary API domains:
-
-```text
-/auth
-/me
-/users
-/approvals
-/devices
-/monitoring
-/alerts
-/faucet-commands
-/audit-logs
-/settings
-/realtime
-```
-
-### Example Endpoints
-
-```text
-POST   /api/v1/auth/register
-POST   /api/v1/auth/login
-POST   /api/v1/auth/logout
-
-GET    /api/v1/me
-PATCH  /api/v1/me
-PATCH  /api/v1/me/preferences
-
-GET    /api/v1/approvals/pending
-POST   /api/v1/approvals/{userId}/approve
-POST   /api/v1/approvals/{userId}/reject
-
-GET    /api/v1/devices
-GET    /api/v1/devices/{deviceId}
-GET    /api/v1/devices/{deviceId}/monitoring/latest
-GET    /api/v1/devices/{deviceId}/monitoring/soil/history
-GET    /api/v1/devices/{deviceId}/monitoring/water/history
-
-POST   /api/v1/devices/{deviceId}/faucet-commands
-GET    /api/v1/devices/{deviceId}/faucet-commands/{commandId}
-
-GET    /api/v1/alerts
-POST   /api/v1/alerts/{alertId}/acknowledge
-
-GET    /api/v1/audit-logs
-GET    /api/v1/realtime/stream
-```
-
-See `docs/API.md` for the full contract.
-
----
-
-## 14. Database Overview
-
-Recommended database:
-
-```text
-PostgreSQL
-```
-
-Core tables:
-
-```text
-users
-roles
-permissions
-user_roles
-role_permissions
-account_approvals
-
-sites
-devices
-device_capabilities
-user_device_access
-device_status_events
-
-soil_readings
-water_readings
-
-faucet_commands
-faucet_command_events
-
-alerts
-alert_acknowledgements
-
-user_preferences
-sessions
-audit_logs
-integration_errors
-```
-
-Important integrity rules include:
-
-- Unique email.
-- Exactly one active role per user initially.
-- Unique canonical device ID.
-- Unique telemetry message ID per device.
-- Separate `canView` and `canControl`.
-- Fixed phase-to-volume constraint.
-- Unique command ID.
-- Unique idempotency key.
-- Append-only command events and audit logs.
-
----
-
-## 15. Internationalisation
-
-Supported locales:
-
-```text
-en
-id
-```
-
-Display labels shall be translated in the frontend.
-
-The following remain untranslated:
-
-- Device IDs.
-- API field names.
-- MQTT topics.
-- Database fields.
-- Canonical statuses.
-- Audit event keys.
-- pH.
-- EC.
-- TDS.
-- N.
-- P.
-- K.
-- ESP32.
-- NodeMCU.
-- MQTT.
-- API.
-- RBAC.
-
-The default and fallback locale remain `TBD`.
-
----
-
-## 16. Testing
-
-The implementation shall include:
-
-- Unit tests.
-- Component tests.
-- API contract tests.
-- Database tests.
-- Integration tests.
-- End-to-end tests.
-- MQTT tests.
-- Security tests.
-- Accessibility tests.
-- Performance tests.
-- Hardware-in-the-loop tests.
-- User acceptance testing.
-
-Recommended tools:
-
-```text
-Vitest or Jest
-React Testing Library
-Playwright
-Testcontainers
-MQTT.js test clients
-k6
-axe-core
-OWASP ZAP
-Gitleaks
-Trivy
-```
-
-The final tools depend on the existing codebase.
-
----
-
-## 17. Security
-
-Mandatory security expectations include:
-
-- HTTPS in production.
-- MQTT over TLS in production.
-- Server-side RBAC.
-- Device-level access.
-- Unique device credentials.
-- Topic-level ACLs.
-- Secure password hashing.
-- Session revocation.
-- CSRF protection where applicable.
-- CORS allowlist.
-- Content Security Policy.
-- Rate limiting.
-- Input validation.
-- Secret scanning.
-- Dependency scanning.
-- Append-only audit logging.
-- No browser access to MQTT credentials.
-
-See `docs/SECURITY.md` for full requirements.
-
----
-
-## 18. Implementation Sequence
-
-The implementation backlog is defined in `TASKS.md`.
-
-Recommended order:
-
-```text
-Phase 0  — Resolve blockers and audit frontend
-Phase 1  — Repository, database, configuration, and CI
-Phase 2  — Authentication, approval, and RBAC
-Phase 3  — Device registry and assignments
-Phase 4  — IoT gateway and telemetry ingestion
-Phase 5  — Monitoring and history
-Phase 6  — Internationalisation
-Phase 7  — Alerts
-Phase 8  — Faucet control
-Phase 9  — Security and observability
-Phase 10 — Testing, UAT, and production readiness
-```
-
----
-
-## 19. First Implementation Task
-
-Start with:
-
-```text
-TASK-0001 — Confirm Existing Frontend Technology
-```
-
-Do not modify application behaviour during this task.
-
-The coding agent shall inspect the current repository and update `FRONTEND_AUDIT.md` with:
-
-- Framework and version.
-- Build tool.
-- Routing.
-- Styling.
-- Component libraries.
-- State management.
-- Authentication code.
-- API integration.
-- Chart and map libraries.
-- Project structure.
-- Reusable components.
-- Existing technical debt.
-- Security concerns.
-- Files that must be preserved.
-- Conflicts with the proposed architecture.
-
-Do not start another task until the frontend audit has been reviewed.
-
----
-
-## 20. Recommended Agent Prompt
-
-```text
-Read AGENTS.md and all project documentation referenced by the selected task.
-
-Start with TASK-0001 only: Confirm Existing Frontend Technology.
-
-Do not modify application behaviour yet.
-
-Inspect the current repository and update FRONTEND_AUDIT.md with:
-
-- Framework and version
-- Build tool
-- Routing
-- Styling
-- Component libraries
-- State management
-- Authentication code
-- API integration
-- Chart and map libraries
-- Project structure
-- Reusable components
-- Existing technical debt
-- Security concerns
-- Files that must be preserved
-- Conflicts with the proposed architecture
-
-Then report:
-
-- Files inspected
-- Findings
-- Documentation changes
-- Blockers
-- Recommended next READY task
-
-Do not start another task.
-```
-
----
-
-## 21. Current Release Blockers
-
-Production release remains blocked until:
-
-- [ ] Existing frontend technology is confirmed.
-- [ ] Authentication and session strategy are approved.
-- [ ] First Owner provisioning is approved.
-- [ ] Owner/Admin permissions are final.
-- [x] MQTT broker and device authentication are selected (`DEC-DEV-020`, `DEC-DEV-032`).
-- [x] Production MQTT TLS and ACLs are verified (`TASK-0907`, `npm run mqtt:verify:prod`).
-- [ ] Telemetry units are confirmed.
-- [x] Battery (`BAT`) parameter identity & scope clarified (`DEC-MON-085`).
-- [ ] Offline and stale thresholds are approved.
-- [ ] Faucet permission matrix is approved.
-- [ ] Command concurrency is approved.
-- [ ] Timeout and late-event handling are approved.
-- [ ] Duplicate physical execution protection passes.
-- [ ] Hardware-in-the-loop tests pass.
-- [ ] Security tests pass.
-- [ ] UAT is approved.
-- [ ] Backup and rollback are verified.
-- [ ] Production physical-control enablement is explicitly approved.
-
----
-
-## 22. Known Open Decisions
-
-The current documentation still contains unresolved decisions, including:
-
-1. Existing frontend framework and version.
-2. Monorepo or separate repositories.
-3. Authentication library.
-4. Session storage.
-5. First Owner provisioning.
-6. Multiple Owner policy.
-7. `APPROVED` versus `ACTIVE`.
-8. Owner device scope.
-9. Site model.
-10. Owner faucet-control permission.
-11. Admin faucet-control permission.
-12. Control-assignment model.
-13. Concurrent command policy.
-14. Cancellation and stop.
-15. Command timeout values.
-16. Late-event reconciliation.
-17. MQTT broker selection.
-18. Device password versus certificate authentication.
-19. Telemetry intervals.
-20. Measurement units.
-21. ~~`Water BAT` meaning.~~ **RESOLVED** — `BAT` stands for Battery, incorporated into soil and water quality sensors (`DEC-MON-085`).
-22. Offline and stale thresholds.
-23. Default and fallback locale.
-24. Real-time transport.
-25. Redis requirement.
-26. Notification channels.
-27. Hosting platform.
-28. Backup objectives.
-29. Performance targets.
-30. Hardware dispensing tolerance.
-
-Do not invent these values during implementation.
-
----
-
-## 23. Contribution Rules
-
-Before contributing:
-
-1. Read `AGENTS.md`.
-2. Select a `READY` task from `TASKS.md`.
-3. Confirm dependencies.
-4. Read relevant specifications.
-5. State the task and expected changes.
-6. Implement the smallest coherent change.
-7. Add tests.
-8. Run tests.
-9. Update documentation.
-10. Report remaining blockers.
-
-### Commit Format
-
-Recommended:
-
-```text
-type(scope): summary
-```
-
-Examples:
-
-```text
-feat(auth): add pending admin registration
-feat(rbac): enforce device-level access
-feat(gateway): validate soil telemetry
-fix(control): prevent duplicate faucet commands
-test(auth): cover suspended account access
-docs(api): document approval endpoints
-```
-
----
-
-## 24. Definition of Done
-
-A task is complete only when:
-
-- Requirements are implemented.
-- Error and alternative states are implemented.
-- Server-side security is enforced.
-- Device access is enforced where relevant.
-- English and Indonesian text is included.
-- Tests are added.
-- Tests pass.
-- Build passes.
-- Documentation is updated.
-- No unresolved requirement was silently invented.
-- Required human review is complete.
-
----
-
-## 25. Critical Prohibitions
-
-Never:
-
-- Create an Owner through public registration.
-- Allow pending Admins into protected pages.
-- Allow Admins to manage other users.
-- Trust a browser-supplied role.
-- Trust a browser-supplied account status.
-- Trust a browser-supplied target volume.
-- Expose MQTT or device credentials to the browser.
-- Retain faucet commands in MQTT.
-- Mark a faucet command completed without final confirmation.
-- Treat a timeout as completion.
-- Retry a physical command blindly.
-- Convert missing telemetry into zero.
-- Translate canonical API or database values.
-- Commit secrets.
-- Delete audit history to simplify development.
-- Enable production physical control without approval.
-
----
-
-## 26. Licence
-
-The project licence is `TBD`.
-
-Do not assume the repository is open source until a licence file is added.
-
----
-
-## 27. Project Status
-
-```text
-Documentation: Complete
-Frontend audit: Pending
-Architecture decisions: Partially unresolved
-Implementation: Not yet started or not yet confirmed
-Physical control: Must remain disabled until approved
-```
-
-The next action is:
-
-```text
-Execute TASK-0001 only.
-```
+## 10. Documentation Index & Authority
+
+All implementation and contribution must follow the 14-level hierarchy of authority established in [`AGENTS.md`](AGENTS.md):
+
+1. [`docs/PRD.md`](docs/PRD.md) — Product intent, functional scope, and domain invariants.
+2. [`docs/RBAC.md`](docs/RBAC.md) — Roles, permissions, approval lifecycle, and access rules.
+3. [`docs/USER_FLOWS.md`](docs/USER_FLOWS.md) — End-to-end user journeys, UX behavior, and error handling.
+4. [`docs/SECURITY.md`](docs/SECURITY.md) — Mandatory security controls, threat mitigations, and tokens.
+5. [`docs/DEVICE_COMMUNICATION.md`](docs/DEVICE_COMMUNICATION.md) — Hardware contracts, MQTT topics, and REST telemetry.
+6. [`docs/API.md`](docs/API.md) — REST API specifications, DTOs, and real-time SSE protocols.
+7. [`docs/DATABASE.md`](docs/DATABASE.md) — PostgreSQL persistence, Prisma entities, and retention policies.
+8. [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — System boundaries, microservices, and network topologies.
+9. [`docs/I18N.md`](docs/I18N.md) — Multilingual behavior, terminology, and locale switching.
+10. [`docs/UI_UX.md`](docs/UI_UX.md) — Visual standards, 6 UI directions, and 12 controlled motion effects.
+11. [`docs/FRONTEND_AUDIT.md`](docs/FRONTEND_AUDIT.md) — Historical audit of the initial frontend codebase.
+12. [`docs/TESTING.md`](docs/TESTING.md) — Quality gates, test suites, and release verification.
+13. [`TASKS.md`](TASKS.md) — Master implementation backlog and execution status.
+14. [`AGENTS.md`](AGENTS.md) — Coding agent rules, constraints, and execution policies.
