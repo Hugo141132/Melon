@@ -1533,3 +1533,34 @@ The water-tank monitoring interface on `/controls` and monitoring dashboard comp
   - Accessibility: `role="progressbar"`, `aria-valuenow`, `aria-valuemin="0"`, `aria-valuemax="2200"`, `aria-label` fully maintained.
   - Faucet control preset behavior (Phase 1: 0.3 L, Phase 2: 1.0 L, Phase 3: 1.5 L), confirmation modal, and `ENABLE_FAUCET_CONTROL=false` safety flag remain untouched.
 <!-- Water Tank UI Layout & Scale Reconciled: 2026-09-09 -->
+
+---
+
+## User Management Improvements & Lifecycle Modals UI/UX Note (TASK-0212 / Reconciled 2026-09-13)
+
+The user management console on `/users`, lifecycle confirmation modals, and email notification presentation are reconciled and polished under `TASK-0212`:
+- **Frontend Impact:** `MINOR`
+- **Selected UI Direction:** `Premium Minimal Ops`
+- **Existing Color Template:** `UNCHANGED` (Brand palette: green tokens, red deletion accents, surface containers preserved)
+- **Selected Motion Effects:** `Modal`, `Button hover`
+- **21st.dev MCP:** `NOT REQUIRED` (reuses established dialog patterns and input styling)
+- **Role Label & Terminology Standardization:**
+  - Standardized Owner presentation across English and Indonesian UI as `OWNER / PIC` (Person in Charge / Penanggung Jawab).
+  - Stripped redundant `(OWNER)` and `(ADMIN)` parentheticals from user-facing dropdown filters, headers, and card badges.
+- **Bulk Permanent Account Deletion Workflow:**
+  - Implemented multi-account checkbox selection on non-owner cards with a "Select All" toggle bar and dynamic selection counter.
+  - Removed individual permanent delete buttons from user cards to eliminate accidental single-click deletions; permanent deletion is executed strictly through deliberate selection.
+  - Owner cards permanently disable the checkbox with an explanatory tooltip (`ownerProtectedTooltip`), guaranteeing Owner account protection.
+- **Lifecycle Action Modals Polish:**
+  - Removed distracting warning and information callout boxes from all lifecycle action modals (single suspend, single reactivate, single delete, and bulk delete).
+  - Modals strictly present:
+    1. Action title.
+    2. Target user identification.
+    3. Optional reason input field with character counter (`0/500`).
+    4. Action execution and cancellation buttons.
+- **Email Notification Presentation:**
+  - Cleaned email notification templates across account suspension, reactivation, and permanent deletion.
+  - Eliminated template literal indentation and monospace formatting.
+  - Applied flush-left alignment, proportional typography, and natural word wrapping (`word-break: break-word`) to ensure long reasons render cleanly on all client devices.
+<!-- User Management UI/UX Reconciled: 2026-09-13 -->
+

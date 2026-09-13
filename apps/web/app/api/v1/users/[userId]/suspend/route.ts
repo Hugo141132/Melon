@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
 import { prisma, UserRepository } from '@kebun-melon/database';
-import { UserLifecycleActionInputSchema } from '@kebun-melon/contracts';
+import { UserLifecycleActionInputSchema, DEFAULT_SUSPENSION_REASON } from '@kebun-melon/contracts';
 import {
   requireSession,
   requirePermission,
   AuthorizationError,
 } from '../../../../../../lib/auth/rbac';
+import { sendAccountSuspensionEmail } from '../../../../../../lib/email/resend';
 
 export async function POST(request: Request, props: { params: Promise<{ userId: string }> }) {
   const params = await props.params;
@@ -15,7 +16,7 @@ export async function POST(request: Request, props: { params: Promise<{ userId: 
     const session = await requireSession(request);
     requirePermission(session, 'account.suspend', 'USER', params.userId, request);
 
-    let reason: string | undefined = undefined;
+    let reason: string = DEFAULT_SUSPENSION_REASON;
     try {
       const text = await request.text();
       if (text && text.trim().length > 0) {
@@ -35,7 +36,9 @@ export async function POST(request: Request, props: { params: Promise<{ userId: 
             { status: 422 }
           );
         }
-        reason = parseResult.data.reason;
+        if (parseResult.data.reason && parseResult.data.reason.trim().length > 0) {
+          reason = parseResult.data.reason.trim();
+        }
       }
     } catch {
       return NextResponse.json(
@@ -65,6 +68,14 @@ export async function POST(request: Request, props: { params: Promise<{ userId: 
       requestId,
       ipAddress,
       userAgent,
+      notifyFn: async (target) => {
+        await sendAccountSuspensionEmail({
+          toEmail: target.email,
+          recipientName: target.fullName,
+          reason: target.reason || reason,
+          requestId,
+        });
+      },
     });
 
     if (!result.success) {

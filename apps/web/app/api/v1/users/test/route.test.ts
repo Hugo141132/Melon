@@ -409,6 +409,8 @@ describe('TASK-0212 Owner User Management API & Safety Tests', () => {
     // Run suspension
     const req = new Request('http://localhost:3000/api/v1/users/admin-id-2/suspend', {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: 'Policy violation on sensor usage' }),
     });
     await SUSPEND_USER(req, { params: Promise.resolve({ userId: 'admin-id-2' }) });
 
@@ -529,6 +531,8 @@ describe('TASK-0212 Owner User Management API & Safety Tests', () => {
 
     const req = new Request('http://localhost:3000/api/v1/users/owner-id-1/suspend', {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: 'Safety test reason' }),
     });
 
     const res = await SUSPEND_USER(req, { params: Promise.resolve({ userId: 'owner-id-1' }) });
@@ -547,6 +551,8 @@ describe('TASK-0212 Owner User Management API & Safety Tests', () => {
 
     const req = new Request('http://localhost:3000/api/v1/users/admin-id-2', {
       method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: 'Safety test reason' }),
     });
 
     const res = await DELETE_USER(req, { params: Promise.resolve({ userId: 'admin-id-2' }) });
@@ -568,6 +574,8 @@ describe('TASK-0212 Owner User Management API & Safety Tests', () => {
 
     const req = new Request('http://localhost:3000/api/v1/users/pending-admin-id', {
       method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: 'Safety test reason' }),
     });
 
     const res = await DELETE_USER(req, { params: Promise.resolve({ userId: 'pending-admin-id' }) });
@@ -587,6 +595,8 @@ describe('TASK-0212 Owner User Management API & Safety Tests', () => {
 
     const req = new Request('http://localhost:3000/api/v1/users/owner-id-1', {
       method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: 'Safety test reason' }),
     });
 
     const res = await DELETE_USER(req, { params: Promise.resolve({ userId: 'owner-id-1' }) });

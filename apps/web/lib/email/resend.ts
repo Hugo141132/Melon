@@ -1,6 +1,11 @@
 import { Resend } from 'resend';
 import { Logger } from '@/lib/observability/logger';
 import { validateServerEnv } from '@/lib/env/server';
+import {
+  DEFAULT_SUSPENSION_REASON,
+  DEFAULT_DELETION_REASON,
+  DEFAULT_REACTIVATION_REASON,
+} from '@kebun-melon/contracts';
 
 const logger = new Logger({ serviceName: 'web:email' });
 
@@ -631,6 +636,568 @@ export async function sendEmailChangeVerificationEmail(
   } catch (err: any) {
     reqLogger.error(
       'Unexpected exception during Resend email change dispatch: ' + (err?.message || String(err))
+    );
+    return {
+      success: false,
+      emailSent: false,
+      error: err?.message || 'Email delivery failed',
+    };
+  }
+}
+
+export interface SendAccountNoticeEmailInput {
+  toEmail: string;
+  recipientName: string;
+  reason: string;
+  locale?: string;
+  requestId?: string;
+}
+
+export interface SendAccountNoticeEmailResult {
+  success: boolean;
+  emailSent: boolean;
+  id?: string;
+  simulated?: boolean;
+  error?: string;
+}
+
+function getAccountSuspensionEmailHtml(
+  name: string,
+  reason: string,
+  locale: string
+): { subject: string; html: string; text: string } {
+  const isId = locale === 'id';
+  const resolvedReason = reason?.trim() || DEFAULT_SUSPENSION_REASON;
+
+  const subject = isId
+    ? 'Akun Kebun Melon Anda Ditangguhkan'
+    : 'Your Kebun Melon Account Has Been Suspended';
+
+  const greeting = isId ? `Halo ${name || 'Pengguna'},` : `Hello ${name || 'User'},`;
+  const intro = isId
+    ? 'Akun Anda di Kebun Melon Monitoring System telah ditangguhkan oleh OWNER / PIC.'
+    : 'Your account on the Kebun Melon Monitoring System has been suspended by OWNER / PIC.';
+  const reasonLabel = isId ? 'Alasan Penangguhan:' : 'Reason for Suspension:';
+  const sessionNotice = isId
+    ? 'Semua sesi aktif Anda telah dicabut secara otomatis. Anda tidak dapat mengakses sistem selama status akun ditangguhkan.'
+    : 'All of your active sessions have been automatically revoked. You cannot access the system while your account is suspended.';
+  const appealNotice = isId
+    ? 'Jika Anda merasa ini adalah kekeliruan atau ingin mengajukan pengaktifan kembali, silakan hubungi OWNER / PIC.'
+    : 'If you believe this is an error or wish to appeal for reactivation, please contact OWNER / PIC.';
+
+  const html = `
+<!DOCTYPE html>
+<html lang="${locale}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${subject}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #F8F9FA; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1F2937;">
+  <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #F8F9FA; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 540px; background-color: #FFFFFF; border-radius: 16px; border: 1px solid #E5E7EB; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+          <!-- Header -->
+          <tr>
+            <td style="padding: 32px 32px 24px; text-align: left; border-bottom: 1px solid #F3F4F6;">
+              <span style="font-size: 20px; font-weight: 800; color: #2D5A27; letter-spacing: -0.5px;">Kebun Melon</span>
+            </td>
+          </tr>
+          <!-- Body -->
+          <tr>
+            <td style="padding: 32px;">
+              <div style="display: inline-block; padding: 6px 12px; background-color: #FEF3C7; border: 1px solid #FCD34D; border-radius: 8px; color: #92400E; font-size: 13px; font-weight: 700; margin-bottom: 16px;">
+                ${isId ? 'Pemberitahuan Penangguhan Akun' : 'Account Suspension Notice'}
+              </div>
+              <h1 style="margin: 0 0 16px; font-size: 20px; font-weight: 700; color: #111827; line-height: 1.4;">
+                ${subject}
+              </h1>
+              <p style="margin: 0 0 16px; font-size: 15px; line-height: 1.6; color: #4B5563;">
+                ${greeting}
+              </p>
+              <p style="margin: 0 0 20px; font-size: 15px; line-height: 1.6; color: #4B5563;">
+                ${intro}
+              </p>
+
+              <!-- Reason Box -->
+              <div style="background-color: #FFFBEB; border-left: 4px solid #F59E0B; padding: 16px; border-radius: 4px; margin-bottom: 24px;">
+                <p style="margin: 0 0 6px; font-size: 13px; font-weight: 700; color: #92400E; text-transform: uppercase; letter-spacing: 0.5px;">${reasonLabel}</p>
+                <p style="margin: 0; font-size: 14px; color: #78350F; line-height: 1.5; text-align: left; word-break: break-word;">${resolvedReason}</p>
+              </div>
+
+              <p style="margin: 0 0 12px; font-size: 14px; line-height: 1.6; color: #6B7280;">
+                ${sessionNotice}
+              </p>
+              <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #6B7280;">
+                ${appealNotice}
+              </p>
+            </td>
+          </tr>
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 24px 32px; background-color: #FAFAFA; border-top: 1px solid #F3F4F6; text-align: left; font-size: 13px; color: #9CA3AF; line-height: 1.5;">
+              <p style="margin: 0;">© ${new Date().getFullYear()} Kebun Melon Monitoring System.</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim();
+
+  const text = `
+${subject}
+
+${greeting}
+
+${intro}
+
+${reasonLabel}
+${resolvedReason}
+
+${sessionNotice}
+
+${appealNotice}
+
+© ${new Date().getFullYear()} Kebun Melon Monitoring System.
+  `.trim();
+
+  return { subject, html, text };
+}
+
+function getAccountDeletionEmailHtml(
+  name: string,
+  reason: string,
+  locale: string
+): { subject: string; html: string; text: string } {
+  const isId = locale === 'id';
+  const resolvedReason = reason?.trim() || DEFAULT_DELETION_REASON;
+
+  const subject = isId
+    ? 'Pemberitahuan Penghapusan Akun — Kebun Melon'
+    : 'Account Deletion Notification — Kebun Melon';
+
+  const greeting = isId ? `Halo ${name || 'Pengguna'},` : `Hello ${name || 'User'},`;
+  const intro = isId
+    ? 'Akun Anda di Kebun Melon Monitoring System telah dihapus secara permanen oleh OWNER / PIC.'
+    : 'Your account on the Kebun Melon Monitoring System has been permanently deleted by OWNER / PIC.';
+  const reasonLabel = isId ? 'Alasan Penghapusan:' : 'Reason for Deletion:';
+  const deletionNotice = isId
+    ? 'Tindakan ini bersifat permanen dan tidak dapat dibatalkan. Semua sesi aktif, hak akses perangkat, dan preferensi akun Anda telah dihapus secara penuh dari sistem.'
+    : 'This action is permanent and irreversible. All of your active sessions, device assignments, and account preferences have been completely purged from the system.';
+  const thankYouNotice = isId
+    ? 'Terima kasih atas kontribusi Anda selama menggunakan layanan Kebun Melon.'
+    : 'Thank you for your contributions during your time with Kebun Melon.';
+
+  const html = `
+<!DOCTYPE html>
+<html lang="${locale}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${subject}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #F8F9FA; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1F2937;">
+  <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #F8F9FA; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 540px; background-color: #FFFFFF; border-radius: 16px; border: 1px solid #E5E7EB; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+          <!-- Header -->
+          <tr>
+            <td style="padding: 32px 32px 24px; text-align: left; border-bottom: 1px solid #F3F4F6;">
+              <span style="font-size: 20px; font-weight: 800; color: #2D5A27; letter-spacing: -0.5px;">Kebun Melon</span>
+            </td>
+          </tr>
+          <!-- Body -->
+          <tr>
+            <td style="padding: 32px;">
+              <div style="display: inline-block; padding: 6px 12px; background-color: #FEE2E2; border: 1px solid #FCA5A5; border-radius: 8px; color: #991B1B; font-size: 13px; font-weight: 700; margin-bottom: 16px;">
+                ${isId ? 'Penghapusan Akun Permanen' : 'Permanent Account Deletion'}
+              </div>
+              <h1 style="margin: 0 0 16px; font-size: 20px; font-weight: 700; color: #111827; line-height: 1.4;">
+                ${subject}
+              </h1>
+              <p style="margin: 0 0 16px; font-size: 15px; line-height: 1.6; color: #4B5563;">
+                ${greeting}
+              </p>
+              <p style="margin: 0 0 20px; font-size: 15px; line-height: 1.6; color: #4B5563;">
+                ${intro}
+              </p>
+
+              <!-- Reason Box -->
+              <div style="background-color: #FEF2F2; border-left: 4px solid #EF4444; padding: 16px; border-radius: 4px; margin-bottom: 24px;">
+                <p style="margin: 0 0 6px; font-size: 13px; font-weight: 700; color: #991B1B; text-transform: uppercase; letter-spacing: 0.5px;">${reasonLabel}</p>
+                <p style="margin: 0; font-size: 14px; color: #7F1D1D; line-height: 1.5; text-align: left; word-break: break-word;">${resolvedReason}</p>
+              </div>
+
+              <p style="margin: 0 0 12px; font-size: 14px; line-height: 1.6; color: #6B7280;">
+                ${deletionNotice}
+              </p>
+              <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #6B7280;">
+                ${thankYouNotice}
+              </p>
+            </td>
+          </tr>
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 24px 32px; background-color: #FAFAFA; border-top: 1px solid #F3F4F6; text-align: left; font-size: 13px; color: #9CA3AF; line-height: 1.5;">
+              <p style="margin: 0;">© ${new Date().getFullYear()} Kebun Melon Monitoring System.</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim();
+
+  const text = `
+${subject}
+
+${greeting}
+
+${intro}
+
+${reasonLabel}
+${resolvedReason}
+
+${deletionNotice}
+
+${thankYouNotice}
+
+© ${new Date().getFullYear()} Kebun Melon Monitoring System.
+  `.trim();
+
+  return { subject, html, text };
+}
+
+/**
+ * Sends an account suspension notification email via the approved Resend provider.
+ */
+export async function sendAccountSuspensionEmail(
+  input: SendAccountNoticeEmailInput
+): Promise<SendAccountNoticeEmailResult> {
+  const reqLogger = logger.child({
+    requestId: input.requestId,
+  });
+
+  const env = validateServerEnv();
+  const locale = input.locale || env.DEFAULT_LOCALE || 'id';
+  const name = input.recipientName || '';
+  const reason = input.reason || '';
+
+  const { subject, html, text } = getAccountSuspensionEmailHtml(name, reason, locale);
+
+  const apiKey = env.RESEND_API_KEY || process.env.RESEND_API_KEY;
+  const fromEmail =
+    env.RESEND_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || 'Kebun Melon <onboarding@resend.dev>';
+
+  if (!apiKey || env.NODE_ENV === 'test' || process.env.NODE_ENV === 'test') {
+    reqLogger.info('Simulated account suspension email delivery to ' + input.toEmail);
+    return {
+      success: true,
+      emailSent: false,
+      simulated: true,
+    };
+  }
+
+  try {
+    const resend = new Resend(apiKey);
+    const result = await sendWithRetry(
+      resend,
+      {
+        from: fromEmail,
+        to: [input.toEmail],
+        subject,
+        html,
+        text,
+      },
+      reqLogger
+    );
+
+    if (!result.success) {
+      reqLogger.error(
+        'Resend delivery reported error for account suspension: ' +
+          (result.error || 'Unknown error')
+      );
+      return {
+        success: false,
+        emailSent: false,
+        error: result.error,
+      };
+    }
+
+    reqLogger.info('Account suspension email dispatched successfully via Resend');
+    return {
+      success: true,
+      emailSent: true,
+      id: result.id,
+    };
+  } catch (err: any) {
+    reqLogger.error(
+      'Unexpected exception during Resend suspension email dispatch: ' +
+        (err?.message || String(err))
+    );
+    return {
+      success: false,
+      emailSent: false,
+      error: err?.message || 'Email delivery failed',
+    };
+  }
+}
+
+/**
+ * Sends a permanent account deletion notification email via the approved Resend provider.
+ */
+export async function sendAccountDeletionEmail(
+  input: SendAccountNoticeEmailInput
+): Promise<SendAccountNoticeEmailResult> {
+  const reqLogger = logger.child({
+    requestId: input.requestId,
+  });
+
+  const env = validateServerEnv();
+  const locale = input.locale || env.DEFAULT_LOCALE || 'id';
+  const name = input.recipientName || '';
+  const reason = input.reason || '';
+
+  const { subject, html, text } = getAccountDeletionEmailHtml(name, reason, locale);
+
+  const apiKey = env.RESEND_API_KEY || process.env.RESEND_API_KEY;
+  const fromEmail =
+    env.RESEND_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || 'Kebun Melon <onboarding@resend.dev>';
+
+  if (!apiKey || env.NODE_ENV === 'test' || process.env.NODE_ENV === 'test') {
+    reqLogger.info('Simulated account deletion email delivery to ' + input.toEmail);
+    return {
+      success: true,
+      emailSent: false,
+      simulated: true,
+    };
+  }
+
+  try {
+    const resend = new Resend(apiKey);
+    const result = await sendWithRetry(
+      resend,
+      {
+        from: fromEmail,
+        to: [input.toEmail],
+        subject,
+        html,
+        text,
+      },
+      reqLogger
+    );
+
+    if (!result.success) {
+      reqLogger.error(
+        'Resend delivery reported error for account deletion: ' + (result.error || 'Unknown error')
+      );
+      return {
+        success: false,
+        emailSent: false,
+        error: result.error,
+      };
+    }
+
+    reqLogger.info('Account deletion email dispatched successfully via Resend');
+    return {
+      success: true,
+      emailSent: true,
+      id: result.id,
+    };
+  } catch (err: any) {
+    reqLogger.error(
+      'Unexpected exception during Resend deletion email dispatch: ' + (err?.message || String(err))
+    );
+    return {
+      success: false,
+      emailSent: false,
+      error: err?.message || 'Email delivery failed',
+    };
+  }
+}
+
+function getAccountReactivationEmailHtml(
+  name: string,
+  reason: string,
+  locale: string
+): { subject: string; html: string; text: string } {
+  const isId = locale === 'id';
+  const resolvedReason = reason?.trim() || DEFAULT_REACTIVATION_REASON;
+
+  const subject = isId
+    ? 'Akun Kebun Melon Anda Telah Diaktifkan Kembali'
+    : 'Your Kebun Melon Account Has Been Reactivated';
+
+  const greeting = isId ? `Halo ${name || 'Pengguna'},` : `Hello ${name || 'User'},`;
+  const intro = isId
+    ? 'Akun Anda di Kebun Melon Monitoring System telah diaktifkan kembali oleh OWNER / PIC.'
+    : 'Your account on the Kebun Melon Monitoring System has been reactivated by OWNER / PIC.';
+
+  const reasonLabel = isId ? 'Alasan / Catatan:' : 'Reason / Notes:';
+
+  const accessNotice = isId
+    ? 'Anda dapat masuk kembali ke aplikasi menggunakan kredensial akun Anda.'
+    : 'You may now log in to the application using your account credentials.';
+  const supportNotice = isId
+    ? 'Jika Anda tidak mengenali aktivitas ini atau membutuhkan bantuan, silakan hubungi OWNER / PIC.'
+    : 'If you do not recognize this activity or require assistance, please contact OWNER / PIC.';
+
+  const html = `
+<!DOCTYPE html>
+<html lang="${locale}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${subject}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #F8F9FA; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1F2937;">
+  <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #F8F9FA; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 540px; background-color: #FFFFFF; border-radius: 16px; border: 1px solid #E5E7EB; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+          <!-- Header -->
+          <tr>
+            <td style="padding: 32px 32px 24px; text-align: left; border-bottom: 1px solid #F3F4F6;">
+              <span style="font-size: 20px; font-weight: 800; color: #2D5A27; letter-spacing: -0.5px;">Kebun Melon</span>
+            </td>
+          </tr>
+          <!-- Body -->
+          <tr>
+            <td style="padding: 32px;">
+              <div style="display: inline-block; padding: 6px 12px; background-color: #DCFCE7; border: 1px solid #86EFAC; border-radius: 8px; color: #166534; font-size: 13px; font-weight: 700; margin-bottom: 16px;">
+                ${isId ? 'Akun Diaktifkan Kembali' : 'Account Reactivated'}
+              </div>
+              <h1 style="margin: 0 0 16px; font-size: 20px; font-weight: 700; color: #111827; line-height: 1.4;">
+                ${subject}
+              </h1>
+              <p style="margin: 0 0 16px; font-size: 15px; line-height: 1.6; color: #4B5563;">
+                ${greeting}
+              </p>
+              <p style="margin: 0 0 20px; font-size: 15px; line-height: 1.6; color: #4B5563;">
+                ${intro}
+              </p>
+
+              <!-- Reason Box -->
+              <div style="background-color: #F0FDF4; border-left: 4px solid #22C55E; padding: 16px; border-radius: 4px; margin-bottom: 24px;">
+                <p style="margin: 0 0 6px; font-size: 13px; font-weight: 700; color: #166534; text-transform: uppercase; letter-spacing: 0.5px;">${reasonLabel}</p>
+                <p style="margin: 0; font-size: 14px; color: #14532D; line-height: 1.5; text-align: left; word-break: break-word;">${resolvedReason}</p>
+              </div>
+
+              <p style="margin: 0 0 12px; font-size: 14px; line-height: 1.6; color: #6B7280;">
+                ${accessNotice}
+              </p>
+              <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #6B7280;">
+                ${supportNotice}
+              </p>
+            </td>
+          </tr>
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 24px 32px; background-color: #FAFAFA; border-top: 1px solid #F3F4F6; text-align: left; font-size: 13px; color: #9CA3AF; line-height: 1.5;">
+              <p style="margin: 0;">© ${new Date().getFullYear()} Kebun Melon Monitoring System.</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim();
+
+  const text = `
+${subject}
+
+${greeting}
+
+${intro}
+
+${reasonLabel}
+${resolvedReason}
+
+${accessNotice}
+
+${supportNotice}
+
+© ${new Date().getFullYear()} Kebun Melon Monitoring System.
+  `.trim();
+
+  return { subject, html, text };
+}
+
+/**
+ * Sends an account reactivation notification email via the approved Resend provider.
+ */
+export async function sendAccountReactivationEmail(
+  input: SendAccountNoticeEmailInput
+): Promise<SendAccountNoticeEmailResult> {
+  const reqLogger = logger.child({
+    requestId: input.requestId,
+  });
+
+  const env = validateServerEnv();
+  const locale = input.locale || env.DEFAULT_LOCALE || 'id';
+  const name = input.recipientName || '';
+  const reason = input.reason || '';
+
+  const { subject, html, text } = getAccountReactivationEmailHtml(name, reason, locale);
+
+  const apiKey = env.RESEND_API_KEY || process.env.RESEND_API_KEY;
+  const fromEmail =
+    env.RESEND_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || 'Kebun Melon <onboarding@resend.dev>';
+
+  if (!apiKey || env.NODE_ENV === 'test' || process.env.NODE_ENV === 'test') {
+    reqLogger.info('Simulated account reactivation email delivery to ' + input.toEmail);
+    return {
+      success: true,
+      emailSent: false,
+      simulated: true,
+    };
+  }
+
+  try {
+    const resend = new Resend(apiKey);
+    const result = await sendWithRetry(
+      resend,
+      {
+        from: fromEmail,
+        to: [input.toEmail],
+        subject,
+        html,
+        text,
+      },
+      reqLogger
+    );
+
+    if (!result.success) {
+      reqLogger.error(
+        'Resend delivery reported error for account reactivation: ' +
+          (result.error || 'Unknown error')
+      );
+      return {
+        success: false,
+        emailSent: false,
+        error: result.error,
+      };
+    }
+
+    reqLogger.info('Account reactivation email dispatched successfully via Resend');
+    return {
+      success: true,
+      emailSent: true,
+      id: result.id,
+    };
+  } catch (err: any) {
+    reqLogger.error(
+      'Unexpected exception during Resend reactivation email dispatch: ' +
+        (err?.message || String(err))
     );
     return {
       success: false,

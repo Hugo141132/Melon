@@ -204,4 +204,144 @@ describe('TASK-0213 Resend Email Service Unit Tests', () => {
     expect(result.id).toBe('email_retry_success_456');
     expect(sendMock).toHaveBeenCalledTimes(2);
   });
+
+  it('dispatches account reactivation email with custom reason via Resend', async () => {
+    process.env.RESEND_API_KEY = 're_test_key_12345';
+    process.env.RESEND_FROM_EMAIL = 'Kebun Melon <noreply@kebunmelon.id>';
+    (process.env as Record<string, string | undefined>).NODE_ENV = 'development';
+
+    const sendMock = vi.fn().mockResolvedValue({
+      data: { id: 'email_reactivate_123' },
+      error: null,
+    });
+
+    (Resend as unknown as any).mockImplementation(function (this: any) {
+      this.emails = { send: sendMock };
+    });
+
+    const { sendAccountReactivationEmail } = await import('../../lib/email/resend');
+    const result = await sendAccountReactivationEmail({
+      toEmail: 'farmer@example.com',
+      recipientName: 'Pak Wahyu',
+      reason: 'Selesai masa audit internal',
+      locale: 'id',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.emailSent).toBe(true);
+    expect(result.id).toBe('email_reactivate_123');
+    expect(sendMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        from: 'Kebun Melon <noreply@kebunmelon.id>',
+        to: ['farmer@example.com'],
+        subject: 'Akun Kebun Melon Anda Telah Diaktifkan Kembali',
+        text: expect.stringContaining('Selesai masa audit internal'),
+      })
+    );
+  });
+
+  it('dispatches account reactivation email with default restoration notice when reason is omitted', async () => {
+    process.env.RESEND_API_KEY = 're_test_key_12345';
+    process.env.RESEND_FROM_EMAIL = 'Kebun Melon <noreply@kebunmelon.id>';
+    (process.env as Record<string, string | undefined>).NODE_ENV = 'development';
+
+    const sendMock = vi.fn().mockResolvedValue({
+      data: { id: 'email_reactivate_default_456' },
+      error: null,
+    });
+
+    (Resend as unknown as any).mockImplementation(function (this: any) {
+      this.emails = { send: sendMock };
+    });
+
+    const { sendAccountReactivationEmail } = await import('../../lib/email/resend');
+    const result = await sendAccountReactivationEmail({
+      toEmail: 'farmer@example.com',
+      recipientName: 'Pak Wahyu',
+      reason: '',
+      locale: 'en',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.emailSent).toBe(true);
+    expect(result.id).toBe('email_reactivate_default_456');
+    expect(sendMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        from: 'Kebun Melon <noreply@kebunmelon.id>',
+        to: ['farmer@example.com'],
+        subject: 'Your Kebun Melon Account Has Been Reactivated',
+        text: expect.stringContaining('Account reactivated by OWNER / PIC.'),
+      })
+    );
+  });
+
+  it('dispatches account suspension email with default reason when omitted', async () => {
+    process.env.RESEND_API_KEY = 're_test_key_12345';
+    process.env.RESEND_FROM_EMAIL = 'Kebun Melon <noreply@kebunmelon.id>';
+    (process.env as Record<string, string | undefined>).NODE_ENV = 'development';
+
+    const sendMock = vi.fn().mockResolvedValue({
+      data: { id: 'email_suspend_default_789' },
+      error: null,
+    });
+
+    (Resend as unknown as any).mockImplementation(function (this: any) {
+      this.emails = { send: sendMock };
+    });
+
+    const { sendAccountSuspensionEmail } = await import('../../lib/email/resend');
+    const result = await sendAccountSuspensionEmail({
+      toEmail: 'farmer@example.com',
+      recipientName: 'Pak Wahyu',
+      reason: '',
+      locale: 'en',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.emailSent).toBe(true);
+    expect(result.id).toBe('email_suspend_default_789');
+    expect(sendMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        from: 'Kebun Melon <noreply@kebunmelon.id>',
+        to: ['farmer@example.com'],
+        subject: 'Your Kebun Melon Account Has Been Suspended',
+        text: expect.stringContaining('Account suspended by OWNER / PIC.'),
+      })
+    );
+  });
+
+  it('dispatches account deletion email with default reason when omitted', async () => {
+    process.env.RESEND_API_KEY = 're_test_key_12345';
+    process.env.RESEND_FROM_EMAIL = 'Kebun Melon <noreply@kebunmelon.id>';
+    (process.env as Record<string, string | undefined>).NODE_ENV = 'development';
+
+    const sendMock = vi.fn().mockResolvedValue({
+      data: { id: 'email_delete_default_101' },
+      error: null,
+    });
+
+    (Resend as unknown as any).mockImplementation(function (this: any) {
+      this.emails = { send: sendMock };
+    });
+
+    const { sendAccountDeletionEmail } = await import('../../lib/email/resend');
+    const result = await sendAccountDeletionEmail({
+      toEmail: 'farmer@example.com',
+      recipientName: 'Pak Wahyu',
+      reason: '',
+      locale: 'en',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.emailSent).toBe(true);
+    expect(result.id).toBe('email_delete_default_101');
+    expect(sendMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        from: 'Kebun Melon <noreply@kebunmelon.id>',
+        to: ['farmer@example.com'],
+        subject: 'Account Deletion Notification — Kebun Melon',
+        text: expect.stringContaining('Account permanently deleted by OWNER / PIC.'),
+      })
+    );
+  });
 });

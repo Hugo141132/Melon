@@ -151,19 +151,21 @@ flowchart TD
 flowchart TD
     A[Owner opens User Management] --> B[Server verifies OWNER]
     B --> C[Load permitted users]
-    C --> D[Owner selects user]
-    D --> E[Load profilee and access information]
+    C --> D[Owner selects user or multiple accounts]
+    D --> E[Review profile and status]
     E --> F{Owner action}
-    F -- Edit profilee --> G[Validate and save permitted fields]
+    F -- Edit profile --> G[Validate and save permitted fields]
     F -- Assign device --> H[Create device-access assignment]
     F -- Remove device --> I[Deactivate device-access assignment]
-    F -- Suspend --> J[Set SUSPENDED and invalidate sessions]
-    F -- Deactivate --> K[Set DEACTIVATED and invalidate sessions]
+    F -- Suspend --> J[Set SUSPENDED, revoke sessions, send notice]
+    F -- Reactivate --> K[Set ACTIVE, record audit, send notice]
+    F -- Bulk / Delete --> M[Hard-delete user rows, anonymize logs, send notice]
     G --> L[Create audit event]
     H --> L
     I --> L
     J --> L
     K --> L
+    M --> L
 ```
 
 ## 5.5 Faucet Command Flow
@@ -817,30 +819,64 @@ flowchart TD
 
 ---
 
-## Flow 17 — Owner Suspends or Deactivates an Admin
+## Flow 17 — Owner Lifecycle Actions: Suspend, Reactivate, and Permanently Delete Admin Accounts
 
-**Primary actor:** Owner
-**Preconditions:** Active Owner; target is an Admin within scope.
-**Trigger:** Owner confirms suspension or deactivation.
+**Primary actor:** Owner (formally designated in UI as `OWNER / PIC`).
+**Preconditions:** Active Owner session; target is an Admin within scope. (Owner accounts can NEVER be suspended, reactivated, or deleted).
+**Trigger:** Owner triggers suspension, reactivation, or permanent deletion from the `/users` management console.
 
-**Main success flow:**
+**UI & Modal Presentation:**
+- The lifecycle confirmation modal cleanly presents:
+  1. Action title (e.g., `Konfirmasi Penangguhan`, `Konfirmasi Aktivasi`, `Hapus Permanen Akun Terpilih`).
+  2. Target user information (name, email, or list of selected accounts).
+  3. Optional reason input field with character counter (`0/500`).
+  4. Confirmation and cancellation buttons.
+- All warning/notice callout boxes are removed from the modals to keep the interface focused and unambiguous.
 
-1. The UI displays consequences and requires confirmation.
-2. The server verifies `account.suspend` or `account.deactivate`.
-3. The server verifies the target role and current status.
-4. The server updates account status.
-5. The system invalidates or restricts existing sessions as soon as practical.
-6. The system records the action and reason.
-7. The Owner receives confirmation.
+**Reason Resolution Logic:**
+- If the Owner provides a reason, it is preserved and trimmed.
+- If the reason is omitted or empty, the system automatically resolves the authoritative canonical default reason:
+  - Suspension: `"Account suspended by OWNER / PIC."`
+  - Reactivation: `"Account reactivated by OWNER / PIC."`
+  - Permanent Deletion: `"Account permanently deleted by OWNER / PIC."`
+- The final resolved reason is written to the audit log and included in notification emails.
 
-**Alternative flows:** Owner reactivates a suspended Admin if policy permits.
-**Error flows:** Admin already deactivated; target is unauthorised; session invalidation service fails.
-**Postconditions:** Target loses protected access.
-**Required permissions:** `account.suspend` or `account.deactivate`.
-**Relevant account statuses:** Target usually `ACTIVE`.
-**UI states:** Confirmation, processing, success, conflict.
-**Audit events:** `account.suspended` or `account.deactivated`.
-**Open decisions:** Reactivation process and mandatory reasons.
+**Main success flow — Account Suspension (`POST /api/v1/users/{userId}/suspend`):**
+1. Owner clicks "Tangguhkan Akun" on an active Admin card.
+2. The UI opens the confirmation modal. Owner optionally enters a reason.
+3. Owner confirms; server verifies `account.suspend` permission and ensures target is not an Owner.
+4. Server updates target status to `SUSPENDED`, invalidates all active target sessions in the database transaction, and writes an `account.suspended` audit event with actor, target ID, and resolved reason.
+5. Server dispatches an account suspension email notification via Resend.
+6. The target account loses protected access immediately.
+
+**Alternative flow A — Account Reactivation (`POST /api/v1/users/{userId}/activate`):**
+1. Owner clicks "Aktifkan Kembali Akun" on a suspended Admin card.
+2. The UI opens the confirmation modal. Owner optionally enters a reason.
+3. Owner confirms; server verifies `account.activate` permission.
+4. Server updates target status to `ACTIVE` and writes an `account.reactivated` audit event with actor, target ID, and resolved reason.
+5. Server dispatches an account reactivation email notification via Resend.
+6. The target user can now log in normally.
+
+**Alternative flow B — Bulk Permanent Account Deletion (`POST /api/v1/users/bulk-delete`):**
+1. Owner selects one or more eligible non-owner accounts via checkboxes (or clicks "Pilih Semua Akun"). Individual card delete buttons are omitted to eliminate accidental single-click deletions.
+2. A bulk actions banner displays selection count and a "Hapus Permanen Terpilih" button.
+3. Owner clicks the deletion trigger; the bulk confirmation modal displays the list of accounts and an optional reason input.
+4. Owner confirms; server verifies `account.deactivate` permission and validates that no target user is an Owner or in `PENDING_APPROVAL` status.
+5. Inside a single database transaction, the server:
+   - Revokes all active sessions for target users.
+   - Anonymizes historical audit log references (`actorUserId = NULL`).
+   - Deletes all account-owned dependent child records (`sessions`, `user_roles`, `user_preferences`, `user_device_access`, `account_approvals`, `faucet_commands`).
+   - Writes an `account.deleted` audit event for each deleted account recording actor, target identity, and resolved reason.
+   - Hard-deletes the `users` database rows.
+6. Server dispatches permanent deletion notification emails via Resend.
+7. The UI removes the deleted accounts from the list immediately.
+
+**Error flows:** Target is an Owner account (`403 FORBIDDEN_TARGET`); target is in pending approval (`409 CANNOT_DELETE_PENDING_APPROVAL`); session expired; email service failure (non-blocking).
+**Postconditions:** Target status updated or records permanently removed; audit log recorded; email notification delivered.
+**Required permissions:** `account.suspend`, `account.activate`, or `account.deactivate`.
+**Relevant account statuses:** `ACTIVE`, `SUSPENDED`, `REJECTED`, `DEACTIVATED`.
+**UI states:** Confirmation modal, processing spinner, list refresh, toast notification.
+**Audit events:** `account.suspended`, `account.reactivated`, `account.deleted`.
 
 ---
 

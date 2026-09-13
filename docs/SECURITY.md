@@ -528,10 +528,13 @@ The Owner may:
 
 - Approve or reject Admin registrations.
 - View and edit permitted fields of other users.
-- Suspend or deactivate Admins.
+- Suspend, reactivate, or permanently delete Admin accounts (via single action or bulk selection workflow).
 - Assign devices.
 - Review audit records.
 - Access system functions according to the final permission matrix.
+
+The Owner shall NOT:
+- Delete, suspend, or deactivate their own account or peer Owner accounts (`403 FORBIDDEN_TARGET`). Owner accounts are strictly protected from lifecycle modification.
 
 ### 10.4 Admin Rules
 
@@ -1126,7 +1129,9 @@ account.registration.created
 account.approved
 account.rejected
 account.suspended
+account.reactivated
 account.deactivated
+account.deleted
 profilee.self.updated
 profilee.other.updated
 device.updated
@@ -1182,6 +1187,17 @@ messageId
 Untrusted values shall be structured and escaped.
 
 Do not concatenate raw user input into unstructured security logs.
+
+### 20.6 Permanent Deletion Audit Preservation
+
+When an Admin account is permanently deleted (`DELETE /api/v1/users/{userId}` or `POST /api/v1/users/bulk-delete`):
+- Historical audit log records referencing the deleted user as actor (`audit_logs.actorUserId`) are transactionally set to `NULL` to prevent foreign key violations upon user row deletion.
+- A dedicated `account.deleted` audit log event is recorded before hard-deleting the user row, capturing:
+  - `actorUserId`: The Owner who executed the deletion.
+  - `targetUserId`: The deleted user's immutable UUID.
+  - `metadata`: Target email, full name, deletion timestamp, and resolved reason (custom reason or default `"Account permanently deleted by OWNER / PIC."`).
+  - Strict privacy: No passwords, tokens, or extraneous PII are logged.
+- The audit record remains permanently preserved in the PostgreSQL audit log table even after user and child records are removed.
 
 ---
 

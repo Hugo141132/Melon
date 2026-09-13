@@ -14,6 +14,7 @@ import idMessages from '@/messages/id.json';
 import enMessages from '@/messages/en.json';
 import { getSessionOrNull } from '@/lib/auth/rbac';
 
+// Re-evaluated layout message bundle
 const MESSAGES = {
   id: idMessages,
   en: enMessages,

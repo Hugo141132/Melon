@@ -193,7 +193,13 @@ Additional roles require an approved change to the product requirements and this
 
 ### 6.1 Owner (RBAC-ROLE-001)
 
-The Owner is the highest-authority application user.
+The Owner is the highest-authority application user. In the user interface across both Indonesian and English locales, the Owner role is formally designated as `OWNER / PIC` (Person in Charge / Penanggung Jawab).
+
+#### Owner Account Protection Invariants
+Owner accounts are strictly protected from accidental or intentional lifecycle modification or deletion:
+- An Owner account cannot be selected for deletion, suspended, deactivated, or deleted by any user (including self-deletion or peer Owner action).
+- In the user management interface (`/users`), selection checkboxes on Owner cards are permanently disabled with an explanatory tooltip (`ownerProtectedTooltip`).
+- Backend lifecycle endpoints reject operations targeting Owner accounts with `403 FORBIDDEN_TARGET`.
 
 The Owner shall be able to:
 
@@ -209,8 +215,9 @@ The Owner shall be able to:
 - Review pending Admin registrations.
 - Approve Admin registrations.
 - Reject Admin registrations.
-- Suspend Admin accounts.
-- Deactivate Admin accounts.
+- Suspend Admin accounts (`POST /api/v1/users/{userId}/suspend`).
+- Reactivate suspended Admin accounts (`POST /api/v1/users/{userId}/activate`).
+- Permanently delete eligible Admin accounts individually or in bulk via checkbox multi-selection (`POST /api/v1/users/bulk-delete`).
 - Assign or remove device access for Admin users.
 - Activate or deactivate devices (`device.activate`, `device.deactivate`). Hard delete is eliminated per `DEC-DEV-030`.
 - Edit external canonical `deviceId` and device `name` (`DEC-DEV-028`). Note: in-app device creation is removed per `DEC-DEV-027`.
@@ -315,26 +322,32 @@ A rejected account shall:
 
 #### `SUSPENDED` (RBAC-STATE-005)
 
-The account is temporarily blocked.
+The account is temporarily blocked by an Owner.
 
 A suspended account shall:
 
-- Be denied new protected sessions.
-- Lose access through existing sessions as soon as practical.
-- Be unable to call protected APIs.
-- Retain historical audit records.
-- Be eligible for reactivation by an Owner, subject to policy.
+- Be denied new protected sessions (login attempts rejected with 403 `ACCOUNT_SUSPENDED`).
+- Have all active sessions immediately revoked inside the transaction.
+- Be unable to call protected APIs or view protected views.
+- Retain historical audit and operational records.
+- Be eligible for reactivation by an Owner via `POST /api/v1/users/{userId}/activate`.
+- Receive an account suspension email notification via Resend.
+- Preserve optional action reason provided by Owner, or automatically generate canonical default reason: `"Account suspended by OWNER / PIC."`.
 
-#### `DEACTIVATED` (RBAC-STATE-006)
+#### `DEACTIVATED` / Permanent Deletion (RBAC-STATE-006)
 
-The account is disabled and is not expected to regain access without an explicit Owner action or administrative recovery process.
+The account is disabled or permanently removed from the system.
 
-A deactivated account shall:
-
-- Be denied protected access.
-- Lose access through existing sessions.
-- Remain in historical records for audit purposes where soft-deactivated.
-- When an Owner explicitly executes the 'Delete Account' action on an eligible Admin, permanent hard deletion (`DELETE /api/v1/users/{userId}`) removes the user row and account-owned records from the database in a transaction, leaving an `account.deleted` audit event with anonymized actor references.
+- **Soft-Deactivated Status:** When deactivated without hard deletion, the account is denied access, active sessions are revoked, and data remains in the database.
+- **Permanent Account Deletion (`DELETE /api/v1/users/{userId}` / `POST /api/v1/users/bulk-delete`):**
+  - Owner-only workflow executed via checkbox multi-selection on `/users` or single API.
+  - Owner accounts can NEVER be deleted (`403 FORBIDDEN_TARGET`).
+  - Pending approval accounts cannot be deleted directly (`409 CANNOT_DELETE_PENDING_APPROVAL`).
+  - Permanently hard-deletes the target user row and account-owned dependent records (`sessions`, `user_roles`, `user_preferences`, `user_device_access`, `account_approvals`, `faucet_commands`) inside a single database transaction.
+  - Anonymizes `actorUserId` in historical audit logs (`actorUserId = NULL`) to avoid foreign key violations.
+  - Writes a structured `account.deleted` audit event with actor, target user identity, timestamp, and resolved reason.
+  - Dispatches a permanent deletion notification email via Resend.
+  - Optional action reason is preserved if provided, or automatically resolves to default: `"Account permanently deleted by OWNER / PIC."`.
 
 ### 7.2 Email Verification State (DEC-AUTH-104 / TASK-0214)
 

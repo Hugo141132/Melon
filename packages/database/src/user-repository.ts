@@ -9,6 +9,9 @@ import {
   RawDbUserWithRoles,
   OwnerUserProfileUpdateInput,
   AuditEventKey,
+  DEFAULT_SUSPENSION_REASON,
+  DEFAULT_DELETION_REASON,
+  DEFAULT_REACTIVATION_REASON,
 } from '@kebun-melon/contracts';
 import { revokeAllUserSessions } from './session-service';
 import { validatePasswordPolicy, hashPassword, verifyPassword } from './password-service';
@@ -217,6 +220,40 @@ export interface UserLifecycleInput {
   requestId?: string;
   ipAddress?: string;
   userAgent?: string;
+  notifyFn?: (target: {
+    id: string;
+    email: string;
+    fullName: string;
+    reason?: string;
+  }) => Promise<void>;
+  beforeDeleteNotifyFn?: (target: {
+    id: string;
+    email: string;
+    fullName: string;
+    reason?: string;
+  }) => Promise<void>;
+}
+
+export interface BulkDeleteUsersRepoInput {
+  actorUserId: string;
+  targetUserIds: string[];
+  reason: string;
+  requestId?: string;
+  ipAddress?: string;
+  userAgent?: string;
+  beforeDeleteNotifyFn?: (target: {
+    id: string;
+    email: string;
+    fullName: string;
+    reason: string;
+  }) => Promise<void>;
+}
+
+export interface BulkDeleteUsersRepoResult {
+  success: boolean;
+  deletedCount: number;
+  deletedUserIds: string[];
+  errors?: Array<{ userId: string; error: string; message: string }>;
 }
 
 export type UserLifecycleResult =
@@ -1753,6 +1790,8 @@ export class UserRepository {
         // Soft-revoke all sessions for target user atomically inside transaction
         await revokeAllUserSessions(tx, input.targetUserId);
 
+        const resolvedReason = input.reason?.trim() || DEFAULT_SUSPENSION_REASON;
+
         // Audit log (strictly without secrets)
         await tx.auditLog.create({
           data: {
@@ -1763,7 +1802,7 @@ export class UserRepository {
             result: 'SUCCESS',
             previousValues: { accountStatus: targetUser.accountStatus },
             newValues: { accountStatus: AccountStatus.SUSPENDED, suspendedAt: now },
-            metadata: { reason: input.reason?.trim() || null },
+            metadata: { reason: resolvedReason },
             requestId: input.requestId || null,
             ipAddress: input.ipAddress || null,
             userAgent: input.userAgent || null,
@@ -1772,6 +1811,22 @@ export class UserRepository {
 
         return toPublicSafeUserDto(this.mapPrismaUserToRawDbUser(updated));
       }, DEFAULT_TRANSACTION_OPTIONS);
+
+      const resolvedReason = input.reason?.trim() || DEFAULT_SUSPENSION_REASON;
+
+      // Post-commit notification callback (non-blocking)
+      if (input.notifyFn) {
+        try {
+          await input.notifyFn({
+            id: result.id,
+            email: result.email,
+            fullName: result.fullName,
+            reason: resolvedReason,
+          });
+        } catch (notifyErr) {
+          console.error('[UserRepository.suspendUser] Notification callback error:', notifyErr);
+        }
+      }
 
       return { success: true, user: result };
     } catch (error) {
@@ -1787,9 +1842,6 @@ export class UserRepository {
    * Transactionally deactivates an ACTIVE or SUSPENDED user account.
    * Atomically sets accountStatus = DEACTIVATED, revokes all sessions, and logs audit event.
    * Target must be ADMIN (Owner accounts cannot be deactivated).
-   */
-  /**
-   * Deactivates/Deletes an Admin user permanently.
    */
   async deactivateUser(input: UserLifecycleInput): Promise<UserLifecycleResult> {
     const res = await this.deleteUserPermanently(input);
@@ -1823,6 +1875,8 @@ export class UserRepository {
   /**
    * Permanently deletes an ADMIN user account and all dependent records in a single database transaction.
    * Target MUST be ADMIN and MUST NOT be PENDING_APPROVAL or OWNER.
+   * Dispatches deletion notification email before permanent removal.
+   * Preserves identity metadata in account.deleted audit log.
    */
   async deleteUserPermanently(input: UserLifecycleInput): Promise<{
     success: boolean;
@@ -1858,6 +1912,25 @@ export class UserRepository {
           message: 'Pending approval accounts must be processed through the approval workflow.',
           currentStatus: targetUser.accountStatus,
         };
+      }
+
+      const resolvedReason = input.reason?.trim() || DEFAULT_DELETION_REASON;
+
+      // Send deletion notification email before permanent removal from database
+      if (input.beforeDeleteNotifyFn) {
+        try {
+          await input.beforeDeleteNotifyFn({
+            id: targetUser.id,
+            email: targetUser.email,
+            fullName: targetUser.fullName,
+            reason: resolvedReason,
+          });
+        } catch (notifyErr) {
+          console.error(
+            `[UserRepository.deleteUserPermanently] Before-delete notification error for ${targetUser.email}:`,
+            notifyErr
+          );
+        }
       }
 
       await this.prisma.$transaction(async (tx) => {
@@ -1908,17 +1981,31 @@ export class UserRepository {
         }
 
         // 7. Delete alert acknowledgements by target user
-        await tx.alertAcknowledgement.deleteMany({
-          where: { acknowledgedByUserId: targetId },
-        });
+        if (tx.alertAcknowledgement) {
+          await tx.alertAcknowledgement.deleteMany({
+            where: { acknowledgedByUserId: targetId },
+          });
+        }
 
-        // 8. Anonymize/nullify audit log actorUserId where target was actor
+        // 8. Delete password reset and email verification tokens
+        if (tx.passwordResetToken) {
+          await tx.passwordResetToken.deleteMany({
+            where: { userId: targetId },
+          });
+        }
+        if (tx.emailVerificationToken) {
+          await tx.emailVerificationToken.deleteMany({
+            where: { userId: targetId },
+          });
+        }
+
+        // 9. Anonymize/nullify audit log actorUserId where target was actor
         await tx.auditLog.updateMany({
           where: { actorUserId: targetId },
           data: { actorUserId: null },
         });
 
-        // 9. Audit log event for permanent deletion (strictly non-PII)
+        // 10. Audit log event for permanent deletion (preserving identity info in non-PII metadata)
         await tx.auditLog.create({
           data: {
             eventKey: 'account.deleted',
@@ -1931,14 +2018,21 @@ export class UserRepository {
               targetRole: 'ADMIN',
             },
             newValues: Prisma.JsonNull,
-            metadata: { reason: input.reason?.trim() || null },
+            metadata: {
+              reason: resolvedReason,
+              deletedUserEmail: targetUser.email,
+              deletedUserFullName: targetUser.fullName,
+              deletedUserUsername: targetUser.username,
+              deletedUserRoles: targetUser.activeRoles,
+              deletedAt: new Date().toISOString(),
+            },
             requestId: input.requestId || null,
             ipAddress: input.ipAddress || null,
             userAgent: input.userAgent || null,
           },
         });
 
-        // 10. Delete the User row itself
+        // 11. Delete the User row itself
         await tx.user.delete({
           where: { id: targetId },
         });
@@ -1953,6 +2047,175 @@ export class UserRepository {
         message: 'A database error occurred while deleting the target user.',
       };
     }
+  }
+
+  /**
+   * Bulk deletes eligible ADMIN user accounts and all dependent records in safe database transactions.
+   * Owner accounts are strictly protected from deletion.
+   * PENDING_APPROVAL accounts cannot be deleted directly.
+   * Preserves required audit trail and dispatches deletion notification before removal.
+   */
+  async bulkDeleteUsers(input: BulkDeleteUsersRepoInput): Promise<BulkDeleteUsersRepoResult> {
+    const deletedUserIds: string[] = [];
+    const errors: Array<{ userId: string; error: string; message: string }> = [];
+
+    // Pre-validate all target users
+    const usersToDelete: Array<{
+      id: string;
+      email: string;
+      fullName: string;
+      username: string | null;
+      activeRoles: string[];
+      accountStatus: AccountStatus;
+    }> = [];
+
+    for (const targetId of input.targetUserIds) {
+      const targetUser = await this.getUserManagementById(targetId);
+      if (!targetUser) {
+        errors.push({
+          userId: targetId,
+          error: 'NOT_FOUND',
+          message: `User with ID '${targetId}' not found.`,
+        });
+        continue;
+      }
+      if (
+        targetUser.activeRoles.includes(ContractUserRole.OWNER) ||
+        targetId === input.actorUserId
+      ) {
+        errors.push({
+          userId: targetId,
+          error: 'FORBIDDEN_TARGET',
+          message: 'Owner accounts cannot be deleted.',
+        });
+        continue;
+      }
+      if (targetUser.accountStatus === AccountStatus.PENDING_APPROVAL) {
+        errors.push({
+          userId: targetId,
+          error: 'CANNOT_DELETE_PENDING_APPROVAL',
+          message: 'Pending approval accounts must be processed through the approval workflow.',
+        });
+        continue;
+      }
+      usersToDelete.push(targetUser as any);
+    }
+
+    const resolvedReason = input.reason?.trim() || DEFAULT_DELETION_REASON;
+
+    // Process valid users
+    for (const targetUser of usersToDelete) {
+      try {
+        if (input.beforeDeleteNotifyFn) {
+          try {
+            await input.beforeDeleteNotifyFn({
+              id: targetUser.id,
+              email: targetUser.email,
+              fullName: targetUser.fullName,
+              reason: resolvedReason,
+            });
+          } catch (notifyErr) {
+            console.error(
+              `[UserRepository.bulkDeleteUsers] Notification failed for ${targetUser.email}:`,
+              notifyErr
+            );
+          }
+        }
+
+        await this.prisma.$transaction(async (tx) => {
+          const targetId = targetUser.id;
+
+          await tx.session.deleteMany({ where: { userId: targetId } });
+          await tx.userPreference.deleteMany({ where: { userId: targetId } });
+          await tx.userRoleAssignment.deleteMany({ where: { userId: targetId } });
+          await tx.accountApproval.deleteMany({
+            where: { OR: [{ applicantUserId: targetId }, { decidedByUserId: targetId }] },
+          });
+          await tx.userDeviceAccess.deleteMany({
+            where: { OR: [{ userId: targetId }, { assignedByUserId: targetId }] },
+          });
+
+          const userCommands = await tx.faucetCommand.findMany({
+            where: { initiatedByUserId: targetId },
+            select: { id: true },
+          });
+          if (userCommands.length > 0) {
+            const commandIds = userCommands.map((c) => c.id);
+            await tx.faucetCommandEvent.deleteMany({
+              where: { faucetCommandId: { in: commandIds } },
+            });
+            await tx.faucetCommand.deleteMany({
+              where: { initiatedByUserId: targetId },
+            });
+          }
+
+          if (tx.alertAcknowledgement) {
+            await tx.alertAcknowledgement.deleteMany({
+              where: { acknowledgedByUserId: targetId },
+            });
+          }
+          if (tx.passwordResetToken) {
+            await tx.passwordResetToken.deleteMany({ where: { userId: targetId } });
+          }
+          if (tx.emailVerificationToken) {
+            await tx.emailVerificationToken.deleteMany({ where: { userId: targetId } });
+          }
+
+          await tx.auditLog.updateMany({
+            where: { actorUserId: targetId },
+            data: { actorUserId: null },
+          });
+
+          await tx.auditLog.create({
+            data: {
+              eventKey: 'account.deleted',
+              actorUserId: input.actorUserId,
+              targetType: 'USER',
+              targetId: targetId,
+              result: 'SUCCESS',
+              previousValues: {
+                accountStatus: targetUser.accountStatus,
+                targetRole: 'ADMIN',
+              },
+              newValues: Prisma.JsonNull,
+              metadata: {
+                reason: resolvedReason,
+                isBulk: true,
+                deletedUserEmail: targetUser.email,
+                deletedUserFullName: targetUser.fullName,
+                deletedUserUsername: targetUser.username,
+                deletedUserRoles: targetUser.activeRoles,
+                deletedAt: new Date().toISOString(),
+              },
+              requestId: input.requestId || null,
+              ipAddress: input.ipAddress || null,
+              userAgent: input.userAgent || null,
+            },
+          });
+
+          await tx.user.delete({ where: { id: targetId } });
+        }, DEFAULT_TRANSACTION_OPTIONS);
+
+        deletedUserIds.push(targetUser.id);
+      } catch (err: any) {
+        console.error(
+          `[UserRepository.bulkDeleteUsers] Error deleting user ${targetUser.id}:`,
+          err
+        );
+        errors.push({
+          userId: targetUser.id,
+          error: 'INTERNAL_ERROR',
+          message: err?.message || 'Database error occurred during user deletion.',
+        });
+      }
+    }
+
+    return {
+      success: errors.length === 0,
+      deletedCount: deletedUserIds.length,
+      deletedUserIds,
+      errors: errors.length > 0 ? errors : undefined,
+    };
   }
 
   /**
@@ -2041,6 +2304,8 @@ export class UserRepository {
           },
         });
 
+        const resolvedReason = input.reason?.trim() || DEFAULT_REACTIVATION_REASON;
+
         // Audit log (strictly without secrets)
         await tx.auditLog.create({
           data: {
@@ -2051,7 +2316,7 @@ export class UserRepository {
             result: 'SUCCESS',
             previousValues: { accountStatus: targetUser.accountStatus },
             newValues: { accountStatus: AccountStatus.ACTIVE },
-            metadata: { reason: input.reason?.trim() || null },
+            metadata: { reason: resolvedReason },
             requestId: input.requestId || null,
             ipAddress: input.ipAddress || null,
             userAgent: input.userAgent || null,
@@ -2060,6 +2325,22 @@ export class UserRepository {
 
         return toPublicSafeUserDto(this.mapPrismaUserToRawDbUser(updated));
       }, DEFAULT_TRANSACTION_OPTIONS);
+
+      const resolvedReason = input.reason?.trim() || DEFAULT_REACTIVATION_REASON;
+
+      // Post-commit notification callback (non-blocking)
+      if (input.notifyFn) {
+        try {
+          await input.notifyFn({
+            id: result.id,
+            email: result.email,
+            fullName: result.fullName,
+            reason: resolvedReason,
+          });
+        } catch (notifyErr) {
+          console.error('[UserRepository.activateUser] Notification callback error:', notifyErr);
+        }
+      }
 
       return { success: true, user: result };
     } catch (error) {

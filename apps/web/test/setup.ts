@@ -36,21 +36,27 @@ function getActiveTestLocale(): 'id' | 'en' {
   return 'id';
 }
 
+const translatorCache = new Map<string, (key: string, values?: Record<string, any>) => string>();
+
 vi.mock('next-intl', () => {
   return {
     useTranslations: (namespace?: string) => {
-      return (key: string, values?: Record<string, any>) => {
-        const loc = getActiveTestLocale();
-        const msgs = loc === 'en' ? enMessages : idMessages;
-        const nsObj = namespace ? (msgs as any)[namespace] : msgs;
-        let template = nsObj?.[key] ?? key;
-        if (typeof template === 'string' && values) {
-          Object.entries(values).forEach(([k, v]) => {
-            template = template.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v));
-          });
-        }
-        return template;
-      };
+      const ns = namespace || '__default__';
+      if (!translatorCache.has(ns)) {
+        translatorCache.set(ns, (key: string, values?: Record<string, any>) => {
+          const loc = getActiveTestLocale();
+          const msgs = loc === 'en' ? enMessages : idMessages;
+          const nsObj = namespace ? (msgs as any)[namespace] : msgs;
+          let template = nsObj?.[key] ?? key;
+          if (typeof template === 'string' && values) {
+            Object.entries(values).forEach(([k, v]) => {
+              template = template.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v));
+            });
+          }
+          return template;
+        });
+      }
+      return translatorCache.get(ns)!;
     },
     useLocale: () => getActiveTestLocale(),
     useMessages: () => (getActiveTestLocale() === 'en' ? enMessages : idMessages),

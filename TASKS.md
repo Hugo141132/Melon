@@ -786,6 +786,23 @@ Implemented complete Owner User Management:
   - Implemented route-level loading shell `apps/web/app/users/loading.tsx` rendering `TopAppBar`, header skeleton with `Users` icon, search/filter skeletons, and a 5-row user table card skeleton in `bg-app-surface text-app-on-surface min-h-dvh pb-24`, replacing blank transitions with a seamless skeleton shell.
   - Added dedicated unit tests: `apps/web/test/unit/users-page.test.tsx` (2/2 passed) and `apps/web/test/unit/users-loading-transition.test.tsx` (1/1 passed).
   - Verified live route navigation and loading transitions via Playwright MCP with zero regressions.
+- Implemented complete User Management Improvements on 2026-09-13:
+  - Standardized terminology across UI: Owner is formally presented as `OWNER / PIC` (Person in Charge / Penanggung Jawab) across both English and Indonesian locales. Cleaned up redundant `(OWNER)` and `(ADMIN)` parenthetical suffixes from dropdown options and badges.
+  - Hardened Owner protection invariants: Owner account cannot be selected for deletion or lifecycle action (`isTargetOwner` guard disables checkbox with tooltip; backend strictly returns `403 FORBIDDEN_TARGET`).
+  - Bulk Permanent Account Deletion (`POST /api/v1/users/bulk-delete`):
+    - Added multi-account selection with individual card checkboxes, select-all toggle, and floating bulk actions banner displaying selection count and deletion trigger.
+    - Removed individual permanent delete buttons from user cards so deletion occurs strictly through deliberate checkbox selection.
+    - Transactionally deletes `users` row and dependent child records in a single database transaction, while anonymizing `actorUserId` in existing audit logs and writing an `account.deleted` audit event with actor, deleted user identity, and resolved reason.
+  - Account Lifecycle & Reason Handling:
+    - Supported suspend (`POST /api/v1/users/{userId}/suspend`), reactivate (`POST /api/v1/users/{userId}/activate`), and permanent delete (`DELETE /api/v1/users/{userId}`, `POST /api/v1/users/bulk-delete`).
+    - Reason input is optional in all modals. If provided, the custom reason is preserved; if omitted, the system automatically resolves the canonical default reason (`Account suspended by OWNER / PIC.`, `Account reactivated by OWNER / PIC.`, `Account permanently deleted by OWNER / PIC.`).
+    - Resolved reason is persisted to audit log and included in email notifications.
+  - Lifecycle Confirmation Modals UI Polish:
+    - Removed distracting warning/notice boxes from all confirmation modals (suspend, reactivate, delete, bulk delete).
+    - Modals cleanly render only: action title, target user information, optional reason textarea with counter (`0/500`), and confirmation buttons.
+  - Notification Emails via Resend:
+    - Added reactivation email notification (`sendAccountReactivationEmail`), joining existing suspension and deletion emails.
+    - Fixed email typography: removed multi-line template literal indentation and monospace styling, replacing with flush-left layout, proportional typography, and natural word wrapping.
 
 ### Acceptance Criteria
 
@@ -794,8 +811,10 @@ Implemented complete Owner User Management:
 - Status changes and permanent deletion revoke all target active sessions.
 - Account deletion executes transactional hard-delete of `users` row and account-owned dependent records, and logs non-PII `account.deleted` audit event.
 - `PENDING_APPROVAL` accounts cannot be deleted directly (rejected with `409 CANNOT_DELETE_PENDING_APPROVAL`).
-- `OWNER` accounts cannot be deleted or suspended (`403 FORBIDDEN_TARGET`).
-- Actions are audited.
+- `OWNER` accounts cannot be deleted, suspended, or selected for bulk deletion (`403 FORBIDDEN_TARGET`).
+- Actions are audited with actor ID, target user ID, timestamp, and resolved reason.
+- Notification emails are dispatched for account suspension, reactivation, and permanent deletion.
+- Modal dialogs omit warning/notice boxes and present clean, focused action controls.
 
 ---
 

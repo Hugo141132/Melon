@@ -22,7 +22,7 @@
 | `PRD-FR-010` | Provide English and Bahasa Indonesia UI | `docs/PRD.md` | `DEC-I18N-068` | `TASK-0603` | `TEST-E2E-004` | `VERIFIED` |
 | `PRD-FR-011` | Preserve existing visual frontend design | `docs/PRD.md` | - | `TASK-0001` | `TEST-E2E-001` | `IMPLEMENTED` |
 | `PRD-FR-012` | Separate website logic from hardware measurement implementation | `docs/PRD.md` | `DEC-DEV-020` | `TASK-0401` | `TEST-MQTT-001` | `READY_FOR_IMPLEMENTATION` |
-| `PRD-FR-013` | Owner role capabilities and management scope | `docs/PRD.md` | `DEC-RBAC-013` | `TASK-0212` | `TEST-SEC-002` | `READY_FOR_IMPLEMENTATION` |
+| `PRD-FR-013` | Owner role capabilities and management scope | `docs/PRD.md` | `DEC-RBAC-013` | `TASK-0212` | `TEST-SEC-002` | `VERIFIED` |
 | `PRD-FR-014` | Admin role capabilities and scope limits | `docs/PRD.md` | `DEC-RBAC-015` | `TASK-0211` | `TEST-SEC-002` | `READY_FOR_IMPLEMENTATION` |
 | `PRD-FR-015` | Access restriction to authenticated users | `docs/PRD.md` | `DEC-AUTH-001` | `TASK-0210` | `TEST-API-001` | `READY_FOR_IMPLEMENTATION` |
 | `PRD-FR-016` | Admin account self-registration submission | `docs/PRD.md` | `DEC-AUTH-006` | `TASK-0203` | `TEST-API-002` | `READY_FOR_IMPLEMENTATION` |
@@ -599,4 +599,31 @@ The following facts are verified in the traceability matrix regarding `TASK-0907
   - *Credential-Dependent Operator Checks (Optional):*
     - Visual inspection of the live Authorization list via the EMQX Cloud Web Console using operator credentials.
 <!-- TASK-0907 Traceability Reconciled: 2026-09-11 -->
+
+---
+
+## User Management Improvements & Lifecycle Administration Traceability Note (TASK-0212 / Reconciled 2026-09-13)
+
+The following facts are verified in the traceability matrix regarding `TASK-0212` (User Management Improvements and Lifecycle Administration):
+- **Traceability Baseline:** Governed by `PRD-FR-013`, `DEC-RBAC-013`, `docs/RBAC.md`, `docs/USER_FLOWS.md` Flow 17, `docs/API.md` §12.4–12.7, `docs/DATABASE.md` §3.5, and `docs/SECURITY.md` §10.3 & §20.6. Formally establishes full owner-governed user lifecycle management, account protection, and notification delivery.
+- **Implementation Status:** Fully implemented and verified:
+  - Role Presentation Standardization: Standardized Owner presentation in English and Indonesian as `OWNER / PIC` (Person in Charge / Penanggung Jawab). Stripped redundant parentheticals `(OWNER)` and `(ADMIN)` from UI role filters and badges.
+  - Owner Protection Invariants: Owner accounts are protected from deletion or suspension (`isTargetOwner` guard disables checkbox with tooltip; backend strictly enforces `403 FORBIDDEN_TARGET`).
+  - Bulk Permanent Deletion Workflow (`POST /api/v1/users/bulk-delete`): Implemented multi-account checkbox selection, select-all bar with counter, and batch deletion API. Individual user cards omit delete buttons to eliminate accidental single-click deletions.
+  - Account Lifecycle & Reason Resolution: Supported suspend (`POST /api/v1/users/{userId}/suspend`), reactivate (`POST /api/v1/users/{userId}/activate`), and permanent delete actions. Optional action reason preserves custom input or resolves canonical defaults (`Account suspended by OWNER / PIC.`, `Account reactivated by OWNER / PIC.`, `Account permanently deleted by OWNER / PIC.`).
+  - Lifecycle Modals Polish: Removed distracting warning/notice callout boxes from all lifecycle action modals, keeping strictly action title, target user info, optional reason textarea (`0/500`), and confirmation buttons.
+  - Email Notifications via Resend: Dispatched notification emails for suspension, reactivation, and permanent deletion with flush-left layout, proportional typography, and natural word wrapping.
+  - Audit Trail & Data Integrity: Transactionally hard-deleted user rows and account-owned records upon deletion, anonymized `actorUserId` in historical audit logs (`actorUserId = NULL`), recorded structured audit logs (`account.suspended`, `account.reactivated`, `account.deleted`), and revoked active sessions.
+- **Verification Evidence:**
+  - Automated Unit & Route Test Suites (PASSED):
+    - `apps/web/test/unit/resend-email.test.ts`: 11/11 passed (100%).
+    - `apps/web/test/unit/users-bulk-delete-ui.test.tsx`: 8/8 passed (100%).
+    - `apps/web/test/unit/users-page.test.tsx`: 2/2 passed (100%).
+    - `apps/web/test/unit/users-bulk-delete-routes.test.ts`: 15/15 passed (100%).
+    - `packages/database/test/user-repository.test.ts`: 23/23 passed (100%).
+    - Total: 5 test files, 59/59 tests passed (100%).
+  - Static Typecheck (PASSED): `tsc --noEmit` across `@kebun-melon/web` passed with 0 errors.
+  - Playwright MCP Browser Inspection (PASSED): Confirmed clean modal presentation (no warning boxes), role labels, and bulk selection flows on `http://localhost:3000/users`.
+<!-- TASK-0212 Traceability Reconciled: 2026-09-13 -->
+
 

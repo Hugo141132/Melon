@@ -151,7 +151,7 @@ Security-sensitive and historical records (audit logs, telemetry history) shall 
 
 #### Deletion and Deactivation Policies
 
-- Owner-initiated Admin Account Deletion (`DELETE /api/v1/users/{userId}`): Permanently hard-deletes the target Admin user row and account-owned dependent records (`sessions`, `user_roles`, `user_preferences`, `user_device_access`, `account_approvals`, `faucet_commands`) inside a single database transaction, while anonymizing `actorUserId` in existing audit logs and recording an `account.deleted` audit event.
+- Owner-initiated Admin Account Deletion (`DELETE /api/v1/users/{userId}` and `POST /api/v1/users/bulk-delete`): Permanently hard-deletes the target Admin user row(s) and account-owned dependent records (`sessions`, `user_roles`, `user_preferences`, `user_device_access`, `account_approvals`, `faucet_commands`, `alert_acknowledgements`) inside a single database transaction. All active sessions are immediately revoked. References to the deleted user as an actor in historical `audit_logs` are anonymized (`actorUserId = NULL`) to preserve audit continuity without foreign key errors. A dedicated `account.deleted` audit event is recorded capturing actor ID, deleted user ID, timestamp, and resolved reason (custom reason or default `"Account permanently deleted by OWNER / PIC."`). Owner accounts and accounts in `PENDING_APPROVAL` status are strictly protected from deletion.
 - Devices and Device assignments: Soft deletion or deactivation is used where historical telemetry reconstruction matters (`DEC-DEV-030`). Hard device deletion is permanently disabled.
 
 #### Telemetry Data Retention and Automated Maintenance Policy (TASK-0913)

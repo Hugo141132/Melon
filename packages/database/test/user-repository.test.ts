@@ -724,4 +724,500 @@ describe('UserRepository Unit Tests', () => {
       });
     });
   });
+
+  describe('TASK-0212: suspendUser, deleteUserPermanently, and bulkDeleteUsers', () => {
+    const testAdminId1 = '11111111-1111-4111-8111-111111111111';
+    const testAdminId2 = '22222222-2222-4222-8222-222222222222';
+    const testOwnerId = '99999999-9999-4999-8999-999999999999';
+
+    it('suspendUser requires reason, stores in auditLog metadata, and triggers notifyFn', async () => {
+      const mockUser = {
+        id: testAdminId1,
+        email: 'admin1@example.com',
+        fullName: 'Admin One',
+        username: 'admin1',
+        accountStatus: 'ACTIVE',
+        emailVerifiedAt: new Date(),
+        lastLoginAt: null,
+        suspendedAt: null,
+        deactivatedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        userRoles: [{ role: { code: 'ADMIN' }, revokedAt: null }],
+      };
+
+      const mockTx: any = {
+        user: {
+          findUnique: vi.fn().mockResolvedValue(mockUser),
+          update: vi.fn().mockResolvedValue({
+            ...mockUser,
+            accountStatus: 'SUSPENDED',
+            suspendedAt: new Date(),
+          }),
+        },
+        session: {
+          updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+        },
+        auditLog: {
+          create: vi.fn().mockResolvedValue({ id: 'audit-1' }),
+        },
+      };
+
+      const mockPrisma: any = {
+        user: {
+          findUnique: vi.fn().mockResolvedValue(mockUser),
+        },
+        $transaction: vi.fn().mockImplementation((cb) => cb(mockTx)),
+      };
+
+      const repo = new UserRepository(mockPrisma);
+      const notifyFn = vi.fn().mockResolvedValue(undefined);
+
+      const res = await repo.suspendUser({
+        targetUserId: testAdminId1,
+        actorUserId: testOwnerId,
+        reason: 'Repeated unauthorized overrides',
+        notifyFn,
+      });
+
+      expect(res.success).toBe(true);
+      expect(mockTx.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: testAdminId1 },
+          data: expect.objectContaining({
+            accountStatus: 'SUSPENDED',
+          }),
+        })
+      );
+      expect(mockTx.auditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            eventKey: 'account.suspended',
+            actorUserId: testOwnerId,
+            targetId: testAdminId1,
+            metadata: expect.objectContaining({
+              reason: 'Repeated unauthorized overrides',
+            }),
+          }),
+        })
+      );
+      expect(notifyFn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          email: 'admin1@example.com',
+          fullName: 'Admin One',
+          reason: 'Repeated unauthorized overrides',
+        })
+      );
+    });
+
+    it('deleteUserPermanently prevents owner deletion, triggers beforeDeleteNotifyFn, cascades relations, and logs metadata', async () => {
+      const mockAdminUser = {
+        id: testAdminId2,
+        email: 'admin2@example.com',
+        fullName: 'Admin Two',
+        username: 'admin2',
+        accountStatus: 'ACTIVE',
+        emailVerifiedAt: new Date(),
+        lastLoginAt: null,
+        suspendedAt: null,
+        deactivatedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        userRoles: [{ role: { code: 'ADMIN' }, revokedAt: null }],
+      };
+
+      const mockTx: any = {
+        user: {
+          findUnique: vi.fn().mockResolvedValue(mockAdminUser),
+          delete: vi.fn().mockResolvedValue(mockAdminUser),
+        },
+        auditLog: {
+          updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+          create: vi.fn().mockResolvedValue({ id: 'audit-2' }),
+        },
+        session: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
+        userRoleAssignment: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
+        userDeviceAccess: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
+        userPreference: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
+        accountApproval: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
+        passwordResetToken: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
+        emailVerificationToken: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
+        faucetCommand: { findMany: vi.fn().mockResolvedValue([]), deleteMany: vi.fn() },
+      };
+
+      const mockPrisma: any = {
+        user: {
+          findUnique: vi.fn().mockResolvedValue(mockAdminUser),
+        },
+        $transaction: vi.fn().mockImplementation((cb) => cb(mockTx)),
+      };
+
+      const repo = new UserRepository(mockPrisma);
+      const beforeNotify = vi.fn().mockResolvedValue(undefined);
+
+      const res = await repo.deleteUserPermanently({
+        targetUserId: testAdminId2,
+        actorUserId: testOwnerId,
+        reason: 'Staff permanent departure',
+        beforeDeleteNotifyFn: beforeNotify,
+      });
+
+      expect(res.success).toBe(true);
+      expect(beforeNotify).toHaveBeenCalledWith(
+        expect.objectContaining({
+          email: 'admin2@example.com',
+          fullName: 'Admin Two',
+          reason: 'Staff permanent departure',
+        })
+      );
+      expect(mockTx.auditLog.updateMany).toHaveBeenCalledWith({
+        where: { actorUserId: testAdminId2 },
+        data: { actorUserId: null },
+      });
+      expect(mockTx.auditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            eventKey: 'account.deleted',
+            actorUserId: testOwnerId,
+            targetId: testAdminId2,
+            metadata: expect.objectContaining({
+              deletedUserEmail: 'admin2@example.com',
+              deletedUserFullName: 'Admin Two',
+              reason: 'Staff permanent departure',
+            }),
+          }),
+        })
+      );
+    });
+
+    it('bulkDeleteUsers deletes eligible non-owner accounts, rejects owners, and calls beforeDeleteNotifyFn', async () => {
+      const mockUsers = [
+        {
+          id: testAdminId1,
+          email: 'a10@example.com',
+          fullName: 'A Ten',
+          username: null,
+          accountStatus: 'ACTIVE',
+          emailVerifiedAt: new Date(),
+          lastLoginAt: null,
+          suspendedAt: null,
+          deactivatedAt: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          userRoles: [{ role: { code: 'ADMIN' }, revokedAt: null }],
+        },
+        {
+          id: testOwnerId,
+          email: 'o99@example.com',
+          fullName: 'Owner Ninety Nine',
+          username: null,
+          accountStatus: 'ACTIVE',
+          emailVerifiedAt: new Date(),
+          lastLoginAt: null,
+          suspendedAt: null,
+          deactivatedAt: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          userRoles: [{ role: { code: 'OWNER' }, revokedAt: null }],
+        },
+      ];
+
+      const mockTx: any = {
+        user: {
+          delete: vi.fn().mockResolvedValue({}),
+        },
+        auditLog: {
+          updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+          create: vi.fn().mockResolvedValue({ id: 'audit-bulk' }),
+        },
+        session: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+        userRoleAssignment: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+        userDeviceAccess: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+        userPreference: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+        accountApproval: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+        passwordResetToken: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+        emailVerificationToken: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+        faucetCommand: { findMany: vi.fn().mockResolvedValue([]), deleteMany: vi.fn() },
+      };
+
+      const mockPrisma: any = {
+        user: {
+          findUnique: vi.fn().mockImplementation(({ where }) => {
+            return Promise.resolve(mockUsers.find((u) => u.id === where.id) || null);
+          }),
+        },
+        $transaction: vi.fn().mockImplementation((cb) => cb(mockTx)),
+      };
+
+      const repo = new UserRepository(mockPrisma);
+      const beforeNotify = vi.fn().mockResolvedValue(undefined);
+
+      // 1. Valid non-owner deletion
+      const res = await repo.bulkDeleteUsers({
+        targetUserIds: [testAdminId1],
+        actorUserId: testOwnerId,
+        reason: 'Bulk cleanup of testing batches',
+        beforeDeleteNotifyFn: beforeNotify,
+      });
+
+      expect(res.success).toBe(true);
+      expect(res.deletedCount).toBe(1);
+      expect(res.deletedUserIds).toEqual([testAdminId1]);
+      expect(beforeNotify).toHaveBeenCalledTimes(1);
+      expect(beforeNotify).toHaveBeenCalledWith(
+        expect.objectContaining({
+          email: 'a10@example.com',
+          reason: 'Bulk cleanup of testing batches',
+        })
+      );
+
+      // 2. Owner protection: attempting to delete owner account is rejected
+      const ownerRes = await repo.bulkDeleteUsers({
+        targetUserIds: [testOwnerId],
+        actorUserId: testOwnerId,
+        reason: 'Attempted owner delete',
+      });
+      expect(ownerRes.success).toBe(false);
+      expect(ownerRes.deletedCount).toBe(0);
+      expect(ownerRes.errors?.[0].error).toBe('FORBIDDEN_TARGET');
+    });
+
+    it('21. activateUser restores suspended account and invokes notifyFn post-commit', async () => {
+      const suspendedUser: any = {
+        id: '10000000-0000-0000-0000-000000000099',
+        email: 'suspended@example.com',
+        fullName: 'Suspended Admin',
+        username: 'suspended_admin',
+        accountStatus: 'SUSPENDED',
+        emailVerifiedAt: new Date(),
+        lastLoginAt: null,
+        suspendedAt: new Date(),
+        deactivatedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        userRoles: [
+          {
+            id: 'r-99',
+            userId: '10000000-0000-0000-0000-000000000099',
+            roleId: 'role-admin',
+            assignedByUserId: null,
+            assignedAt: new Date(),
+            revokedAt: null,
+            role: { code: 'ADMIN' },
+          },
+        ],
+      };
+
+      const mockTx: any = {
+        user: {
+          update: vi.fn().mockResolvedValue({
+            ...suspendedUser,
+            accountStatus: 'ACTIVE',
+            suspendedAt: null,
+          }),
+        },
+        auditLog: {
+          create: vi.fn().mockResolvedValue({ id: 'audit-act-1' }),
+        },
+      };
+
+      const mockPrisma: any = {
+        user: {
+          findUnique: vi.fn().mockResolvedValue(suspendedUser),
+        },
+        $transaction: vi.fn().mockImplementation((cb) => cb(mockTx)),
+      };
+
+      const repo = new UserRepository(mockPrisma);
+      const notifySpy = vi.fn().mockResolvedValue(undefined);
+
+      const result = await repo.activateUser({
+        targetUserId: '10000000-0000-0000-0000-000000000099',
+        actorUserId: 'owner-id-1',
+        reason: 'Restoring access after verification',
+        notifyFn: notifySpy,
+      });
+
+      expect(result.success).toBe(true);
+      expect(notifySpy).toHaveBeenCalledTimes(1);
+      expect(notifySpy).toHaveBeenCalledWith({
+        id: '10000000-0000-0000-0000-000000000099',
+        email: 'suspended@example.com',
+        fullName: 'Suspended Admin',
+        reason: 'Restoring access after verification',
+      });
+    });
+
+    it('22. activateUser uses default OWNER / PIC reason when reason is omitted or empty', async () => {
+      const suspendedUser: any = {
+        id: '10000000-0000-0000-0000-000000000099',
+        email: 'suspended@example.com',
+        fullName: 'Suspended Admin',
+        username: 'suspended_admin',
+        accountStatus: 'SUSPENDED',
+        emailVerifiedAt: new Date(),
+        lastLoginAt: null,
+        suspendedAt: new Date(),
+        deactivatedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        userRoles: [
+          {
+            id: 'r-99',
+            userId: '10000000-0000-0000-0000-000000000099',
+            roleId: 'role-admin',
+            assignedByUserId: null,
+            assignedAt: new Date(),
+            revokedAt: null,
+            role: { code: 'ADMIN' },
+          },
+        ],
+      };
+
+      const mockTx: any = {
+        user: {
+          update: vi.fn().mockResolvedValue({
+            ...suspendedUser,
+            accountStatus: 'ACTIVE',
+            suspendedAt: null,
+          }),
+        },
+        auditLog: {
+          create: vi.fn().mockResolvedValue({ id: 'audit-act-2' }),
+        },
+      };
+
+      const mockPrisma: any = {
+        user: {
+          findUnique: vi.fn().mockResolvedValue(suspendedUser),
+        },
+        $transaction: vi.fn().mockImplementation((cb) => cb(mockTx)),
+      };
+
+      const repo = new UserRepository(mockPrisma);
+      const notifySpy = vi.fn().mockResolvedValue(undefined);
+
+      const result = await repo.activateUser({
+        targetUserId: '10000000-0000-0000-0000-000000000099',
+        actorUserId: 'owner-id-1',
+        notifyFn: notifySpy,
+      });
+
+      expect(result.success).toBe(true);
+      expect(mockTx.auditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            eventKey: 'account.activated',
+            metadata: { reason: 'Account reactivated by OWNER / PIC.' },
+          }),
+        })
+      );
+      expect(notifySpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          reason: 'Account reactivated by OWNER / PIC.',
+        })
+      );
+    });
+
+    it('23. suspendUser and deleteUserPermanently use default OWNER / PIC reasons when omitted', async () => {
+      const mockAdminUser = {
+        id: testAdminId1,
+        email: 'admin1@example.com',
+        fullName: 'Admin One',
+        username: 'admin1',
+        accountStatus: 'ACTIVE',
+        emailVerifiedAt: new Date(),
+        lastLoginAt: null,
+        suspendedAt: null,
+        deactivatedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        userRoles: [{ role: { code: 'ADMIN' }, revokedAt: null }],
+      };
+
+      const mockTx: any = {
+        user: {
+          findUnique: vi.fn().mockResolvedValue(mockAdminUser),
+          update: vi.fn().mockResolvedValue({
+            ...mockAdminUser,
+            accountStatus: 'SUSPENDED',
+            suspendedAt: new Date(),
+          }),
+          delete: vi.fn().mockResolvedValue(mockAdminUser),
+        },
+        session: {
+          updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+          deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
+        },
+        auditLog: {
+          create: vi.fn().mockResolvedValue({ id: 'audit-default' }),
+          updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+        },
+        userRoleAssignment: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
+        userDeviceAccess: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
+        userPreference: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
+        accountApproval: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
+        passwordResetToken: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
+        emailVerificationToken: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
+        faucetCommand: { findMany: vi.fn().mockResolvedValue([]), deleteMany: vi.fn() },
+      };
+
+      const mockPrisma: any = {
+        user: {
+          findUnique: vi.fn().mockResolvedValue(mockAdminUser),
+        },
+        $transaction: vi.fn().mockImplementation((cb) => cb(mockTx)),
+      };
+
+      const repo = new UserRepository(mockPrisma);
+      const suspendNotify = vi.fn().mockResolvedValue(undefined);
+
+      // Suspend without reason
+      const suspendRes = await repo.suspendUser({
+        targetUserId: testAdminId1,
+        actorUserId: testOwnerId,
+        notifyFn: suspendNotify,
+      });
+
+      expect(suspendRes.success).toBe(true);
+      expect(mockTx.auditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            eventKey: 'account.suspended',
+            metadata: { reason: 'Account suspended by OWNER / PIC.' },
+          }),
+        })
+      );
+      expect(suspendNotify).toHaveBeenCalledWith(
+        expect.objectContaining({
+          reason: 'Account suspended by OWNER / PIC.',
+        })
+      );
+
+      // Delete without reason
+      const deleteNotify = vi.fn().mockResolvedValue(undefined);
+      const deleteRes = await repo.deleteUserPermanently({
+        targetUserId: testAdminId1,
+        actorUserId: testOwnerId,
+        beforeDeleteNotifyFn: deleteNotify,
+      });
+
+      expect(deleteRes.success).toBe(true);
+      expect(mockTx.auditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            eventKey: 'account.deleted',
+            metadata: expect.objectContaining({
+              reason: 'Account permanently deleted by OWNER / PIC.',
+            }),
+          }),
+        })
+      );
+      expect(deleteNotify).toHaveBeenCalledWith(
+        expect.objectContaining({
+          reason: 'Account permanently deleted by OWNER / PIC.',
+        })
+      );
+    });
+  });
 });

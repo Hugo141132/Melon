@@ -228,6 +228,13 @@ export const UserQueryInputSchema = z.object({
 export type UserQueryInput = z.infer<typeof UserQueryInputSchema>;
 
 /**
+ * Default fallback reasons generated when OWNER / PIC does not provide an explicit reason.
+ */
+export const DEFAULT_SUSPENSION_REASON = 'Account suspended by OWNER / PIC.';
+export const DEFAULT_DELETION_REASON = 'Account permanently deleted by OWNER / PIC.';
+export const DEFAULT_REACTIVATION_REASON = 'Account reactivated by OWNER / PIC.';
+
+/**
  * Schema for user lifecycle actions (suspend, deactivate, activate) with an optional reason.
  */
 export const UserLifecycleActionInputSchema = z
@@ -237,6 +244,34 @@ export const UserLifecycleActionInputSchema = z
   .strict();
 
 export type UserLifecycleActionInput = z.infer<typeof UserLifecycleActionInputSchema>;
+
+/**
+ * Schema for lifecycle actions where reason input is optional (defaults to OWNER / PIC reason if omitted).
+ */
+export const UserRequiredReasonLifecycleInputSchema = z
+  .object({
+    reason: z.string().max(500).optional(),
+  })
+  .strict();
+
+export type UserRequiredReasonLifecycleInput = z.infer<
+  typeof UserRequiredReasonLifecycleInputSchema
+>;
+
+/**
+ * Schema for bulk permanent deletion of user accounts with optional reason.
+ */
+export const BulkDeleteUsersInputSchema = z
+  .object({
+    userIds: z
+      .array(z.string().uuid())
+      .min(1, 'At least one user ID must be specified')
+      .max(50, 'Cannot delete more than 50 users in a single request'),
+    reason: z.string().max(500).optional(),
+  })
+  .strict();
+
+export type BulkDeleteUsersInput = z.infer<typeof BulkDeleteUsersInputSchema>;
 
 /**
  * Schema for updating user preferences.

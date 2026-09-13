@@ -1,11 +1,16 @@
 import { NextResponse } from 'next/server';
 import { prisma, UserRepository } from '@kebun-melon/database';
-import { OwnerUserProfileUpdateInputSchema } from '@kebun-melon/contracts';
+import {
+  OwnerUserProfileUpdateInputSchema,
+  UserLifecycleActionInputSchema,
+  DEFAULT_DELETION_REASON,
+} from '@kebun-melon/contracts';
 import {
   requireSession,
   requirePermission,
   AuthorizationError,
 } from '../../../../../lib/auth/rbac';
+import { sendAccountDeletionEmail } from '../../../../../lib/email/resend';
 
 export async function GET(request: Request, props: { params: Promise<{ userId: string }> }) {
   const params = await props.params;
@@ -215,19 +220,66 @@ export async function DELETE(request: Request, props: { params: Promise<{ userId
     const session = await requireSession(request);
     requirePermission(session, 'account.deactivate', 'USER', params.userId, request);
 
-    let body: any = {};
+    let reason: string = DEFAULT_DELETION_REASON;
     try {
-      body = await request.json();
+      const text = await request.text();
+      if (text && text.trim().length > 0) {
+        const body = JSON.parse(text);
+        const parseResult = UserLifecycleActionInputSchema.safeParse(body);
+        if (!parseResult.success) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: {
+                code: 'VALIDATION_ERROR',
+                message: 'Invalid request payload for permanent deletion.',
+                details: parseResult.error.flatten(),
+              },
+              meta: { requestId },
+            },
+            { status: 422 }
+          );
+        }
+        if (parseResult.data.reason && parseResult.data.reason.trim().length > 0) {
+          reason = parseResult.data.reason.trim();
+        }
+      }
     } catch {
-      // Optional body
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'INVALID_REQUEST',
+            message: 'Request body must be valid JSON.',
+          },
+          meta: { requestId },
+        },
+        { status: 400 }
+      );
     }
+
+    const ipAddress =
+      request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+      request.headers.get('x-real-ip') ||
+      undefined;
+    const userAgent = request.headers.get('user-agent') || undefined;
 
     const userRepo = new UserRepository(prisma);
     const result = await userRepo.deleteUserPermanently({
       targetUserId: params.userId,
       actorUserId: session.id,
-      reason: body?.reason,
+      reason,
       requestId,
+      ipAddress,
+      userAgent,
+      beforeDeleteNotifyFn: async (target) => {
+        await sendAccountDeletionEmail({
+          toEmail: target.email,
+          recipientName: target.fullName,
+          reason: target.reason || reason,
+          requestId,
+        });
+      },
     });
 
     if (!result.success) {

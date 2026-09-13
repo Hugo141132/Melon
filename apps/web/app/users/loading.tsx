@@ -30,7 +30,7 @@ export default function UsersLoading() {
 
         {/* Controls & Filters Skeleton */}
         <div
-          className="bg-app-surface-container-lowest p-4 rounded-2xl border border-app-outline-variant/30 soft-elevation flex flex-col md:flex-row gap-3 animate-pulse"
+          className="bg-app-surface-container-lowest p-4 rounded-2xl border border-app-outline-variant/30 soft-elevation flex flex-col sm:flex-row gap-3 animate-pulse"
           data-testid="users-loading-filters"
         >
           <div className="relative flex-1">
@@ -41,9 +41,9 @@ export default function UsersLoading() {
             <div className="w-full h-10 bg-app-surface border border-app-outline-variant/40 rounded-xl" />
           </div>
 
-          <div className="flex items-center gap-2">
-            <div className="h-10 w-36 bg-app-surface border border-app-outline-variant/40 rounded-xl" />
-            <div className="h-10 w-36 bg-app-surface border border-app-outline-variant/40 rounded-xl" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full sm:w-auto">
+            <div className="h-10 w-full sm:w-36 bg-app-surface border border-app-outline-variant/40 rounded-xl" />
+            <div className="h-10 w-full sm:w-36 bg-app-surface border border-app-outline-variant/40 rounded-xl" />
           </div>
         </div>
 
@@ -59,12 +59,15 @@ export default function UsersLoading() {
 
           <div className="divide-y divide-app-outline-variant/10">
             {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="p-4 flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
+              <div
+                key={i}
+                className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+              >
+                <div className="flex items-center gap-3 min-w-0 flex-1">
                   <div className="w-10 h-10 rounded-full bg-app-surface-container flex-shrink-0" />
-                  <div className="space-y-1.5">
-                    <div className="h-4 w-36 bg-app-surface-container rounded" />
-                    <div className="h-3 w-48 bg-app-surface-container rounded" />
+                  <div className="space-y-1.5 min-w-0 flex-1">
+                    <div className="h-4 w-36 max-w-full bg-app-surface-container rounded" />
+                    <div className="h-3 w-48 max-w-full bg-app-surface-container rounded" />
                   </div>
                 </div>
 
@@ -73,9 +76,9 @@ export default function UsersLoading() {
                   <div className="h-6 w-16 bg-app-surface-container rounded-full" />
                 </div>
 
-                <div className="flex gap-2 flex-shrink-0">
-                  <div className="h-8 w-8 bg-app-surface-container rounded-lg" />
-                  <div className="h-8 w-8 bg-app-surface-container rounded-lg" />
+                <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto pt-3 sm:pt-0 border-t sm:border-t-0 border-app-outline-variant/10">
+                  <div className="h-8 flex-1 sm:flex-initial min-w-[calc(50%-0.5rem)] sm:w-20 bg-app-surface-container rounded-lg" />
+                  <div className="h-8 flex-1 sm:flex-initial min-w-[calc(50%-0.5rem)] sm:w-20 bg-app-surface-container rounded-lg" />
                 </div>
               </div>
             ))}

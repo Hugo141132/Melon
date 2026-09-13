@@ -1119,8 +1119,16 @@ Role and account-status changes shall use dedicated endpoints.
 POST /api/v1/users/{userId}/suspend
 ```
 
-**Authentication:** Required
+**Authentication:** Required (Owner only)
 **Permission:** `account.suspend`
+
+**Rules:**
+- Owner-only endpoint.
+- Target must be an `ADMIN` account. Suspending Owner accounts is strictly forbidden (`403 FORBIDDEN_TARGET`).
+- Optional `reason` parameter in request body. If omitted, the system generates the default canonical reason: `"Account suspended by OWNER / PIC."`.
+- All active sessions for the target user are transactionally revoked immediately.
+- Dispatches an account suspension notification email via Resend.
+- Records an `account.suspended` audit event with actor, target user ID, and resolved reason.
 
 Request:
 
@@ -1139,11 +1147,12 @@ Response:
     "userId": "user-002",
     "accountStatus": "SUSPENDED",
     "suspendedAt": "2026-07-27T14:00:00+07:00"
+  },
+  "meta": {
+    "requestId": "req-01JXYZ001"
   }
 }
 ```
-
-The server shall revoke or restrict active sessions.
 
 ---
 
@@ -1153,10 +1162,40 @@ The server shall revoke or restrict active sessions.
 POST /api/v1/users/{userId}/activate
 ```
 
-**Authentication:** Required
+**Authentication:** Required (Owner only)
 **Permission:** `account.activate`
 
-Status: `TBD`, depending on the final `APPROVED` and `ACTIVE` workflow.
+**Rules:**
+- Owner-only endpoint.
+- Target must be an existing user in `SUSPENDED` (or `DEACTIVATED`) status.
+- Optional `reason` parameter in request body. If omitted, the system generates the default canonical reason: `"Account reactivated by OWNER / PIC."`.
+- Updates target account status to `ACTIVE`.
+- Dispatches an account reactivation notification email via Resend.
+- Records an `account.reactivated` audit event with actor, target user ID, and resolved reason.
+
+Request:
+
+```json
+{
+  "reason": "Restoration after verification completed"
+}
+```
+
+Response:
+
+```json
+{
+  "success": true,
+  "data": {
+    "userId": "user-002",
+    "accountStatus": "ACTIVE",
+    "activatedAt": "2026-07-27T14:00:00+07:00"
+  },
+  "meta": {
+    "requestId": "req-01JXYZ002"
+  }
+}
+```
 
 ---
 
@@ -1166,7 +1205,7 @@ Status: `TBD`, depending on the final `APPROVED` and `ACTIVE` workflow.
 DELETE /api/v1/users/{userId}
 ```
 
-**Authentication:** Required
+**Authentication:** Required (Owner only)
 **Permission:** `account.deactivate` (or `account.delete`)
 
 **Rules:**
@@ -1174,7 +1213,9 @@ DELETE /api/v1/users/{userId}
 - Target must be an `ADMIN` account in `ACTIVE`, `SUSPENDED`, `REJECTED`, `DEACTIVATED`, or legacy `APPROVED` status.
 - Deletion of `PENDING_APPROVAL` accounts is rejected with `409 CANNOT_DELETE_PENDING_APPROVAL`. (Pending accounts must be processed via the approval workflow).
 - Deletion of `OWNER` accounts or self-deletion is strictly forbidden (`403 FORBIDDEN_TARGET`).
+- Optional `reason` parameter in request body. If omitted, the system generates the default canonical reason: `"Account permanently deleted by OWNER / PIC."`.
 - Transactionally deletes all dependent records (`sessions`, `user_roles`, `user_preferences`, `user_device_access`, `account_approvals`, `faucet_commands`), anonymizes `actorUserId` in `audit_logs`, logs an `account.deleted` audit event, and hard-deletes the `users` database row.
+- Dispatches a permanent account deletion notification email via Resend.
 
 Request:
 
@@ -1193,14 +1234,69 @@ Response:
     "deletedUserId": "user-002"
   },
   "meta": {
-    "requestId": "req-01JXYZ001"
+    "requestId": "req-01JXYZ003"
   }
 }
 ```
 
 ---
 
-## 12.7 Change User Role
+## 12.7 Bulk Permanent Delete User Accounts
+
+```http
+POST /api/v1/users/bulk-delete
+```
+
+**Authentication:** Required (Owner only)
+**Permission:** `account.deactivate` (or `account.delete`)
+
+**Rules:**
+- Owner-only endpoint for batch account removal.
+- Payload contains an array `userIds` of 1 to 50 target UUIDs.
+- Validates that none of the target user IDs belong to an `OWNER` account (`403 FORBIDDEN_TARGET`).
+- Validates that none of the target user IDs are in `PENDING_APPROVAL` status (`409 CANNOT_DELETE_PENDING_APPROVAL`).
+- Optional `reason` parameter. If omitted, the system generates the default canonical reason: `"Account permanently deleted by OWNER / PIC."`.
+- Executes inside a single interactive database transaction:
+  - Revokes all active sessions for target users.
+  - Anonymizes `actorUserId` in historical audit logs (`actorUserId = NULL`).
+  - Deletes all account-owned dependent child records (`sessions`, `user_roles`, `user_preferences`, `user_device_access`, `account_approvals`, `faucet_commands`).
+  - Writes an `account.deleted` audit event for each target user with actor, target ID, and resolved reason.
+  - Hard-deletes target rows from `users`.
+- Dispatches permanent deletion notification emails to all deleted accounts via Resend.
+
+Request:
+
+```json
+{
+  "userIds": [
+    "22222222-2222-4222-8222-222222222222",
+    "33333333-3333-4333-8333-333333333333"
+  ],
+  "reason": "Completed seasonal internship"
+}
+```
+
+Response:
+
+```json
+{
+  "success": true,
+  "data": {
+    "deletedUserIds": [
+      "22222222-2222-4222-8222-222222222222",
+      "33333333-3333-4333-8333-333333333333"
+    ],
+    "count": 2
+  },
+  "meta": {
+    "requestId": "req-01JXYZ004"
+  }
+}
+```
+
+---
+
+## 12.8 Change User Role
 
 ```http
 PATCH /api/v1/users/{userId}/role
