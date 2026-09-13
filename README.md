@@ -44,47 +44,9 @@ Kebun Melon is designed to manage agricultural sensor networks and irrigation in
 
 ## 2. Core Architecture & Communication Topologies
 
-```mermaid
-flowchart TD
-    subgraph Hardware["Field Hardware & Sensors"]
-        SoilNode["ESP32 Soil Quality Node"]
-        WaterNode["ESP32 Water Quality Node"]
-        TankNode["ESP32 Reservoir Tank Node"]
-        SolenoidValve["Physical Solenoid Valve"]
-    end
-
-    subgraph Broker["Message Broker & Transport"]
-        EMQX["EMQX Cloud Broker (Port 8084 WSS)"]
-    end
-
-    subgraph Backend["Application Services & Persistence"]
-        Gateway["IoT Gateway Service (apps/iot-gateway)"]
-        WebAPI["Next.js Web Application & API (apps/web)"]
-        Postgres[("PostgreSQL Database (Supabase)")]
-    end
-
-    subgraph Client["Client Tier"]
-        Browser["User Web Browser (OWNER / PIC & ADMIN)"]
-    end
-
-    %% Ingress 1: Soil & Water Quality via REST API
-    SoilNode -->|"REST POST /telemetry/soil (Wi-Fi)"| WebAPI
-    WaterNode -->|"REST POST /telemetry/water (Wi-Fi)"| WebAPI
-    WebAPI -->|"Prisma ORM"| Postgres
-
-    %% Ingress 2: Water Tank via MQTT
-    TankNode -->|"MQTT Pub: irigasi/melon/sensor/volume"| EMQX
-    EMQX -->|"MQTT Sub: irigasi/melon/sensor/volume"| Gateway
-    Gateway -->|"Persist Telemetry & Prune Retention"| Postgres
-
-    %% Faucet Control & Realtime
-    Browser -->|"HTTPS Operations & Dispense Requests"| WebAPI
-    WebAPI -->|"Server-Sent Events (SSE)"| Browser
-    WebAPI -->|"Internal Service HTTP: Bearer Token"| Gateway
-    Gateway -->|"MQTT Pub: irigasi/melon/kontrol/valve"| EMQX
-    Gateway -->|"MQTT Pub: irigasi/melon/setting/otomasi"| EMQX
-    EMQX -->|"Actuation Commands"| SolenoidValve
-```
+<p align="center">
+  <img src="docs/assets/iot-irrigation-system-architecture.png" alt="IoT Irrigation System Architecture" />
+</p>
 
 ### Communication Principles
 
