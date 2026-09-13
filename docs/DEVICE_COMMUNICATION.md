@@ -370,6 +370,38 @@ Rules:
 - Devices with `TANK_MONITORING` or `FAUCET_CONTROL` capabilities connect via **MQTT 5.0 over TLS** to the **EMQX Broker** (`FLOW_MONITORING` deleted per `DEC-MON-089`).
 - The existing `DeviceType` enum values (`SOIL_NODE`, `WATER_QUALITY_NODE`, `WATER_TANK_NODE`) are sufficient and unambiguous when evaluated together with registered device capabilities. No schema enum modification is required.
 
+### 7.2 Device Capability Display & Irrigation Control Rules
+
+To prevent operational confusion and ensure hardware safety:
+- **Irrigation Valve Control (`FAUCET_CONTROL`):**
+  - Appears **only** on supported controller/reservoir devices (`WATER_TANK_NODE`).
+  - Soil monitoring devices (`SOIL_NODE`) and Water Quality monitoring devices (`WATER_QUALITY_NODE`) shall **strictly not display** irrigation control capability across the UI or accept faucet commands.
+- **Monitoring vs Actuator Separation:**
+  - Monitoring devices expose only passive sensing parameters (Soil NPK, temperature, moisture, pH, EC; Water pH, TDS, EC).
+  - Actuation controls (`FAUCET_CONTROL`) are strictly segregated under "Control Capabilities" on controller devices.
+- **Invariant Internal Canonical Values:**
+  - Internal keys in database, API contracts, and MQTT payloads remain language-neutral and unchanged (`SOIL_TELEMETRY`, `WATER_TELEMETRY`, `TANK_MONITORING`, `FAUCET_CONTROL`).
+
+### 7.3 Device Status Presentation & UI Mapping
+
+To provide clear operational visibility without overwhelming operators with technical heartbeat nuances, the user-facing interface simplifies device status presentation to strictly three operational states:
+
+| Canonical Internal Status | User-Facing English | User-Facing Bahasa Indonesia | UI Badge Presentation | Operational Meaning |
+|---|---|---|---|---|
+| `ONLINE` | **Connected** | **Terhubung** | Emerald pill (`border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400`), pulsing dot | Device is actively communicating within the freshness threshold ($\le 60\text{s}$). |
+| `OFFLINE` | **Disconnected** | **Terputus** | Muted zinc/amber pill (`border-zinc-500/20 bg-zinc-500/10 text-zinc-500 dark:text-zinc-400`), static dot | Device has stopped communicating or missed heartbeat windows. |
+| `STALE` | **Disconnected** | **Terputus** | Muted zinc/amber pill (`border-zinc-500/20 bg-zinc-500/10 text-zinc-500 dark:text-zinc-400`), static dot | Telemetry timestamp exceeds freshness window ($> 60\text{s}$). |
+| `UNKNOWN` | **Disconnected** | **Terputus** | Muted zinc/amber pill (`border-zinc-500/20 bg-zinc-500/10 text-zinc-500 dark:text-zinc-400`), static dot | Device initial state upon reactivation or before first telemetry. |
+| `INACTIVE` (or `accountStatus = 'DEACTIVATED'`) | **Inactive** | **Tidak Aktif** | Neutral gray pill (`border-zinc-500/20 bg-zinc-500/10 text-zinc-400`), static dot | Device has been administratively deactivated by the Owner. |
+
+**Invariants:**
+- Database schema and REST API contracts retain the canonical `DeviceConnectionStatus` enum: `ONLINE`, `OFFLINE`, `STALE`, `UNKNOWN`, `INACTIVE`.
+- Client-side filtering maps:
+  - `CONNECTED` $\to$ `device.connectionStatus === 'ONLINE'`
+  - `DISCONNECTED` $\to$ `['OFFLINE', 'STALE', 'UNKNOWN'].includes(device.connectionStatus)`
+  - `INACTIVE` $\to$ `device.connectionStatus === 'INACTIVE' || device.accountStatus === 'DEACTIVATED'`
+- API query contracts remain strictly untouched (no custom non-canonical query enum strings passed to backend, preventing HTTP 422 `VALIDATION_ERROR`).
+
 ---
 
 ## 8. Topic Naming Convention
@@ -1005,16 +1037,16 @@ Recommended payload:
 
 ### 13.1 Soil Fields
 
-| Field | Type | Required | Unit |
-|---|---|---:|---|
-| `nitrogen` | Number or null | Yes when capability exists | `TBD` |
-| `phosphorus` | Number or null | Yes when capability exists | `TBD` |
-| `potassium` | Number or null | Yes when capability exists | `TBD` |
-| `temperature` | Number or null | Yes when capability exists | `TBD` |
-| `moisture` | Number or null | Yes when capability exists | `TBD` |
-| `ph` | Number or null | Yes when capability exists | Unitless |
-| `ec` | Number or null | Yes when capability exists | `mS/cm` (UI display converts to `µS/cm`) |
-| `status` | Canonical enum | Recommended | Defined by external status rules |
+| Field | Type | Required | Canonical Unit | UI Display Unit | Parameter Description |
+|---|---|---:|---|---|---|
+| `nitrogen` | Number or null | Yes when capability exists | `mg/kg` | `mg/kg` | Soil Nitrogen (N) content |
+| `phosphorus` | Number or null | Yes when capability exists | `mg/kg` | `mg/kg` | Soil Phosphorus (P) content |
+| `potassium` | Number or null | Yes when capability exists | `mg/kg` | `mg/kg` | Soil Potassium (K) content |
+| `temperature` | Number or null | Yes when capability exists | `°C` | `°C` | Soil temperature |
+| `moisture` | Number or null | Yes when capability exists | `%` | `%` | Volumetric soil moisture percentage |
+| `ph` | Number or null | Yes when capability exists | `pH` | `pH` | Soil pH acidity / alkalinity scale (unitless) |
+| `ec` | Number or null | Yes when capability exists | `mS/cm` (or `µS/cm`) | `µS/cm` | Soil Electrical Conductivity |
+| `status` | Canonical enum | Recommended | None | None | Defined by external status rules |
 
 Allowed provisional soil status values:
 
@@ -1058,7 +1090,18 @@ Recommended payload (Water-Quality monitoring domain):
 }
 ```
 
-### 14.1 Reservoir-Water Telemetry Payload (Proposed Domain)
+### 14.1 Water Quality Fields
+
+| Field | Type | Required | Canonical Unit | UI Display Unit | Parameter Description |
+|---|---|---:|---|---|---|
+| `ph` | Number or null | Yes when capability exists | `pH` | `pH` | Water pH acidity / alkalinity scale (unitless) |
+| `tds` | Number or null | Yes when capability exists | `ppm` | `ppm` | Total Dissolved Solids |
+| `ec` | Number or null | Yes when capability exists | `mS/cm` (or `µS/cm`) | `µS/cm` | Water Electrical Conductivity |
+| `status` | Canonical enum | Recommended | None | None | Defined by external status rules |
+
+---
+
+### 14.2 Reservoir-Water Telemetry Payload (Proposed Domain)
 
 Topic:
 

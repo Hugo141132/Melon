@@ -1564,3 +1564,60 @@ The user management console on `/users`, lifecycle confirmation modals, and emai
   - Applied flush-left alignment, proportional typography, and natural word wrapping (`word-break: break-word`) to ensure long reasons render cleanly on all client devices.
 <!-- User Management UI/UX Reconciled: 2026-09-13 -->
 
+---
+
+## Device Management Interface Refinement & Parameter Display UI/UX Note (TASK-0302 / TASK-0303 / Reconciled 2026-09-13)
+
+The Device Management interface on `/devices`, parameter display presentation, capability segregation, and status presentation are reconciled and polished:
+- **Frontend Impact:** `MINOR`
+- **Selected UI Direction:** `Premium Minimal Ops`
+- **Existing Color Template:** `UNCHANGED` (Brand palette: emerald `#0d631b` status tokens, muted surface containers, neutral gray inactive styling preserved)
+- **Selected Motion Effects:** `Skeleton loading`, `Card hover`, `Button hover`, `Modal`
+- **21st.dev MCP:** `NOT REQUIRED` (reuses existing Tailwind tokens, card structures, and dialog components)
+- **Responsive Mobile Layout Improvements:**
+  - **Search Input Geometry:** Resolved search bar text and placeholder truncation on mobile viewports ($390\text{px}$) by removing fixed min-widths and applying fluid flexbox sizing with localized placeholder text.
+  - **Filter Controls Spacing & Alignment:** Reorganized filter controls with responsive wrapping (`flex flex-col sm:flex-row gap-3 sm:items-center`), allowing search input to stretch flexibly while domain and status dropdown selects maintain consistent, legible widths.
+  - **Card Compactness & Geometry:** Reduced vertical card bulk by compacting header padding and body spacing, improving scannability on both mobile and desktop grids.
+  - **Action Button & Badge Alignment:** Standardized header alignment with device title and domain/status badges stacked or grouped cleanly, and lifecycle action buttons placed flush in the card footer with full touch-friendly targets.
+- **Device Card Visual Hierarchy:**
+  1. **Primary Identity:** Device Name (`text-base font-semibold text-app-on-surface`).
+  2. **Status & Domain Badges:** Side-by-side badges with distinct color semantics and status indicator dots.
+  3. **Technical Metadata:** Device ID (Owner-only monospace pill per `DEC-DEV-028`) and Firmware version pill (`vX.Y.Z`).
+  4. **Monitoring Parameters:** Dedicated section with parameter count badge (`paramCount`), displaying parameter pill chips with readable labels and agricultural measurement units.
+  5. **Control Capabilities:** Distinct actuator section rendered exclusively when control actuators are supported.
+  6. **Card Footer:** Last seen timestamp with relative time (`formatDistanceToNowStrict`) and Owner lifecycle management buttons (Deactivate/Reactivate).
+- **Device Parameter Presentation & Measurement Units:**
+  - Internal database keys are cleanly converted into human-readable user-facing labels with standard agricultural measurement units across both English and Indonesian locales:
+    - **Soil Monitoring Parameters (`SOIL_NODE`):**
+      - Nitrogen (N): `mg/kg`
+      - Phosphorus (P): `mg/kg`
+      - Potassium (K): `mg/kg`
+      - Soil Temperature: `°C`
+      - Soil Moisture: `%`
+      - Soil pH: `pH`
+      - Soil EC: `µS/cm`
+    - **Water Quality Parameters (`WATER_QUALITY_NODE`):**
+      - Water pH: `pH`
+      - Water TDS: `ppm`
+      - Water EC: `µS/cm`
+    - **Water Reservoir Parameters (`WATER_TANK_NODE`):**
+      - Tank Volume: `L`
+  - Canonical internal keys in backend, API contracts, and database remain language-neutral and unchanged.
+- **Device Capability Rules:**
+  - **Irrigation Valve Control (`FAUCET_CONTROL`):** Rendered strictly and exclusively on supported controller/reservoir devices (`WATER_TANK_NODE`).
+  - **Monitoring Node Isolation:** Soil monitoring nodes (`SOIL_NODE`) and Water Quality monitoring nodes (`WATER_QUALITY_NODE`) shall **strictly not display** irrigation control capabilities in the UI, preserving strict boundary between passive sensors and physical actuators.
+- **Device Status Simplification:**
+  - Replaced technical 5-state connection display with 3 clear operational presentation statuses:
+    - `ONLINE` $\to$ **Connected** (*"Terhubung"*): Emerald pill with pulsing green dot.
+    - `OFFLINE` $\to$ **Disconnected** (*"Terputus"*): Muted amber/zinc pill with static dot.
+    - `STALE` $\to$ **Disconnected** (*"Terputus"*): Muted amber/zinc pill with static dot.
+    - `UNKNOWN` $\to$ **Disconnected** (*"Terputus"*): Muted amber/zinc pill with static dot.
+    - `INACTIVE` (or `accountStatus = 'DEACTIVATED'`) $\to$ **Inactive** (*"Tidak Aktif"*): Neutral gray pill with static dot.
+  - Connection status dropdown filter provides 4 intuitive options: All Connection Statuses, Connected, Disconnected, and Inactive.
+  - Safe client-side filtering maps presentation statuses without modifying backend `DeviceQueryInputSchema` contracts, preventing HTTP 422 `VALIDATION_ERROR`.
+- **Bilingual Localization:**
+  - 100% key parity maintained across `messages/en.json` and `messages/id.json` under the `devices.*` namespace.
+  - Zero raw translation keys, English leaks, or Unicode emoji characters.
+<!-- Device Management UI/UX Reconciled: 2026-09-13 -->
+
+

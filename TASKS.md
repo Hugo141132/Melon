@@ -1101,6 +1101,18 @@ Implement sites if required for version 1.
   - Implemented route-level loading shell `apps/web/app/devices/loading.tsx` rendering `TopAppBar`, header skeleton with `Cpu` icon, search/filter skeletons, and 4-card device grid skeleton in `bg-app-surface text-app-on-surface min-h-dvh pb-24`, replacing white screen flashes with a seamless loading shell.
   - Added dedicated unit tests: `apps/web/test/unit/devices-page.test.tsx` (3/3 passed) and `apps/web/test/unit/devices-loading-transition.test.tsx` (1/1 passed).
   - Verified live route navigation and loading transitions via Playwright MCP with zero regressions.
+- Reconciled and refined Device Management UI & parameter display on 2026-09-13 (`TASK-0302` / `TASK-0303`):
+  - **Responsive Mobile Layout:** Resolved search bar text and placeholder truncation on mobile viewports ($390\text{px}$) with fluid flexbox sizing; reorganized filter controls with responsive wrapping (`flex-col sm:flex-row`); reduced card vertical height by compacting padding; aligned action buttons and badges consistently.
+  - **Device Card Visual Hierarchy:** Standardized card structure: Device Name $\to$ side-by-side domain & status badges $\to$ technical metadata (Owner-only canonical `deviceId` & firmware version) $\to$ parameter section with count badge (`paramCount`) and unit-labeled pill chips $\to$ control capabilities section $\to$ card footer with relative last-seen timestamp and Owner lifecycle actions.
+  - **Parameter Presentation & Measurement Units:** Converted internal capability keys to clear human-readable labels with standard agricultural units:
+    - Soil: Nitrogen (`mg/kg`), Phosphorus (`mg/kg`), Potassium (`mg/kg`), Soil Temperature (`°C`), Soil Moisture (`%`), Soil pH (`pH`), Soil EC (`µS/cm`).
+    - Water Quality: Water pH (`pH`), Water TDS (`ppm`), Water EC (`µS/cm`).
+    - Water Reservoir: Tank Volume (`L`).
+    - Canonical values in backend, API, and database remain language-neutral and unchanged.
+  - **Device Capability Restriction Rules:** Restricted "Irrigation Valve Control" (`FAUCET_CONTROL`) strictly to supported controller/reservoir devices (`WATER_TANK_NODE`). Soil (`SOIL_NODE`) and Water Quality (`WATER_QUALITY_NODE`) monitoring devices strictly do not display irrigation control capability.
+  - **Simplified Status Display & Client Filtering:** Mapped raw connection statuses to 3 user-facing presentation statuses (`ONLINE` $\to$ Connected, `OFFLINE`/`STALE`/`UNKNOWN` $\to$ Disconnected, `INACTIVE`/deactivated $\to$ Inactive) with custom badge colors and indicator dots. Provided 4-option dropdown filter operating client-side without violating backend API query schemas.
+  - **Bilingual Localization:** Maintained 100% key parity across `messages/id.json` and `messages/en.json` under `devices.*` namespace with zero hardcoded UI strings or Unicode emojis.
+  - **Verification:** 12/12 unit tests passed in `apps/web/test/unit/devices-page.test.tsx`, TypeScript typecheck passed with 0 errors across 4 workspaces, and Playwright MCP visual verification confirmed responsive layout and status filtering across mobile and desktop.
 
 ### Work
 
@@ -1132,6 +1144,10 @@ Implement:
 **Status:** `DONE`
 **Dependencies:** `TASK-0302`
 **Completed:** 2026-07-30 — Implemented typed device capabilities with single server-authoritative mapping source in `@kebun-melon/contracts`, runtime feature detection helper `supportsCapability`, MONITORING vs CONTROL capability categorization (`getCapabilityCategory`), atomic transaction reconciliation on device profileee (`deviceType`) update in `@kebun-melon/database`, controlled one-time DB reconciliation removing obsolete `RELAY_CONTROL` & `SOLENOID_VALVE_CONTROL` rows on `water-tank-node-ryd0at`, and read-only capability rendering under Monitoring and Control headers on `/devices` UI. Added unit and integration test coverage across contract, database, and frontend layers.
+- Reconciled capability display and domain segregation on 2026-09-13:
+  - Enforced strict physical actuator isolation: "Irrigation Valve Control" (`FAUCET_CONTROL`) renders strictly for `WATER_TANK_NODE` controller devices.
+  - Passive sensor nodes (`SOIL_NODE`, `WATER_QUALITY_NODE`) strictly omit irrigation control capabilities in the UI.
+  - Separated monitoring parameters (NPK, Temp, Moisture, pH, EC, TDS) from control actuators across visual hierarchy and translation keys.
 
 ### Work
 

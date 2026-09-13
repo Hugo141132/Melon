@@ -1030,7 +1030,7 @@ flowchart TD
 7. The database updates `accountStatus = DEACTIVATED`, `connectionStatus = INACTIVE`, and records `deactivatedAt = NOW()`.
 8. Any active or pending faucet control capability on the device is immediately blocked.
 9. A `device.deactivated` audit log event is recorded with actor ID and timestamp.
-10. The UI updates device status badge to `DEACTIVATED` (inactive) and presents a "Reactivate" action. All historical telemetry, readings, and logs remain completely preserved.
+10. The UI updates device status badge to `Inactive` (*"Tidak Aktif"*) and presents a "Reactivate" action. All historical telemetry, readings, and logs remain completely preserved.
 
 **Alternative flows:** Device is already deactivated; system returns current status.
 **Error flows:** Unauthenticated request (401), non-Owner request (403), device not found (404).
@@ -1056,13 +1056,52 @@ flowchart TD
 6. The server validates the Owner session and verifies `device.activate` permission (`DEC-DEV-030`).
 7. The database updates `accountStatus = ACTIVE`, resets `connectionStatus = UNKNOWN`, and clears `deactivatedAt = NULL`.
 8. A `device.activated` audit log event is recorded with actor ID and timestamp.
-9. The UI updates the device status badge to `ACTIVE` and restores standard operational views.
+9. The UI updates the device status badge to `Disconnected` (*"Terputus"*, awaiting initial telemetry) and restores standard operational views.
 
 **Alternative flows:** Device is already active; system returns current status.
 **Error flows:** Unauthenticated request (401), non-Owner request (403), device not found (404).
 **Postconditions:** Device account status is restored to `ACTIVE`.
 **Required permissions:** `device.activate` (Owner only).
 **Audit events:** `device.activated`.
+
+---
+
+## Flow 22C — User Views and Filters Devices on Device Management Console (TASK-0302 / TASK-0303 Refinement)
+
+**Primary actor:** Owner or Admin
+**Preconditions:** Active authenticated session (`requireActiveAccount`).
+**Trigger:** User navigates to `/devices`.
+
+**Main success flow:**
+
+1. The frontend renders the route loading skeleton (`loading.tsx`) while hydrating `AuthContext`.
+2. The client fetches authorized devices via `GET /api/v1/devices` (Owner receives all devices with canonical `deviceId`; Admin receives assigned devices with canonical `deviceId` concealed per `DEC-DEV-028`).
+3. The user interacts with responsive search and filter controls:
+   - Search bar filters devices by name, firmware version, or canonical `deviceId` (Owner only). Fluid flex layout prevents text or placeholder truncation on mobile ($390\text{px}$).
+   - Domain filter dropdown filters by domain: All Domains, Soil Monitoring (`SOIL_NODE`), Water Quality (`WATER_QUALITY_NODE`), or Water Tank (`WATER_TANK_NODE`).
+   - Connection status dropdown filter provides 4 simplified operational views:
+     - **All Connection Statuses** (*"Semua Status Koneksi"*)
+     - **Connected** (*"Terhubung"*): maps to canonical `ONLINE`.
+     - **Disconnected** (*"Terputus"*): maps to canonical `['OFFLINE', 'STALE', 'UNKNOWN']`.
+     - **Inactive** (*"Tidak Aktif"*): maps to canonical `INACTIVE` or `accountStatus = 'DEACTIVATED'`.
+   - Filtering runs client-side to ensure full compatibility with backend API contracts without generating HTTP 422 `VALIDATION_ERROR` responses.
+4. The device grid renders cards with refined visual hierarchy:
+   - Device name and side-by-side domain and simplified status badges with indicator dots (emerald for Connected, muted zinc for Disconnected, neutral gray for Inactive).
+   - Technical metadata: canonical `deviceId` monospace pill (Owner only) and firmware version pill.
+   - Monitoring parameters pill chips showing readable labels and standardized measurement units:
+     - **Soil Node:** Nitrogen (`mg/kg`), Phosphorus (`mg/kg`), Potassium (`mg/kg`), Soil Temperature (`°C`), Soil Moisture (`%`), Soil pH (`pH`), Soil EC (`µS/cm`).
+     - **Water Quality Node:** Water pH (`pH`), Water TDS (`ppm`), Water EC (`µS/cm`).
+     - **Water Tank Node:** Tank Volume (`L`).
+   - Control capabilities: "Irrigation Valve Control" (`FAUCET_CONTROL`) appears **strictly and exclusively** on controller/reservoir devices (`WATER_TANK_NODE`). Passive monitoring devices (`SOIL_NODE`, `WATER_QUALITY_NODE`) strictly omit irrigation control capabilities.
+   - Footer: Last seen timestamp with relative time formatting and Owner-only lifecycle action buttons (Deactivate / Reactivate).
+5. All UI labels, placeholders, tooltips, dialogs, and units support full bilingual localization in English and Bahasa Indonesia.
+
+**Alternative flows:** No devices found matching filter criteria; empty state card is displayed.
+**Error flows:** Unauthenticated request (401), non-active account (403), network error.
+**Postconditions:** User scans device fleet health, parameters, and control readiness without visual clutter or layout overflow.
+**Required permissions:** `device.read`.
+**UI states:** Loading skeleton, device grid, filtered grid, empty search results, error alert.
+**Audit events:** None for read/filter operations.
 
 ---
 

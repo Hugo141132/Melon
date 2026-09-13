@@ -326,15 +326,31 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
   - Selected motion effects: `Skeleton loading`, `Card hover`, `Button hover`
   - 21st.dev MCP: `NOT REQUIRED`
   - Summary: Optimized `/devices` authentication flow and route transition. Removed redundant client-side `fetch('/api/v1/auth/session')`, `currentUserRole` state, and blocking `"Memeriksa sesi pengguna..."` / `"Checking user session..."` spinner from `apps/web/app/devices/page.tsx`, directly reusing server-hydrated `useAuth()` (`const { role } = useAuth(); const isOwner = role === 'OWNER';`). Enabled `fetchDevices(1)` to trigger immediately on component mount without waiting for redundant client session roundtrips. Created route-level static loading skeleton `apps/web/app/devices/loading.tsx` rendering `TopAppBar`, header skeleton (`Cpu` icon container and pulsing title/subtitle), search/filter input skeletons, and 4-card device grid skeleton in `bg-app-surface text-app-on-surface min-h-dvh pb-24`, replacing blank white screen transitions with a seamless, flicker-free skeleton during App Router streaming and client transitions. Verified global `<body>` styles in `apps/web/app/layout.tsx` were safely left untouched to prevent color token leakage into public authentication screens (`bg-surface`). Preserved all server-side session checks, RBAC scoping, and Admin canonical `deviceId` concealment (`DEC-DEV-028`). Added unit test suites `apps/web/test/unit/devices-page.test.tsx` (3/3 passed) and `apps/web/test/unit/devices-loading-transition.test.tsx` (1/1 passed). Verified 100% test pass rate, 0 typecheck errors across all 4 monorepo packages, and verified smooth transition in browser via Playwright MCP.
+- 2026-09-13 Device Management UI Refinement & Parameter Display:
+  - Frontend impact: `MINOR`
+  - Selected UI direction: `Premium Minimal Ops`
+  - Existing color template: `UNCHANGED`
+  - Selected motion effects: `Skeleton loading`, `Card hover`, `Button hover`, `Modal`
+  - 21st.dev MCP: `NOT REQUIRED`
+  - Summary: Reconciled and polished `/devices` mobile layout, parameter display presentation, capability rules, and status presentation:
+    - Responsive Mobile Layout: Fixed search bar text and placeholder truncation on mobile viewports ($390\text{px}$) via fluid flexbox sizing; reorganized filter controls with wrapping (`flex-col sm:flex-row`); compacted card vertical padding; aligned action buttons and badges consistently.
+    - Card Visual Hierarchy: Standardized card layout: Device Name $\to$ dual domain & status badges $\to$ technical metadata (Owner-only canonical `deviceId` & firmware version) $\to$ monitoring parameters section with count badge (`paramCount`) and unit-labeled pill chips $\to$ control capabilities section $\to$ card footer with relative last-seen timestamp and Owner deactivation/reactivation actions.
+    - Parameter Display & Units: Converted internal capability keys into localized human-readable labels with standard agricultural units: Soil (N, P, K in `mg/kg`, Temp `°C`, Moisture `%`, pH, EC `µS/cm`); Water Quality (pH, TDS `ppm`, EC `µS/cm`); Water Reservoir (Volume `L`). Canonical internal keys in backend, API, and database remain unchanged.
+    - Device Capability Rules: Restricted "Irrigation Valve Control" (`FAUCET_CONTROL`) strictly to supported controller/reservoir devices (`WATER_TANK_NODE`). Soil (`SOIL_NODE`) and Water Quality (`WATER_QUALITY_NODE`) monitoring devices strictly do not display irrigation control capability.
+    - Status Simplification & Client Filtering: Mapped raw connection statuses to 3 operational presentation statuses (`ONLINE` $\to$ Connected, `OFFLINE`/`STALE`/`UNKNOWN` $\to$ Disconnected, `INACTIVE`/deactivated $\to$ Inactive) with distinct badge styling and indicator dots. Provided 4-option dropdown filter operating client-side without violating backend API query schemas.
+    - Bilingual Localization: Maintained 100% key parity across `messages/id.json` and `messages/en.json` under `devices.*` namespace with zero hardcoded UI strings or Unicode emojis.
+    - Verification: 12/12 unit tests passed in `apps/web/test/unit/devices-page.test.tsx`, TypeScript typecheck passed with 0 errors across 4 workspaces, and Playwright MCP visual verification confirmed responsive layout and status filtering across mobile and desktop.
 
 #### TASK-0303 Governance Record
 
 `TASK-0303` frontend implementation record:
+- Status: `DONE` (Reconciled 2026-09-13)
 - Frontend impact: `MINOR`
 - Selected UI direction: `Premium Minimal Ops`
 - Existing color template: `UNCHANGED`
 - Selected motion effects: `Card hover`, `Skeleton loading`
 - 21st.dev MCP: `NOT REQUIRED`
+- Summary: Reconciled device capability presentation and domain segregation. Enforced strict physical actuator isolation: "Irrigation Valve Control" (`FAUCET_CONTROL`) renders strictly for `WATER_TANK_NODE` controller devices. Passive monitoring devices (`SOIL_NODE`, `WATER_QUALITY_NODE`) strictly omit irrigation control capabilities in the UI, preserving clear operational boundary between passive telemetry sensors and physical actuators.
 
 #### TASK-0305 Governance Record
 
