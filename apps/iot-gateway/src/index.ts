@@ -16,6 +16,7 @@ export async function startServer() {
         MQTT_GATEWAY_CLIENT_ID: env.MQTT_GATEWAY_CLIENT_ID,
         MQTT_GATEWAY_USERNAME: env.MQTT_GATEWAY_USERNAME,
         ENABLE_FAUCET_CONTROL: env.ENABLE_FAUCET_CONTROL,
+        SOIL_WATER_ADAPTER_ENABLED: env.SOIL_WATER_ADAPTER_ENABLED,
       }),
     });
 
@@ -23,12 +24,14 @@ export async function startServer() {
       app,
       mqttClient,
       hardwareMqttClient,
+      soilWaterMqttClient,
       commandPublisher,
       acknowledgementProcessor,
       faucetEventProcessor,
       telemetryProcessor,
       retentionScheduler,
       hardwareAdapter,
+      soilWaterAdapter,
     } = buildApp({ env });
 
     // Connect to MQTT Broker asynchronously (non-blocking server start)
@@ -48,6 +51,11 @@ export async function startServer() {
           if (!hardwareMqttClient && env.HARDWARE_ADAPTER_ENABLED) {
             hardwareAdapter.start().catch((err) => {
               logger.error('Failed to start hardware adapter after MQTT connection', err);
+            });
+          }
+          if (env.SOIL_WATER_ADAPTER_ENABLED) {
+            soilWaterAdapter.start().catch((err) => {
+              logger.error('Failed to start soil/water adapter after MQTT connection', err);
             });
           }
         })
@@ -99,11 +107,15 @@ export async function startServer() {
         faucetEventProcessor.stop();
         telemetryProcessor.stop();
         hardwareAdapter.stop();
+        soilWaterAdapter.stop();
         retentionScheduler.stop();
         await app.close();
         await mqttClient.disconnect();
         if (hardwareMqttClient) {
           await hardwareMqttClient.disconnect();
+        }
+        if (soilWaterMqttClient) {
+          await soilWaterMqttClient.disconnect();
         }
         logger.info('IoT Gateway Service shutdown complete.');
         process.exit(0);

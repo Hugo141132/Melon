@@ -66,6 +66,24 @@ export const gatewayEnvSchema = z.object({
   HARDWARE_MQTT_BROKER_URL: z.string().optional(),
   HARDWARE_TARGET_DEVICE_ID: z.string().default('water-tank-node-zi37gz'),
   WATER_TANK_DEVICE_ID: z.string().optional(),
+  SOIL_WATER_ADAPTER_ENABLED: z
+    .preprocess((val) => {
+      if (val === undefined || val === null || val === '') return true;
+      if (val === 'true' || val === '1') return true;
+      if (val === 'false' || val === '0') return false;
+      return val;
+    }, z.boolean().default(true))
+    .default(true),
+  SOIL_MQTT_PUB_TOPIC: z.string().default('melon/sensor-tanah/data-2424600050'),
+  SOIL_MQTT_SUB_TOPIC: z.string().default('melon/ai-tanah/rekomendasi-2424600050'),
+  SOIL_DEVICE_MQTT_CLIENT_ID: z.string().default('melon-esp32-tanah1'),
+  SOIL_DEVICE_MQTT_USERNAME: z.string().optional(),
+  SOIL_DEVICE_MQTT_PASSWORD: z.string().optional(),
+  WATER_MQTT_PUB_TOPIC: z.string().default('melon/sensor-air/data-2424600050'),
+  WATER_MQTT_SUB_TOPIC: z.string().default('melon/ai-air/rekomendasi-2424600050'),
+  WATER_DEVICE_MQTT_CLIENT_ID: z.string().default('melon-esp32-air1'),
+  WATER_DEVICE_MQTT_USERNAME: z.string().optional(),
+  WATER_DEVICE_MQTT_PASSWORD: z.string().optional(),
   RETENTION_ENABLED: z
     .preprocess((val) => {
       if (val === undefined || val === null || val === '') return true;

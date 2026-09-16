@@ -22,14 +22,23 @@ import {
   HardwareMqttAdapter,
   hardwareMqttAdapter as defaultHardwareMqttAdapter,
 } from './mqtt/hardware-adapter';
+import {
+  SoilWaterMqttAdapter,
+  soilWaterMqttAdapter as defaultSoilWaterMqttAdapter,
+} from './mqtt/soil-water-adapter';
 import { registerHealthRoutes, DbChecker } from './routes/health';
 import { logger } from './observability/logger';
-import { DeviceRepository, prisma as defaultPrisma } from '@kebun-melon/database';
+import {
+  DeviceRepository,
+  TelemetryRepository,
+  prisma as defaultPrisma,
+} from '@kebun-melon/database';
 
 export interface AppOptions {
   env: GatewayEnv;
   mqttClient?: GatewayMqttClient;
   hardwareMqttClient?: GatewayMqttClient;
+  soilWaterMqttClient?: GatewayMqttClient;
   dbChecker?: DbChecker;
   commandPublisher?: CommandPublisher;
   acknowledgementProcessor?: AcknowledgementProcessor;
@@ -37,7 +46,9 @@ export interface AppOptions {
   telemetryProcessor?: TelemetryProcessor;
   retentionScheduler?: RetentionScheduler;
   hardwareAdapter?: HardwareMqttAdapter;
+  soilWaterAdapter?: SoilWaterMqttAdapter;
   deviceRepo?: DeviceRepository;
+  telemetryRepo?: TelemetryRepository;
 }
 
 // In-memory rate limit store for gateway HTTP endpoints
@@ -87,12 +98,14 @@ export function buildApp(options: AppOptions): {
   app: FastifyInstance;
   mqttClient: GatewayMqttClient;
   hardwareMqttClient?: GatewayMqttClient;
+  soilWaterMqttClient?: GatewayMqttClient;
   commandPublisher: CommandPublisher;
   acknowledgementProcessor: AcknowledgementProcessor;
   faucetEventProcessor: FaucetEventProcessor;
   telemetryProcessor: TelemetryProcessor;
   retentionScheduler: RetentionScheduler;
   hardwareAdapter: HardwareMqttAdapter;
+  soilWaterAdapter: SoilWaterMqttAdapter;
 } {
   const app = Fastify({
     logger: false, // We use our structured logger module with secret redaction
@@ -116,6 +129,8 @@ export function buildApp(options: AppOptions): {
         })
       : undefined);
 
+  const soilWaterMqttClient = options.soilWaterMqttClient;
+
   const commandPublisher = options.commandPublisher ?? defaultCommandPublisher;
   const acknowledgementProcessor =
     options.acknowledgementProcessor ?? defaultAcknowledgementProcessor;
@@ -124,8 +139,14 @@ export function buildApp(options: AppOptions): {
   const retentionScheduler =
     options.retentionScheduler ?? new RetentionScheduler({ env: options.env });
   const hardwareAdapter = options.hardwareAdapter ?? defaultHardwareMqttAdapter;
+  const soilWaterAdapter = options.soilWaterAdapter ?? defaultSoilWaterMqttAdapter;
   const deviceRepo =
     options.deviceRepo ?? (defaultPrisma ? new DeviceRepository(defaultPrisma) : undefined);
+  const telemetryRepo =
+    options.telemetryRepo ?? (defaultPrisma ? new TelemetryRepository(defaultPrisma) : undefined);
+
+  const targetSoilWaterClient = soilWaterMqttClient ?? mqttClient;
+  soilWaterAdapter.bind(options.env, targetSoilWaterClient, telemetryRepo, deviceRepo);
 
   hardwareAdapter.bind(options.env, mqttClient, hardwareMqttClient, deviceRepo);
   commandPublisher.bind(options.env, mqttClient, hardwareAdapter);
@@ -206,11 +227,13 @@ export function buildApp(options: AppOptions): {
     app,
     mqttClient,
     hardwareMqttClient,
+    soilWaterMqttClient,
     commandPublisher,
     acknowledgementProcessor,
     faucetEventProcessor,
     telemetryProcessor,
     retentionScheduler,
     hardwareAdapter,
+    soilWaterAdapter,
   };
 }

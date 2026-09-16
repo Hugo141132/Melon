@@ -16,14 +16,6 @@ const PUBLIC_PATH_PREFIXES = [
   '/api/v1/internal/',
 ];
 
-/**
- * Helper to identify device telemetry ingestion paths (e.g. /api/v1/devices/[deviceId]/telemetry/soil).
- * Device telemetry endpoints use device-level authentication (e.g. X-Device-Id header), not user session cookies.
- */
-function isDeviceTelemetryIngestionPath(pathname: string): boolean {
-  return /^\/api\/v1\/devices\/[^\/]+\/telemetry(\/.*)?$/.test(pathname);
-}
-
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -31,11 +23,9 @@ export function middleware(request: NextRequest) {
     (prefix) => pathname === prefix || pathname.startsWith(prefix)
   );
 
-  const isDeviceTelemetry = isDeviceTelemetryIngestionPath(pathname);
-
   const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
 
-  if (!isPublic && !isDeviceTelemetry && !token) {
+  if (!isPublic && !token) {
     if (pathname.startsWith('/api/')) {
       return NextResponse.json(
         {

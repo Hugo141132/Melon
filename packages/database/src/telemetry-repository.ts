@@ -347,7 +347,6 @@ export class TelemetryRepository {
             ph: toDecimal(input.ph),
             tds: toDecimal(input.tds),
             ec: toDecimal(input.ec),
-            // latitude and longitude deleted (left null)
             status: input.status || null,
             validationStatus: input.validationStatus || TelemetryValidationStatus.VALID,
           },

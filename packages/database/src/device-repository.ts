@@ -55,6 +55,7 @@ export class DeviceRepository {
     return {
       id: device.id,
       deviceId: device.deviceId,
+      clientId: device.clientId ?? null,
       siteId: device.siteId,
       name: device.name,
       deviceType: device.deviceType as DeviceType,
@@ -170,6 +171,55 @@ export class DeviceRepository {
         : {
             OR: [{ deviceId: cleanId }, { deviceId: { equals: cleanId, mode: 'insensitive' } }],
           },
+      include: {
+        capabilities: true,
+      },
+    });
+
+    if (!device) {
+      return null;
+    }
+
+    return this.formatPublicSafeDto(device);
+  }
+
+  /**
+   * Retrieves a single active device by its registered hardware MQTT client ID.
+   * Enables dynamic hardware replacement without code modification.
+   */
+  async getDeviceByClientId(clientId: string): Promise<PublicSafeDeviceDto | null> {
+    if (!clientId || typeof clientId !== 'string') return null;
+    const cleanId = clientId.trim();
+    if (!cleanId) return null;
+
+    const device = await this.prisma.device.findFirst({
+      where: {
+        OR: [{ clientId: cleanId }, { clientId: { equals: cleanId, mode: 'insensitive' } }],
+        accountStatus: 'ACTIVE',
+      },
+      include: {
+        capabilities: true,
+      },
+    });
+
+    if (!device) {
+      return null;
+    }
+
+    return this.formatPublicSafeDto(device);
+  }
+
+  /**
+   * Retrieves the active device registered for a specific DeviceType.
+   * Fallback resolver when MQTT messages omit explicit hardware client IDs.
+   */
+  async getActiveDeviceByType(deviceType: DeviceType): Promise<PublicSafeDeviceDto | null> {
+    const device = await this.prisma.device.findFirst({
+      where: {
+        deviceType,
+        accountStatus: 'ACTIVE',
+      },
+      orderBy: { createdAt: 'asc' },
       include: {
         capabilities: true,
       },

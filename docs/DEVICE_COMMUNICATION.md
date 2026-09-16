@@ -51,19 +51,36 @@ The browser shall not communicate directly with an ESP32/NodeMCU device or publi
 
 The architecture provides two distinct ingress paths based on monitoring domain:
 
-### Path A — REST API over Wi-Fi (Soil & Water Quality Telemetry)
+#### Path A — MQTT over TLS via Unified EMQX Broker (Soil & Water Quality Telemetry, TASK-0412)
 
 ```text
-Soil and Water Monitoring Equipment
+Soil & Water Monitoring Equipment (ESP32)
+[Soil Client ID: melon-esp32-tanah1 | Water Client ID: melon-esp32-air1]
     │
-    │ HTTPS / REST API over Wi-Fi
+    │ MQTT over TLS (Port 8883)
+    │ Soil Inbound Telemetry: melon/sensor-tanah/data-2424600050
+    │ Soil AI Recommendation: melon/ai-tanah/rekomendasi-2424600050
+    │ Water Inbound Telemetry: melon/sensor-air/data-2424600050
+    │ Water AI Recommendation: melon/ai-air/rekomendasi-2424600050
     ▼
-Backend Ingestion Boundary (Web Backend)
+Unified EMQX Broker (Port 8883 / Port 8084 WSS)
     │
-    ├── Validate payload schema & device authentication
-    ├── Persist telemetry to PostgreSQL database
-    └── Stream live updates to authenticated web frontend
+    ▼
+IoT Gateway (apps/iot-gateway — Unified Gateway Client & SoilWaterMqttAdapter)
+    │
+    ├── Resolve database device dynamically via MQTT Client ID (devices.client_id)
+    ├── Dual payload normalization (canonical JSON envelope + flat abbreviated keys)
+    ├── Persist telemetry to PostgreSQL database (soil_readings, water_readings)
+    ├── Atomically update device lastSeenAt and connectionStatus: ONLINE
+    └── Dispatch internal realtime webhook to Web Backend for SSE delivery
+             │
+             ▼
+      Web Application
+             │
+             ▼
+   Authenticated Frontend
 ```
+
 
 ### Path B — MQTT through Dedicated EMQX Cloud Broker (Water Tank Monitoring & Faucet Control, DEC-DEV-032)
 
@@ -288,6 +305,7 @@ Minimum identity fields:
 | Field | Type | Required | Description |
 |---|---|---:|---|
 | `deviceId` | String | Yes | Unique external canonical hardware identifier (Owner-editable per `DEC-DEV-028`; internal DB UUID immutable) |
+| `clientId` | String | No | Unique hardware MQTT Client ID used by physical device (e.g. `melon-esp32-tanah1`, `melon-esp32-air1`). Primary identity for MQTT dynamic device resolution (`TASK-0412`). Decouples physical hardware identity from database record to allow device replacement without code changes |
 | `siteId` | String | Yes or TBD | Site, project, or location identifier |
 | `deviceName` | String | No | User-facing device name stored by backend |
 | `deviceType` | Enum | Yes | Device capability category |
@@ -309,12 +327,35 @@ Rules:
 - `deviceId` shall not contain personal information.
 - `deviceId` is editable ONLY by the Owner (`DEC-DEV-028`).
 - `deviceId` shall NOT be viewable or editable by Admin users across UI and API responses (`DEC-DEV-028` / `TASK-0305`). Admin responses return only user-facing device names and metadata.
+- `clientId` (`devices.client_id`): MQTT Client ID is the primary identity source for resolving physical devices into database entities. The expected hardware client mapping:
+  - `melon-esp32-tanah1` $\rightarrow$ `SOIL_NODE`
+  - `melon-esp32-air1` $\rightarrow$ `WATER_QUALITY_NODE`
+  Future physical device replacements are supported by updating `client_id` in the database registry with zero code changes.
+- **Identity Flow & Payload Hardware Identity:**
+  - Topic identifies the monitoring domain (e.g. soil vs water quality).
+  - Payload explicitly contains the hardware identity (`clientId: "melon-esp32-tanah1"` or `clientId: "melon-esp32-air1"`). Normal MQTT subscribers do not assume broker connection metadata is available; identity is carried in the message payload.
+  - Gateway resolves: `payload.clientId` $\rightarrow$ `devices.client_id` $\rightarrow$ canonical database device record.
+  - **Strict Rejection of Unknown Hardware:** Payloads missing a hardware identifier are rejected (`MISSING_CLIENT_ID`). Payloads with unmapped or unknown `clientId` values are strictly rejected (`UNKNOWN_DEVICE_CLIENT_ID`). The gateway shall never silently assign unknown telemetry to an arbitrary active device.
+  - Payloads with mismatched device types (e.g. water client on soil topic) or inactive account status are rejected.
+- **Configurable Telemetry Topics:**
+  - Soil Data Inbound (Gateway Subscribe / Node Publish): `SOIL_MQTT_PUB_TOPIC` (default: `melon/sensor-tanah/data-2424600050`)
+  - Soil AI Recommendation Outbound (Gateway Publish / Node Subscribe): `SOIL_MQTT_SUB_TOPIC` (default: `melon/ai-tanah/rekomendasi-2424600050`, QoS 1)
+  - Water Quality Data Inbound (Gateway Subscribe / Node Publish): `WATER_MQTT_PUB_TOPIC` (default: `melon/sensor-air/data-2424600050`)
+  - Water Quality AI Recommendation Outbound (Gateway Publish / Node Subscribe): `WATER_MQTT_SUB_TOPIC` (default: `melon/ai-air/rekomendasi-2424600050`, QoS 1)
+- **MQTT Credentials Separation & Explicit Device Configuration (`TASK-0412`):**
+  - Gateway MQTT Client Credentials: `MQTT_BROKER_URL`, `MQTT_GATEWAY_CLIENT_ID`, `MQTT_GATEWAY_USERNAME`, `MQTT_GATEWAY_PASSWORD`.
+  - ESP32 Soil Node Hardware Credentials: `SOIL_DEVICE_MQTT_CLIENT_ID` (`melon-esp32-tanah1`), `SOIL_DEVICE_MQTT_USERNAME`, `SOIL_DEVICE_MQTT_PASSWORD`.
+  - ESP32 Water Quality Node Hardware Credentials: `WATER_DEVICE_MQTT_CLIENT_ID` (`melon-esp32-air1`), `WATER_DEVICE_MQTT_USERNAME`, `WATER_DEVICE_MQTT_PASSWORD`.
+  - Gateway identity and physical hardware identity are strictly decoupled; gateway service (`Test_Gateway`) never simulates hardware devices using gateway client identity.
+  - Device simulator (`scripts/device-simulator.ts`) connects as 3 distinct MQTT clients using their respective hardware identities (`melon-esp32-tanah1`, `melon-esp32-air1`, `sim-${tankId}-...`).
+  - End-to-end live flow verified: `melon-esp32-air1` publishes to `melon/sensor-air/data-2424600050` over EMQX Cloud broker, IoT Gateway receives and dynamically resolves `melon-esp32-air1` $\rightarrow$ `devices.client_id` $\rightarrow$ `WATER_QUALITY_NODE`, persisting to `water_readings` with zero changes to staging.
 - Internal database primary key UUID is immutable across all relational tables.
 - A device shall not publish as another device.
-- Device credentials shall be bound to the permitted `deviceId`.
+- Device credentials shall be bound to the permitted `deviceId` or `clientId`.
 - Topic authorisation shall prevent cross-device access.
 - Deactivated devices (`accountStatus = 'DEACTIVATED'`) transition `connectionStatus` to `INACTIVE` and are rejected from executing new faucet commands. Reactivation resets `connectionStatus` to `UNKNOWN` until new communication is established (`DEC-DEV-030`).
 - Operational and hardware procedures for reconciling physical ESP32/NodeMCU firmware configurations and EMQX broker credentials/ACLs following a `deviceId` rename are **TBD / BLOCKING** automation (`DEC-DEV-028`).
+
 
 ---
 

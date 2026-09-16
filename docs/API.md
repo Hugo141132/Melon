@@ -26,7 +26,7 @@ The API shall support:
 - Owner approval and rejection.
 - Owner and Admin profilee management.
 - Device listing and device access.
-- **Device Telemetry Ingestion (Soil and Water Quality via REST API over Wi-Fi)**.
+- **Device Telemetry Ingestion (Soil, Water Quality, and Reservoir via MQTT over TLS)** (Obsolete REST telemetry endpoints retired per `TASK-0412`).
 - Current soil and water monitoring query endpoints.
 - Historical telemetry.
 - Device status.
@@ -37,10 +37,17 @@ The API shall support:
 - Real-time update endpoints.
 - Health and readiness checks.
 
-Note: Water tank telemetry (volume & status, with flow rate deleted per `DEC-MON-089` / `TASK-0410`) is ingested separately via MQTT/EMQX through the IoT Gateway service, not through the REST API. Electrical monitoring (voltage, current, power) via INA219 is sent via REST over Wi-Fi.
+Note: All telemetry sources (soil, water quality, and reservoir water volume & status) are ingested through the IoT Gateway service via MQTT over TLS. Faucet control commands are dispatched via EMQX under strict `ENABLE_FAUCET_CONTROL=false` safety defaults.
 
 ### 2.1 TASK-0914 Architectural Reconciliation
-REST Soil and Water Quality telemetry ingestion endpoints (`POST /api/v1/devices/{deviceId}/telemetry/soil` and `.../water`) remain unchanged by `TASK-0914`. Direct EMQX Cloud TLS connectivity applies exclusively to the MQTT reservoir telemetry and faucet-control boundary handled by `apps/iot-gateway`. REST API interfaces, endpoints, error responses, and `ENABLE_FAUCET_CONTROL=false` safety defaults remain untouched.
+Direct EMQX Cloud TLS connectivity applies to the MQTT reservoir telemetry and faucet-control boundary handled by `apps/iot-gateway`. REST API interfaces, endpoints, error responses, and `ENABLE_FAUCET_CONTROL=false` safety defaults remain untouched.
+
+### 2.2 TASK-0412 Soil & Water Quality Ingestion Migration to MQTT & REST Route Retirement
+Under `TASK-0412` and `DEC-DEV-033`, soil and water quality monitoring devices transitioned from direct REST API ingestion (`POST /api/v1/devices/{deviceId}/telemetry/soil` and `.../water`) to dedicated MQTT over TLS topics (`melon/sensor-tanah/data-2424600050` and `melon/sensor-air/data-2424600050`) handled by `SoilWaterMqttAdapter` in `apps/iot-gateway`:
+- Ingestion endpoints `POST /api/v1/devices/[deviceId]/telemetry/soil` and `.../water` were completely removed from `apps/web`.
+- Edge middleware was tightened to require valid authentication sessions for all `/api/v1/devices` routes, eliminating unauthenticated public device telemetry bypass.
+- Telemetry ingestion persists directly through `TelemetryRepository` (`soil_readings` and `water_readings`) and emits real-time Server-Sent Events via internal webhook `POST /api/v1/internal/realtime/publish`.
+- Historical telemetry query endpoints (`GET /api/v1/devices/{deviceId}/telemetry/{soil|water}/history`) remain 100% active and backward-compatible.
 
 ### 2.2 TASK-0916 Database Relocation, Singapore Dev & Staging Cutover Reconciliation
 Database tier relocation from AWS Mumbai (`ap-south-1`) to AWS Singapore (`ap-southeast-1`) governed by `DEC-INF-095` introduces **zero changes** to public or internal REST API contracts, schemas, DTOs, endpoint routes, query parameters, or response payloads:

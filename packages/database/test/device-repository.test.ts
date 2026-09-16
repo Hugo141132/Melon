@@ -123,6 +123,64 @@ describe('DeviceRepository Unit Tests (TASK-0302)', () => {
     });
   });
 
+  describe('getDeviceByClientId (TASK-0412)', () => {
+    it('queries active device by case-insensitive clientId', async () => {
+      mockPrisma.device.findFirst.mockResolvedValue({
+        id: 'uuid-air-1',
+        deviceId: 'water-node-001',
+        clientId: 'melon-esp32-air1',
+        accountStatus: 'ACTIVE',
+      });
+
+      const result = await repo.getDeviceByClientId('melon-esp32-air1');
+
+      expect(mockPrisma.device.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            OR: [
+              { clientId: 'melon-esp32-air1' },
+              { clientId: { equals: 'melon-esp32-air1', mode: 'insensitive' } },
+            ],
+            accountStatus: 'ACTIVE',
+          },
+          include: { capabilities: true },
+        })
+      );
+      expect(result?.clientId).toBe('melon-esp32-air1');
+    });
+
+    it('returns null when clientId is empty or whitespace', async () => {
+      const result = await repo.getDeviceByClientId('   ');
+      expect(result).toBeNull();
+      expect(mockPrisma.device.findFirst).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getActiveDeviceByType (TASK-0412)', () => {
+    it('queries active device by deviceType', async () => {
+      mockPrisma.device.findFirst.mockResolvedValue({
+        id: 'uuid-soil-1',
+        deviceId: 'soil-node-001',
+        deviceType: 'SOIL_NODE',
+        accountStatus: 'ACTIVE',
+      });
+
+      const result = await repo.getActiveDeviceByType(DeviceType.SOIL_NODE);
+
+      expect(mockPrisma.device.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            deviceType: DeviceType.SOIL_NODE,
+            accountStatus: 'ACTIVE',
+          },
+          orderBy: { createdAt: 'asc' },
+          include: { capabilities: true },
+        })
+      );
+      expect(result?.deviceType).toBe(DeviceType.SOIL_NODE);
+    });
+  });
+
   describe('updateDevice (TASK-0302 / DEC-DEV-028)', () => {
     it('updates canonical deviceId and name, preserving immutable database UUID id and logging audit', async () => {
       const existingDevice = {

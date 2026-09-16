@@ -475,4 +475,116 @@ describe('TASK-0408: DeviceSimulator Unit & Scenario Verification', () => {
       fetchSpy.mockRestore();
     });
   });
+
+  describe('TASK-0412: MQTT Soil & Water Quality Telemetry Publication', () => {
+    it('publishes canonical Soil Telemetry payload to melon/sensor-tanah/data-2424600050', async () => {
+      const res = await simulator.publishSoilTelemetry({ nitrogen: 55.0, moisture: 68.0 });
+
+      expect(res.topic).toBe('melon/sensor-tanah/data-2424600050');
+      const payload = res.payload as any;
+      expect(payload.deviceId).toBe('soil-node-test-001');
+      expect(payload.data.nitrogen).toBe(55.0);
+      expect(payload.data.moisture).toBe(68.0);
+    });
+
+    it('publishes flat abbreviated Soil Telemetry payload when flat=true', async () => {
+      const res = await simulator.publishSoilTelemetry(
+        { nitrogen: 55.0, moisture: 68.0 },
+        undefined,
+        { flat: true }
+      );
+
+      expect(res.topic).toBe('melon/sensor-tanah/data-2424600050');
+      const payload = res.payload as any;
+      expect(payload.n).toBe(55.0);
+      expect(payload.hum).toBe(68.0);
+      expect(payload.data).toBeUndefined();
+    });
+
+    it('publishes canonical Water Quality Telemetry payload to melon/sensor-air/data-2424600050', async () => {
+      const res = await simulator.publishWaterTelemetry({ ph: 7.3, tds: 410 });
+
+      expect(res.topic).toBe('melon/sensor-air/data-2424600050');
+      const payload = res.payload as any;
+      expect(payload.deviceId).toBe('water-node-test-001');
+      expect(payload.data.ph).toBe(7.3);
+      expect(payload.data.tds).toBe(410);
+    });
+
+    it('publishes flat Water Quality Telemetry payload when flat=true', async () => {
+      const res = await simulator.publishWaterTelemetry({ ph: 7.3, tds: 410 }, undefined, {
+        flat: true,
+      });
+
+      expect(res.topic).toBe('melon/sensor-air/data-2424600050');
+      const payload = res.payload as any;
+      expect(payload.ph).toBe(7.3);
+      expect(payload.tds).toBe(410);
+      expect(payload.data).toBeUndefined();
+    });
+
+    it('configures discrete client IDs and credentials for Soil and Water Quality ESP32 nodes', () => {
+      const customSim = new DeviceSimulator({
+        soilClientId: 'melon-esp32-tanah1',
+        soilUsername: 'petanimelon',
+        soilPassword: 'soil_device_secret_123',
+        waterClientId: 'melon-esp32-air1',
+        waterUsername: 'petanimelon',
+        waterPassword: 'water_device_secret_456',
+        tankDeviceId: 'water-tank-node-test-001',
+        username: 'general_dev_user',
+        password: 'general_dev_pass',
+      });
+
+      expect(customSim.getSoilClientId()).toBe('melon-esp32-tanah1');
+      expect(customSim.getSoilUsername()).toBe('petanimelon');
+      expect(customSim.getSoilPassword()).toBe('soil_device_secret_123');
+
+      expect(customSim.getWaterClientId()).toBe('melon-esp32-air1');
+      expect(customSim.getWaterUsername()).toBe('petanimelon');
+      expect(customSim.getWaterPassword()).toBe('water_device_secret_456');
+
+      expect(customSim.getTankDeviceId()).toBe('water-tank-node-test-001');
+    });
+
+    it('passes discrete credentials to createMqttConnection for each hardware role', async () => {
+      const customSim = new DeviceSimulator({
+        soilClientId: 'melon-esp32-tanah1',
+        soilUsername: 'petanimelon_soil',
+        soilPassword: 'soil_pass_test',
+        waterClientId: 'melon-esp32-air1',
+        waterUsername: 'petanimelon_water',
+        waterPassword: 'water_pass_test',
+        tankDeviceId: 'water-tank-node-test-001',
+        username: 'general_dev_user',
+        password: 'general_dev_pass',
+      });
+
+      const createSpy = vi.spyOn(customSim as any, 'createMqttConnection').mockResolvedValue({
+        publish: vi.fn(),
+        subscribe: vi.fn(),
+        end: vi.fn(),
+        connected: true,
+      } as any);
+
+      await customSim.connectMqtt('soil');
+      expect(createSpy).toHaveBeenCalledWith('melon-esp32-tanah1', 'Soil ESP32 Simulator', {
+        username: 'petanimelon_soil',
+        password: 'soil_pass_test',
+      });
+
+      await customSim.connectMqtt('water');
+      expect(createSpy).toHaveBeenCalledWith('melon-esp32-air1', 'Water Quality ESP32 Simulator', {
+        username: 'petanimelon_water',
+        password: 'water_pass_test',
+      });
+
+      await customSim.connectMqtt('tank');
+      expect(createSpy).toHaveBeenCalledWith(
+        expect.stringContaining('sim-water-tank-node-test-001'),
+        'water-tank-node-test-001 Simulator',
+        { username: 'general_dev_user', password: 'general_dev_pass' }
+      );
+    });
+  });
 });

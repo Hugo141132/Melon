@@ -27,13 +27,13 @@ The project is a web-based multi-device monitoring and control system for ESP32/
 
 The system monitors:
 
-### Soil Monitoring (REST API over Wi-Fi)
+### Soil Monitoring (MQTT over TLS)
 
-- Nitrogen, Phosphorus, Potassium, Temperature, Moisture, pH, EC, Soil status (Battery deleted per `DEC-MON-086`).
+- Nitrogen, Phosphorus, Potassium, Temperature, Moisture, pH, EC, Soil status (Battery deleted per `DEC-MON-086`). Ingested via MQTT on `melon/sensor-tanah/data-2424600050` with outbound recommendation on `melon/ai-tanah/rekomendasi-2424600050` per `TASK-0412`.
 
-### Water Quality Monitoring (REST API over Wi-Fi)
+### Water Quality Monitoring (MQTT over TLS)
 
-- pH, TDS, EC, Water status (Battery, Latitude, and Longitude deleted).
+- pH, TDS, EC, Water status (Battery, Latitude, and Longitude deleted per `DEC-MON-086`). Ingested via MQTT on `melon/sensor-air/data-2424600050` with outbound recommendation on `melon/ai-air/rekomendasi-2424600050` per `TASK-0412`.
 
 ### Reservoir-Water Monitoring (MQTT 5.0 over TLS via EMQX Broker)
 
@@ -385,6 +385,41 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
 - Selected motion effects: `None`
 - 21st.dev MCP: `NOT REQUIRED`
 - Summary: Reconciled external hardware MQTT parameters and direct gateway ingestion per `DEC-DEV-031` and `DEC-DEV-032`. Established permanent external topic names: `irigasi/melon/sensor/volume` (tank water volume telemetry), `irigasi/melon/kontrol/valve` (valve OPEN/CLOSE behavioral control), and `irigasi/melon/setting/otomasi` (irrigation). Direct 2-tier gateway consumes canonical hardware topics directly through `TelemetryProcessor` with zero intermediate hops. Converted water tank display precision to 2 decimal places (`formatMetricValue(volumeVal, 2)`). Implemented time-based telemetry freshness calculation across monitoring routes (`/api/v1/devices/[deviceId]/monitoring/latest`, `/water/latest`, `/soil/latest`) and device routes (`/api/v1/devices`, `/api/v1/devices/[deviceId]`) using authoritative constant `TELEMETRY_STALE_THRESHOLD_MS = 60 * 1000` (60 seconds). Dynamically calculates effective `connectionStatus: STALE` when hardware telemetry exceeds 60 seconds without mutating database facts prematurely. Synchronized `DeviceContext` in-memory state via `updateDeviceStatus` and `useLatestMonitoring` freshness updates, resolving UI indicator inconsistencies across `DeviceSelector`, `WaterTankMonitoringCard`, `MonitoringDashboard`, `FaucetPresetSelector`, and `FaucetConfirmationModal`. Unified semantic indicators (`ONLINE` emerald dot, `STALE` amber dot, `OFFLINE` rose dot). Suppressed numerical volume display during stale or offline states, rendering placeholder (`— L` / `- L`) with 0% gauge fill while keeping stale alert notices and last seen timestamps visible. Automatically restores `ONLINE` status when fresh telemetry resumes (<60s). Verified 100% test pass rate across `water-tank-monitoring-card.test.tsx` (11/11), `monitoring-dashboard.test.tsx` (8/8), `latest.test.ts` (16/16), full telemetry test suites (53/53 passed), and monorepo TypeScript typecheck (0 errors across 4 workspaces).
+
+#### TASK-0412 Governance Record
+
+`TASK-0412` soil & water quality MQTT migration, explicit device credentials, and live verification record:
+- Status: `DONE` (Completed 2026-09-15; Live Verified 2026-09-16)
+- Priority: `P1`
+- Frontend impact: `NONE`
+- Selected UI direction: `N/A`
+- Existing color template: `UNCHANGED`
+- Selected motion effects: `None`
+- 21st.dev MCP: `NOT REQUIRED`
+- Summary: Migrated soil (`SOIL_NODE`) and water quality (`WATER_QUALITY_NODE`) device communication from legacy REST ingestion endpoints to MQTT over TLS via unified gateway client connection in `apps/iot-gateway` (`SoilWaterMqttAdapter`). Implemented bidirectional communication matching physical ESP32 device specifications:
+  - Inbound Telemetry: `melon/sensor-tanah/data-2424600050` (soil) and `melon/sensor-air/data-2424600050` (water quality).
+  - Outbound AI Recommendations: `melon/ai-tanah/rekomendasi-2424600050` (soil) and `melon/ai-air/rekomendasi-2424600050` (water quality) with QoS 1, retain: false.
+  - Unified Gateway MQTT Architecture: Single `GatewayMqttClient` on EMQX Broker (`MQTT_BROKER_URL`, `MQTT_GATEWAY_CLIENT_ID`, `MQTT_GATEWAY_USERNAME`, `MQTT_GATEWAY_PASSWORD`), dispatching incoming messages to dedicated domain adapters (`SoilWaterMqttAdapter`, `HardwareMqttAdapter`, `CommandPublisher`, `AcknowledgementProcessor`, `FaucetEventProcessor`, `TelemetryProcessor`). Retained reservoir water tank (`irigasi/melon/...`) and faucet control MQTT flow on EMQX completely unchanged (`ENABLE_FAUCET_CONTROL=false`).
+  - Dynamic Device Identity via MQTT Client ID (`devices.client_id`): Removed static device ID environment variables (`SOIL_DEVICE_ID`, `WATER_DEVICE_ID`). Added `clientId` (`devices.client_id`) to database schema and contracts (`PublicSafeDeviceDtoSchema`), migrating DEV database via `20260915230000_add_client_id_to_devices`. Primary identity source is MQTT Client ID (`melon-esp32-tanah1` $\rightarrow$ `SOIL_NODE`, `melon-esp32-air1` $\rightarrow$ `WATER_QUALITY_NODE`, `water-tank-node-zi37gz` $\rightarrow$ `WATER_TANK_NODE`). Supports future physical hardware replacement without code changes via database registry updates.
+  - Explicit Device MQTT Credentials & Configuration: Added explicit device MQTT environment configuration in `.env.example`, `apps/iot-gateway/.env.example`, `apps/iot-gateway/src/config/env.ts`, `scripts/mqtt-config.ts`, and `scripts/device-simulator.ts`:
+    - Soil ESP32: `SOIL_DEVICE_MQTT_CLIENT_ID=melon-esp32-tanah1`, `SOIL_DEVICE_MQTT_USERNAME`, `SOIL_DEVICE_MQTT_PASSWORD`.
+    - Water Quality ESP32: `WATER_DEVICE_MQTT_CLIENT_ID=melon-esp32-air1`, `WATER_DEVICE_MQTT_USERNAME`, `WATER_DEVICE_MQTT_PASSWORD`.
+    - Gateway credentials (`MQTT_GATEWAY_*`) remain strictly decoupled from hardware device identities; devices never simulate under gateway client identities.
+  - Normalization & Persistence: Dual payload support (canonical JSON envelope + flat abbreviated keys `{ n, p, k, temp, hum, ph, ec, status }` and `{ ph, tds, ec, status }`). Persists records via `TelemetryRepository.ingestSoilReading` and `ingestWaterReading` with transactional updates to `lastSeenAt` and `connectionStatus: ONLINE`. Dispatches webhooks to `/api/v1/internal/realtime/publish` for instant SSE streaming (`/api/v1/realtime/stream`).
+  - Database Column Drop: Created migration `20260915000000_drop_water_readings_unused_coordinates` and applied to DEV database via `supabase-dev` MCP, dropping unreferenced `latitude` and `longitude` from `water_readings` (`DEC-MON-086`). Updated `schema.prisma` and regenerated Prisma Client.
+  - REST Telemetry Route Removal: Removed obsolete endpoints `apps/web/app/api/v1/devices/[deviceId]/telemetry/soil` and `water`, removed `isDeviceTelemetryIngestionPath` from `apps/web/middleware.ts`, tightened middleware to enforce 401 UNAUTHENTICATED on all `/api/v1/devices` endpoints without session cookies, and updated `route_protection.test.ts`.
+  - Simulator Multi-Client Architecture: Updated `scripts/device-simulator.ts` to manage three distinct MQTT clients: Soil ESP32 (`melon-esp32-tanah1`), Water Quality ESP32 (`melon-esp32-air1`), and Reservoir Tank Node (`sim-${tankId}-...`), strictly preventing devices from simulating under gateway credentials.
+  - Bugs Discovered & Fixed During Live Verification:
+    - Synchronized `packages/database` build output (`npm run build --workspace=@kebun-melon/database`) so that `DeviceRepository.getDeviceByClientId` is available in `packages/database/dist/src/index.js`, fixing runtime `TypeError: this.deviceRepo.getDeviceByClientId is not a function`.
+    - Added `waterClientId` initialization to `this.config` in `scripts/device-simulator.ts` and aligned username/password paired fallback logic when placeholder passwords are used.
+  - Live End-to-End Verification (TASK-0412 Water Quality MQTT Telemetry Flow):
+    - Authenticated simulator client `melon-esp32-air1` connected to EMQX Cloud broker over WSS (`he100b10.ala.asia-southeast1.emqxsl.com:8084/mqtt`).
+    - Published live payload to `melon/sensor-air/data-2424600050`: `{ clientId: 'melon-esp32-air1', data: { ph: 7.25, tds: 420, ec: 1.35, status: 'NORMAL' } }`.
+    - IoT Gateway received message over active subscription via client `Test_Gateway`.
+    - Dynamically resolved `melon-esp32-air1` $\rightarrow$ `devices.client_id` $\rightarrow$ canonical device `water-quality-node-quiua` (`WATER_QUALITY_NODE`, DB UUID `3c19684e-e646-4eb0-a8f1-b6a7e24ad6af`).
+    - Persisted reading `b0b1dfbb-959c-4ce7-9bb1-ffb4d1e94d61` in `water_readings` (`ph: 7.25, tds: 420, ec: 1.35, status: NORMAL`) and transitioned device `connection_status` to `ONLINE`.
+    - Verified zero changes to staging environment or staging database via `supabase-staging` MCP (`water_readings` count = 0).
+  - Test & Quality Verification: 100% test pass rate across gateway suites (23/23 files, 338/338 tests passed), web suites (78/78 files, 649/649 tests passed), 0 TypeScript errors across 4 monorepo packages, secrets scanner passed with 0 leaks, and environment validator passed.
 
 #### TASK-1004 Governance & Infrastructure Record
 

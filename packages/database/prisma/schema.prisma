@@ -210,6 +210,7 @@ model Site {
 model Device {
   id               String                 @id @default(uuid()) @db.Uuid
   deviceId         String                 @unique @map("device_id") @db.VarChar(150)
+  clientId         String?                @unique @map("client_id") @db.VarChar(150)
   siteId           String?                @map("site_id") @db.Uuid
   name             String                 @db.VarChar(200)
   deviceType       DeviceType             @map("device_type")
@@ -338,8 +339,6 @@ model WaterReading {
   ph               Decimal?  @db.Decimal
   tds              Decimal?  @db.Decimal
   ec               Decimal?  @db.Decimal
-  latitude         Decimal?  @db.Decimal(9, 6)
-  longitude        Decimal?  @db.Decimal(9, 6)
   status           String?   @db.VarChar(30)
   validationStatus String    @default("VALID") @map("validation_status") @db.VarChar(30)
   createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz

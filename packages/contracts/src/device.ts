@@ -125,6 +125,7 @@ export type DevicePermissionsDto = z.infer<typeof DevicePermissionsDtoSchema>;
 export const PublicSafeDeviceDtoSchema = z.object({
   id: z.string().uuid(),
   deviceId: z.string().min(1).max(150),
+  clientId: z.string().nullable().optional(),
   siteId: z.string().uuid().nullable(),
   name: z.string().min(1).max(200),
   deviceType: DeviceTypeSchema,
@@ -174,6 +175,7 @@ export const CanonicalDeviceIdSchema = z
 export const UpdateDeviceInputSchema = z
   .object({
     deviceId: CanonicalDeviceIdSchema.optional(),
+    clientId: z.string().min(1).max(150).nullable().optional(),
     name: z.string().min(1, 'Nama perangkat wajib diisi').max(200).optional(),
     deviceType: DeviceTypeSchema.optional(),
     accountStatus: DeviceAccountStatusSchema.optional(),

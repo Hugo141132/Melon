@@ -20,6 +20,13 @@ export interface DeviceSimulatorConfig {
   soilDeviceId?: string;
   waterDeviceId?: string;
   tankDeviceId?: string;
+  soilClientId?: string;
+  soilUsername?: string;
+  soilPassword?: string;
+  waterClientId?: string;
+  waterUsername?: string;
+  waterPassword?: string;
+  tankClientId?: string;
   apiBaseUrl?: string;
   brokerUrl?: string;
   username?: string;
@@ -61,6 +68,9 @@ export interface ScenarioResult {
 export class DeviceSimulator {
   public readonly config: Required<DeviceSimulatorConfig>;
   private client: mqtt.MqttClient | null = null;
+  private tankClient: mqtt.MqttClient | null = null;
+  private soilClient: mqtt.MqttClient | null = null;
+  private waterClient: mqtt.MqttClient | null = null;
   private sequence = 1;
 
   constructor(config?: DeviceSimulatorConfig) {
@@ -112,6 +122,55 @@ export class DeviceSimulator {
               : config?.deviceId
                 ? config.deviceId
                 : process.env.MQTT_DEVICE_ID || creds.deviceId || ''),
+      soilClientId:
+        config?.soilClientId ||
+        process.env.SOIL_DEVICE_MQTT_CLIENT_ID ||
+        process.env.MQTT_SOIL_CLIENT_ID ||
+        creds.soilClientId ||
+        'melon-esp32-tanah1',
+      soilUsername:
+        config?.soilUsername ||
+        (process.env.SOIL_DEVICE_MQTT_USERNAME &&
+        process.env.SOIL_DEVICE_MQTT_PASSWORD &&
+        !process.env.SOIL_DEVICE_MQTT_PASSWORD.startsWith('CHANGE_ME')
+          ? process.env.SOIL_DEVICE_MQTT_USERNAME
+          : creds.soilUsername && creds.soilPassword && !creds.soilPassword.startsWith('CHANGE_ME')
+            ? creds.soilUsername
+            : creds.username),
+      soilPassword:
+        config?.soilPassword ||
+        (process.env.SOIL_DEVICE_MQTT_PASSWORD &&
+        !process.env.SOIL_DEVICE_MQTT_PASSWORD.startsWith('CHANGE_ME')
+          ? process.env.SOIL_DEVICE_MQTT_PASSWORD
+          : creds.soilPassword && !creds.soilPassword.startsWith('CHANGE_ME')
+            ? creds.soilPassword
+            : creds.password),
+      waterClientId:
+        config?.waterClientId ||
+        process.env.WATER_DEVICE_MQTT_CLIENT_ID ||
+        process.env.MQTT_WATER_CLIENT_ID ||
+        creds.waterClientId ||
+        'melon-esp32-air1',
+      waterUsername:
+        config?.waterUsername ||
+        (process.env.WATER_DEVICE_MQTT_USERNAME &&
+        process.env.WATER_DEVICE_MQTT_PASSWORD &&
+        !process.env.WATER_DEVICE_MQTT_PASSWORD.startsWith('CHANGE_ME')
+          ? process.env.WATER_DEVICE_MQTT_USERNAME
+          : creds.waterUsername &&
+              creds.waterPassword &&
+              !creds.waterPassword.startsWith('CHANGE_ME')
+            ? creds.waterUsername
+            : creds.username),
+      waterPassword:
+        config?.waterPassword ||
+        (process.env.WATER_DEVICE_MQTT_PASSWORD &&
+        !process.env.WATER_DEVICE_MQTT_PASSWORD.startsWith('CHANGE_ME')
+          ? process.env.WATER_DEVICE_MQTT_PASSWORD
+          : creds.waterPassword && !creds.waterPassword.startsWith('CHANGE_ME')
+            ? creds.waterPassword
+            : creds.password),
+      tankClientId: config?.tankClientId || process.env.MQTT_TANK_CLIENT_ID || '',
       apiBaseUrl: config?.apiBaseUrl || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000',
       brokerUrl: config?.brokerUrl || creds.brokerUrl,
       username: config?.username || creds.username,
@@ -206,6 +265,46 @@ export class DeviceSimulator {
     }
 
     return selected;
+  }
+
+  /**
+   * Resolves MQTT Client ID for Soil ESP32 Node (melon-esp32-tanah1).
+   */
+  public getSoilClientId(): string {
+    return this.config.soilClientId || 'melon-esp32-tanah1';
+  }
+
+  public getSoilUsername(): string {
+    return this.config.soilUsername;
+  }
+
+  public getSoilPassword(): string {
+    return this.config.soilPassword;
+  }
+
+  /**
+   * Resolves MQTT Client ID for Water Quality ESP32 Node (melon-esp32-air1).
+   */
+  public getWaterClientId(): string {
+    return this.config.waterClientId || 'melon-esp32-air1';
+  }
+
+  public getWaterUsername(): string {
+    return this.config.waterUsername;
+  }
+
+  public getWaterPassword(): string {
+    return this.config.waterPassword;
+  }
+
+  /**
+   * Resolves MQTT Client ID for Reservoir Water Tank Node.
+   */
+  public getTankClientId(): string {
+    return (
+      this.config.tankClientId ||
+      `sim-${this.getTankDeviceId()}-${Math.random().toString(16).substring(2, 8)}`
+    );
   }
 
   /**
@@ -384,32 +483,33 @@ export class DeviceSimulator {
   }
 
   /**
-   * Establishes MQTT connection if not connected.
+   * Helper to establish an authenticated MQTT client connection.
    */
-  public async connectMqtt(): Promise<mqtt.MqttClient> {
-    if (this.client && this.client.connected) {
-      return this.client;
-    }
-
-    const clientId = `sim-${this.getTankDeviceId()}-${Math.random().toString(16).substring(2, 8)}`;
+  private async createMqttConnection(
+    clientId: string,
+    clientLabel: string,
+    auth?: { username?: string; password?: string }
+  ): Promise<mqtt.MqttClient> {
     const isWebSocket =
       this.config.brokerUrl.startsWith('ws://') || this.config.brokerUrl.startsWith('wss://');
 
+    const username = auth?.username ?? this.config.username;
+    const password = auth?.password ?? this.config.password;
+
     const client = mqtt.connect(this.config.brokerUrl, {
-      username: this.config.username,
-      password: this.config.password,
+      username,
+      password,
       clientId,
       clean: true,
       reconnectPeriod: 2000,
       rejectUnauthorized: true,
       ...(isWebSocket ? { path: '/mqtt' } : {}),
     });
-    this.client = client;
 
     await new Promise<void>((resolve, reject) => {
       const timeout = setTimeout(() => {
         client.end(true);
-        reject(new Error(`[${this.getTankDeviceId()} Simulator] MQTT connection timeout`));
+        reject(new Error(`[${clientLabel}] MQTT connection timeout for client '${clientId}'`));
       }, 10000);
 
       client.on('connect', () => {
@@ -428,15 +528,156 @@ export class DeviceSimulator {
   }
 
   /**
+   * Establishes MQTT connection by hardware role:
+   * - 'soil': Soil ESP32 client (melon-esp32-tanah1)
+   * - 'water': Water Quality ESP32 client (melon-esp32-air1)
+   * - 'tank': Reservoir Tank Node client
+   */
+  public async connectMqtt(role: 'tank' | 'soil' | 'water' = 'tank'): Promise<mqtt.MqttClient> {
+    if (role === 'soil') {
+      if (this.soilClient && this.soilClient.connected) {
+        return this.soilClient;
+      }
+      const clientId = this.getSoilClientId();
+      this.soilClient = await this.createMqttConnection(clientId, 'Soil ESP32 Simulator', {
+        username: this.config.soilUsername,
+        password: this.config.soilPassword,
+      });
+      return this.soilClient;
+    }
+
+    if (role === 'water') {
+      if (this.waterClient && this.waterClient.connected) {
+        return this.waterClient;
+      }
+      const clientId = this.getWaterClientId();
+      this.waterClient = await this.createMqttConnection(
+        clientId,
+        'Water Quality ESP32 Simulator',
+        {
+          username: this.config.waterUsername,
+          password: this.config.waterPassword,
+        }
+      );
+      return this.waterClient;
+    }
+
+    if (this.tankClient && this.tankClient.connected) {
+      return this.tankClient;
+    }
+    const clientId = this.getTankClientId();
+    this.tankClient = await this.createMqttConnection(
+      clientId,
+      `${this.getTankDeviceId()} Simulator`,
+      {
+        username: this.config.username,
+        password: this.config.password,
+      }
+    );
+    this.client = this.tankClient;
+    return this.tankClient;
+  }
+
+  public async connectSoilMqtt(): Promise<mqtt.MqttClient> {
+    return this.connectMqtt('soil');
+  }
+
+  public async connectWaterMqtt(): Promise<mqtt.MqttClient> {
+    return this.connectMqtt('water');
+  }
+
+  public async connectTankMqtt(): Promise<mqtt.MqttClient> {
+    return this.connectMqtt('tank');
+  }
+
+  /**
    * Publishes Reservoir Telemetry payload over MQTT.
    */
   public async publishReservoirTelemetry(
     customData?: Partial<ReservoirTelemetryData>,
     payloadOverrides?: Partial<ReservoirTelemetryPayload>
   ): Promise<{ topic: string; payload: ReservoirTelemetryPayload }> {
-    const client = await this.connectMqtt();
+    const client = await this.connectMqtt('tank');
     const payload = this.buildReservoirTelemetryPayload(customData, payloadOverrides);
     const topic = `agriculture/${this.config.environment}/${this.config.siteId}/${payload.deviceId}/telemetry/reservoir`;
+
+    await new Promise<void>((resolve, reject) => {
+      client.publish(topic, JSON.stringify(payload), { qos: 1, retain: false }, (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+
+    return { topic, payload };
+  }
+
+  /**
+   * Publishes Soil Telemetry reading over MQTT (TASK-0412).
+   * Uses distinct Soil ESP32 MQTT client (melon-esp32-tanah1).
+   * Topic: melon/sensor-tanah/data-2424600050
+   */
+  public async publishSoilTelemetry(
+    customData?: Partial<SoilTelemetryData>,
+    payloadOverrides?: Partial<SoilTelemetryPayload>,
+    options?: { flat?: boolean }
+  ): Promise<{ topic: string; payload: unknown }> {
+    const client = await this.connectSoilMqtt();
+    const topic = process.env.SOIL_MQTT_PUB_TOPIC || 'melon/sensor-tanah/data-2424600050';
+    const canonicalPayload = this.buildSoilTelemetryPayload(customData, payloadOverrides);
+
+    const payload = options?.flat
+      ? {
+          clientId: this.getSoilClientId(),
+          n: canonicalPayload.data.nitrogen,
+          p: canonicalPayload.data.phosphorus,
+          k: canonicalPayload.data.potassium,
+          temp: canonicalPayload.data.temperature,
+          hum: canonicalPayload.data.moisture,
+          ph: canonicalPayload.data.ph,
+          ec: canonicalPayload.data.ec,
+          status: canonicalPayload.data.status,
+        }
+      : {
+          clientId: this.getSoilClientId(),
+          ...canonicalPayload,
+        };
+
+    await new Promise<void>((resolve, reject) => {
+      client.publish(topic, JSON.stringify(payload), { qos: 1, retain: false }, (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+
+    return { topic, payload };
+  }
+
+  /**
+   * Publishes Water Quality Telemetry reading over MQTT (TASK-0412).
+   * Uses distinct Water Quality ESP32 MQTT client (melon-esp32-air1).
+   * Topic: melon/sensor-air/data-2424600050
+   */
+  public async publishWaterTelemetry(
+    customData?: Partial<WaterTelemetryData>,
+    payloadOverrides?: Partial<WaterTelemetryPayload>,
+    options?: { flat?: boolean }
+  ): Promise<{ topic: string; payload: unknown }> {
+    const client = await this.connectWaterMqtt();
+    const topic = process.env.WATER_MQTT_PUB_TOPIC || 'melon/sensor-air/data-2424600050';
+    const canonicalPayload = this.buildWaterTelemetryPayload(customData, payloadOverrides);
+
+    const payload = options?.flat
+      ? {
+          clientId: this.getWaterClientId(),
+          ph: canonicalPayload.data.ph,
+          tds: canonicalPayload.data.tds,
+          ec: canonicalPayload.data.ec,
+          status: canonicalPayload.data.status,
+        }
+      : {
+          clientId: this.getWaterClientId(),
+          ...canonicalPayload,
+        };
 
     await new Promise<void>((resolve, reject) => {
       client.publish(topic, JSON.stringify(payload), { qos: 1, retain: false }, (err) => {
@@ -1066,15 +1307,26 @@ export class DeviceSimulator {
   }
 
   /**
-   * Disconnects MQTT client gracefully.
+   * Disconnects all MQTT clients gracefully.
    */
   public async disconnect(): Promise<void> {
-    if (this.client) {
-      await new Promise<void>((resolve) => {
-        this.client?.end(false, () => resolve());
-      });
-      this.client = null;
-    }
+    const clientsToClose = [this.tankClient, this.soilClient, this.waterClient, this.client].filter(
+      (c, idx, arr): c is mqtt.MqttClient => Boolean(c) && arr.indexOf(c) === idx
+    );
+
+    await Promise.all(
+      clientsToClose.map(
+        (c) =>
+          new Promise<void>((resolve) => {
+            c.end(false, () => resolve());
+          })
+      )
+    );
+
+    this.tankClient = null;
+    this.soilClient = null;
+    this.waterClient = null;
+    this.client = null;
   }
 }
 
@@ -1106,6 +1358,9 @@ async function runCli(): Promise<void> {
     (scenario !== 'soil-telemetry' && scenario !== 'water-telemetry'
       ? explicitDeviceId
       : undefined);
+  const soilClientId = getArg('soil-client-id');
+  const waterClientId = getArg('water-client-id');
+  const tankClientId = getArg('tank-client-id');
   const siteId = getArg('site-id');
   const env = getArg('env') as 'development' | 'staging' | 'production' | undefined;
   const apiUrl = getArg('api-url');
@@ -1116,6 +1371,9 @@ async function runCli(): Promise<void> {
     soilDeviceId,
     waterDeviceId,
     tankDeviceId,
+    soilClientId,
+    waterClientId,
+    tankClientId,
     siteId,
     environment: env,
     apiBaseUrl: apiUrl,
@@ -1140,34 +1398,74 @@ async function runCli(): Promise<void> {
     let result: ScenarioResult;
 
     switch (scenario) {
-      case 'soil-telemetry':
-        const soilRes = await simulator.sendSoilTelemetry();
-        result = {
-          scenario,
-          simulated: true,
-          status: soilRes.ok ? 'SUCCESS' : 'FAILED',
-          message: `Sent soil telemetry REST payload. Response status: ${soilRes.status}`,
-          details: {
-            deviceId: simulator.getSoilDeviceId(),
-            status: soilRes.status,
-            body: soilRes.body,
-          },
-        };
+      case 'soil-telemetry': {
+        const transport = getArg('transport') || 'mqtt';
+        const isFlat = hasFlag('flat');
+        if (transport === 'rest') {
+          const soilRes = await simulator.sendSoilTelemetry();
+          result = {
+            scenario,
+            simulated: true,
+            status: soilRes.ok ? 'SUCCESS' : 'FAILED',
+            message: `Sent legacy soil telemetry REST payload. Response status: ${soilRes.status}`,
+            details: {
+              deviceId: simulator.getSoilDeviceId(),
+              status: soilRes.status,
+              body: soilRes.body,
+            },
+          };
+        } else {
+          const soilObj = await simulator.publishSoilTelemetry(undefined, undefined, {
+            flat: isFlat,
+          });
+          result = {
+            scenario,
+            simulated: true,
+            status: 'SUCCESS',
+            message: `Published soil telemetry MQTT payload to topic '${soilObj.topic}'.`,
+            details: {
+              deviceId: simulator.getSoilDeviceId(),
+              topic: soilObj.topic,
+              payload: soilObj.payload,
+            },
+          };
+        }
         break;
-      case 'water-telemetry':
-        const waterRes = await simulator.sendWaterTelemetry();
-        result = {
-          scenario,
-          simulated: true,
-          status: waterRes.ok ? 'SUCCESS' : 'FAILED',
-          message: `Sent water telemetry REST payload. Response status: ${waterRes.status}`,
-          details: {
-            deviceId: simulator.getWaterDeviceId(),
-            status: waterRes.status,
-            body: waterRes.body,
-          },
-        };
+      }
+      case 'water-telemetry': {
+        const transport = getArg('transport') || 'mqtt';
+        const isFlat = hasFlag('flat');
+        if (transport === 'rest') {
+          const waterRes = await simulator.sendWaterTelemetry();
+          result = {
+            scenario,
+            simulated: true,
+            status: waterRes.ok ? 'SUCCESS' : 'FAILED',
+            message: `Sent legacy water telemetry REST payload. Response status: ${waterRes.status}`,
+            details: {
+              deviceId: simulator.getWaterDeviceId(),
+              status: waterRes.status,
+              body: waterRes.body,
+            },
+          };
+        } else {
+          const waterObj = await simulator.publishWaterTelemetry(undefined, undefined, {
+            flat: isFlat,
+          });
+          result = {
+            scenario,
+            simulated: true,
+            status: 'SUCCESS',
+            message: `Published water quality telemetry MQTT payload to topic '${waterObj.topic}'.`,
+            details: {
+              deviceId: simulator.getWaterDeviceId(),
+              topic: waterObj.topic,
+              payload: waterObj.payload,
+            },
+          };
+        }
         break;
+      }
       case 'reservoir-telemetry':
         const resObj = await simulator.publishReservoirTelemetry();
         result = {

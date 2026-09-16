@@ -104,6 +104,12 @@ export interface MqttSimulatorCredentials {
   username: string;
   password: string;
   deviceId: string;
+  soilClientId?: string;
+  soilUsername?: string;
+  soilPassword?: string;
+  waterClientId?: string;
+  waterUsername?: string;
+  waterPassword?: string;
 }
 
 export function getMqttSimulatorCredentials(): MqttSimulatorCredentials {
@@ -113,5 +119,17 @@ export function getMqttSimulatorCredentials(): MqttSimulatorCredentials {
     username: process.env.MQTT_STAGING_USERNAME || requireConfigEnv('MQTT_DEV1_USERNAME'),
     password: process.env.MQTT_STAGING_PASSWORD || requireConfigEnv('MQTT_DEV1_PASSWORD'),
     deviceId: process.env.MQTT_TANK_DEVICE_ID || process.env.MQTT_DEVICE_ID,
+    soilClientId:
+      process.env.SOIL_DEVICE_MQTT_CLIENT_ID ||
+      process.env.MQTT_SOIL_CLIENT_ID ||
+      'melon-esp32-tanah1',
+    soilUsername: process.env.SOIL_DEVICE_MQTT_USERNAME,
+    soilPassword: process.env.SOIL_DEVICE_MQTT_PASSWORD,
+    waterClientId:
+      process.env.WATER_DEVICE_MQTT_CLIENT_ID ||
+      process.env.MQTT_WATER_CLIENT_ID ||
+      'melon-esp32-air1',
+    waterUsername: process.env.WATER_DEVICE_MQTT_USERNAME,
+    waterPassword: process.env.WATER_DEVICE_MQTT_PASSWORD,
   };
 }

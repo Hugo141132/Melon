@@ -59,6 +59,12 @@ The database shall be the durable system of record for application state.
 - **Service Connectivity & Container Status:** Reconfigured `.env.staging` line 23 to Singapore transaction pooler (`aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres?pgbouncer=true`). Staging containers (`kebun-melon-staging-web` and `kebun-melon-staging-gateway`) rebuilt, redeployed, and healthy (`/health`, `/ready` HTTP 200).
 - **Environment Status & Staleness:** Both Mumbai Dev (`xjsencdgfcbkzdzqcnqx`) and Mumbai Staging (`scqrbtfilmttqrutynyo`) are paused (`INACTIVE`, 0 active project slots) and permanently stale. Per Owner decision, Mumbai rollback is decommissioned and technical cutover is complete (`DONE`). Restarted 72-hour soak period active from `2026-09-08 15:28:30 UTC` through `2026-09-11 15:28:30 UTC`. Sampled observations confirm healthy service at tested points, with the gap between periodic sample probes and continuous telemetry aggregation explicitly disclosed. Full details in [`docs/SUPABASE_MIGRATION_RUNBOOK.md`](file:///c:/Users/Puroh/Documents/Melon/docs/SUPABASE_MIGRATION_RUNBOOK.md).
 
+### 2.3 TASK-0412 Database Migration: water_readings Unused Coordinate Columns Dropped
+Under `TASK-0412` and `DEC-MON-086`:
+- Confirmed unused columns `latitude` and `longitude` in `water_readings` were dropped via migration `20260915000000_drop_water_readings_unused_coordinates`.
+- Applied and verified on Dev database (PostgreSQL 17 Singapore `unbyxlkrzqlafolxcypi`).
+- Zero data loss: `water_readings` contained 0 rows prior to migration. Staging migration remains deferred until formal release cutover.
+
 ---
 
 
@@ -869,12 +875,12 @@ Stores general water-quality telemetry.
 | `received_at` | TIMESTAMPTZ | No | |
 | `ph` | NUMERIC | Yes | |
 | `tds` | NUMERIC | Yes | Unit `TBD` |
-| `ec` | NUMERIC | Yes | Unit `TBD` |
-| `latitude` | NUMERIC(9,6) | Yes | DELETED parameter |
-| `longitude` | NUMERIC(9,6) | Yes | DELETED parameter |
+| `ec` | NUMERIC | Yes | Unit `mS/cm` |
 | `status` | VARCHAR(30) | Yes | Canonical status |
 | `validation_status` | VARCHAR(30) | No | |
 | `created_at` | TIMESTAMPTZ | No | |
+
+*Note: Unused columns `latitude` and `longitude` were dropped via migration `20260915000000_drop_water_readings_unused_coordinates` (`DEC-MON-086` / `TASK-0412`).*
 
 ---
 
@@ -917,8 +923,6 @@ Stores time-series battery / power-supply measurements. Note: `BAT` is completel
 
 ### Constraints
 
-- Latitude between `-90` and `90`.
-- Longitude between `-180` and `180`.
 - `message_id` unique per device.
 - Missing values shall remain `NULL`.
 - Battery shall not be constrained until its meaning is confirmed.
