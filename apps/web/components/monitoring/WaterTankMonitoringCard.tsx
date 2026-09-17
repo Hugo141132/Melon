@@ -16,8 +16,6 @@ import { useTranslations } from 'next-intl';
 import { cn, formatDeviceDisplayName } from '@/lib/utils';
 import { WATER_TANK_MAX_CAPACITY } from '@/lib/constants';
 
-export { WATER_TANK_MAX_CAPACITY };
-
 // Helper to format numeric values nicely or return placeholder
 function formatMetricValue(val: number | null | undefined, decimals = 1, fallback = '—'): string {
   if (val === null || val === undefined || isNaN(val)) return fallback;

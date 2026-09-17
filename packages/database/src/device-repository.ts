@@ -379,18 +379,6 @@ export class DeviceRepository {
   }
 
   /**
-   * One-time maintenance method to reconcile existing database records.
-   * Scans existing devices in the database and cleans up obsolete rows (e.g. RELAY_CONTROL, SOLENOID_VALVE_CONTROL).
-   */
-  async reconcileExistingDeviceCapabilitiesOnce(): Promise<{ reconciledDeviceCount: number }> {
-    const devices = await this.prisma.device.findMany({ select: { id: true } });
-    for (const dev of devices) {
-      await this.reconcileDeviceCapabilities(dev.id);
-    }
-    return { reconciledDeviceCount: devices.length };
-  }
-
-  /**
    * Deactivates a device in the registry (Owner-only operation).
    * Sets accountStatus = DEACTIVATED, connectionStatus = INACTIVE, deactivatedAt = now().
    * Inactive devices cannot receive commands.

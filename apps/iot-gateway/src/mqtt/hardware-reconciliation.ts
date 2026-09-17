@@ -26,9 +26,6 @@ export const PERMANENT_HARDWARE_TOPICS: HardwareTopicParameters = {
   topicLiterKeluar: 'irigasi/melon/sensor/liter_keluar',
 };
 
-// Backwards-compatible alias
-export const HARDWARE_TEAM_PARAMETERS = PERMANENT_HARDWARE_TOPICS;
-
 export interface HardwareMappingContext {
   environment: AllowedEnvironment;
   siteId: string;
@@ -56,11 +53,7 @@ export interface BroadcastControlIsolationEvaluation {
   feasibleOptionsPreservingTopicName: string[];
 }
 
-/**
- * Confirmed functional purposes of the permanent hardware topics per hardware clarification.
- * Documented separately from wire payload semantics.
- */
-export const CONFIRMED_HARDWARE_TOPIC_PURPOSES = {
+const CONFIRMED_HARDWARE_TOPIC_PURPOSES = {
   topicVolume: 'Tank water-volume telemetry',
   topicValve: 'Valve OPEN/CLOSE commands (behavioral intent, NOT wire payload syntax)',
   topicOtomasi: 'Irrigation (unconfirmed whether setting config, 1-shot dispense, or autonomous)',

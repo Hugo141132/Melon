@@ -24,11 +24,6 @@ export const SOIL_WATER_TOPICS = {
   WATER_RECOMMENDATION: 'melon/ai-air/rekomendasi-2424600050',
 } as const;
 
-export const DEFAULT_HARDWARE_CLIENTS = {
-  SOIL: 'melon-esp32-tanah1',
-  WATER: 'melon-esp32-air1',
-} as const;
-
 export interface SoilWaterAdapterOptions {
   env?: GatewayEnv;
   mqttClient?: GatewayMqttClient;

@@ -5,7 +5,9 @@ export interface FaucetPresetSelectorSkeletonProps {
   className?: string;
 }
 
-export function FaucetPresetSelectorSkeleton({ className }: FaucetPresetSelectorSkeletonProps) {
+export default function FaucetPresetSelectorSkeleton({
+  className,
+}: FaucetPresetSelectorSkeletonProps) {
   return (
     <div
       className={cn(
@@ -60,5 +62,3 @@ export function FaucetPresetSelectorSkeleton({ className }: FaucetPresetSelector
     </div>
   );
 }
-
-export default FaucetPresetSelectorSkeleton;

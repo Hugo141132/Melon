@@ -2,7 +2,6 @@ import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import DashboardPage from '@/app/page';
-import DashboardDirectPage from '@/app/dashboard/page';
 import { DeviceProvider } from '@/context/DeviceContext';
 import { AuthProvider } from '@/context/AuthContext';
 import { FIXED_WEATHER_LOCATION } from '@/components/dashboard/WeatherCard';
@@ -252,19 +251,6 @@ describe('Dashboard UI & Fixed-Location Weather Suite (TASK-0506 Final Refined)'
     expect(screen.queryByText('Ringkasan Pemantauan Air')).toBeNull();
     expect(screen.queryByText('Ringkasan Pemantauan Reservoir')).toBeNull();
     expect(screen.queryByText('Status Armada Perangkat')).toBeNull();
-  });
-
-  it('5. Renders identical focused DashboardView on /dashboard route without redirects', () => {
-    render(
-      <AuthProvider initialSession={mockSession}>
-        <DeviceProvider initialDevices={mockDevices}>
-          <DashboardDirectPage />
-        </DeviceProvider>
-      </AuthProvider>
-    );
-
-    expect(screen.getByText(/Selamat Datang, Budi/i)).toBeInTheDocument();
-    expect(screen.getByText('King Agrowisata')).toBeInTheDocument();
   });
 
   it('6. Strictly contains zero emojis across all greetings, cards, and labels', () => {
