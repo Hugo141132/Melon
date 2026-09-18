@@ -22,7 +22,7 @@ Migrate both the **Development** and **Staging** Supabase PostgreSQL databases f
 4. **Colocation Rationale:** Moving databases to AWS Singapore co-locates persistence with the project's EMQX Cloud MQTT broker (`asia-southeast1`: `he100b10.ala.asia-southeast1.emqxsl.com:8443`), reducing regional network round-trips from ~240ms (Mumbai) to an expected ~20–40ms. (Note: Network latency is path-dependent and cannot be unconditionally guaranteed; operational risks are mitigated through rehearsal and disciplined rollback procedures).
 
 ### 1.3 Scope Boundaries & Decoupling from `TASK-0909`
-- `TASK-0909` (automated daily offsite backup pipeline to R2/S3) is an independent operational task currently blocked on cloud storage selection. It does **not** block `TASK-0916`.
+- `TASK-0909` (automated daily offsite backup pipeline to R2/S3) is an independent operational task deferred until an operational requirement arises. It does **not** block `TASK-0916`.
 - Migration-specific recovery is satisfied independently by dedicated, point-in-time, GPG/AES-256 encrypted snapshots, cryptographic checksums, and a mandatory isolated restore rehearsal.
 - **Checksum Limitation:** SHA-256 checksums verify transport file integrity only. They do **not** guarantee logical data completeness, foreign key consistency, or successful SQL execution. Logical integrity is validated via row-count parity and local restore rehearsal.
 

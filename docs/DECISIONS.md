@@ -575,7 +575,7 @@ The following decisions remain TBD and must be resolved before the listed tasks 
 | Physical test run count per faucet phase | `TASK-0811` | No numeric value approved. |
 | Telemetry publish interval | `TASK-0405`, `TASK-0406` | Not defined. |
 | Heartbeat interval | `TASK-0407` (DEFERRED) | Not defined (`DEC-DEV-030`). |
-| Backup schedule, retention, RPO, RTO | `TASK-0909` | Not yet explicitly approved. |
+| Backup schedule, retention, RPO, RTO | `TASK-0909` (DEFERRED) | Intentionally postponed until operational requirement (`DEC-INF-096`). |
 | Physical device firmware & EMQX credentials/ACLs rename reconciliation | Post-Phase 3 device rename automation | Unresolved operational/hardware workflow (`DEC-DEV-028`). Manual/TBD. |
 
 ---
@@ -872,3 +872,12 @@ The following facts are supported by the verified decisions governance of `TASK-
   7. **Clamped Progress Calculation:** Progress percentage uses the 2200 L maximum, clamped strictly between 0% and 100%: $\text{clamp}((\text{tankVolume} / 2200) \times 100, 0, 100)$.
   8. **Responsive Layout Geometry (Single Full-Width Column):** Reconcile responsive grid styling in `WaterTankMonitoringCard.tsx`, `apps/web/app/controls/loading.tsx`, and `MonitoringDashboard.tsx` from residual two-column grids (`sm:grid-cols-2`) to a single full-width column (`grid-cols-1 gap-4`), spanning the complete available content area on desktop while adapting fluidly on mobile without horizontal overflow.
 <!-- TASK-0410 Reconciled: 2026-09-09 -->
+
+---
+
+## DEC-INF-096: Backup and Restore Capability Deferral
+- **Status:** APPROVED
+- **Context:** Cloud storage selection for the automated daily offsite backup pipeline (R2/S3) has not been decided, and backup and restore functionality is not required at this stage of the project.
+- **Decision:** Due to the absence of an immediate operational requirement, the implementation of an automated daily offsite backup pipeline, cloud storage integration, and restore procedures (`TASK-0909`) is formally deferred. Backup and restore capability is intentionally postponed until there is an operational requirement.
+- **Safety & Scope Boundaries:** No backup pipelines, storage integrations, database migrations, or infrastructure changes are implemented. Point-in-time snapshots and manual restore runbooks established during maintenance cutovers remain documented independently in `docs/SUPABASE_MIGRATION_RUNBOOK.md`.
+<!-- TASK-0909 Deferral Reconciled: 2026-09-18 -->

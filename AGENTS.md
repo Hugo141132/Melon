@@ -858,6 +858,17 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
 - 21st.dev MCP: `NOT REQUIRED`
 - Summary: Completely removed unused water-tank flow rate telemetry parameter (`flowRate`, `flow_rate`, `WATER_FLOW_RATE`) across contracts, database schema, IoT gateway MQTT ingestion, REST API/SSE responses, web UI, translations, simulators, fixtures, and tests governed by `DEC-MON-089`. Scoped capability removal strictly to water tank devices. Verified legacy payload backward compatibility: payloads with or without `flowRate` validate cleanly, stripping `flowRate` at ingestion without data corruption or rejection. Removed flow rate card and skeleton from `WaterTankMonitoringCard` and `/controls` loading view, preserving explicit zero `tankVolume`, status-only telemetry, and null states without fallback to `smoothFlow`. Applied versioned migration `20260909010000_remove_reservoir_flow_rate` on Supabase DEV and STAGING. Verified staging containers `/health` and `/ready` (200 OK, `ENABLE_FAUCET_CONTROL=false`). Verified 100% test pass rate across all monorepo unit/integration suites and 0 typecheck errors.
 
+#### TASK-0909 Governance Record
+
+`TASK-0909` automated backup and restore capability deferral record:
+- Status: `DEFERRED` (Reconciled 2026-09-18)
+- Frontend impact: `NONE`
+- Selected UI direction: `N/A`
+- Existing color template: `UNCHANGED`
+- Selected motion effects: `None`
+- 21st.dev MCP: `NOT REQUIRED`
+- Summary: Formally deferred the automated daily offsite backup pipeline (e.g., Cloudflare R2 / AWS S3) and restore testing capabilities under `DEC-INF-096`. Updated task status from `BLOCKED` to `DEFERRED` in `TASKS.md` and traceability matrix `docs/TRACEABILITY.md` (`SEC-OPS-003`). Because backup and restore capability is intentionally postponed until there is an operational requirement, no backup pipeline code, storage SDK integrations, database migrations, or infrastructure changes are implemented. Confirmed that point-in-time encrypted snapshot exports and local isolated restore rehearsal procedures documented for database maintenance in `docs/SUPABASE_MIGRATION_RUNBOOK.md` remain independently operational and unaffected. Zero changes to staging environment or running services.
+
 ---
 
 

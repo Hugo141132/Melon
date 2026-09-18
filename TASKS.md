@@ -2671,8 +2671,9 @@ Apply to:
 ## TASK-0909 — Configure Backup and Restore
 
 **Priority:** `P0`
-**Status:** `BLOCKED`
+**Status:** `DEFERRED`
 **Dependencies:** `TASK-0104`, Offsite Backup Storage Selection (e.g., Cloudflare R2 / AWS S3)
+**Blocked Reason:** Deferred from the current release. Backup and restore capability is intentionally postponed until there is an operational requirement.
 
 ### Acceptance Criteria
 
