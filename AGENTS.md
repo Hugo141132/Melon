@@ -2268,3 +2268,21 @@ The following facts are supported by the current implementation regarding device
   - **Operator CI Gates:** The five pre-commit CI gates (`npm run test:coverage`, `npm run test:integration`, `npm run check:quality`, `npm run test`, `npm run test:e2e`) are reserved for manual execution by the operator.
 <!-- TASK-0916 Dev & Staging Cutover Reconciled: 2026-09-08 -->
 
+---
+
+## TASK-0413 Governance & External ML Supabase Integration Record
+
+`TASK-0413` external Supabase ML prediction integration and outbound recommendation pipeline record:
+- **Status:** `IN_PROGRESS` (Phase A, Phase B, Database Mapping, and Phase C Outbound MQTT Completed 2026-09-18; Phase D Dashboard Binding pending)
+- **Frontend impact:** `NONE` (Phases A–C) / `MINOR` (Phase D, zero layout redesign per `DEC-UIUX-101`)
+- **Selected UI direction:** `Premium Minimal Ops` (for upcoming Phase D dashboard cards)
+- **Existing color template:** `UNCHANGED`
+- **Selected motion effects:** `None` (Phases A–C) / `KPI refresh`, `Card hover` (Phase D)
+- **21st.dev MCP:** `NOT REQUIRED`
+- **Summary:**
+  - **Phase A (Contracts & Client Adapter):** Defined canonical schemas in `packages/contracts/src/prediction.ts` and implemented read-only HTTPS PostgREST client in `packages/database/src/external-prediction-client.ts` with 30s TTL cache, 3000ms timeout, candidate column fallback, and JSON recommendation parser.
+  - **Phase B (Protected Prediction API):** Implemented `GET /api/v1/devices/[deviceId]/predictions/latest` in `apps/web` with session authentication, RBAC device access verification (`requireDeviceViewAccess`), dual identifier resolution (UUID and canonical string `deviceId`), server-side cache control, and strict privacy (masking external ML IDs to canonical Melon IDs, zero URL/key leakage).
+  - **Database-Driven Device Mapping:** Added `device_external_mappings` table and repository methods in `packages/database/src/device-repository.ts` (`getActiveExternalDeviceId`, `upsertExternalMapping`, `getExternalMappings`) to dynamically resolve external ML IDs from Melon database. Enforced fail-closed behavior in production.
+  - **Phase C (Outbound MQTT Recommendation Publishing):** Integrated non-blocking, asynchronous prediction dispatch into `SoilWaterMqttAdapter` (`apps/iot-gateway`). Configurable debounce delay (`EXTERNAL_ML_DEBOUNCE_MS`, default 1500ms pending confirmed pipeline latency), staleness validation (`EXTERNAL_ML_MAX_STALENESS_SECONDS`, default 300s), duplicate suppression (`lastPublishedPredictionId`), stable `messageId` and `predictionId` for subscriber idempotency, and advisory-only QoS 1 / `retain: false` MQTT dispatch.
+  - **Verification:** 95/95 unit tests passed across 4 suites (`soil-water-adapter.test.ts` 37/37, `device-repository.test.ts` 23/23, `prediction-latest-route.test.ts` 15/15, `external-prediction-client.test.ts` 20/20), 0 monorepo typecheck errors, and live end-to-end MQTT verification confirmed against EMQX Cloud broker for both soil and water quality domains.
+<!-- TASK-0413 Phases A-C Reconciled: 2026-09-18 -->

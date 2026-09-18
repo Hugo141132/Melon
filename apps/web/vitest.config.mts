@@ -4,6 +4,12 @@ import path from 'path';
 
 export default defineConfig({
   plugins: [react()],
+  // @ts-expect-error vite 8 oxc option
+  oxc: {
+    jsx: {
+      runtime: 'automatic',
+    },
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './'),
@@ -14,7 +20,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: true,
-    setupFiles: ['./test/setup.ts'],
+    setupFiles: [path.resolve(__dirname, './test/setup.ts')],
     pool: 'forks',
     execArgv: ['--max-old-space-size=4096'],
     maxWorkers: 1,

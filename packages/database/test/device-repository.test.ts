@@ -23,6 +23,11 @@ describe('DeviceRepository Unit Tests (TASK-0302)', () => {
       auditLog: {
         create: vi.fn(),
       },
+      deviceExternalMapping: {
+        findFirst: vi.fn(),
+        upsert: vi.fn(),
+        findMany: vi.fn(),
+      },
       $transaction: vi.fn(async (cb: any) => cb(mockPrisma)),
     };
 
@@ -454,6 +459,185 @@ describe('DeviceRepository Unit Tests (TASK-0302)', () => {
         'device-id-123',
         expect.anything()
       );
+    });
+  });
+
+  describe('device_external_mappings methods (TASK-0413)', () => {
+    const mockDevice = {
+      id: '3216f033-4c21-4b19-adc6-365854c31704',
+      deviceId: 'soil-node-jvbkdbv',
+      name: 'Soil Node Bedeng 1',
+      deviceType: DeviceType.SOIL_NODE,
+      accountStatus: DeviceAccountStatus.ACTIVE,
+      connectionStatus: DeviceConnectionStatus.ONLINE,
+      capabilities: [],
+    };
+
+    describe('getActiveExternalDeviceId', () => {
+      it('returns externalDeviceId when active mapping exists for deviceId', async () => {
+        mockPrisma.deviceExternalMapping.findFirst.mockResolvedValue({
+          externalDeviceId: 'melon002',
+        });
+
+        const result = await repo.getActiveExternalDeviceId(
+          'soil-node-jvbkdbv',
+          'SOIL',
+          'EXTERNAL_ML'
+        );
+
+        expect(result).toBe('melon002');
+        expect(mockPrisma.deviceExternalMapping.findFirst).toHaveBeenCalledWith({
+          where: {
+            provider: 'EXTERNAL_ML',
+            domain: 'SOIL',
+            isActive: true,
+            device: {
+              OR: [
+                { deviceId: 'soil-node-jvbkdbv' },
+                { deviceId: { equals: 'soil-node-jvbkdbv', mode: 'insensitive' } },
+              ],
+            },
+          },
+          select: {
+            externalDeviceId: true,
+          },
+        });
+      });
+
+      it('returns externalDeviceId when querying by UUID', async () => {
+        mockPrisma.deviceExternalMapping.findFirst.mockResolvedValue({
+          externalDeviceId: 'melon002',
+        });
+
+        const result = await repo.getActiveExternalDeviceId(
+          '3216f033-4c21-4b19-adc6-365854c31704',
+          'SOIL'
+        );
+
+        expect(result).toBe('melon002');
+        expect(mockPrisma.deviceExternalMapping.findFirst).toHaveBeenCalledWith({
+          where: {
+            provider: 'EXTERNAL_ML',
+            domain: 'SOIL',
+            isActive: true,
+            device: {
+              OR: [
+                { id: '3216f033-4c21-4b19-adc6-365854c31704' },
+                { deviceId: '3216f033-4c21-4b19-adc6-365854c31704' },
+                {
+                  deviceId: { equals: '3216f033-4c21-4b19-adc6-365854c31704', mode: 'insensitive' },
+                },
+              ],
+            },
+          },
+          select: {
+            externalDeviceId: true,
+          },
+        });
+      });
+
+      it('returns null when no active mapping is found', async () => {
+        mockPrisma.deviceExternalMapping.findFirst.mockResolvedValue(null);
+
+        const result = await repo.getActiveExternalDeviceId('soil-node-jvbkdbv', 'SOIL');
+        expect(result).toBeNull();
+      });
+
+      it('returns null for empty or invalid deviceIdentifier', async () => {
+        expect(await repo.getActiveExternalDeviceId('', 'SOIL')).toBeNull();
+        expect(await repo.getActiveExternalDeviceId(null as any, 'SOIL')).toBeNull();
+      });
+    });
+
+    describe('upsertExternalMapping', () => {
+      it('creates or updates mapping for resolved device', async () => {
+        mockPrisma.device.findFirst.mockResolvedValue(mockDevice);
+        const mockUpsertResult = {
+          id: 'map-uuid-1234',
+          deviceId: mockDevice.id,
+          provider: 'EXTERNAL_ML',
+          domain: 'SOIL',
+          externalDeviceId: 'melon002',
+          isActive: true,
+          createdAt: new Date('2026-09-18T10:00:00Z'),
+          updatedAt: new Date('2026-09-18T10:00:00Z'),
+        };
+        mockPrisma.deviceExternalMapping.upsert.mockResolvedValue(mockUpsertResult);
+
+        const result = await repo.upsertExternalMapping({
+          deviceId: 'soil-node-jvbkdbv',
+          domain: 'SOIL',
+          externalDeviceId: 'melon002',
+        });
+
+        expect(result.externalDeviceId).toBe('melon002');
+        expect(result.canonicalDeviceId).toBe('soil-node-jvbkdbv');
+        expect(mockPrisma.deviceExternalMapping.upsert).toHaveBeenCalledWith({
+          where: {
+            deviceId_provider_domain: {
+              deviceId: mockDevice.id,
+              provider: 'EXTERNAL_ML',
+              domain: 'SOIL',
+            },
+          },
+          create: {
+            deviceId: mockDevice.id,
+            provider: 'EXTERNAL_ML',
+            domain: 'SOIL',
+            externalDeviceId: 'melon002',
+            isActive: true,
+          },
+          update: {
+            externalDeviceId: 'melon002',
+            isActive: true,
+            updatedAt: expect.any(Date),
+          },
+        });
+      });
+
+      it('throws DeviceNotFoundError if target device does not exist', async () => {
+        mockPrisma.device.findFirst.mockResolvedValue(null);
+
+        await expect(
+          repo.upsertExternalMapping({
+            deviceId: 'non-existent',
+            domain: 'SOIL',
+            externalDeviceId: 'melon002',
+          })
+        ).rejects.toThrow(DeviceNotFoundError);
+      });
+    });
+
+    describe('getExternalMappings', () => {
+      it('returns mapped DTOs for a device', async () => {
+        mockPrisma.device.findFirst.mockResolvedValue(mockDevice);
+        const mockMappings = [
+          {
+            id: 'map-uuid-1',
+            deviceId: mockDevice.id,
+            provider: 'EXTERNAL_ML',
+            domain: 'SOIL',
+            externalDeviceId: 'melon002',
+            isActive: true,
+            createdAt: new Date('2026-09-18T10:00:00Z'),
+            updatedAt: new Date('2026-09-18T10:00:00Z'),
+          },
+        ];
+        mockPrisma.deviceExternalMapping.findMany.mockResolvedValue(mockMappings);
+
+        const result = await repo.getExternalMappings('soil-node-jvbkdbv');
+
+        expect(result).toHaveLength(1);
+        expect(result[0].externalDeviceId).toBe('melon002');
+        expect(result[0].canonicalDeviceId).toBe('soil-node-jvbkdbv');
+      });
+
+      it('returns empty array if device is not found', async () => {
+        mockPrisma.device.findFirst.mockResolvedValue(null);
+
+        const result = await repo.getExternalMappings('non-existent');
+        expect(result).toEqual([]);
+      });
     });
   });
 });

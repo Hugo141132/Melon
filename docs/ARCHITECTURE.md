@@ -2000,3 +2000,91 @@ The following architecture specifications govern the permanent external hardware
    - Physical valve actuation and dispensing remain blocked pending physical hardware deployment.
 <!-- Hardware MQTT Architecture Reconciled: 2026-09-11 -->
 
+---
+
+## External Machine Learning (ML) Prediction & Outbound Recommendation Architecture (TASK-0413 / DEC-MON-090 / Reconciled 2026-09-18)
+
+This section defines the architectural integration for consuming external machine learning predictions and publishing outbound recommendation payloads across the Melon ecosystem:
+
+### 1. Architectural Boundary & Invariants
+- **Team Ownership Separation:**
+  - **External ML Team:** Owns ML model development, feature engineering, offline/online inference execution, and the external Supabase project (`https://styjuynxuykvujnnqxos.supabase.co`).
+  - **Melon Platform:** Ingests field sensor telemetry over EMQX, persists raw telemetry to its own PostgreSQL database (`soil_readings`, `water_readings`), and acts strictly as a **read-only consumer** of prediction records.
+- **Zero Local ML Compute & Zero Migrations:**
+  - The Melon repository does **not** install ML runtimes (`onnxruntime-node`), bundle model weights (`.onnx`, `.pkl`, `.h5`), or run in-process heuristic inference fallback engines.
+  - Zero local database migrations are created in `@kebun-melon/database`; prediction tables (`soil_predictions`, `water_predictions`) reside exclusively in the external Supabase project.
+  - Zero changes to staging environment (`.env.staging`, staging containers, staging database).
+
+### 2. End-to-End System Integration Flow
+```text
+[ESP32 Field Nodes]
+       │
+       ▼ (MQTT Telemetry: QoS 0/1)
+[EMQX Broker] (melon/sensor-tanah/data-*, melon/sensor-air/data-*)
+       │
+       ▼ (MQTT Ingestion)
+[IoT Gateway Service (VPS)]
+       │
+       ▼ (DB Insert)
+[Melon Raw Telemetry: soil_readings, water_readings]
+       │
+       ▼ (External ML Pipeline Processing)
+[External Supabase Project (styjuynxuykvujnnqxos): soil_predictions, water_predictions]
+       │
+       ▼ (HTTPS PostgREST API / Read-Only / In-Memory TTL Cache)
+[ExternalPredictionClient (@kebun-melon/database)]
+       │
+       ├──────────────────────────────────────────┐
+       ▼                                          ▼
+[Melon Web API Layer]                     [IoT Gateway Outbound Worker]
+(GET /api/v1/devices/[id]/predictions)     (melon/ai-*/rekomendasi-*)
+       │                                          │
+       ▼                                          ▼
+[Next.js Dashboard (/soil, /water)]       [ESP32 Field Microcontrollers]
+```
+
+### 3. Verified External Database Schema
+Both `soil_predictions` and `water_predictions` tables share an identical PostgreSQL structure:
+- `id` (`uuid`, PK, `uuid_generate_v4()`): Unique prediction record identifier.
+- `device_id` (`varchar`, FK to `devices.device_id`): Target hardware device identifier.
+- `classification` (`varchar`): Categorical condition result (`optimal`, `warning`, `kritis`).
+- `confidence` (`double precision`): Model prediction confidence score (e.g. `0.905`, `1.0`, `0.895`).
+- `recommendation` (`text`): JSON-encoded diagnostic and action payload.
+- `created_at` (`timestamptz`): Timestamp of prediction generation.
+
+#### Recommendation JSON Structure
+```json
+{
+  "module": "soil",
+  "classification": "optimal",
+  "summary": "Kondisi tanah baik. Pertahankan pola perawatan.",
+  "issues": [
+    {
+      "parameter": "EC air",
+      "value": 5.8,
+      "problem": "Kandungan garam/nutrisi terlalu tinggi",
+      "impact": "Dapat menyebabkan tanaman stres"
+    }
+  ],
+  "farmer_action": [
+    "Kurangi konsentrasi pupuk nutrisi",
+    "Tambahkan air bersih untuk pengenceran"
+  ]
+}
+```
+
+### 4. Database-Driven External Device Mapping
+Hardware devices in the external ML database use distinct identifiers, mapped dynamically via Melon's `device_external_mappings` table:
+- **Soil Monitoring Node:** Melon canonical `soil-node-jvbkdbv` (MQTT client `melon-esp32-tanah1`) $\rightarrow$ External ML `device_id: melon002`.
+- **Water Quality Node:** Melon canonical `water-quality-node-quiua` (MQTT client `melon-esp32-air1`) $\rightarrow$ External ML `device_id: water001`.
+- **Resolution Strategy:** `DeviceRepository.getActiveExternalDeviceId` resolves active mapping rows dynamically. In production (`isProduction = true`), unmapped devices fail closed safely. `DEFAULT_ML_DEVICE_ALIASES` is retained solely as an explicit local development/test fallback.
+
+### 5. Ingress, Egress & Outbound Worker Architecture
+- **PostgREST over HTTPS Port 443:** Stateless queries using keep-alive connections avoid persistent socket pool overhead on VPS RAM/CPU.
+- **Cache-Aside Pattern:** In-memory 30-second TTL cache eliminates redundant external HTTP round-trips for dashboard consumers, achieving $\le 10$ ms response latency on cache hits.
+- **Timeout Protection:** 3000ms `AbortController` timeout protects callers from external latency spikes or network partitions.
+- **Asynchronous Outbound Worker:** Post-persistence trigger in `SoilWaterMqttAdapter` dispatches recommendations in the background without blocking incoming telemetry.
+- **Debounce Delay:** Server-side configurable (`EXTERNAL_ML_DEBOUNCE_MS`, default 1500ms pending confirmed pipeline latency).
+- **MQTT Idempotency & Dedup Guard:** Stale predictions (> 300s) and duplicate prediction IDs are suppressed. Outbound messages contain `predictionId` and stable `messageId` (`rec-${domain}-${prediction.id}`) published with **QoS 1** and **`retain: false`**.
+- **Advisory Safety Lock:** AI recommendations published to `melon/ai-*/rekomendasi-*` are strictly advisory and never actuate physical valves under `ENABLE_FAUCET_CONTROL=false`.
+<!-- External ML Architecture Reconciled: 2026-09-18 -->

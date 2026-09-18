@@ -104,6 +104,36 @@ export const gatewayEnvSchema = z.object({
   RETENTION_INTERVAL_MS: z
     .preprocess((val) => (val ? parseInt(String(val), 10) : 86400000), z.number().int().min(1000))
     .default(86400000),
+  EXTERNAL_ML_SUPABASE_URL: z.string().url().optional(),
+  EXTERNAL_ML_SUPABASE_PUBLISHABLE_KEY: z.string().optional(),
+  EXTERNAL_ML_SUPABASE_SECRET_KEY: z.string().optional(),
+  // Configurable debounce delay before querying external ML predictions (default 1500ms pending confirmed pipeline latency)
+  EXTERNAL_ML_DEBOUNCE_MS: z
+    .preprocess(
+      (val) => (val !== undefined && val !== null && val !== '' ? parseInt(String(val), 10) : 1500),
+      z.number().int().min(0)
+    )
+    .default(1500),
+  EXTERNAL_ML_TIMEOUT_MS: z
+    .preprocess(
+      (val) => (val !== undefined && val !== null && val !== '' ? parseInt(String(val), 10) : 3000),
+      z.number().int().min(500)
+    )
+    .default(3000),
+  EXTERNAL_ML_MAX_STALENESS_SECONDS: z
+    .preprocess(
+      (val) => (val !== undefined && val !== null && val !== '' ? parseInt(String(val), 10) : 300),
+      z.number().int().min(10)
+    )
+    .default(300),
+  EXTERNAL_ML_RECOMMENDATION_ENABLED: z
+    .preprocess((val) => {
+      if (val === undefined || val === null || val === '') return true;
+      if (val === 'true' || val === '1') return true;
+      if (val === 'false' || val === '0') return false;
+      return val;
+    }, z.boolean().default(true))
+    .default(true),
 });
 
 export type GatewayEnv = z.infer<typeof gatewayEnvSchema>;

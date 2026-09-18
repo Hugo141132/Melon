@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
-import { afterEach, vi } from 'vitest';
+import { afterEach, beforeEach, vi } from 'vitest';
+import { clearRateLimitStore } from '../lib/rate-limit';
 import idMessages from '../messages/id.json';
 import enMessages from '../messages/en.json';
 
@@ -76,6 +77,12 @@ vi.mock('next-intl', () => {
   };
 });
 
+// Reset rate limits and DOM after each test to prevent cross-test pollution
+beforeEach(() => {
+  clearRateLimitStore();
+});
+
 afterEach(() => {
   cleanup();
+  clearRateLimitStore();
 });

@@ -9,12 +9,18 @@ import {
   TelemetryRepository,
   DeviceNotFoundError,
   DeviceInactiveError,
+  ExternalPredictionClient,
+  getExternalPredictionClient,
+  buildOutboundRecommendationPayload,
 } from '@kebun-melon/database';
 import {
   DeviceType,
   MonitoringStatus,
   SoilTelemetryDataSchema,
   WaterTelemetryDataSchema,
+  SoilPredictionDto,
+  WaterPredictionDto,
+  OutboundRecommendationPayload,
 } from '@kebun-melon/contracts';
 
 export const SOIL_WATER_TOPICS = {
@@ -29,6 +35,8 @@ export interface SoilWaterAdapterOptions {
   mqttClient?: GatewayMqttClient;
   telemetryRepo?: TelemetryRepository;
   deviceRepo?: DeviceRepository;
+  predictionClient?: ExternalPredictionClient;
+  allowAliasFallback?: boolean;
 }
 
 export interface IngestSoilResult {
@@ -50,16 +58,22 @@ export class SoilWaterMqttAdapter {
   private mqttClient: GatewayMqttClient | null = null;
   private telemetryRepo: TelemetryRepository | null = null;
   private deviceRepo: DeviceRepository | null = null;
+  private predictionClient: ExternalPredictionClient | null = null;
+  private allowAliasFallback = false;
   private unsubscribeFn: (() => void) | null = null;
   private isSubscribed = false;
   private deviceCache = new Map<string, { deviceId: string; id: string; cachedAt: number }>();
   private readonly CACHE_TTL_MS = 30000;
+  private lastPublishedPredictionIds = new Map<string, string>();
+  private recommendationDebounceTimers = new Map<string, NodeJS.Timeout>();
 
   constructor(options: SoilWaterAdapterOptions = {}) {
     this.env = options.env || null;
     this.mqttClient = options.mqttClient || null;
     this.telemetryRepo = options.telemetryRepo || null;
     this.deviceRepo = options.deviceRepo || null;
+    this.predictionClient = options.predictionClient || null;
+    this.allowAliasFallback = options.allowAliasFallback ?? false;
   }
 
   public getSoilDataTopic(): string {
@@ -82,12 +96,33 @@ export class SoilWaterMqttAdapter {
     env: GatewayEnv,
     mqttClient: GatewayMqttClient,
     telemetryRepo?: TelemetryRepository,
-    deviceRepo?: DeviceRepository
+    deviceRepo?: DeviceRepository,
+    predictionClient?: ExternalPredictionClient
   ): void {
     this.env = env;
     this.mqttClient = mqttClient;
     if (telemetryRepo) this.telemetryRepo = telemetryRepo;
     if (deviceRepo) this.deviceRepo = deviceRepo;
+    if (predictionClient) this.predictionClient = predictionClient;
+  }
+
+  public setPredictionClient(client: ExternalPredictionClient | null): void {
+    this.predictionClient = client;
+  }
+
+  public setAllowAliasFallback(allow: boolean): void {
+    this.allowAliasFallback = allow;
+  }
+
+  public clearPublishedHistory(): void {
+    this.lastPublishedPredictionIds.clear();
+  }
+
+  public clearDebounceTimers(): void {
+    for (const timer of this.recommendationDebounceTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.recommendationDebounceTimers.clear();
   }
 
   public clearDeviceCache(): void {
@@ -314,6 +349,7 @@ export class SoilWaterMqttAdapter {
       this.unsubscribeFn = null;
     }
     this.isSubscribed = false;
+    this.clearDebounceTimers();
   }
 
   /**
@@ -514,6 +550,19 @@ export class SoilWaterMqttAdapter {
           },
           result.canonicalDeviceId || targetDeviceId
         );
+
+        // TASK-0413 Phase C: Asynchronously dispatch outbound AI recommendation without blocking telemetry ingestion
+        this.triggerRecommendationDispatch({
+          deviceDbId: result.deviceId,
+          canonicalDeviceId: result.canonicalDeviceId || targetDeviceId,
+          clientId: normalized.clientId || targetDeviceId,
+          domain: 'SOIL',
+          recordedAt: normalized.recordedAt,
+        }).catch((err) => {
+          logger.error('Unhandled background soil recommendation dispatch error', err, {
+            deviceId: targetDeviceId,
+          });
+        });
       }
 
       logger.info('Soil telemetry message ingested successfully via MQTT', {
@@ -729,6 +778,19 @@ export class SoilWaterMqttAdapter {
           },
           result.canonicalDeviceId || targetDeviceId
         );
+
+        // TASK-0413 Phase C: Asynchronously dispatch outbound AI recommendation without blocking telemetry ingestion
+        this.triggerRecommendationDispatch({
+          deviceDbId: result.deviceId,
+          canonicalDeviceId: result.canonicalDeviceId || targetDeviceId,
+          clientId: normalized.clientId || targetDeviceId,
+          domain: 'WATER',
+          recordedAt: normalized.recordedAt,
+        }).catch((err) => {
+          logger.error('Unhandled background water recommendation dispatch error', err, {
+            deviceId: targetDeviceId,
+          });
+        });
       }
 
       logger.info('Water quality telemetry message ingested successfully via MQTT', {
@@ -765,16 +827,229 @@ export class SoilWaterMqttAdapter {
   }
 
   /**
+   * Asynchronously schedules recommendation retrieval and dispatch.
+   * Uses configurable debounce (default 1500ms pending confirmed pipeline latency) before querying external ML.
+   */
+  public async triggerRecommendationDispatch(params: {
+    deviceDbId: string;
+    canonicalDeviceId: string;
+    clientId: string;
+    domain: 'SOIL' | 'WATER';
+    recordedAt?: string | null;
+  }): Promise<void> {
+    if (this.env?.EXTERNAL_ML_RECOMMENDATION_ENABLED === false) {
+      return;
+    }
+
+    const debounceMs = this.env?.EXTERNAL_ML_DEBOUNCE_MS ?? 1500;
+    const debounceKey = `${params.canonicalDeviceId}:${params.domain}`;
+
+    if (debounceMs <= 0) {
+      await this.executeRecommendationDispatch(params);
+      return;
+    }
+
+    const existing = this.recommendationDebounceTimers.get(debounceKey);
+    if (existing) {
+      clearTimeout(existing);
+    }
+
+    const timer = setTimeout(async () => {
+      this.recommendationDebounceTimers.delete(debounceKey);
+      try {
+        await this.executeRecommendationDispatch(params);
+      } catch (err) {
+        logger.error('Error executing delayed recommendation dispatch', err, {
+          deviceId: params.canonicalDeviceId,
+          domain: params.domain,
+        });
+      }
+    }, debounceMs);
+
+    this.recommendationDebounceTimers.set(debounceKey, timer);
+  }
+
+  /**
+   * Executes prediction retrieval and MQTT recommendation publishing.
+   * Invariants:
+   * 1. Resolves externalDeviceId dynamically from Melon's device_external_mappings.
+   * 2. Rejects unmapped devices fail-closed in production (no hardcoded fallback).
+   * 3. Queries ExternalPredictionClient with timeout and forceRefresh.
+   * 4. Validates freshness against EXTERNAL_ML_MAX_STALENESS_SECONDS.
+   * 5. Prevents duplicate publishing if prediction ID was already dispatched.
+   * 6. Dispatches to recommendation topic with QoS 1, retain: false.
+   * 7. Remains strictly advisory: zero actuation or command triggers.
+   */
+  public async executeRecommendationDispatch(params: {
+    deviceDbId: string;
+    canonicalDeviceId: string;
+    clientId: string;
+    domain: 'SOIL' | 'WATER';
+    recordedAt?: string | null;
+  }): Promise<{ published: boolean; reason?: string; predictionId?: string }> {
+    if (!this.deviceRepo) {
+      logger.warn('DeviceRepository not available for recommendation dispatch');
+      return { published: false, reason: 'DEVICE_REPO_UNAVAILABLE' };
+    }
+
+    // 1. Resolve active external device ID from database
+    const activeExternalId = await this.deviceRepo.getActiveExternalDeviceId(
+      params.deviceDbId,
+      params.domain,
+      'EXTERNAL_ML'
+    );
+
+    let targetExternalId: string | null = activeExternalId;
+
+    if (!targetExternalId) {
+      const isProduction =
+        this.env?.APP_ENV === 'production' || process.env.NODE_ENV === 'production';
+
+      if (this.allowAliasFallback && !isProduction) {
+        targetExternalId = params.canonicalDeviceId;
+      } else {
+        logger.warn('Skipping recommendation publish: no active external ML mapping in database', {
+          deviceId: params.canonicalDeviceId,
+          domain: params.domain,
+        });
+        return { published: false, reason: 'NO_ACTIVE_EXTERNAL_MAPPING' };
+      }
+    }
+
+    // 2. Query ExternalPredictionClient
+    const client =
+      this.predictionClient ||
+      (this.env?.EXTERNAL_ML_SUPABASE_URL
+        ? new ExternalPredictionClient({
+            supabaseUrl: this.env.EXTERNAL_ML_SUPABASE_URL,
+            supabaseKey:
+              this.env.EXTERNAL_ML_SUPABASE_SECRET_KEY ||
+              this.env.EXTERNAL_ML_SUPABASE_PUBLISHABLE_KEY,
+            timeoutMs: this.env.EXTERNAL_ML_TIMEOUT_MS,
+          })
+        : getExternalPredictionClient(process.env));
+
+    if (!client || !client.isConfigured()) {
+      logger.warn('Skipping recommendation publish: ExternalPredictionClient not configured', {
+        domain: params.domain,
+      });
+      return { published: false, reason: 'PREDICTION_CLIENT_NOT_CONFIGURED' };
+    }
+
+    let prediction: SoilPredictionDto | WaterPredictionDto | null = null;
+    try {
+      if (params.domain === 'SOIL') {
+        prediction = await client.getLatestSoilPrediction(targetExternalId, { forceRefresh: true });
+      } else {
+        prediction = await client.getLatestWaterPrediction(targetExternalId, {
+          forceRefresh: true,
+        });
+      }
+    } catch (err: any) {
+      logger.error('Failed to fetch prediction from external ML service', err, {
+        domain: params.domain,
+        targetExternalId,
+      });
+      return { published: false, reason: 'FETCH_ERROR' };
+    }
+
+    if (!prediction) {
+      logger.info('No prediction available from external ML service', {
+        domain: params.domain,
+        targetExternalId,
+      });
+      return { published: false, reason: 'PREDICTION_UNAVAILABLE' };
+    }
+
+    // 3. Validate prediction freshness
+    const maxStalenessMs = (this.env?.EXTERNAL_ML_MAX_STALENESS_SECONDS ?? 300) * 1000;
+    const predCreatedAt = new Date(prediction.createdAt).getTime();
+
+    if (isNaN(predCreatedAt)) {
+      logger.warn('Skipping recommendation publish: invalid prediction createdAt timestamp', {
+        predictionId: prediction.id,
+        createdAt: prediction.createdAt,
+      });
+      return { published: false, reason: 'INVALID_TIMESTAMP' };
+    }
+
+    if (Date.now() - predCreatedAt > maxStalenessMs) {
+      logger.warn('Skipping recommendation publish: prediction is stale', {
+        predictionId: prediction.id,
+        createdAt: prediction.createdAt,
+        ageSeconds: Math.round((Date.now() - predCreatedAt) / 1000),
+      });
+      return { published: false, reason: 'PREDICTION_STALE' };
+    }
+
+    // 4. Prevent duplicate publish of identical prediction ID
+    const dedupeKey = `${params.canonicalDeviceId}:${params.domain}`;
+    if (prediction.id && this.lastPublishedPredictionIds.get(dedupeKey) === prediction.id) {
+      logger.info('Skipping recommendation publish: duplicate prediction ID already published', {
+        predictionId: prediction.id,
+        deviceId: params.canonicalDeviceId,
+      });
+      return { published: false, reason: 'DUPLICATE_PREDICTION', predictionId: prediction.id };
+    }
+
+    // 5. Build canonical outbound recommendation payload
+    let outboundPayload: OutboundRecommendationPayload;
+    try {
+      outboundPayload = buildOutboundRecommendationPayload({
+        prediction,
+        domain: params.domain,
+        clientId: params.clientId,
+        canonicalDeviceId: params.canonicalDeviceId,
+      });
+    } catch (err: any) {
+      logger.error('Failed to construct OutboundRecommendationPayload schema', err, {
+        predictionId: prediction.id,
+      });
+      return { published: false, reason: 'PAYLOAD_VALIDATION_FAILED' };
+    }
+
+    // 6. Publish to topic with QoS 1 and retain: false
+    let published = false;
+    if (params.domain === 'SOIL') {
+      published = await this.publishSoilRecommendation(outboundPayload);
+    } else {
+      published = await this.publishWaterRecommendation(outboundPayload);
+    }
+
+    if (published) {
+      if (prediction.id) {
+        this.lastPublishedPredictionIds.set(dedupeKey, prediction.id);
+      }
+      logger.info('Dispatched outbound AI recommendation successfully via MQTT', {
+        topic:
+          params.domain === 'SOIL'
+            ? this.getSoilRecommendationTopic()
+            : this.getWaterRecommendationTopic(),
+        predictionId: prediction.id,
+        deviceId: params.canonicalDeviceId,
+        domain: params.domain,
+        predictedClass: prediction.predictedClass,
+      });
+      return { published: true, predictionId: prediction.id ?? undefined };
+    }
+
+    return { published: false, reason: 'PUBLISH_FAILED' };
+  }
+
+  /**
    * Publishes recommendation payload to soil device recommendation topic.
    */
-  public async publishSoilRecommendation(payload: Record<string, unknown>): Promise<boolean> {
+  public async publishSoilRecommendation(
+    payload: Record<string, unknown>,
+    customTopic?: string
+  ): Promise<boolean> {
     if (!this.mqttClient) {
       logger.warn('Cannot publish soil recommendation: MQTT client not bound');
       return false;
     }
 
     try {
-      const topic = this.getSoilRecommendationTopic();
+      const topic = customTopic || this.getSoilRecommendationTopic();
       const json = JSON.stringify(payload);
       await this.mqttClient.publish(topic, json, 1, false);
       logger.info('Published soil recommendation successfully', { topic });
@@ -788,14 +1063,17 @@ export class SoilWaterMqttAdapter {
   /**
    * Publishes recommendation payload to water quality device recommendation topic.
    */
-  public async publishWaterRecommendation(payload: Record<string, unknown>): Promise<boolean> {
+  public async publishWaterRecommendation(
+    payload: Record<string, unknown>,
+    customTopic?: string
+  ): Promise<boolean> {
     if (!this.mqttClient) {
       logger.warn('Cannot publish water recommendation: MQTT client not bound');
       return false;
     }
 
     try {
-      const topic = this.getWaterRecommendationTopic();
+      const topic = customTopic || this.getWaterRecommendationTopic();
       const json = JSON.stringify(payload);
       await this.mqttClient.publish(topic, json, 1, false);
       logger.info('Published water recommendation successfully', { topic });

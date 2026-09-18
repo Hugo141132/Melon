@@ -16,6 +16,12 @@ const dbIntegrationPatterns = [
 
 export default defineConfig({
   plugins: [react()],
+  // @ts-expect-error vite 8 oxc option
+  oxc: {
+    jsx: {
+      runtime: 'automatic',
+    },
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './apps/web'),

@@ -1772,6 +1772,146 @@ Metrics:
 
 ---
 
+## TASK-0413 — Integrate External Supabase ML Predictions & Outbound Recommendations
+
+**Priority:** `P1`
+**Status:** `IN_PROGRESS`
+**Dependencies:** `TASK-0405`, `TASK-0406`, `TASK-0411`, `TASK-0412`, `DEC-MON-090`
+**Phase A Completed:** 2026-09-18 — Canonical contracts defined, `ExternalPredictionClient` implemented in `@kebun-melon/database`, server-side environment variables configured, and live external Supabase schema verified.
+
+### Background & Objective
+
+`TASK-0412` established MQTT telemetry ingestion for Soil (`melon-esp32-tanah1` on `melon/sensor-tanah/data-2424600050`) and Water Quality (`melon-esp32-air1` on `melon/sensor-air/data-2424600050`), and configured placeholder outbound recommendation topics (`melon/ai-tanah/rekomendasi-2424600050` and `melon/ai-air/rekomendasi-2424600050`).
+
+Per architectural decision `DEC-MON-090`, the ML model artifact is **not** deployed inside the VPS, and the VPS IoT Gateway does **not** execute ML inference. Prediction tables `soil_predictions` and `water_predictions` are **not** located in the Melon development database (`unbyxlkrzqlafolxcypi`), but belong to an external ML team's Supabase project (`https://styjuynxuykvujnnqxos.supabase.co`).
+
+This task integrates an external prediction adapter into the Melon application to consume prediction records from the external Supabase project via REST API, binds dynamic recommendations to the existing `/soil` and `/water` dashboard cards without UI redesign, and dispatches hybrid MQTT recommendation payloads to field microcontrollers.
+
+### Specification & Architecture
+
+1. **Team Ownership & Architectural Boundary:**
+   - **External ML Team:** Owns model training, feature extraction, inference execution, and the external Supabase project (`https://styjuynxuykvujnnqxos.supabase.co`), including schema maintenance of `soil_predictions` and `water_predictions`.
+   - **Melon System:** Owns field sensor telemetry ingestion over EMQX, persists raw telemetry to its own PostgreSQL database (`soil_readings`, `water_readings`), and acts strictly as an **external read-only consumer** of prediction results.
+   - **Invariance / What NOT to Create:**
+     - Zero database migrations in Melon repository (`packages/database`).
+     - No `ai_predictions`, `soil_predictions`, or `water_predictions` tables in the Melon development database.
+     - No `onnxruntime-node`, local model files (`.onnx`, `.pkl`, `.h5`), or in-process ML inference engines.
+
+2. **Integration Flow:**
+   ```text
+   [ESP32 Field Nodes]
+          │
+          ▼ (MQTT Telemetry: QoS 0/1)
+   [EMQX Broker] (melon/sensor-tanah/data-*, melon/sensor-air/data-*)
+          │
+          ▼ (MQTT Ingestion)
+   [IoT Gateway Service (VPS)]
+          │
+          ▼ (DB Insert)
+   [Melon Raw Telemetry: soil_readings, water_readings]
+          │
+          ▼ (External ML Pipeline Processing)
+   [External Supabase Tables: soil_predictions, water_predictions]
+          │
+          ▼ (HTTPS PostgREST API)
+   [ExternalPredictionClient (Melon Backend Adapter)]
+          │
+          ├──────────────────────────────────────────┐
+          ▼                                          ▼
+   [Melon Web API Layer]                     [IoT Gateway Outbound Worker]
+   (GET /api/v1/devices/[id]/predictions)     (melon/ai-*/rekomendasi-*)
+          │                                          │
+          ▼                                          ▼
+   [Next.js Dashboard (/soil, /water)]       [ESP32 Field Microcontrollers]
+   ```
+
+3. **Verified External Schema & Contract Mapping:**
+   - **Tables:** `soil_predictions` and `water_predictions` (both accessible via PostgREST `/rest/v1/*`).
+   - **Columns:**
+     - `id`: `uuid` (Primary Key, `uuid_generate_v4()`)
+     - `device_id`: `varchar` (Foreign Key to `devices.device_id`)
+     - `classification`: `varchar` (`optimal`, `warning`, `kritis`)
+     - `confidence`: `double precision` (e.g. `0.905`, `1.0`, `0.895`, `0.55`)
+     - `recommendation`: `text` (JSON string serialized)
+     - `created_at`: `timestamptz` (ISO 8601)
+   - **Recommendation JSON Structure:**
+     ```json
+     {
+       "module": "soil",
+       "classification": "optimal",
+       "summary": "Kondisi tanah baik. Pertahankan pola perawatan.",
+       "issues": [
+         {
+           "parameter": "EC air",
+           "value": 5.8,
+           "problem": "Kandungan garam/nutrisi terlalu tinggi",
+           "impact": "Dapat menyebabkan tanaman stres"
+         }
+       ],
+       "farmer_action": [
+         "Kurangi konsentrasi pupuk nutrisi",
+         "Tambahkan air bersih untuk pengenceran"
+       ]
+     }
+     ```
+   - **Hardware Device Mapping:**
+     - Soil node: `soil-node-jvbkdbv` (MQTT client `melon-esp32-tanah1`) $\rightarrow$ external ML `device_id: melon002`
+     - Water quality node: `water-quality-node-quiua` (MQTT client `melon-esp32-air1`) $\rightarrow$ external ML `device_id: water001`
+
+4. **Access Method & Synchronization Strategy:**
+   - **PostgREST over HTTPS (Port 443):** Stateless read-only access using `EXTERNAL_ML_SUPABASE_URL` and `EXTERNAL_ML_SUPABASE_PUBLISHABLE_KEY` / `EXTERNAL_ML_SUPABASE_SECRET_KEY`. No persistent socket pool overhead on VPS.
+   - **Dashboard (Cache-Aside):** Internal API queries cache results in-memory with a 30-second TTL.
+   - **Telemetry Ingestion Trigger:** IoT Gateway triggers asynchronous background fetch to external ML REST API with 1.5–2.0s debounce and publishes recommendations to EMQX.
+
+5. **Phased Implementation Roadmap:**
+   - **Phase A — Contracts, Database Client Adapter, Configuration & Schema Verification:** `DONE`
+     - [x] Canonical prediction contracts in `packages/contracts/src/prediction.ts` (`SoilPredictionDto`, `WaterPredictionDto`, `OutboundRecommendationPayload`, `PredictionIssue`).
+     - [x] `ExternalPredictionClient` in `packages/database/src/external-prediction-client.ts` with PostgREST query, 30s TTL cache, 3000ms timeout, candidate column fallback, JSON recommendation parser, sensor feature extraction from issues, and device alias resolution.
+     - [x] Server-side environment variables `EXTERNAL_ML_SUPABASE_*` configured.
+     - [x] Schema verification against live external Supabase project completed.
+     - [x] Unit test suite passed (16/16 in `packages/database/test/external-prediction-client.test.ts`, 191/191 full DB suite, 0 typecheck errors).
+   - **Phase B — Protected Prediction API Endpoint (`apps/web`):** `DONE`
+     - [x] Expose `GET /api/v1/devices/[deviceId]/predictions/latest` in `apps/web/app/api/v1/devices/[deviceId]/predictions/latest/route.ts`.
+     - [x] Enforce RBAC session authentication via `requireDeviceViewAccess`.
+     - [x] Support dual identifier resolution (`devices.id` UUID and canonical `deviceId`).
+     - [x] Return cached prediction DTO with standard success envelope.
+     - [x] Fail-safe unavailable behavior for malformed/unavailable predictions returning `{ success: true, data: null, meta: { status: 'UNAVAILABLE' } }`.
+     - [x] Mask external device ID to canonical Melon `deviceId`, with zero credential or external URL leakage.
+     - [x] Add unit test suite in `apps/web/test/unit/prediction-latest-route.test.ts` (12/12 passed, 31/31 across related suites).
+   - **Phase C — Outbound Recommendation MQTT Publishing (`apps/iot-gateway`):** `DONE` (Completed 2026-09-18)
+     - [x] Hook external prediction fetch into `SoilWaterMqttAdapter` post-persistence trigger (`triggerRecommendationDispatch` called asynchronously without blocking telemetry ingestion).
+     - [x] Dynamically resolve `externalDeviceId` from Melon's `device_external_mappings` via `DeviceRepository.getActiveExternalDeviceId`.
+     - [x] Enforce production fail-closed security: missing active mapping skips prediction query and publish with clear operational log, prohibiting fallback to hard-coded aliases in production (`isProduction = true`).
+     - [x] Query `ExternalPredictionClient` using resolved ID with `{ forceRefresh: true }`.
+     - [x] Publish valid recommendations to `melon/ai-tanah/rekomendasi-2424600050` and `melon/ai-air/rekomendasi-2424600050` (QoS 1, `retain: false`). Outbound payload masks device identifier to Melon's canonical `deviceId`.
+     - [x] Prevent stale and duplicate publishing: check prediction timestamp against configurable staleness window (`EXTERNAL_ML_MAX_STALENESS_SECONDS`, default 300s) and suppress duplicate publishes for the same `prediction.id`.
+     - [x] MQTT subscriber idempotency: added `predictionId` and stable `messageId` (`rec-${domain.toLowerCase()}-${prediction.id ?? timestamp}`) to `OutboundRecommendationPayloadSchema`.
+     - [x] Server-side configurable parameters with safe defaults: `EXTERNAL_ML_DEBOUNCE_MS=1500` (configurable default pending confirmed pipeline latency), `EXTERNAL_ML_TIMEOUT_MS=3000`, `EXTERNAL_ML_MAX_STALENESS_SECONDS=300`, `EXTERNAL_ML_RECOMMENDATION_ENABLED=true`.
+     - [x] Preserve physical safety invariant: recommendations are strictly advisory; faucet control remains locked (`ENABLE_FAUCET_CONTROL=false`).
+     - [x] Add 10 focused unit tests in `apps/iot-gateway/src/__tests__/soil-water-adapter.test.ts` (37/37 tests passed).
+     - [x] Verify live end-to-end telemetry ingestion and outbound recommendation dispatch against EMQX Cloud broker for both soil and water quality domains.
+   - **Phase D — Dynamic Dashboard Recommendation Cards (`apps/web`):** `PENDING`
+     - [ ] Bind live prediction data to existing recommendation cards on `/soil` and `/water`.
+     - [ ] Preserve established visual design, typography, layout geometry, and color tokens (`DEC-UIUX-101`, `Premium Minimal Ops`).
+     - [ ] Provide empty, loading, populated, and offline states.
+     - [ ] Add unit test coverage for UI data binding.
+
+### Acceptance Criteria
+
+- [x] Zero ML inference compute executed inside the VPS gateway.
+- [x] `soil_predictions` and `water_predictions` schema verified against external Supabase project.
+- [x] Raw telemetry tables (`soil_readings`, `water_readings`, `reservoir_water_readings`) remain untouched.
+- [x] No local `ai_predictions` or local model inference DDL is created (dynamic mapping cleanly separated in `device_external_mappings`).
+- [x] Unit test pass rate remains 100% (95/95 passed across all related suites) and TypeScript typecheck passes with 0 errors across 4 workspaces.
+- [x] Zero changes to staging environment or staging database.
+- [x] Latest prediction is served via `GET /api/v1/devices/[deviceId]/predictions/latest` with RBAC verification (Phase B).
+- [x] Outbound recommendations are published to `melon/ai-*/rekomendasi-*` with QoS 1 and hybrid payload structure (Phase C).
+- [x] Live end-to-end MQTT delivery verified against EMQX Cloud broker for soil and water quality domains.
+- [ ] Dashboard recommendation cards display live predictions while strictly preserving established UI layout and color tokens (Phase D).
+- [x] AI recommendations strictly obey physical control safety lock (`ENABLE_FAUCET_CONTROL=false`).
+
+---
+
 # 13. Phase 5 — Monitoring and History
 
 ## TASK-0501 — Implement Latest Monitoring API

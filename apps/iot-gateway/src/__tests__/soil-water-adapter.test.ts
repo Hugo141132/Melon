@@ -99,18 +99,12 @@ describe('SoilWaterMqttAdapter (TASK-0412 / Soil & Water MQTT Ingestion)', () =>
       }),
       updateDeviceLastSeen: vi.fn().mockResolvedValue(undefined),
       updateDeviceStatus: vi.fn().mockResolvedValue(undefined),
+      getActiveExternalDeviceId: vi.fn().mockImplementation(async (id: string, domain: string) => {
+        if (domain === 'SOIL') return 'melon002';
+        if (domain === 'WATER') return 'water001';
+        return null;
+      }),
     };
-
-    mockEnv = {
-      NODE_ENV: 'test',
-      APP_ENV: 'local',
-      PORT: 3001,
-      HOST: '0.0.0.0',
-      MQTT_BROKER_URL: 'mqtt://localhost:1883',
-      MQTT_GATEWAY_CLIENT_ID: 'gateway-test',
-      ENABLE_FAUCET_CONTROL: false,
-      SOIL_WATER_ADAPTER_ENABLED: true,
-    } as GatewayEnv;
 
     mockEnv = {
       NODE_ENV: 'test',
@@ -125,6 +119,10 @@ describe('SoilWaterMqttAdapter (TASK-0412 / Soil & Water MQTT Ingestion)', () =>
       SOIL_MQTT_SUB_TOPIC: 'melon/ai-tanah/rekomendasi-2424600050',
       WATER_MQTT_PUB_TOPIC: 'melon/sensor-air/data-2424600050',
       WATER_MQTT_SUB_TOPIC: 'melon/ai-air/rekomendasi-2424600050',
+      EXTERNAL_ML_DEBOUNCE_MS: 0,
+      EXTERNAL_ML_TIMEOUT_MS: 3000,
+      EXTERNAL_ML_MAX_STALENESS_SECONDS: 300,
+      EXTERNAL_ML_RECOMMENDATION_ENABLED: true,
     } as GatewayEnv;
 
     adapter = new SoilWaterMqttAdapter({
@@ -640,6 +638,323 @@ describe('SoilWaterMqttAdapter (TASK-0412 / Soil & Water MQTT Ingestion)', () =>
       expect(second).toBe('melon-esp32-tanah1');
       // Should only query database once due to cache
       expect(mockDeviceRepo.getDeviceByClientId).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('Outbound AI Recommendation Publishing (TASK-0413 Phase C)', () => {
+    const mockSoilPrediction = {
+      id: 'pred-soil-uuid-111',
+      deviceId: 'melon002',
+      predictedClass: 'optimal',
+      confidence: 0.92,
+      summary: 'Kondisi tanah optimal. Pertahankan pemupukan.',
+      actions: { module: 'soil' },
+      farmerAction: ['Pertahankan kelembapan'],
+      issues: [],
+      modelVersion: 'v1.0.0',
+      createdAt: new Date().toISOString(),
+    };
+
+    const mockWaterPrediction = {
+      id: 'pred-water-uuid-222',
+      deviceId: 'water001',
+      predictedClass: 'warning',
+      confidence: 0.85,
+      summary: 'Ditemukan masalah keasaman air.',
+      actions: { module: 'water' },
+      farmerAction: ['Netralkan pH larutan'],
+      issues: [
+        { parameter: 'pH air', value: 5.2, problem: 'Terlalu asam', impact: 'Nutrisi terhambat' },
+      ],
+      modelVersion: 'v1.0.0',
+      createdAt: new Date().toISOString(),
+    };
+
+    let mockPredictionClient: any;
+
+    beforeEach(() => {
+      mockPredictionClient = {
+        isConfigured: vi.fn().mockReturnValue(true),
+        getLatestSoilPrediction: vi.fn().mockResolvedValue(mockSoilPrediction),
+        getLatestWaterPrediction: vi.fn().mockResolvedValue(mockWaterPrediction),
+      };
+      adapter.setPredictionClient(mockPredictionClient);
+      adapter.clearPublishedHistory();
+    });
+
+    it('successfully fetches prediction and publishes outbound recommendation for soil telemetry with QoS 1 and retain false', async () => {
+      const payload = JSON.stringify({
+        clientId: 'melon-esp32-tanah1',
+        n: 45,
+        p: 25,
+        k: 80,
+        temp: 26,
+        hum: 70,
+        ph: 6.5,
+        ec: 1.5,
+      });
+
+      const result = await adapter.handleInboundSoilData(payload);
+      expect(result.success).toBe(true);
+
+      // Allow async background dispatch promise to resolve
+      await new Promise((r) => setTimeout(r, 20));
+
+      // Verify dynamic database mapping lookup
+      expect(mockDeviceRepo.getActiveExternalDeviceId).toHaveBeenCalledWith(
+        mockSoilDevice.id,
+        'SOIL',
+        'EXTERNAL_ML'
+      );
+
+      // Verify prediction client queried with resolved externalDeviceId
+      expect(mockPredictionClient.getLatestSoilPrediction).toHaveBeenCalledWith('melon002', {
+        forceRefresh: true,
+      });
+
+      // Verify MQTT publish to topic with QoS 1 and retain false
+      expect(mockMqttClient.publish).toHaveBeenCalledWith(
+        SOIL_WATER_TOPICS.SOIL_RECOMMENDATION,
+        expect.any(String),
+        1,
+        false
+      );
+
+      // Verify outbound payload content conforms to OutboundRecommendationPayload schema
+      const publishedJson = JSON.parse(mockMqttClient.publish.mock.calls[0][1]);
+      expect(publishedJson.domain).toBe('SOIL');
+      expect(publishedJson.deviceId).toBe('melon-esp32-tanah1'); // canonical Melon deviceId
+      expect(publishedJson.clientId).toBe('melon-esp32-tanah1');
+      expect(publishedJson.predictionId).toBe('pred-soil-uuid-111');
+      expect(publishedJson.messageId).toBe('rec-soil-pred-soil-uuid-111');
+      expect(publishedJson.predictedClass).toBe('optimal');
+      expect(publishedJson.confidence).toBe(0.92);
+      expect(publishedJson.summary).toContain('Kondisi tanah');
+    });
+
+    it('successfully fetches prediction and publishes outbound recommendation for water quality telemetry with QoS 1 and retain false', async () => {
+      const payload = JSON.stringify({
+        clientId: 'melon-esp32-air1',
+        ph: 5.2,
+        tds: 800,
+        ec: 1.6,
+      });
+
+      const result = await adapter.handleInboundWaterData(payload);
+      expect(result.success).toBe(true);
+
+      // Allow async background dispatch promise to resolve
+      await new Promise((r) => setTimeout(r, 20));
+
+      expect(mockDeviceRepo.getActiveExternalDeviceId).toHaveBeenCalledWith(
+        mockWaterDevice.id,
+        'WATER',
+        'EXTERNAL_ML'
+      );
+
+      expect(mockPredictionClient.getLatestWaterPrediction).toHaveBeenCalledWith('water001', {
+        forceRefresh: true,
+      });
+
+      expect(mockMqttClient.publish).toHaveBeenCalledWith(
+        SOIL_WATER_TOPICS.WATER_RECOMMENDATION,
+        expect.any(String),
+        1,
+        false
+      );
+
+      const publishedJson = JSON.parse(mockMqttClient.publish.mock.calls[0][1]);
+      expect(publishedJson.domain).toBe('WATER');
+      expect(publishedJson.deviceId).toBe('melon-esp32-air1');
+      expect(publishedJson.predictionId).toBe('pred-water-uuid-222');
+      expect(publishedJson.messageId).toBe('rec-water-pred-water-uuid-222');
+      expect(publishedJson.predictedClass).toBe('warning');
+      expect(publishedJson.issues).toHaveLength(1);
+    });
+
+    it('skips prediction query and publish when device lacks an active external mapping (missing mapping)', async () => {
+      mockDeviceRepo.getActiveExternalDeviceId.mockResolvedValueOnce(null);
+
+      const dispatchResult = await adapter.executeRecommendationDispatch({
+        deviceDbId: mockSoilDevice.id,
+        canonicalDeviceId: 'melon-esp32-tanah1',
+        clientId: 'melon-esp32-tanah1',
+        domain: 'SOIL',
+      });
+
+      expect(dispatchResult.published).toBe(false);
+      expect(dispatchResult.reason).toBe('NO_ACTIVE_EXTERNAL_MAPPING');
+      expect(mockPredictionClient.getLatestSoilPrediction).not.toHaveBeenCalled();
+      expect(mockMqttClient.publish).not.toHaveBeenCalled();
+    });
+
+    it('skips publish when external prediction is unavailable (null)', async () => {
+      mockPredictionClient.getLatestSoilPrediction.mockResolvedValueOnce(null);
+
+      const dispatchResult = await adapter.executeRecommendationDispatch({
+        deviceDbId: mockSoilDevice.id,
+        canonicalDeviceId: 'melon-esp32-tanah1',
+        clientId: 'melon-esp32-tanah1',
+        domain: 'SOIL',
+      });
+
+      expect(dispatchResult.published).toBe(false);
+      expect(dispatchResult.reason).toBe('PREDICTION_UNAVAILABLE');
+      expect(mockMqttClient.publish).not.toHaveBeenCalled();
+    });
+
+    it('skips publish when external prediction is stale (older than max staleness window)', async () => {
+      const stalePrediction = {
+        ...mockSoilPrediction,
+        createdAt: new Date(Date.now() - 600000).toISOString(), // 10 minutes ago (> 300s window)
+      };
+      mockPredictionClient.getLatestSoilPrediction.mockResolvedValueOnce(stalePrediction);
+
+      const dispatchResult = await adapter.executeRecommendationDispatch({
+        deviceDbId: mockSoilDevice.id,
+        canonicalDeviceId: 'melon-esp32-tanah1',
+        clientId: 'melon-esp32-tanah1',
+        domain: 'SOIL',
+      });
+
+      expect(dispatchResult.published).toBe(false);
+      expect(dispatchResult.reason).toBe('PREDICTION_STALE');
+      expect(mockMqttClient.publish).not.toHaveBeenCalled();
+    });
+
+    it('prevents republishing the same prediction ID (duplicate prediction suppression)', async () => {
+      // First publish
+      const firstResult = await adapter.executeRecommendationDispatch({
+        deviceDbId: mockSoilDevice.id,
+        canonicalDeviceId: 'melon-esp32-tanah1',
+        clientId: 'melon-esp32-tanah1',
+        domain: 'SOIL',
+      });
+      expect(firstResult.published).toBe(true);
+      expect(mockMqttClient.publish).toHaveBeenCalledTimes(1);
+
+      // Second dispatch with same prediction ID
+      const secondResult = await adapter.executeRecommendationDispatch({
+        deviceDbId: mockSoilDevice.id,
+        canonicalDeviceId: 'melon-esp32-tanah1',
+        clientId: 'melon-esp32-tanah1',
+        domain: 'SOIL',
+      });
+      expect(secondResult.published).toBe(false);
+      expect(secondResult.reason).toBe('DUPLICATE_PREDICTION');
+      // No second MQTT publish
+      expect(mockMqttClient.publish).toHaveBeenCalledTimes(1);
+
+      // Third dispatch with a new prediction ID should publish
+      const newSoilPrediction = {
+        ...mockSoilPrediction,
+        id: 'pred-soil-uuid-999',
+        createdAt: new Date().toISOString(),
+      };
+      mockPredictionClient.getLatestSoilPrediction.mockResolvedValueOnce(newSoilPrediction);
+
+      const thirdResult = await adapter.executeRecommendationDispatch({
+        deviceDbId: mockSoilDevice.id,
+        canonicalDeviceId: 'melon-esp32-tanah1',
+        clientId: 'melon-esp32-tanah1',
+        domain: 'SOIL',
+      });
+      expect(thirdResult.published).toBe(true);
+      expect(thirdResult.predictionId).toBe('pred-soil-uuid-999');
+      expect(mockMqttClient.publish).toHaveBeenCalledTimes(2);
+    });
+
+    it('enforces strict MQTT topic, QoS 1, retain: false, and stable prediction/message ID for subscriber idempotency', async () => {
+      const dispatchResult = await adapter.executeRecommendationDispatch({
+        deviceDbId: mockSoilDevice.id,
+        canonicalDeviceId: 'melon-esp32-tanah1',
+        clientId: 'melon-esp32-tanah1',
+        domain: 'SOIL',
+      });
+
+      expect(dispatchResult.published).toBe(true);
+      expect(mockMqttClient.publish).toHaveBeenCalledWith(
+        SOIL_WATER_TOPICS.SOIL_RECOMMENDATION,
+        expect.any(String),
+        1,
+        false
+      );
+
+      const payload = JSON.parse(mockMqttClient.publish.mock.calls[0][1]);
+      // Verify stable identifiers
+      expect(payload.predictionId).toBe('pred-soil-uuid-111');
+      expect(payload.messageId).toBe('rec-soil-pred-soil-uuid-111');
+      expect(payload.deviceId).toBe('melon-esp32-tanah1'); // canonical Melon deviceId
+      expect(payload.domain).toBe('SOIL');
+
+      // Verify zero leakage of credentials, URLs, or internal query parameters
+      expect(payload).not.toHaveProperty('supabaseUrl');
+      expect(payload).not.toHaveProperty('supabaseKey');
+      expect(payload).not.toHaveProperty('apiKey');
+      expect(payload).not.toHaveProperty('rawRecommendation');
+    });
+
+    it('fails safely without throwing when external ML client times out or throws error', async () => {
+      mockPredictionClient.getLatestSoilPrediction.mockRejectedValueOnce(
+        new Error('ETIMEDOUT: Connection to external Supabase timed out')
+      );
+
+      const dispatchResult = await adapter.executeRecommendationDispatch({
+        deviceDbId: mockSoilDevice.id,
+        canonicalDeviceId: 'melon-esp32-tanah1',
+        clientId: 'melon-esp32-tanah1',
+        domain: 'SOIL',
+      });
+
+      expect(dispatchResult.published).toBe(false);
+      expect(dispatchResult.reason).toBe('FETCH_ERROR');
+      expect(mockMqttClient.publish).not.toHaveBeenCalled();
+    });
+
+    it('ensures telemetry ingestion remains 100% successful even if recommendation dispatch fails', async () => {
+      mockPredictionClient.getLatestSoilPrediction.mockRejectedValueOnce(
+        new Error('External ML service is down (503 Service Unavailable)')
+      );
+
+      const payload = JSON.stringify({
+        clientId: 'melon-esp32-tanah1',
+        n: 45,
+        p: 25,
+        k: 80,
+        temp: 26,
+        hum: 70,
+        ph: 6.5,
+        ec: 1.5,
+      });
+
+      const ingestionResult = await adapter.handleInboundSoilData(payload);
+
+      // Ingestion itself must succeed and record readingId
+      expect(ingestionResult.success).toBe(true);
+      expect(ingestionResult.readingId).toBe('soil-reading-uuid-123');
+      expect(mockTelemetryRepo.ingestSoilReading).toHaveBeenCalledTimes(1);
+    });
+
+    it('preserves physical safety: recommendations are strictly advisory and never trigger faucet commands', async () => {
+      const payload = JSON.stringify({
+        clientId: 'melon-esp32-tanah1',
+        n: 10,
+        p: 10,
+        k: 10,
+        temp: 35,
+        hum: 20,
+        ph: 4.0,
+        ec: 0.2,
+        status: 'CRITICAL',
+      });
+
+      await adapter.handleInboundSoilData(payload);
+
+      // Verify no publish to valve or automation actuation topics
+      const publishedTopics = mockMqttClient.publish.mock.calls.map((c: any[]) => c[0]);
+      expect(publishedTopics).not.toContain('irigasi/melon/kontrol/valve');
+      expect(publishedTopics).not.toContain('irigasi/melon/setting/otomasi');
+      expect(publishedTopics).not.toContain('agriculture/local/site-01/faucet/command');
     });
   });
 });

@@ -11,4 +11,5 @@ export * from './alert-repository';
 export * from './faucet-command-repository';
 export * from './audit-repository';
 export * from './retention-service';
+export * from './external-prediction-client';
 export { CANONICAL_PERMISSIONS } from '../prisma/seed';

@@ -55,6 +55,9 @@ export const serverEnvSchema = z.object({
   AUTH_RESET_TOKEN_EXPIRY_MINUTES: z
     .preprocess((val) => (val ? parseInt(String(val), 10) : 15), z.number().int().min(1))
     .default(15),
+  EXTERNAL_ML_SUPABASE_URL: z.string().url().optional(),
+  EXTERNAL_ML_SUPABASE_PUBLISHABLE_KEY: z.string().optional(),
+  EXTERNAL_ML_SUPABASE_SECRET_KEY: z.string().optional(),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;

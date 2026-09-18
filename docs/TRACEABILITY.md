@@ -38,6 +38,9 @@
 | `PRD-FR-026` | Optimized login transaction and same-client session recovery | `docs/PRD.md` | `DEC-AUTH-108` | `TASK-0217` | `TEST-API-001` | `VERIFIED` |
 | `DEV-MQTT-001` | Permanent hardware MQTT topic reconciliation and gateway ingress mapping boundary | `docs/DEVICE_COMMUNICATION.md` | `DEC-DEV-031` | `TASK-0411` | `TEST-MQTT-001` | `IMPLEMENTED` |
 | `PRD-FR-040` | Operational overview Bento dashboard and environmental weather | `docs/PRD.md` | `DEC-UIUX-106` | `TASK-0506` | `TEST-UI-006` | `VERIFIED` |
+| `PRD-FR-041` | Latest external ML prediction ingestion and API access | `docs/PRD.md` | `DEC-MON-090` | `TASK-0413` | `TEST-API-003` | `IMPLEMENTED` |
+| `DEV-MQTT-002` | Outbound AI recommendation MQTT publishing pipeline | `docs/DEVICE_COMMUNICATION.md` | `DEC-MON-090` | `TASK-0413` | `TEST-MQTT-001` | `IMPLEMENTED` |
+| `SEC-DATA-005` | Database-driven external device mapping and fail-closed privacy isolation | `docs/SECURITY.md` | `DEC-MON-090` | `TASK-0413` | `TEST-DB-001` | `IMPLEMENTED` |
 | `SEC-AUTH-006` | Email change token scoping and non-sensitive audit logging | `docs/SECURITY.md` | `DEC-AUTH-106` | `TASK-0216` | `TEST-SEC-005` | `VERIFIED` |
 | `SEC-AUTH-007` | Atomic single active session verification and race-safe login rejection | `docs/SECURITY.md` | `DEC-AUTH-107` | `TASK-0217` | `TEST-SEC-001` | `VERIFIED` |
 | `SEC-AUTH-008` | Preserved transactional audit durability with non-blocking user login tracking | `docs/SECURITY.md` | `DEC-AUTH-108` | `TASK-0217` | `TEST-SEC-001` | `VERIFIED` |
@@ -625,5 +628,30 @@ The following facts are verified in the traceability matrix regarding `TASK-0212
   - Static Typecheck (PASSED): `tsc --noEmit` across `@kebun-melon/web` passed with 0 errors.
   - Playwright MCP Browser Inspection (PASSED): Confirmed clean modal presentation (no warning boxes), role labels, and bulk selection flows on `http://localhost:3000/users`.
 <!-- TASK-0212 Traceability Reconciled: 2026-09-13 -->
+
+---
+
+## External ML Prediction & Outbound Recommendation Traceability Note (TASK-0413 / Reconciled 2026-09-18)
+
+The following facts are verified in the traceability matrix regarding `TASK-0413` (External ML Prediction Ingestion and Outbound Recommendation Pipeline):
+- **Traceability Baseline:** Governed by `PRD-FR-041`, `DEV-MQTT-002`, `SEC-DATA-005`, `DEC-MON-090`, `docs/DEVICE_COMMUNICATION.md` §53, `docs/API.md`, `docs/ARCHITECTURE.md`, `docs/DATABASE.md`, `docs/SECURITY.md`, and `docs/TESTING.md`. Formally establishes external Supabase PostgREST client adapter, protected prediction query API with RBAC, database-driven device mapping, and outbound asynchronous MQTT recommendation publishing with subscriber idempotency.
+- **Implementation Status:**
+  - *Phase A (Contracts & Client Adapter):* Canonical prediction contracts defined in `packages/contracts/src/prediction.ts` (`SoilPredictionDto`, `WaterPredictionDto`, `OutboundRecommendationPayload`, `PredictionIssue`). Read-only PostgREST client implemented in `packages/database/src/external-prediction-client.ts` with 30s TTL in-memory cache, 3000ms timeout protection, candidate column fallback, and JSON recommendation parsing.
+  - *Phase B (Protected Prediction API):* Implemented `GET /api/v1/devices/[deviceId]/predictions/latest` in `apps/web` with session authentication, RBAC authorization (`requireDeviceViewAccess`), dual identifier resolution (`devices.id` UUID and canonical `deviceId`), server-side cache control, and strict privacy masking (external ML IDs, database URLs, and API keys remain completely internal).
+  - *Database-Driven Device Mapping:* Added `device_external_mappings` table (`packages/database/prisma/migrations/20260918190000_add_device_external_mappings`) and repository lookup `DeviceRepository.getActiveExternalDeviceId`. Eliminated hard-coded hardware aliases in production flow, enforcing fail-closed behavior when unmapped.
+  - *Phase C (Outbound MQTT Recommendation Publishing):* Integrated non-blocking asynchronous recommendation dispatch into `SoilWaterMqttAdapter` (`apps/iot-gateway`). Configurable debounce delay (`EXTERNAL_ML_DEBOUNCE_MS`, default 1500ms pending confirmed pipeline latency), staleness validation (`EXTERNAL_ML_MAX_STALENESS_SECONDS`, default 300s), duplicate suppression (`lastPublishedPredictionId`), subscriber idempotency (`predictionId` and stable `messageId`), and advisory-only QoS 1 / `retain: false` MQTT dispatch.
+  - *Phase D (Dashboard Recommendation Binding):* `PENDING` (Binding live predictions to existing `/soil` and `/water` recommendation cards while preserving `Premium Minimal Ops` layout and color tokens per `DEC-UIUX-101`).
+- **Verification Evidence:**
+  - *Automated Unit & Route Test Suites (PASSED):*
+    - `apps/iot-gateway/src/__tests__/soil-water-adapter.test.ts`: 37/37 passed (100%).
+    - `packages/database/test/device-repository.test.ts`: 23/23 passed (100%).
+    - `apps/web/test/unit/prediction-latest-route.test.ts`: 15/15 passed (100%).
+    - `packages/database/test/external-prediction-client.test.ts`: 20/20 passed (100%).
+    - Total: 4 test suites, 95/95 tests passed (100%).
+  - *Static Typecheck (PASSED):* `npm run typecheck` passed with 0 errors across all 4 monorepo workspaces (`contracts`, `database`, `iot-gateway`, `web`).
+  - *Secret Scanning (PASSED):* `npm run scan:secrets` detected 0 hardcoded secrets across 343 files.
+  - *Live Broker End-to-End Delivery (PASSED):* Verified live MQTT telemetry ingestion and recommendation publishing against EMQX Cloud broker for both soil (`melon/ai-tanah/rekomendasi-2424600050`) and water quality (`melon/ai-air/rekomendasi-2424600050`) domains.
+  - *Safety Guard Verified:* Advisory-only invariant verified; actuator lock `ENABLE_FAUCET_CONTROL=false` strictly preserved.
+<!-- TASK-0413 Traceability Reconciled: 2026-09-18 -->
 
 

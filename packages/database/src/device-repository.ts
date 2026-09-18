@@ -40,6 +40,26 @@ export interface PaginatedDevicesResult {
   };
 }
 
+export interface UpsertExternalMappingInput {
+  deviceId: string;
+  domain: string;
+  externalDeviceId: string;
+  provider?: string;
+  isActive?: boolean;
+}
+
+export interface DeviceExternalMappingDto {
+  id: string;
+  deviceId: string;
+  canonicalDeviceId?: string;
+  provider: string;
+  domain: string;
+  externalDeviceId: string;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export class DeviceRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
@@ -474,5 +494,125 @@ export class DeviceRepository {
     });
 
     return this.formatPublicSafeDto(activated);
+  }
+
+  /**
+   * Resolves the active external device ID for a device in a specific domain.
+   * Accepts either canonical deviceId string or internal UUID.
+   */
+  async getActiveExternalDeviceId(
+    deviceIdentifier: string,
+    domain: string,
+    provider: string = 'EXTERNAL_ML'
+  ): Promise<string | null> {
+    if (!deviceIdentifier || typeof deviceIdentifier !== 'string') return null;
+    const cleanId = deviceIdentifier.trim();
+    if (!cleanId) return null;
+
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanId);
+
+    const mapping = await this.prisma.deviceExternalMapping.findFirst({
+      where: {
+        provider,
+        domain: domain.toUpperCase(),
+        isActive: true,
+        device: isUuid
+          ? {
+              OR: [
+                { id: cleanId },
+                { deviceId: cleanId },
+                { deviceId: { equals: cleanId, mode: 'insensitive' } },
+              ],
+            }
+          : {
+              OR: [{ deviceId: cleanId }, { deviceId: { equals: cleanId, mode: 'insensitive' } }],
+            },
+      },
+      select: {
+        externalDeviceId: true,
+      },
+    });
+
+    return mapping?.externalDeviceId ?? null;
+  }
+
+  /**
+   * Safely creates or updates an external device mapping.
+   */
+  async upsertExternalMapping(
+    input: UpsertExternalMappingInput
+  ): Promise<DeviceExternalMappingDto> {
+    const target = await this.getDeviceByCanonicalId(input.deviceId);
+    if (!target) {
+      throw new DeviceNotFoundError(
+        `Cannot map external device: Target device '${input.deviceId}' was not found.`
+      );
+    }
+
+    const provider = input.provider ?? 'EXTERNAL_ML';
+    const domain = input.domain.toUpperCase();
+    const isActive = input.isActive ?? true;
+    const externalDeviceId = input.externalDeviceId.trim();
+
+    const result = await this.prisma.deviceExternalMapping.upsert({
+      where: {
+        deviceId_provider_domain: {
+          deviceId: target.id,
+          provider,
+          domain,
+        },
+      },
+      create: {
+        deviceId: target.id,
+        provider,
+        domain,
+        externalDeviceId,
+        isActive,
+      },
+      update: {
+        externalDeviceId,
+        isActive,
+        updatedAt: new Date(),
+      },
+    });
+
+    return {
+      id: result.id,
+      deviceId: result.deviceId,
+      canonicalDeviceId: target.deviceId,
+      provider: result.provider,
+      domain: result.domain,
+      externalDeviceId: result.externalDeviceId,
+      isActive: result.isActive,
+      createdAt: result.createdAt,
+      updatedAt: result.updatedAt,
+    };
+  }
+
+  /**
+   * Lists all external mappings for a target device.
+   */
+  async getExternalMappings(deviceIdentifier: string): Promise<DeviceExternalMappingDto[]> {
+    const target = await this.getDeviceByCanonicalId(deviceIdentifier);
+    if (!target) {
+      return [];
+    }
+
+    const mappings = await this.prisma.deviceExternalMapping.findMany({
+      where: { deviceId: target.id },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    return mappings.map((m) => ({
+      id: m.id,
+      deviceId: m.deviceId,
+      canonicalDeviceId: target.deviceId,
+      provider: m.provider,
+      domain: m.domain,
+      externalDeviceId: m.externalDeviceId,
+      isActive: m.isActive,
+      createdAt: m.createdAt,
+      updatedAt: m.updatedAt,
+    }));
   }
 }

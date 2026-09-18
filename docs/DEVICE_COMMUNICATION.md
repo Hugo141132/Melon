@@ -2513,4 +2513,116 @@ The Singapore Dev and Staging database cutovers (`TASK-0916`) reinforce backend 
 - **Protocol & Actuator Invariance:** Zero changes to ESP32/NodeMCU firmware contracts, MQTT 5.0 TLS topics, QoS policies, or gateway schemas. `ENABLE_FAUCET_CONTROL=false` strictly enforced across all services; `public.faucet_commands` remains strictly 0. Full details in [`docs/SUPABASE_MIGRATION_RUNBOOK.md`](file:///c:/Users/Puroh/Documents/Melon/docs/SUPABASE_MIGRATION_RUNBOOK.md).
 <!-- TASK-0916 Device Communication Reconciled: 2026-09-08 -->
 
+---
 
+## 53. Outbound AI Recommendation MQTT Publishing Pipeline (TASK-0413 / DEC-MON-090 / Reconciled 2026-09-18)
+
+This section defines the outbound MQTT recommendation publishing pipeline for dispatching verified ML agronomic guidance to field microcontrollers:
+
+### 1. Topic Structure & MQTT QoS
+- **Soil AI Recommendation Topic:** `melon/ai-tanah/rekomendasi-2424600050`
+- **Water Quality AI Recommendation Topic:** `melon/ai-air/rekomendasi-2424600050`
+- **Broker Scheme:** Unified EMQX Broker via TLS (Port 8883 / Port 8084 WSS).
+- **Quality of Service (QoS):** QoS 1 (At least once delivery).
+- **Retain Flag:** `false` (Prevents stale recommendations from being delivered to newly connected microcontrollers).
+
+### 2. Ingestion Trigger & Debounce Flow
+1. Field ESP32 nodes publish raw telemetry to `melon/sensor-tanah/data-2424600050` or `melon/sensor-air/data-2424600050`.
+2. `SoilWaterMqttAdapter` in `apps/iot-gateway` ingests and persists raw readings to `soil_readings` or `water_readings` non-blockingly.
+3. An asynchronous background task schedules an external prediction query with a configurable debounce delay (`EXTERNAL_ML_DEBOUNCE_MS`, default 1500ms pending confirmed pipeline latency).
+4. Device resolution queries Melon's `device_external_mappings` via `DeviceRepository.getActiveExternalDeviceId` (fail-closed in production if no active mapping exists).
+5. The worker queries `ExternalPredictionClient` with `{ forceRefresh: true }` and timeout `EXTERNAL_ML_TIMEOUT_MS`.
+6. Stale predictions (older than `EXTERNAL_ML_MAX_STALENESS_SECONDS`, default 300s) and duplicate predictions (`lastPublishedPredictionId`) are suppressed.
+7. The resulting prediction is packaged via `buildOutboundRecommendationPayload` (masking external identifiers to canonical Melon `deviceId`) and dispatched with QoS 1 and `retain: false`.
+
+### 3. Hybrid Wire Payload Contract
+```json
+{
+  "messageId": "rec-soil-37c2718e-4a67-4f6c-b34e-00a295847e3a",
+  "predictionId": "37c2718e-4a67-4f6c-b34e-00a295847e3a",
+  "clientId": "melon-esp32-tanah1",
+  "deviceId": "soil-node-jvbkdbv",
+  "timestamp": "2026-09-18T00:33:06.431288+00:00",
+  "domain": "SOIL",
+  "status": "NORMAL",
+  "predictedClass": "optimal",
+  "confidence": 0.905,
+  "actions": {
+    "module": "soil",
+    "classification": "optimal",
+    "summary": "Kondisi tanah baik. Pertahankan pola perawatan.",
+    "issues": [],
+    "farmer_action": []
+  },
+  "farmerAction": [
+    "Pertahankan jadwal penyiraman dan pemupukan saat ini.",
+    "Lakukan pemantauan rutin parameter tanah setiap hari."
+  ],
+  "issues": [],
+  "summary": "Kondisi tanah baik. Pertahankan pola perawatan.",
+  "modelVersion": "v1.0.0"
+}
+```
+
+#### Water Quality Example (Diagnostic Issues & Actions)
+```json
+{
+  "messageId": "rec-water-5ae55235-98ea-46b5-926f-45a9096ae5c4",
+  "predictionId": "5ae55235-98ea-46b5-926f-45a9096ae5c4",
+  "clientId": "melon-esp32-air1",
+  "deviceId": "water-quality-node-quiua",
+  "timestamp": "2026-09-18T01:43:44.798075+00:00",
+  "domain": "WATER",
+  "status": "CRITICAL",
+  "predictedClass": "kritis",
+  "confidence": 0.895,
+  "actions": {
+    "module": "water",
+    "classification": "kritis",
+    "summary": "Ditemukan 2 masalah kualitas air.",
+    "issues": [
+      {
+        "parameter": "EC air",
+        "value": 5.8,
+        "problem": "Kandungan garam/nutrisi terlalu tinggi",
+        "impact": "Dapat menyebabkan tanaman stres"
+      },
+      {
+        "parameter": "TDS air",
+        "value": 4900,
+        "problem": "Zat terlarut terlalu tinggi",
+        "impact": "Risiko akar sulit menyerap air"
+      }
+    ],
+    "farmer_action": [
+      "Kurangi konsentrasi pupuk nutrisi",
+      "Tambahkan air bersih untuk pengenceran"
+    ]
+  },
+  "farmerAction": [
+    "Kurangi konsentrasi pupuk nutrisi",
+    "Tambahkan air bersih untuk pengenceran"
+  ],
+  "issues": [
+    {
+      "parameter": "EC air",
+      "value": 5.8,
+      "problem": "Kandungan garam/nutrisi terlalu tinggi",
+      "impact": "Dapat menyebabkan tanaman stres"
+    },
+    {
+      "parameter": "TDS air",
+      "value": 4900,
+      "problem": "Zat terlarut terlalu tinggi",
+      "impact": "Risiko akar sulit menyerap air"
+    }
+  ],
+  "summary": "Ditemukan 2 masalah kualitas air.",
+  "modelVersion": "v1.0.0"
+}
+```
+
+### 4. Actuator Safety Invariant
+- Outbound AI recommendations are **strictly informational and advisory**.
+- Under `ENABLE_FAUCET_CONTROL=false`, receiving an alert or critical classification shall **never** trigger automatic faucet actuation, valve opening/closing, or dispensing commands (`DEC-CTRL-051`, `DEC-CTRL-067`).
+<!-- Outbound AI Recommendation MQTT Pipeline Reconciled: 2026-09-18 -->

@@ -39,7 +39,7 @@
 | **Authentication** | `DEC-AUTH-001` to `DEC-AUTH-012`, `DEC-AUTH-102` to `DEC-AUTH-108` | **APPROVED** | HTTP-only secure cookies (`HttpOnly`, `Secure`, `SameSite=Strict`), PostgreSQL session table, 30m idle / 8h absolute maximum lifetime, CLI Owner seed, no public Owner creation, mandatory 6-digit email verification, 15m password recovery, verified self-email change, single active session enforcement, and Prisma relationLoadStrategy WAN login latency optimization. |
 | **RBAC** | `DEC-RBAC-013` to `DEC-RBAC-019` | **APPROVED** | Owner has global device visibility. Admins have mandatory per-device assignments; device assignment automatically grants both monitoring and faucet control. Owners manage assignments. No separate per-user-device `canControl` permission in v1. |
 | **Devices** | `DEC-DEV-020` to `DEC-DEV-032` | **APPROVED** | Multi-protocol architecture: Soil & Water quality monitoring telemetry via REST API over Wi-Fi (no MQTT broker). Water Tank monitoring (tank volume & status, flow rate deleted per `DEC-MON-089`) via direct MQTT 2-tier gateway using canonical hardware topics `irigasi/melon/...` through an EMQX broker (`DEC-DEV-032`). Shared INA219 electrical monitoring via REST/Wi-Fi. Per-device credentials/ACLs, no anonymous access, no direct browser-to-MQTT. Offline threshold: **TBD**. Stale threshold: **TBD**. In-app device creation / Add Device removed (`DEC-DEV-027`). External `deviceId` editable by OWNER only; internal DB UUID immutable; canonical `deviceId` strictly hidden from ADMIN in UI & API (`DEC-DEV-028`). Previously/last-accessed device history & persistent restoration removed while preserving all telemetry/command/assignment/audit history (`DEC-DEV-029`). Hard delete of devices permanently removed in favor of `DEACTIVATED` / `ACTIVE` lifecycle (`DEC-DEV-030`). Permanent external hardware topics (`irigasi/melon/...`) adopted as canonical MQTT contract for single water tank node (`DEC-DEV-032`). |
-| **Monitoring** | `DEC-MON-036` to `DEC-MON-050`, `DEC-MON-089` | **APPROVED** | Three distinct monitoring domains: 1) Soil monitoring (NPK, Temp, Moisture, pH, EC in `µS/cm`, status), 2) Water Quality monitoring (pH, TDS in ppm, EC in `µS/cm`, status), 3) Water Tank monitoring (Tank Vol in `L`, 0 L–2200 L scale per `DEC-MON-089`, status; Flow rate deleted per `DEC-MON-089`). Canonical display unit for EC is `µS/cm` (values in `mS/cm` converted at presentation boundary via `×1000`). Control capabilities (Solenoid Valve, Relay) are actuators, not monitoring sensors. INA219 electrical monitoring tracks system electrical consumption (voltage, current, power) as device health/power telemetry, not as a battery percentage or primary agronomic measurement. 90-day raw telemetry retention TTL with chunked batch maintenance (`DEC-MON-048` / `TASK-0913`). Sensor precision and valid ranges: **TBD**. |
+| **Monitoring** | `DEC-MON-036` to `DEC-MON-050`, `DEC-MON-085` to `DEC-MON-090` | **APPROVED** | Three distinct monitoring domains: 1) Soil monitoring (NPK, Temp, Moisture, pH, EC in `µS/cm`, status), 2) Water Quality monitoring (pH, TDS in ppm, EC in `µS/cm`, status), 3) Water Tank monitoring (Tank Vol in `L`, 0 L–2200 L scale per `DEC-MON-089`, status; Flow rate deleted per `DEC-MON-089`). Soil & Water Quality ML classification is ingested from an external ML team's Supabase project over read-only PostgREST HTTPS (`ExternalPredictionClient`), mapped dynamically via `device_external_mappings`, and hybrid MQTT recommendations are published asynchronously via `apps/iot-gateway` without local ML compute (`DEC-MON-090`). Raw telemetry remains immutable. 90-day retention TTL with chunked batch maintenance (`DEC-MON-048` / `TASK-0913`). |
 | **Faucet Control** | `DEC-CTRL-051` to `DEC-CTRL-067` | **APPROVED** | Max 1 active command/device, no auto retries, `ENABLE_FAUCET_CONTROL=false` default, dual written sign-off (Owner + Hardware Lead) required before production activation. Duplicate command IDs never re-dispense. Timeout ≠ completion. ACK timeout, completion timeout, expiry duration: **TBD**. Cancellation/stop support: **TBD**. |
 | **I18N** | `DEC-I18N-068` to `DEC-I18N-074` | **APPROVED** | Default `id` (Bahasa Indonesia), `en` fallback, mandatory centered language-selection gate for unauthenticated visitors without valid locale (`English` -> `en`, `Bahasa Indonesia` -> `id`), cookie-based non-prefixed routing (no URL path pollution), subsequent language changes strictly in Settings (`/settings`), UTC storage with `Asia/Jakarta` (WIB) presentation. |
 | **Infrastructure** | `DEC-INF-075` to `DEC-INF-088` | **APPROVED** | npm monorepo, PostgreSQL with Prisma ORM, internal health probes, dedicated Linux VPS production with Docker Compose (`TASK-1011`), and containerized staging decoupled from Railway (`TASK-1012`). Backup schedule and retention: daily automated encrypted pg_dump with offsite object storage. |
@@ -881,3 +881,98 @@ The following facts are supported by the verified decisions governance of `TASK-
 - **Decision:** Due to the absence of an immediate operational requirement, the implementation of an automated daily offsite backup pipeline, cloud storage integration, and restore procedures (`TASK-0909`) is formally deferred. Backup and restore capability is intentionally postponed until there is an operational requirement.
 - **Safety & Scope Boundaries:** No backup pipelines, storage integrations, database migrations, or infrastructure changes are implemented. Point-in-time snapshots and manual restore runbooks established during maintenance cutovers remain documented independently in `docs/SUPABASE_MIGRATION_RUNBOOK.md`.
 <!-- TASK-0909 Deferral Reconciled: 2026-09-18 -->
+
+---
+
+## DEC-MON-090: External ML Prediction Integration Architecture, Supabase Client Access Strategy, and Outbound Recommendation Contract
+- **Status:** APPROVED (External ML Supabase Integration Architecture)
+- **Related Task IDs:** `TASK-0413`
+- **Related Documentation:** `docs/DEVICE_COMMUNICATION.md`, `docs/DATABASE.md`, `docs/API.md`, `docs/ARCHITECTURE.md`, `AGENTS.md`
+- **Context:**
+  `TASK-0412` established MQTT telemetry ingestion for Soil (`melon/sensor-tanah/data-2424600050`) and Water Quality (`melon/sensor-air/data-2424600050`) with placeholder recommendation topics. The prediction tables `soil_predictions` and `water_predictions` are **not** located in the Melon development database (`unbyxlkrzqlafolxcypi`). They belong to an external ML team's Supabase project: `https://styjuynxuykvujnnqxos.supabase.co`. The Melon application and VPS gateway do not perform ML inference or manage prediction schemas. This decision establishes the authoritative architectural boundary, access method, synchronization strategy, security posture, and contract mapping for consuming external predictions.
+- **Decision:**
+  1. **Team Ownership & Architectural Boundary:**
+     - **ML Team Ownership:** The external ML team owns model training, feature extraction, inference execution, and the external Supabase project (`https://styjuynxuykvujnnqxos.supabase.co`), including the DDL schema and lifecycle of `soil_predictions` and `water_predictions`.
+     - **Melon System Ownership:** The Melon system owns field sensor telemetry ingestion over EMQX, persists raw telemetry to its own PostgreSQL database (`soil_readings`, `water_readings`), and acts strictly as an **external read-only consumer** of prediction results.
+     - **Zero In-House ML Compute & Zero Migrations:** The Melon codebase shall **not** create local database migrations for `ai_predictions`, `soil_predictions`, or `water_predictions`. The VPS gateway shall **not** install `onnxruntime-node`, bundle local model files (`.onnx`, `.pkl`, `.h5`), or run in-process inference engines.
+  2. **Integration Layer Architecture:**
+     - **External Prediction Adapter:** Implement an isolated `ExternalPredictionClient` service within the backend that wraps communication with the ML Supabase project, parses external response records, and maps them to canonical internal DTOs (`SoilPredictionDto`, `WaterPredictionDto`).
+     - **Authentication Strategy:** Access is authenticated strictly using dedicated backend environment variables:
+       - `EXTERNAL_ML_SUPABASE_URL=https://styjuynxuykvujnnqxos.supabase.co`
+       - `EXTERNAL_ML_SUPABASE_KEY=<token>` (read-only token / anon key provided by the ML team).
+       These credentials remain confidential server-side secrets on the VPS and are **never** exposed to browser clients or committed to source control.
+     - **API Contract Boundary:** Next.js dashboard routes query an internal protected endpoint: `GET /api/v1/devices/[deviceId]/predictions/latest` with session authentication (`requireDeviceViewAccess`). The frontend never connects directly to the external ML Supabase project.
+  3. **Access Method Evaluation & Selection (REST API vs Direct PostgreSQL):**
+     - *Direct PostgreSQL Connection (Supavisor / Port 5432/6543):* Rejected. Requires holding persistent connection pools in Node.js memory on a resource-constrained VPS, creates connection exhaustion risks, requires cross-cloud firewall port allowances, and tightly couples Prisma ORM schema to an external team's database DDL.
+     - *Supabase REST API (PostgREST / HTTPS Port 443):* **APPROVED.** Stateless, lightweight HTTPS queries using standard keep-alive connections. Zero persistent socket pool overhead on VPS RAM/CPU, firewall-friendly outbound port 443, strict read-only token restriction via RLS/API keys, and resilient decoupling from external schema alterations.
+  4. **Synchronization Strategy (On-Demand Cache-Aside & Telemetry Trigger):**
+     - **Dashboard Ingress (Cache-Aside Pattern):** User navigation to `/soil` and `/water` fetches predictions via internal API with a short-lived in-memory cache (30s TTL). Cache hits eliminate redundant external HTTP round-trips and keep dashboard latency $\le 10$ ms.
+     - **MQTT Telemetry Trigger (Outbound Recommendation Dispatch):** Upon successful persistence of raw telemetry into `soil_readings` or `water_readings`, the IoT Gateway triggers an asynchronous background fetch to the external ML API (with a brief configurable debounce, e.g. 1.5–2.0s to allow the external ML pipeline to write new predictions), and immediately publishes the fresh hybrid recommendation payload over EMQX.
+     - **Zero Additional Infrastructure Cost:** Operates entirely within existing VPS memory and network allowances without requiring external message queues, paid caches (Redis), or complex webhooks.
+  5. **Prediction Data Contracts (`soil_predictions` & `water_predictions`):**
+     - **Verified Real Schema (PostgreSQL on External Supabase):**
+       - `id`: Primary key (`uuid`, `uuid_generate_v4()`)
+       - `device_id`: Device identifier (`varchar`, Foreign Key to `devices.device_id`)
+       - `classification`: Model classification result (`varchar`, e.g. `optimal`, `warning`, `kritis`)
+       - `confidence`: Model prediction confidence (`double precision`, e.g. `0.905`, `1.0`, `0.895`)
+       - `recommendation`: Diagnostic guidance (`text`, serialized JSON string)
+       - `created_at`: Timestamptz of prediction generation (`timestamptz`, ISO 8601)
+     - **Verified Recommendation JSON Payload Structure:**
+       ```json
+       {
+         "module": "soil",
+         "classification": "optimal",
+         "summary": "Kondisi tanah baik. Pertahankan pola perawatan.",
+         "issues": [
+           {
+             "parameter": "EC air",
+             "value": 5.8,
+             "problem": "Kandungan garam/nutrisi terlalu tinggi",
+             "impact": "Dapat menyebabkan tanaman stres"
+           }
+         ],
+         "farmer_action": [
+           "Kurangi konsentrasi pupuk nutrisi",
+           "Tambahkan air bersih untuk pengenceran"
+         ]
+       }
+       ```
+     - **Hardware Device Mapping:**
+       - Soil node: `soil-node-jvbkdbv` (MQTT client `melon-esp32-tanah1`) $\rightarrow$ external ML `device_id: melon002`
+       - Water quality node: `water-quality-node-quiua` (MQTT client `melon-esp32-air1`) $\rightarrow$ external ML `device_id: water001`
+     - **Relationship with `device_id` & Timestamps:**
+       - Queries resolve latest prediction by `WHERE device_id = :deviceId ORDER BY created_at DESC LIMIT 1`. Supported transparently across immutable UUID, canonical `deviceId`, and external device alias via `DEFAULT_ML_DEVICE_ALIASES`.
+  6. **MQTT Recommendation Contract (Hybrid Payload Structure):**
+     - Outbound recommendation topics: `melon/ai-tanah/rekomendasi-2424600050` (Soil) and `melon/ai-air/rekomendasi-2424600050` (Water Quality) published with QoS 1, `retain: false`.
+     - Hybrid payload structure combining machine-readable action fields for field microcontrollers and human-readable summaries for operators:
+       ```json
+       {
+         "messageId": "rec-soil-018f-402a-a92c-e58f0012c4ba",
+         "clientId": "melon-esp32-tanah1",
+         "deviceId": "soil-node-biuc2f",
+         "timestamp": "2026-09-18T10:45:00.000Z",
+         "domain": "SOIL",
+         "status": "NORMAL",
+         "predictedClass": "OPTIMAL",
+         "confidence": 0.9450,
+         "actions": {
+           "farmer_action": ["Pertahankan pola perawatan."],
+           "issues": []
+         },
+         "farmerAction": ["Pertahankan pola perawatan."],
+         "issues": [],
+         "summary": "Kondisi tanah baik. Pertahankan pola perawatan.",
+         "modelVersion": "soil-ml-v1.0.0"
+       }
+       ```
+     - Actuator Safety Invariant: AI recommendations are strictly advisory. Under `ENABLE_FAUCET_CONTROL=false`, ML predictions shall **never** trigger automatic actuation of physical valves, solenoids, or relays (`DEC-CTRL-051`, `DEC-CTRL-067`).
+  7. **Frontend Integration Boundary:**
+     - Contract only: Frontends retrieve predictions via `GET /api/v1/devices/[deviceId]/predictions/latest` or real-time SSE stream.
+     - UI Invariance: Governed by `DEC-UIUX-101` (`Frontend impact: MINOR`, `Selected UI direction: Premium Minimal Ops`, `Existing color template: UNCHANGED`). Recommendation cards in `apps/web/app/soil/page.tsx` and `apps/web/app/water/page.tsx` dynamically bind to prediction data without changing existing layout geometry, visual styling, or color tokens.
+  8. **Implementation Checkpoints & Progressive Milestones:**
+     - **Phase A (Completed 2026-09-18):** Implemented canonical contracts in `packages/contracts/src/prediction.ts` (`SoilPredictionDto`, `WaterPredictionDto`, `OutboundRecommendationPayload`, `PredictionIssue`). Implemented read-only `ExternalPredictionClient` in `packages/database/src/external-prediction-client.ts` with 30s TTL cache, 3000ms timeout, candidate column fallback, and JSON recommendation parsing.
+     - **Phase B (Completed 2026-09-18):** Implemented protected endpoint `GET /api/v1/devices/[deviceId]/predictions/latest` in `apps/web` with session authentication, RBAC authorization (`requireDeviceViewAccess`), dual identifier resolution, and privacy masking (concealing external ML IDs, URLs, and keys).
+     - **Database-Driven Device Mapping (Completed 2026-09-18):** Added `device_external_mappings` table (`packages/database/prisma/migrations/20260918190000_add_device_external_mappings`) and repository lookup `DeviceRepository.getActiveExternalDeviceId`. Eliminated hard-coded hardware aliases in production flow with fail-closed security.
+     - **Phase C (Completed 2026-09-18):** Integrated non-blocking asynchronous recommendation publishing into `SoilWaterMqttAdapter` (`apps/iot-gateway`). Configurable debounce delay (`EXTERNAL_ML_DEBOUNCE_MS`, default 1500ms pending confirmed pipeline latency), staleness validation, duplicate suppression, and subscriber idempotency (`predictionId` and stable `messageId`). Verified live end-to-end telemetry ingestion and recommendation publishing against EMQX Cloud broker for both soil and water quality domains.
+     - **Verification Status:** 95/95 unit tests passing across all 4 related suites, 0 monorepo typecheck errors, 0 committed secrets across 343 files, and zero staging modifications.
+<!-- TASK-0413 Reconciled: 2026-09-18 -->
