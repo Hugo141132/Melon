@@ -209,13 +209,12 @@ describe('TASK-0502 — Live Soil and Water Monitoring UI Data Binding', () => {
     );
 
     await waitFor(() => {
+      // Stale banner and status indicator must be present
+      expect(screen.getAllByText(/Kedaluwarsa|Stale/i).length).toBeGreaterThanOrEqual(1);
       // Must display '-' placeholders instead of the old sensor values
       const dashes = screen.getAllByText('-');
       expect(dashes.length).toBeGreaterThanOrEqual(7);
     });
-
-    // Stale banner and status indicator must be present
-    expect(screen.getAllByText(/Kedaluwarsa|Stale/i).length).toBeGreaterThanOrEqual(1);
 
     // Old numerical values must NOT be displayed
     expect(screen.queryByText('152')).toBeNull();
@@ -363,13 +362,12 @@ describe('TASK-0502 — Live Soil and Water Monitoring UI Data Binding', () => {
     );
 
     await waitFor(() => {
+      // Stale banner must be present
+      expect(screen.getAllByText(/Kedaluwarsa|Stale/i).length).toBeGreaterThanOrEqual(1);
       // Must display '-' placeholders instead of the old sensor values
       const dashes = screen.getAllByText('-');
       expect(dashes.length).toBeGreaterThanOrEqual(3);
     });
-
-    // Stale banner must be present
-    expect(screen.getAllByText(/Kedaluwarsa|Stale/i).length).toBeGreaterThanOrEqual(1);
 
     // Old sensor values must NOT be displayed
     expect(screen.queryByText('880')).toBeNull();
