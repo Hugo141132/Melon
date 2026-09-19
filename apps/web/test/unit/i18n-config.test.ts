@@ -5,7 +5,6 @@ import {
   LOCALE_COOKIE_NAME,
   SUPPORTED_LOCALES,
   isSupportedLocale,
-  resolveLocale,
 } from '../../lib/i18n/config';
 import idMessages from '../../messages/id.json';
 import enMessages from '../../messages/en.json';
@@ -26,14 +25,6 @@ describe('TASK-0601 — I18N Configuration & Infrastructure', () => {
     expect(isSupportedLocale(null)).toBe(false);
     expect(isSupportedLocale(undefined)).toBe(false);
     expect(isSupportedLocale(123)).toBe(false);
-  });
-
-  it('resolves valid locales or falls back safely to default locale (id)', () => {
-    expect(resolveLocale('en')).toBe('en');
-    expect(resolveLocale('id')).toBe('id');
-    expect(resolveLocale('es')).toBe('id');
-    expect(resolveLocale(null)).toBe('id');
-    expect(resolveLocale(undefined)).toBe('id');
   });
 
   it('maintains structural key parity between Indonesian and English dictionaries', () => {

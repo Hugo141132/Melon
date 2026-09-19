@@ -344,7 +344,7 @@ export async function seedRBAC(prisma: PrismaClient) {
   };
 }
 
-export async function seedCanonicalDevices(prisma: PrismaClient) {
+async function seedCanonicalDevices(prisma: PrismaClient) {
   const devices = [
     {
       deviceId: 'soil-node-001',

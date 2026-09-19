@@ -1,8 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { mqttTopicRouter } from '../mqtt/router';
-import { messageValidator } from '../validation/validator';
 import { telemetryProcessor } from '../telemetry/processor';
-import { deviceStatusProcessor } from '../devices/status-processor';
 import { commandPublisher } from '../commands/publisher';
 import { acknowledgementProcessor } from '../acknowledgements/processor';
 import { GatewayMqttClient } from '../mqtt/client';
@@ -56,43 +54,12 @@ describe('IoT Gateway Subsystem Modules', () => {
     });
   });
 
-  describe('Message Validator', () => {
-    it('validates a valid base payload JSON', () => {
-      const raw = Buffer.from(
-        JSON.stringify({
-          schemaVersion: '1.0',
-          messageId: '550e8400-e29b-41d4-a716-446655440000',
-          deviceId: 'device-01',
-          timestamp: new Date().toISOString(),
-        })
-      );
-
-      const res = messageValidator.validateBaseMessage(raw);
-      expect(res.valid).toBe(true);
-      expect(res.data?.deviceId).toBe('device-01');
-    });
-
-    it('rejects invalid JSON or missing mandatory schema fields', () => {
-      const invalidJson = Buffer.from('not json');
-      expect(messageValidator.validateBaseMessage(invalidJson).valid).toBe(false);
-
-      const missingId = Buffer.from(JSON.stringify({ deviceId: 'dev' }));
-      expect(messageValidator.validateBaseMessage(missingId).valid).toBe(false);
-    });
-  });
-
-  describe('Scaffold Processors (Telemetry, Status, Commands, ACKs)', () => {
+  describe('Scaffold Processors (Telemetry, Commands, ACKs)', () => {
     it('telemetryProcessor receives and processes payload scaffold', async () => {
       const res = await telemetryProcessor.processTelemetry('device-01', 'soil', {
         moisture: 45,
       });
       expect(res.success).toBe(true);
-    });
-
-    it('deviceStatusProcessor handles status update scaffold', async () => {
-      await expect(
-        deviceStatusProcessor.processStatusEvent('device-01', 'ONLINE')
-      ).resolves.not.toThrow();
     });
 
     it('commandPublisher publishes command with retain=false', async () => {

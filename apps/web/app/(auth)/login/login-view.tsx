@@ -84,7 +84,7 @@ function LoginForm() {
   };
 
   return (
-    <form className="space-y-6" onSubmit={handleSubmit}>
+    <form className="space-y-5" onSubmit={handleSubmit}>
       {successMessage && (
         <div className="p-3.5 bg-primary/10 border border-primary/30 rounded-xl text-primary text-[14px] leading-[20px] flex items-start gap-2.5">
           <CheckCircle size={18} className="mt-0.5 shrink-0" />
@@ -100,20 +100,17 @@ function LoginForm() {
       )}
 
       {/* Email */}
-      <div className="space-y-2">
-        <label
-          className="text-[14px] leading-[20px] font-semibold tracking-[0.05em] text-on-surface-variant uppercase block"
-          htmlFor="email"
-        >
+      <div>
+        <label className="text-[14px] font-semibold text-on-surface mb-1.5 block" htmlFor="email">
           {tAuth('email')}
         </label>
         <div className="relative group">
           <Mail
             size={20}
-            className="absolute left-4 top-1/2 -translate-y-1/2 text-outline group-focus-within:text-secondary transition-colors"
+            className="absolute left-4 top-1/2 -translate-y-1/2 text-outline group-focus-within:text-primary transition-colors"
           />
           <input
-            className="w-full h-[56px] pl-12 pr-4 bg-surface border border-outline rounded-xl text-[18px] leading-[28px] text-on-surface focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/10 transition-all"
+            className="w-full h-[56px] pl-12 pr-4 bg-surface border border-outline-variant hover:border-outline focus:border-primary rounded-xl text-[16px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all placeholder:text-outline/60"
             id="email"
             placeholder="Wahyu123@gmail.com"
             type="email"
@@ -124,9 +121,9 @@ function LoginForm() {
       </div>
 
       {/* Password */}
-      <div className="space-y-2">
+      <div>
         <label
-          className="text-[14px] leading-[20px] font-semibold tracking-[0.05em] text-on-surface-variant uppercase block"
+          className="text-[14px] font-semibold text-on-surface mb-1.5 block"
           htmlFor="password"
         >
           {tAuth('password')}
@@ -134,10 +131,10 @@ function LoginForm() {
         <div className="relative group">
           <Lock
             size={20}
-            className="absolute left-4 top-1/2 -translate-y-1/2 text-outline group-focus-within:text-secondary transition-colors"
+            className="absolute left-4 top-1/2 -translate-y-1/2 text-outline group-focus-within:text-primary transition-colors"
           />
           <input
-            className="w-full h-[56px] pl-12 pr-12 bg-surface border border-outline rounded-xl text-[18px] leading-[28px] text-on-surface focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/10 transition-all"
+            className="w-full h-[56px] pl-12 pr-12 bg-surface border border-outline-variant hover:border-outline focus:border-primary rounded-xl text-[16px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all placeholder:text-outline/60"
             id="password"
             placeholder="••••••••"
             type={showPassword ? 'text' : 'password'}
@@ -145,7 +142,7 @@ function LoginForm() {
             onChange={(e) => setPassword(e.target.value)}
           />
           <button
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-outline hover:text-secondary active:scale-90 transition-all cursor-pointer"
+            className="absolute right-4 top-1/2 -translate-y-1/2 text-outline hover:text-primary active:scale-95 transition-all p-1 cursor-pointer"
             onClick={() => setShowPassword(!showPassword)}
             type="button"
             aria-label={showPassword ? tAuth('hidePassword') : tAuth('showPassword')}
@@ -156,10 +153,10 @@ function LoginForm() {
       </div>
 
       {/* Forgot password link */}
-      <div className="flex items-center justify-end py-1">
+      <div className="flex items-center justify-end pt-0.5">
         <Link
           href="/forgot-password"
-          className="text-[14px] leading-[20px] font-semibold tracking-[0.05em] text-secondary hover:underline underline-offset-4 decoration-2"
+          className="text-[14px] font-medium text-primary hover:underline underline-offset-4"
         >
           {tAuth('forgotPassword')}
         </Link>
@@ -168,14 +165,14 @@ function LoginForm() {
       {/* Submit */}
       <div className="pt-2">
         <button
-          className="w-full h-[56px] bg-primary text-on-primary rounded-xl text-[24px] leading-[32px] font-semibold hover:bg-primary-container hover:text-on-primary-container transition-all active:scale-[0.98] duration-100 shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+          className="w-full h-[56px] bg-primary text-on-primary rounded-xl text-[17px] font-semibold hover:bg-primary-container transition-all active:scale-[0.99] duration-150 shadow-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
           type="submit"
           disabled={loading}
         >
           {loading ? (
             <>
               <Loader2 size={20} className="animate-spin" />
-              <span className="text-[16px]">{tCommon('processing')}</span>
+              <span className="text-[15px]">{tCommon('processing')}</span>
             </>
           ) : (
             tAuth('loginButton')
@@ -192,13 +189,13 @@ export default function LoginView() {
 
   return (
     <div className="bg-surface text-on-surface min-h-dvh flex flex-col justify-center items-center p-[24px]">
-      <main className="w-full max-w-md bg-surface-container-lowest bento-shape p-[32px] shadow-sm border border-outline-variant">
+      <main className="w-full max-w-md bg-surface-container-lowest bento-shape p-[32px] md:p-[36px] shadow-sm border border-outline-variant/60 rounded-3xl">
         {/* Header */}
-        <header className="mb-[32px] text-center">
-          <h1 className="text-[32px] leading-[40px] font-bold tracking-[-0.01em] text-primary mb-2 md:text-[32px] text-[24px]">
+        <header className="mb-[28px] text-center">
+          <h1 className="text-[28px] md:text-[32px] leading-[36px] md:leading-[40px] font-bold text-primary mb-1.5">
             {tAuth('loginHeading')}
           </h1>
-          <p className="text-[16px] leading-[24px] text-on-surface-variant">
+          <p className="text-[15px] leading-[22px] text-on-surface-variant">
             {tAuth('loginSubtitle')}
           </p>
         </header>
@@ -209,10 +206,13 @@ export default function LoginView() {
       </main>
 
       {/* Footer */}
-      <footer className="mt-[32px] text-center">
-        <p className="text-[16px] leading-[24px] text-on-surface-variant">
+      <footer className="mt-[28px] text-center">
+        <p className="text-[15px] leading-[22px] text-on-surface-variant">
           {tAuth('noAccount')}{' '}
-          <Link href="/register" className="text-secondary font-bold hover:underline">
+          <Link
+            href="/register"
+            className="text-primary font-semibold hover:underline underline-offset-4"
+          >
             {tAuth('registerLand')}
           </Link>
         </p>

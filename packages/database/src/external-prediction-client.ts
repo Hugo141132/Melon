@@ -17,7 +17,7 @@ import {
  * from Melon's `device_external_mappings` table. These hard-coded aliases
  * are strictly a secondary fallback for local development and unit tests.
  */
-export const DEFAULT_ML_DEVICE_ALIASES: Record<string, string> = {
+const DEFAULT_ML_DEVICE_ALIASES: Record<string, string> = {
   'melon-esp32-tanah1': 'melon002',
   'soil-node-jvbkdbv': 'melon002',
   'melon-esp32-air1': 'water001',

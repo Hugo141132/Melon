@@ -267,6 +267,3 @@ export async function registerUser(
     return { user: safeUser };
   });
 }
-
-// Export alias for backwards compatibility
-export const registerAdminUser = registerUser;

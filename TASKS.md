@@ -2352,6 +2352,39 @@ Key Implementation Details:
 - [x] Page refresh retains active locale.
 - [x] Locale change does not alter device selection, canonical values, or RBAC.
 
+### 2026-09-19 Language Gate & Login Screen UI Refinements for Farmer Groups (Addendum)
+
+- **Status:** `DONE` (Completed 2026-09-19)
+- **Frontend Impact:** `MINOR`
+- **Selected UI Direction:** `Premium Minimal Ops`
+- **Existing Color Template:** `UNCHANGED`
+- **Selected Motion Effects:** `Card hover`, `Button hover`
+- **21st.dev MCP:** `VALIDATED & APPLIED`
+- **Deliverables & Enhancements:**
+  1. **Language Gate Screen (`apps/web/components/auth/language-gate.tsx`):**
+     - Removed bureaucratic bilingual title `"Select Language / Pilih Bahasa"`.
+     - Integrated 21st.dev choice card ergonomics tailored for agricultural/field users and non-technical farmer groups.
+     - Centered neutral `Globe` icon anchor (`w-12 h-12 rounded-full bg-primary/10 text-primary`) providing immediate visual context without unapproved branding or slogans.
+     - Implemented dual tactile choice cards (min-h `80px`, `rounded-2xl`) with clear visual flag representations: Indonesian flag (red/white) for `Bahasa Indonesia` (`Indonesia`) and UK flag (Union Jack) for `English` (`English`), with defensive inline dimension bounding (`width: 36px, height: 24px`) preventing layout shifts.
+     - Preserved accessible button naming (`aria-label="Pilih Bahasa Indonesia"`, `aria-label="Select English"`), cookie persistence (`locale=id` / `locale=en`), router refresh, zero logic/RBAC changes.
+     - Updated unit tests in `apps/web/test/unit/i18n-language-gate-and-settings.test.tsx` (13/13 passed).
+  2. **Login Screen UI Refinements (`apps/web/app/(auth)/login/login-view.tsx` & dictionaries):**
+     - Simplified heading: removed `"to Kebun Melon"` from `auth.loginHeading` (`"Log In"` in `en.json`, `"Masuk"` in `id.json`).
+     - Simplified registration link: removed `"New Farm"` from `auth.registerLand` (`"Register"` in `en.json`, `"Daftar"` in `id.json`).
+     - Refactored `login-view.tsx` card ergonomics inspired by 21st.dev choice patterns:
+       - Clean `rounded-3xl` card surface with soft elevation and high outdoor contrast.
+       - Natural sentence-case form labels (`Alamat Email`, `Kata Sandi` / `Email Address`, `Password`), removing aggressive uppercase tracked styling.
+       - High-touch 56px input fields (`h-[56px]`) and action button for error-free mobile and field operation.
+       - Contextual icons (`Mail`, `Lock`) and password visibility toggle (`Eye` / `EyeOff`).
+       - Preserved 100% authentication workflows, form validation, error handling, `AuthContext` reactive state hydration, and routing.
+     - Staging environment left untouched.
+- **Verification:**
+  - `npm run i18n:check`: 100% key parity verified.
+  - Vitest test suites: `test/route_protection.test.ts` (13/13 passed), `test/unit/auth-context-hydration.test.tsx` (6/6 passed), `i18n-language-gate-and-settings.test.tsx` (13/13 passed), `i18n-config.test.ts` (3/3 passed). Total: 35/35 passed.
+  - Monorepo Typecheck: `npm run typecheck` passed with 0 errors across 4 workspaces.
+  - Linter: `npm run lint:web` passed with 0 warnings/errors.
+  - Playwright visual/behavioral audit: Verified desktop and mobile rendering for Indonesian and English locales, flag layout stability, and error states.
+
 ---
 
 ## TASK-0605 — Add Translation Completeness Checks

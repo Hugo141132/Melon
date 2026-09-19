@@ -176,21 +176,6 @@ export function requirePermission(
   return session;
 }
 
-export function requireSelfOrPermission(
-  session: AuthenticatedUserSession,
-  targetUserId: string,
-  permissionCode: string,
-  request?: Request
-): AuthenticatedUserSession {
-  requireActiveAccount(session);
-
-  if (session.id === targetUserId) {
-    return session;
-  }
-
-  return requirePermission(session, permissionCode, 'USER', targetUserId, request);
-}
-
 export interface DeviceAuthorizationOptions {
   isDeviceAssignedToUser?: (userId: string, deviceId: string) => Promise<boolean> | boolean;
   isDeviceActiveAndControllable?: (deviceId: string) => Promise<boolean> | boolean;

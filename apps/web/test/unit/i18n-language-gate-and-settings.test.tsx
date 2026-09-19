@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { LanguageGate } from '@/components/auth/language-gate';
 import { SettingsLocaleSwitcher } from '@/components/settings/locale-switcher';
 import { UserPreferenceUpdateInputSchema } from '@kebun-melon/contracts';
-import { isSupportedLocale, resolveLocale, LOCALE_COOKIE_NAME } from '@/lib/i18n/config';
+import { isSupportedLocale, LOCALE_COOKIE_NAME } from '@/lib/i18n/config';
 import nextConfig from '../../next.config.mjs';
 
 const mockRefresh = vi.fn();
@@ -36,12 +36,10 @@ describe('TASK-0604 — Mandatory Initial Language Gate & Settings Locale Change
   });
 
   describe('1. Language Gate Component (Unauthenticated Flow)', () => {
-    it('renders language selection gate with bilingual header and accessible buttons', () => {
+    it('renders language selection gate with accessible choice buttons and without bureaucratic heading', () => {
       render(<LanguageGate />);
 
-      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
-        'Select Language / Pilih Bahasa'
-      );
+      expect(screen.queryByText(/Select Language \/ Pilih Bahasa/i)).not.toBeInTheDocument();
       expect(screen.getByRole('button', { name: /Select English/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /Pilih Bahasa Indonesia/i })).toBeInTheDocument();
     });
@@ -82,14 +80,6 @@ describe('TASK-0604 — Mandatory Initial Language Gate & Settings Locale Change
       // Valid locales
       expect(isSupportedLocale('id')).toBe(true);
       expect(isSupportedLocale('en')).toBe(true);
-    });
-
-    it('resolves valid locales or falls back to default id without crash', () => {
-      expect(resolveLocale('en')).toBe('en');
-      expect(resolveLocale('id')).toBe('id');
-      expect(resolveLocale('invalid')).toBe('id');
-      expect(resolveLocale(null)).toBe('id');
-      expect(resolveLocale(undefined)).toBe('id');
     });
   });
 

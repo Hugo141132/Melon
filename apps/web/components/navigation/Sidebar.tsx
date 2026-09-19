@@ -27,7 +27,7 @@ export interface SidebarProps {
   onMouseLeave?: () => void;
 }
 
-export const SIDEBAR_NAV_ITEMS = [
+const SIDEBAR_NAV_ITEMS = [
   { href: '/', key: 'home', icon: Home },
   { href: '/sensor', key: 'sensor', icon: Radio },
   { href: '/notifikasi', key: 'alerts', icon: Bell },

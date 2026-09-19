@@ -121,21 +121,6 @@ export function buildTrustedResetUrl(rawToken: string): string {
 }
 
 /**
- * Builds trusted verify email link using ONLY configured server environment URL.
- * Never relies on untrusted request Host headers.
- */
-export function buildTrustedVerifyEmailUrl(rawToken: string): string {
-  const env = validateServerEnv();
-  const rawBaseUrl =
-    env.APP_URL ||
-    process.env.NEXT_PUBLIC_APP_URL ||
-    process.env.APP_URL ||
-    'http://localhost:3000';
-  const baseUrl = rawBaseUrl.replace(/\/+$/, '');
-  return `${baseUrl}/verify-email?token=${encodeURIComponent(rawToken)}`;
-}
-
-/**
  * Generates bilingual HTML content for password reset email.
  */
 function getEmailHtml(

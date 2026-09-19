@@ -1,5 +1,3 @@
-import { redactSecrets } from '../config/env';
-
 export type BrokerConnectionState =
   'DISCONNECTED' | 'CONNECTING' | 'CONNECTED' | 'RECONNECTING' | 'ERROR';
 
@@ -240,16 +238,4 @@ export const metricsCollector = new GatewayMetricsCollector();
  */
 export function generateCorrelationId(prefix: string = 'corr'): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-}
-
-/**
- * Builds correlation metadata ensuring secrets are redacted.
- */
-export function createCorrelationMeta(meta: CorrelationMeta): Record<string, unknown> {
-  const correlationId = meta.correlationId || generateCorrelationId();
-  const rawMeta: Record<string, unknown> = {
-    correlationId,
-    ...meta,
-  };
-  return redactSecrets(rawMeta);
 }

@@ -26,7 +26,7 @@ export interface FaucetPreset {
   volumeMl: number;
 }
 
-export const FAUCET_PRESETS: FaucetPreset[] = [
+const FAUCET_PRESETS: FaucetPreset[] = [
   {
     phase: 1,
     labelKey: 'phase1',

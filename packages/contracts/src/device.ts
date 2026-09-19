@@ -29,21 +29,6 @@ export const WATER_TANK_NODE_MONITORING_PARAMETERS = ['WATER_TANK_VOLUME'] as co
 
 export const WATER_TANK_NODE_CONTROL_CAPABILITIES = ['FAUCET_CONTROL'] as const;
 
-export enum CapabilityCategory {
-  MONITORING = 'MONITORING',
-  CONTROL = 'CONTROL',
-}
-
-/**
- * Classifies a capability into MONITORING or CONTROL.
- */
-export function getCapabilityCategory(capability: string): CapabilityCategory {
-  if (capability === 'FAUCET_CONTROL') {
-    return CapabilityCategory.CONTROL;
-  }
-  return CapabilityCategory.MONITORING;
-}
-
 /**
  * Feature detection helper to check if a device supports an active, enabled capability.
  * Returns false if capability is missing or if enabled === false.

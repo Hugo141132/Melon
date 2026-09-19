@@ -35,7 +35,7 @@ export interface WeatherData {
   timestamp: string;
 }
 
-export function getWeatherConditionKey(code: number): string {
+function getWeatherConditionKey(code: number): string {
   if (code === 0) return 'weatherClear';
   if (code === 1) return 'weatherMainlyClear';
   if (code === 2) return 'weatherPartlyCloudy';
@@ -48,7 +48,7 @@ export function getWeatherConditionKey(code: number): string {
   return 'weatherPartlyCloudy';
 }
 
-export function getWeatherIcon(code: number, isDay = true, className = 'w-6 h-6') {
+function getWeatherIcon(code: number, isDay = true, className = 'w-6 h-6') {
   if (code === 0) {
     return <Sun className={cn(className, 'text-app-tertiary-container animate-spin-slow')} />;
   }

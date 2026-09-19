@@ -26,7 +26,7 @@ interface GlobalCache {
   earliestDate: number;
   latestDate: number;
 }
-export const globalHistoryCache = new Map<string, GlobalCache>();
+const globalHistoryCache = new Map<string, GlobalCache>();
 
 function groupDataByHour(data: any[], isMultiDay: boolean): BaseSeriesItem[] {
   const groups = new Map<number, any[]>();

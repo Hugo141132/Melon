@@ -16,13 +16,3 @@ export const LOCALE_COOKIE_NAME = 'locale';
 export function isSupportedLocale(locale: unknown): locale is SupportedLocale {
   return typeof locale === 'string' && (SUPPORTED_LOCALES as readonly string[]).includes(locale);
 }
-
-/**
- * Resolves a valid locale from an input string or cookie, defaulting to DEFAULT_LOCALE ('id').
- */
-export function resolveLocale(rawLocale?: string | null): SupportedLocale {
-  if (rawLocale && isSupportedLocale(rawLocale)) {
-    return rawLocale;
-  }
-  return DEFAULT_LOCALE;
-}

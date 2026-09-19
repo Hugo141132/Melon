@@ -7,7 +7,7 @@ const startTime = Date.now();
 
 export type DbChecker = () => Promise<boolean>;
 
-export const defaultDbChecker: DbChecker = async () => {
+const defaultDbChecker: DbChecker = async () => {
   if (!process.env.DATABASE_URL) {
     return false;
   }

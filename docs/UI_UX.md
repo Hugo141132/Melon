@@ -51,6 +51,32 @@ All Next.js App Router layouts, operational views, cards, modals, controls, and 
 3. **Advisory Safety Disclaimer (Mandatory)**: Every card includes an explicit footer note: `"Rekomendasi bersifat saran agronomi dan tidak mengontrol pompa air secara otomatis."` (`advisoryDisclaimer`), enforcing `DEC-MON-090` / `ENABLE_FAUCET_CONTROL=false` safety guarantees.
 4. **Mobile Layout Clearance**: `/water` page padding is bounded to `pb-24` ensuring complete clearance above fixed mobile navigation bars across all responsive viewports.
 
+### 1.4 Language Gate & Login Screen UI Refinements Governance & UI Specification (2026-09-19)
+The 2026-09-19 UI refinements optimize the entry experience for agricultural workers and farmer groups:
+- **Frontend impact:** `MINOR`
+- **Selected UI direction:** `Premium Minimal Ops`
+- **Existing color template:** `UNCHANGED`
+- **Selected motion effects:** `Card hover`, `Button hover`
+- **21st.dev MCP:** `VALIDATED & APPLIED`
+
+#### Presentation and Usability Rules
+1. **Language Gate Screen (`apps/web/components/auth/language-gate.tsx`):**
+   - **Removal of Bureaucratic Prompting:** The bilingual heading `"Select Language / Pilih Bahasa"` is removed.
+   - **Visual Anchor:** Uses a centered, neutral `Globe` icon (`w-12 h-12 rounded-full bg-primary/10 text-primary`) providing immediate visual context without unapproved slogans or decorative logos.
+   - **Tactile Choice Cards:** Employs 21st.dev-inspired high-contrast choice cards (`min-h-[80px]`, `rounded-2xl`, `p-5`, `border-2`, `hover:border-primary/40 active:scale-[0.98] transition-all`) featuring distinct flag representations:
+     - Indonesian flag (Red/White) for `Bahasa Indonesia` (`Indonesia`).
+     - United Kingdom flag (Union Jack) for `English` (`English`).
+     - Inline defensive bounds (`width: 36px, height: 24px`) preventing layout shift across rendering states.
+   - **Accessibility & Persistence:** ARIA button labels (`aria-label="Pilih Bahasa Indonesia"`, `aria-label="Select English"`) and non-prefixed cookie (`locale=id` / `locale=en`) handling strictly preserved.
+2. **Login Screen (`apps/web/app/(auth)/login/login-view.tsx`):**
+   - **Concise Hierarchy:** Heading text simplified to `"Log In"` / `"Masuk"` (removing `"to Kebun Melon"`), and registration link text simplified to `"Register"` / `"Daftar"` (removing `"New Farm"`).
+   - **Practical Ergonomics for Field Users:**
+     - High-touch 56px input fields (`h-[56px]`) and submission button ensuring error-free mobile and outdoor operation.
+     - Natural sentence-case labels (`Alamat Email`, `Kata Sandi` / `Email Address`, `Password`) eliminating aggressive uppercase tracked labels.
+     - Orientation icons (`Mail`, `Lock`) and interactive password toggle (`Eye`/`EyeOff`).
+     - Soft-elevated `rounded-3xl` card surface with high contrast against the app background.
+   - **Preserved Core:** 100% auth validation, error mapping, `AuthContext` reactive state hydration, and guest route guards remain intact.
+
 ---
 
 
@@ -757,9 +783,9 @@ Fallback locale:
 ### 15.2 Language Selector Placement & Initial Gate UX
 
 1. **Mandatory Initial Language Gate**:
-   - For an unauthenticated visitor with **no valid persisted locale cookie**, show a small centered mandatory language-selection gate before rendering login, register, or account-status UI.
+   - For an unauthenticated visitor with **no valid persisted locale cookie**, show a centered mandatory language-selection gate before rendering login, register, or account-status UI.
    - Gate options: `English` (`en`) and `Bahasa Indonesia` (`id`).
-   - Prompt text must be concise bilingual/language-neutral (`Select Language / Pilih Bahasa`).
+   - Presentation: The previous text `"Select Language / Pilih Bahasa"` was superseded on 2026-09-19 by a neutral `Globe` icon anchor and 21st.dev tactile choice cards (`min-h-[80px]`) displaying clear flag emblems (Indonesia red/white, UK Union Jack), optimized for farmer groups and non-technical users.
    - If a valid locale cookie already exists, **skip the gate** and render the requested page directly.
 
 2. **Subsequent Language Changes**:

@@ -5,8 +5,6 @@ import {
   WATER_QUALITY_NODE_MONITORING_PARAMETERS,
   WATER_TANK_NODE_CONTROL_CAPABILITIES,
   getCanonicalCapabilitiesForDeviceType,
-  getCapabilityCategory,
-  CapabilityCategory,
   supportsCapability,
 } from '../device';
 
@@ -47,13 +45,6 @@ describe('Device Capabilities Contracts', () => {
     expect(caps).not.toContain('SOLENOID_VALVE_CONTROL');
     expect(caps).not.toContain('WATER_FLOW_RATE');
     expect(WATER_TANK_NODE_CONTROL_CAPABILITIES).toEqual(['FAUCET_CONTROL']);
-  });
-
-  it('correctly classifies MONITORING vs CONTROL capabilities', () => {
-    expect(getCapabilityCategory('SOIL_PH')).toBe(CapabilityCategory.MONITORING);
-    expect(getCapabilityCategory('WATER_TDS')).toBe(CapabilityCategory.MONITORING);
-    expect(getCapabilityCategory('WATER_TANK_VOLUME')).toBe(CapabilityCategory.MONITORING);
-    expect(getCapabilityCategory('FAUCET_CONTROL')).toBe(CapabilityCategory.CONTROL);
   });
 
   it('supportsCapability feature detection helper works for string array DTOs', () => {

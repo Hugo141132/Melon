@@ -6,7 +6,6 @@ import {
   requireActiveAccount,
   requireRole,
   requirePermission,
-  requireSelfOrPermission,
   requireDeviceViewAccess,
   requireDeviceControlAccess,
 } from '../rbac';
@@ -128,29 +127,6 @@ describe('TASK-0209 — Authorisation Library (apps/web/lib/auth/rbac.ts)', () =
       } catch (err: any) {
         expect(err.statusCode).toBe(403);
         expect(err.code).toBe('UNKNOWN_PERMISSION');
-      }
-    });
-  });
-
-  describe('requireSelfOrPermission', () => {
-    it('10. Allows action if target matches self, even without admin/owner permission', () => {
-      expect(() =>
-        requireSelfOrPermission(activeAdmin, 'user-admin-1', 'account.approve')
-      ).not.toThrow();
-    });
-
-    it('11. Allows action if target is another user but caller has permission (Owner)', () => {
-      expect(() =>
-        requireSelfOrPermission(activeOwner, 'user-admin-1', 'account.approve')
-      ).not.toThrow();
-    });
-
-    it('12. Denies action if target is another user and caller lacks permission (Admin)', () => {
-      try {
-        requireSelfOrPermission(activeAdmin, 'user-other-99', 'account.approve');
-      } catch (err: any) {
-        expect(err.statusCode).toBe(403);
-        expect(err.code).toBe('INSUFFICIENT_PERMISSION');
       }
     });
   });

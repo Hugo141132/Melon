@@ -1,7 +1,7 @@
 import { PrismaClient, AccountStatus, UserRole } from '@prisma/client';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
-  registerAdminUser,
+  registerUser,
   DuplicateEmailError,
   MissingRoleError,
   PasswordPolicyError,
@@ -88,7 +88,7 @@ describe('TASK-0203 Public Admin Registration Integration Test Suite', () => {
       password: 'SecurePassword123!',
     };
 
-    const res = await registerAdminUser(prisma, input);
+    const res = await registerUser(prisma, input);
 
     expect(res.user).toBeDefined();
     expect(res.user.fullName).toBe('Verified Pending Admin');
@@ -131,7 +131,7 @@ describe('TASK-0203 Public Admin Registration Integration Test Suite', () => {
       password: 'SecurePassword123!',
     };
 
-    await registerAdminUser(prisma, input);
+    await registerUser(prisma, input);
 
     const duplicateInput = {
       fullName: 'Admin Two',
@@ -139,7 +139,7 @@ describe('TASK-0203 Public Admin Registration Integration Test Suite', () => {
       password: 'AnotherPassword123!',
     };
 
-    await expect(registerAdminUser(prisma, duplicateInput)).rejects.toThrow(DuplicateEmailError);
+    await expect(registerUser(prisma, duplicateInput)).rejects.toThrow(DuplicateEmailError);
   });
 
   it('3. Role, status, permission, and device-assignment injection are rejected', async () => {
@@ -153,7 +153,7 @@ describe('TASK-0203 Public Admin Registration Integration Test Suite', () => {
       assignedDevices: ['device-1'],
     };
 
-    await expect(registerAdminUser(prisma, maliciousInput)).rejects.toThrow();
+    await expect(registerUser(prisma, maliciousInput)).rejects.toThrow();
 
     // Verify database remains untouched
     const userCount = await prisma.user.count();
@@ -167,7 +167,7 @@ describe('TASK-0203 Public Admin Registration Integration Test Suite', () => {
       password: 'SecurePassword123!',
     };
 
-    const res = await registerAdminUser(prisma, input);
+    const res = await registerUser(prisma, input);
 
     const auditLog = await prisma.auditLog.findFirst({
       where: {
@@ -196,7 +196,7 @@ describe('TASK-0203 Public Admin Registration Integration Test Suite', () => {
       password: 'SecurePassword123!',
     };
 
-    await expect(registerAdminUser(prisma, input)).rejects.toThrow(MissingRoleError);
+    await expect(registerUser(prisma, input)).rejects.toThrow(MissingRoleError);
 
     // Verify zero users and zero role assignments exist
     const userCount = await prisma.user.count();

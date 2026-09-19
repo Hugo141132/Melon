@@ -639,6 +639,37 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
 - Selected UI direction: `Premium Minimal Ops`
 - Existing color template: `UNCHANGED`
 - Summary: Implemented mandatory initial language gate (`Select Language / Pilih Bahasa`, English -> `en`, Bahasa Indonesia -> `id`) blocking unauthenticated access on `/login`, `/register`, `/forgot-password`, `/status` until a valid non-prefixed `locale` cookie is set. Implemented authenticated language modal selector exclusively on `/setting` (`SettingsLocaleSwitcher`), backed by `PATCH /api/v1/me/preferences` with strict Zod schema validation (`UserPreferenceUpdateInputSchema`), `language.self.update` RBAC permission check, transactional persistence to `user_preferences` table with `profileee.self.updated` audit logging, and immediate client-side `locale` cookie synchronization. Replaced inline select with accessible modal dialog adhering to `Premium Minimal Ops` (clear active indicator, localized error handling, preserved route & device context). Fixed presentation-layer system default device display labels (`Node Sensor Tanah` <-> `Soil Sensor Node`, `Node Kualitas Air` <-> `Water Quality Node`, `Node Tangki Air` <-> `Water Tank Node`) in `formatDeviceDisplayName` and `DeviceSelector` across `id` and `en` modes while preserving canonical device IDs, database records, deviceType enums, and user-custom device names. Responsive mobile selector centering and dropdown viewport bounding enforced across 360px, 390px, 430px, and desktop widths. Verified dynamic `<html lang>` attribute updates, device context and route preservation, canonical internal value stability, 100% test pass rate across 18 unit test suites (136/136 tests, including new `device-selector-localization.test.tsx`), 0 TypeScript errors, 32/32 static pages generated in Next.js production build, Playwright verification across desktop and mobile viewports with 0 console errors, and confirmed user pass across all 5 reserved pre-commit checks (`test:coverage`, `test:integration`, `check:quality`, `test`, `test:e2e`).
+- 2026-09-19 Language Gate & Login Screen UI Refinements for Farmer Groups Record:
+  - Status: `DONE` (Completed 2026-09-19)
+  - Frontend impact: `MINOR`
+  - Selected UI direction: `Premium Minimal Ops`
+  - Existing color template: `UNCHANGED`
+  - Selected motion effects: `Card hover`, `Button hover`
+  - 21st.dev MCP: `VALIDATED & APPLIED`
+  - Summary:
+    - Language Gate Screen Refinement (`apps/web/components/auth/language-gate.tsx`):
+      - Removed bureaucratic bilingual title `"Select Language / Pilih Bahasa"`.
+      - Redesigned the screen using 21st.dev choice card inspiration tailored for farmer groups and non-technical users.
+      - Introduced a centered neutral `Globe` icon anchor (`w-12 h-12 rounded-full bg-primary/10 text-primary`) without unapproved branding or slogans.
+      - Implemented two tactile choice cards (min-h `80px`, `rounded-2xl`) with crisp visual flag indicators: Indonesian flag (red/white) for `Bahasa Indonesia` (`Indonesia`) and UK flag (Union Jack) for `English` (`English`), with defensive inline dimension constraints (`width: 36px, height: 24px`) to eliminate layout shifts.
+      - Preserved accessible names (`aria-label="Pilih Bahasa Indonesia"` & `aria-label="Select English"`), cookie handling (`locale=id` / `locale=en`), router refresh, zero backend/RBAC/i18n logic changes, zero new dependencies.
+      - Updated unit tests in `apps/web/test/unit/i18n-language-gate-and-settings.test.tsx` (13/13 passed).
+    - Login Screen Refinement (`apps/web/app/(auth)/login/login-view.tsx` & translation dictionaries):
+      - Removed `"to Kebun Melon"` from login heading: `auth.loginHeading` updated to `"Log In"` (`en.json`) and `"Masuk"` (`id.json`).
+      - Removed `"New Farm"` from registration link: `auth.registerLand` updated to `"Register"` (`en.json`) and `"Daftar"` (`id.json`).
+      - Redesigned `login-view.tsx` following practical 21st.dev card conventions without excessive decorative elements:
+        - Clean `rounded-3xl` card with soft elevation and high contrast.
+        - Readable sentence/title case labels (`Alamat Email`, `Kata Sandi`, `Email Address`, `Password`), eliminating aggressive uppercase tracked labels.
+        - High-touch 56px input fields (`h-[56px]`) with smooth focus states (`focus:ring-2 focus:ring-primary/20`) and high outdoor/sunlight contrast.
+        - Functional orientation icons (`Mail`, `Lock`) and password visibility toggle (`Eye` / `EyeOff`).
+        - Preserved all authentication flow (`handleSubmit`, `POST /api/v1/auth/login`), error handling (`ACCOUNT_PENDING_APPROVAL`, `EMAIL_NOT_VERIFIED`, `ACTIVE_SESSION_EXISTS`), `AuthContext` state hydration, and routing.
+      - Staging environment left untouched.
+    - Verification:
+      - `npm run i18n:check`: 100% parity passed.
+      - Vitest tests: `test/route_protection.test.ts` (13/13 passed), `test/unit/auth-context-hydration.test.tsx` (6/6 passed), `i18n-language-gate-and-settings.test.tsx` (13/13 passed), `i18n-config.test.ts` (3/3 passed). Total: 35/35 passed.
+      - Monorepo Typecheck: `npm run typecheck` passed with 0 errors across all 4 packages.
+      - Linter: `npm run lint:web` passed with 0 warnings/errors.
+      - Playwright MCP visual and behavioral verification: Confirmed Indonesian and English flows, flag indicators, responsive touch targets, and form validation error states with zero regressions.
 
 #### TASK-0703 Governance Record
 

@@ -1,9 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import {
-  GatewayMetricsCollector,
-  generateCorrelationId,
-  createCorrelationMeta,
-} from '../observability/metrics';
+import { GatewayMetricsCollector, generateCorrelationId } from '../observability/metrics';
 import { validateGatewayEnv } from '../config/env';
 import { buildApp } from '../app';
 
@@ -140,23 +136,6 @@ describe('TASK-0409 — Gateway Observability', () => {
       const id2 = generateCorrelationId('test');
       expect(id1).toMatch(/^test-\d+-[a-z0-9]+$/);
       expect(id1).not.toBe(id2);
-    });
-
-    it('creates correlation metadata while redacting sensitive secrets', () => {
-      const rawMeta = {
-        deviceId: 'device-123',
-        messageId: 'msg-456',
-        MQTT_GATEWAY_PASSWORD: 'secretpassword123',
-        DATABASE_URL: 'postgresql://user:pass@localhost:5432/db',
-      };
-
-      const meta = createCorrelationMeta(rawMeta);
-
-      expect(meta.correlationId).toBeDefined();
-      expect(meta.deviceId).toBe('device-123');
-      expect(meta.messageId).toBe('msg-456');
-      expect(meta.MQTT_GATEWAY_PASSWORD).toBe('[REDACTED]');
-      expect(meta.DATABASE_URL).toBe('postgresql://user:***@localhost:5432/db');
     });
   });
 

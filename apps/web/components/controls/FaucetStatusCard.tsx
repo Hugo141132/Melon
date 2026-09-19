@@ -64,7 +64,7 @@ export interface FaucetStatusCardProps {
 }
 
 export const ACTIVE_COMMAND_STATUSES = ['QUEUED', 'SENT', 'ACKNOWLEDGED', 'IN_PROGRESS'];
-export const TERMINAL_COMMAND_STATUSES = ['COMPLETED', 'FAILED', 'CANCELLED', 'TIMEOUT', 'EXPIRED'];
+const TERMINAL_COMMAND_STATUSES = ['COMPLETED', 'FAILED', 'CANCELLED', 'TIMEOUT', 'EXPIRED'];
 
 export function getAuthoritativePhysicalStateFromCommand(
   cmd: FaucetCommandDto | null | undefined

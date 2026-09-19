@@ -1,5 +1,5 @@
 import { PrismaClient, AccountStatus, UserRole } from '@prisma/client';
-import { validatePasswordPolicy, hashPassword, verifyPassword } from './password-service';
+import { validatePasswordPolicy, hashPassword } from './password-service';
 
 export { validatePasswordPolicy };
 
@@ -7,7 +7,7 @@ export { validatePasswordPolicy };
  * Stable, application-specific 64-bit integer advisory lock key for first-Owner provisioning.
  * Reserved exclusively for serialising initial system bootstrap.
  */
-export const FIRST_OWNER_PROVISIONING_LOCK_ID = BigInt('84736291106');
+const FIRST_OWNER_PROVISIONING_LOCK_ID = BigInt('84736291106');
 
 export interface OwnerProvisioningInput {
   email: string;
@@ -40,7 +40,7 @@ export function normaliseEmail(email: string): string {
 /**
  * Validates email format.
  */
-export function validateEmail(email: string): boolean {
+function validateEmail(email: string): boolean {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
 }
@@ -223,14 +223,4 @@ export async function provisionFirstOwner(
   );
 
   return result;
-}
-
-/**
- * Verifies a stored Argon2id password hash using the reusable password service.
- */
-export async function verifyOwnerPassword(
-  storedHash: string,
-  plainPassword: string
-): Promise<boolean> {
-  return await verifyPassword(storedHash, plainPassword);
 }

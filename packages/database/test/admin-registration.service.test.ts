@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AccountStatus, UserRole } from '@prisma/client';
 import {
-  registerAdminUser,
+  registerUser,
   DuplicateEmailError,
   MissingRoleError,
   PasswordPolicyError,
@@ -95,7 +95,7 @@ describe('Admin Registration Service & Transaction Unit Tests', () => {
       }),
     };
 
-    const result = await registerAdminUser(mockPrisma, input);
+    const result = await registerUser(mockPrisma, input);
 
     expect(result.user).toBeDefined();
     expect(result.user.fullName).toBe('New Admin');
@@ -122,7 +122,7 @@ describe('Admin Registration Service & Transaction Unit Tests', () => {
       }),
     };
 
-    await expect(registerAdminUser(mockPrisma, input)).rejects.toThrow(DuplicateEmailError);
+    await expect(registerUser(mockPrisma, input)).rejects.toThrow(DuplicateEmailError);
   });
 
   it('rejects registration when canonical ADMIN role is missing from DB', async () => {
@@ -146,7 +146,7 @@ describe('Admin Registration Service & Transaction Unit Tests', () => {
       }),
     };
 
-    await expect(registerAdminUser(mockPrisma, input)).rejects.toThrow(MissingRoleError);
+    await expect(registerUser(mockPrisma, input)).rejects.toThrow(MissingRoleError);
   });
 
   it('rejects registration if password fails password policy', async () => {
@@ -156,6 +156,6 @@ describe('Admin Registration Service & Transaction Unit Tests', () => {
       password: 'weakpassword',
     };
 
-    await expect(registerAdminUser(mockPrisma, weakInput)).rejects.toThrow(PasswordPolicyError);
+    await expect(registerUser(mockPrisma, weakInput)).rejects.toThrow(PasswordPolicyError);
   });
 });

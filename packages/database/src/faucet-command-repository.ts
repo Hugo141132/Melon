@@ -34,13 +34,6 @@ export class InvalidCommandStateTransitionError extends Error {
   }
 }
 
-export class DuplicateCommandEventError extends Error {
-  constructor(messageId: string) {
-    super(`Faucet command event with messageId '${messageId}' already exists.`);
-    this.name = 'DuplicateCommandEventError';
-  }
-}
-
 const FINAL_STATUSES: FaucetCommandStatus[] = [
   FaucetCommandStatus.COMPLETED,
   FaucetCommandStatus.FAILED,

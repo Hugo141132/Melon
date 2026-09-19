@@ -7,8 +7,8 @@ import {
   validatePasswordPolicy,
   normaliseEmail,
   validateTestDatabaseUrl,
-  verifyOwnerPassword,
 } from '../src/owner-provisioning';
+import { verifyPassword } from '../src/password-service';
 import { seedRBAC } from '../prisma/seed';
 
 describe('Permanent TASK-0106 First Owner Provisioning Test Suite', () => {
@@ -209,13 +209,10 @@ describe('Permanent TASK-0106 First Owner Provisioning Test Suite', () => {
 
       // Verify Argon2id hashing via library verify function
       expect(createdUser.passwordHash).toMatch(/^\$argon2id\$/);
-      const passwordValid = await verifyOwnerPassword(
-        createdUser.passwordHash,
-        'ValidPassword123!'
-      );
+      const passwordValid = await verifyPassword(createdUser.passwordHash, 'ValidPassword123!');
       expect(passwordValid).toBe(true);
 
-      const invalidPasswordValid = await verifyOwnerPassword(
+      const invalidPasswordValid = await verifyPassword(
         createdUser.passwordHash,
         'WrongPassword123!'
       );
