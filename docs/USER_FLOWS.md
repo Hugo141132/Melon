@@ -1355,7 +1355,7 @@ The application does NOT provide a "Delete Device" flow. Device removal from the
 6. The frontend displays historical chart components (`NPKChart` rendering NPK as a multi-line `LineChart` with Nitrogen `#0d631b`, Phosphorus `#884200`, Potassium `#476800`, `WaterNutrientChart`, `HistoricalChartControls`).
 7. X-axis tick density is decoupled from 1-hour data resolution via `getCustomXTicks`: 24h shows 5–8 time labels; 7d shows 4–5 well-spaced daily labels to eliminate label crowding and text overlap; 30d shows spaced date labels.
 8. Missing intervals are rendered as visual gaps (`connectNulls={false}`), never synthesized zeros.
-9. Telemetry EC values stored in `mS/cm` are converted to `µS/cm` (×1000) for display.
+9. Telemetry EC values are stored, transmitted, and displayed directly in `µS/cm` without multiplier conversions.
 10. Dates and numbers are formatted according to the application's active locale (`formatDayMonth`) without trailing commas or periods (`20 Agu` / `20 Aug`).
 
 **Alternative flows:** No historical readings exist; API returns HTTP 200 with an empty series array and the UI displays a no-data banner.

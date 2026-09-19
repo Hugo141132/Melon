@@ -119,7 +119,7 @@ flowchart LR
     R[Realtime Delivery SSE]
     G[IoT Gateway]
     M_Res[EMQX MQTT Broker Reservoir]
-    M_SW[EMQX MQTT Broker Soil and Water]
+    M_SW[HiveMQ Cloud MQTT Broker Soil and Water]
     D_Soil[Soil Node ESP32 MQTT]
     D_Water[Water Node ESP32 MQTT]
     D_Res[Water Tank Node MQTT]
@@ -143,8 +143,9 @@ flowchart LR
 
 ### 4.1 Ingress Paths by Domain
 
-1. **Soil & Water Quality Telemetry (Path A - MQTT over TLS, TASK-0412 / DEC-DEV-033)**: Soil and water quality equipment connects via MQTT 5.0 over TLS (Port 8883) to EMQX broker (`mqtts://...:8883`). `apps/iot-gateway` runs a dedicated `SoilWaterMqttAdapter` subscribing to `melon/sensor-tanah/data-2424600050` and `melon/sensor-air/data-2424600050`, publishes recommendations back on `melon/ai-tanah/rekomendasi-2424600050` and `melon/ai-air/rekomendasi-2424600050` (QoS 1), persists telemetry to PostgreSQL (`DB`), and triggers real-time SSE stream events via internal service webhook to `apps/web` (`R`). Obsolete REST telemetry ingestion routes (`POST /api/v1/devices/[deviceId]/telemetry/...`) were permanently retired.
-2. **Reservoir-Water Telemetry & Faucet Control (Path B - Direct MQTT Gateway, DEC-DEV-032)**: The single Water Tank node connects via MQTT 5.0 over TLS to the EMQX broker (`M_Res`) using canonical hardware topics (`irigasi/melon/...`). The IoT Gateway (`G`) ingests telemetry directly from `irigasi/melon/sensor/volume`, validates payloads, binds deterministically to the database `WATER_TANK_NODE` entity, persists to PostgreSQL (`DB`), emits real-time updates (`R`), and publishes valve/automation commands directly to `irigasi/melon/kontrol/valve` and `irigasi/melon/setting/otomasi` under strict `ENABLE_FAUCET_CONTROL=false` safety locks. The intermediate `agriculture/...` topic hop is permanently retired for the reservoir domain, and reservoir flow remains completely unchanged.
+1. **Soil & Water Quality Telemetry (Path A - MQTT over TLS via HiveMQ Cloud, TASK-0412 / TASK-0414 / DEC-DEV-033)**: Soil and water quality equipment connects via MQTT over TLS (Port 8883) to dedicated HiveMQ Cloud broker (`mqtts://217c0d73f9b648c09a5741c80dbb80df.s1.eu.hivemq.cloud:8883`). `apps/iot-gateway` runs a dedicated secondary MQTT client with `SoilWaterMqttAdapter` subscribing to `melon/sensor-tanah/data-2424600050` and `melon/sensor-air/data-2424600050`, publishes AI recommendations back on `melon/ai-tanah/rekomendasi-2424600050` and `melon/ai-air/rekomendasi-2424600050` (QoS 1), persists telemetry to PostgreSQL (`DB`), standardizes EC directly in `µS/cm` (`DEC-MON-091`), and triggers real-time SSE stream events via internal service webhook to `apps/web` (`R`). Obsolete REST telemetry ingestion routes (`POST /api/v1/devices/[deviceId]/telemetry/...`) were permanently retired.
+2. **Reservoir-Water Telemetry & Faucet Control (Path B - Direct MQTT Gateway via EMQX Cloud, DEC-DEV-032 / DEC-DEV-033)**: The single Water Tank node connects via MQTT 5.0 over TLS/WSS to the primary EMQX Cloud broker (`M_Res`) using canonical hardware topics (`irigasi/melon/...`). The IoT Gateway (`G`) ingests telemetry directly from `irigasi/melon/sensor/volume`, validates payloads, binds deterministically to the database `WATER_TANK_NODE` entity, persists to PostgreSQL (`DB`), emits real-time updates (`R`), and publishes valve/automation commands directly to `irigasi/melon/kontrol/valve` and `irigasi/melon/setting/otomasi` under strict `ENABLE_FAUCET_CONTROL=false` safety locks. The intermediate `agriculture/...` topic hop is permanently retired for the reservoir domain, and reservoir flow remains completely unchanged.
+
 
 #### 4.1.1 Gateway Connectivity Topology, EMQX Cloud & Runtime Isolation (TASK-0914, TASK-1012, DEC-DEV-032)
 
@@ -171,16 +172,19 @@ flowchart LR
 - **Staging Post-Cutover Mutations & SSE Delivery:** Verified Owner login (active session `3072c4f8-973e-4502-ab6b-8df589eaff72`, synchronous audit log `35c7c64b-73f1-4f37-bbfd-ed190d779c44`, `DEC-AUTH-107` enforced) and telemetry writes to `soil_readings` (`676f7aca`, `965f54cf`, `d319dd56`). Remediated in-route event publishing in telemetry endpoints, bound event-hub globally, and verified live authenticated browser EventSource receipt (`telemetry.soil.updated` correlating 100% with reading `d319dd56-821c-47b8-a56e-4012cd26f4f4`, Gate 5 PASS). `ENABLE_FAUCET_CONTROL=false` strictly preserved across all configurations.
 - **Environment Status, Staleness & Soak Monitoring:** Both Mumbai Dev (`xjsencdgfcbkzdzqcnqx`) and Mumbai Staging (`scqrbtfilmttqrutynyo`) are paused (`INACTIVE`, 0 active project slots) and permanently stale. Per Owner decision, Mumbai rollback is decommissioned and technical cutover is complete (`DONE`). Restarted 72-hour soak period active from `2026-09-08 15:28:30 UTC` through `2026-09-11 15:28:30 UTC`. Sampled observations confirm healthy service at tested points, with the gap between periodic sample probes and continuous telemetry aggregation explicitly disclosed. Paused Mumbai project deletion tracked as post-migration retirement follow-up. Reference: `docs/DATABASE.md` §2.2, `docs/TESTING.md` §35, and [`docs/SUPABASE_MIGRATION_RUNBOOK.md`](file:///c:/Users/Puroh/Documents/Melon/docs/SUPABASE_MIGRATION_RUNBOOK.md).
 
-#### 4.1.3 Soil & Water Quality Ingress Topology (TASK-0412 / DEC-DEV-033)
+#### 4.1.3 Soil & Water Quality Ingress Topology & Dual Broker Architecture (TASK-0412 / TASK-0414 / DEC-DEV-033)
 
-- **Dedicated Soil & Water MQTT Ingestion Boundary:** Telemetry ingestion for soil (`SOIL_NODE`) and water quality (`WATER_QUALITY_NODE`) is handled by `SoilWaterMqttAdapter` inside `apps/iot-gateway`.
-- **Broker & Port Connectivity:** Connects over TLS (Port 8883) to EMQX broker (`mqtts://...:8883`).
+- **Dedicated Soil & Water MQTT Ingestion Boundary:** Telemetry ingestion for soil (`SOIL_NODE`) and water quality (`WATER_QUALITY_NODE`) is handled by a dedicated secondary MQTT client with `SoilWaterMqttAdapter` inside `apps/iot-gateway`.
+- **Broker & Port Connectivity:** Connects over TLS (Port 8883) to dedicated HiveMQ Cloud broker (`mqtts://217c0d73f9b648c09a5741c80dbb80df.s1.eu.hivemq.cloud:8883`).
 - **Topics:**
   - Soil Data Ingestion: `melon/sensor-tanah/data-2424600050`
   - Soil AI Recommendation Out: `melon/ai-tanah/rekomendasi-2424600050` (QoS 1)
   - Water Quality Data Ingestion: `melon/sensor-air/data-2424600050`
   - Water Quality AI Recommendation Out: `melon/ai-air/rekomendasi-2424600050` (QoS 1)
-- **Reservoir Isolation:** EMQX MQTT flow (`irigasi/melon/...`) and `ENABLE_FAUCET_CONTROL=false` safety locks for reservoir water tank remain isolated and untouched.
+- **Primary Broker & Reservoir Isolation:** EMQX Cloud MQTT flow (`irigasi/melon/...`) and `ENABLE_FAUCET_CONTROL=false` safety locks for reservoir water tank remain isolated and untouched on the primary EMQX broker client.
+- **Gateway Health & Readiness:** Probes (`/health`, `/ready`) report both `emqx` and `hivemq` connection states independently.
+- **Canonical EC Unit Standardization (`DEC-MON-091`):** Ingested EC values are persisted, processed, and displayed directly in `µS/cm` without multiplier conversions.
+- **Hardware Verification Status:** Backend software pipeline, subscriptions, and DB ingestion are verified. Physical ESP32 telemetry remains pending hardware team firmware source code (`.ino`) and serial runtime log inspection (`PENDING_HARDWARE_FIRMWARE_LOGS`).
 - **REST Telemetry Ingestion Retirement:** Obsolete REST ingestion routes (`POST /api/v1/devices/[deviceId]/telemetry/...`) were permanently deleted, and Edge middleware was tightened to require valid user sessions for all `/api/v1/devices` paths.
 
 ---

@@ -74,7 +74,7 @@ const mockSoilSnapshot: LatestMonitoringSnapshotDto = {
       temperature: 29.4,
       moisture: 68.5,
       ph: 6.4,
-      ec: 1.85,
+      ec: 1850,
       status: 'OPTIMAL',
     },
   },
@@ -95,7 +95,7 @@ const mockWaterSnapshot: LatestMonitoringSnapshotDto = {
     data: {
       ph: 6.3,
       tds: 880,
-      ec: 1.75,
+      ec: 1750,
       tankVolume: null,
       status: 'NORMAL',
     },
@@ -159,7 +159,7 @@ describe('TASK-0502 — Live Soil and Water Monitoring UI Data Binding', () => {
     expect(screen.getByText('68.5')).toBeInTheDocument(); // Moisture
     expect(screen.getByText('%RH')).toBeInTheDocument(); // Moisture unit (%RH)
     expect(screen.getByText('6.40')).toBeInTheDocument(); // pH (no unit)
-    expect(screen.getByText('1850')).toBeInTheDocument(); // EC converted from 1.85 mS/cm to 1850 µS/cm
+    expect(screen.getByText('1850')).toBeInTheDocument(); // EC stored and displayed directly as 1850 µS/cm
     expect(screen.getAllByText('µS/cm').length).toBeGreaterThan(0); // EC unit
 
     // Check symbols for cards
@@ -185,7 +185,7 @@ describe('TASK-0502 — Live Soil and Water Monitoring UI Data Binding', () => {
           temperature: 29.4,
           moisture: 68.5,
           ph: 6.4,
-          ec: 1.85,
+          ec: 1850,
           status: 'OPTIMAL',
         },
       },
@@ -341,7 +341,7 @@ describe('TASK-0502 — Live Soil and Water Monitoring UI Data Binding', () => {
     });
     expect(screen.getByText('ppm')).toBeInTheDocument(); // TDS unit
     expect(screen.getByText('6.30')).toBeInTheDocument(); // pH
-    expect(screen.getByText('1750')).toBeInTheDocument(); // EC converted from 1.75 mS/cm to 1750 µS/cm
+    expect(screen.getByText('1750')).toBeInTheDocument(); // EC stored and displayed directly as 1750 µS/cm
     expect(screen.getByText('µS/cm')).toBeInTheDocument(); // EC unit
   });
 
@@ -355,7 +355,7 @@ describe('TASK-0502 — Live Soil and Water Monitoring UI Data Binding', () => {
         data: {
           ph: 6.3,
           tds: 880,
-          ec: 1.75,
+          ec: 1750,
           tankVolume: null,
           status: 'NORMAL',
         },

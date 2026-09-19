@@ -70,8 +70,8 @@ function groupDataByHour(data: any[], isMultiDay: boolean): BaseSeriesItem[] {
     const k = avg('potassium');
 
     const ecRaw = avg('ec');
-    // Explicit presentation conversion from source unit (mS/cm) to display unit (µS/cm: 1 mS/cm = 1000 µS/cm)
-    const ecVal = ecRaw !== null ? Math.round(ecRaw * 1000) : null;
+    // EC stored and aggregated directly in µS/cm
+    const ecVal = ecRaw !== null ? Math.round(ecRaw) : null;
 
     // Sort items by timestamp to ensure we get the latest status
     items.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());

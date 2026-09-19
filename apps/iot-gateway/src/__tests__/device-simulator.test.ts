@@ -113,7 +113,7 @@ describe('TASK-0408: DeviceSimulator Unit & Scenario Verification', () => {
       expect(payload.deviceId).toBe('water-node-test-001');
       expect(payload.data.ph).toBe(7.2);
       expect(payload.data.tds).toBe(350);
-      expect(payload.data.ec).toBe(0.84);
+      expect(payload.data.ec).toBe(450); // Canonical EC in µS/cm per DEC-MON-091
       expect(payload.data.status).toBe('NORMAL');
 
       // Verify BAT, latitude, longitude parameters are omitted

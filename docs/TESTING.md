@@ -3039,3 +3039,43 @@ The following verification gates, test results, and frontend evidence were evalu
 - No environment files (`.env`) were modified.
 - Actuator physical valve control remains strictly locked under `ENABLE_FAUCET_CONTROL=false`.
 <!-- TASK-0411 Testing Evidence Reconciled: 2026-09-11 -->
+
+---
+
+## 35.10 TASK-0414 Dual MQTT Broker Architecture, EC Standardization & Staging Verification Evidence (2026-09-19)
+
+The following verification gates, test results, and staging deployment evidence were evaluated for `TASK-0414` (Dual MQTT Broker Architecture, Canonical EC Standardization, and Staging Synchronization):
+
+### 1. Verification Gates & Evidence Summary
+- **EC Unit Standardization (`DEC-MON-091`):**
+  - Canonical unit is standardized directly in `µS/cm` across PostgreSQL database, Prisma schema, API serialization, UI visualization (`MonitoringDashboard.tsx`, `useHistoricalMonitoring.ts`, `NPKChart`, `WaterNutrientChart`), device simulator (`scripts/device-simulator.ts`), and external ML inference integration.
+  - Verified 100% parity with SmartTani two-sided classification rules (`Soil optimal: 800–2500 µS/cm; Water optimal: 0–500 µS/cm`).
+- **Dual MQTT Broker Architecture (`DEC-DEV-033`):**
+  - Primary Broker (EMQX Cloud): Dedicated to Water Tank Node (`WATER_TANK_NODE`) and valve/automation commands over MQTT 5.0 / TLS / WSS.
+  - Secondary Broker (HiveMQ Cloud): Dedicated to Soil ESP32 (`melon-esp32-tanah1`) and Water Quality ESP32 (`melon-esp32-air1`) telemetry topics (`melon/sensor-tanah/data-2424600050`, `melon/sensor-air/data-2424600050`) and outbound recommendations (`melon/ai-tanah/rekomendasi-2424600050`, `melon/ai-air/rekomendasi-2424600050`) over TLS port 8883.
+  - Gateway Client Support: Added dedicated secondary client in `apps/iot-gateway` with stable client ID `melon-gateway-soil-water`.
+  - Probes: `/health` and `/ready` updated to report both EMQX and HiveMQ broker connection states independently.
+- **Staging Database & Container Synchronization:**
+  - Applied pending migrations (`20260915000000_drop_water_readings_unused_coordinates`, `20260915230000_add_client_id_to_devices`, `20260918190000_add_device_external_mappings`) to Supabase Staging (`ihgoxqdncepbcrqkchxu`) with bit-for-bit SHA-256 parity in `_prisma_migrations`.
+  - Populated staging `devices.client_id` (`melon-esp32-tanah1`, `melon-esp32-air1`, `water-tank-node-zi37gz`) and seeded `device_external_mappings`.
+  - Updated `.env.staging` with `SOIL_WATER_MQTT_*` and `EXTERNAL_ML_*` configuration.
+  - Rebuilt and deployed staging Docker containers (`docker compose -f docker-compose.staging.yml up -d --build`).
+  - Health probe results:
+    - `GET http://localhost:3000/health` → HTTP 200 `{"status":"ok"}`
+    - `GET http://localhost:3001/health` → HTTP 200
+    - `GET http://localhost:3001/ready` → HTTP 200 `{"status":"UP","service":"iot-gateway","emqx":{"status":"CONNECTED","connected":true},"mqtt":{"status":"CONNECTED","connected":true},"soilWaterMqtt":{"broker":"HIVEMQ","status":"CONNECTED","connected":true},"database":{"status":"CONNECTED","connected":true}}`
+
+### 2. Evidence-Backed Automated Test Results
+- **Unit & Route Test Suites (PASSED):**
+  - `apps/iot-gateway/src/__tests__/broker-config.test.ts`: 9/9 passed (100%).
+  - `apps/iot-gateway/src/__tests__/health.test.ts`: 16/16 passed (100%).
+  - `apps/web/test/unit/monitoring-dashboard.test.tsx`: 8/8 passed (100%).
+  - `apps/web/test/unit/soil-telemetry-ui.test.tsx`: 8/8 passed (100%).
+  - `apps/web/test/unit/historical-charts.test.tsx`: 18/18 passed (100%).
+- **Static Typecheck:** `npm run typecheck` returned **0 errors** across all 4 monorepo packages (`@kebun-melon/contracts`, `@kebun-melon/database`, `@kebun-melon/iot-gateway`, `@kebun-melon/web`), exit code 0.
+- **Synthetic Telemetry Ingestion (PASSED):** Verified end-to-end ingestion of synthetic soil and water telemetry through HiveMQ Cloud over TLS 8883, resolved dynamic device client IDs, persisted readings into PostgreSQL, updated device `last_seen_at`, and set `connection_status = 'ONLINE'`.
+
+### 3. Preserved Invariants & Pending Hardware State
+- Actuator physical valve control remains strictly locked under `ENABLE_FAUCET_CONTROL=false`.
+- Physical ESP32 hardware telemetry remains `PENDING_HARDWARE_FIRMWARE_LOGS` pending firmware source code (`.ino`) and serial runtime log audit from the hardware team.
+<!-- TASK-0414 Testing Evidence Reconciled: 2026-09-19 -->

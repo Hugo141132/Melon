@@ -132,7 +132,7 @@ UUID
 
 Device IDs remain stable human-readable identifiers (e.g. `soil-node-001`) in addition to internal UUID primary keys. Database repository lookups resolve both canonical string `deviceId` and internal `id` UUID values.
 
-Telemetry EC readings are persisted in canonical source units (`mS/cm`). Presentation boundaries in the web UI convert these to `µS/cm` (×1000) for visual display.
+Telemetry EC readings are standardized and persisted directly in canonical units (`µS/cm`). Presentation boundaries in the web UI, simulator, API, and external ML classification use `µS/cm` natively without `×1000` multipliers (`DEC-MON-091`).
 
 ### 3.4 Timestamps
 

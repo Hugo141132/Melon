@@ -316,7 +316,7 @@
     "sensorSoilTitle": "Sensor Tanah",
     "sensorSoilDesc": "Nitrogen, Fosfor, Kalium, Suhu, Kelembapan, pH, EC.",
     "sensorWaterTitle": "Kualitas Air",
-    "sensorWaterDesc": "TDS (ppm), EC (mS/cm), dan derajat keasaman (pH).",
+    "sensorWaterDesc": "TDS (ppm), EC (µS/cm), dan derajat keasaman (pH).",
     "sensorControlsTitle": "Tangki Air & Kran",
     "sensorControlsDesc": "Volume Tangki (L), Preset Kran.",
     "totalDevicesCount": "Total Perangkat: {count}",

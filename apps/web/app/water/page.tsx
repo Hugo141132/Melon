@@ -37,9 +37,9 @@ function formatTimestamp(
 function ECGauge({ value }: { value: number | null | undefined }) {
   const tWater = useTranslations('water');
   const hasValue = value !== null && value !== undefined && !isNaN(value);
-  // Explicit presentation conversion from source unit (mS/cm) to display unit (µS/cm)
-  const displayVal = hasValue ? Math.round(value * 1000) : '-';
-  const numDisplayVal = hasValue ? Math.round(value * 1000) : 0;
+  // Direct presentation from source unit (µS/cm)
+  const displayVal = hasValue ? Math.round(value) : '-';
+  const numDisplayVal = hasValue ? Math.round(value) : 0;
   const maxEC = 4000;
   const angle = hasValue ? -135 + (Math.min(numDisplayVal, maxEC) / maxEC) * 270 : -135;
 

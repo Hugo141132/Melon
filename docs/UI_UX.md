@@ -597,7 +597,7 @@ Historical charts render on domain detail pages (`/soil` and `/water`; legacy `/
   - **Indonesian (`id`):** e.g., `20 Agu`, `24 Agu`.
   - **English (`en`):** e.g., `20 Aug`, `24 Aug`.
   - All unwanted trailing commas and periods are stripped from axis ticks, raw data strings, and tooltip headers (`20 Agu`, not `20 Agu,`).
-- **EC Display Unit:** Electrical Conductivity is stored in `mS/cm` and converted to `µS/cm` (×1000) for display.
+- **EC Display Unit:** Electrical Conductivity is standardized directly in `µS/cm` across storage, API, and display without multiplier conversion (`DEC-MON-091`).
 - **Empty State:** Queries returning zero records display a translated no-data banner (HTTP 200), not zero values or a 404 error.
 
 ---

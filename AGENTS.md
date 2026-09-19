@@ -27,17 +27,17 @@ The project is a web-based multi-device monitoring and control system for ESP32/
 
 The system monitors:
 
-### Soil Monitoring (MQTT over TLS)
+### Soil Monitoring (MQTT over TLS via HiveMQ Cloud Broker, TASK-0412 / TASK-0414)
 
-- Nitrogen, Phosphorus, Potassium, Temperature, Moisture, pH, EC, Soil status (Battery deleted per `DEC-MON-086`). Ingested via MQTT on `melon/sensor-tanah/data-2424600050` with outbound recommendation on `melon/ai-tanah/rekomendasi-2424600050` per `TASK-0412`.
+- Nitrogen, Phosphorus, Potassium, Temperature, Moisture, pH, EC (canonically standardized in `µS/cm` per `DEC-MON-091`), Soil status (Battery deleted per `DEC-MON-086`). Ingested via HiveMQ Cloud over TLS on `melon/sensor-tanah/data-2424600050` with outbound recommendation on `melon/ai-tanah/rekomendasi-2424600050` per `TASK-0412`.
 
-### Water Quality Monitoring (MQTT over TLS)
+### Water Quality Monitoring (MQTT over TLS via HiveMQ Cloud Broker, TASK-0412 / TASK-0414)
 
-- pH, TDS, EC, Water status (Battery, Latitude, and Longitude deleted per `DEC-MON-086`). Ingested via MQTT on `melon/sensor-air/data-2424600050` with outbound recommendation on `melon/ai-air/rekomendasi-2424600050` per `TASK-0412`.
+- pH, TDS, EC (canonically standardized in `µS/cm` per `DEC-MON-091`), Water status (Battery, Latitude, and Longitude deleted per `DEC-MON-086`). Ingested via HiveMQ Cloud over TLS on `melon/sensor-air/data-2424600050` with outbound recommendation on `melon/ai-air/rekomendasi-2424600050` per `TASK-0412`.
 
-### Reservoir-Water Monitoring (MQTT 5.0 over TLS via EMQX Broker)
+### Reservoir-Water Monitoring (MQTT 5.0 over TLS via Primary EMQX Cloud Broker, DEC-DEV-032 / DEC-DEV-033)
 
-- Reservoir water volume, Reservoir status (Flow rate deleted per `DEC-MON-089`).
+- Reservoir water volume, Reservoir status (Flow rate deleted per `DEC-MON-089`). Preserved on dedicated EMQX Cloud broker (`irigasi/melon/...`).
 
 ### Sensor Battery (`BAT`)
 
@@ -443,6 +443,18 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
   - Page Integration & Mobile Clearance: Replaced static hardcoded markup on `/soil` and integrated symmetrically into `/water` with `pb-24` clearance to avoid overlap with mobile navigation bars.
   - Bilingual Localization: Added `recommendation` namespace to `apps/web/messages/id.json` and `messages/en.json` with 14 keys and 100% key and ICU placeholder parity (`{value}`, `{time}`).
   - Verification: 20/20 tests passed across dedicated unit test suites (`recommendation-card.test.tsx` 7/7, `use-latest-prediction.test.ts` 5/5, `soil-telemetry-ui.test.tsx` 8/8), full web workspace suite passed (83/83 files, 697/697 tests), and TypeScript typecheck passed with 0 errors across 4 monorepo packages.
+- 2026-09-19 ML Classification Standards & Threshold Matrix Reconciliation:
+  - Source of Truth: Audited ML pipeline standards (`agronomic_standards_v1.json` / `BaseRuleClassifier.php` in `padail/SmartTani-`) and live prediction records in external Supabase project (`https://styjuynxuykvujnnqxos.supabase.co`).
+  - Decision Logic: Two-sided evaluation (low/high); critical override on important parameters (`['ph', 'ec', 'moisture']` for soil; `['ph', 'ec']` for water) forcing status to `kritis`; weighted risk scoring (`riskScore > 65` $\to$ `kritis`, `> 30` or `$hasWarning` $\to$ `waspada`, $\le 30$ $\to$ `baik`).
+  - Soil Standards: pH ($6.00-6.80$ Good, $\le 5.49$ / $> 7.50$ Critical), Moisture ($60-80\%$ Good, $< 45\%$ / $> 90\%$ Critical), Temp ($24-32^\circ\text{C}$ Good, $< 20^\circ\text{C}$ / $> 38^\circ\text{C}$ Critical), EC ($800-2500\ \mu\text{S/cm}$ Good, $> 5000\ \mu\text{S/cm}$ Critical), N ($45-80\ \text{mg/kg}$ Good), P ($45-80\ \text{mg/kg}$ Good), K ($60-160\ \text{mg/kg}$ Good).
+  - Water Standards: pH ($5.50-6.50$ Good, $< 5.00$ / $> 7.00$ Critical), EC ($0-500\ \mu\text{S/cm}$ Good, $500.01-1500\ \mu\text{S/cm}$ Warning, $> 1500\ \mu\text{S/cm}$ Critical), TDS ($0-500\ \text{ppm}$ Good, $500.01-1000\ \text{ppm}$ Warning, $> 1000\ \text{ppm}$ Critical).
+  - Manual SQL Validation Dummy Data:
+    - Soil Optimal: `pH: 6.4, Moisture: 72%, Temp: 28°C, EC: 1600 µS/cm, N: 60, P: 55, K: 110` $\to$ `optimal`.
+    - Soil Warning: `pH: 6.4, Moisture: 52%, Temp: 28°C, EC: 1600 µS/cm, N: 35, P: 55, K: 110` $\to$ `warning`.
+    - Soil Critical: `pH: 4.8, Moisture: 35%, Temp: 34°C, EC: 5500 µS/cm, N: 15, P: 15, K: 20` $\to$ `kritis`.
+    - Water Optimal: `pH: 6.2, TDS: 420 ppm, EC: 450 µS/cm` $\to$ `optimal`.
+    - Water Warning: `pH: 6.2, TDS: 420 ppm, EC: 900 µS/cm` $\to$ `warning`.
+    - Water Critical: `pH: 6.2, TDS: 420 ppm, EC: 2200 µS/cm` $\to$ `kritis`.
 
 #### TASK-1004 Governance & Infrastructure Record
 
@@ -2309,3 +2321,45 @@ The following facts are supported by the current implementation regarding device
   - **Phase C (Outbound MQTT Recommendation Publishing):** Integrated non-blocking, asynchronous prediction dispatch into `SoilWaterMqttAdapter` (`apps/iot-gateway`). Configurable debounce delay (`EXTERNAL_ML_DEBOUNCE_MS`, default 1500ms pending confirmed pipeline latency), staleness validation (`EXTERNAL_ML_MAX_STALENESS_SECONDS`, default 300s), duplicate suppression (`lastPublishedPredictionId`), stable `messageId` and `predictionId` for subscriber idempotency, and advisory-only QoS 1 / `retain: false` MQTT dispatch.
   - **Verification:** 95/95 unit tests passed across 4 suites (`soil-water-adapter.test.ts` 37/37, `device-repository.test.ts` 23/23, `prediction-latest-route.test.ts` 15/15, `external-prediction-client.test.ts` 20/20), 0 monorepo typecheck errors, and live end-to-end MQTT verification confirmed against EMQX Cloud broker for both soil and water quality domains.
 <!-- TASK-0413 Phases A-C Reconciled: 2026-09-18 -->
+
+---
+
+## TASK-0414 Governance, Dual MQTT Broker Architecture, EC Standardization & Hardware Telemetry Verification Record
+
+`TASK-0414` dual MQTT broker integration, canonical EC unit standardization, and hardware telemetry ingestion debugging record:
+- **Status:** `IN_PROGRESS` (Software pipeline & synthetic ingestion verified; physical ESP32 telemetry pending hardware team firmware inspection)
+- **Frontend impact:** `MINOR` (Preserved layout, color tokens, and chart controls; standardized EC units)
+- **Selected UI direction:** `Premium Minimal Ops`
+- **Existing color template:** `UNCHANGED`
+- **Selected motion effects:** `None`
+- **21st.dev MCP:** `NOT REQUIRED`
+- **Summary:**
+  - **EC Unit Standardization (`DEC-MON-091`):** Canonical EC unit is standardized directly in `µS/cm` across PostgreSQL database, Prisma schema, API serialization, UI visualization (`MonitoringDashboard.tsx`, `useHistoricalMonitoring.ts`, `NPKChart`, `WaterNutrientChart`), device simulator (`scripts/device-simulator.ts`), and external ML inference integration. Removed legacy `mS/cm` assumptions and arbitrary `×1000` display multipliers. Verified full compatibility with SmartTani two-sided agronomic standards (Soil optimal: 800–2500 µS/cm; Water optimal: 0–500 µS/cm).
+  - **Dual MQTT Broker Architecture (`DEC-DEV-033`):**
+    - **Primary Broker (EMQX Cloud):** Preserved for Water Tank Node (`WATER_TANK_NODE`, client ID `water-tank-node-zi37gz`), faucet valve control, and automation configuration (`irigasi/melon/...`) over MQTT 5.0 / TLS / WSS.
+    - **Secondary Broker (HiveMQ Cloud):** Dedicated broker (`mqtts://217c0d73f9b648c09a5741c80dbb80df.s1.eu.hivemq.cloud:8883`) for Soil ESP32 (`melon-esp32-tanah1`) and Water Quality ESP32 (`melon-esp32-air1`) telemetry topics (`melon/sensor-tanah/data-2424600050`, `melon/sensor-air/data-2424600050`) and outbound recommendation topics (`melon/ai-tanah/rekomendasi-2424600050`, `melon/ai-air/rekomendasi-2424600050`).
+    - **Lightweight Gateway Client Support:** Implemented dedicated dual MQTT client in `apps/iot-gateway` without memory bloat, maintaining a stable configurable client ID (`SOIL_WATER_MQTT_CLIENT_ID=melon-gateway-soil-water`). Updated health and readiness probes (`/health`, `/ready`) to report both EMQX and HiveMQ broker statuses independently. Wired graceful shutdown to cleanly disconnect both broker clients.
+    - **Zero Staging or DB Schema Changes:** Retained existing PostgreSQL tables (`soil_readings`, `water_readings`, `devices`) and strictly isolated from staging container deployments.
+  - **Verification Results (Software Pipeline & Synthetic Telemetry):**
+    - Live HiveMQ Cloud connection established over TLS port 8883.
+    - EMQX Cloud connection preserved and operational.
+    - Gateway `/ready` probe reports both `emqx: { connected: true }` and `hivemq: { connected: true }`.
+    - Synthetic telemetry messages on both soil and water topics successfully ingested through HiveMQ Cloud, dynamically resolved via `devices.client_id` (`melon-esp32-tanah1` $\rightarrow$ `soil-node-jvbkdbv`; `melon-esp32-air1` $\rightarrow$ `water-quality-node-quiua`), persisted to database, and device status updated to `ONLINE`.
+  - **Current Hardware Verification Status (Pending Firmware Inspection):**
+    - The software and ingestion backend is completely ready and verified.
+    - Physical ESP32 telemetry has **not** been observed yet on HiveMQ Cloud topics.
+    - The hardware team provided broker parameters only. Physical firmware source code (`.ino` / `.cpp`) and serial runtime logs are still required from the hardware team to resolve physical device connectivity.
+    - Target firmware items identified for hardware team audit:
+      1. Mandatory TLS via `WiFiClientSecure` with `setInsecure()` (standard `WiFiClient` fails on HiveMQ port 8883).
+      2. Bare hostname string in `PubSubClient::setServer()` without `mqtts://` prefix.
+      3. Setting `client.setBufferSize(512)` to prevent silent packet drops due to the default 128-byte `MQTT_MAX_PACKET_SIZE`.
+      4. Top-level `"clientId"` in the published JSON payload for database device mapping.
+      5. Checking `client.state()` on connection failure (`rc = -2` TLS/DNS failure, `rc = 4` bad credentials).
+    - Status: Marked as **`PENDING_HARDWARE_FIRMWARE_LOGS`**.
+  - **Staging Deployment & Verification (Completed 2026-09-19):**
+    - Applied pending migrations (`20260915000000_drop_water_readings_unused_coordinates`, `20260915230000_add_client_id_to_devices`, `20260918190000_add_device_external_mappings`) to Supabase Staging (`ihgoxqdncepbcrqkchxu`) and recorded in `_prisma_migrations` with bit-for-bit SHA-256 checksums.
+    - Populated `devices.client_id` (`melon-esp32-tanah1`, `melon-esp32-air1`, `water-tank-node-zi37gz`) and seeded `device_external_mappings` on Staging.
+    - Updated `.env.staging` with secondary HiveMQ Cloud broker (`SOIL_WATER_MQTT_*`) and external ML configurations.
+    - Rebuilt and restarted staging Docker containers (`docker compose -f docker-compose.staging.yml up -d --build`). Verified both containers `healthy`: web `/health` (HTTP 200 `{"status":"ok"}`), gateway `/health` (HTTP 200), and gateway `/ready` (HTTP 200 reporting `database: CONNECTED`, `emqx: CONNECTED`, and `soilWaterMqtt: CONNECTED`).
+<!-- TASK-0414 Reconciled: 2026-09-19 -->
+

@@ -4,6 +4,8 @@ import path from 'path';
 import { commandPublisher } from '../commands/publisher';
 import { GatewayMqttClient } from '../mqtt/client';
 import { generateMosquittoHash } from '../../../../scripts/generate-mqtt-pwfile';
+import { validateGatewayEnv } from '../config/env';
+import { buildApp } from '../app';
 
 /**
  * TASK-0402: MQTT Broker Configuration & Security Controls
@@ -157,5 +159,44 @@ describe('TASK-0402: MQTT Broker Configuration & Security Controls', () => {
     );
 
     expect(res.published).toBe(true);
+  });
+
+  describe('Dual MQTT Broker Configuration & Invariants', () => {
+    it('uses stable SOIL_WATER_MQTT_CLIENT_ID without timestamps by default', () => {
+      const parsedEnv = validateGatewayEnv({
+        NODE_ENV: 'test',
+        APP_ENV: 'test',
+        MQTT_BROKER_URL: 'wss://he100b10.ala.asia-southeast1.emqxsl.com:8084/mqtt',
+        MQTT_GATEWAY_CLIENT_ID: 'Test_Gateway',
+        MQTT_GATEWAY_USERNAME: 'Test_gateway',
+        MQTT_GATEWAY_PASSWORD: 'password123',
+        INTERNAL_SERVICE_TOKEN: 'internal_secret_token_123',
+        SOIL_WATER_MQTT_BROKER_URL: 'mqtts://test-hivemq.cloud:8883',
+      });
+
+      expect(parsedEnv.SOIL_WATER_MQTT_CLIENT_ID).toBe('melon-gateway-soil-water');
+      expect(parsedEnv.SOIL_WATER_MQTT_CLIENT_ID).not.toMatch(/\d{10,}/); // No timestamp
+    });
+
+    it('instantiates dedicated soilWaterMqttClient when SOIL_WATER_MQTT_BROKER_URL is configured', () => {
+      const parsedEnv = validateGatewayEnv({
+        NODE_ENV: 'test',
+        APP_ENV: 'test',
+        MQTT_BROKER_URL: 'wss://he100b10.ala.asia-southeast1.emqxsl.com:8084/mqtt',
+        MQTT_GATEWAY_CLIENT_ID: 'Test_Gateway',
+        MQTT_GATEWAY_USERNAME: 'Test_gateway',
+        MQTT_GATEWAY_PASSWORD: 'password123',
+        INTERNAL_SERVICE_TOKEN: 'internal_secret_token_123',
+        SOIL_WATER_MQTT_BROKER_URL: 'mqtts://test-hivemq.cloud:8883',
+        SOIL_WATER_MQTT_CLIENT_ID: 'melon-gateway-soil-water',
+        SOIL_WATER_MQTT_USERNAME: 'hivemq_user',
+        SOIL_WATER_MQTT_PASSWORD: 'hivemq_password',
+      });
+
+      const { soilWaterMqttClient, mqttClient } = buildApp({ env: parsedEnv });
+
+      expect(soilWaterMqttClient).toBeDefined();
+      expect(soilWaterMqttClient).not.toBe(mqttClient);
+    });
   });
 });

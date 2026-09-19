@@ -70,7 +70,7 @@ const mockSoilSnapshot: LatestMonitoringSnapshotDto = {
       temperature: 28.5,
       moisture: 65.2,
       ph: 6.5,
-      ec: 1.8,
+      ec: 1800,
       status: 'NORMAL',
     },
   },
@@ -91,7 +91,7 @@ const mockWaterQualitySnapshot: LatestMonitoringSnapshotDto = {
     data: {
       ph: 6.8,
       tds: 450,
-      ec: 1.9,
+      ec: 1900,
       tankVolume: null,
       status: 'NORMAL',
     },
@@ -166,7 +166,7 @@ describe('TASK-0502 — Real-Time Monitoring Dashboard Integration Tests', () =>
     expect(screen.getByText('65.2')).toBeInTheDocument(); // Moisture
     expect(screen.getByText('%RH')).toBeInTheDocument(); // Moisture Unit
     expect(screen.getByText('6.50')).toBeInTheDocument(); // pH
-    expect(screen.getByText('1800')).toBeInTheDocument(); // EC in µS/cm (1.8 * 1000)
+    expect(screen.getByText('1800')).toBeInTheDocument(); // EC stored and displayed directly as 1800 µS/cm
   });
 
   it('3. Render Canonical WATER QUALITY Metrics (pH, TDS, EC)', async () => {
@@ -196,7 +196,7 @@ describe('TASK-0502 — Real-Time Monitoring Dashboard Integration Tests', () =>
 
     expect(screen.getByText('6.80')).toBeInTheDocument(); // pH
     expect(screen.getByText('450')).toBeInTheDocument(); // TDS
-    expect(screen.getByText('1900')).toBeInTheDocument(); // EC in µS/cm (1.9 * 1000)
+    expect(screen.getByText('1900')).toBeInTheDocument(); // EC stored and displayed directly as 1900 µS/cm
   });
 
   it('4. Render Canonical WATER TANK Metrics (Volume) without Reservoir terminology', async () => {

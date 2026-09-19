@@ -316,7 +316,7 @@
     "sensorSoilTitle": "Soil Sensor",
     "sensorSoilDesc": "Nitrogen, Phosphorus, Potassium, Temperature, Moisture, pH, EC.",
     "sensorWaterTitle": "Water Quality",
-    "sensorWaterDesc": "TDS (ppm), EC (mS/cm), and acidity level (pH).",
+    "sensorWaterDesc": "TDS (ppm), EC (µS/cm), and acidity level (pH).",
     "sensorControlsTitle": "Water Tank & Faucet",
     "sensorControlsDesc": "Tank Volume (L), Faucet Presets.",
     "totalDevicesCount": "Total Devices: {count}",

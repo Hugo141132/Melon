@@ -51,7 +51,7 @@ The browser shall not communicate directly with an ESP32/NodeMCU device or publi
 
 The architecture provides two distinct ingress paths based on monitoring domain:
 
-#### Path A — MQTT over TLS via Unified EMQX Broker (Soil & Water Quality Telemetry, TASK-0412)
+#### Path A — MQTT over TLS via Secondary HiveMQ Cloud Broker (Soil & Water Quality Telemetry, TASK-0412 / TASK-0414)
 
 ```text
 Soil & Water Monitoring Equipment (ESP32)
@@ -63,14 +63,15 @@ Soil & Water Monitoring Equipment (ESP32)
     │ Water Inbound Telemetry: melon/sensor-air/data-2424600050
     │ Water AI Recommendation: melon/ai-air/rekomendasi-2424600050
     ▼
-Unified EMQX Broker (Port 8883 / Port 8084 WSS)
+Dedicated HiveMQ Cloud Broker (Port 8883 TLS)
     │
     ▼
-IoT Gateway (apps/iot-gateway — Unified Gateway Client & SoilWaterMqttAdapter)
+IoT Gateway (apps/iot-gateway — Dedicated SoilWaterMqttAdapter Client)
     │
     ├── Resolve database device dynamically via MQTT Client ID (devices.client_id)
     ├── Dual payload normalization (canonical JSON envelope + flat abbreviated keys)
     ├── Persist telemetry to PostgreSQL database (soil_readings, water_readings)
+    ├── Standardize EC values directly in µS/cm without multiplier conversion
     ├── Atomically update device lastSeenAt and connectionStatus: ONLINE
     └── Dispatch internal realtime webhook to Web Backend for SSE delivery
              │
@@ -80,6 +81,7 @@ IoT Gateway (apps/iot-gateway — Unified Gateway Client & SoilWaterMqttAdapter)
              ▼
    Authenticated Frontend
 ```
+
 
 
 ### Path B — MQTT through Dedicated EMQX Cloud Broker (Water Tank Monitoring & Faucet Control, DEC-DEV-032)
@@ -240,14 +242,23 @@ The broker shall:
 - Expose operational metrics and logs.
 - Permit revocation of a single device without affecting other devices.
 
-#### 5.2.1 Broker Connectivity Architecture (EMQX Cloud & Local Fallback)
+#### 5.2.1 Broker Connectivity Architecture (Dual MQTT Broker Topology, TASK-0414 / DEC-DEV-033)
 
-- **Primary Path:** Direct connection to **EMQX Cloud** over TLS (`mqtts://` port 8883 / `wss://` port 8084) is the standard MQTT communication path for both local development (`APP_ENV=development`) and staging (`APP_ENV=staging`). Staging is an isolated containerized application deployment (`TASK-1012`; formerly hosted on Railway) and is not an MQTT proxy or intermediary for local development.
-- **Environment & Topic Isolation:** All MQTT topics are strictly partitioned by environment namespace (`agriculture/development/...` vs `agriculture/staging/...` vs `agriculture/production/...`), allowing shared broker clusters without telemetry or command crosstalk.
-- **Client ID Collision Avoidance:** Local gateways default to `gateway-kebun-melon-dev-local-01` and staging gateways use `gateway-kebun-melon-staging-*`; simulation clients use `sim-${tankDeviceId}-${random}` to ensure simultaneous connections never kick off active hardware or gateway sessions.
-- **Dynamic Simulator Identity & Topic/Payload Parity:** Simulator target device IDs are resolved dynamically at runtime via CLI arguments (`--tank-device-id`, `--device-id`) or environment variables (`MQTT_TANK_DEVICE_ID`, `MQTT_DEVICE_ID`). No canonical device IDs are hardcoded in source files. The topic `deviceId` and JSON payload `deviceId` strictly match.
-- **Offline Local Fallback:** Local Eclipse Mosquitto via Docker Compose (`docker-compose.yml`) is preserved as an explicit optional fallback for offline development.
-- **Verification Status:** Live gateway/EMQX/canonical-device runtime ingestion verified. Monitoring UI smoke testing was intentionally deferred/skipped. Staging requires no update or redeployment.
+The system operates a lightweight dual MQTT broker architecture in `apps/iot-gateway` to accommodate hardware topology requirements:
+
+- **Primary Broker — Dedicated EMQX Cloud:**
+  - **Scope:** Dedicated strictly to Water Tank Monitoring (`WATER_TANK_NODE`) and Faucet Control (`irigasi/melon/...`).
+  - **Transport:** WebSocket Secure (`wss://<cluster-host>:8084/mqtt`) or TLS TCP (Port 8883).
+  - **Topics:** Telemetry (`irigasi/melon/sensor/volume`), Valve actuation (`irigasi/melon/kontrol/valve`), Automation setting (`irigasi/melon/setting/otomasi`).
+  - **Safety:** Obeying strict safety lock `ENABLE_FAUCET_CONTROL=false`.
+- **Secondary Broker — Dedicated HiveMQ Cloud:**
+  - **Scope:** Dedicated strictly to Soil Node ESP32 (`melon-esp32-tanah1`) and Water Quality Node ESP32 (`melon-esp32-air1`).
+  - **Transport:** MQTT over TLS (Port 8883) at `217c0d73f9b648c09a5741c80dbb80df.s1.eu.hivemq.cloud:8883`.
+  - **Topics:** Soil inbound (`melon/sensor-tanah/data-2424600050`), Water inbound (`melon/sensor-air/data-2424600050`), Outbound AI recommendations (`melon/ai-tanah/rekomendasi-2424600050`, `melon/ai-air/rekomendasi-2424600050`).
+  - **Gateway Client:** Dedicated lightweight client (`SOIL_WATER_MQTT_CLIENT_ID=melon-gateway-soil-water`) configured via environment variables.
+- **Client ID Collision Avoidance:** Gateway clients use static, non-colliding client IDs (`melon-gateway-soil-water` for HiveMQ; `gateway-kebun-melon-dev-local-01` for EMQX). Device simulators connect with dedicated client IDs and never impersonate gateway clients.
+- **Staging Isolation:** Staging environments remain 100% isolated containerized deployments and are untouched by local development broker testing.
+
 
 ### 5.3 IoT Gateway
 
@@ -1070,7 +1081,7 @@ Recommended payload:
     "temperature": 28.4,
     "moisture": 67.3,
     "ph": 6.5,
-    "ec": 1.42,
+    "ec": 1420,
     "status": "NORMAL"
   }
 }
@@ -1086,7 +1097,7 @@ Recommended payload:
 | `temperature` | Number or null | Yes when capability exists | `°C` | `°C` | Soil temperature |
 | `moisture` | Number or null | Yes when capability exists | `%` | `%` | Volumetric soil moisture percentage |
 | `ph` | Number or null | Yes when capability exists | `pH` | `pH` | Soil pH acidity / alkalinity scale (unitless) |
-| `ec` | Number or null | Yes when capability exists | `mS/cm` (or `µS/cm`) | `µS/cm` | Soil Electrical Conductivity |
+| `ec` | Number or null | Yes when capability exists | `µS/cm` | `µS/cm` | Soil Electrical Conductivity |
 | `status` | Canonical enum | Recommended | None | None | Defined by external status rules |
 
 Allowed provisional soil status values:
@@ -1125,7 +1136,7 @@ Recommended payload (Water-Quality monitoring domain):
   "data": {
     "ph": 7.1,
     "tds": 420,
-    "ec": 0.84,
+    "ec": 450,
     "status": "NORMAL"
   }
 }
@@ -1137,7 +1148,7 @@ Recommended payload (Water-Quality monitoring domain):
 |---|---|---:|---|---|---|
 | `ph` | Number or null | Yes when capability exists | `pH` | `pH` | Water pH acidity / alkalinity scale (unitless) |
 | `tds` | Number or null | Yes when capability exists | `ppm` | `ppm` | Total Dissolved Solids |
-| `ec` | Number or null | Yes when capability exists | `mS/cm` (or `µS/cm`) | `µS/cm` | Water Electrical Conductivity |
+| `ec` | Number or null | Yes when capability exists | `µS/cm` | `µS/cm` | Water Electrical Conductivity |
 | `status` | Canonical enum | Recommended | None | None | Defined by external status rules |
 
 ---
@@ -2632,4 +2643,86 @@ Agronomic recommendations produced by the external ML pipeline are disseminated 
 2. **Operator Dashboard Channel (Web UI):** Consumed via `GET /api/v1/devices/[deviceId]/predictions/latest` by the `useLatestPrediction` hook and rendered on `/soil` and `/water` using `RecommendationCard`.
    - **Visual States:** Loading skeleton (`aria-busy="true"`), Empty (`Belum Ada Rekomendasi`), Populated (with classification pill badges and action checklists), and Stale/Offline notice banner.
    - **Safety Guard:** Both channels strictly obey `DEC-MON-090` / `DEC-CTRL-051` (`ENABLE_FAUCET_CONTROL=false`). Recommendations are purely advisory and cannot trigger automatic pump, valve, or dispensing operations.
-<!-- Outbound AI Recommendation MQTT Pipeline Reconciled: 2026-09-19 -->
+
+### 6. Audited ML Classification Thresholds & Agronomic Standards Matrix (TASK-0413 / Reconciled 2026-09-19)
+
+Field telemetry published to MQTT topics (`melon/sensor-tanah/data-*` and `melon/sensor-air/data-*`) is analyzed against the following two-sided agronomic standards authored by the SmartTani ML team (`agronomic_standards_v1.json` / `BaseRuleClassifier.php`):
+
+#### A. Soil Monitoring Standards
+
+| Parameter | Telemetry Key | Unit | Critical Low | Warning Low | Optimal (Good) | Warning High | Critical High | Important Parameter |
+|---|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| **pH** | `ph` | pH | $\le 5.49$ | $5.50 - 5.99$ | **$6.00 - 6.80$** | $6.81 - 7.50$ | $> 7.50$ | **Yes** |
+| **Moisture** | `moisture` | % | $< 45.0$ | $45.0 - 59.99$ | **$60.0 - 80.0$** | $80.01 - 90.0$ | $> 90.0$ | **Yes** |
+| **Temperature** | `temperature` | °C | $< 20.0$ | $20.0 - 23.99$ | **$24.0 - 32.0$** | $32.01 - 38.0$ | $> 38.0$ | No |
+| **EC** | `ec` | µS/cm | — | $< 800$ | **$800 - 2500$** | $2500.01 - 5000$ | $> 5000$ | **Yes** |
+| **Nitrogen** | `nitrogen` | mg/kg | $< 25.0$ | $25.0 - 44.99$ | **$45.0 - 80.0$** | $80.01 - 120.0$ | $> 120.0$ | No |
+| **Phosphorus** | `phosphorus` | mg/kg | $< 25.0$ | $25.0 - 44.99$ | **$45.0 - 80.0$** | $80.01 - 120.0$ | $> 120.0$ | No |
+| **Potassium** | `potassium` | mg/kg | $< 35.0$ | $35.0 - 59.99$ | **$60.0 - 160.0$** | $160.01 - 250.0$ | $> 250.0$ | No |
+
+#### B. Water Quality Monitoring Standards
+
+| Parameter | Telemetry Key | Unit | Critical Low | Warning Low | Optimal (Good) | Warning High | Critical High | Important Parameter |
+|---|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| **pH** | `ph` | pH | $< 5.00$ | $5.00 - 5.49$ | **$5.50 - 6.50$** | $6.51 - 7.00$ | $> 7.00$ | **Yes** |
+| **EC** | `ec` | µS/cm | — | — | **$0 - 500$** | $500.01 - 1500$ | $> 1500$ | **Yes** |
+| **TDS** | `tds` | ppm | — | — | **$0 - 500$** | $500.01 - 1000$ | $> 1000$ | No |
+
+#### C. Outbound Recommendation Triggers
+- **Critical Trigger (`kritis`):** Any critical excursion on an important parameter (`ph`, `ec`, `moisture` for soil; `ph`, `ec` for water) forces overall status to `kritis`. Outbound MQTT recommendation publishes emergency mitigation steps (e.g. diluting nutrient solution, adjusting pH).
+- **Warning Trigger (`waspada` / `warning`):** Parameter excursions into warning bands or total weighted risk $> 30$. Outbound MQTT recommendation publishes corrective monitoring advisories.
+- **Optimal Trigger (`baik` / `optimal`):** All parameters within optimal bounds. Outbound MQTT recommendation confirms good conditions.
+
+---
+
+### 7. Dual MQTT Broker Architecture, EC Standardization & Hardware Verification Status (TASK-0414)
+
+#### 7.1 Dual Broker Topology & Parameter Matrix
+
+The platform implements a lightweight dual-broker MQTT architecture in `apps/iot-gateway` to accommodate hardware vendor topology without global broker replacements:
+
+| Feature / Scope | Primary Broker (EMQX Cloud) | Secondary Broker (HiveMQ Cloud) |
+|---|---|---|
+| **Domain Responsibility** | Water Tank Node (`WATER_TANK_NODE`) & Faucet Control | Soil Node (`SOIL_NODE`) & Water Quality Node (`WATER_QUALITY_NODE`) |
+| **Broker URL** | `wss://<cluster-host>:8084/mqtt` / TLS 8883 | `mqtts://217c0d73f9b648c09a5741c80dbb80df.s1.eu.hivemq.cloud:8883` |
+| **Port & Encryption** | 8084 (WSS) / 8883 (TLS) | 8883 (TLS 1.2+ with SNI mandatory) |
+| **Gateway Client ID** | `gateway-kebun-melon-dev-local-01` | `melon-gateway-soil-water` |
+| **Hardware Client IDs** | `water-tank-node-zi37gz` | Soil: `melon-esp32-tanah1`<br>Water: `melon-esp32-air1` |
+| **Inbound Telemetry** | `irigasi/melon/sensor/volume` | Soil: `melon/sensor-tanah/data-2424600050`<br>Water: `melon/sensor-air/data-2424600050` |
+| **Outbound Topics** | `irigasi/melon/kontrol/valve`<br>`irigasi/melon/setting/otomasi` | Soil AI: `melon/ai-tanah/rekomendasi-2424600050`<br>Water AI: `melon/ai-air/rekomendasi-2424600050` |
+| **Gateway Health Probe** | `/ready` -> `emqx.connected: true` | `/ready` -> `hivemq.connected: true` |
+
+#### 7.2 Canonical EC Unit Standardization (`DEC-MON-091`)
+
+Electrical Conductivity (EC) across the entire platform is standardized directly in **`µS/cm`**:
+- **Database & Prisma:** Persisted directly as `µS/cm` in `soil_readings.ec` and `water_readings.ec`.
+- **API Contracts:** Serialized directly as `µS/cm` without multiplier conversions.
+- **Frontend Presentation:** Visualized directly as `µS/cm` in `MonitoringDashboard.tsx`, `useHistoricalMonitoring.ts`, `NPKChart`, and `WaterNutrientChart`. Legacy `mS/cm` assumptions and UI `×1000` multiplier hacks are completely eliminated.
+- **Simulator & ML Classification:** Simulator emits `µS/cm` values; SmartTani classification rules evaluate `µS/cm` thresholds natively (Soil optimal: 800–2500 µS/cm; Water optimal: 0–500 µS/cm).
+
+#### 7.3 Verification Results (Software Pipeline)
+
+1. **HiveMQ Connection:** Verified active connection over TLS port 8883 using Node.js TLS stack.
+2. **EMQX Connection:** Preserved existing EMQX client connection for Water Tank and Faucet Control.
+3. **Gateway Probes:** `/health` and `/ready` report both brokers connected and healthy simultaneously.
+4. **Dynamic Device Resolution:**
+   - Inbound `melon-esp32-tanah1` resolves dynamically to `soil-node-jvbkdbv` (`SOIL_NODE`, `ACTIVE`).
+   - Inbound `melon-esp32-air1` resolves dynamically to `water-quality-node-quiua` (`WATER_QUALITY_NODE`, `ACTIVE`).
+5. **Synthetic Telemetry Ingestion:** Injected synthetic MQTT test packets on both topics; verified persistence into PostgreSQL `soil_readings` and `water_readings`, connection status set to `ONLINE`, and test fixtures safely purged.
+6. **Environment Safety:** Staging environment and staging database remained 100% untouched.
+
+#### 7.4 Physical ESP32 Hardware Status (Pending Firmware Inspection)
+
+- **Status:** **`PENDING_HARDWARE_FIRMWARE_LOGS`**
+- **Observed State:** While the software pipeline, gateway subscriptions, database mapping, and UI display are operational, real telemetry from the physical ESP32 devices has **not** been observed on the HiveMQ Cloud broker.
+- **Available Hardware Context:** The hardware team provided MQTT parameters only (broker hostname, port 8883, credentials, client IDs, topics). Firmware source code (`.ino` / `.cpp`) and serial runtime logs were not provided.
+- **Required Firmware Audit Items for Hardware Team:**
+  1. **Transport Layer:** Must use `WiFiClientSecure` with `espClient.setInsecure()` (or ISRG Root X1 CA). Plaintext `WiFiClient` fails on HiveMQ port 8883 with `rc = -2`.
+  2. **Hostname Format:** Bare string `"217c0d73f9b648c09a5741c80dbb80df.s1.eu.hivemq.cloud"` in `client.setServer()`. Prefixing `mqtts://` causes DNS resolution failure.
+  3. **Buffer Limit:** Default `PubSubClient` buffer is 128 bytes. Telemetry JSON payloads exceed 140 bytes; calling `client.setBufferSize(512)` in `setup()` is mandatory to prevent silent publish drops.
+  4. **Payload Mapping:** Published JSON must include top-level `"clientId": "melon-esp32-tanah1"` or `"melon-esp32-air1"`.
+  5. **Serial Monitor Logging:** Capture ESP32 serial output at 115200 baud showing `client.state()` on failure and `client.publish()` return boolean.
+
+<!-- Dual MQTT Broker Architecture Reconciled: 2026-09-19 -->
+
+

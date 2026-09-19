@@ -209,7 +209,7 @@ function SoilMonitoringSection({ data, recordedAt }: SoilSectionProps) {
           label={`${tSoil('ec')} (${tSoil('status')})`}
           value={
             data.ec !== null && data.ec !== undefined
-              ? formatMetricValue(Math.round(data.ec * 1000), 0)
+              ? formatMetricValue(Math.round(data.ec), 0)
               : '-'
           }
           unit="µS/cm"
@@ -276,7 +276,7 @@ function WaterQualitySection({ data, recordedAt }: WaterQualitySectionProps) {
           label={tWater('ec')}
           value={
             data.ec !== null && data.ec !== undefined
-              ? formatMetricValue(Math.round(data.ec * 1000), 0)
+              ? formatMetricValue(Math.round(data.ec), 0)
               : '-'
           }
           unit="µS/cm"

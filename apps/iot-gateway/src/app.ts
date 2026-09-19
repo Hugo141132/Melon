@@ -129,7 +129,21 @@ export function buildApp(options: AppOptions): {
         })
       : undefined);
 
-  const soilWaterMqttClient = options.soilWaterMqttClient;
+  const soilWaterMqttClient =
+    options.soilWaterMqttClient ??
+    (options.env.SOIL_WATER_MQTT_BROKER_URL &&
+    options.env.SOIL_WATER_MQTT_BROKER_URL !== options.env.MQTT_BROKER_URL
+      ? new GatewayMqttClient({
+          ...options.env,
+          MQTT_BROKER_URL: options.env.SOIL_WATER_MQTT_BROKER_URL,
+          MQTT_GATEWAY_CLIENT_ID:
+            options.env.SOIL_WATER_MQTT_CLIENT_ID || 'melon-gateway-soil-water',
+          MQTT_GATEWAY_USERNAME:
+            options.env.SOIL_WATER_MQTT_USERNAME ?? options.env.MQTT_GATEWAY_USERNAME,
+          MQTT_GATEWAY_PASSWORD:
+            options.env.SOIL_WATER_MQTT_PASSWORD ?? options.env.MQTT_GATEWAY_PASSWORD,
+        })
+      : undefined);
 
   const commandPublisher = options.commandPublisher ?? defaultCommandPublisher;
   const acknowledgementProcessor =
@@ -208,7 +222,7 @@ export function buildApp(options: AppOptions): {
   });
 
   // Register routes
-  registerHealthRoutes(app, mqttClient, options.dbChecker, options.env);
+  registerHealthRoutes(app, mqttClient, options.dbChecker, options.env, soilWaterMqttClient);
 
   // Global error handler with secret redaction (typed for Fastify v5)
   app.setErrorHandler((error: FastifyError | Error | unknown, _request, reply) => {

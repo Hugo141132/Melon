@@ -657,4 +657,25 @@ The following facts are verified in the traceability matrix regarding `TASK-0413
   - *Safety Guard Verified:* Advisory-only invariant verified; actuator lock `ENABLE_FAUCET_CONTROL=false` strictly preserved.
 <!-- TASK-0413 Traceability Reconciled: 2026-09-19 -->
 
+---
 
+## Dual MQTT Broker Architecture, EC Standardization & Staging Reconciliation Traceability Note (TASK-0414 / Reconciled 2026-09-19)
+
+The following facts are verified in the traceability matrix regarding `TASK-0414` (Dual MQTT Broker Architecture, EC Standardization, and Staging Synchronization):
+- **Traceability Baseline:** Governed by `PRD-FR-041`, `DEC-DEV-032`, `DEC-DEV-033`, `DEC-MON-091`, `docs/DEVICE_COMMUNICATION.md`, `docs/ARCHITECTURE.md`, `docs/API.md`, and `docs/DATABASE.md`.
+- **Dual MQTT Broker Architecture (`DEC-DEV-033`):**
+  - Primary Broker (EMQX Cloud): Preserved strictly for Water Tank Node (`WATER_TANK_NODE`, client ID `water-tank-node-zi37gz`), faucet valve control, and automation configuration (`irigasi/melon/...`) over MQTT 5.0 / TLS / WSS.
+  - Secondary Broker (HiveMQ Cloud): Dedicated broker (`mqtts://217c0d73f9b648c09a5741c80dbb80df.s1.eu.hivemq.cloud:8883`) for Soil ESP32 (`melon-esp32-tanah1`) and Water Quality ESP32 (`melon-esp32-air1`) telemetry topics (`melon/sensor-tanah/data-2424600050`, `melon/sensor-air/data-2424600050`) and outbound recommendation topics (`melon/ai-tanah/rekomendasi-2424600050`, `melon/ai-air/rekomendasi-2424600050`).
+  - Lightweight Gateway Client: Added dedicated secondary MQTT client in `apps/iot-gateway` with stable client ID (`melon-gateway-soil-water`). Updated `/health` and `/ready` to report dual broker statuses independently. Wired clean graceful shutdown.
+- **Canonical EC Unit Standardization (`DEC-MON-091`):**
+  - EC unit standardized directly in `µS/cm` across PostgreSQL database, Prisma schema, API serialization, UI visualization (`MonitoringDashboard.tsx`, `useHistoricalMonitoring.ts`, `NPKChart`, `WaterNutrientChart`), device simulator (`scripts/device-simulator.ts`), and external ML inference integration.
+  - Removed legacy `mS/cm` assumptions and arbitrary `×1000` display multipliers. Verified full compatibility with SmartTani two-sided agronomic standards.
+- **Staging Synchronization & Deployment:**
+  - Applied pending migrations (`20260915000000_drop_water_readings_unused_coordinates`, `20260915230000_add_client_id_to_devices`, `20260918190000_add_device_external_mappings`) to Supabase Staging (`ihgoxqdncepbcrqkchxu`) with bit-for-bit SHA-256 parity in `_prisma_migrations`.
+  - Populated `devices.client_id` (`melon-esp32-tanah1`, `melon-esp32-air1`, `water-tank-node-zi37gz`) and seeded `device_external_mappings` on Staging.
+  - Updated `.env.staging` with secondary HiveMQ Cloud broker (`SOIL_WATER_MQTT_*`) and external ML configuration.
+  - Rebuilt and deployed staging Docker containers (`kebun-melon-staging-web` and `kebun-melon-staging-gateway`). Verified both containers healthy, web `/health` (HTTP 200), gateway `/health` (HTTP 200), and gateway `/ready` (HTTP 200 reporting `database: CONNECTED`, `emqx: CONNECTED`, `soilWaterMqtt: CONNECTED`).
+- **Hardware Verification Status:**
+  - Software ingestion pipeline, database persistence, and UI display are 100% verified and operational.
+  - Physical ESP32 telemetry remains pending hardware team firmware source code (`.ino`) and serial runtime log inspection (`PENDING_HARDWARE_FIRMWARE_LOGS`).
+<!-- TASK-0414 Traceability Reconciled: 2026-09-19 -->

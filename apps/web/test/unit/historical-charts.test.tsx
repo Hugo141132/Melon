@@ -143,7 +143,7 @@ describe('TASK-0504 — Historical Monitoring Charts & Controls Fixes Test Suite
   });
 
   describe('useHistoricalMonitoring Hook & Presentation Boundary EC Conversion', () => {
-    it('fetches history API, formats series data, and converts EC from mS/cm to µS/cm', async () => {
+    it('fetches history API, formats series data, and verifies EC in µS/cm', async () => {
       const now = new Date();
       const tenHoursAgo = new Date(now.getTime() - 10 * 60 * 60 * 1000);
       const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
@@ -161,7 +161,7 @@ describe('TASK-0504 — Historical Monitoring Charts & Controls Fixes Test Suite
               phosphorus: 20,
               potassium: 35,
               temperature: 26.5,
-              ec: 1.8, // mS/cm -> should convert to 1800 µS/cm for display
+              ec: 1800, // stored and displayed directly as 1800 µS/cm
               moisture: null, // null value preserved
             },
           ],
@@ -193,7 +193,7 @@ describe('TASK-0504 — Historical Monitoring Charts & Controls Fixes Test Suite
 
       expect(result.current.data.length).toBe(1);
       expect(result.current.data[0].nitrogen).toBe(45);
-      expect(result.current.data[0].ec).toBe(1800); // verified conversion to µS/cm
+      expect(result.current.data[0].ec).toBe(1800); // verified direct EC in µS/cm
       expect(result.current.data[0].moisture).toBeNull(); // verify null preserved
       expect(result.current.error).toBeNull();
     });
@@ -217,7 +217,7 @@ describe('TASK-0504 — Historical Monitoring Charts & Controls Fixes Test Suite
               phosphorus: 25,
               potassium: 30,
               temperature: 27,
-              ec: 1.5,
+              ec: 1500,
               moisture: 60,
             },
             {
@@ -226,7 +226,7 @@ describe('TASK-0504 — Historical Monitoring Charts & Controls Fixes Test Suite
               phosphorus: 20,
               potassium: 35,
               temperature: 26,
-              ec: 1.8,
+              ec: 1800,
               moisture: 65,
             },
           ],

@@ -183,8 +183,8 @@ export default function SoilPage() {
   const phVal = !isTelemetryStale ? (soilData?.ph ?? null) : null;
   const ecVal = !isTelemetryStale ? (soilData?.ec ?? null) : null;
 
-  // Converted presentation EC: stored in mS/cm, displayed in µS/cm (x1000)
-  const ecDisplayVal = ecVal !== null && ecVal !== undefined ? Math.round(ecVal * 1000) : null;
+  // Direct presentation EC: stored and displayed in µS/cm
+  const ecDisplayVal = ecVal !== null && ecVal !== undefined ? Math.round(ecVal) : null;
 
   // Check whether any valid, fresh telemetry reading exists
   const hasTelemetry = Boolean(

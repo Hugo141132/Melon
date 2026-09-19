@@ -337,7 +337,7 @@ export class DeviceSimulator {
         temperature: 28.4,
         moisture: 67.3,
         ph: 6.5,
-        ec: 1.42,
+        ec: 1420,
         status: MonitoringStatus.NORMAL,
         ...customData,
       },
@@ -406,7 +406,7 @@ export class DeviceSimulator {
       data: {
         ph: 7.1,
         tds: 420,
-        ec: 0.84,
+        ec: 450,
         status: MonitoringStatus.NORMAL,
         ...customData,
       },

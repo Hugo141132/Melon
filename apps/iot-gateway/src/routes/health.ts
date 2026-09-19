@@ -23,14 +23,23 @@ export function registerHealthRoutes(
   app: FastifyInstance,
   mqttClient: GatewayMqttClient,
   dbChecker: DbChecker = defaultDbChecker,
-  env?: GatewayEnv
+  env?: GatewayEnv,
+  soilWaterMqttClient?: GatewayMqttClient
 ): void {
   const getReadinessData = async () => {
     const mqttStatus = mqttClient.getStatus();
     const isMqttConnected = mqttClient.isConnected();
     const isDbConnected = await dbChecker();
 
+    const isSoilWaterConfigured = !!soilWaterMqttClient;
+    const isSoilWaterConnected = soilWaterMqttClient
+      ? soilWaterMqttClient.isConnected()
+      : undefined;
+    const soilWaterStatus = soilWaterMqttClient ? soilWaterMqttClient.getStatus() : undefined;
+
     const dbStatus = isDbConnected ? 'CONNECTED' : 'DISCONNECTED';
+
+    const allBrokersConnected = isMqttConnected && (!soilWaterMqttClient || isSoilWaterConnected);
 
     let overallStatus: 'UP' | 'DEGRADED' | 'DOWN';
     let canonicalStatus: 'ready' | 'degraded' | 'down';
@@ -40,7 +49,7 @@ export function registerHealthRoutes(
       overallStatus = 'DOWN';
       canonicalStatus = 'down';
       statusCode = 503;
-    } else if (isMqttConnected) {
+    } else if (allBrokersConnected) {
       overallStatus = 'UP';
       canonicalStatus = 'ready';
       statusCode = 200;
@@ -58,6 +67,9 @@ export function registerHealthRoutes(
       isMqttConnected,
       dbStatus,
       isDbConnected,
+      isSoilWaterConfigured,
+      isSoilWaterConnected,
+      soilWaterStatus,
     };
   };
 
@@ -71,17 +83,30 @@ export function registerHealthRoutes(
     });
   });
 
-  // Public Readiness Endpoint (preserves existing contract and status enums)
+  // Public Readiness Endpoint (preserves existing contract and reports both EMQX and HiveMQ)
   app.get('/ready', async (_request: FastifyRequest, reply: FastifyReply) => {
     const data = await getReadinessData();
     return reply.status(data.statusCode).send({
       status: data.overallStatus,
       service: 'iot-gateway',
       timestamp: new Date().toISOString(),
+      emqx: {
+        status: data.mqttStatus,
+        connected: data.isMqttConnected,
+      },
       mqtt: {
         status: data.mqttStatus,
         connected: data.isMqttConnected,
       },
+      ...(data.isSoilWaterConfigured
+        ? {
+            soilWaterMqtt: {
+              broker: 'HIVEMQ',
+              status: data.soilWaterStatus,
+              connected: data.isSoilWaterConnected,
+            },
+          }
+        : {}),
       database: {
         status: data.dbStatus,
         connected: data.isDbConnected,
@@ -152,6 +177,12 @@ export function registerHealthRoutes(
       dependencies: {
         database: data.isDbConnected ? 'up' : 'down',
         broker: data.isMqttConnected ? 'up' : 'down',
+        ...(data.isSoilWaterConfigured
+          ? {
+              emqxBroker: data.isMqttConnected ? 'up' : 'down',
+              soilWaterBroker: data.isSoilWaterConnected ? 'up' : 'down',
+            }
+          : {}),
       },
     });
   });

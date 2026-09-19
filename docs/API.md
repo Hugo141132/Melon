@@ -1871,7 +1871,7 @@ Response:
       "temperature": 28.4,
       "moisture": 67.3,
       "ph": 6.5,
-      "ec": 1.42,
+      "ec": 1420,
       "status": "NORMAL",
       "freshness": "CURRENT"
     },
@@ -1880,7 +1880,7 @@ Response:
       "receivedAt": "2026-07-27T14:24:31+07:00",
       "ph": 7.1,
       "tds": 420,
-      "ec": 0.84,
+      "ec": 450,
       "status": "NORMAL",
       "freshness": "CURRENT"
     }
@@ -1960,7 +1960,7 @@ Response:
 > - **Telemetry Isolation:** Water-quality history (`ph`, `tds`, `ec`) is separate from reservoir telemetry (`tankVolume`; `flowRate` deleted per `DEC-MON-089`).
 > - **Identifier Resolution:** `{deviceId}` parameter accepts both canonical string `deviceId` (e.g. `soil-node-001`) and database UUID `id`.
 > - **Empty History Response:** Queries matching zero records return HTTP `200 OK` with an empty `series: []` array and `totalRecords: 0`, NOT a 404 error or fabricated zero records.
-> - **EC Unit Contract:** EC telemetry values in API contracts are stored and transmitted in source units (`mS/cm`). The web UI converts values to `µS/cm` (×1000) for presentation.
+> - **EC Unit Contract:** EC telemetry values in API contracts, storage, and presentation are standardized directly in `µS/cm` across both Soil and Water domains.
 
 ## 17.1 Get Soil History
 
@@ -3442,4 +3442,48 @@ GET /api/v1/devices/{deviceId}/predictions/latest
   - Error responses (401, 403, 404, 500) $\to$ Renders localized operational error state without crashing dashboard views.
   - Telemetry freshness: Correlated with `isTelemetryStale` / `isOffline` to display an inline warning notice banner.
 - **Actuator Invariant:** Recommendations are strictly advisory and never trigger physical actuators or dispensing commands (`ENABLE_FAUCET_CONTROL=false`).
+
+### 5. Audited ML Classification Thresholds & Agronomic Standards Matrix (TASK-0413 / Reconciled 2026-09-19)
+
+The external ML inference pipeline classifies soil and irrigation water telemetry based on two-sided agronomic standards authored by the SmartTani ML team (`agronomic_standards_v1.json`) and implemented in `BaseRuleClassifier.php`.
+
+#### A. Soil Monitoring Classification Thresholds
+
+| Parameter | Unit | Critical Low | Warning Low | Optimal (Good) | Warning High | Critical High | Risk Weight | Important Parameter |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| **pH** | pH | $\le 5.49$ | $5.50 - 5.99$ | **$6.00 - 6.80$** | $6.81 - 7.50$ | $> 7.50$ | 20.0 | **Yes** |
+| **Moisture** | % | $< 45.0$ | $45.0 - 59.99$ | **$60.0 - 80.0$** | $80.01 - 90.0$ | $> 90.0$ | 20.0 | **Yes** |
+| **Temperature** | °C | $< 20.0$ | $20.0 - 23.99$ | **$24.0 - 32.0$** | $32.01 - 38.0$ | $> 38.0$ | 15.0 | No |
+| **EC** | µS/cm | — | $< 800$ | **$800 - 2500$** | $2500.01 - 5000$ | $> 5000$ | 20.0 | **Yes** |
+| **Nitrogen (N)** | mg/kg | $< 25.0$ | $25.0 - 44.99$ | **$45.0 - 80.0$** | $80.01 - 120.0$ | $> 120.0$ | 10.0 | No |
+| **Phosphorus (P)** | mg/kg | $< 25.0$ | $25.0 - 44.99$ | **$45.0 - 80.0$** | $80.01 - 120.0$ | $> 120.0$ | 7.5 | No |
+| **Potassium (K)** | mg/kg | $< 35.0$ | $35.0 - 59.99$ | **$60.0 - 160.0$** | $160.01 - 250.0$ | $> 250.0$ | 7.5 | No |
+
+#### B. Water Quality Monitoring Classification Thresholds
+
+| Parameter | Unit | Critical Low | Warning Low | Optimal (Good) | Warning High | Critical High | Risk Weight | Important Parameter |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| **pH** | pH | $< 5.00$ | $5.00 - 5.49$ | **$5.50 - 6.50$** | $6.51 - 7.00$ | $> 7.00$ | 35.0 | **Yes** |
+| **EC** | µS/cm | — | — | **$0 - 500$** | $500.01 - 1500$ | $> 1500$ | 35.0 | **Yes** |
+| **TDS** | ppm | — | — | **$0 - 500$** | $500.01 - 1000$ | $> 1000$ | 30.0 | No |
+
+*(Note: Per `agronomic_standards_v1.json`, baseline irrigation water sets EC $0-500\ \mu\text{S/cm}$ and TDS $0-500\ \text{ppm}$ as optimal).*
+
+#### C. Decision Engine Logic (`BaseRuleClassifier.php`)
+
+1. **Two-Sided Parameter Evaluation:** Each sensor reading is evaluated for both deficiency (low) and excess/toxicity (high).
+2. **Important Parameter Override:**
+   - Soil Important Parameters: `['ph', 'ec', 'moisture']`.
+   - Water Important Parameters: `['ph', 'ec']`.
+   - If **ANY** important parameter enters a **Critical** state, the overall prediction is forced directly to **`kritis`** (`hasImportantCritical = true`).
+3. **Risk Scoring:**
+   - Warning severity contributes `riskWeight * 0.5`.
+   - Critical severity contributes `riskWeight * 1.0`.
+   - Total `riskScore = sum(weighted_risk)` clamped to $[0, 100]$.
+4. **Classification Assignment:**
+   - `riskScore > 65` $\to$ **`kritis`** (Critical)
+   - `riskScore > 30` OR `$hasWarning` $\to$ **`waspada`** (`warning`)
+   - `riskScore <= 30` with all parameters in good range $\to$ **`baik`** (`optimal`)
+
 <!-- Latest Prediction API Reconciled: 2026-09-19 -->
+
