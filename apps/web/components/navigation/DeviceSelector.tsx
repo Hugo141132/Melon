@@ -1,11 +1,17 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { useTranslations } from 'next-intl';
 import { useDeviceContext, AuthorisedDevice } from '@/context/DeviceContext';
 import { useRouter } from 'next/navigation';
 import { ChevronDown, Search, Check, AlertTriangle, Cpu, RefreshCw, X } from 'lucide-react';
-import { useTranslations } from 'next-intl';
-import { cn, formatDeviceDisplayName } from '@/lib/utils';
+import {
+  cn,
+  formatDeviceDisplayName,
+  normalizeConnectionStatus,
+  getConnectionStatusLabel,
+  getConnectionStatusDotColor,
+} from '@/lib/utils';
 
 export interface DeviceSelectorProps {
   className?: string;
@@ -31,7 +37,7 @@ export default function DeviceSelector({ className }: DeviceSelectorProps) {
 
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ONLINE' | 'OFFLINE'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'CONNECTED' | 'DISCONNECTED'>('ALL');
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -73,10 +79,11 @@ export default function DeviceSelector({ className }: DeviceSelectorProps) {
         (d.deviceId && d.deviceId.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (d.siteName && d.siteName.toLowerCase().includes(searchQuery.toLowerCase()));
 
+      const normalized = normalizeConnectionStatus(d.connectionStatus);
       const matchesStatus =
         statusFilter === 'ALL' ||
-        (statusFilter === 'ONLINE' && d.connectionStatus === 'ONLINE') ||
-        (statusFilter === 'OFFLINE' && d.connectionStatus !== 'ONLINE');
+        (statusFilter === 'CONNECTED' && normalized === 'CONNECTED') ||
+        (statusFilter === 'DISCONNECTED' && normalized === 'DISCONNECTED');
 
       return matchesSearch && matchesStatus;
     });
@@ -104,20 +111,9 @@ export default function DeviceSelector({ className }: DeviceSelectorProps) {
     }
   };
 
-  // Status Dot Color helper
+  // Status Dot Color helper (strictly Connected [emerald] vs Disconnected [rose])
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'ONLINE':
-        return 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]';
-      case 'OFFLINE':
-        return 'bg-rose-500';
-      case 'STALE':
-        return 'bg-amber-500';
-      case 'INACTIVE':
-        return 'bg-gray-400';
-      default:
-        return 'bg-gray-400';
-    }
+    return getConnectionStatusDotColor(status);
   };
 
   // 1. Loading State (Skeleton loading)
@@ -188,6 +184,7 @@ export default function DeviceSelector({ className }: DeviceSelectorProps) {
               'w-2 h-2 rounded-full flex-shrink-0',
               getStatusColor(selectedDevice.connectionStatus)
             )}
+            title={getConnectionStatusLabel(selectedDevice.connectionStatus, tDevices)}
           />
           <span
             className="truncate max-w-[95px] xs:max-w-[130px] sm:max-w-[160px]"
@@ -232,6 +229,11 @@ export default function DeviceSelector({ className }: DeviceSelectorProps) {
             'w-2 h-2 rounded-full flex-shrink-0',
             getStatusColor(selectedDevice?.connectionStatus || 'UNKNOWN')
           )}
+          title={
+            selectedDevice
+              ? getConnectionStatusLabel(selectedDevice.connectionStatus, tDevices)
+              : undefined
+          }
         />
         <span
           className="truncate max-w-[95px] xs:max-w-[130px] sm:max-w-[160px]"
@@ -316,8 +318,8 @@ export default function DeviceSelector({ className }: DeviceSelectorProps) {
             <div className="flex items-center gap-1">
               {[
                 { key: 'ALL', label: tCommon('all') },
-                { key: 'ONLINE', label: tDevices('online') },
-                { key: 'OFFLINE', label: tDevices('offline') },
+                { key: 'CONNECTED', label: tDevices('connected') },
+                { key: 'DISCONNECTED', label: tDevices('disconnected') },
               ].map((tab) => (
                 <button
                   key={tab.key}
@@ -367,6 +369,7 @@ export default function DeviceSelector({ className }: DeviceSelectorProps) {
                           'w-2.5 h-2.5 rounded-full flex-shrink-0 mt-1',
                           getStatusColor(device.connectionStatus)
                         )}
+                        title={getConnectionStatusLabel(device.connectionStatus, tDevices)}
                       />
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5">

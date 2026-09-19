@@ -1,5 +1,7 @@
 # Build & Compilation Artifacts
 .next
+**/.next
+apps/*/.next
 out
 dist
 build

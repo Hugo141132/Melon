@@ -76,8 +76,42 @@ The 2026-09-19 UI refinements optimize the entry experience for agricultural wor
      - Orientation icons (`Mail`, `Lock`) and interactive password toggle (`Eye`/`EyeOff`).
      - Soft-elevated `rounded-3xl` card surface with high contrast against the app background.
    - **Preserved Core:** 100% auth validation, error mapping, `AuthContext` reactive state hydration, and guest route guards remain intact.
+### 1.5 Device Connection Status Presentation Normalization & Header Selector Governance (2026-09-19)
+The 2026-09-19 status normalization unifies device connectivity presentation across all operational interfaces (`DEC-DEV-034`, `DEC-UIUX-106`):
+- **Frontend impact:** `MINOR`
+- **Selected UI direction:** `Premium Minimal Ops`
+- **Existing color template:** `UNCHANGED`
+- **Selected motion effects:** `Skeleton loading`, `Button hover`
+- **21st.dev MCP:** `NOT REQUIRED`
+
+#### Presentation and Normalization Rules
+1. **Two User-Facing Connection States**:
+   - **Connected** (`Terhubung`): Displays strictly for `ONLINE` / active device connection. Semantic indicator: Emerald pulsing dot (`bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]`).
+   - **Disconnected** (`Terputus`): Displays for `OFFLINE`, `STALE`, missing heartbeat, or unavailable device states. Semantic indicator: Rose dot (`bg-rose-500`).
+   - **Zero "Stale" Exposure**: End users are never exposed to `"Stale"` / `"Data Usang"` as a connection status in badges, selector lists, dots, or tabs.
+2. **Device Selector Filter Tabs**:
+   - Filter tabs in `DeviceSelector` dropdown are strictly:
+     - `All` (`Semua`)
+     - `Connected` (`Terhubung`)
+     - `Disconnected` (`Terputus`)
+   - The `Disconnected` tab filters all non-online devices (`OFFLINE`, `STALE`, and `UNKNOWN`).
+3. **Frontend Normalization Layer**:
+   - Standardized helpers in `apps/web/lib/utils.ts`:
+     - `normalizeConnectionStatus(status)`
+     - `getConnectionStatusLabel(status, resolver)`
+     - `getConnectionStatusDotColor(status)`
+4. **Synchronized Surfaces**:
+   - **Header Selector (`apps/web/components/navigation/DeviceSelector.tsx`)**: Trigger badge, dropdown filter tabs, device list items, and status dots.
+   - **Soil Monitoring (`apps/web/app/soil/page.tsx`)**: Status meter dot, realtime update notice, and alert banner (`Disconnected` / `Terputus` in rose).
+   - **Water Quality Monitoring (`apps/web/app/water/page.tsx`)**: Status meter dot, realtime update notice, and alert banner (`Disconnected` / `Terputus` in rose).
+   - **Water Tank Monitoring (`apps/web/components/monitoring/WaterTankMonitoringCard.tsx`)**: Consolidated into single normalized badge (`Connected` vs `Disconnected`) and rose dot.
+   - **Irrigation Faucet Controls (`apps/web/components/controls/FaucetPresetSelector.tsx`, `FaucetConfirmationModal.tsx`)**: Normalized device status label and dot color.
+   - **Dashboard Fleet Summary (`apps/web/components/dashboard/DashboardView.tsx`)**: Reconciled card labels and count calculation to `Connected` vs `Disconnected`.
+5. **Backend Preservation Invariant**:
+   - Internal telemetry freshness evaluation (`TELEMETRY_STALE_THRESHOLD_MS = 60000`), gateway decay logic, and MQTT ingestion contracts remain 100% untouched.
 
 ---
+
 
 
 ## 2. Source-of-Truth Hierarchy

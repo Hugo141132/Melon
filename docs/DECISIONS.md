@@ -38,13 +38,13 @@
 |---|---|---|---|
 | **Authentication** | `DEC-AUTH-001` to `DEC-AUTH-012`, `DEC-AUTH-102` to `DEC-AUTH-108` | **APPROVED** | HTTP-only secure cookies (`HttpOnly`, `Secure`, `SameSite=Strict`), PostgreSQL session table, 30m idle / 8h absolute maximum lifetime, CLI Owner seed, no public Owner creation, mandatory 6-digit email verification, 15m password recovery, verified self-email change, single active session enforcement, and Prisma relationLoadStrategy WAN login latency optimization. |
 | **RBAC** | `DEC-RBAC-013` to `DEC-RBAC-019` | **APPROVED** | Owner has global device visibility. Admins have mandatory per-device assignments; device assignment automatically grants both monitoring and faucet control. Owners manage assignments. No separate per-user-device `canControl` permission in v1. |
-| **Devices** | `DEC-DEV-020` to `DEC-DEV-033` | **APPROVED** | Multi-protocol and dual-broker architecture: Soil & Water quality monitoring telemetry via dedicated HiveMQ Cloud broker over TLS (`DEC-DEV-033`), Water Tank monitoring via direct 2-tier gateway on dedicated EMQX Cloud broker (`DEC-DEV-032`). Shared INA219 electrical monitoring via REST/Wi-Fi. Per-device credentials/ACLs, no anonymous access, no direct browser-to-MQTT. Offline threshold: **TBD**. Stale threshold: **TBD**. In-app device creation / Add Device removed (`DEC-DEV-027`). External `deviceId` editable by OWNER only; internal DB UUID immutable; canonical `deviceId` strictly hidden from ADMIN in UI & API (`DEC-DEV-028`). Previously/last-accessed device history & persistent restoration removed while preserving all telemetry/command/assignment/audit history (`DEC-DEV-029`). Hard delete of devices permanently removed in favor of `DEACTIVATED` / `ACTIVE` lifecycle (`DEC-DEV-030`). Permanent external hardware topics (`irigasi/melon/...`) adopted as canonical MQTT contract for single water tank node (`DEC-DEV-032`). |
+| **Devices** | `DEC-DEV-020` to `DEC-DEV-034` | **APPROVED** | Multi-protocol and dual-broker architecture: Soil & Water quality monitoring telemetry via dedicated HiveMQ Cloud broker over TLS (`DEC-DEV-033`), Water Tank monitoring via direct 2-tier gateway on dedicated EMQX Cloud broker (`DEC-DEV-032`). Shared INA219 electrical monitoring via REST/Wi-Fi. Per-device credentials/ACLs, no anonymous access, no direct browser-to-MQTT. Offline threshold: **TBD**. Stale threshold: **TBD**. In-app device creation / Add Device removed (`DEC-DEV-027`). External `deviceId` editable by OWNER only; internal DB UUID immutable; canonical `deviceId` strictly hidden from ADMIN in UI & API (`DEC-DEV-028`). Previously/last-accessed device history & persistent restoration removed while preserving all telemetry/command/assignment/audit history (`DEC-DEV-029`). Hard delete of devices permanently removed in favor of `DEACTIVATED` / `ACTIVE` lifecycle (`DEC-DEV-030`). Permanent external hardware topics (`irigasi/melon/...`) adopted as canonical MQTT contract for single water tank node (`DEC-DEV-032`). User-facing connection status normalized strictly to Connected vs Disconnected (`DEC-DEV-034`). |
 | **Monitoring** | `DEC-MON-036` to `DEC-MON-050`, `DEC-MON-085` to `DEC-MON-091` | **APPROVED** | Three distinct monitoring domains: 1) Soil monitoring (NPK, Temp, Moisture, pH, EC in `µS/cm`, status), 2) Water Quality monitoring (pH, TDS in ppm, EC in `µS/cm`, status), 3) Water Tank monitoring (Tank Vol in `L`, 0 L–2200 L scale per `DEC-MON-089`, status; Flow rate deleted per `DEC-MON-089`). Canonical EC unit standardized directly in `µS/cm` without multiplier conversions across storage, API, UI, simulator, and ML inference (`DEC-MON-091`). Soil & Water Quality ML classification is ingested from an external ML team's Supabase project over read-only PostgREST HTTPS (`ExternalPredictionClient`), mapped dynamically via `device_external_mappings`, and hybrid MQTT recommendations are published asynchronously via `apps/iot-gateway` without local ML compute (`DEC-MON-090`). Raw telemetry remains immutable. 90-day retention TTL with chunked batch maintenance (`DEC-MON-048` / `TASK-0913`). |
 | **Faucet Control** | `DEC-CTRL-051` to `DEC-CTRL-067` | **APPROVED** | Max 1 active command/device, no auto retries, `ENABLE_FAUCET_CONTROL=false` default, dual written sign-off (Owner + Hardware Lead) required before production activation. Duplicate command IDs never re-dispense. Timeout ≠ completion. ACK timeout, completion timeout, expiry duration: **TBD**. Cancellation/stop support: **TBD**. |
 | **I18N** | `DEC-I18N-068` to `DEC-I18N-074` | **APPROVED** | Default `id` (Bahasa Indonesia), `en` fallback, mandatory centered language-selection gate for unauthenticated visitors without valid locale (`English` -> `en`, `Bahasa Indonesia` -> `id`), cookie-based non-prefixed routing (no URL path pollution), subsequent language changes strictly in Settings (`/settings`), UTC storage with `Asia/Jakarta` (WIB) presentation. |
 | **Infrastructure** | `DEC-INF-075` to `DEC-INF-088` | **APPROVED** | npm monorepo, PostgreSQL with Prisma ORM, internal health probes, dedicated Linux VPS production with Docker Compose (`TASK-1011`), and containerized staging decoupled from Railway (`TASK-1012`). Backup schedule and retention: daily automated encrypted pg_dump with offsite object storage. |
 | **Testing** | `DEC-TST-089` to `DEC-TST-100` | **APPROVED** | Modern Evergreen browsers. Mobile viewport primary (360-430px). Accessibility standard: **TBD**. API performance targets (p95): **TBD**. Physical test run count per faucet phase: **TBD**. |
-| **UI/UX & Frontend** | `DEC-UIUX-101` to `DEC-UIUX-105` | **APPROVED** | 6 primary UI directions (1 per task), authoritative Kebun Melon color palette (UNCHANGED), controlled 12-motion library, performant motion quality, mandatory task-level frontend declaration, 21st.dev MCP required ONLY for material redesigns, removal of Linked Devices from profile, Account/Session Security management, and simplified faucet confirmation modal. |
+| **UI/UX & Frontend** | `DEC-UIUX-101` to `DEC-UIUX-106` | **APPROVED** | 6 primary UI directions (1 per task), authoritative Kebun Melon color palette (UNCHANGED), controlled 12-motion library, performant motion quality, mandatory task-level frontend declaration, 21st.dev MCP required ONLY for material redesigns, removal of Linked Devices from profile, Account/Session Security management, simplified faucet confirmation modal, and device connection status presentation normalization (`Connected` vs `Disconnected` per `DEC-UIUX-106`). |
 
 ---
 
@@ -1004,3 +1004,35 @@ The following facts are supported by the verified decisions governance of `TASK-
      - **Phase D (Completed 2026-09-19):** Dynamic Dashboard Recommendation Cards (`apps/web`). Bound live predictions to `/soil` and `/water` using `useLatestPrediction` hook (30s polling, `activeDeviceIdRef` in-flight cancellation) and reusable `RecommendationCard` (4 states: loading skeleton with `aria-busy="true"`, empty/unavailable, populated, and stale/offline warning banner). Enforced advisory safety disclaimer (`advisoryDisclaimer`), 14 bilingual keys under `recommendation` namespace with 100% key parity, and `pb-24` mobile clearance on `/water`.
      - **Verification Status:** 20/20 focused Phase D unit tests passing, full web suite passing (83/83 files, 697/697 tests, 100%), 0 monorepo typecheck errors across all 4 workspaces, 0 committed secrets across 343 files, and zero staging modifications.
 <!-- TASK-0413 Reconciled: 2026-09-19 -->
+
+---
+
+### DEC-DEV-034 & DEC-UIUX-106: Device Connection Status Presentation Normalization (Connected vs Disconnected)
+
+* **Related Subsystem**: Devices & UI/UX Presentation
+* **Related Task IDs**: `TASK-0306`, `TASK-0302`, `TASK-0502`
+* **Status**: **APPROVED & IMPLEMENTED (2026-09-19)**
+* **Context**:
+  Previously, device connection status was exposed in the frontend using a mixture of raw database enums (`ONLINE`, `OFFLINE`, `STALE`), with certain views rendering an intermediate `"Stale"` / `"Data Usang"` connection state. This caused cognitive confusion for agricultural operators when evaluating device connectivity. The agreed product design requirement specifies that users should only see two operational connection types:
+  1. **Connected** (`Terhubung`): for `ONLINE` / active device connection.
+  2. **Disconnected** (`Terputus`): for `OFFLINE`, `STALE`, missing heartbeat, or unavailable device states.
+  Under no circumstance should `"Stale"` be exposed as a user-facing connection state.
+* **Decision & Implementation Directives**:
+  1. **Non-Breaking Frontend Normalization Layer**:
+     - Standardized normalization utilities in `apps/web/lib/utils.ts`:
+       - `normalizeConnectionStatus(status)`: Maps `ONLINE` $\to$ `'CONNECTED'`, and all other statuses (`OFFLINE`, `STALE`, `UNKNOWN`, `null`) $\to$ `'DISCONNECTED'`.
+       - `getConnectionStatusLabel(status, resolver)`: Resolves localized presentation label (`tDevices('connected')` vs `tDevices('disconnected')`).
+       - `getConnectionStatusDotColor(status)`: Maps `'CONNECTED'` to emerald pulsing dot (`bg-emerald-500`) and `'DISCONNECTED'` to rose dot (`bg-rose-500`).
+  2. **Device Selector Filter Normalization**:
+     - Dropdown quick status filter tabs are strictly: `All` (`Semua`), `Connected` (`Terhubung`), and `Disconnected` (`Terputus`).
+     - Selecting `Disconnected` filters both `OFFLINE` and `STALE` devices using `normalizeConnectionStatus`.
+  3. **Domain Views Alignment**:
+     - Aligned header `DeviceSelector`, `/soil`, `/water`, `/controls` (`WaterTankMonitoringCard`, `FaucetPresetSelector`, `FaucetConfirmationModal`), and `DashboardView`.
+     - Alert banners and realtime notices display `Disconnected` (`Terputus`) in rose styling.
+  4. **Backend Invariant Preservation**:
+     - The internal backend telemetry freshness evaluation (`TELEMETRY_STALE_THRESHOLD_MS = 60000`), gateway decay logic, and MQTT contracts remain completely unchanged.
+  5. **Verification**:
+     - 11/11 unit tests passed in `apps/web/test/unit/device-selector-localization.test.tsx` (including tab filtering and stale exclusion tests).
+     - Full `@kebun-melon/web` unit test suite: 82/82 files passed, 687/687 tests passed (100%).
+     - TypeScript typecheck: 0 errors across 4 monorepo packages.
+<!-- TASK-0306 Reconciled: 2026-09-19 -->

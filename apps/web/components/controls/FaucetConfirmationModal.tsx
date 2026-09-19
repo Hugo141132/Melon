@@ -5,6 +5,7 @@ import { X, Droplets, AlertTriangle, Loader2, CheckCircle2, Power, PowerOff } fr
 import { useTranslations } from 'next-intl';
 import { AuthorisedDevice } from '@/context/DeviceContext';
 import { formatLitersDisplay } from './FaucetPresetSelector';
+import { normalizeConnectionStatus, getConnectionStatusLabel } from '@/lib/utils';
 
 export interface FaucetConfirmationModalProps {
   isOpen: boolean;
@@ -207,23 +208,19 @@ export default function FaucetConfirmationModal({
               </span>
               <span
                 className={`inline-flex items-center gap-1 font-semibold ${
-                  selectedDevice.connectionStatus === 'ONLINE'
+                  normalizeConnectionStatus(selectedDevice.connectionStatus) === 'CONNECTED'
                     ? 'text-emerald-600'
-                    : selectedDevice.connectionStatus === 'STALE'
-                      ? 'text-amber-600'
-                      : 'text-rose-600'
+                    : 'text-rose-600'
                 }`}
               >
                 <span
                   className={`w-1.5 h-1.5 rounded-full ${
-                    selectedDevice.connectionStatus === 'ONLINE'
+                    normalizeConnectionStatus(selectedDevice.connectionStatus) === 'CONNECTED'
                       ? 'bg-emerald-500 animate-pulse'
-                      : selectedDevice.connectionStatus === 'STALE'
-                        ? 'bg-amber-500'
-                        : 'bg-rose-500'
+                      : 'bg-rose-500'
                   }`}
                 />
-                {selectedDevice.connectionStatus}
+                {getConnectionStatusLabel(selectedDevice.connectionStatus, tDevices)}
               </span>
             </div>
           </div>

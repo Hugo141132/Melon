@@ -876,6 +876,11 @@ During development verification with live hardware transmissions on `irigasi/mel
    - **STALE / OFFLINE:** Hides numeric volume, displays placeholder (`— L` in `WaterTankMonitoringCard`, `- L` in `MonitoringDashboard`), and sets progress gauge bar to `0%`, while keeping the amber Stale Alert notice and `lastSeen` timestamp visible.
 6. **Automatic Online Restoration:**
    - When hardware resumes publishing and fresh telemetry arrives ($< 60\text{s}$), the system automatically transitions back to `ONLINE`, clears stale banners, and restores live volume rendering across all UI elements.
+7. **Frontend Presentation Normalization (DEC-DEV-034 / DEC-UIUX-106, Reconciled 2026-09-19):**
+   - While backend services, gateway decay logic, and database persistence retain the authoritative 60-second telemetry freshness calculation (`TELEMETRY_STALE_THRESHOLD_MS = 60000`) and internal `STALE` status evaluation, the authenticated frontend web application normalizes user-facing connection presentation strictly into two operational states:
+     - **Connected** (`Terhubung`): for `ONLINE` active telemetry connection (emerald dot `bg-emerald-500`).
+     - **Disconnected** (`Terputus`): for `OFFLINE`, `STALE`, missing heartbeat, or unavailable device states (rose dot `bg-rose-500`).
+   - The user-facing term `"Stale"` / `"Data Usang"` is strictly not exposed in connection badges, selector lists, dots, or dropdown filter tabs. Quick status filter tabs in `DeviceSelector` strictly offer `All` / `Connected` / `Disconnected`, where `Disconnected` filters both `OFFLINE` and `STALE` nodes.
 
 ##### 4. Verification Evidence & Preserved Invariants
 

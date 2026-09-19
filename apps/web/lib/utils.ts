@@ -88,3 +88,41 @@ export function formatDeviceDisplayName(
 
   return name;
 }
+
+export type NormalizedConnectionStatus = 'CONNECTED' | 'DISCONNECTED';
+
+/**
+ * Normalizes device connection status for user-facing presentation.
+ * Per repository requirements, users only see two connection types:
+ * - Connected: for ONLINE / active device connection.
+ * - Disconnected: for OFFLINE, STALE, missing heartbeat, or unavailable device states.
+ * Internal backend and device telemetry freshness evaluation logic remains intact.
+ */
+export function normalizeConnectionStatus(status?: string | null): NormalizedConnectionStatus {
+  if (status === 'ONLINE') {
+    return 'CONNECTED';
+  }
+  return 'DISCONNECTED';
+}
+
+/**
+ * Returns localized presentation label for device connection status ('Connected' | 'Disconnected').
+ */
+export function getConnectionStatusLabel(
+  status: string | null | undefined,
+  resolver: (key: string) => string
+): string {
+  const normalized = normalizeConnectionStatus(status);
+  return normalized === 'CONNECTED' ? resolver('connected') : resolver('disconnected');
+}
+
+/**
+ * Returns consistent semantic dot indicator class for normalized connection status.
+ */
+export function getConnectionStatusDotColor(status?: string | null): string {
+  const normalized = normalizeConnectionStatus(status);
+  if (normalized === 'CONNECTED') {
+    return 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]';
+  }
+  return 'bg-rose-500';
+}

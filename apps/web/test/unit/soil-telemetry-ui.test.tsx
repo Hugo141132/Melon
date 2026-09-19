@@ -223,8 +223,10 @@ describe('TASK-0502 — Live Soil and Water Monitoring UI Data Binding', () => {
     );
 
     await waitFor(() => {
-      // Stale banner and status indicator must be present
-      expect(screen.getAllByText(/Kedaluwarsa|Stale/i).length).toBeGreaterThanOrEqual(1);
+      // Disconnected banner and status indicator must be present (normalized from stale/offline)
+      expect(screen.getAllByText(/Terputus|Disconnected/i).length).toBeGreaterThanOrEqual(1);
+      // "Stale" must NOT be exposed as a user-facing connection status
+      expect(screen.queryByText(/^Stale$/i)).toBeNull();
       // Must display '-' placeholders instead of the old sensor values
       const dashes = screen.getAllByText('-');
       expect(dashes.length).toBeGreaterThanOrEqual(7);
@@ -397,8 +399,10 @@ describe('TASK-0502 — Live Soil and Water Monitoring UI Data Binding', () => {
     );
 
     await waitFor(() => {
-      // Stale banner must be present
-      expect(screen.getAllByText(/Kedaluwarsa|Stale/i).length).toBeGreaterThanOrEqual(1);
+      // Disconnected banner must be present (normalized from stale/offline)
+      expect(screen.getAllByText(/Terputus|Disconnected/i).length).toBeGreaterThanOrEqual(1);
+      // "Stale" must NOT be exposed as a user-facing connection status
+      expect(screen.queryByText(/^Stale$/i)).toBeNull();
       // Must display '-' placeholders instead of the old sensor values
       const dashes = screen.getAllByText('-');
       expect(dashes.length).toBeGreaterThanOrEqual(3);

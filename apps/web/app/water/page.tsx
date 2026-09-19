@@ -96,6 +96,7 @@ export default function WaterPage() {
   const tWater = useTranslations('water');
   const tSoil = useTranslations('soil');
   const tCommon = useTranslations('common');
+  const tDevices = useTranslations('devices');
   const { selectedDevice } = useDeviceContext();
   const { snapshot, isStale } = useLatestMonitoring();
 
@@ -182,8 +183,8 @@ export default function WaterPage() {
                 <div className="flex items-center gap-2">
                   <div
                     className={`w-2 h-2 rounded-full ${
-                      isTelemetryStale
-                        ? 'bg-amber-500'
+                      isTelemetryStale || isOffline
+                        ? 'bg-rose-500'
                         : hasTelemetry
                           ? 'bg-app-primary animate-pulse'
                           : 'bg-gray-400'
@@ -191,15 +192,15 @@ export default function WaterPage() {
                   />
                   <span
                     className={`text-[14px] font-semibold ${
-                      isTelemetryStale
-                        ? 'text-amber-700 dark:text-amber-400'
+                      isTelemetryStale || isOffline
+                        ? 'text-rose-600 dark:text-rose-400'
                         : hasTelemetry
                           ? 'text-app-primary'
                           : 'text-app-on-surface-variant'
                     }`}
                   >
-                    {isTelemetryStale
-                      ? tCommon('stale')
+                    {isTelemetryStale || isOffline
+                      ? tDevices('disconnected')
                       : hasTelemetry
                         ? tWater('statusLabel', { status: statusLabel })
                         : tCommon('noDataAvailable')}
@@ -218,19 +219,19 @@ export default function WaterPage() {
                 </p>
               ) : (
                 <p className="text-[14px] text-app-on-surface-variant">
-                  {isTelemetryStale
-                    ? `${tSoil('realtimeUpdate')}: ${tCommon('stale')}`
+                  {isTelemetryStale || isOffline
+                    ? `${tSoil('realtimeUpdate')}: ${tDevices('disconnected')}`
                     : tSoil('noDataNotice')}
                 </p>
               )}
             </section>
 
-            {/* Stale Alert Banner */}
-            {isTelemetryStale && (
-              <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-center gap-3 animate-fade-in">
-                <AlertTriangle size={20} className="text-amber-600 flex-shrink-0" />
-                <p className="text-[13px] leading-5 text-amber-800 dark:text-amber-300 font-medium">
-                  {tSoil('realtimeUpdate')}: {tCommon('stale')}
+            {/* Disconnected Alert Banner */}
+            {(isTelemetryStale || isOffline) && (
+              <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-4 flex items-center gap-3 animate-fade-in">
+                <AlertTriangle size={20} className="text-rose-600 flex-shrink-0" />
+                <p className="text-[13px] leading-5 text-rose-800 dark:text-rose-300 font-medium">
+                  {tSoil('realtimeUpdate')}: {tDevices('disconnected')}
                 </p>
               </div>
             )}

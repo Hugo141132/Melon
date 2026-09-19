@@ -184,9 +184,8 @@ export function WaterTankMonitoringCard() {
           <div
             className={cn(
               'w-3 h-3 rounded-full flex-shrink-0',
-              isOnline && 'bg-emerald-500 animate-pulse',
-              isOffline && 'bg-rose-500',
-              isStaleStatus && 'bg-amber-500'
+              isOnline && !isStaleStatus && 'bg-emerald-500 animate-pulse',
+              (isOffline || isStaleStatus) && 'bg-rose-500'
             )}
           />
           <div>
@@ -211,19 +210,14 @@ export function WaterTankMonitoringCard() {
 
         {/* Status Badges */}
         <div className="flex items-center gap-2">
-          {isOffline && (
+          {(isOffline || isStaleStatus) && (
             <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full bg-rose-500/10 text-rose-700">
-              <WifiOff size={13} /> {tDevices('offlineStatus')}
-            </span>
-          )}
-          {isStaleStatus && !isOffline && (
-            <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-700">
-              <AlertTriangle size={13} /> {tDevices('staleStatus')}
+              <WifiOff size={13} /> {tDevices('disconnected')}
             </span>
           )}
           {isOnline && !isStaleStatus && (
             <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-700">
-              <CheckCircle2 size={13} /> {tDevices('onlineStatus')}
+              <CheckCircle2 size={13} /> {tDevices('connected')}
             </span>
           )}
 

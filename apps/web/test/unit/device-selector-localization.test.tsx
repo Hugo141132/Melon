@@ -286,3 +286,105 @@ describe('DeviceSelector Mobile Centering & Viewport Bounding (360px, 390px, 430
     expect(singleContainer).toHaveTextContent('Soil Sensor Node');
   });
 });
+
+describe('DeviceSelector Connection Status Normalization (Connected vs Disconnected)', () => {
+  const mixedStatusDevices: AuthorisedDevice[] = [
+    {
+      id: 'dev-online',
+      deviceId: 'soil-online-01',
+      deviceName: 'Device Alpha',
+      deviceType: 'SOIL_NODE',
+      firmwareVersion: '1.0.0',
+      connectionStatus: 'ONLINE',
+      lastSeenAt: new Date().toISOString(),
+      siteId: 'site-1',
+      siteName: 'Blok Barat',
+      latitude: null,
+      longitude: null,
+    },
+    {
+      id: 'dev-stale',
+      deviceId: 'soil-beta-02',
+      deviceName: 'Device Beta',
+      deviceType: 'SOIL_NODE',
+      firmwareVersion: '1.0.0',
+      connectionStatus: 'STALE',
+      lastSeenAt: new Date().toISOString(),
+      siteId: 'site-1',
+      siteName: 'Blok Barat',
+      latitude: null,
+      longitude: null,
+    },
+    {
+      id: 'dev-offline',
+      deviceId: 'water-gamma-03',
+      deviceName: 'Device Gamma',
+      deviceType: 'WATER_QUALITY_NODE',
+      firmwareVersion: '1.0.0',
+      connectionStatus: 'OFFLINE',
+      lastSeenAt: new Date().toISOString(),
+      siteId: 'site-1',
+      siteName: 'Kolam',
+      latitude: null,
+      longitude: null,
+    },
+  ];
+
+  it('renders Quick Status filter tabs as All, Connected, Disconnected without Stale', () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={enMessages}>
+        <DeviceProvider initialDevices={mixedStatusDevices}>
+          <DeviceSelector />
+        </DeviceProvider>
+      </NextIntlClientProvider>
+    );
+
+    fireEvent.click(screen.getByTestId('device-selector-trigger'));
+
+    expect(screen.getByRole('button', { name: 'All' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Connected' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Disconnected' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /stale/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/stale/i)).not.toBeInTheDocument();
+  });
+
+  it('filters both STALE and OFFLINE devices under Disconnected tab', () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={enMessages}>
+        <DeviceProvider initialDevices={mixedStatusDevices}>
+          <DeviceSelector />
+        </DeviceProvider>
+      </NextIntlClientProvider>
+    );
+
+    fireEvent.click(screen.getByTestId('device-selector-trigger'));
+
+    // Filter by Connected
+    fireEvent.click(screen.getByRole('button', { name: 'Connected' }));
+    expect(screen.getByTestId('device-option-dev-online')).toBeInTheDocument();
+    expect(screen.queryByTestId('device-option-dev-stale')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('device-option-dev-offline')).not.toBeInTheDocument();
+
+    // Filter by Disconnected
+    fireEvent.click(screen.getByRole('button', { name: 'Disconnected' }));
+    expect(screen.queryByTestId('device-option-dev-online')).not.toBeInTheDocument();
+    expect(screen.getByTestId('device-option-dev-stale')).toBeInTheDocument();
+    expect(screen.getByTestId('device-option-dev-offline')).toBeInTheDocument();
+  });
+
+  it('renders localized tabs in Indonesian mode (Semua, Terhubung, Terputus)', () => {
+    render(
+      <NextIntlClientProvider locale="id" messages={idMessages}>
+        <DeviceProvider initialDevices={mixedStatusDevices}>
+          <DeviceSelector />
+        </DeviceProvider>
+      </NextIntlClientProvider>
+    );
+
+    fireEvent.click(screen.getByTestId('device-selector-trigger'));
+
+    expect(screen.getByRole('button', { name: 'Semua' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Terhubung' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Terputus' })).toBeInTheDocument();
+  });
+});

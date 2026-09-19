@@ -377,8 +377,8 @@ describe('WaterTankMonitoringCard Component Tests', () => {
       </DeviceProvider>
     );
 
-    // Stale status badge
-    expect(await screen.findByText(/Data Usang \(Stale\)/i)).toBeInTheDocument();
+    // Disconnected status badge (STALE is normalized to Disconnected)
+    expect(await screen.findByText(/^Terputus$/i)).toBeInTheDocument();
     // Stale warning notice banner
     expect(
       screen.getByText(/Data pemantauan tangki air saat ini tidak diperbarui/i)
@@ -426,8 +426,8 @@ describe('WaterTankMonitoringCard Component Tests', () => {
       </DeviceProvider>
     );
 
-    // Offline badge
-    expect(await screen.findByText(/Terputus \(Offline\)/i)).toBeInTheDocument();
+    // Offline badge (normalized to Disconnected)
+    expect(await screen.findByText(/^Terputus$/i)).toBeInTheDocument();
     // Last seen timestamp remains visible
     expect(screen.getByText(/Terakhir Terlihat/i)).toBeInTheDocument();
     // Tank volume number is hidden; placeholder is shown

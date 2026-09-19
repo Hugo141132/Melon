@@ -7,6 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useDeviceContext } from '@/context/DeviceContext';
 import { Cpu, Activity } from 'lucide-react';
 import { useTranslations, useLocale } from 'next-intl';
+import { normalizeConnectionStatus } from '@/lib/utils';
 
 export default function DashboardView() {
   const tDash = useTranslations('dashboard');
@@ -18,8 +19,10 @@ export default function DashboardView() {
   const rawName = user?.fullName || user?.email || '';
   const userName = rawName.replace(/^pak\s+/i, '').trim();
 
-  const onlineDevicesCount = devices.filter((d) => d.connectionStatus === 'ONLINE').length;
-  const offlineOrStaleCount = devices.length - onlineDevicesCount;
+  const onlineDevicesCount = devices.filter(
+    (d) => normalizeConnectionStatus(d.connectionStatus) === 'CONNECTED'
+  ).length;
+  const offlineDevicesCount = devices.length - onlineDevicesCount;
 
   // Format today's localized date
   const todayFormatted = new Intl.DateTimeFormat(locale === 'id' ? 'id-ID' : 'en-US', {
@@ -79,14 +82,14 @@ export default function DashboardView() {
               </div>
             </div>
 
-            {/* Offline or Stale Nodes */}
+            {/* Disconnected Nodes */}
             <div className="bg-app-surface-container-low rounded-xl p-4 border border-app-outline-variant/40 flex items-center justify-between">
               <div>
                 <span className="text-[12px] font-medium text-app-on-surface-variant block mb-1">
                   {tDash('offlineDevices')}
                 </span>
                 <span className="text-[22px] sm:text-[26px] font-extrabold text-app-on-surface-variant">
-                  {offlineOrStaleCount}
+                  {offlineDevicesCount}
                 </span>
               </div>
               <div className="w-10 h-10 rounded-xl bg-app-surface-container-high flex items-center justify-center flex-shrink-0">

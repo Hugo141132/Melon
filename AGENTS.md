@@ -371,8 +371,14 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
 - Selected UI direction: `Premium Minimal Ops`
 - Existing color template: `UNCHANGED`
 - Selected motion effects: `Dropdown`, `Modal`
-- 21st.dev MCP: `NOT REQUIRED`
-- Summary: Reconciled device selector and context state per `DEC-DEV-028` and `DEC-DEV-029`. Enforced neutral initial state (`selectedDevice = null`) on fresh login and bare routes (`/`, `/sensor`, `/soil` without `?deviceId=`), eliminating all automatic first-device fallbacks. Removed persistent restoration from `localStorage`, `sessionStorage`, cookies, and profileee preferences (`DEC-DEV-029`). Restricted device selection strictly to explicit user action in the `/sensor` device cards or header `DeviceSelector`. Preserved active in-memory selection during client navigation and synchronized selection with route URL (`?deviceId=...`). Supported route-scoped rehydration on hard refresh (Ctrl+Shift+R) after validating against the fresh `GET /api/v1/devices` server-authorized list. Handled loading skeleton states vs true empty lists on `/sensor`. Cleared selection to `null` with a notice banner if access to the selected device is revoked, unassigned, or invalid without silent fallback. Preserved canonical `deviceId` monospace rendering for Owner users and strict concealment for Admin users (`DEC-DEV-028`). Verified 100% test pass rate across 31 test suites (239/239 tests), TypeScript typecheck (0 errors), and Semgrep scan (0 findings).
+- 2026-09-19 Device Connection Status Normalization & Header Selector Refinement:
+  - Status: `DONE` (Completed 2026-09-19)
+  - Frontend impact: `MINOR`
+  - Selected UI direction: `Premium Minimal Ops`
+  - Existing color template: `UNCHANGED`
+  - Selected motion effects: `Skeleton loading`, `Button hover`
+  - 21st.dev MCP: `NOT REQUIRED`
+  - Summary: Reconciled device connection status naming and filtering across the global header `DeviceSelector`, `/soil`, `/water`, `/controls` (`WaterTankMonitoringCard`, `FaucetPresetSelector`, `FaucetConfirmationModal`), and `DashboardView` per `DEC-DEV-034` and `DEC-UIUX-106`. Enforced two canonical user-facing connection states: Connected (`ONLINE`) and Disconnected (`OFFLINE`, `STALE`, `UNKNOWN`), completely eliminating the intermediate "Stale" label from user-facing badges, dots, and tabs. Added frontend normalization utilities (`normalizeConnectionStatus`, `getConnectionStatusLabel`, `getConnectionStatusDotColor`) in `apps/web/lib/utils.ts`. Standardized semantic dot indicators strictly to emerald (`bg-emerald-500`) for Connected and rose (`bg-rose-500`) for Disconnected. Updated selector quick status filter tabs to All / Connected / Disconnected (`Semua` / `Terhubung` / `Terputus`), with `Disconnected` capturing both offline and stale devices. Preserved internal backend telemetry freshness evaluation (`TELEMETRY_STALE_THRESHOLD_MS = 60000`) and MQTT ingestion logic intact. Verified 100% test pass rate across 82 test files (687/687 tests in `@kebun-melon/web`), 0 TypeScript typecheck errors across all 4 monorepo packages, and zero staging modifications.
 
 #### TASK-0411 Governance Record
 

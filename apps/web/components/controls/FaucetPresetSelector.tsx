@@ -15,7 +15,7 @@ import {
   Activity,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { cn } from '@/lib/utils';
+import { cn, getConnectionStatusLabel, getConnectionStatusDotColor } from '@/lib/utils';
 import { AuthorisedDevice } from '@/context/DeviceContext';
 
 export interface FaucetPreset {
@@ -98,6 +98,7 @@ export default function FaucetPresetSelector({
   className,
 }: FaucetPresetSelectorProps) {
   const tFaucet = useTranslations('faucet');
+  const tDevices = useTranslations('devices');
 
   // Local state for plant count if not controlled from parent
   const [internalPlantCount, setInternalPlantCount] = useState<number>(1);
@@ -187,16 +188,12 @@ export default function FaucetPresetSelector({
             <span
               className={cn(
                 'w-2 h-2 rounded-full',
-                selectedDevice.connectionStatus === 'ONLINE'
-                  ? 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)] animate-pulse'
-                  : selectedDevice.connectionStatus === 'STALE'
-                    ? 'bg-amber-500'
-                    : 'bg-rose-500'
+                getConnectionStatusDotColor(selectedDevice.connectionStatus)
               )}
             />
             <span className="font-semibold text-app-on-surface">{selectedDevice.deviceName}</span>
             <span className="text-[10px] text-app-on-surface-variant font-mono">
-              ({selectedDevice.connectionStatus})
+              ({getConnectionStatusLabel(selectedDevice.connectionStatus, tDevices)})
             </span>
           </div>
         )}
