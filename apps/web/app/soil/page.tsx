@@ -7,6 +7,8 @@ import HistoricalChartControls from '@/components/charts/HistoricalChartControls
 import { useDeviceContext } from '@/context/DeviceContext';
 import { useLatestMonitoring } from '@/hooks/useLatestMonitoring';
 import { useHistoricalMonitoring } from '@/hooks/useHistoricalMonitoring';
+import { useLatestPrediction } from '@/hooks/useLatestPrediction';
+import RecommendationCard from '@/components/monitoring/RecommendationCard';
 import { CheckCircle, TrendingUp, Cpu, Clock, AlertTriangle, Info } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
@@ -165,6 +167,12 @@ export default function SoilPage() {
   const isTelemetryStale = Boolean(
     isStale || snapshot?.soil?.isStale || snapshot?.connectionStatus === 'STALE'
   );
+  const isOffline =
+    selectedDevice?.connectionStatus === 'OFFLINE' ||
+    snapshot?.connectionStatus === 'OFFLINE' ||
+    false;
+
+  const { prediction, isLoading: isPredictionLoading } = useLatestPrediction(activeDeviceId);
 
   // Real telemetry values (with strict null preservation; suppressed when telemetry is stale or not present)
   const nVal = !isTelemetryStale ? (soilData?.nitrogen ?? null) : null;
@@ -420,33 +428,13 @@ export default function SoilPage() {
             </div>
 
             {/* Recommendation */}
-            <section className="bg-app-surface-container-lowest rounded-xl p-5 soft-elevation border border-app-outline-variant/20 animate-fade-in">
-              <h3 className="text-[20px] leading-7 font-bold text-app-on-surface mb-3">
-                {tSoil('recommendationTitle')}
-              </h3>
-              {hasTelemetry ? (
-                <div className="space-y-3">
-                  {[
-                    { label: tSoil('nitrogen'), rec: tSoil('maintainCurrentLevel') },
-                    { label: tSoil('phosphorus'), rec: tSoil('addPhosThisWeek') },
-                    { label: tSoil('potassium'), rec: tSoil('maintainCurrentLevel') },
-                  ].map(({ label, rec }) => (
-                    <div key={label} className="flex items-start gap-3">
-                      <CheckCircle size={16} className="text-app-primary mt-0.5 flex-shrink-0" />
-                      <div>
-                        <p className="text-[14px] font-semibold text-app-on-surface">{label}</p>
-                        <p className="text-[12px] text-app-on-surface-variant">{rec}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 text-[14px] text-app-on-surface-variant py-1">
-                  <Info size={16} className="text-app-on-surface-variant shrink-0" />
-                  <p>{tSoil('noDataNotice')}</p>
-                </div>
-              )}
-            </section>
+            <RecommendationCard
+              domain="soil"
+              prediction={prediction}
+              isLoading={isPredictionLoading}
+              isStale={isTelemetryStale}
+              isOffline={isOffline}
+            />
           </>
         )}
       </main>

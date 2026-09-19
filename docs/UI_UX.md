@@ -31,7 +31,25 @@ This document defines presentation and interaction behaviour. It does not define
 - **Selected motion effects:** `None`
 - **21st.dev MCP:** `NOT REQUIRED`
 
-All Next.js App Router layouts, operational views, cards, modals, controls, and Tailwind tokens remain completely untouched across both Singapore Dev (`unbyxlkrzqlafolxcypi`) and Singapore Staging (`ihgoxqdncepbcrqkchxu`). Genuine Owner logins, REST telemetry ingestion, service health probes, and subscriber-side browser EventSource receipt (`telemetry.soil.updated` correlating 100% with persisted reading `d319dd56-821c-47b8-a56e-4012cd26f4f4`) were verified with zero visual regression. Technical migration cutover is complete (`DONE`). Complete E2E test isolation runs on dedicated port `3005` with `reuseExistingServer: false` without triggering frontend layout shifts. Documentation updates require no staging container redeploy. Full details in [`docs/SUPABASE_MIGRATION_RUNBOOK.md`](file:///c:/Users/Puroh/Documents/Melon/docs/SUPABASE_MIGRATION_RUNBOOK.md).
+All Next.js App Router layouts, operational views, cards, modals, controls, and Tailwind tokens remain completely untouched across both Singapore Dev (`unbyxlkrzqlafolxcypi`) and Singapore Staging (`ihgoxqdncepbcrqkchxu`). Genuine Owner logins, REST telemetry ingestion, service health probes, and subscriber-side browser EventSource receipt (`telemetry.soil.updated` correlating 100% with persisted reading `d319dd56-821c-47b8-a56e-4012cd26f4f4`, Gate 5 PASS) were verified with zero visual regression. Technical migration cutover is complete (`DONE`). Complete E2E test isolation runs on dedicated port `3005` with `reuseExistingServer: false` without triggering frontend layout shifts. Documentation updates require no staging container redeploy. Full details in [`docs/SUPABASE_MIGRATION_RUNBOOK.md`](file:///c:/Users/Puroh/Documents/Melon/docs/SUPABASE_MIGRATION_RUNBOOK.md).
+
+### 1.3 TASK-0413 Phase D — Dynamic Dashboard Recommendation Cards Governance & UI Specification
+`TASK-0413 Phase D` binds external ML predictions and agronomic recommendations to the Soil (`/soil`) and Water Quality (`/water`) monitoring views:
+- **Frontend impact:** `MINOR`
+- **Selected UI direction:** `Premium Minimal Ops`
+- **Existing color template:** `UNCHANGED`
+- **Selected motion effects:** `Skeleton loading`, `Card hover`, `Healthy status`, `Critical alert`
+- **21st.dev MCP:** `NOT REQUIRED`
+
+#### Presentation and State Rules
+1. **Visual Hierarchy & Tokens**: The card reuses established tokens (`bg-app-surface-container-lowest`, `soft-elevation`, `border-app-outline-variant/20`, `rounded-xl`, `p-5`, `text-app-on-surface`, `text-app-on-surface-variant`). Card title uses domain-specific headers (`Rekomendasi Pemupukan & Tanah` / `Rekomendasi Kualitas Air`) preceded by a subtle `Sparkles` icon.
+2. **Four Operational States**:
+   - *Loading Skeleton State*: Displays a pulsing placeholder (`animate-pulse`) with `aria-busy="true"` adhering to non-blocking UX.
+   - *Empty / Unavailable State*: Renders clean empty notification (`Belum Ada Rekomendasi` / `No Recommendations Yet`) with informational helper text without disrupting the dashboard structure.
+   - *Populated State*: Displays classification pill badge (`Optimal` in emerald `bg-emerald-500/10 text-emerald-700`, `Peringatan` in amber `bg-amber-500/10 text-amber-800`, `Kritis` in rose `bg-rose-500/10 text-rose-700`), rounded confidence percentage (`Keyakinan {value}%`), bold summary text, diagnostic issue cards, and suggested farmer action items.
+   - *Stale / Offline Notice*: Renders an inline amber warning banner when sensor telemetry is stale or device connection is offline.
+3. **Advisory Safety Disclaimer (Mandatory)**: Every card includes an explicit footer note: `"Rekomendasi bersifat saran agronomi dan tidak mengontrol pompa air secara otomatis."` (`advisoryDisclaimer`), enforcing `DEC-MON-090` / `ENABLE_FAUCET_CONTROL=false` safety guarantees.
+4. **Mobile Layout Clearance**: `/water` page padding is bounded to `pb-24` ensuring complete clearance above fixed mobile navigation bars across all responsive viewports.
 
 ---
 

@@ -578,7 +578,34 @@ Test:
 - Translation key generation.
 - Duplicate acknowledgement handling.
 
-## 10.7 TASK-1001 Monorepo Unit Test Suite Verification (Reconciled 2026-08-21)
+## 10.7 Prediction & Recommendation Units (TASK-0413 Phase D)
+
+Test:
+
+- Protected latest prediction endpoint authorization and caching (`apps/web/test/unit/prediction-latest-route.test.ts`, 15/15 passed).
+- In-memory data polling and race-condition safety (`apps/web/test/unit/use-latest-prediction.test.ts`, 5/5 passed):
+  - Null/undefined device handling (returns null, loading false).
+  - Successful retrieval and state hydration (`prediction`, `isLoading`, `error: null`).
+  - Safe unavailable state handling without artificial data fabrication.
+  - 403 Forbidden handling with localized user-facing message.
+  - Active device switching race condition guard (`activeDeviceIdRef` in-flight request cancellation).
+- Dynamic recommendation card component states (`apps/web/test/unit/recommendation-card.test.tsx`, 7/7 passed):
+  - Loading skeleton state with `aria-busy="true"`.
+  - Empty / unavailable state with guidance text (`noDataTitle`, `noDataDesc`).
+  - Populated optimal state with classification badge, confidence, summary, and reassurance text.
+  - Populated warning state with diagnostic parameter issues and farmer action checklist.
+  - Populated critical state for water domain with multi-parameter issues and recovery actions.
+  - Stale telemetry warning banner (`staleNotice`).
+  - Offline device warning banner (`offlineNotice`).
+  - Mandatory advisory safety disclaimer rendering (`advisoryDisclaimer`).
+- Dashboard UI integration on `/soil` and `/water` (`apps/web/test/unit/soil-telemetry-ui.test.tsx`, 8/8 passed):
+  - Telemetry parameter preservation alongside recommendation card.
+  - Metric meter formatting and unit binding.
+  - Stale data value suppression with placeholder rendering.
+  - Advisory disclaimer presence confirming no automated actuator trigger.
+- Full web workspace regression suite: 83/83 suites, 697/697 tests passing (100%).
+
+## 10.8 TASK-1001 Monorepo Unit Test Suite Verification (Reconciled 2026-08-21)
 
 The complete monorepo unit test suite (`TASK-1001`) was audited, hardened, and verified with 100% test pass rate across all four workspaces:
 - **Test Results:** **102 test files, 958/958 unit tests passed (100%)**.

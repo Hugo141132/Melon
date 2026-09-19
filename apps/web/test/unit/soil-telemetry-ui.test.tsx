@@ -116,6 +116,13 @@ describe('TASK-0502 — Live Soil and Water Monitoring UI Data Binding', () => {
           json: async () => ({ success: true, data: mockSoilSnapshot }),
         });
       }
+      if (url.includes('/predictions/latest')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ success: true, data: null }),
+        });
+      }
       if (url.includes('/history')) {
         return Promise.resolve({
           ok: true,
@@ -192,6 +199,13 @@ describe('TASK-0502 — Live Soil and Water Monitoring UI Data Binding', () => {
           json: async () => ({ success: true, data: staleSoilSnapshot }),
         });
       }
+      if (url.includes('/predictions/latest')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ success: true, data: null }),
+        });
+      }
       if (url.includes('/history')) {
         return Promise.resolve({
           ok: true,
@@ -253,6 +267,13 @@ describe('TASK-0502 — Live Soil and Water Monitoring UI Data Binding', () => {
           json: async () => ({ success: true, data: nullSoilSnapshot }),
         });
       }
+      if (url.includes('/predictions/latest')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ success: true, data: null }),
+        });
+      }
       if (url.includes('/history')) {
         return Promise.resolve({
           ok: true,
@@ -287,6 +308,13 @@ describe('TASK-0502 — Live Soil and Water Monitoring UI Data Binding', () => {
           ok: true,
           status: 200,
           json: async () => ({ success: true, data: mockWaterSnapshot }),
+        });
+      }
+      if (url.includes('/predictions/latest')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ success: true, data: null }),
         });
       }
       if (url.includes('/history')) {
@@ -342,6 +370,13 @@ describe('TASK-0502 — Live Soil and Water Monitoring UI Data Binding', () => {
           json: async () => ({ success: true, data: staleWaterSnapshot }),
         });
       }
+      if (url.includes('/predictions/latest')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ success: true, data: null }),
+        });
+      }
       if (url.includes('/history')) {
         return Promise.resolve({
           ok: true,
@@ -394,5 +429,64 @@ describe('TASK-0502 — Live Soil and Water Monitoring UI Data Binding', () => {
 
     render(<WaterNutrientChart data={[]} />);
     expect(screen.getByText(/Tidak ada data riwayat/i)).toBeInTheDocument();
+  });
+
+  it('8. /soil and /water render dynamic RecommendationCard with live ML prediction data and advisory disclaimer', async () => {
+    const mockLiveSoilPrediction = {
+      id: 'pred-live-soil-1',
+      deviceId: 'soil-node-001',
+      readingId: null,
+      predictedClass: 'optimal',
+      confidence: 0.94,
+      summary: 'Kondisi tanah sangat baik untuk pembungaan.',
+      farmerAction: ['Pertahankan irigasi saat ini'],
+      issues: [],
+      createdAt: '2026-09-18T10:00:00.000Z',
+    };
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/v1/devices') && url.includes('/monitoring/latest')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ success: true, data: mockSoilSnapshot }),
+        });
+      }
+      if (url.includes('/predictions/latest')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ success: true, data: mockLiveSoilPrediction }),
+        });
+      }
+      if (url.includes('/history')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ success: true, data: { series: [] } }),
+        });
+      }
+      return Promise.reject(new Error(`Unknown URL: ${url}`));
+    });
+
+    const { unmount } = render(
+      <DeviceProvider initialDevices={[mockSoilDevice]} initialSelectedDeviceId="soil-node-001">
+        <SoilPage />
+      </DeviceProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Rekomendasi Pemupukan & Tanah')).toBeInTheDocument();
+      expect(screen.getByText('Kondisi tanah sangat baik untuk pembungaan.')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('Pertahankan irigasi saat ini')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Rekomendasi bersifat saran agronomi dan tidak mengontrol pompa air secara otomatis.'
+      )
+    ).toBeInTheDocument();
+
+    unmount();
   });
 });

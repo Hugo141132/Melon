@@ -3431,4 +3431,15 @@ GET /api/v1/devices/{deviceId}/predictions/latest
 - `403 Forbidden`: Authenticated user lacks permission for this device (`DEVICE_NOT_ASSIGNED` / `FORBIDDEN_ROLE`).
 - `404 Not Found`: Device not found in Melon database (`DEVICE_NOT_FOUND`).
 - `500 Internal Server Error`: Unhandled exception (`INTERNAL_ERROR`).
-<!-- Latest Prediction API Reconciled: 2026-09-18 -->
+
+### 4. Client Hook & Dashboard Consumption (TASK-0413 Phase D / Reconciled 2026-09-19)
+- **Primary Client Hook:** `useLatestPrediction(deviceId)` (`apps/web/hooks/useLatestPrediction.ts`).
+- **Polling Cadence:** 30 seconds default (matching backend 30s cache-aside TTL).
+- **In-Flight Cancellation:** Uses `activeDeviceIdRef` to guarantee that delayed responses for previously selected devices are discarded if the user rapidly switches devices in the UI.
+- **Client State Mapping:**
+  - `data: {...}` $\to$ Populates `RecommendationCard` (Optimal, Warning, or Critical states with confidence score, issues, and action checklists).
+  - `data: null` with `meta.status: 'UNAVAILABLE'` $\to$ Renders clean empty guidance state (`Belum Ada Rekomendasi`).
+  - Error responses (401, 403, 404, 500) $\to$ Renders localized operational error state without crashing dashboard views.
+  - Telemetry freshness: Correlated with `isTelemetryStale` / `isOffline` to display an inline warning notice banner.
+- **Actuator Invariant:** Recommendations are strictly advisory and never trigger physical actuators or dispensing commands (`ENABLE_FAUCET_CONTROL=false`).
+<!-- Latest Prediction API Reconciled: 2026-09-19 -->

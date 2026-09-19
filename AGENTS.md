@@ -421,6 +421,29 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
     - Verified zero changes to staging environment or staging database via `supabase-staging` MCP (`water_readings` count = 0).
   - Test & Quality Verification: 100% test pass rate across gateway suites (23/23 files, 338/338 tests passed), web suites (78/78 files, 649/649 tests passed), 0 TypeScript errors across 4 monorepo packages, secrets scanner passed with 0 leaks, and environment validator passed.
 
+#### TASK-0413 Governance Record
+
+`TASK-0413 Phase D` dynamic dashboard recommendation cards record:
+- Status: `DONE` (Completed 2026-09-19)
+- Priority: `P1`
+- Frontend impact: `MINOR`
+- Selected UI direction: `Premium Minimal Ops`
+- Existing color template: `UNCHANGED`
+- Selected motion effects: `Skeleton loading`, `Card hover`, `Healthy status`, `Critical alert`
+- 21st.dev MCP: `NOT REQUIRED`
+- Reason: Small additions using existing components, icons, and design tokens to bind live ML predictions and agronomic recommendations to `/soil` and `/water` dashboards while preserving established page layout and geometry.
+- Summary: Bound dynamic machine-learning recommendations and agronomic advice to the Soil (`/soil`) and Water Quality (`/water`) monitoring views:
+  - Client Data Polling Hook (`apps/web/hooks/useLatestPrediction.ts`): Implemented SWR-like data hook polling `GET /api/v1/devices/[deviceId]/predictions/latest` on a 30s cadence (matching backend cache-aside TTL). Guarded against in-flight race conditions during rapid device switching via `activeDeviceIdRef`. Exposes reactive state (`prediction`, `isLoading`, `isRevalidating`, `isUnavailable`, `error`, `refetch`).
+  - Reusable Recommendation Card (`apps/web/components/monitoring/RecommendationCard.tsx`): Built accessible 4-state visual card component adhering strictly to `Premium Minimal Ops`:
+    1. Loading Skeleton State: Pulsing placeholder (`animate-pulse`) with `aria-busy="true"`.
+    2. Empty / Unavailable State: Clean prompt with sparkle icon and reassurance text (`Belum Ada Rekomendasi`), cleanly handling devices without prediction records without breaking dashboard composition.
+    3. Populated State: Prominently renders title, classification pill badge (`Optimal` emerald, `Peringatan` amber, `Kritis` rose), rounded confidence percentage, bold summary statement, diagnostic parameter issue cards with impact descriptions, and checklist of farmer actions.
+    4. Stale / Offline Notice: Inline warning banner alerting users when telemetry is stale or device is offline.
+  - Advisory Safety Disclaimer: Explicitly renders `advisoryDisclaimer` (`"Rekomendasi bersifat saran agronomi dan tidak mengontrol pompa air secara otomatis."`) at the bottom of every card, strictly enforcing `DEC-MON-090` / `ENABLE_FAUCET_CONTROL=false` physical control safety constraints.
+  - Page Integration & Mobile Clearance: Replaced static hardcoded markup on `/soil` and integrated symmetrically into `/water` with `pb-24` clearance to avoid overlap with mobile navigation bars.
+  - Bilingual Localization: Added `recommendation` namespace to `apps/web/messages/id.json` and `messages/en.json` with 14 keys and 100% key and ICU placeholder parity (`{value}`, `{time}`).
+  - Verification: 20/20 tests passed across dedicated unit test suites (`recommendation-card.test.tsx` 7/7, `use-latest-prediction.test.ts` 5/5, `soil-telemetry-ui.test.tsx` 8/8), full web workspace suite passed (83/83 files, 697/697 tests), and TypeScript typecheck passed with 0 errors across 4 monorepo packages.
+
 #### TASK-1004 Governance & Infrastructure Record
 
 `TASK-1004` staging infrastructure and verification record:

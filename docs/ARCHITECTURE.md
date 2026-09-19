@@ -2087,4 +2087,42 @@ Hardware devices in the external ML database use distinct identifiers, mapped dy
 - **Debounce Delay:** Server-side configurable (`EXTERNAL_ML_DEBOUNCE_MS`, default 1500ms pending confirmed pipeline latency).
 - **MQTT Idempotency & Dedup Guard:** Stale predictions (> 300s) and duplicate prediction IDs are suppressed. Outbound messages contain `predictionId` and stable `messageId` (`rec-${domain}-${prediction.id}`) published with **QoS 1** and **`retain: false`**.
 - **Advisory Safety Lock:** AI recommendations published to `melon/ai-*/rekomendasi-*` are strictly advisory and never actuate physical valves under `ENABLE_FAUCET_CONTROL=false`.
-<!-- External ML Architecture Reconciled: 2026-09-18 -->
+
+### 6. Dynamic Dashboard Frontend Architecture (TASK-0413 Phase D / Reconciled 2026-09-19)
+The web frontend presents live ML predictions and agronomic advice dynamically without altering existing layout geometry or design tokens:
+
+#### Data Flow
+```text
+[External ML Supabase] ──(HTTPS)──> [ExternalPredictionClient] (In-memory 30s cache)
+                                             │
+                                             ▼
+                             [GET /api/v1/devices/[deviceId]/predictions/latest]
+                                             │ (SWR Polling 30s / activeDeviceIdRef guard)
+                                             ▼
+                             [useLatestPrediction Hook (apps/web/hooks)]
+                                             │
+                                             ▼
+                        [RecommendationCard (apps/web/components/monitoring)]
+                                             │
+                       ┌─────────────────────┴─────────────────────┐
+                       ▼                                           ▼
+             [/soil Dashboard Route]                     [/water Dashboard Route]
+```
+
+#### Key Architecture Components & State Lifecycle
+1. **Client Polling Hook (`useLatestPrediction.ts`):**
+   - Implements SWR-like data hydration polling `GET /api/v1/devices/[deviceId]/predictions/latest` at a 30s interval aligning with backend cache TTL.
+   - Preserves race condition immunity: `activeDeviceIdRef` tracks the active device ID, immediately discarding responses from previous in-flight requests when the user switches devices.
+   - Exposes clean reactive contract: `{ prediction, isLoading, isRevalidating, isUnavailable, error, refetch }`.
+2. **Reusable Component Lifecycle (`RecommendationCard.tsx`):**
+   - **Loading Skeleton:** Displays pulsing skeleton placeholders (`animate-pulse`) with `aria-busy="true"`.
+   - **Empty / Unavailable State:** Renders clean guidance text (`Belum Ada Rekomendasi` / `No Recommendations Yet`) with sparkle icon without distorting page structure.
+   - **Populated State:** Displays classification badge (`Optimal` emerald, `Warning` amber, `Critical` rose), rounded confidence score (`Keyakinan {value}%`), summary statement, diagnostic parameter issue cards with impact descriptions, and farmer action checklist.
+   - **Stale / Offline Notice:** Inlines amber alert banner alerting operators when underlying sensor telemetry is stale or hardware is offline.
+3. **Actuator Safety Lock Enforcement:**
+   - Every card explicitly renders the mandatory advisory disclaimer: `"Rekomendasi bersifat saran agronomi dan tidak mengontrol pompa air secara otomatis."` (`advisoryDisclaimer`).
+   - Strictly enforces `DEC-MON-090` / `DEC-CTRL-051` / `ENABLE_FAUCET_CONTROL=false`: under no circumstances do ML recommendations trigger automatic pump or valve actuation.
+4. **Bilingual Support & Mobile Clearance:**
+   - Integrated with `next-intl` under the `recommendation` namespace with 14 keys and 100% parity across `id` and `en`.
+   - Symmetrically embedded on `/soil` and `/water` with `pb-24` clearance to avoid clipping or occlusion by mobile navigation bars.
+<!-- External ML Architecture Reconciled: 2026-09-19 -->

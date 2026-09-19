@@ -6,6 +6,8 @@ import HistoricalChartControls from '@/components/charts/HistoricalChartControls
 import { useDeviceContext } from '@/context/DeviceContext';
 import { useLatestMonitoring } from '@/hooks/useLatestMonitoring';
 import { useHistoricalMonitoring } from '@/hooks/useHistoricalMonitoring';
+import { useLatestPrediction } from '@/hooks/useLatestPrediction';
+import RecommendationCard from '@/components/monitoring/RecommendationCard';
 import { CheckCircle, TrendingUp, Cpu, Clock, AlertTriangle } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
@@ -134,6 +136,12 @@ export default function WaterPage() {
   const isTelemetryStale = Boolean(
     isStale || snapshot?.water?.isStale || snapshot?.connectionStatus === 'STALE'
   );
+  const isOffline =
+    selectedDevice?.connectionStatus === 'OFFLINE' ||
+    snapshot?.connectionStatus === 'OFFLINE' ||
+    false;
+
+  const { prediction, isLoading: isPredictionLoading } = useLatestPrediction(activeDeviceId);
 
   const phVal = !isTelemetryStale ? (waterData?.ph ?? null) : null;
   const tdsVal = !isTelemetryStale ? (waterData?.tds ?? null) : null;
@@ -144,7 +152,7 @@ export default function WaterPage() {
   const statusLabel = waterData?.status || tCommon('optimal');
 
   return (
-    <div className="bg-app-surface text-app-on-surface min-h-dvh pb-10">
+    <div className="bg-app-surface text-app-on-surface min-h-dvh pb-24">
       <TopAppBar showDeviceSelector={true} />
 
       <main className="pt-20 px-[1rem] max-w-4xl mx-auto space-y-5">
@@ -301,6 +309,15 @@ export default function WaterPage() {
                 error={historyError}
               />
             </div>
+
+            {/* Recommendation */}
+            <RecommendationCard
+              domain="water"
+              prediction={prediction}
+              isLoading={isPredictionLoading}
+              isStale={isTelemetryStale}
+              isOffline={isOffline}
+            />
           </>
         )}
       </main>

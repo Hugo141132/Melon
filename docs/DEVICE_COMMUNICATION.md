@@ -2625,4 +2625,11 @@ This section defines the outbound MQTT recommendation publishing pipeline for di
 ### 4. Actuator Safety Invariant
 - Outbound AI recommendations are **strictly informational and advisory**.
 - Under `ENABLE_FAUCET_CONTROL=false`, receiving an alert or critical classification shall **never** trigger automatic faucet actuation, valve opening/closing, or dispensing commands (`DEC-CTRL-051`, `DEC-CTRL-067`).
-<!-- Outbound AI Recommendation MQTT Pipeline Reconciled: 2026-09-18 -->
+
+### 5. Multi-Channel Dissemination & Dashboard Presentation (TASK-0413 Phase D / Reconciled 2026-09-19)
+Agronomic recommendations produced by the external ML pipeline are disseminated concurrently across two complementary channels:
+1. **Field Hardware Channel (MQTT):** Outbound payloads published to `melon/ai-tanah/rekomendasi-*` and `melon/ai-air/rekomendasi-*` over EMQX with **QoS 1** and **`retain: false`** for local microcontroller display/receipt.
+2. **Operator Dashboard Channel (Web UI):** Consumed via `GET /api/v1/devices/[deviceId]/predictions/latest` by the `useLatestPrediction` hook and rendered on `/soil` and `/water` using `RecommendationCard`.
+   - **Visual States:** Loading skeleton (`aria-busy="true"`), Empty (`Belum Ada Rekomendasi`), Populated (with classification pill badges and action checklists), and Stale/Offline notice banner.
+   - **Safety Guard:** Both channels strictly obey `DEC-MON-090` / `DEC-CTRL-051` (`ENABLE_FAUCET_CONTROL=false`). Recommendations are purely advisory and cannot trigger automatic pump, valve, or dispensing operations.
+<!-- Outbound AI Recommendation MQTT Pipeline Reconciled: 2026-09-19 -->

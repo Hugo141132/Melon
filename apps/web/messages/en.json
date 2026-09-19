@@ -821,5 +821,22 @@
     "chartLabel": "Telemetry chart for {metric}",
     "loadingSpinner": "Loading data",
     "backToRole": "Back to role selection"
+  },
+  "recommendation": {
+    "titleSoil": "Soil & Fertilization Recommendation",
+    "titleWater": "Water Quality Recommendation",
+    "optimal": "Optimal",
+    "warning": "Warning",
+    "critical": "Critical",
+    "confidence": "Confidence {value}%",
+    "issuesTitle": "Detected Issues",
+    "actionsTitle": "Suggested Actions",
+    "optimalStatusDesc": "All parameters are within ideal limits. Maintain current care pattern.",
+    "noDataTitle": "No Recommendations Yet",
+    "noDataDesc": "Recommendations will be generated automatically once telemetry is analyzed by the prediction model.",
+    "staleNotice": "Telemetry data is stale — recommendation is based on earlier data.",
+    "offlineNotice": "Device is offline — recommendation reflects last known data.",
+    "advisoryDisclaimer": "Recommendations are agronomic advice and do not automatically control water pumps.",
+    "lastUpdated": "Updated {time}"
   }
 }

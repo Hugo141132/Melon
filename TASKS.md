@@ -1775,9 +1775,12 @@ Metrics:
 ## TASK-0413 — Integrate External Supabase ML Predictions & Outbound Recommendations
 
 **Priority:** `P1`
-**Status:** `IN_PROGRESS`
+**Status:** `DONE`
 **Dependencies:** `TASK-0405`, `TASK-0406`, `TASK-0411`, `TASK-0412`, `DEC-MON-090`
 **Phase A Completed:** 2026-09-18 — Canonical contracts defined, `ExternalPredictionClient` implemented in `@kebun-melon/database`, server-side environment variables configured, and live external Supabase schema verified.
+**Phase B Completed:** 2026-09-18 — Protected prediction endpoint `GET /api/v1/devices/[deviceId]/predictions/latest` implemented with RBAC verification and external ID masking.
+**Phase C Completed:** 2026-09-18 — Outbound recommendation dispatch integrated in `SoilWaterMqttAdapter` with dynamic mapping, debounce, deduplication, and EMQX publishing.
+**Phase D Completed:** 2026-09-19 — Dynamic dashboard recommendation cards bound to `/soil` and `/water` with `useLatestPrediction` hook, 4 card states, advisory disclaimer, and bilingual support.
 
 ### Background & Objective
 
@@ -1890,11 +1893,31 @@ This task integrates an external prediction adapter into the Melon application t
      - [x] Preserve physical safety invariant: recommendations are strictly advisory; faucet control remains locked (`ENABLE_FAUCET_CONTROL=false`).
      - [x] Add 10 focused unit tests in `apps/iot-gateway/src/__tests__/soil-water-adapter.test.ts` (37/37 tests passed).
      - [x] Verify live end-to-end telemetry ingestion and outbound recommendation dispatch against EMQX Cloud broker for both soil and water quality domains.
-   - **Phase D — Dynamic Dashboard Recommendation Cards (`apps/web`):** `PENDING`
-     - [ ] Bind live prediction data to existing recommendation cards on `/soil` and `/water`.
-     - [ ] Preserve established visual design, typography, layout geometry, and color tokens (`DEC-UIUX-101`, `Premium Minimal Ops`).
-     - [ ] Provide empty, loading, populated, and offline states.
-     - [ ] Add unit test coverage for UI data binding.
+   - **Phase D — Dynamic Dashboard Recommendation Cards (`apps/web`):** `DONE` (Completed 2026-09-19)
+     - [x] Bind live prediction data to recommendation cards on `/soil` and `/water`.
+     - [x] Preserve established visual design, typography, layout geometry, and color tokens (`DEC-UIUX-101`, `Premium Minimal Ops`).
+     - [x] Provide empty, loading, populated, and offline states with graceful fallbacks.
+     - [x] Implement client-side polling hook `useLatestPrediction` with 30s cadence and `activeDeviceIdRef` in-flight race-condition protection.
+     - [x] Enforce advisory-only physical safety disclaimer on every card (`DEC-MON-090`, `ENABLE_FAUCET_CONTROL=false`).
+     - [x] Implement bilingual support in `apps/web/messages/id.json` and `messages/en.json` (`recommendation` namespace with 14 keys, 100% parity).
+     - [x] Provide `pb-24` mobile navigation bar clearance on `/water`.
+     - [x] Add 20 unit tests across `use-latest-prediction.test.ts` (5/5), `recommendation-card.test.tsx` (7/7), and `soil-telemetry-ui.test.tsx` (8/8).
+     - [x] Verify full web suite pass rate (83/83 test files, 697/697 tests passed) and zero TypeScript errors across 4 workspaces.
+     - **Changed Files:**
+       - `apps/web/hooks/useLatestPrediction.ts` (NEW: polling hook with race-condition guard)
+       - `apps/web/components/monitoring/RecommendationCard.tsx` (NEW: 4-state reusable UI card)
+       - `apps/web/app/soil/page.tsx` (MODIFIED: integrated RecommendationCard for soil domain)
+       - `apps/web/app/water/page.tsx` (MODIFIED: integrated RecommendationCard for water domain with pb-24)
+       - `apps/web/messages/id.json` (MODIFIED: 14 Indonesian recommendation keys)
+       - `apps/web/messages/en.json` (MODIFIED: 14 English recommendation keys, 100% parity)
+       - `apps/web/test/unit/use-latest-prediction.test.ts` (NEW: 5 hook unit tests)
+       - `apps/web/test/unit/recommendation-card.test.tsx` (NEW: 7 card unit tests)
+       - `apps/web/test/unit/soil-telemetry-ui.test.tsx` (MODIFIED: updated mock routing and added integration test)
+     - **Verification Evidence:**
+       - *Focused Unit Tests (PASSED):* 20/20 passed (100%) across `recommendation-card.test.tsx`, `use-latest-prediction.test.ts`, `soil-telemetry-ui.test.tsx`.
+       - *Full Web Workspace Suite (PASSED):* 83/83 test files passed, 697/697 tests passed (100%).
+       - *Static Typecheck (PASSED):* `npm run typecheck` passed with 0 errors across 4 workspaces (`contracts`, `database`, `iot-gateway`, `web`).
+       - *Visual & State Verification:* Verified loading skeleton (`aria-busy="true"`), empty state (`Belum Ada Rekomendasi`), populated states (Optimal emerald, Warning amber, Critical rose), stale/offline warning banner, and advisory safety disclaimer.
 
 ### Acceptance Criteria
 
@@ -1902,12 +1925,12 @@ This task integrates an external prediction adapter into the Melon application t
 - [x] `soil_predictions` and `water_predictions` schema verified against external Supabase project.
 - [x] Raw telemetry tables (`soil_readings`, `water_readings`, `reservoir_water_readings`) remain untouched.
 - [x] No local `ai_predictions` or local model inference DDL is created (dynamic mapping cleanly separated in `device_external_mappings`).
-- [x] Unit test pass rate remains 100% (95/95 passed across all related suites) and TypeScript typecheck passes with 0 errors across 4 workspaces.
+- [x] Unit test pass rate remains 100% (83/83 suites, 697/697 web tests passed) and TypeScript typecheck passes with 0 errors across 4 workspaces.
 - [x] Zero changes to staging environment or staging database.
 - [x] Latest prediction is served via `GET /api/v1/devices/[deviceId]/predictions/latest` with RBAC verification (Phase B).
 - [x] Outbound recommendations are published to `melon/ai-*/rekomendasi-*` with QoS 1 and hybrid payload structure (Phase C).
 - [x] Live end-to-end MQTT delivery verified against EMQX Cloud broker for soil and water quality domains.
-- [ ] Dashboard recommendation cards display live predictions while strictly preserving established UI layout and color tokens (Phase D).
+- [x] Dashboard recommendation cards display live predictions while strictly preserving established UI layout and color tokens (Phase D).
 - [x] AI recommendations strictly obey physical control safety lock (`ENABLE_FAUCET_CONTROL=false`).
 
 ---

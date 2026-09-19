@@ -821,5 +821,22 @@
     "chartLabel": "Grafik telemetri untuk {metric}",
     "loadingSpinner": "Memuat data",
     "backToRole": "Kembali ke pilih peran"
+  },
+  "recommendation": {
+    "titleSoil": "Rekomendasi Pemupukan & Tanah",
+    "titleWater": "Rekomendasi Kualitas Air",
+    "optimal": "Optimal",
+    "warning": "Peringatan",
+    "critical": "Kritis",
+    "confidence": "Keyakinan {value}%",
+    "issuesTitle": "Masalah Terdeteksi",
+    "actionsTitle": "Tindakan yang Disarankan",
+    "optimalStatusDesc": "Semua parameter dalam batas ideal. Pertahankan pola perawatan saat ini.",
+    "noDataTitle": "Belum Ada Rekomendasi",
+    "noDataDesc": "Rekomendasi akan dibuat otomatis setelah telemetri dianalisis model prediksi.",
+    "staleNotice": "Data telemetri kedaluwarsa — rekomendasi berdasarkan data sebelumnya.",
+    "offlineNotice": "Perangkat offline — rekomendasi mencerminkan data terakhir.",
+    "advisoryDisclaimer": "Rekomendasi bersifat saran agronomi dan tidak mengontrol pompa air secara otomatis.",
+    "lastUpdated": "Diperbarui {time}"
   }
 }
