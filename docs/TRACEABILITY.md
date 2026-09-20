@@ -679,3 +679,29 @@ The following facts are verified in the traceability matrix regarding `TASK-0414
   - Software ingestion pipeline, database persistence, and UI display are 100% verified and operational.
   - Physical ESP32 telemetry remains pending hardware team firmware source code (`.ino`) and serial runtime log inspection (`PENDING_HARDWARE_FIRMWARE_LOGS`).
 <!-- TASK-0414 Traceability Reconciled: 2026-09-19 -->
+
+---
+
+## Resend Verified Custom Sending Domain Configuration Traceability Note (Reconciled 2026-09-20)
+
+The following facts are verified in the traceability matrix regarding the Resend Verified Custom Sending Domain configuration:
+- **Traceability Baseline:** Governed by `DEC-AUTH-102`, `DEC-AUTH-104`, `DEC-AUTH-106`, `SEC-AUTH-006`, `docs/SECURITY.md` §7.6–7.8, `docs/ARCHITECTURE.md` §23.4, and `TASKS.md` (`TASK-0213`, `TASK-0214`, `TASK-1011`).
+- **Standardized Sender Identity:**
+  - Standardized canonical sender address to `Melon Madura <noreply@melonmadura.my.id>`, replacing hardcoded test defaults (`onboarding@resend.dev`) across all transactional notification endpoints.
+  - Exported canonical constant `DEFAULT_RESEND_FROM_EMAIL = 'Melon Madura <noreply@melonmadura.my.id>'` in `apps/web/lib/email/resend.ts`.
+  - Updated `serverEnvSchema` in `apps/web/lib/env/server.ts` to default `RESEND_FROM_EMAIL` to the custom domain.
+  - Preserved strict production validation in `validateServerEnv()` immediately throwing an error if `onboarding@resend.dev` is configured in production with `RESEND_API_KEY`.
+- **Verification Evidence:**
+  - **Email Service Unit Tests:** 12/12 passed (`apps/web/test/unit/resend-email.test.ts`).
+  - **Server Environment Guard Tests:** 14/14 passed (`apps/web/test/unit/server-env.test.ts`).
+  - **Email Verification Route Tests:** 9/9 passed (`apps/web/test/unit/verify-email-routes.test.ts`).
+  - **Password Recovery Route Tests:** 6/6 passed (`apps/web/test/unit/forgot-password-route.test.ts`).
+  - **Environment Validation:** `npm run env:check` PASSED.
+  - **Monorepo TypeScript Typecheck:** `npm run typecheck` PASSED with 0 errors across all 4 workspaces.
+  - **Translation Completeness:** `npm run i18n:check` PASSED with 100% key parity.
+- **Strict Constraint Invariants:**
+  - Zero modifications to staging environment (`.env.staging` preserved intact).
+  - Zero database schema modifications or migrations executed.
+  - Zero automated server deployments or git commits executed.
+<!-- Resend Custom Domain Traceability Reconciled: 2026-09-20 -->
+

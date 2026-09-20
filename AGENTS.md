@@ -952,6 +952,17 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
 - 21st.dev MCP: `NOT REQUIRED`
 - Summary: Completed and verified the production domain and DNS infrastructure preparation prerequisite for TASK-1011. Configured dedicated production subdomain `monitoring.melonmadura.my.id` on JagoanHosting cPanel Zone Editor as an `A` record pointing to JagoanHosting Nebula VPS (`38.103.171.46`) with optimal TTL of 300s. Verified 100% authoritative resolution via `one.jagoanhosting.com` and global propagation across major recursive resolvers (Cloudflare `1.1.1.1`, Google `8.8.8.8`, Quad9 `9.9.9.9`, and local workstation). Confirmed that root apex domain `melonmadura.my.id` and `www` CNAME remain 100% unchanged and isolated on shared hosting IP `101.50.1.84`. Verified host network reachability via TCP port 22 (`TcpTestSucceeded: True`) without logging in or exposing secrets. Zero code modifications, zero staging modifications, zero git commits, and zero automatic VPS deployments executed. Satisfies the "Production Domain & DNS Provisioning" dependency of TASK-1011 while retaining TASK-1011 in `BACKLOG` for future server setup.
 
+#### Resend Custom Sending Domain Configuration Governance Record (Reconciled 2026-09-20)
+
+`Resend Custom Sending Domain` configuration and validation record:
+- Status: `DONE` (Implemented & Verified 2026-09-20; Live Mailbox Deliverability / DNS Verification Reserved for Operator)
+- Frontend impact: `NONE`
+- Selected UI direction: `N/A`
+- Existing color template: `UNCHANGED`
+- Selected motion effects: `None`
+- 21st.dev MCP: `NOT REQUIRED`
+- Summary: Configured and standardized the transactional email sender to use the verified custom sending domain `Melon Madura <noreply@melonmadura.my.id>` instead of the default Resend test sender (`onboarding@resend.dev`), satisfying `DEC-AUTH-102` and preparation for unrestricted recipient email delivery. Centralized the default sender constant in `apps/web/lib/email/resend.ts` via `export const DEFAULT_RESEND_FROM_EMAIL = 'Melon Madura <noreply@melonmadura.my.id>'`, replacing 6 duplicate hardcoded fallbacks across all transactional notification functions (`sendPasswordResetEmail`, `sendVerificationEmail`, `sendEmailChangeVerificationEmail`, `sendAccountSuspensionEmail`, `sendAccountDeletionEmail`, `sendAccountReactivationEmail`). Updated `serverEnvSchema` in `apps/web/lib/env/server.ts` to default `RESEND_FROM_EMAIL` to `'Melon Madura <noreply@melonmadura.my.id>'`, while strictly preserving the existing production guard that rejects `onboarding@resend.dev` in production. Updated example configuration `apps/web/.env.example` and active development environment files (`.env`, `apps/web/.env`). Added unit tests asserting default custom domain sender fallback and server environment defaults. Executed targeted Vitest suites (41/41 passed), `npm run env:check` (PASSED), `npm run typecheck` (0 errors across 4 workspaces), and `npm run i18n:check` (100% parity). Preserved all constraints: zero git commits, zero staging modifications, zero database migrations, zero deployments.
+
 ---
 
 

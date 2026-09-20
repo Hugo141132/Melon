@@ -9,6 +9,8 @@ import {
 
 const logger = new Logger({ serviceName: 'web:email' });
 
+export const DEFAULT_RESEND_FROM_EMAIL = 'Melon Madura <noreply@melonmadura.my.id>';
+
 export interface SendPasswordResetEmailInput {
   toEmail: string;
   recipientName?: string;
@@ -233,7 +235,7 @@ export async function sendPasswordResetEmail(
 
   const apiKey = env.RESEND_API_KEY || process.env.RESEND_API_KEY;
   const fromEmail =
-    env.RESEND_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || 'Kebun Melon <onboarding@resend.dev>';
+    env.RESEND_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || DEFAULT_RESEND_FROM_EMAIL;
 
   // In test environment or when API key is unconfigured in development, simulate safely
   if (!apiKey || env.NODE_ENV === 'test' || process.env.NODE_ENV === 'test') {
@@ -403,7 +405,7 @@ export async function sendVerificationEmail(
 
   const apiKey = env.RESEND_API_KEY || process.env.RESEND_API_KEY;
   const fromEmail =
-    env.RESEND_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || 'Kebun Melon <onboarding@resend.dev>';
+    env.RESEND_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || DEFAULT_RESEND_FROM_EMAIL;
 
   // In test environment or when API key is unconfigured in development, simulate safely
   if (!apiKey || env.NODE_ENV === 'test' || process.env.NODE_ENV === 'test') {
@@ -573,7 +575,7 @@ export async function sendEmailChangeVerificationEmail(
 
   const apiKey = env.RESEND_API_KEY || process.env.RESEND_API_KEY;
   const fromEmail =
-    env.RESEND_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || 'Kebun Melon <onboarding@resend.dev>';
+    env.RESEND_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || DEFAULT_RESEND_FROM_EMAIL;
 
   // In test environment or when API key is unconfigured in development, simulate safely
   if (!apiKey || env.NODE_ENV === 'test' || process.env.NODE_ENV === 'test') {
@@ -879,7 +881,7 @@ export async function sendAccountSuspensionEmail(
 
   const apiKey = env.RESEND_API_KEY || process.env.RESEND_API_KEY;
   const fromEmail =
-    env.RESEND_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || 'Kebun Melon <onboarding@resend.dev>';
+    env.RESEND_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || DEFAULT_RESEND_FROM_EMAIL;
 
   if (!apiKey || env.NODE_ENV === 'test' || process.env.NODE_ENV === 'test') {
     reqLogger.info('Simulated account suspension email delivery to ' + input.toEmail);
@@ -954,7 +956,7 @@ export async function sendAccountDeletionEmail(
 
   const apiKey = env.RESEND_API_KEY || process.env.RESEND_API_KEY;
   const fromEmail =
-    env.RESEND_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || 'Kebun Melon <onboarding@resend.dev>';
+    env.RESEND_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || DEFAULT_RESEND_FROM_EMAIL;
 
   if (!apiKey || env.NODE_ENV === 'test' || process.env.NODE_ENV === 'test') {
     reqLogger.info('Simulated account deletion email delivery to ' + input.toEmail);
@@ -1136,7 +1138,7 @@ export async function sendAccountReactivationEmail(
 
   const apiKey = env.RESEND_API_KEY || process.env.RESEND_API_KEY;
   const fromEmail =
-    env.RESEND_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || 'Kebun Melon <onboarding@resend.dev>';
+    env.RESEND_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || DEFAULT_RESEND_FROM_EMAIL;
 
   if (!apiKey || env.NODE_ENV === 'test' || process.env.NODE_ENV === 'test') {
     reqLogger.info('Simulated account reactivation email delivery to ' + input.toEmail);

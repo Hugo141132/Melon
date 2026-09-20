@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { buildTrustedResetUrl, sendPasswordResetEmail } from '../../lib/email/resend';
+import {
+  buildTrustedResetUrl,
+  sendPasswordResetEmail,
+  DEFAULT_RESEND_FROM_EMAIL,
+} from '../../lib/email/resend';
 import { Resend } from 'resend';
 
 vi.mock('resend');
@@ -88,6 +92,38 @@ describe('TASK-0213 Resend Email Service Unit Tests', () => {
         from: 'Kebun Melon <noreply@kebunmelon.id>',
         to: ['farmer@example.com'],
         subject: 'Atur Ulang Kata Sandi — Kebun Melon',
+      })
+    );
+  });
+
+  it('dispatches email using DEFAULT_RESEND_FROM_EMAIL when RESEND_FROM_EMAIL is unconfigured in development', async () => {
+    process.env.RESEND_API_KEY = 're_test_key_12345';
+    delete process.env.RESEND_FROM_EMAIL;
+    (process.env as Record<string, string | undefined>).NODE_ENV = 'development';
+
+    expect(DEFAULT_RESEND_FROM_EMAIL).toBe('Melon Madura <noreply@melonmadura.my.id>');
+
+    const sendMock = vi.fn().mockResolvedValue({
+      data: { id: 'email_msg_default_from' },
+      error: null,
+    });
+
+    (Resend as unknown as any).mockImplementation(function (this: any) {
+      this.emails = { send: sendMock };
+    });
+
+    const result = await sendPasswordResetEmail({
+      toEmail: 'farmer@example.com',
+      recipientName: 'Pak Wahyu',
+      rawToken: 'secure-token-default-from',
+      locale: 'id',
+    });
+
+    expect(result.success).toBe(true);
+    expect(sendMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        from: 'Melon Madura <noreply@melonmadura.my.id>',
+        to: ['farmer@example.com'],
       })
     );
   });

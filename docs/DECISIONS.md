@@ -138,6 +138,7 @@
      - Environment variables remain available for operational configuration with these approved values as defaults.
   6. **Single-Use, Invalidation & Session Revocation**: When a token is created, any prior unused tokens for the user are invalidated. Once consumed, the token is marked `used_at = NOW()` and cannot be replayed. Successful password reset transactionally revokes all active user sessions across devices per `TASK-0908`.
   7. **Account Status Policy**: Password recovery is permitted for any existing user account with an email. Password reset MUST NEVER activate, approve, or alter the `accountStatus` of an account (e.g. `PENDING_APPROVAL` or `SUSPENDED` accounts remain unchanged). Normal login status checks continue to enforce system access control.
+  8. **Verified Custom Sending Domain (Reconciled 2026-09-20)**: Formally standardized the verified sender address `Melon Madura <noreply@melonmadura.my.id>` as the canonical default across all transactional notification routines (`DEFAULT_RESEND_FROM_EMAIL` in `apps/web/lib/email/resend.ts` and `serverEnvSchema` in `apps/web/lib/env/server.ts`), replacing the development onboarding default (`onboarding@resend.dev`) and preparing the application for live, unrestricted external email delivery. Strict production validation continues to reject unverified test senders (`onboarding@resend.dev`) in production.
 
 ---
 

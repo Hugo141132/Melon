@@ -854,6 +854,11 @@ Implemented complete Owner User Management:
 - Added bilingual translation keys to `messages/id.json` and `messages/en.json` (100% key and ICU placeholder parity verified via `npm run i18n:check`).
 - Added comprehensive unit test coverage across contracts, database, email service, API routes, UI components, and server guest guard (67/67 tests passed 100%).
 - Verified responsive layout and zero console errors via Playwright browser testing across desktop and mobile viewports.
+- **Resend Verified Custom Sending Domain Configuration (Reconciled 2026-09-20):**
+  - Configured and standardized transactional email sender to verified custom domain `Melon Madura <noreply@melonmadura.my.id>` across `apps/web/lib/email/resend.ts`, `apps/web/lib/env/server.ts`, `apps/web/.env.example`, and local environments (`.env`, `apps/web/.env`).
+  - Exported canonical constant `DEFAULT_RESEND_FROM_EMAIL = 'Melon Madura <noreply@melonmadura.my.id>'` in `resend.ts`, eliminating duplicate hardcoded `'Kebun Melon <onboarding@resend.dev>'` fallbacks across all transactional email dispatch routines (`sendPasswordResetEmail`, `sendVerificationEmail`, `sendEmailChangeVerificationEmail`, `sendAccountSuspensionEmail`, `sendAccountDeletionEmail`, `sendAccountReactivationEmail`).
+  - Preserved strict production validation in `validateServerEnv()` rejecting any unverified default sender (`onboarding@resend.dev`).
+  - Added unit test coverage in `resend-email.test.ts` and `server-env.test.ts` (100% pass rate, 41/41 tests across email/auth suites).
 
 ### Acceptance Criteria
 
@@ -865,6 +870,7 @@ Implemented complete Owner User Management:
 - [x] Password recovery is available for any existing account with an email, while password reset strictly preserves `accountStatus` (never auto-approves pending accounts).
 - [x] Successful password reset transactionally revokes all active login sessions across devices (`TASK-0908`).
 - [x] Email dispatch via Resend is explicitly awaited and handles failure gracefully.
+- [x] Verified Resend custom sending domain (`Melon Madura <noreply@melonmadura.my.id>`) configured in web email service and server environment schema with strict production rejection of unverified test domains.
 - [x] Both Indonesian and English locales supported with 100% translation key parity.
 - [x] Server-side guest route guards (`DEC-AUTH-103`) eliminate UI page flash on auth routes for active sessions.
 - [x] `/forgot-password` UX includes clean input, neutral placeholder, 15:00 countdown timer, `sessionStorage` cooldown persistence, and 5s auto-dismiss toast.
@@ -3497,6 +3503,7 @@ Prepare, harden, and automate the production deployment environment on a dedicat
 ### Acceptance Criteria
 
 - [x] Production subdomain `monitoring.melonmadura.my.id` provisioned in DNS and verified pointing to Nebula VPS (`38.103.171.46`) with 100% isolation of root shared hosting domain (`melonmadura.my.id` on `101.50.1.84`).
+- [x] Verified Resend custom sending domain (`Melon Madura <noreply@melonmadura.my.id>`) prepared in application configuration for production deployment, with strict validation blocking unverified test senders.
 - [ ] VPS provisioned, SSH hardened (no root/password auth), and UFW firewall active (only 22, 80, 443 open).
 - [ ] Multi-stage Dockerfiles build clean, unprivileged production images for `@kebun-melon/web` and `@kebun-melon/iot-gateway`.
 - [ ] Docker Compose orchestrates web, gateway, and reverse proxy with health checks and restart policies.

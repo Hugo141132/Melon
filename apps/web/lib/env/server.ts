@@ -50,7 +50,7 @@ export const serverEnvSchema = z.object({
     .preprocess((val) => (val ? parseInt(String(val), 10) : 60000), z.number().int().min(1000))
     .default(60000),
   RESEND_API_KEY: z.string().optional(),
-  RESEND_FROM_EMAIL: z.string().optional().default('Kebun Melon <onboarding@resend.dev>'),
+  RESEND_FROM_EMAIL: z.string().optional().default('Melon Madura <noreply@melonmadura.my.id>'),
   APP_URL: z.string().url().optional(),
   AUTH_RESET_TOKEN_EXPIRY_MINUTES: z
     .preprocess((val) => (val ? parseInt(String(val), 10) : 15), z.number().int().min(1))

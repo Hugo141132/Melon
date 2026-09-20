@@ -150,5 +150,14 @@ describe('Web Server Environment Guard', () => {
       expect(config.APP_URL).toBe('https://melon.example.com');
       expect(config.RESEND_FROM_EMAIL).toBe('Kebun Melon <notifications@app.kebunmelon.id>');
     });
+
+    it('defaults RESEND_FROM_EMAIL to custom verified domain when omitted in non-production', () => {
+      const config = validateServerEnv({
+        NODE_ENV: 'development',
+        APP_ENV: 'development',
+      });
+
+      expect(config.RESEND_FROM_EMAIL).toBe('Melon Madura <noreply@melonmadura.my.id>');
+    });
   });
 });

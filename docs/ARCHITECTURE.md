@@ -2178,5 +2178,17 @@ The production environment implements strict separation between existing shared 
 - DNS resolution operates strictly at Layer 3/4 and is decoupled from application container lifecycle.
 - Pre-provisioning the A record satisfies the Let's Encrypt / ACME HTTP-01 automated certificate issuance challenge required during reverse proxy setup in [TASK-1011](file:///c:/Users/Puroh/Documents/Melon/TASKS.md#L3420).
 - Visiting the subdomain prior to reverse proxy deployment returns standard TCP connection refused, as expected until container orchestration is launched.
-<!-- Production DNS Architecture Reconciled: 2026-09-20 -->
+
+### 4. Transactional Email Sending Domain Architecture & DNS Delegation (DEC-AUTH-102 / Reconciled 2026-09-20)
+
+- **Canonical Sender Address:** Transactional notification dispatch (`@kebun-melon/web`) standardizes on `Melon Madura <noreply@melonmadura.my.id>`, governed by `DEFAULT_RESEND_FROM_EMAIL`.
+- **Decoupled Mail Routing:**
+  - Inbound and existing corporate mail remains routed to JagoanHosting shared hosting via primary MX records.
+  - Outbound transactional dispatch is delegated to Resend REST API (over HTTPS port 443) authenticated via `RESEND_API_KEY`.
+- **DNS Delegation in cPanel Zone Editor (`melonmadura.my.id`):**
+  - **DKIM Authentication:** Two distinct `CNAME` records (`resend._domainkey` and `resend2._domainkey` pointing to Resend cluster servers) provide cryptographic signature verification and domain alignment.
+  - **SPF / Return-Path:** Dedicated return-path subdomain configuration enables SPF validation without conflicting with apex SPF/cPanel mail servers.
+  - **DMARC Alignment:** `TXT` record at `_dmarc.melonmadura.my.id` (`v=DMARC1; p=none;`) establishes delivery policy and reporting.
+- **Fail-Closed Production Guard:** In strict production, `validateServerEnv()` immediately rejects any fallback to `onboarding@resend.dev`, ensuring that transactional emails are never dispatched with test sender credentials in live deployment.
+<!-- Production DNS & Email Sending Architecture Reconciled: 2026-09-20 -->
 
