@@ -46,6 +46,7 @@ export async function POST(request: Request) {
     if (user && !user.emailVerifiedAt) {
       const tokenResult = await userRepository.createEmailVerificationToken({
         userId: user.id,
+        expiryMinutes: env.AUTH_VERIFY_TOKEN_EXPIRY_MINUTES,
         requestId,
         ipAddress,
         userAgent,

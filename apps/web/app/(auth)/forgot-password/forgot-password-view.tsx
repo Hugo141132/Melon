@@ -9,7 +9,7 @@ import { useTranslations } from 'next-intl';
 
 const STORAGE_KEY = 'kebun_melon_pw_reset_cooldown_until';
 const STORAGE_KEY_EMAIL = 'kebun_melon_pw_reset_email';
-const RESET_TOKEN_LIFETIME_SECONDS = 15 * 60; // 15:00 matching approved reset-token lifetime
+const RESET_TOKEN_LIFETIME_SECONDS = 60; // 1:00 (60s) resend cooldown and reset window (TASK-0218)
 
 function formatTime(totalSeconds: number): string {
   const m = Math.floor(totalSeconds / 60);

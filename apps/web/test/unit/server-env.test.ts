@@ -159,5 +159,27 @@ describe('Web Server Environment Guard', () => {
 
       expect(config.RESEND_FROM_EMAIL).toBe('Melon Madura <noreply@melonmadura.my.id>');
     });
+
+    it('defaults AUTH_RESET_TOKEN_EXPIRY_MINUTES and AUTH_VERIFY_TOKEN_EXPIRY_MINUTES to 1 (TASK-0218)', () => {
+      const config = validateServerEnv({
+        NODE_ENV: 'development',
+        APP_ENV: 'development',
+      });
+
+      expect(config.AUTH_RESET_TOKEN_EXPIRY_MINUTES).toBe(1);
+      expect(config.AUTH_VERIFY_TOKEN_EXPIRY_MINUTES).toBe(1);
+    });
+
+    it('respects configured AUTH_RESET_TOKEN_EXPIRY_MINUTES and AUTH_VERIFY_TOKEN_EXPIRY_MINUTES', () => {
+      const config = validateServerEnv({
+        NODE_ENV: 'development',
+        APP_ENV: 'development',
+        AUTH_RESET_TOKEN_EXPIRY_MINUTES: '5',
+        AUTH_VERIFY_TOKEN_EXPIRY_MINUTES: '3',
+      });
+
+      expect(config.AUTH_RESET_TOKEN_EXPIRY_MINUTES).toBe(5);
+      expect(config.AUTH_VERIFY_TOKEN_EXPIRY_MINUTES).toBe(3);
+    });
   });
 });

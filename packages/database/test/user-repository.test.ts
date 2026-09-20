@@ -607,7 +607,7 @@ describe('UserRepository Unit Tests', () => {
         }
       });
 
-      it('createEmailVerificationToken generates 6-digit numeric code with 15-minute expiry', async () => {
+      it('createEmailVerificationToken generates 6-digit numeric code with 1-minute expiry', async () => {
         const dummyUser = {
           id: '550e8400-e29b-41d4-a716-446655440000',
           fullName: 'Test Code User',
@@ -623,10 +623,10 @@ describe('UserRepository Unit Tests', () => {
           userRoles: [],
         };
 
-        const mockTx = {
+        const mockTx: any = {
           emailVerificationToken: {
             deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
-            create: vi.fn().mockResolvedValue({ id: 'token-id-123' }),
+            create: vi.fn().mockResolvedValue({ id: 'token-uuid' }),
           },
         };
 
@@ -646,7 +646,9 @@ describe('UserRepository Unit Tests', () => {
         if (result.success) {
           expect(result.code).toMatch(/^\d{6}$/);
           expect(result.rawToken).toBe(result.code);
-          expect(result.expiresAt.getTime()).toBeGreaterThan(Date.now() + 14 * 60 * 1000);
+          const now = Date.now();
+          expect(result.expiresAt.getTime()).toBeGreaterThan(now + 50 * 1000);
+          expect(result.expiresAt.getTime()).toBeLessThanOrEqual(now + 60 * 1000 + 1000);
           expect(mockTx.emailVerificationToken.deleteMany).toHaveBeenCalledWith({
             where: { userId: dummyUser.id },
           });

@@ -157,7 +157,7 @@
     "verificationCodePlaceholder": "000000",
     "verifyCodeButton": "Verifikasi Kode",
     "codeSentToEmail": "Kode verifikasi telah dikirim ke",
-    "codeExpiryNotice": "Kode berlaku selama 15 menit.",
+    "codeExpiryNotice": "Kode berlaku selama 1 menit.",
     "resendCode": "Kirim Ulang Kode",
     "resendCodeWithTimer": "Kirim Ulang Kode ({time})",
     "invalidOrExpiredCode": "Kode verifikasi tidak valid atau telah kedaluwarsa.",

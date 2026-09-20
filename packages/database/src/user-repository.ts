@@ -1216,7 +1216,7 @@ export class UserRepository {
       const rawToken = crypto.randomBytes(32).toString('hex');
       const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
 
-      const expiryMinutes = input.expiryMinutes ?? 15;
+      const expiryMinutes = input.expiryMinutes ?? 1; // Default 1 minute (TASK-0218)
       const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000);
 
       await this.prisma.$transaction(async (tx) => {
@@ -2497,7 +2497,7 @@ export class UserRepository {
     // Generate 6-digit numeric CSPRNG code (100000 - 999999)
     const code = String(crypto.randomInt(100000, 1000000));
     const tokenHash = crypto.createHash('sha256').update(`${user.id}:${code}`).digest('hex');
-    const expiryMinutes = input.expiryMinutes ?? 15; // Default 15 minutes
+    const expiryMinutes = input.expiryMinutes ?? 1; // Default 1 minute (TASK-0218)
     const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000);
 
     await this.prisma.$transaction(async (tx) => {
@@ -2847,7 +2847,7 @@ export class UserRepository {
         .createHash('sha256')
         .update(`${user.id}:${normalisedNewEmail}:${code}`)
         .digest('hex');
-      const expiryMinutes = input.expiryMinutes ?? 15;
+      const expiryMinutes = input.expiryMinutes ?? 1; // Default 1 minute (TASK-0218)
       const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000);
 
       await this.prisma.$transaction(async (tx) => {

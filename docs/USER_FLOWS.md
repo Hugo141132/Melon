@@ -308,7 +308,7 @@ flowchart TD
 4. If React Strict Mode or a concurrent remount triggers while the request is in flight, the pending Promise is shared (exactly 1 POST is sent).
 5. The server receives `POST /api/v1/auth/verify-email` with `{ email, code }` (or `{ token }`).
 6. The server looks up the token by SHA-256 hash `sha256(userId:code)` in `email_verification_tokens`.
-7. The server validates code expiration (15 minutes) and single-use status.
+7. The server validates code expiration (1 minute) and single-use status.
 8. The server updates `emailVerifiedAt = NOW()`, transactionally deletes the code, handles any Prisma `P2034` write conflicts with bounded retries, and logs `account.email.verified`.
 9. The server returns HTTP 200 OK with `{ user }` without creating an authenticated session.
 10. Upon promise settlement, the key is evicted from the in-flight cache map (`finally`).
@@ -319,7 +319,7 @@ flowchart TD
 **Error flows:**
 
 - Invalid or missing code/token: display clear error with option to resend code.
-- Expired code: display expiration notice (15 minutes) with option to resend.
+- Expired code: display expiration notice (1 minute) with option to resend.
 - Already used code/email (P2025 / duplicate): server returns HTTP 400 `TOKEN_ALREADY_USED`; frontend displays clear already-verified message.
 - Reopening consumed link: cache is clear, server returns HTTP 400 `TOKEN_ALREADY_USED`.
 - Concurrency conflict exhaustion: server returns HTTP 409 `CONCURRENCY_CONFLICT`.
@@ -673,17 +673,17 @@ flowchart TD
 2. The user enters their email address and clicks "Send Reset Link".
 3. The server validates email format and enforces rate limiting (3 requests/min per `RATE_LIMIT_FORGOT_PASSWORD_MAX`).
 4. The server checks user existence:
-   - **If email is not found (`DEC-AUTH-108`)**: The server returns HTTP 404 with error code `EMAIL_NOT_FOUND`. The frontend displays an error alert (*"Alamat email tidak terdaftar dalam sistem kami."* / *"This email address is not registered in our system."*) without starting the 15:00 countdown timer.
-   - **If email is found**: Generates a 256-bit CSPRNG token, persists SHA-256 hash in `password_reset_tokens` (15-minute expiry), dispatches email via Resend (`DEC-AUTH-102`), and returns HTTP 200.
+   - **If email is not found (`DEC-AUTH-108`)**: The server returns HTTP 404 with error code `EMAIL_NOT_FOUND`. The frontend displays an error alert (*"Alamat email tidak terdaftar dalam sistem kami."* / *"This email address is not registered in our system."*) without starting the 01:00 cooldown timer.
+   - **If email is found**: Generates a 256-bit CSPRNG token, persists SHA-256 hash in `password_reset_tokens` (1-minute expiry per `DEC-AUTH-109`), dispatches email via Resend (`DEC-AUTH-102`), and returns HTTP 200.
 5. The frontend displays an auto-dismissing (5s) success toast (*"Please check your email inbox."*).
-6. The submit button enters a disabled 15:00 countdown timer, e.g. `Send Reset Link (14:32)`, persisted in `sessionStorage`. An additional "Verifikasi Status Reset" / "Verify Reset Status" button appears below the submit button.
+6. The submit button enters a disabled 01:00 (60s) cooldown timer, e.g. `Send Reset Link (00:45)`, persisted in `sessionStorage`. An additional "Verifikasi Status Reset" / "Verify Reset Status" button appears below the submit button.
 7. **Verify Reset Status Flow**: At any point during the countdown, the user may click "Verify Reset Status":
    - The frontend queries `GET /api/v1/auth/forgot-password?email=...` (rate limited at 10 requests/min).
    - If the password reset has not been completed yet, an informational alert is displayed (*"Reset kata sandi belum selesai. Silakan buka email Anda dan ikuti tautan reset terlebih dahulu."*).
    - If the password reset has been completed (`completed: true`), `sessionStorage` cooldown timer is cleared and the user is immediately redirected to `/login?message=PASSWORD_RESET_COMPLETED`.
 8. Alternatively, the user clicks the trusted reset link received via email, opening `/reset-password?token=<rawToken>`.
 9. The user enters a new password meeting policy (min 8 chars, uppercase, lowercase, number, special char) and confirms.
-10. The server validates the token hash in PostgreSQL, verifies token expiry (< 15 min) and single-use status (`used_at IS NULL`).
+10. The server validates the token hash in PostgreSQL, verifies token expiry (< 1 min) and single-use status (`used_at IS NULL`).
 11. The server hashes the password with Argon2id, marks the token consumed, and transactionally revokes all active login sessions for the user across all devices.
 12. The server strictly preserves the user's existing `accountStatus`.
 13. The user is notified of success and directed to `/login`.

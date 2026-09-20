@@ -31,7 +31,7 @@ describe('TASK-0213 Forgot Password UI Component', () => {
     expect(submitBtn).toBeEnabled();
   });
 
-  it('2. Submits email, shows toast notification, starts 15:00 countdown, and disables submit button', async () => {
+  it('2. Submits email, shows toast notification, starts 01:00 countdown, and disables submit button', async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -53,7 +53,7 @@ describe('TASK-0213 Forgot Password UI Component', () => {
         screen.getByText(/Silakan periksa kotak masuk email Anda|Please check your email inbox/i)
       ).toBeInTheDocument();
       const submit = screen.getByRole('button', { name: /Kirim Link Reset|Send Reset Link/i });
-      expect(submit).toHaveTextContent(/15:00/);
+      expect(submit).toHaveTextContent(/01:00/);
       expect(submit).toBeDisabled();
       expect(
         screen.getByRole('button', { name: /Verifikasi Status Reset|Verify Reset Status/i })

@@ -132,7 +132,7 @@
   3. **Reset Link URL Construction**: Reset URLs are constructed strictly from server-configured trusted environment variables (`APP_URL` / `NEXT_PUBLIC_APP_URL`). In production, an explicit trusted HTTPS URL is required (cannot point to localhost/127.0.0.1). The untrusted request `Host` header MUST NEVER be used, preventing Host Header injection / password reset poisoning.
   4. **Email Dispatch & Anti-Enumeration**: Email dispatch is explicitly `await`ed (preventing lost sends or unhandled promise rejections). `POST /api/v1/auth/forgot-password` unconditionally returns HTTP 200 with a generic message (`If an account exists with that email, a password reset link has been sent.`) and applies timing-mitigation equalizers to prevent side-channel account existence enumeration. In production with Resend, `RESEND_FROM_EMAIL` must use a verified sender domain (not `onboarding@resend.dev`).
   5. **Approved Operational Policies**:
-     - Reset-token expiry is formally approved as **15 minutes** (`AUTH_RESET_TOKEN_EXPIRY_MINUTES = 15`).
+     - Reset-token expiry was originally approved as **15 minutes** (`AUTH_RESET_TOKEN_EXPIRY_MINUTES = 15`), subsequently superseded to **1 minute** via `DEC-AUTH-109` / `TASK-0218`.
      - Forgot-password rate limit is formally approved as **3 requests per minute** (`RATE_LIMIT_FORGOT_PASSWORD_MAX = 3`).
      - Reset-password rate limit is formally approved as **5 requests per minute** (`RATE_LIMIT_RESET_PASSWORD_MAX = 5`).
      - Environment variables remain available for operational configuration with these approved values as defaults.
@@ -179,11 +179,25 @@
   1. **Explicit 404 Response**: `POST /api/v1/auth/forgot-password` returns HTTP 404 with error code `EMAIL_NOT_FOUND` and message *"Alamat email tidak terdaftar dalam sistem kami."* (*"This email address is not registered in our system."*) when the submitted email address does not exist in the database.
   2. **Anti-Enumeration Trade-off & Mitigations**: The enumeration trade-off is accepted for operational usability in a closed agricultural operations system where public registration is already restricted to `ADMIN` with mandatory `PENDING_APPROVAL` by the Owner. Enumeration attacks are mitigated by:
      - Strict rate limiting: `RATE_LIMIT_FORGOT_PASSWORD_MAX = 3` requests/minute per IP address.
-     - Cryptographic CSPRNG tokens with SHA-256 database hashing and 15-minute expiration.
+     - Cryptographic CSPRNG tokens with SHA-256 database hashing and 1-minute expiration (updated via `DEC-AUTH-109`).
      - Structured audit logging (`auth.password_reset.failed`) tracking IP and User-Agent.
   3. **Verify Reset Status Flow**: Provided `GET /api/v1/auth/forgot-password?email=...` (rate limited at 10 requests/minute per IP) allowing the frontend to poll or verify whether password reset has been completed.
   4. **Immediate Redirection to /login**: Upon confirmed reset completion (`completed: true`), the frontend immediately clears `sessionStorage` cooldown tokens and redirects the user to `/login?message=PASSWORD_RESET_COMPLETED`.
   5. **Asset Format Standard**: Any future image asset must use the `.webp` format. Existing typography and Lucide icons are strictly preserved without adding arbitrary logos.
+
+---
+
+#### DEC-AUTH-109: Unified 1-Minute Authentication Verification Expiry & Resend Cooldown Policy
+* **Related Task IDs**: `TASK-0218`, `TASK-0213`, `TASK-0214`, `TASK-0216`
+* **Related Documentation**: `docs/SECURITY.md` §7.6, §7.8, §7.9; `docs/USER_FLOWS.md` §Flow 2b, §Flow 12A; `docs/API.md` §10.6, §10.7, §10.8, §11.2; `TASKS.md`, `AGENTS.md`
+* **Status**: **APPROVED BY USER**
+* **Context**: Previously, authentication verification codes and tokens (registration verification, password reset, and self-service email change) defaulted to a 15-minute expiration lifetime. Additionally, `/forgot-password` enforced a 15:00 disabled button countdown timer (`RESET_TOKEN_LIFETIME_SECONDS = 15 * 60`). This created operational delays when testing or when users experienced network issues.
+* **Approved Decision**:
+  1. **1-Minute Token Expiry Invariant**: All token and verification code validity windows are standardized to **1 minute (60 seconds)** across registration email verification, forgot password / password reset, and self-service email change verification.
+  2. **1-Minute (60-Second) Resend Cooldown Invariant**: All client-side resend cooldown timers are unified to **60 seconds (1 minute)** (`RESET_TOKEN_LIFETIME_SECONDS = 60` in `forgot-password-view.tsx`, `setCooldownSeconds(60)` in `verify-email-view.tsx`, and `setCooldown(60)` in `EmailChangeModal.tsx`).
+  3. **Environment Variable Configuration**: Server environment variables `AUTH_RESET_TOKEN_EXPIRY_MINUTES` and `AUTH_VERIFY_TOKEN_EXPIRY_MINUTES` default to `1` (minimum 1), allowing operational overrides without hardcoding.
+  4. **Email Template & Localization Synchronization**: All transactional email copy and bilingual user notices (`codeExpiryNotice` in `id.json` and `en.json`) are updated to specify 1 minute validity.
+  5. **Security Defenses Maintained**: High-entropy CSPRNG tokens, user/target scoped SHA-256 hashing, transactional invalidation of prior codes, single-use deletion, and strict IP rate limiting (3 req/min request, 5 req/min verify) remain fully active.
 
 ---
 

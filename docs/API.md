@@ -624,7 +624,7 @@ Server rules:
 - Unconditionally returns HTTP 200 with generic message whether user exists, is pending, is suspended, or does not exist.
 - Never reveals user existence or returns user profilee metadata.
 - Applies timing-mitigation equalizers to prevent side-channel timing enumeration of account existence.
-- If user exists, generates a 256-bit CSPRNG token (valid for 15 minutes by default, configurable via `AUTH_RESET_TOKEN_EXPIRY_MINUTES`), persists SHA-256 hash in `password_reset_tokens`, and dispatches email via Resend (`sendPasswordResetEmail`).
+- If user exists, generates a 256-bit CSPRNG token (valid for 1 minute by default, configurable via `AUTH_RESET_TOKEN_EXPIRY_MINUTES`, `DEC-AUTH-109`), persists SHA-256 hash in `password_reset_tokens`, and dispatches email via Resend (`sendPasswordResetEmail`).
 - Reset link URL is constructed strictly from configured `APP_URL` / `NEXT_PUBLIC_APP_URL` (in production, explicit HTTPS URL is required).
 
 Possible errors:
@@ -675,7 +675,7 @@ Response (HTTP 200 OK):
 Server rules:
 - Validates password complexity against policy (minimum 12 chars, uppercase, lowercase, numbers, special characters).
 - Looks up token by SHA-256 hash in `password_reset_tokens`.
-- Verifies token has not expired (token lifetime: 15 minutes, configurable via `AUTH_RESET_TOKEN_EXPIRY_MINUTES`) and has not been used (`used_at IS NULL`).
+- Verifies token has not expired (token lifetime: 1 minute, configurable via `AUTH_RESET_TOKEN_EXPIRY_MINUTES`, `DEC-AUTH-109`) and has not been used (`used_at IS NULL`).
 - Hashes new password with Argon2id and updates `users.password_hash`.
 - Strictly preserves existing `accountStatus` (password reset NEVER activates or approves pending accounts; normal login guards control access).
 - Marks token `used_at = NOW()` and invalidates other pending tokens for user.
@@ -738,7 +738,7 @@ Response (HTTP 200 OK):
 
 Server rules:
 - Verifies code by SHA-256 hash `sha256(userId:code)` in `email_verification_tokens` (or token directly).
-- Asserts code is unexpired (15-minute validity) and unconsumed.
+- Asserts code is unexpired (1-minute validity per `DEC-AUTH-109` / `TASK-0218`) and unconsumed.
 - Sets `users.email_verified_at = NOW()` for the associated user account.
 - Strictly preserves existing `accountStatus` (`ADMIN` accounts remain `PENDING_APPROVAL`, `OWNER` accounts remain `ACTIVE`).
 - Strictly does NOT issue, create, or return an authentication session. Verification confirms ownership only; normal login remains a separate step.
@@ -794,7 +794,7 @@ Response (HTTP 200 OK — strictly anti-enumeration):
 Server rules:
 - Unconditionally returns HTTP 200 with generic message whether user exists, is already verified, or does not exist (anti-enumeration).
 - Applies timing-mitigation equalizers to prevent side-channel timing attacks.
-- If an account exists and `email_verified_at` is null, invalidates prior verification tokens, generates a new 6-digit verification code (valid for 15 minutes per `AUTH_VERIFY_TOKEN_EXPIRY_MINUTES = 15`), and dispatches bilingual verification email via Resend (`DEC-AUTH-104` / `TASK-0214`).
+- If an account exists and `email_verified_at` is null, invalidates prior verification tokens, generates a new 6-digit verification code (valid for 1 minute per `AUTH_VERIFY_TOKEN_EXPIRY_MINUTES = 1`, `DEC-AUTH-109` / `TASK-0218`), and dispatches bilingual verification email via Resend (`DEC-AUTH-104` / `TASK-0214`).
 
 Possible errors:
 - `400 Bad Request`: `VALIDATION_ERROR` (invalid email)
@@ -941,7 +941,7 @@ Server rules:
 - Normalizes `newEmail` (`trim().toLowerCase()`).
 - Rejects request if `newEmail` matches caller's existing authoritative email (`SAME_EMAIL`).
 - Validates that `newEmail` is not already taken by another user (`DUPLICATE_EMAIL`).
-- Generates a 6-digit numeric CSPRNG verification code (`100000`–`999999`) with 15-minute expiry (`AUTH_VERIFY_TOKEN_EXPIRY_MINUTES = 15`).
+- Generates a 6-digit numeric CSPRNG verification code (`100000`–`999999`) with 1-minute expiry (`AUTH_VERIFY_TOKEN_EXPIRY_MINUTES = 1`, `DEC-AUTH-109` / `TASK-0218`).
 - Persists user-and-target-scoped hash `sha256(userId:newEmail:code)` in `email_verification_tokens.token_hash` and candidate email in `email_verification_tokens.pending_email`.
 - Dispatches verification email strictly to `newEmail` via Resend (`sendWithRetry`).
 - Existing user email remains 100% authoritative for all system access until verification.

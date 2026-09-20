@@ -68,7 +68,7 @@ describe('TASK-0213 /api/v1/auth/forgot-password Unit Tests', () => {
         updatedAt: new Date(),
         activeRoles: ['ADMIN' as any],
       },
-      expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+      expiresAt: new Date(Date.now() + 1 * 60 * 1000),
     });
 
     const sendEmailSpy = vi.spyOn(resendModule, 'sendPasswordResetEmail').mockResolvedValue({
@@ -120,7 +120,7 @@ describe('TASK-0213 /api/v1/auth/forgot-password Unit Tests', () => {
         updatedAt: new Date(),
         activeRoles: [],
       },
-      expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+      expiresAt: new Date(Date.now() + 1 * 60 * 1000),
     });
 
     // Email dispatch reports failure

@@ -94,7 +94,7 @@ describe('TASK-0216 Email Change API Routes Test Suite', () => {
         success: true,
         code: '123456',
         pendingEmail: 'new@example.com',
-        expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+        expiresAt: new Date(Date.now() + 1 * 60 * 1000),
         user: mockUserSession,
       });
       vi.spyOn(resendModule, 'sendEmailChangeVerificationEmail').mockResolvedValue({} as any);
@@ -229,7 +229,7 @@ describe('TASK-0216 Email Change API Routes Test Suite', () => {
     });
 
     it('returns 200 with VERIFICATION_CODE_SENT and sends verification email on success', async () => {
-      const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+      const expiresAt = new Date(Date.now() + 1 * 60 * 1000);
       mockRequestEmailChange.mockResolvedValue({
         success: true,
         code: '654321',

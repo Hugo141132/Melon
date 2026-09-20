@@ -209,7 +209,7 @@ describe('TASK-0216 Email Change Repository Unit & Concurrency Test Suite', () =
       }
     });
 
-    it('successfully generates 6-digit code, scoped hash, and stages pendingEmail with 15-minute expiry', async () => {
+    it('successfully generates 6-digit code, scoped hash, and stages pendingEmail with 1-minute expiry', async () => {
       let createdToken: any = null;
       let deletedWhere: any = null;
 
@@ -278,11 +278,11 @@ describe('TASK-0216 Email Change Repository Unit & Concurrency Test Suite', () =
           .digest('hex');
         expect(createdToken.tokenHash).toBe(expectedHash);
 
-        // Expiry check: ~15 minutes in the future
+        // Expiry check: ~1 minute in the future
         const now = Date.now();
         const expiryTime = result.expiresAt.getTime();
-        expect(expiryTime - now).toBeGreaterThan(14 * 60 * 1000);
-        expect(expiryTime - now).toBeLessThanOrEqual(15 * 60 * 1000 + 1000);
+        expect(expiryTime - now).toBeGreaterThan(50 * 1000);
+        expect(expiryTime - now).toBeLessThanOrEqual(60 * 1000 + 1000);
       }
     });
   });

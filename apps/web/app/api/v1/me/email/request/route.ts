@@ -14,6 +14,7 @@ import {
   applyRateLimitToResponse,
 } from '../../../../../../lib/rate-limit';
 import { sendEmailChangeVerificationEmail } from '../../../../../../lib/email/resend';
+import { validateServerEnv } from '@/lib/env/server';
 
 export async function POST(request: Request) {
   const requestId = `req-${Date.now()}`;
@@ -79,10 +80,12 @@ export async function POST(request: Request) {
     const userAgent = request.headers.get('user-agent') || undefined;
 
     const userRepo = new UserRepository(prisma);
+    const env = validateServerEnv();
     const result = await userRepo.requestEmailChange({
       userId: session.id,
       newEmail,
       currentPassword,
+      expiryMinutes: env.AUTH_VERIFY_TOKEN_EXPIRY_MINUTES,
       ipAddress,
       userAgent,
       requestId,

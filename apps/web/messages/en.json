@@ -157,7 +157,7 @@
     "verificationCodePlaceholder": "000000",
     "verifyCodeButton": "Verify Code",
     "codeSentToEmail": "Verification code sent to",
-    "codeExpiryNotice": "Code is valid for 15 minutes.",
+    "codeExpiryNotice": "Code is valid for 1 minute.",
     "resendCode": "Resend Code",
     "resendCodeWithTimer": "Resend Code ({time})",
     "invalidOrExpiredCode": "Invalid or expired verification code.",

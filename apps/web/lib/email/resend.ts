@@ -216,8 +216,8 @@ function getEmailHtml(
     : 'We received a request to reset the password for your Kebun Melon account. Click the button below to create a new password:';
   const buttonText = isId ? 'Atur Ulang Kata Sandi' : 'Reset Password';
   const expiryNotice = isId
-    ? 'Tautan ini hanya berlaku sekali dan akan kadaluwarsa dalam 15 menit.'
-    : 'This link is single-use and will expire in 15 minutes.';
+    ? 'Tautan ini hanya berlaku sekali dan akan kadaluwarsa dalam 1 menit.'
+    : 'This link is single-use and will expire in 1 minute.';
   const ignoreNotice = isId
     ? 'Jika Anda tidak meminta pengaturan ulang kata sandi ini, abaikan email ini. Akun Anda tetap aman.'
     : 'If you did not request a password reset, please ignore this email. Your account remains secure.';
@@ -384,8 +384,8 @@ function getVerificationCodeEmailHtml(
     ? 'Terima kasih telah mendaftar di Kebun Melon. Masukkan 6 digit kode verifikasi berikut pada halaman verifikasi email Anda untuk mengonfirmasi kepemilikan akun:'
     : 'Thank you for registering at Kebun Melon. Enter the following 6-digit verification code on the email verification page to confirm your account ownership:';
   const expiryNotice = isId
-    ? 'Kode verifikasi ini berlaku selama 15 menit dan hanya dapat digunakan sekali.'
-    : 'This verification code is valid for 15 minutes and can only be used once.';
+    ? 'Kode verifikasi ini berlaku selama 1 menit dan hanya dapat digunakan sekali.'
+    : 'This verification code is valid for 1 minute and can only be used once.';
   const securityNotice = isId
     ? 'Jangan bagikan kode ini kepada siapa pun. Tim Kebun Melon tidak akan pernah meminta kode verifikasi Anda.'
     : 'Do not share this code with anyone. Kebun Melon team will never ask for your verification code.';
@@ -555,8 +555,8 @@ function getEmailChangeCodeEmailHtml(
     ? 'Kami menerima permintaan untuk mengubah alamat email akun Kebun Melon Anda. Masukkan 6 digit kode verifikasi berikut untuk mengonfirmasi perubahan email ini:'
     : 'We received a request to change the email address for your Kebun Melon account. Enter the following 6-digit verification code to confirm this email change:';
   const expiryNotice = isId
-    ? 'Kode verifikasi ini berlaku selama 15 menit dan hanya dapat digunakan sekali.'
-    : 'This verification code is valid for 15 minutes and can only be used once.';
+    ? 'Kode verifikasi ini berlaku selama 1 menit dan hanya dapat digunakan sekali.'
+    : 'This verification code is valid for 1 minute and can only be used once.';
   const securityNotice = isId
     ? 'Jangan bagikan kode ini kepada siapa pun. Tim Kebun Melon tidak akan pernah meminta kode verifikasi Anda.'
     : 'Do not share this code with anyone. Kebun Melon team will never ask for your verification code.';

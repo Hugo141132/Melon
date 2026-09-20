@@ -40,6 +40,7 @@ export async function POST(request: Request) {
     const userRepository = new UserRepository(prisma);
     const tokenResult = await userRepository.createEmailVerificationToken({
       userId: result.user.id,
+      expiryMinutes: env.AUTH_VERIFY_TOKEN_EXPIRY_MINUTES,
       requestId,
       ipAddress: clientIp,
       userAgent: request.headers.get('user-agent') || undefined,

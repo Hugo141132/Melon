@@ -53,8 +53,11 @@ export const serverEnvSchema = z.object({
   RESEND_FROM_EMAIL: z.string().optional().default('Melon Madura <noreply@melonmadura.my.id>'),
   APP_URL: z.string().url().optional(),
   AUTH_RESET_TOKEN_EXPIRY_MINUTES: z
-    .preprocess((val) => (val ? parseInt(String(val), 10) : 15), z.number().int().min(1))
-    .default(15),
+    .preprocess((val) => (val ? parseInt(String(val), 10) : 1), z.number().int().min(1))
+    .default(1),
+  AUTH_VERIFY_TOKEN_EXPIRY_MINUTES: z
+    .preprocess((val) => (val ? parseInt(String(val), 10) : 1), z.number().int().min(1))
+    .default(1),
   EXTERNAL_ML_SUPABASE_URL: z.string().url().optional(),
   EXTERNAL_ML_SUPABASE_PUBLISHABLE_KEY: z.string().optional(),
   EXTERNAL_ML_SUPABASE_SECRET_KEY: z.string().optional(),

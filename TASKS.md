@@ -1081,6 +1081,63 @@ Implemented complete Owner User Management:
 
 ---
 
+## TASK-0218 — Unify Authentication Verification Expiry and Resend Cooldown to 1 Minute
+
+**Priority:** `P1`
+**Status:** `DONE`
+**Dependencies:** `TASK-0213`, `TASK-0214`, `TASK-0216`, `DEC-AUTH-109`
+**Completed:** 2026-09-20 (Implementation, test updates, localization, and specification reconciliation complete; 100% test pass rate across all auth and database test suites)
+
+### Work
+
+Unified all authentication token validity lifetimes and UI resend cooldown timers to exactly 1 minute across registration verification, forgot password / password reset, and self-service email change flows per `DEC-AUTH-109`:
+
+1. **Database & Repository Defaults (`packages/database`):**
+   - Updated `createPasswordResetToken`, `createEmailVerificationToken`, and `requestEmailChange` in `packages/database/src/user-repository.ts` to use a 1-minute fallback (`expiryMinutes ?? 1`) instead of 15 minutes.
+2. **Server Environment Configuration (`apps/web`):**
+   - In `apps/web/lib/env/server.ts`, updated `AUTH_RESET_TOKEN_EXPIRY_MINUTES` default from `15` to `1`.
+   - Added `AUTH_VERIFY_TOKEN_EXPIRY_MINUTES` with default `1` (positive integer).
+   - Updated `.env`, `apps/web/.env`, and `apps/web/.env.example` to declare `AUTH_RESET_TOKEN_EXPIRY_MINUTES=1` and `AUTH_VERIFY_TOKEN_EXPIRY_MINUTES=1`.
+3. **API Route Handlers (`apps/web`):**
+   - `POST /api/v1/auth/register`: passed `expiryMinutes: env.AUTH_VERIFY_TOKEN_EXPIRY_MINUTES` into `userRepository.createEmailVerificationToken`.
+   - `POST /api/v1/auth/resend-verification`: passed `expiryMinutes: env.AUTH_VERIFY_TOKEN_EXPIRY_MINUTES` into `userRepository.createEmailVerificationToken`.
+   - `POST /api/v1/me/email/request`: imported `validateServerEnv` and passed `expiryMinutes: env.AUTH_VERIFY_TOKEN_EXPIRY_MINUTES` into `userRepository.requestEmailChange`.
+4. **UI Cooldown Timers & Resend Flows:**
+   - Registration email verification (`/verify-email`) already used 60s cooldown; retained.
+   - Self-service email change modal (`/profile`) already used 60s cooldown; retained.
+   - Password reset request (`apps/web/app/(auth)/forgot-password/forgot-password-view.tsx`): updated `RESET_TOKEN_LIFETIME_SECONDS` from `15 * 60` to `60` (1 minute cooldown timer).
+5. **Email Templates & Localization (`apps/web`):**
+   - Updated transactional email templates in `apps/web/lib/email/resend.ts` (`sendPasswordResetEmail`, `sendVerificationEmail`, `sendEmailChangeVerificationEmail`) to state "Kode berlaku selama 1 menit" / "Code is valid for 1 minute".
+   - Updated `messages/id.json` and `messages/en.json` `codeExpiryNotice` to state "Kode berlaku selama 1 menit." / "Code is valid for 1 minute.".
+   - Verified 100% key parity via `npm run i18n:check`.
+6. **Documentation & Specifications:**
+   - Updated `docs/SECURITY.md` (§§7.6, 7.8, 7.9, 8.4, 8.5).
+   - Updated `docs/USER_FLOWS.md` (Flow 2b, Flow 12A).
+   - Updated `docs/API.md` (§§10.6, 10.7, 10.8, 11.2).
+   - Added `DEC-AUTH-109` to `docs/DECISIONS.md`.
+7. **Test Suites:**
+   - Updated and verified 100% pass rate across:
+     - `packages/database/test/user-repository.test.ts` (23/23 tests)
+     - `packages/database/test/user-repository-email-change.test.ts` (13/13 tests)
+     - `packages/database/test/user-repository-reset-password.test.ts` (10/10 tests)
+     - `apps/web/test/unit/server-env.test.ts` (16/16 tests)
+     - `apps/web/test/unit/forgot-password-ui.test.tsx` (8/8 tests)
+     - `apps/web/test/unit/forgot-password-route.test.ts` (10/10 tests)
+     - `apps/web/test/unit/email-change-routes.test.ts` (14/14 tests)
+     - `apps/web/test/unit/verify-email-routes.test.ts` (9/9 tests)
+
+### Acceptance Criteria
+
+- [x] Password reset tokens expire after exactly 1 minute.
+- [x] Registration email verification tokens expire after exactly 1 minute.
+- [x] Self-service email change verification tokens expire after exactly 1 minute.
+- [x] UI resend cooldown timers across all 3 flows are set to 60 seconds (1 minute).
+- [x] Environment variable defaults default to 1 minute (`AUTH_RESET_TOKEN_EXPIRY_MINUTES=1`, `AUTH_VERIFY_TOKEN_EXPIRY_MINUTES=1`).
+- [x] Transactional emails and localized UI copy consistently reflect the 1-minute expiration.
+- [x] All unit and integration test assertions pass (100% pass rate).
+
+---
+
 # 11. Phase 3 — Device Registry and Access
 
 ## TASK-0301 — Implement Site Model

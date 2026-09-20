@@ -309,6 +309,23 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
   - 21st.dev MCP: `NOT REQUIRED`
   - Summary: Resolved duplicated "Change Email" action labels on `/profile`. The initial implementation of `TASK-0216` placed the trigger button in two locations: (1) adjacent to the read-only email field in the Personal Info form, and (2) inside the Email Verification Status card under Account & Session Security. To adhere to clean UI separation of concerns, the trigger was retained solely adjacent to the email input field (`{/* Email (Read-Only with Change Email Action) */}`), and permanently removed from the Email Verification Status card. Security cards strictly represent operational account status badges (*"Terverifikasi"* / *"Verified"*), preventing redundant action triggers. Updated `apps/web/app/profile/page.tsx` and added test assertions in `apps/web/test/unit/profile-page.test.tsx` verifying that exactly one "Ubah Email" / "Change Email" button exists in the DOM across Indonesian and English locales. Verified 100% test pass rate across unit suites (`profile-page.test.tsx` 4/4, `email-change-ui.test.tsx` 7/7), 0 TypeScript typecheck errors across all 4 monorepo packages, rebuilt and restarted staging web container (`kebun-melon-staging-web`) healthy on port 3000, and verified via Playwright health check.
 
+#### TASK-0218 Governance Record
+
+`TASK-0218` unify authentication verification expiry and resend cooldown to 1 minute record:
+- Status: `DONE` (Completed 2026-09-20)
+- Frontend impact: `MINOR`
+- Selected UI direction: `Premium Minimal Ops`
+- Existing color template: `UNCHANGED`
+- Selected motion effects: `None`
+- 21st.dev MCP: `NOT REQUIRED`
+- Summary: Unified all authentication verification token validity lifetimes and UI resend cooldown timers to exactly 1 minute across registration email verification, forgot password / password reset, and self-service email change verification flows, governed by `DEC-AUTH-109`.
+  - Token Lifetimes & Repository Defaults: In `packages/database/src/user-repository.ts`, changed the default fallback for `createPasswordResetToken`, `createEmailVerificationToken`, and `requestEmailChange` from `expiryMinutes ?? 15` to `expiryMinutes ?? 1`.
+  - Environment Variables & Server Configuration: In `apps/web/lib/env/server.ts`, changed default `AUTH_RESET_TOKEN_EXPIRY_MINUTES` to `1` and added `AUTH_VERIFY_TOKEN_EXPIRY_MINUTES` defaulting to `1`. Updated `.env`, `apps/web/.env`, and `apps/web/.env.example`.
+  - API Routes: Passed `expiryMinutes: env.AUTH_VERIFY_TOKEN_EXPIRY_MINUTES` to `userRepository.createEmailVerificationToken` in `POST /api/v1/auth/register` and `POST /api/v1/auth/resend-verification`. Passed `expiryMinutes: env.AUTH_VERIFY_TOKEN_EXPIRY_MINUTES` to `userRepository.requestEmailChange` in `POST /api/v1/me/email/request`.
+  - UI Timers & Copy: Updated forgot-password cooldown timer (`apps/web/app/(auth)/forgot-password/forgot-password-view.tsx`) from `15 * 60` to `60` seconds. Updated `apps/web/messages/id.json` and `apps/web/messages/en.json` `codeExpiryNotice` to state 1 minute. Updated transactional email copies in `apps/web/lib/email/resend.ts` to state 1 minute.
+  - Specifications: Reconciled `docs/SECURITY.md`, `docs/USER_FLOWS.md`, `docs/API.md`, `docs/DECISIONS.md`, and `TASKS.md`.
+  - Verification: 100% test pass rate across all related database and web unit/integration test suites (104 tests total across `user-repository.test.ts`, `user-repository-email-change.test.ts`, `user-repository-reset-password.test.ts`, `server-env.test.ts`, `forgot-password-ui.test.tsx`, `forgot-password-route.test.ts`, `email-change-routes.test.ts`, and `verify-email-routes.test.ts`), plus 100% translation key parity via `npm run i18n:check`.
+
 #### TASK-0302 Governance Record
 
 

@@ -25,6 +25,7 @@ export default defineConfig({
     execArgv: ['--max-old-space-size=4096'],
     maxWorkers: 1,
     isolate: true,
+    exclude: ['**/node_modules/**', '**/.next/**', '**/dist/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
