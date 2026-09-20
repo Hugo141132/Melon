@@ -941,6 +941,17 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
 - 21st.dev MCP: `NOT REQUIRED`
 - Summary: Formally deferred the automated daily offsite backup pipeline (e.g., Cloudflare R2 / AWS S3) and restore testing capabilities under `DEC-INF-096`. Updated task status from `BLOCKED` to `DEFERRED` in `TASKS.md` and traceability matrix `docs/TRACEABILITY.md` (`SEC-OPS-003`). Because backup and restore capability is intentionally postponed until there is an operational requirement, no backup pipeline code, storage SDK integrations, database migrations, or infrastructure changes are implemented. Confirmed that point-in-time encrypted snapshot exports and local isolated restore rehearsal procedures documented for database maintenance in `docs/SUPABASE_MIGRATION_RUNBOOK.md` remain independently operational and unaffected. Zero changes to staging environment or running services.
 
+#### TASK-1011 Production DNS Provisioning & Verification Governance Record
+
+`TASK-1011` production DNS provisioning and subdomain verification record:
+- Status: `IN_PROGRESS` (DNS Provisioned & Verified 2026-09-20; VPS Server Deployment Pending)
+- Frontend impact: `NONE`
+- Selected UI direction: `N/A`
+- Existing color template: `UNCHANGED`
+- Selected motion effects: `None`
+- 21st.dev MCP: `NOT REQUIRED`
+- Summary: Completed and verified the production domain and DNS infrastructure preparation prerequisite for TASK-1011. Configured dedicated production subdomain `monitoring.melonmadura.my.id` on JagoanHosting cPanel Zone Editor as an `A` record pointing to JagoanHosting Nebula VPS (`38.103.171.46`) with optimal TTL of 300s. Verified 100% authoritative resolution via `one.jagoanhosting.com` and global propagation across major recursive resolvers (Cloudflare `1.1.1.1`, Google `8.8.8.8`, Quad9 `9.9.9.9`, and local workstation). Confirmed that root apex domain `melonmadura.my.id` and `www` CNAME remain 100% unchanged and isolated on shared hosting IP `101.50.1.84`. Verified host network reachability via TCP port 22 (`TcpTestSucceeded: True`) without logging in or exposing secrets. Zero code modifications, zero staging modifications, zero git commits, and zero automatic VPS deployments executed. Satisfies the "Production Domain & DNS Provisioning" dependency of TASK-1011 while retaining TASK-1011 in `BACKLOG` for future server setup.
+
 ---
 
 

@@ -3430,6 +3430,14 @@ Prepare, harden, and automate the production deployment environment on a dedicat
 
 ### Work
 
+- **Production Domain & DNS Infrastructure Preparation (Verified 2026-09-20):**
+  - Configured dedicated production subdomain `monitoring.melonmadura.my.id` on JagoanHosting cPanel Zone Editor as an `A` record pointing to JagoanHosting Nebula VPS (`38.103.171.46`) with optimal TTL `300s`.
+  - Authoritative DNS verification on `one.jagoanhosting.com` confirmed immediate resolution to `38.103.171.46`.
+  - Global DNS propagation confirmed 100% across Cloudflare (`1.1.1.1`), Google (`8.8.8.8`), Quad9 (`9.9.9.9`), and local resolvers.
+  - Root domain `melonmadura.my.id` and `www` CNAME verified completely intact and isolated on JagoanHosting Shared Hosting (`101.50.1.84`).
+  - Network reachability verified via TCP port 22 (`TcpTestSucceeded: True`) without logging in or exposing secrets.
+  - Satisfies the "Production Domain & DNS Provisioning" prerequisite for TASK-1011 while retaining zero modifications to code, staging, or server runtime.
+
 - **VPS Host Environment Preparation & Hardening:**
   - Provision Linux VPS (Ubuntu 24.04 LTS recommended, min 2 vCPU, 4GB RAM, SSD storage).
   - Configure non-root deploy user (`deploy`) with sudo privileges.
@@ -3488,6 +3496,7 @@ Prepare, harden, and automate the production deployment environment on a dedicat
 
 ### Acceptance Criteria
 
+- [x] Production subdomain `monitoring.melonmadura.my.id` provisioned in DNS and verified pointing to Nebula VPS (`38.103.171.46`) with 100% isolation of root shared hosting domain (`melonmadura.my.id` on `101.50.1.84`).
 - [ ] VPS provisioned, SSH hardened (no root/password auth), and UFW firewall active (only 22, 80, 443 open).
 - [ ] Multi-stage Dockerfiles build clean, unprivileged production images for `@kebun-melon/web` and `@kebun-melon/iot-gateway`.
 - [ ] Docker Compose orchestrates web, gateway, and reverse proxy with health checks and restart policies.

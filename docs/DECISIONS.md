@@ -484,11 +484,11 @@
 
 #### DEC-INF-088: Production VPS Hosting & Containerized Staging Architecture
 * **Related Task IDs**: `TASK-1011`, `TASK-1012`
-* **Related Documentation**: `docs/ARCHITECTURE.md` §22, `docs/SECURITY.md` §27, `docs/PRD.md` §10, `TASKS.md`
+* **Related Documentation**: `docs/ARCHITECTURE.md` §22 & §23, `docs/SECURITY.md` §27, `docs/PRD.md` §10, `TASKS.md`
 * **Status**: **APPROVED BY USER**
 * **Approved Decision**:
-  1. **Production Hosting**: Production application runtime (`apps/web`, `apps/iot-gateway`) shall be deployed to a dedicated Linux VPS using a multi-service Docker Compose topology (`TASK-1011`).
-  2. **Automated Reverse Proxy & TLS**: Production uses an automated HTTPS reverse proxy (Caddy or Nginx) with Let's Encrypt automated TLS certificate issuance and renewal, strict security headers, and unbuffered SSE proxying (`/api/v1/realtime/stream`).
+  1. **Production Hosting & Domain Provisioning**: Production application runtime (`apps/web`, `apps/iot-gateway`) shall be deployed to a dedicated Linux VPS (JagoanHosting Nebula VPS General Purpose, `38.103.171.46`) using a multi-service Docker Compose topology under dedicated subdomain `monitoring.melonmadura.my.id` (`TASK-1011`). The apex domain (`melonmadura.my.id`) and `www` alias remain isolated on JagoanHosting Shared Hosting (`101.50.1.84`).
+  2. **Automated Reverse Proxy & TLS**: Production uses an automated HTTPS reverse proxy (Caddy or Nginx) with Let's Encrypt automated TLS certificate issuance and renewal, strict security headers, and unbuffered SSE proxying (`/api/v1/realtime/stream`). Pre-provisioned A record satisfies the ACME HTTP-01 challenge prerequisite.
   3. **Staging Architecture**: Railway PaaS is decommissioned. Staging transitions to a dual-tier containerized staging architecture (`TASK-1012`): Tier 1 (local containerized staging using `docker-compose.staging.yml` connecting to cloud Supabase Staging and EMQX Cloud Staging at $0 cost) and Tier 2 (pre-production verification drill on the VPS host).
   4. **Strict Environment Segregation**: Development, staging, and production maintain 100% isolation across databases, secrets, domains, broker credentials, and topic namespaces (`agriculture/production/...` vs `agriculture/staging/...` vs `agriculture/development/...`).
   5. **Safety Baseline**: `ENABLE_FAUCET_CONTROL=false` remains strictly enforced across all environments.

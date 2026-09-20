@@ -2130,3 +2130,53 @@ The web frontend presents live ML predictions and agronomic advice dynamically w
    - Integrated with `next-intl` under the `recommendation` namespace with 14 keys and 100% parity across `id` and `en`.
    - Symmetrically embedded on `/soil` and `/water` with `pb-24` clearance to avoid clipping or occlusion by mobile navigation bars.
 <!-- External ML Architecture Reconciled: 2026-09-19 -->
+
+---
+
+## Production Infrastructure & DNS Ingress Topology (TASK-1011 Prerequisite / DEC-INF-088 / Reconciled 2026-09-20)
+
+This section documents the network ingress and DNS topology established for production deployment:
+
+### 1. Network & Host Isolation Architecture
+
+The production environment implements strict separation between existing shared web hosting and dedicated IoT monitoring infrastructure:
+
+```text
+                                Internet / Public DNS
+                                          │
+                  ┌───────────────────────┴───────────────────────┐
+                  │                                               │
+                  ▼                                               ▼
+         melonmadura.my.id                          monitoring.melonmadura.my.id
+       (and www CNAME alias)                                 (A Record)
+                  │                                               │
+                  ▼                                               ▼
+       [101.50.1.84: Port 80/443]                     [38.103.171.46: Port 80/443/22]
+   JagoanHosting cPanel Shared Hosting                  JagoanHosting Nebula VPS
+(Existing Website & Corporate Services)             (Dedicated Docker Monitoring Stack)
+                                                                  │
+                                                    ┌─────────────┴─────────────┐
+                                                    ▼                           ▼
+                                             Reverse Proxy               Docker Bridge
+                                            (Caddy / Nginx)              (Web & Gateway)
+```
+
+### 2. DNS Zone Authority & Routing Contract
+
+- **Authoritative Nameservers:** Managed via JagoanHosting cPanel Zone Editor (`one.jagoanhosting.com`, `best.jagoanhosting.com`, `great.jagoanhosting.com`).
+- **Production Subdomain (`monitoring.melonmadura.my.id`):**
+  - Record Type: `A`
+  - Target IPv4: `38.103.171.46` (Nebula VPS General Purpose).
+  - Time-To-Live (TTL): `300s` (5 minutes) for agile initial rollout and zero-friction rollback capability.
+  - Verified Propagation: 100% resolution across Cloudflare (`1.1.1.1`), Google (`8.8.8.8`), Quad9 (`9.9.9.9`), and local recursive resolvers.
+- **Apex Domain Isolation (`melonmadura.my.id` & `www`):**
+  - Resolves strictly to `101.50.1.84` (Shared Hosting cPanel web server).
+  - Subdomain routing has zero impact on apex HTTP traffic, cPanel mail routing (MX), or existing shared hosting assets.
+
+### 3. Verification & Deployment Sequencing Invariant
+
+- DNS resolution operates strictly at Layer 3/4 and is decoupled from application container lifecycle.
+- Pre-provisioning the A record satisfies the Let's Encrypt / ACME HTTP-01 automated certificate issuance challenge required during reverse proxy setup in [TASK-1011](file:///c:/Users/Puroh/Documents/Melon/TASKS.md#L3420).
+- Visiting the subdomain prior to reverse proxy deployment returns standard TCP connection refused, as expected until container orchestration is launched.
+<!-- Production DNS Architecture Reconciled: 2026-09-20 -->
+
