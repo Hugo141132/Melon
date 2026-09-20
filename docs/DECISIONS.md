@@ -1094,3 +1094,25 @@ The following facts are supported by the verified decisions governance of `TASK-
      - Any future image asset introduced must use the `.webp` format.
      - No new logo asset is created; existing brand typography `<span className="text-[24px] font-bold text-primary">Kebun Melon</span>` and Lucide icons are strictly preserved.
 <!-- TASK-0213 Reconciled: 2026-09-20 -->
+
+---
+
+## DEC-DEV-035: Retirement of Deprecated HiveMQ Dual Broker Support and Consolidation on Unified EMQX Cloud Broker
+- **Status:** APPROVED & IMPLEMENTED (2026-09-20)
+- **Related Task IDs:** `TASK-0415`, `TASK-0416`
+- **Context:**
+  Following the successful consolidation under `TASK-0415` where Soil and Water Quality telemetry pipelines were migrated to the primary EMQX Cloud broker (`wss://...:8084/mqtt` / `mqtts://...:8883`), backward-compatible fallback logic and dual-broker environment variables remained in the IoT Gateway. Maintaining dual-broker instantiation paths and fallback tests introduced unnecessary complexity, configuration overhead, and divergence between local/staging environments.
+- **Decision & Implementation Directives:**
+  1. **Retirement of Secondary Broker Variables**:
+     - Permanently removed `SOIL_WATER_MQTT_BROKER_URL`, `SOIL_WATER_MQTT_CLIENT_ID`, `SOIL_WATER_MQTT_USERNAME`, and `SOIL_WATER_MQTT_PASSWORD` from `apps/iot-gateway/src/config/env.ts` and example configurations.
+     - Preserved `SOIL_WATER_ADAPTER_ENABLED` and all telemetry topic path definitions.
+  2. **Single Unified MQTT Gateway Client**:
+     - `apps/iot-gateway` now instantiates and maintains exactly one primary `GatewayMqttClient` connecting to EMQX Cloud.
+     - `SoilWaterMqttAdapter` binds unconditionally to the primary MQTT client upon connection.
+  3. **Simplified Health & Readiness Reporting**:
+     - `/ready` and `/internal/v1/ready` endpoints now report unified dependency status based strictly on the primary EMQX broker and database connection.
+  4. **Preservation of Invariants**:
+     - No modifications to MQTT topic schemas (`melon/sensor-tanah/...`, `melon/sensor-air/...`, `irigasi/melon/...`).
+     - No modifications to device client IDs (`melon-esp32-tanah1`, `melon-esp32-air1`, `water-tank-node-zi37gz`).
+     - No modifications to database models or frontend views.
+<!-- TASK-0416 Reconciled: 2026-09-20 -->

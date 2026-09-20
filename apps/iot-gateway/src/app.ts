@@ -38,7 +38,6 @@ export interface AppOptions {
   env: GatewayEnv;
   mqttClient?: GatewayMqttClient;
   hardwareMqttClient?: GatewayMqttClient;
-  soilWaterMqttClient?: GatewayMqttClient;
   dbChecker?: DbChecker;
   commandPublisher?: CommandPublisher;
   acknowledgementProcessor?: AcknowledgementProcessor;
@@ -98,7 +97,6 @@ export function buildApp(options: AppOptions): {
   app: FastifyInstance;
   mqttClient: GatewayMqttClient;
   hardwareMqttClient?: GatewayMqttClient;
-  soilWaterMqttClient?: GatewayMqttClient;
   commandPublisher: CommandPublisher;
   acknowledgementProcessor: AcknowledgementProcessor;
   faucetEventProcessor: FaucetEventProcessor;
@@ -129,22 +127,6 @@ export function buildApp(options: AppOptions): {
         })
       : undefined);
 
-  const soilWaterMqttClient =
-    options.soilWaterMqttClient ??
-    (options.env.SOIL_WATER_MQTT_BROKER_URL &&
-    options.env.SOIL_WATER_MQTT_BROKER_URL !== options.env.MQTT_BROKER_URL
-      ? new GatewayMqttClient({
-          ...options.env,
-          MQTT_BROKER_URL: options.env.SOIL_WATER_MQTT_BROKER_URL,
-          MQTT_GATEWAY_CLIENT_ID:
-            options.env.SOIL_WATER_MQTT_CLIENT_ID || 'melon-gateway-soil-water',
-          MQTT_GATEWAY_USERNAME:
-            options.env.SOIL_WATER_MQTT_USERNAME ?? options.env.MQTT_GATEWAY_USERNAME,
-          MQTT_GATEWAY_PASSWORD:
-            options.env.SOIL_WATER_MQTT_PASSWORD ?? options.env.MQTT_GATEWAY_PASSWORD,
-        })
-      : undefined);
-
   const commandPublisher = options.commandPublisher ?? defaultCommandPublisher;
   const acknowledgementProcessor =
     options.acknowledgementProcessor ?? defaultAcknowledgementProcessor;
@@ -159,8 +141,7 @@ export function buildApp(options: AppOptions): {
   const telemetryRepo =
     options.telemetryRepo ?? (defaultPrisma ? new TelemetryRepository(defaultPrisma) : undefined);
 
-  const targetSoilWaterClient = soilWaterMqttClient ?? mqttClient;
-  soilWaterAdapter.bind(options.env, targetSoilWaterClient, telemetryRepo, deviceRepo);
+  soilWaterAdapter.bind(options.env, mqttClient, telemetryRepo, deviceRepo);
 
   hardwareAdapter.bind(options.env, mqttClient, hardwareMqttClient, deviceRepo);
   commandPublisher.bind(options.env, mqttClient, hardwareAdapter);
@@ -222,7 +203,7 @@ export function buildApp(options: AppOptions): {
   });
 
   // Register routes
-  registerHealthRoutes(app, mqttClient, options.dbChecker, options.env, soilWaterMqttClient);
+  registerHealthRoutes(app, mqttClient, options.dbChecker, options.env);
 
   // Global error handler with secret redaction (typed for Fastify v5)
   app.setErrorHandler((error: FastifyError | Error | unknown, _request, reply) => {
@@ -241,7 +222,6 @@ export function buildApp(options: AppOptions): {
     app,
     mqttClient,
     hardwareMqttClient,
-    soilWaterMqttClient,
     commandPublisher,
     acknowledgementProcessor,
     faucetEventProcessor,

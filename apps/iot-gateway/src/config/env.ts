@@ -66,10 +66,6 @@ export const gatewayEnvSchema = z.object({
   HARDWARE_MQTT_BROKER_URL: z.string().optional(),
   HARDWARE_TARGET_DEVICE_ID: z.string().default('water-tank-node-zi37gz'),
   WATER_TANK_DEVICE_ID: z.string().optional(),
-  SOIL_WATER_MQTT_BROKER_URL: z.string().optional(),
-  SOIL_WATER_MQTT_CLIENT_ID: z.string().default('melon-gateway-soil-water'),
-  SOIL_WATER_MQTT_USERNAME: z.string().optional(),
-  SOIL_WATER_MQTT_PASSWORD: z.string().optional(),
   SOIL_WATER_ADAPTER_ENABLED: z
     .preprocess((val) => {
       if (val === undefined || val === null || val === '') return true;

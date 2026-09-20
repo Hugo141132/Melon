@@ -49,9 +49,7 @@ This specification does not define how a sensor produces a measurement. It defin
 
 The browser shall not communicate directly with an ESP32/NodeMCU device or publish directly to MQTT topics.
 
-The architecture provides two distinct ingress paths based on monitoring domain:
-
-#### Path A — MQTT over TLS via Secondary HiveMQ Cloud Broker (Soil & Water Quality Telemetry, TASK-0412 / TASK-0414)
+#### Path A — MQTT over TLS via Unified EMQX Cloud Broker (Soil & Water Quality Telemetry, TASK-0415 / TASK-0416 / DEC-DEV-035)
 
 ```text
 Soil & Water Monitoring Equipment (ESP32)
@@ -63,10 +61,10 @@ Soil & Water Monitoring Equipment (ESP32)
     │ Water Inbound Telemetry: melon/sensor-air/data-2424600050
     │ Water AI Recommendation: melon/ai-air/rekomendasi-2424600050
     ▼
-Dedicated HiveMQ Cloud Broker (Port 8883 TLS)
+Unified EMQX Cloud Broker (Port 8883 TLS / 8084 WSS)
     │
     ▼
-IoT Gateway (apps/iot-gateway — Dedicated SoilWaterMqttAdapter Client)
+IoT Gateway (apps/iot-gateway — Unified EMQX Client / SoilWaterMqttAdapter)
     │
     ├── Resolve database device dynamically via MQTT Client ID (devices.client_id)
     ├── Dual payload normalization (canonical JSON envelope + flat abbreviated keys)
@@ -242,21 +240,25 @@ The broker shall:
 - Expose operational metrics and logs.
 - Permit revocation of a single device without affecting other devices.
 
-#### 5.2.1 Broker Connectivity Architecture (Dual MQTT Broker Topology, TASK-0414 / DEC-DEV-033)
+#### 5.2.1 Broker Connectivity Architecture (Unified EMQX Topology, TASK-0415 / TASK-0416 / DEC-DEV-035)
 
-The system operates a lightweight dual MQTT broker architecture in `apps/iot-gateway` to accommodate hardware topology requirements:
+The system consolidates all MQTT communication onto a single unified EMQX Cloud broker (`TASK-0415`, `TASK-0416`, `DEC-DEV-035`). The deprecated HiveMQ Cloud secondary broker fallback has been permanently retired from the gateway codebase.
 
-- **Primary Broker — Dedicated EMQX Cloud:**
-  - **Scope:** Dedicated strictly to Water Tank Monitoring (`WATER_TANK_NODE`) and Faucet Control (`irigasi/melon/...`).
-  - **Transport:** WebSocket Secure (`wss://<cluster-host>:8084/mqtt`) or TLS TCP (Port 8883).
-  - **Topics:** Telemetry (`irigasi/melon/sensor/volume`), Valve actuation (`irigasi/melon/kontrol/valve`), Automation setting (`irigasi/melon/setting/otomasi`).
+- **Unified Primary Broker — EMQX Cloud:**
+  - **Scope:** Handles all monitoring and actuation domains:
+    - Water Tank Monitoring (`WATER_TANK_NODE`) and Faucet Control (`irigasi/melon/...`).
+    - Soil Node ESP32 (`melon-esp32-tanah1`) and Water Quality Node ESP32 (`melon-esp32-air1`) (`melon/...`).
+  - **Transport:** WebSocket Secure (`wss://<cluster-host>:8084/mqtt`) or TLS TCP (`mqtts://<cluster-host>:8883`).
+  - **Topics:**
+    - Reservoir telemetry (`irigasi/melon/sensor/volume`), valve actuation (`irigasi/melon/kontrol/valve`), automation setting (`irigasi/melon/setting/otomasi`).
+    - Soil inbound (`melon/sensor-tanah/data-2424600050`), water inbound (`melon/sensor-air/data-2424600050`), outbound AI recommendations (`melon/ai-tanah/rekomendasi-2424600050`, `melon/ai-air/rekomendasi-2424600050`).
+  - **Gateway Client:** Primary client connects once to EMQX; `SoilWaterMqttAdapter` binds unconditionally to this primary client (`apps/iot-gateway/src/app.ts`).
   - **Safety:** Obeying strict safety lock `ENABLE_FAUCET_CONTROL=false`.
-- **Secondary Broker — Dedicated HiveMQ Cloud:**
-  - **Scope:** Dedicated strictly to Soil Node ESP32 (`melon-esp32-tanah1`) and Water Quality Node ESP32 (`melon-esp32-air1`).
-  - **Transport:** MQTT over TLS (Port 8883) at `217c0d73f9b648c09a5741c80dbb80df.s1.eu.hivemq.cloud:8883`.
-  - **Topics:** Soil inbound (`melon/sensor-tanah/data-2424600050`), Water inbound (`melon/sensor-air/data-2424600050`), Outbound AI recommendations (`melon/ai-tanah/rekomendasi-2424600050`, `melon/ai-air/rekomendasi-2424600050`).
-  - **Gateway Client:** Dedicated lightweight client (`SOIL_WATER_MQTT_CLIENT_ID=melon-gateway-soil-water`) configured via environment variables.
-- **Client ID Collision Avoidance:** Gateway clients use static, non-colliding client IDs (`melon-gateway-soil-water` for HiveMQ; `gateway-kebun-melon-dev-local-01` for EMQX). Device simulators connect with dedicated client IDs and never impersonate gateway clients.
+- **Retirement of Secondary Broker Fallback (`TASK-0416` / `DEC-DEV-035`):**
+  - Obsolete `SOIL_WATER_MQTT_*` environment variables have been removed from the IoT Gateway runtime.
+  - No secondary MQTT client is instantiated.
+  - Live probe confirmed 0 active client connections and 0 messages on legacy HiveMQ, verifying that hardware traffic has ceased on the fallback broker.
+- **Client ID Collision Avoidance:** Gateway client uses static, non-colliding client ID (`MQTT_GATEWAY_CLIENT_ID=Test_Gateway` or `gateway-kebun-melon-dev-local-01` for primary EMQX). Hardware devices use MAC-derived or configured IDs (`melon-esp32-tanah1`, `melon-esp32-air1`, `water-tank-node-zi37gz`) and authenticate via `petanimelon` or `Test_Device`.
 - **Staging Isolation:** Staging environments remain 100% isolated containerized deployments and are untouched by local development broker testing.
 
 

@@ -51,6 +51,11 @@ describe('Gateway Health & Internal Readiness Endpoints', { timeout: 30000 }, ()
       expect(json.status).toBe('UP');
       expect(json.database.connected).toBe(true);
       expect(json.mqtt.connected).toBe(true);
+      expect(json.soilWaterMqtt).toEqual({
+        broker: 'EMQX',
+        status: 'CONNECTED',
+        connected: true,
+      });
     });
 
     it('GET /ready returns DEGRADED (503) when MQTT is disconnected', async () => {
@@ -75,12 +80,8 @@ describe('Gateway Health & Internal Readiness Endpoints', { timeout: 30000 }, ()
       expect(json.status).toBe('DEGRADED');
     });
 
-    it('GET /ready reports separate EMQX and HiveMQ broker statuses when dual broker is configured', async () => {
+    it('GET /ready reports unified EMQX status for soilWaterMqtt in single-broker architecture (TASK-0416)', async () => {
       const mockEmqxClient: any = {
-        getStatus: () => 'CONNECTED',
-        isConnected: () => true,
-      };
-      const mockHivemqClient: any = {
         getStatus: () => 'CONNECTED',
         isConnected: () => true,
       };
@@ -88,7 +89,6 @@ describe('Gateway Health & Internal Readiness Endpoints', { timeout: 30000 }, ()
       const { app } = buildApp({
         env,
         mqttClient: mockEmqxClient,
-        soilWaterMqttClient: mockHivemqClient,
         dbChecker: async () => true,
       });
 
@@ -102,40 +102,10 @@ describe('Gateway Health & Internal Readiness Endpoints', { timeout: 30000 }, ()
       expect(json.status).toBe('UP');
       expect(json.emqx).toEqual({ status: 'CONNECTED', connected: true });
       expect(json.soilWaterMqtt).toEqual({
-        broker: 'HIVEMQ',
+        broker: 'EMQX',
         status: 'CONNECTED',
         connected: true,
       });
-      expect(json.mqtt).toEqual({ status: 'CONNECTED', connected: true });
-    });
-
-    it('GET /ready returns DEGRADED (503) when HiveMQ Soil/Water broker is disconnected', async () => {
-      const mockEmqxClient: any = {
-        getStatus: () => 'CONNECTED',
-        isConnected: () => true,
-      };
-      const mockHivemqClient: any = {
-        getStatus: () => 'DISCONNECTED',
-        isConnected: () => false,
-      };
-
-      const { app } = buildApp({
-        env,
-        mqttClient: mockEmqxClient,
-        soilWaterMqttClient: mockHivemqClient,
-        dbChecker: async () => true,
-      });
-
-      const response = await app.inject({
-        method: 'GET',
-        url: '/ready',
-      });
-
-      expect(response.statusCode).toBe(503);
-      const json = response.json();
-      expect(json.status).toBe('DEGRADED');
-      expect(json.emqx.connected).toBe(true);
-      expect(json.soilWaterMqtt.connected).toBe(false);
     });
   });
 
@@ -331,44 +301,6 @@ describe('Gateway Health & Internal Readiness Endpoints', { timeout: 30000 }, ()
         dependencies: {
           database: 'down',
           broker: 'up',
-        },
-      });
-    });
-
-    it('GET /internal/v1/ready returns separate emqxBroker and soilWaterBroker dependencies when dual broker is configured', async () => {
-      const mockEmqxClient: any = {
-        getStatus: () => 'CONNECTED',
-        isConnected: () => true,
-      };
-      const mockHivemqClient: any = {
-        getStatus: () => 'CONNECTED',
-        isConnected: () => true,
-      };
-
-      const { app } = buildApp({
-        env,
-        mqttClient: mockEmqxClient,
-        soilWaterMqttClient: mockHivemqClient,
-        dbChecker: async () => true,
-      });
-
-      const response = await app.inject({
-        method: 'GET',
-        url: '/internal/v1/ready',
-        headers: {
-          authorization: 'Bearer super_secret_internal_token_123',
-        },
-      });
-
-      expect(response.statusCode).toBe(200);
-      const json = response.json();
-      expect(json).toEqual({
-        status: 'ready',
-        dependencies: {
-          database: 'up',
-          broker: 'up',
-          emqxBroker: 'up',
-          soilWaterBroker: 'up',
         },
       });
     });

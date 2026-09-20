@@ -27,15 +27,15 @@ The project is a web-based multi-device monitoring and control system for ESP32/
 
 The system monitors:
 
-### Soil Monitoring (MQTT over TLS via HiveMQ Cloud Broker, TASK-0412 / TASK-0414)
+### Soil Monitoring (Unified EMQX Cloud Broker per TASK-0415 / TASK-0416, DEC-DEV-035)
 
-- Nitrogen, Phosphorus, Potassium, Temperature, Moisture, pH, EC (canonically standardized in `µS/cm` per `DEC-MON-091`), Soil status (Battery deleted per `DEC-MON-086`). Ingested via HiveMQ Cloud over TLS on `melon/sensor-tanah/data-2424600050` with outbound recommendation on `melon/ai-tanah/rekomendasi-2424600050` per `TASK-0412`.
+- Nitrogen, Phosphorus, Potassium, Temperature, Moisture, pH, EC (canonically standardized in `µS/cm` per `DEC-MON-091`), Soil status (Battery deleted per `DEC-MON-086`). Ingested via primary EMQX Cloud over TLS on `melon/sensor-tanah/data-2424600050` with outbound recommendation on `melon/ai-tanah/rekomendasi-2424600050` (HiveMQ Cloud broker fallback permanently retired per `TASK-0416` / `DEC-DEV-035`).
 
-### Water Quality Monitoring (MQTT over TLS via HiveMQ Cloud Broker, TASK-0412 / TASK-0414)
+### Water Quality Monitoring (Unified EMQX Cloud Broker per TASK-0415 / TASK-0416, DEC-DEV-035)
 
-- pH, TDS, EC (canonically standardized in `µS/cm` per `DEC-MON-091`), Water status (Battery, Latitude, and Longitude deleted per `DEC-MON-086`). Ingested via HiveMQ Cloud over TLS on `melon/sensor-air/data-2424600050` with outbound recommendation on `melon/ai-air/rekomendasi-2424600050` per `TASK-0412`.
+- pH, TDS, EC (canonically standardized in `µS/cm` per `DEC-MON-091`), Water status (Battery, Latitude, and Longitude deleted per `DEC-MON-086`). Ingested via primary EMQX Cloud over TLS on `melon/sensor-air/data-2424600050` with outbound recommendation on `melon/ai-air/rekomendasi-2424600050` (HiveMQ Cloud broker fallback permanently retired per `TASK-0416` / `DEC-DEV-035`).
 
-### Reservoir-Water Monitoring (MQTT 5.0 over TLS via Primary EMQX Cloud Broker, DEC-DEV-032 / DEC-DEV-033)
+### Reservoir-Water Monitoring (MQTT 5.0 over TLS via Primary EMQX Cloud Broker, DEC-DEV-032 / DEC-DEV-033 / DEC-DEV-035)
 
 - Reservoir water volume, Reservoir status (Flow rate deleted per `DEC-MON-089`). Preserved on dedicated EMQX Cloud broker (`irigasi/melon/...`).
 
@@ -323,8 +323,8 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
   - Environment Variables & Server Configuration: In `apps/web/lib/env/server.ts`, changed default `AUTH_RESET_TOKEN_EXPIRY_MINUTES` to `1` and added `AUTH_VERIFY_TOKEN_EXPIRY_MINUTES` defaulting to `1`. Updated `.env`, `apps/web/.env`, and `apps/web/.env.example`.
   - API Routes: Passed `expiryMinutes: env.AUTH_VERIFY_TOKEN_EXPIRY_MINUTES` to `userRepository.createEmailVerificationToken` in `POST /api/v1/auth/register` and `POST /api/v1/auth/resend-verification`. Passed `expiryMinutes: env.AUTH_VERIFY_TOKEN_EXPIRY_MINUTES` to `userRepository.requestEmailChange` in `POST /api/v1/me/email/request`.
   - UI Timers & Copy: Updated forgot-password cooldown timer (`apps/web/app/(auth)/forgot-password/forgot-password-view.tsx`) from `15 * 60` to `60` seconds. Updated `apps/web/messages/id.json` and `apps/web/messages/en.json` `codeExpiryNotice` to state 1 minute. Updated transactional email copies in `apps/web/lib/email/resend.ts` to state 1 minute.
-  - Specifications: Reconciled `docs/SECURITY.md`, `docs/USER_FLOWS.md`, `docs/API.md`, `docs/DECISIONS.md`, and `TASKS.md`.
-  - Verification: 100% test pass rate across all related database and web unit/integration test suites (104 tests total across `user-repository.test.ts`, `user-repository-email-change.test.ts`, `user-repository-reset-password.test.ts`, `server-env.test.ts`, `forgot-password-ui.test.tsx`, `forgot-password-route.test.ts`, `email-change-routes.test.ts`, and `verify-email-routes.test.ts`), plus 100% translation key parity via `npm run i18n:check`.
+  - Specifications: Reconciled `docs/SECURITY.md`, `docs/USER_FLOWS.md`, `docs/API.md`, `docs/DECISIONS.md`, `docs/TRACEABILITY.md`, `docs/SECURITY_EXCEPTIONS.md`, and `TASKS.md`.
+  - Verification & Staging Deployment: 100% test pass rate across all related database and web unit/integration test suites (104 tests total across `user-repository.test.ts`, `user-repository-email-change.test.ts`, `user-repository-reset-password.test.ts`, `server-env.test.ts`, `forgot-password-ui.test.tsx`, `forgot-password-route.test.ts`, `email-change-routes.test.ts`, and `verify-email-routes.test.ts`), plus 100% translation key parity via `npm run i18n:check`. Reconciled `.env.staging` and `.env.staging.example` with `AUTH_RESET_TOKEN_EXPIRY_MINUTES=1` and `AUTH_VERIFY_TOKEN_EXPIRY_MINUTES=1`. Rebuilt and redeployed containerized staging web service (`kebun-melon-staging-web`) and IoT gateway (`kebun-melon-staging-gateway`), both verified healthy (`Up (healthy)`) on ports 3000 and 3001.
 
 #### TASK-0302 Governance Record
 
@@ -478,6 +478,41 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
     - Water Optimal: `pH: 6.2, TDS: 420 ppm, EC: 450 µS/cm` $\to$ `optimal`.
     - Water Warning: `pH: 6.2, TDS: 420 ppm, EC: 900 µS/cm` $\to$ `warning`.
     - Water Critical: `pH: 6.2, TDS: 420 ppm, EC: 2200 µS/cm` $\to$ `kritis`.
+
+#### TASK-0415 Governance Record
+
+`TASK-0415` consolidate soil and water quality MQTT telemetry to unified EMQX Cloud broker record:
+- Status: `DONE` (Completed 2026-09-20)
+- Priority: `P1`
+- Frontend impact: `NONE`
+- Selected UI direction: `Premium Minimal Ops`
+- Existing color template: `UNCHANGED`
+- Selected motion effects: `None`
+- 21st.dev MCP: `NOT REQUIRED`
+- Summary: Consolidated Soil ESP32 (`melon-esp32-tanah1`) and Water Quality ESP32 (`melon-esp32-air1`) MQTT telemetry ingestion from HiveMQ Cloud back to the primary EMQX Cloud broker, unifying all IoT telemetry and actuator control onto a single resilient broker while maintaining backward-compatible secondary broker fallback.
+  - IoT Gateway Unified Wiring (`apps/iot-gateway/src/app.ts`): Reconciled gateway configuration to leverage native fallback where omission of `SOIL_WATER_MQTT_BROKER_URL` binds `soilWaterAdapter` to the primary EMQX client (`mqttClient`).
+  - Deprecated Secondary Broker Configuration (`apps/iot-gateway/src/config/env.ts`): Annotated `SOIL_WATER_MQTT_*` environment variables as `@deprecated TASK-0415`, keeping them available as fallback options if dedicated secondary broker operation is required.
+  - Health & Readiness Reporting (`apps/iot-gateway/src/routes/health.ts`): Updated `/ready` public diagnostic endpoint to explicitly output `soilWaterMqtt: { broker: 'EMQX', status: data.mqttStatus, connected: data.isMqttConnected }` in unified mode, while preserving `{ broker: 'HIVEMQ', ... }` when secondary broker is configured.
+  - Invariants Preserved: Zero database schema changes, zero frontend changes, zero staging environment changes, and identical MQTT topic hierarchies and JSON contracts.
+  - Test & Quality Verification: Added unit tests verifying unified EMQX binding and readiness output in `health.test.ts` and `broker-config.test.ts`. Verified 100% test pass rate across 21 test files (332/332 tests passed) in `apps/iot-gateway`, and 0 TypeScript errors across all 4 monorepo workspaces.
+
+#### TASK-0416 Governance Record
+
+`TASK-0416` remove deprecated HiveMQ dual broker support record:
+- Status: `DONE` (Completed 2026-09-20)
+- Priority: `P2`
+- Frontend impact: `NONE`
+- Selected UI direction: `Premium Minimal Ops`
+- Existing color template: `UNCHANGED`
+- Selected motion effects: `None`
+- 21st.dev MCP: `NOT REQUIRED`
+- Summary: Permanently removed obsolete HiveMQ secondary broker fallback code, environment variables, and tests following consolidation on unified EMQX Cloud under `DEC-DEV-035`.
+  - Environment Cleanup: Removed `SOIL_WATER_MQTT_BROKER_URL`, `SOIL_WATER_MQTT_CLIENT_ID`, `SOIL_WATER_MQTT_USERNAME`, and `SOIL_WATER_MQTT_PASSWORD` from `apps/iot-gateway/src/config/env.ts`, root `.env`, and `apps/iot-gateway/.env`. Retained `SOIL_WATER_ADAPTER_ENABLED` and hardware device credential references (`SOIL_DEVICE_MQTT_*` and `WATER_DEVICE_MQTT_*`).
+  - Gateway Simplification (`apps/iot-gateway/src/app.ts` & `src/index.ts`): Retired secondary MQTT client instantiation logic. `SoilWaterMqttAdapter` connects unconditionally through the primary `GatewayMqttClient`.
+  - Health Endpoint Cleanup (`apps/iot-gateway/src/routes/health.ts`): Simplified `/ready` to report unified EMQX status (`soilWaterMqtt: { broker: 'EMQX', status, connected }`) and simplified `/internal/v1/ready` to check standard database and EMQX broker dependencies without secondary broker branching.
+  - Tests Cleaned & Passing: Pruned legacy HiveMQ-specific fallback tests in `apps/iot-gateway/src/__tests__/health.test.ts` and `apps/iot-gateway/src/__tests__/broker-config.test.ts`. Verified 100% test pass rate across 21 test files (327/327 tests passed).
+  - Monorepo Typecheck: Clean (`tsc --noEmit` exited 0 across all 4 packages).
+  - Hardware & Broker Verification: Probed live EMQX Cloud broker over TLS and confirmed both gateway credentials (`Test_gateway`) and device credentials (`petanimelon`) authenticate and connect with 100% success. Confirmed physical ESP32 devices are currently offline and not transmitting to HiveMQ or EMQX.
 
 #### TASK-1004 Governance & Infrastructure Record
 

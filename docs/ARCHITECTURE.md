@@ -118,8 +118,7 @@ flowchart LR
     A[Authentication and RBAC Layer]
     R[Realtime Delivery SSE]
     G[IoT Gateway]
-    M_Res[EMQX MQTT Broker Reservoir]
-    M_SW[HiveMQ Cloud MQTT Broker Soil and Water]
+    M_Uni[Unified EMQX Cloud MQTT Broker]
     D_Soil[Soil Node ESP32 MQTT]
     D_Water[Water Node ESP32 MQTT]
     D_Res[Water Tank Node MQTT]
@@ -128,12 +127,11 @@ flowchart LR
 
     U -->|HTTPS| W
     W --> A
-    D_Soil -->|melon/sensor-tanah/...| M_SW
-    D_Water -->|melon/sensor-air/...| M_SW
-    M_SW <--> G
+    D_Soil -->|melon/sensor-tanah/...| M_Uni
+    D_Water -->|melon/sensor-air/...| M_Uni
+    D_Res <-->|irigasi/melon/...| M_Uni
+    M_Uni <--> G
     G --> DB
-    G <-->|irigasi/melon/...| M_Res
-    M_Res <--> D_Res
     G -->|POST /internal/realtime/publish| W
     W --> R
     R --> U
@@ -143,8 +141,8 @@ flowchart LR
 
 ### 4.1 Ingress Paths by Domain
 
-1. **Soil & Water Quality Telemetry (Path A - MQTT over TLS via HiveMQ Cloud, TASK-0412 / TASK-0414 / DEC-DEV-033)**: Soil and water quality equipment connects via MQTT over TLS (Port 8883) to dedicated HiveMQ Cloud broker (`mqtts://217c0d73f9b648c09a5741c80dbb80df.s1.eu.hivemq.cloud:8883`). `apps/iot-gateway` runs a dedicated secondary MQTT client with `SoilWaterMqttAdapter` subscribing to `melon/sensor-tanah/data-2424600050` and `melon/sensor-air/data-2424600050`, publishes AI recommendations back on `melon/ai-tanah/rekomendasi-2424600050` and `melon/ai-air/rekomendasi-2424600050` (QoS 1), persists telemetry to PostgreSQL (`DB`), standardizes EC directly in `µS/cm` (`DEC-MON-091`), and triggers real-time SSE stream events via internal service webhook to `apps/web` (`R`). Obsolete REST telemetry ingestion routes (`POST /api/v1/devices/[deviceId]/telemetry/...`) were permanently retired.
-2. **Reservoir-Water Telemetry & Faucet Control (Path B - Direct MQTT Gateway via EMQX Cloud, DEC-DEV-032 / DEC-DEV-033)**: The single Water Tank node connects via MQTT 5.0 over TLS/WSS to the primary EMQX Cloud broker (`M_Res`) using canonical hardware topics (`irigasi/melon/...`). The IoT Gateway (`G`) ingests telemetry directly from `irigasi/melon/sensor/volume`, validates payloads, binds deterministically to the database `WATER_TANK_NODE` entity, persists to PostgreSQL (`DB`), emits real-time updates (`R`), and publishes valve/automation commands directly to `irigasi/melon/kontrol/valve` and `irigasi/melon/setting/otomasi` under strict `ENABLE_FAUCET_CONTROL=false` safety locks. The intermediate `agriculture/...` topic hop is permanently retired for the reservoir domain, and reservoir flow remains completely unchanged.
+1. **Soil & Water Quality Telemetry (Path A - MQTT over TLS via Unified EMQX Cloud, TASK-0415 / TASK-0416 / DEC-DEV-035)**: Soil and water quality equipment connects via MQTT over TLS (Port 8883) to the primary unified EMQX Cloud broker (`mqtts://<cluster-host>:8883` or `wss://<cluster-host>:8084/mqtt`). `apps/iot-gateway` runs `SoilWaterMqttAdapter` bound unconditionally to the single unified EMQX client subscribing to `melon/sensor-tanah/data-2424600050` and `melon/sensor-air/data-2424600050`, publishes AI recommendations back on `melon/ai-tanah/rekomendasi-2424600050` and `melon/ai-air/rekomendasi-2424600050` (QoS 1), persists telemetry to PostgreSQL (`DB`), standardizes EC directly in `µS/cm` (`DEC-MON-091`), and triggers real-time SSE stream events via internal service webhook to `apps/web` (`R`). The deprecated HiveMQ Cloud secondary broker fallback has been permanently retired (`TASK-0416`, `DEC-DEV-035`). Obsolete REST telemetry ingestion routes (`POST /api/v1/devices/[deviceId]/telemetry/...`) were permanently retired.
+2. **Reservoir-Water Telemetry & Faucet Control (Path B - Direct MQTT Gateway via EMQX Cloud, DEC-DEV-032 / DEC-DEV-033 / DEC-DEV-035)**: The single Water Tank node connects via MQTT 5.0 over TLS/WSS to the primary EMQX Cloud broker (`M_Uni`) using canonical hardware topics (`irigasi/melon/...`). The IoT Gateway (`G`) ingests telemetry directly from `irigasi/melon/sensor/volume`, validates payloads, binds deterministically to the database `WATER_TANK_NODE` entity, persists to PostgreSQL (`DB`), emits real-time updates (`R`), and publishes valve/automation commands directly to `irigasi/melon/kontrol/valve` and `irigasi/melon/setting/otomasi` under strict `ENABLE_FAUCET_CONTROL=false` safety locks. The intermediate `agriculture/...` topic hop is permanently retired for the reservoir domain, and reservoir flow remains completely unchanged.
 
 
 #### 4.1.1 Gateway Connectivity Topology, EMQX Cloud & Runtime Isolation (TASK-0914, TASK-1012, DEC-DEV-032)

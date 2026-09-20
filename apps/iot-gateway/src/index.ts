@@ -24,7 +24,6 @@ export async function startServer() {
       app,
       mqttClient,
       hardwareMqttClient,
-      soilWaterMqttClient,
       commandPublisher,
       acknowledgementProcessor,
       faucetEventProcessor,
@@ -53,7 +52,7 @@ export async function startServer() {
               logger.error('Failed to start hardware adapter after MQTT connection', err);
             });
           }
-          if (!soilWaterMqttClient && env.SOIL_WATER_ADAPTER_ENABLED) {
+          if (env.SOIL_WATER_ADAPTER_ENABLED) {
             soilWaterAdapter.start().catch((err) => {
               logger.error('Failed to start soil/water adapter after MQTT connection', err);
             });
@@ -79,22 +78,6 @@ export async function startServer() {
         })
         .catch((err) => {
           logger.warn('Initial hardware MQTT connection attempt failed, will auto-retry', {
-            error: err.message,
-          });
-        });
-    }
-
-    // Connect dedicated soil/water MQTT broker if configured separately
-    if (soilWaterMqttClient && env.SOIL_WATER_ADAPTER_ENABLED) {
-      soilWaterMqttClient
-        .connect()
-        .then(() => {
-          soilWaterAdapter.start().catch((err) => {
-            logger.error('Failed to start soil/water adapter on dedicated broker', err);
-          });
-        })
-        .catch((err) => {
-          logger.warn('Initial soil/water MQTT connection attempt failed, will auto-retry', {
             error: err.message,
           });
         });
@@ -129,9 +112,6 @@ export async function startServer() {
         await mqttClient.disconnect();
         if (hardwareMqttClient) {
           await hardwareMqttClient.disconnect();
-        }
-        if (soilWaterMqttClient) {
-          await soilWaterMqttClient.disconnect();
         }
         logger.info('IoT Gateway Service shutdown complete.');
         process.exit(0);

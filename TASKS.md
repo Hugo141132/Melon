@@ -187,7 +187,7 @@ Code completion alone is not task completion.
 - Whether control is assigned per role, user, or device.
 - Concurrent faucet-command policy.
 - Cancellation and stop support.
-- Meaning and unit of Battery (`BAT`). **RESOLVED** — `BAT` stands for Battery, incorporated into soil and water quality sensors (`DEC-MON-085`).
+- Meaning and unit of Battery (`BAT`). **RESOLVED** — `BAT` parameter is completely removed from soil and water quality monitoring domains (`DEC-MON-086`, superseding `DEC-MON-085`).
 - Measurement units.
 - Offline and stale thresholds.
 - Default and fallback locale.
@@ -1135,6 +1135,7 @@ Unified all authentication token validity lifetimes and UI resend cooldown timer
 - [x] Environment variable defaults default to 1 minute (`AUTH_RESET_TOKEN_EXPIRY_MINUTES=1`, `AUTH_VERIFY_TOKEN_EXPIRY_MINUTES=1`).
 - [x] Transactional emails and localized UI copy consistently reflect the 1-minute expiration.
 - [x] All unit and integration test assertions pass (100% pass rate).
+- [x] Staging configurations (`.env.staging`, `.env.staging.example`) updated and containerized services (`kebun-melon-staging-web`, `kebun-melon-staging-gateway`) rebuilt, deployed, and verified healthy.
 
 ---
 
@@ -2110,9 +2111,89 @@ The external ML inference pipeline classifies soil and irrigation water telemetr
 - [x] Verify dynamic device mapping (`melon-esp32-tanah1` $\rightarrow$ `soil-node-jvbkdbv`, `melon-esp32-air1` $\rightarrow$ `water-quality-node-quiua`).
 - [x] Staging Environment Synchronized & Verified: Applied pending migrations (`drop_water_readings_unused_coordinates`, `add_client_id_to_devices`, `add_device_external_mappings`) to Supabase Staging (`ihgoxqdncepbcrqkchxu`), populated staging `devices.client_id` mappings, aligned `.env.staging` with secondary HiveMQ Cloud broker & external ML, and rebuilt & redeployed containerized staging (`kebun-melon-staging-web` and `kebun-melon-staging-gateway`) with all health and dual-broker `/ready` probes verified passing.
 - [ ] Receive firmware source (`.ino`) or serial runtime logs from hardware team (**PENDING**).
-- [ ] Verify physical ESP32 devices connect to HiveMQ Cloud over TLS port 8883 (**PENDING**).
+- [ ] Verify physical ESP32 devices connect to primary EMQX Cloud broker over TLS / WSS (superseded HiveMQ dual-broker per TASK-0415 / TASK-0416 / DEC-DEV-035) (**PENDING**).
 - [ ] Verify physical ESP32 telemetry packets arrive on target topics with root-level `clientId` (**PENDING**).
 - [ ] Observe live physical hardware telemetry in `/soil` and `/water` dashboards (**PENDING**).
+
+---
+
+## TASK-0415 — Consolidate Soil & Water Quality MQTT Telemetry from HiveMQ Cloud to Unified EMQX Cloud Broker
+
+**Priority:** `P1`
+**Status:** `DONE` (Software pipeline & gateway unified readiness verified; legacy dual-broker fallback preserved)
+**Dependencies:** `TASK-0412`, `TASK-0414`, `DEC-DEV-032`, `DEC-DEV-033`
+**Completed:** 2026-09-20 — Consolidated Soil ESP32 (`melon-esp32-tanah1`) and Water Quality ESP32 (`melon-esp32-air1`) MQTT telemetry ingestion from HiveMQ Cloud back to the primary EMQX Cloud broker, unifying all IoT telemetry and actuator control onto a single resilient broker while maintaining backward-compatible secondary broker fallback.
+
+### Context & Implementation
+1. **Unified EMQX Cloud Ingestion:**
+   - Evaluated dual-broker architecture (`TASK-0414`) vs unified single-broker architecture.
+   - Leveraged existing gateway design in `apps/iot-gateway/src/app.ts` where omitting `SOIL_WATER_MQTT_BROKER_URL` natively binds `soilWaterAdapter` to the primary EMQX MQTT client (`mqttClient`).
+   - Deprecated `SOIL_WATER_MQTT_*` environment variables in `apps/iot-gateway/src/config/env.ts` with JSDoc annotations, keeping them fully functional as fallback options if dedicated secondary broker operation is requested.
+2. **Health & Readiness Diagnostic Reconciliation:**
+   - Reconciled `/ready` endpoint in `apps/iot-gateway/src/routes/health.ts` so that in unified broker mode (`isSoilWaterConfigured === false`), `soilWaterMqtt` explicitly reports `{ broker: 'EMQX', status: data.mqttStatus, connected: data.isMqttConnected }`.
+   - Preserved legacy dual-broker status reporting (`{ broker: 'HIVEMQ', ... }`) when `SOIL_WATER_MQTT_BROKER_URL` is explicitly defined.
+   - Maintained canonical dependency contracts for internal readiness (`/internal/v1/ready`) and public probes.
+3. **Contract & Database Invariants Preserved:**
+   - **Zero Database Changes:** Device client IDs (`melon-esp32-tanah1`, `melon-esp32-air1`, `water-tank-node-zi37gz`), database mappings, and reading tables (`soil_readings`, `water_readings`) remain 100% unchanged.
+   - **Zero Frontend Changes:** Web dashboard consumes telemetry from PostgreSQL via REST/SSE; no UI or direct broker changes required.
+   - **Zero MQTT Contract Changes:** Inbound topics (`melon/sensor-tanah/data-2424600050`, `melon/sensor-air/data-2424600050`) and outbound recommendation topics (`melon/ai-tanah/rekomendasi-2424600050`, `melon/ai-air/rekomendasi-2424600050`) remain identical.
+   - **Zero Staging Modifications:** Preserved existing staging environment configuration per strict execution constraints.
+4. **Verification & Test Coverage:**
+   - Updated `apps/iot-gateway/src/__tests__/health.test.ts` to assert unified `soilWaterMqtt: { broker: 'EMQX' }` readiness in single-broker architecture and retained dual-broker tests.
+   - Updated `apps/iot-gateway/src/__tests__/broker-config.test.ts` to assert that omitting `SOIL_WATER_MQTT_BROKER_URL` binds to primary EMQX client and maintains legacy fallback when configured.
+   - 100% test pass rate achieved across 21 test files (332/332 tests passed) in `apps/iot-gateway`.
+   - Monorepo TypeScript typecheck passed with 0 errors across all 4 workspaces (`@kebun-melon/iot-gateway`, `@kebun-melon/web`, `@kebun-melon/contracts`, `@kebun-melon/database`).
+
+### Acceptance Criteria
+
+- [x] Consolidate Soil and Water Quality telemetry ingestion to primary EMQX Cloud client in `apps/iot-gateway`.
+- [x] Deprecate `SOIL_WATER_MQTT_*` environment variables in `env.ts` while preserving backward-compatible secondary broker fallback.
+- [x] Update `/ready` health reporting to output unified EMQX status (`broker: 'EMQX'`) when running single broker.
+- [x] Update unit test suites in `apps/iot-gateway` (`health.test.ts`, `broker-config.test.ts`) with 100% pass rate.
+- [x] Maintain zero database schema changes and zero frontend changes.
+- [x] Maintain existing MQTT topics, payload schemas, and device client IDs.
+- [x] Preserve historical `TASK-0414` records and documentation without rewriting history.
+- [x] Confirm zero staging environment changes.
+
+---
+
+## TASK-0416 — Remove Deprecated HiveMQ Dual Broker Support
+
+**Priority:** `P2`
+**Status:** `DONE` (Deprecated fallback code, env vars, and tests permanently removed per DEC-DEV-035)
+**Dependencies:** `TASK-0415`, `DEC-DEV-035`
+**Completed:** 2026-09-20 — Permanently removed obsolete HiveMQ dual broker support and legacy fallback code from `apps/iot-gateway` and environment files following the successful consolidation of Soil & Water Quality telemetry onto unified EMQX Cloud.
+
+### Context & Implementation
+1. **Environment Configuration Cleanup:**
+   - Permanently removed deprecated secondary broker variables (`SOIL_WATER_MQTT_BROKER_URL`, `SOIL_WATER_MQTT_CLIENT_ID`, `SOIL_WATER_MQTT_USERNAME`, `SOIL_WATER_MQTT_PASSWORD`) from `apps/iot-gateway/src/config/env.ts`, root `.env`, and `apps/iot-gateway/.env`.
+   - Preserved `SOIL_WATER_ADAPTER_ENABLED` feature flag and all telemetry topic configurations.
+   - Retained and labeled actual ESP32 hardware device credentials (`SOIL_DEVICE_MQTT_*` and `WATER_DEVICE_MQTT_*`) using `petanimelon` in `.env` and `.env.example`.
+2. **Gateway Single-Client Simplification:**
+   - Removed secondary client instantiation logic from `apps/iot-gateway/src/app.ts` and `src/index.ts`.
+   - `SoilWaterMqttAdapter` binds unconditionally to the primary `GatewayMqttClient` on connect.
+3. **Health Check Normalization:**
+   - Simplified `/ready` in `apps/iot-gateway/src/routes/health.ts` to output unified EMQX status (`soilWaterMqtt: { broker: 'EMQX', status, connected }`) without secondary client branching.
+   - Simplified `/internal/v1/ready` to evaluate standard database and broker dependencies cleanly.
+4. **Test Suite Cleanup & Quality Verification:**
+   - Removed obsolete dual-broker tests and legacy HiveMQ fallback assertions from `apps/iot-gateway/src/__tests__/health.test.ts` and `apps/iot-gateway/src/__tests__/broker-config.test.ts`.
+   - Verified 100% test pass rate across all 21 test files (327/327 tests passed).
+   - Monorepo TypeScript typecheck passed cleanly with 0 errors across 4 workspaces.
+5. **Live Hardware & Broker Diagnostic:**
+   - Probed live EMQX Cloud broker over TLS and verified both gateway (`Test_gateway`) and device credentials (`petanimelon`) authenticate and connect with 100% success.
+   - Verified that physical ESP32 devices are currently offline and not transmitting to HiveMQ or EMQX.
+
+### Acceptance Criteria
+
+- [x] Remove `SOIL_WATER_MQTT_*` broker URL, client ID, username, and password from `env.ts` and local `.env` files.
+- [x] Preserve `SOIL_WATER_ADAPTER_ENABLED` feature flag and topic paths.
+- [x] Retain ESP32 hardware device credentials (`petanimelon`) in environment reference.
+- [x] Simplify `apps/iot-gateway` to use single unified EMQX client without secondary client instantiation.
+- [x] Normalize `/ready` and `/internal/v1/ready` health endpoints to report unified EMQX status.
+- [x] Prune obsolete dual-broker tests and verify 100% test pass rate (327/327 tests passing).
+- [x] Monorepo TypeScript typecheck passes with 0 errors.
+- [x] Confirm zero modifications to staging environment.
+- [x] Update documentation (`TASKS.md`, `AGENTS.md`, `docs/DEVICE_COMMUNICATION.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`).
 
 ---
 
@@ -3343,7 +3424,7 @@ Critical unit coverage includes:
 **Infrastructure Provisioned (Transitioning from Railway to Containerized Staging):**
 - Staging Web: Containerized Next.js Staging Runtime (decommissioning `https://melon-monitor.up.railway.app`)
 - Staging Gateway: Containerized IoT Gateway Runtime (decommissioning `https://iot-melon-g4t3.up.railway.app/`)
-- Staging Database: Supabase PostgreSQL (`scqrbtfilmttqrutynyo`) via Supavisor Pooler (`aws-0-ap-south-1.pooler.supabase.com:6543`)
+- Staging Database: Supabase PostgreSQL (`ihgoxqdncepbcrqkchxu`) via Supavisor Pooler (`aws-0-ap-southeast-1.pooler.supabase.com:6543`) (migrated from Mumbai under TASK-0916)
 - Staging Broker: EMQX Cloud Serverless (`wss://` TLS active, per-device topic ACLs)
 - Safety Configuration: `ENABLE_FAUCET_CONTROL=false` strictly enforced
 
@@ -3913,7 +3994,7 @@ The first production release is blocked until:
 18. Telemetry intervals. **TBD** — see `docs/DECISIONS.md` §3.
 19. Offline and stale thresholds. **TBD** — see `docs/DECISIONS.md` §3.
 20. ~~Measurement units.~~ **RESOLVED** — confirmed in `DEC-MON-036` through `DEC-MON-050`.
-21. ~~`Water BAT` meaning and unit.~~ **RESOLVED** — `BAT` stands for Battery, incorporated into soil and water quality sensors (`DEC-MON-085`).
+21. ~~`Water BAT` meaning and unit.~~ **RESOLVED** — `BAT` parameter is completely removed from soil and water quality monitoring domains (`DEC-MON-086`, superseding `DEC-MON-085`).
 22. ~~Default and fallback locale.~~ **RESOLVED** — `id` default, `en` fallback (`DEC-I18N-068`).
 23. Realtime transport. **DEFERRED** — SSE in-memory in v1 (`DEC-INF-077`).
 24. Redis requirement. **DEFERRED** — not required in v1 (`DEC-INF-077`).
@@ -3939,7 +4020,7 @@ The first production release is blocked until:
 2. ~~The frontend technology must be confirmed before choosing implementation libraries.~~ **Resolved** — Next.js 14 App Router confirmed via `FRONTEND_AUDIT.md`.
 3. ~~The authentication and session approach is not final.~~ **Resolved** — PostgreSQL session table with HTTP-only cookies approved (`DEC-AUTH-001`). `SameSite` exact value still TBD.
 4. ~~Owner and Admin faucet permissions remain unresolved.~~ **Partially resolved** — Admin faucet permission rule approved (`DEC-RBAC-015`). Owner faucet permission and cancellation/stop support remain TBD.
-5. ~~`Water BAT` meaning and unit.~~ **Resolved** — `BAT` stands for Battery, incorporated into soil and water quality sensors (`DEC-MON-085`).
+5. ~~`Water BAT` meaning and unit.~~ **Resolved** — `BAT` parameter is completely removed from soil and water quality monitoring domains (`DEC-MON-086`, superseding `DEC-MON-085`).
 6. Device freshness thresholds (offline and stale) remain undefined — see `docs/DECISIONS.md` §3.
 7. ~~The production broker and device credential strategy remain unresolved.~~ **Resolved** — MQTT 5.0 over TLS, per-device credentials, per-device ACLs (`DEC-DEV-020`). Production broker vendor still TBD.
 8. Command concurrency approved. Cancellation, stop, timeout values, and late-event handling remain TBD.
