@@ -2190,5 +2190,15 @@ The production environment implements strict separation between existing shared 
   - **SPF / Return-Path:** Dedicated return-path subdomain configuration enables SPF validation without conflicting with apex SPF/cPanel mail servers.
   - **DMARC Alignment:** `TXT` record at `_dmarc.melonmadura.my.id` (`v=DMARC1; p=none;`) establishes delivery policy and reporting.
 - **Fail-Closed Production Guard:** In strict production, `validateServerEnv()` immediately rejects any fallback to `onboarding@resend.dev`, ensuring that transactional emails are never dispatched with test sender credentials in live deployment.
+
+### 5. Staging Environment Synchronization & Verified Sender Rollout (Reconciled 2026-09-20)
+
+- **Synchronized Configuration:** Staging environment configuration files (`.env.staging`, `.env.staging.example`) updated with the verified custom sending domain `RESEND_FROM_EMAIL="Melon Madura <noreply@melonmadura.my.id>"`, eliminating default test sender usage (`onboarding@resend.dev`) across staging.
+- **Containerized Stack Rebuild & Deployment:** Staging Docker Compose stack rebuilt and redeployed (`docker compose -f docker-compose.staging.yml up -d --build`).
+- **Health Verification:**
+  - `kebun-melon-staging-web` (port 3000): Verified healthy with `/health` returning HTTP 200 (`{"status":"ok"}`) and `/ready` returning HTTP 200 with all dependencies (`database`, `gateway`, `broker`) healthy.
+  - `kebun-melon-staging-gateway` (port 3001): Verified healthy with `/health` returning HTTP 200 (`{"status":"pass","service":"iot-gateway"}`).
+- **Safety Invariant:** `ENABLE_FAUCET_CONTROL=false` strictly preserved across staging containers.
 <!-- Production DNS & Email Sending Architecture Reconciled: 2026-09-20 -->
+
 

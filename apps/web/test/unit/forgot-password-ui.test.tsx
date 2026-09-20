@@ -52,8 +52,12 @@ describe('TASK-0213 Forgot Password UI Component', () => {
       expect(
         screen.getByText(/Silakan periksa kotak masuk email Anda|Please check your email inbox/i)
       ).toBeInTheDocument();
-      expect(screen.getByRole('button')).toHaveTextContent(/15:00/);
-      expect(screen.getByRole('button')).toBeDisabled();
+      const submit = screen.getByRole('button', { name: /Kirim Link Reset|Send Reset Link/i });
+      expect(submit).toHaveTextContent(/15:00/);
+      expect(submit).toBeDisabled();
+      expect(
+        screen.getByRole('button', { name: /Verifikasi Status Reset|Verify Reset Status/i })
+      ).toBeInTheDocument();
     });
 
     expect(global.fetch).toHaveBeenCalledWith(
@@ -81,7 +85,7 @@ describe('TASK-0213 Forgot Password UI Component', () => {
     render(<ForgotPasswordView />);
 
     const emailInput = screen.getByLabelText(/Alamat Email|Email Address/i);
-    const submitBtn = screen.getByRole('button');
+    const submitBtn = screen.getByRole('button', { name: /Kirim Link Reset|Send Reset Link/i });
 
     fireEvent.change(emailInput, { target: { value: 'user@example.com' } });
     fireEvent.click(submitBtn);
@@ -110,9 +114,12 @@ describe('TASK-0213 Forgot Password UI Component', () => {
 
     render(<ForgotPasswordView />);
 
-    const submitBtn = screen.getByRole('button');
+    const submitBtn = screen.getByRole('button', { name: /Kirim Link Reset|Send Reset Link/i });
     expect(submitBtn).toBeDisabled();
     expect(submitBtn).toHaveTextContent(/10:00/);
+    expect(
+      screen.getByRole('button', { name: /Verifikasi Status Reset|Verify Reset Status/i })
+    ).toBeInTheDocument();
   });
 
   it('5. Re-enables submit button and clears storage when countdown finishes', () => {
@@ -123,18 +130,22 @@ describe('TASK-0213 Forgot Password UI Component', () => {
 
     render(<ForgotPasswordView />);
 
-    expect(screen.getByRole('button')).toBeDisabled();
-    expect(screen.getByRole('button')).toHaveTextContent(/00:02/);
+    const submitBefore = screen.getByRole('button', { name: /Kirim Link Reset|Send Reset Link/i });
+    expect(submitBefore).toBeDisabled();
+    expect(submitBefore).toHaveTextContent(/00:02/);
 
     // Advance past expiration
     act(() => {
       vi.advanceTimersByTime(2500);
     });
 
-    const submitBtn = screen.getByRole('button');
+    const submitBtn = screen.getByRole('button', { name: /Kirim Link Reset|Send Reset Link/i });
     expect(submitBtn).toBeEnabled();
     expect(submitBtn).toHaveTextContent(/Kirim Link Reset|Send Reset Link/i);
     expect(sessionStorage.getItem('kebun_melon_pw_reset_cooldown_until')).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: /Verifikasi Status Reset|Verify Reset Status/i })
+    ).not.toBeInTheDocument();
   });
 
   it('6. Displays error banner when server returns an error', async () => {
@@ -152,13 +163,79 @@ describe('TASK-0213 Forgot Password UI Component', () => {
     render(<ForgotPasswordView />);
 
     const emailInput = screen.getByLabelText(/Alamat Email|Email Address/i);
-    const submitBtn = screen.getByRole('button');
+    const submitBtn = screen.getByRole('button', { name: /Kirim Link Reset|Send Reset Link/i });
 
     fireEvent.change(emailInput, { target: { value: 'user@example.com' } });
     fireEvent.click(submitBtn);
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent(/Too many requests/i);
+    });
+  });
+
+  it('7. DEC-AUTH-108: Displays clear message and does NOT start cooldown when email is not registered', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 404,
+      json: async () => ({
+        success: false,
+        error: {
+          code: 'EMAIL_NOT_FOUND',
+          message: 'Alamat email tidak terdaftar dalam sistem kami.',
+        },
+      }),
+    });
+
+    render(<ForgotPasswordView />);
+
+    const emailInput = screen.getByLabelText(/Alamat Email|Email Address/i);
+    const submitBtn = screen.getByRole('button', { name: /Kirim Link Reset|Send Reset Link/i });
+
+    fireEvent.change(emailInput, { target: { value: 'unknown@example.com' } });
+    fireEvent.click(submitBtn);
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(/tidak terdaftar|not registered/i);
+    });
+
+    // Verify cooldown is NOT started
+    expect(sessionStorage.getItem('kebun_melon_pw_reset_cooldown_until')).toBeNull();
+    expect(submitBtn).toBeEnabled();
+    expect(
+      screen.queryByRole('button', { name: /Verifikasi Status Reset|Verify Reset Status/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it('8. Verify Reset Status redirects to /login when reset is completed', async () => {
+    const cooldownUntil = Date.now() + 5 * 60 * 1000;
+    sessionStorage.setItem('kebun_melon_pw_reset_cooldown_until', cooldownUntil.toString());
+
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        completed: true,
+        usedAt: new Date().toISOString(),
+      }),
+    });
+
+    render(<ForgotPasswordView />);
+
+    const emailInput = screen.getByLabelText(/Alamat Email|Email Address/i);
+    fireEvent.change(emailInput, { target: { value: 'user@example.com' } });
+
+    const verifyBtn = screen.getByRole('button', {
+      name: /Verifikasi Status Reset|Verify Reset Status/i,
+    });
+    fireEvent.click(verifyBtn);
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/v1/auth/forgot-password?email=user%40example.com',
+        expect.objectContaining({ method: 'GET' })
+      );
+      // Session storage cooldown should be cleared on completion
+      expect(sessionStorage.getItem('kebun_melon_pw_reset_cooldown_until')).toBeNull();
     });
   });
 });

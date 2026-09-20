@@ -859,10 +859,25 @@ Implemented complete Owner User Management:
   - Exported canonical constant `DEFAULT_RESEND_FROM_EMAIL = 'Melon Madura <noreply@melonmadura.my.id>'` in `resend.ts`, eliminating duplicate hardcoded `'Kebun Melon <onboarding@resend.dev>'` fallbacks across all transactional email dispatch routines (`sendPasswordResetEmail`, `sendVerificationEmail`, `sendEmailChangeVerificationEmail`, `sendAccountSuspensionEmail`, `sendAccountDeletionEmail`, `sendAccountReactivationEmail`).
   - Preserved strict production validation in `validateServerEnv()` rejecting any unverified default sender (`onboarding@resend.dev`).
   - Added unit test coverage in `resend-email.test.ts` and `server-env.test.ts` (100% pass rate, 41/41 tests across email/auth suites).
+- **Password Recovery UX & Reset Status Verification Refinement (Reconciled 2026-09-20):**
+  - **DEC-AUTH-108 Approved Exception for Unknown Email:** Implemented clear feedback for unregistered email addresses in `POST /api/v1/auth/forgot-password`. If user does not exist, returns HTTP 404 with error code `EMAIL_NOT_FOUND` and message *"Alamat email tidak terdaftar dalam sistem kami."* (*"This email address is not registered in our system."*). Eliminates false-positive operational confusion in isolated testing/staging environments without waiting for emails that cannot be delivered. Mitigated against enumeration via strict rate limiting (`RATE_LIMIT_FORGOT_PASSWORD_MAX = 3` req/min per IP) and structured audit logging.
+  - **Verify Reset Status Flow:** Implemented `GET /api/v1/auth/forgot-password?email=...` endpoint rate-limited to 10 req/min per IP. Evaluates if the latest reset token within the active window has been consumed (`completed: true`).
+  - **Immediate Redirection to Login:** Added secondary "Verifikasi Status Reset" / "Verify Reset Status" button on `/forgot-password` during active cooldown timer. When clicked, if the reset was completed, immediately clears `sessionStorage` cooldown tokens and redirects the user directly to `/login?message=PASSWORD_RESET_COMPLETED`. If not yet completed, displays helpful non-blocking informational notice without clearing cooldown.
+  - **Asset Format Governance:** Enforced `.webp` format requirement for all future image assets while strictly preserving existing typography branding `<span className="text-[24px] font-bold text-primary">Kebun Melon</span>` and Lucide icons without introducing unauthorized logo assets.
+  - **Unit Testing & Verification:** Updated unit tests in `forgot-password-route.test.ts` (10/10 passed) and `forgot-password-ui.test.tsx` (8/8 passed). Verified 100% typecheck (0 errors across 4 workspaces) and 100% translation key parity via `npm run i18n:check`.
+- **Logo Brand Assets Reconciliation, Email CID Delivery & Next.js Warning Cleanups (Reconciled 2026-09-20):**
+  - **Institutional & Application Logo Alignment:** Integrated institutional partner logo (`logo1.webp`, transparent background) into headers across all auth views (`/login`, `/register`, `/forgot-password`, `/reset-password`, `/verify-email`) and the bottom footer of `Sidebar.tsx`. Standardized the application brand emblem to `logo2.webp` (KING Agro wisata emblem) in `TopAppBar.tsx` and the `Sidebar.tsx` top header.
+  - **Brand Text Streamlining:** Cleaned up redundant text labels by removing `"Kebun Melon"` next to the top-left emblem in `TopAppBar.tsx` and `"Kebun Melon Monitoring System"` from the institutional footer in `Sidebar.tsx`.
+  - **Middleware Static File Whitelist:** Updated `apps/web/middleware.ts` matcher to bypass static image extensions (`.webp`, `.png`, `.jpg`, `.jpeg`, `.svg`, `.ico`), ensuring public static assets are served reliably without triggering session middleware.
+  - **Resend CID Inline Email Attachments:** Upgraded `apps/web/lib/email/resend.ts` to embed `logo1.webp` directly as an inline MIME attachment (`contentId: 'logo1'`, `src="cid:logo1"`). Prevents broken image icons in Gmail/Outlook webmail when emails are sent from local development environments.
+  - **Next.js Console Warning Cleanups:** Resolved `scroll-behavior: smooth` transition warning by adding `data-scroll-behavior="smooth"` to `<html lang={locale}>` in `apps/web/app/layout.tsx`. Resolved Next.js aspect-ratio dev warning by adding inline `style={{ width: 'auto' }}` to all responsive `<Image src="/logo1.webp" ... />` components.
+  - **Quality Verification:** TypeScript typecheck passed with 0 errors across all 4 monorepo packages, unit tests passed 100% (22/22 tests), and Prettier style check passed cleanly.
 
 ### Acceptance Criteria
 
-- [x] Anti-enumeration guarantee: `POST /api/v1/auth/forgot-password` unconditionally returns generic HTTP 200 without revealing account existence.
+- [x] DEC-AUTH-108 Exception: `POST /api/v1/auth/forgot-password` returns HTTP 404 `EMAIL_NOT_FOUND` when email is not registered in the database, while enforcing strict rate limiting (3 req/min per IP).
+- [x] Institutional partner logo (`logo1.webp`) and application emblem (`logo2.webp`) reconciled across auth pages, TopAppBar, Sidebar, and Resend email templates with transparent backgrounds.
+- [x] Next.js route transition scroll behavior (`data-scroll-behavior="smooth"`) and image aspect-ratio warnings resolved with zero regressions.
 - [x] Raw reset tokens are high-entropy 256-bit CSPRNG strings and are NEVER stored in plaintext or logged.
 - [x] Reset URLs are built solely from trusted server environment configuration, preventing Host Header injection attacks.
 - [x] Single-use tokens cannot be reused or replayed after successful password reset.
@@ -871,9 +886,11 @@ Implemented complete Owner User Management:
 - [x] Successful password reset transactionally revokes all active login sessions across devices (`TASK-0908`).
 - [x] Email dispatch via Resend is explicitly awaited and handles failure gracefully.
 - [x] Verified Resend custom sending domain (`Melon Madura <noreply@melonmadura.my.id>`) configured in web email service and server environment schema with strict production rejection of unverified test domains.
+- [x] Verify Reset Status flow (`GET /api/v1/auth/forgot-password?email=...`) checks token completion status and immediately redirects user to `/login` upon confirmed reset.
 - [x] Both Indonesian and English locales supported with 100% translation key parity.
 - [x] Server-side guest route guards (`DEC-AUTH-103`) eliminate UI page flash on auth routes for active sessions.
-- [x] `/forgot-password` UX includes clean input, neutral placeholder, 15:00 countdown timer, `sessionStorage` cooldown persistence, and 5s auto-dismiss toast.
+- [x] `/forgot-password` UX includes clean input, neutral placeholder, 15:00 countdown timer, `sessionStorage` cooldown persistence, 5s auto-dismiss toast, and Verify Reset Status action.
+- [x] Any future image assets adhere to `.webp` format and project typography branding is strictly preserved.
 
 ---
 
@@ -3551,6 +3568,7 @@ Formally decommission Railway PaaS services for staging. Transition the staging 
 - [x] `TASK-1004` End-to-End critical flows execute successfully against the containerized staging runtime.
 - [x] `ENABLE_FAUCET_CONTROL=false` is strictly maintained and verified in staging.
 - [x] Zero hardcoded secrets and zero cost overhead for maintaining staging before VPS deployment.
+- [x] Verified Resend custom sending domain (`Melon Madura <noreply@melonmadura.my.id>`) synchronized to `.env.staging` and `.env.staging.example`; staging containers (`kebun-melon-staging-web` and `kebun-melon-staging-gateway`) rebuilt, redeployed, and verified healthy on ports 3000 and 3001 (Reconciled 2026-09-20).
 
 ---
 

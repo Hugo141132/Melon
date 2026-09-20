@@ -4,7 +4,6 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { MapPin } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { USER_PROFILE } from '@/lib/constants';
 import DeviceSelector from './DeviceSelector';
@@ -106,12 +105,15 @@ export default function TopAppBar({ showDeviceSelector = true }: TopAppBarProps)
             className="flex items-center gap-2 flex-shrink-0 cursor-pointer p-1.5 -ml-1.5 rounded-xl hover:bg-app-surface-container-low transition-colors group text-left z-10"
             data-testid="top-logo-trigger"
           >
-            <div className="w-8 h-8 rounded-xl bg-app-primary/10 flex items-center justify-center text-app-primary group-hover:bg-app-primary group-hover:text-white transition-colors">
-              <MapPin size={18} strokeWidth={2} />
-            </div>
-            <span className="font-bold text-[18px] sm:text-[20px] leading-7 text-app-primary tracking-tight hidden xs:inline">
-              Kebun Melon
-            </span>
+            <Image
+              src="/logo2.webp"
+              alt="Kebun Melon"
+              width={35}
+              height={28}
+              className="h-7 sm:h-8 w-auto object-contain"
+              priority
+              unoptimized
+            />
           </button>
         </div>
 

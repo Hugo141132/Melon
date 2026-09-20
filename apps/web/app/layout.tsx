@@ -54,7 +54,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const session = await getSessionOrNull();
 
   return (
-    <html lang={locale}>
+    <html lang={locale} data-scroll-behavior="smooth">
       <body className="min-h-dvh font-sans antialiased">
         <NextIntlClientProvider locale={locale} messages={messages}>
           <AuthProvider initialSession={session}>

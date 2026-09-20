@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import {
@@ -172,6 +173,18 @@ export default function RegisterView() {
       </header>
 
       <main className="w-full max-w-md bg-surface-container-lowest bento-shape p-[32px] shadow-sm border border-outline-variant">
+        <div className="flex justify-center mb-5">
+          <Image
+            src="/logo1.webp"
+            alt="Kebun Melon"
+            width={240}
+            height={48}
+            className="h-9 w-auto object-contain"
+            style={{ width: 'auto' }}
+            priority
+            unoptimized
+          />
+        </div>
         {step === 1 ? (
           /* Step 1: Choose Account Role */
           <section className="space-y-6">

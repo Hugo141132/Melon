@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ArrowLeft, Lock, Eye, EyeOff, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
@@ -225,7 +226,16 @@ export default function ResetPasswordView() {
         >
           <ArrowLeft size={22} className="text-primary" />
         </Link>
-        <span className="text-[24px] leading-[32px] font-bold text-primary">Kebun Melon</span>
+        <Image
+          src="/logo1.webp"
+          alt="Kebun Melon"
+          width={140}
+          height={28}
+          className="h-7 w-auto object-contain"
+          style={{ width: 'auto' }}
+          priority
+          unoptimized
+        />
         <div className="w-10" />
       </header>
 

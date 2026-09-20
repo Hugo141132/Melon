@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, Suspense } from 'react';
 import { Mail, Lock, Eye, EyeOff, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
@@ -192,6 +193,18 @@ export default function LoginView() {
       <main className="w-full max-w-md bg-surface-container-lowest bento-shape p-[32px] md:p-[36px] shadow-sm border border-outline-variant/60 rounded-3xl">
         {/* Header */}
         <header className="mb-[28px] text-center">
+          <div className="flex justify-center mb-4">
+            <Image
+              src="/logo1.webp"
+              alt="Kebun Melon"
+              width={240}
+              height={48}
+              className="h-9 w-auto object-contain"
+              style={{ width: 'auto' }}
+              priority
+              unoptimized
+            />
+          </div>
           <h1 className="text-[28px] md:text-[32px] leading-[36px] md:leading-[40px] font-bold text-primary mb-1.5">
             {tAuth('loginHeading')}
           </h1>

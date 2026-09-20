@@ -170,6 +170,23 @@
 
 ---
 
+#### DEC-AUTH-108 (Approved Exception): Explicit Feedback for Unregistered Email on Password Reset (Anti-Enumeration Exception)
+* **Related Task IDs**: `TASK-0213`
+* **Related Documentation**: `docs/SECURITY.md` §7.6 & §8.4, `docs/USER_FLOWS.md` §Flow 12A, `TASKS.md`, `AGENTS.md`
+* **Status**: **APPROVED BY USER**
+* **Context**: Previously, `POST /api/v1/auth/forgot-password` strictly returned generic HTTP 200 responses (`If an account exists with that email...`) to prevent user enumeration per standard OWASP guidelines. In multi-environment operations (e.g. isolated Dev vs. Staging databases), submitting an unregistered email caused operators and users to wait indefinitely and debug email deliverability or spam folders when the user simply did not exist.
+* **Approved Decision**:
+  1. **Explicit 404 Response**: `POST /api/v1/auth/forgot-password` returns HTTP 404 with error code `EMAIL_NOT_FOUND` and message *"Alamat email tidak terdaftar dalam sistem kami."* (*"This email address is not registered in our system."*) when the submitted email address does not exist in the database.
+  2. **Anti-Enumeration Trade-off & Mitigations**: The enumeration trade-off is accepted for operational usability in a closed agricultural operations system where public registration is already restricted to `ADMIN` with mandatory `PENDING_APPROVAL` by the Owner. Enumeration attacks are mitigated by:
+     - Strict rate limiting: `RATE_LIMIT_FORGOT_PASSWORD_MAX = 3` requests/minute per IP address.
+     - Cryptographic CSPRNG tokens with SHA-256 database hashing and 15-minute expiration.
+     - Structured audit logging (`auth.password_reset.failed`) tracking IP and User-Agent.
+  3. **Verify Reset Status Flow**: Provided `GET /api/v1/auth/forgot-password?email=...` (rate limited at 10 requests/minute per IP) allowing the frontend to poll or verify whether password reset has been completed.
+  4. **Immediate Redirection to /login**: Upon confirmed reset completion (`completed: true`), the frontend immediately clears `sessionStorage` cooldown tokens and redirects the user to `/login?message=PASSWORD_RESET_COMPLETED`.
+  5. **Asset Format Standard**: Any future image asset must use the `.webp` format. Existing typography and Lucide icons are strictly preserved without adding arbitrary logos.
+
+---
+
 ### 2.2 Roles and Permissions (RBAC)
 
 #### DEC-RBAC-015: Admin Faucet Control Authorization Policy
@@ -1037,3 +1054,29 @@ The following facts are supported by the verified decisions governance of `TASK-
      - Full `@kebun-melon/web` unit test suite: 82/82 files passed, 687/687 tests passed (100%).
      - TypeScript typecheck: 0 errors across 4 monorepo packages.
 <!-- TASK-0306 Reconciled: 2026-09-19 -->
+
+---
+
+## DEC-AUTH-108 (Approved Exception): Explicit Feedback for Unregistered Email on Password Reset & Verify Status Flow
+- **Status:** APPROVED & IMPLEMENTED (2026-09-20)
+- **Related Task IDs:** `TASK-0213`
+- **Context:**
+  Previously, `POST /api/v1/auth/forgot-password` unconditionally returned generic HTTP 200 responses (`If an account exists with that email, a password reset link has been sent.`) per OWASP anti-enumeration recommendations. In an agricultural IoT operations setting with separate isolated environments (e.g. Supabase Dev vs. Staging), entering an unregistered email or minor typo resulted in a false-positive success message, causing operators to spend significant time checking spam folders or debugging email deliverability.
+- **Decision & Implementation Directives:**
+  1. **Explicit 404 for Unregistered Emails**:
+     - `POST /api/v1/auth/forgot-password` returns HTTP 404 with error code `EMAIL_NOT_FOUND` and message *"Alamat email tidak terdaftar dalam sistem kami."* (*"This email address is not registered in our system."*) when the user record does not exist in the database.
+     - The frontend displays an immediate error alert and does NOT initiate the 15:00 cooldown timer.
+  2. **Anti-Enumeration Trade-off & Compensating Controls**:
+     - The trade-off against strict anti-enumeration is formally accepted for operational clarity in an internal system where public registration is restricted to `ADMIN` with mandatory `PENDING_APPROVAL` by the Owner.
+     - Mitigated by strict IP-based rate limiting (`RATE_LIMIT_FORGOT_PASSWORD_MAX = 3` requests/minute per IP) via `checkRateLimit`, CSPRNG 256-bit token hashing, and structured audit logs (`auth.password_reset.failed`).
+  3. **Verify Reset Status Flow**:
+     - Implemented `GET /api/v1/auth/forgot-password?email=...` (rate limited at 10 requests/minute per IP).
+     - Checks the latest `PasswordResetToken` generated within the active window (last 30 minutes). If `usedAt !== null`, returns `{ success: true, completed: true }`; otherwise returns `{ success: true, completed: false }`.
+  4. **Immediate Redirection to Login**:
+     - When the user clicks "Verifikasi Status Reset" / "Verify Reset Status" during an active countdown and the status check confirms `completed: true`:
+       - Clears `sessionStorage` cooldown timer and saved email.
+       - Immediately redirects the user to `/login?message=PASSWORD_RESET_COMPLETED` without remaining on `/forgot-password`.
+  5. **Image & Asset Formatting Standard**:
+     - Any future image asset introduced must use the `.webp` format.
+     - No new logo asset is created; existing brand typography `<span className="text-[24px] font-bold text-primary">Kebun Melon</span>` and Lucide icons are strictly preserved.
+<!-- TASK-0213 Reconciled: 2026-09-20 -->

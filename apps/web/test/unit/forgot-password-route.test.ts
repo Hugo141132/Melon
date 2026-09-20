@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { POST } from '../../app/api/v1/auth/forgot-password/route';
+import { POST, GET } from '../../app/api/v1/auth/forgot-password/route';
 import { clearRateLimitStore } from '../../lib/rate-limit';
 import * as resendModule from '../../lib/email/resend';
-import { UserRepository } from '@kebun-melon/database';
+import { UserRepository, prisma } from '@kebun-melon/database';
 
-describe('TASK-0213 POST /api/v1/auth/forgot-password Unit Tests', () => {
+describe('TASK-0213 /api/v1/auth/forgot-password Unit Tests', () => {
   const origMax = process.env.RATE_LIMIT_FORGOT_PASSWORD_MAX;
 
   beforeEach(() => {
@@ -18,7 +18,7 @@ describe('TASK-0213 POST /api/v1/auth/forgot-password Unit Tests', () => {
     else delete process.env.RATE_LIMIT_FORGOT_PASSWORD_MAX;
   });
 
-  it('anti-enumeration guarantee: returns 200 generic message when user does NOT exist', async () => {
+  it('DEC-AUTH-108: returns 404 EMAIL_NOT_FOUND when user does NOT exist', async () => {
     vi.spyOn(UserRepository.prototype, 'createPasswordResetToken').mockResolvedValue({
       success: false,
       userExists: false,
@@ -39,18 +39,18 @@ describe('TASK-0213 POST /api/v1/auth/forgot-password Unit Tests', () => {
     });
 
     const res = await POST(req);
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(404);
 
     const json = await res.json();
-    expect(json.success).toBe(true);
-    expect(json.message).toContain('If an account exists with that email');
-    expect(json.data).toBeUndefined(); // Never leak user details
+    expect(json.success).toBe(false);
+    expect(json.error.code).toBe('EMAIL_NOT_FOUND');
+    expect(json.error.message).toContain('Alamat email tidak terdaftar');
 
     // Email send should NOT be triggered for non-existent user
     expect(sendEmailSpy).not.toHaveBeenCalled();
   });
 
-  it('anti-enumeration guarantee: returns exact same 200 generic message when user EXISTS and is active', async () => {
+  it('returns 200 and dispatches email when user EXISTS and is active', async () => {
     vi.spyOn(UserRepository.prototype, 'createPasswordResetToken').mockResolvedValue({
       success: true,
       rawToken: 'mock-raw-token-1234567890123456789012345678901234567890123456789012345678901234',
@@ -90,8 +90,7 @@ describe('TASK-0213 POST /api/v1/auth/forgot-password Unit Tests', () => {
 
     const json = await res.json();
     expect(json.success).toBe(true);
-    expect(json.message).toContain('If an account exists with that email');
-    expect(json.data).toBeUndefined();
+    expect(json.message).toContain('Tautan untuk mengatur ulang kata sandi telah dikirim');
 
     // Email send should be triggered with token
     expect(sendEmailSpy).toHaveBeenCalledTimes(1);
@@ -103,7 +102,7 @@ describe('TASK-0213 POST /api/v1/auth/forgot-password Unit Tests', () => {
     );
   });
 
-  it('anti-enumeration guarantee: returns exact same 200 response even if email delivery fails', async () => {
+  it('returns 200 response even if email delivery fails after token creation', async () => {
     vi.spyOn(UserRepository.prototype, 'createPasswordResetToken').mockResolvedValue({
       success: true,
       rawToken: 'mock-raw-token',
@@ -144,7 +143,6 @@ describe('TASK-0213 POST /api/v1/auth/forgot-password Unit Tests', () => {
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.success).toBe(true);
-    expect(json.message).toContain('If an account exists with that email');
   });
 
   it('returns 400 VALIDATION_ERROR on invalid email format', async () => {
@@ -200,7 +198,7 @@ describe('TASK-0213 POST /api/v1/auth/forgot-password Unit Tests', () => {
     // 3 requests allowed (RATE_LIMIT_FORGOT_PASSWORD_MAX = 3)
     for (let i = 0; i < 3; i++) {
       const res = await POST(makeReq());
-      expect(res.status).toBe(200);
+      expect(res.status).toBe(404);
     }
 
     // 4th request blocked with 429
@@ -212,5 +210,94 @@ describe('TASK-0213 POST /api/v1/auth/forgot-password Unit Tests', () => {
     const json = await blockedRes.json();
     expect(json.success).toBe(false);
     expect(json.error.code).toBe('TOO_MANY_REQUESTS');
+  });
+
+  describe('GET /api/v1/auth/forgot-password (Reset Status Check)', () => {
+    it('returns 400 VALIDATION_ERROR when email query param is missing', async () => {
+      const req = new Request('http://localhost/api/v1/auth/forgot-password', {
+        method: 'GET',
+        headers: {
+          'x-forwarded-for': '198.51.100.7',
+        },
+      });
+
+      const res = await GET(req);
+      expect(res.status).toBe(400);
+      const json = await res.json();
+      expect(json.success).toBe(false);
+      expect(json.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('returns completed: false when user is not found', async () => {
+      vi.spyOn(prisma.user, 'findUnique').mockResolvedValue(null as any);
+
+      const req = new Request(
+        'http://localhost/api/v1/auth/forgot-password?email=nonexistent@example.com',
+        {
+          method: 'GET',
+          headers: {
+            'x-forwarded-for': '198.51.100.8',
+          },
+        }
+      );
+
+      const res = await GET(req);
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.success).toBe(true);
+      expect(json.completed).toBe(false);
+    });
+
+    it('returns completed: false when token exists but usedAt is null', async () => {
+      vi.spyOn(prisma.user, 'findUnique').mockResolvedValue({ id: 'user-1' } as any);
+      vi.spyOn(prisma.passwordResetToken, 'findFirst').mockResolvedValue({
+        id: 'token-1',
+        usedAt: null,
+        expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+      } as any);
+
+      const req = new Request(
+        'http://localhost/api/v1/auth/forgot-password?email=active@example.com',
+        {
+          method: 'GET',
+          headers: {
+            'x-forwarded-for': '198.51.100.9',
+          },
+        }
+      );
+
+      const res = await GET(req);
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.success).toBe(true);
+      expect(json.completed).toBe(false);
+    });
+
+    it('returns completed: true when token has usedAt set (password reset completed)', async () => {
+      const usedAtDate = new Date();
+      vi.spyOn(prisma.user, 'findUnique').mockResolvedValue({ id: 'user-1' } as any);
+      vi.spyOn(prisma.passwordResetToken, 'findFirst').mockResolvedValue({
+        id: 'token-1',
+        usedAt: usedAtDate,
+        expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+      } as any);
+
+      const req = new Request(
+        'http://localhost/api/v1/auth/forgot-password?email=active@example.com',
+        {
+          method: 'GET',
+          headers: {
+            'x-forwarded-for': '198.51.100.10',
+          },
+        }
+      );
+
+      const res = await GET(req);
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.success).toBe(true);
+      expect(json.completed).toBe(true);
+      expect(json.usedAt).toBe(usedAtDate.toISOString());
+    });
   });
 });

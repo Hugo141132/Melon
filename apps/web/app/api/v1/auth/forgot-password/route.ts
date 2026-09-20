@@ -41,26 +41,37 @@ export async function POST(request: Request) {
       userAgent,
     });
 
-    if (tokenResult.success) {
-      // Dispatch email via Resend (awaited securely)
-      await sendPasswordResetEmail({
-        toEmail: tokenResult.user.email,
-        recipientName: tokenResult.user.fullName,
-        rawToken: tokenResult.rawToken,
-        requestId,
-      });
-    } else {
-      // Timing attack mitigation: simulate consistent cryptographic & hash workload
-      // to mitigate side-channel timing analysis of account existence
-      const dummyToken = `dummy-${Date.now()}-${Math.random()}`;
-      void import('crypto').then((c) => c.createHash('sha256').update(dummyToken).digest('hex'));
+    if (!tokenResult.success) {
+      // DEC-AUTH-108: Explicit feedback for unregistered email to prevent operational confusion
+      const notFoundResponse = NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'EMAIL_NOT_FOUND',
+            message: 'Alamat email tidak terdaftar dalam sistem kami.',
+          },
+          meta: {
+            requestId,
+          },
+        },
+        { status: 404 }
+      );
+      applyRateLimitToResponse(notFoundResponse, rateLimitInfo);
+      return notFoundResponse;
     }
 
-    // Always return a generic success response to strictly prevent account enumeration
+    // Dispatch email via Resend (awaited securely)
+    await sendPasswordResetEmail({
+      toEmail: tokenResult.user.email,
+      recipientName: tokenResult.user.fullName,
+      rawToken: tokenResult.rawToken,
+      requestId,
+    });
+
     const response = NextResponse.json(
       {
         success: true,
-        message: 'If an account exists with that email, a password reset link has been sent.',
+        message: 'Tautan untuk mengatur ulang kata sandi telah dikirim ke email Anda.',
         meta: {
           requestId,
         },
@@ -95,6 +106,107 @@ export async function POST(request: Request) {
         error: {
           code: 'INTERNAL_ERROR',
           message: 'An unexpected error occurred while processing password recovery.',
+        },
+        meta: { requestId },
+      },
+      { status: 500 }
+    );
+    applyRateLimitToResponse(errResponse, rateLimitInfo);
+    return errResponse;
+  }
+}
+
+/**
+ * GET /api/v1/auth/forgot-password?email=<email>
+ * Checks if the latest password reset token for the given email has been consumed (completed).
+ */
+export async function GET(request: Request) {
+  const requestId = `req-${Date.now()}`;
+  const { searchParams } = new URL(request.url);
+  const rawEmail = searchParams.get('email');
+
+  if (!rawEmail || typeof rawEmail !== 'string') {
+    return NextResponse.json(
+      {
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Parameter email wajib disertakan.',
+        },
+        meta: { requestId },
+      },
+      { status: 400 }
+    );
+  }
+
+  const env = validateServerEnv();
+  const clientIp = getClientIp(request);
+  const rateLimitInfo = checkRateLimit(clientIp, {
+    keyPrefix: 'forgot-password-status',
+    limit: 10,
+    windowMs: env.RATE_LIMIT_WINDOW_MS,
+  });
+
+  if (!rateLimitInfo.allowed) {
+    return createRateLimitResponse(rateLimitInfo, requestId);
+  }
+
+  try {
+    const normalised = rawEmail.trim().toLowerCase();
+    const user = await prisma.user.findUnique({
+      where: { email: normalised },
+      select: { id: true },
+    });
+
+    if (!user) {
+      const response = NextResponse.json(
+        {
+          success: true,
+          completed: false,
+          meta: { requestId },
+        },
+        { status: 200 }
+      );
+      applyRateLimitToResponse(response, rateLimitInfo);
+      return response;
+    }
+
+    // Look for the latest token generated within the token expiry window (last 30 minutes)
+    const latestToken = await prisma.passwordResetToken.findFirst({
+      where: {
+        userId: user.id,
+        createdAt: {
+          gte: new Date(Date.now() - 30 * 60 * 1000),
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        usedAt: true,
+        expiresAt: true,
+      },
+    });
+
+    const isCompleted = !!latestToken && latestToken.usedAt !== null;
+
+    const response = NextResponse.json(
+      {
+        success: true,
+        completed: isCompleted,
+        usedAt: latestToken?.usedAt ? latestToken.usedAt.toISOString() : null,
+        meta: { requestId },
+      },
+      { status: 200 }
+    );
+    applyRateLimitToResponse(response, rateLimitInfo);
+    return response;
+  } catch (err: any) {
+    const errResponse = NextResponse.json(
+      {
+        success: false,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'Gagal memeriksa status reset kata sandi.',
         },
         meta: { requestId },
       },

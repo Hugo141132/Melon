@@ -110,6 +110,29 @@ The 2026-09-19 status normalization unifies device connectivity presentation acr
 5. **Backend Preservation Invariant**:
    - Internal telemetry freshness evaluation (`TELEMETRY_STALE_THRESHOLD_MS = 60000`), gateway decay logic, and MQTT ingestion contracts remain 100% untouched.
 
+### 1.6 Brand Assets & Logo Presentation Governance (2026-09-20)
+The 2026-09-20 brand reconciliation aligns institutional partner identities and the application emblem across authentication and navigation surfaces:
+- **Frontend impact:** `MINOR`
+- **Selected UI direction:** `Premium Minimal Ops`
+- **Existing color template:** `UNCHANGED`
+- **Selected motion effects:** `Button hover`
+- **21st.dev MCP:** `NOT REQUIRED`
+
+#### Asset Standards & Display Rules
+1. **Institutional Partner Header (`/logo1.webp`):**
+   - **Asset Specification:** Stored as transparent WebP (`docs/assets/logo1.webp` and served from `apps/web/public/logo1.webp`).
+   - **Authentication Pages (`/login`, `/register`, `/forgot-password`, `/reset-password`, `/verify-email`):** Rendered as the primary top branding anchor (`h-7` to `h-9`, `w-auto`, `unoptimized`, `style={{ width: 'auto' }}`).
+   - **Institutional Sidebar Footer:** Positioned at the base of `Sidebar.tsx` as a clean institutional endorsement badge (`h-7 max-w-full`, `unoptimized`, `style={{ width: 'auto' }}`). The redundant text label `"Kebun Melon Monitoring System"` is permanently removed.
+2. **Application Brand Emblem (`/logo2.webp`):**
+   - **Asset Specification:** KING Agro wisata circular emblem (`docs/assets/logo2.webp` and served from `apps/web/public/logo2.webp`).
+   - **Top Navigation (`TopAppBar.tsx`):** Renders the circular emblem as the interactive sidebar drawer trigger (`h-7 sm:h-8`, `w-auto`, `unoptimized`). The redundant adjacent text label `"Kebun Melon"` is removed to maintain a clean minimal ops header.
+   - **Sidebar Header (`Sidebar.tsx`):** Displayed adjacent to the dynamic farm/user title in the drawer header (`w-8 h-8`, `unoptimized`).
+3. **Email MIME Inline Delivery:**
+   - Transactional emails sent via Resend embed `logo1.webp` as an inline attachment (`contentId: 'logo1'`, `src="cid:logo1"`), guaranteeing display in webmail clients regardless of external image proxy configurations or local host origins.
+4. **Next.js Transition & Layout Stability:**
+   - Root layout contains `data-scroll-behavior="smooth"` on `<html>` to maintain instant page transitions without scroll lag.
+   - Responsive images with dynamic Tailwind dimensions declare `style={{ width: 'auto' }}` to prevent dev aspect-ratio warnings.
+
 ---
 
 

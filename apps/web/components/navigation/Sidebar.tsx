@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import {
   Home,
@@ -12,7 +13,6 @@ import {
   ShieldCheck,
   Settings,
   X,
-  MapPin,
   ChevronRight,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -68,9 +68,14 @@ export default function Sidebar({ isOpen, onClose, onMouseEnter, onMouseLeave }:
             onClick={onClose}
             className="flex items-center gap-2.5 text-app-primary font-bold text-lg cursor-pointer min-w-0"
           >
-            <div className="w-8 h-8 rounded-xl bg-app-primary/10 flex items-center justify-center text-app-primary flex-shrink-0">
-              <MapPin size={18} strokeWidth={2.2} />
-            </div>
+            <Image
+              src="/logo2.webp"
+              alt="Kebun Melon"
+              width={32}
+              height={32}
+              className="w-8 h-8 object-contain flex-shrink-0"
+              unoptimized
+            />
             <span
               className="tracking-tight truncate"
               title={headerTitle}
@@ -146,6 +151,19 @@ export default function Sidebar({ isOpen, onClose, onMouseEnter, onMouseLeave }:
             }
           )}
         </nav>
+      </div>
+
+      {/* Sidebar Footer / Institutional Partnership */}
+      <div className="p-4 border-t border-app-outline-variant/20 bg-app-surface-container-low/20 flex flex-col items-center justify-center">
+        <Image
+          src="/logo1.webp"
+          alt="Partnership Logos"
+          width={220}
+          height={44}
+          className="w-auto h-7 max-w-full object-contain"
+          style={{ width: 'auto' }}
+          unoptimized
+        />
       </div>
     </aside>
   );

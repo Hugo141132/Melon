@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import { Resend } from 'resend';
 import { Logger } from '@/lib/observability/logger';
 import { validateServerEnv } from '@/lib/env/server';
@@ -60,19 +62,71 @@ function isRetryableError(error: any): boolean {
 }
 
 /**
+ * Cached inline attachment representation of logo1.webp.
+ */
+let cachedLogoAttachment:
+  { filename: string; content: Buffer; contentType: string; contentId: string } | null | undefined;
+
+export function getLogoAttachment():
+  { filename: string; content: Buffer; contentType: string; contentId: string } | undefined {
+  if (cachedLogoAttachment !== undefined) {
+    return cachedLogoAttachment || undefined;
+  }
+
+  try {
+    const candidatePaths = [
+      path.join(process.cwd(), 'apps/web/public/logo1.webp'),
+      path.join(process.cwd(), 'public/logo1.webp'),
+      path.join(process.cwd(), 'docs/assets/logo1.webp'),
+    ];
+
+    for (const p of candidatePaths) {
+      if (fs.existsSync(p)) {
+        cachedLogoAttachment = {
+          filename: 'logo1.webp',
+          content: fs.readFileSync(p),
+          contentType: 'image/webp',
+          contentId: 'logo1',
+        };
+        return cachedLogoAttachment;
+      }
+    }
+  } catch {
+    // Fail safe
+  }
+
+  cachedLogoAttachment = null;
+  return undefined;
+}
+
+/**
  * Dispatches an email via Resend with bounded exponential backoff retries for transient errors.
+ * Automatically attaches inline branding logo (CID) to ensure reliable rendering across all email clients.
  */
 async function sendWithRetry(
   resend: Resend,
-  payload: { from: string; to: string[]; subject: string; html: string; text: string },
+  payload: {
+    from: string;
+    to: string[];
+    subject: string;
+    html: string;
+    text: string;
+    attachments?: any[];
+  },
   reqLogger: any,
   maxAttempts = 3
 ): Promise<{ success: boolean; id?: string; error?: string }> {
   let lastError: string | undefined;
 
+  const logoAttachment = getLogoAttachment();
+  const emailPayload = {
+    ...payload,
+    attachments: payload.attachments || (logoAttachment ? [logoAttachment] : undefined),
+  };
+
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      const result = await resend.emails.send(payload);
+      const result = await resend.emails.send(emailPayload as any);
 
       if (result.error) {
         lastError = result.error.message;
@@ -123,6 +177,25 @@ export function buildTrustedResetUrl(rawToken: string): string {
 }
 
 /**
+ * Builds trusted public URL or CID reference for email header branding logo (logo1.webp).
+ * Uses CID inline attachment when available, eliminating dependency on localhost image proxying in Gmail/Outlook.
+ */
+export function getEmailLogoUrl(): string {
+  if (getLogoAttachment()) {
+    return 'cid:logo1';
+  }
+
+  const env = validateServerEnv();
+  const rawBaseUrl =
+    env.APP_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.APP_URL ||
+    'http://localhost:3000';
+  const baseUrl = rawBaseUrl.replace(/\/+$/, '');
+  return `${baseUrl}/logo1.webp`;
+}
+
+/**
  * Generates bilingual HTML content for password reset email.
  */
 function getEmailHtml(
@@ -131,6 +204,7 @@ function getEmailHtml(
   locale: string
 ): { subject: string; html: string; text: string } {
   const isId = locale === 'id';
+  const logoUrl = getEmailLogoUrl();
 
   const subject = isId
     ? 'Atur Ulang Kata Sandi — Kebun Melon'
@@ -162,7 +236,7 @@ function getEmailHtml(
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f4f7f4; margin: 0; padding: 24px; color: #1e293b; }
     .container { max-width: 560px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 32px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
     .header { text-align: center; margin-bottom: 24px; }
-    .header h1 { color: #166534; font-size: 24px; margin: 0; font-weight: 700; }
+    .header img { height: 40px; width: auto; max-width: 220px; display: inline-block; object-fit: contain; margin: 0 auto; }
     .content { font-size: 16px; line-height: 1.6; }
     .btn-container { text-align: center; margin: 28px 0; }
     .btn { display: inline-block; background-color: #16a34a; color: #ffffff !important; padding: 14px 28px; font-size: 16px; font-weight: 600; text-decoration: none; border-radius: 8px; }
@@ -173,7 +247,7 @@ function getEmailHtml(
 <body>
   <div class="container">
     <div class="header">
-      <h1>Kebun Melon</h1>
+      <img src="${logoUrl}" alt="Kebun Melon" width="220" height="44" style="height: 40px; width: auto; max-width: 220px; display: inline-block; object-fit: contain; margin: 0 auto;" />
     </div>
     <div class="content">
       <p><strong>${greeting}</strong></p>
@@ -299,6 +373,7 @@ function getVerificationCodeEmailHtml(
   locale: string
 ): { subject: string; html: string; text: string } {
   const isId = locale === 'id';
+  const logoUrl = getEmailLogoUrl();
 
   const subject = isId
     ? `Kode Verifikasi: ${code} — Kebun Melon`
@@ -329,7 +404,7 @@ function getVerificationCodeEmailHtml(
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f4f7f4; margin: 0; padding: 24px; color: #1e293b; }
     .container { max-width: 560px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 32px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
     .header { text-align: center; margin-bottom: 24px; }
-    .header h1 { color: #166534; font-size: 24px; margin: 0; font-weight: 700; }
+    .header img { height: 40px; width: auto; max-width: 220px; display: inline-block; object-fit: contain; margin: 0 auto; }
     .content { font-size: 16px; line-height: 1.6; }
     .code-box { text-align: center; margin: 28px 0; }
     .code-card { display: inline-block; background-color: #f0fdf4; border: 2px dashed #16a34a; border-radius: 12px; padding: 18px 36px; }
@@ -340,7 +415,7 @@ function getVerificationCodeEmailHtml(
 <body>
   <div class="container">
     <div class="header">
-      <h1>Kebun Melon</h1>
+      <img src="${logoUrl}" alt="Kebun Melon" width="220" height="44" style="height: 40px; width: auto; max-width: 220px; display: inline-block; object-fit: contain; margin: 0 auto;" />
     </div>
     <div class="content">
       <p><strong>${greeting}</strong></p>
@@ -469,6 +544,7 @@ function getEmailChangeCodeEmailHtml(
   locale: string
 ): { subject: string; html: string; text: string } {
   const isId = locale === 'id';
+  const logoUrl = getEmailLogoUrl();
 
   const subject = isId
     ? `Kode Verifikasi Perubahan Email: ${code} — Kebun Melon`
@@ -499,7 +575,7 @@ function getEmailChangeCodeEmailHtml(
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f4f7f4; margin: 0; padding: 24px; color: #1e293b; }
     .container { max-width: 560px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 32px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
     .header { text-align: center; margin-bottom: 24px; }
-    .header h1 { color: #166534; font-size: 24px; margin: 0; font-weight: 700; }
+    .header img { height: 40px; width: auto; max-width: 220px; display: inline-block; object-fit: contain; margin: 0 auto; }
     .content { font-size: 16px; line-height: 1.6; }
     .code-box { text-align: center; margin: 28px 0; }
     .code-card { display: inline-block; background-color: #f0fdf4; border: 2px dashed #16a34a; border-radius: 12px; padding: 18px 36px; }
@@ -510,7 +586,7 @@ function getEmailChangeCodeEmailHtml(
 <body>
   <div class="container">
     <div class="header">
-      <h1>Kebun Melon</h1>
+      <img src="${logoUrl}" alt="Kebun Melon" width="220" height="44" style="height: 40px; width: auto; max-width: 220px; display: inline-block; object-fit: contain; margin: 0 auto;" />
     </div>
     <div class="content">
       <p><strong>${greeting}</strong></p>
@@ -655,6 +731,7 @@ function getAccountSuspensionEmailHtml(
 ): { subject: string; html: string; text: string } {
   const isId = locale === 'id';
   const resolvedReason = reason?.trim() || DEFAULT_SUSPENSION_REASON;
+  const logoUrl = getEmailLogoUrl();
 
   const subject = isId
     ? 'Akun Kebun Melon Anda Ditangguhkan'
@@ -688,7 +765,7 @@ function getAccountSuspensionEmailHtml(
           <!-- Header -->
           <tr>
             <td style="padding: 32px 32px 24px; text-align: left; border-bottom: 1px solid #F3F4F6;">
-              <span style="font-size: 20px; font-weight: 800; color: #2D5A27; letter-spacing: -0.5px;">Kebun Melon</span>
+              <img src="${logoUrl}" alt="Kebun Melon" width="180" height="36" style="height: 32px; width: auto; max-width: 180px; display: block; object-fit: contain;" />
             </td>
           </tr>
           <!-- Body -->
@@ -762,6 +839,7 @@ function getAccountDeletionEmailHtml(
 ): { subject: string; html: string; text: string } {
   const isId = locale === 'id';
   const resolvedReason = reason?.trim() || DEFAULT_DELETION_REASON;
+  const logoUrl = getEmailLogoUrl();
 
   const subject = isId
     ? 'Pemberitahuan Penghapusan Akun — Kebun Melon'
@@ -795,7 +873,7 @@ function getAccountDeletionEmailHtml(
           <!-- Header -->
           <tr>
             <td style="padding: 32px 32px 24px; text-align: left; border-bottom: 1px solid #F3F4F6;">
-              <span style="font-size: 20px; font-weight: 800; color: #2D5A27; letter-spacing: -0.5px;">Kebun Melon</span>
+              <img src="${logoUrl}" alt="Kebun Melon" width="180" height="36" style="height: 32px; width: auto; max-width: 180px; display: block; object-fit: contain;" />
             </td>
           </tr>
           <!-- Body -->
@@ -1017,6 +1095,7 @@ function getAccountReactivationEmailHtml(
 ): { subject: string; html: string; text: string } {
   const isId = locale === 'id';
   const resolvedReason = reason?.trim() || DEFAULT_REACTIVATION_REASON;
+  const logoUrl = getEmailLogoUrl();
 
   const subject = isId
     ? 'Akun Kebun Melon Anda Telah Diaktifkan Kembali'
@@ -1052,7 +1131,7 @@ function getAccountReactivationEmailHtml(
           <!-- Header -->
           <tr>
             <td style="padding: 32px 32px 24px; text-align: left; border-bottom: 1px solid #F3F4F6;">
-              <span style="font-size: 20px; font-weight: 800; color: #2D5A27; letter-spacing: -0.5px;">Kebun Melon</span>
+              <img src="${logoUrl}" alt="Kebun Melon" width="180" height="36" style="height: 32px; width: auto; max-width: 180px; display: block; object-fit: contain;" />
             </td>
           </tr>
           <!-- Body -->
