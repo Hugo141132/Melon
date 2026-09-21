@@ -75,8 +75,8 @@ export default function RegisterView() {
       setLoadingCapabilities(true);
       try {
         const res = await fetch('/api/v1/auth/register/capabilities');
-        const json = await res.json();
-        if (isMounted && res.ok && json.success) {
+        const json = await res.json().catch(() => null);
+        if (isMounted && res.ok && json?.success) {
           setOwnerAvailable(json.data.ownerRegistrationAvailable);
         }
       } catch {
@@ -118,16 +118,16 @@ export default function RegisterView() {
         }),
       });
 
-      const json = await res.json();
+      const json = await res.json().catch(() => null);
 
-      if (!res.ok || !json.success) {
-        if (json.error?.code === 'OWNER_ALREADY_EXISTS') {
+      if (!res.ok || !json?.success) {
+        if (json?.error?.code === 'OWNER_ALREADY_EXISTS') {
           setErrorMessage(tAuth('ownerExistsError'));
           setOwnerAvailable(false);
           setSelectedRole('ADMIN');
           setStep(1);
         } else {
-          setErrorMessage(json.error?.message || tAuth('registerFailed'));
+          setErrorMessage(json?.error?.message || tAuth('registerFailed'));
         }
         setLoadingSubmit(false);
         return;
@@ -176,7 +176,7 @@ export default function RegisterView() {
         <div className="flex justify-center mb-5">
           <Image
             src="/logo1.webp"
-            alt="Kebun Melon"
+            alt="Melon"
             width={240}
             height={48}
             className="h-9 w-auto object-contain"
@@ -237,7 +237,7 @@ export default function RegisterView() {
                   <div className="flex-1">
                     <div className="flex items-center justify-between">
                       <h3 className="text-[18px] font-bold text-on-surface">
-                        {tUsers('ownerRole')} (Owner)
+                        {tUsers('ownerRole')}
                       </h3>
                       {selectedRole === 'OWNER' && ownerAvailable && (
                         <CheckCircle2 size={20} className="text-primary" />

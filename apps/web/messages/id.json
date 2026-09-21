@@ -1,6 +1,6 @@
 {
   "system": {
-    "title": "Kebun Melon Monitoring",
+    "title": "Melon Monitoring",
     "status": "Sistem Aktif"
   },
   "common": {
@@ -86,13 +86,13 @@
     "step1Of2": "Langkah 1 dari 2",
     "step2Of2": "Langkah 2 dari 2 — Peran: {role}",
     "chooseRoleTitle": "Pilih Tipe Peran Akun",
-    "chooseRoleSubtitle": "Tentukan jenis akun yang ingin Anda daftarkan di Kebun Melon.",
+    "chooseRoleSubtitle": "Tentukan jenis akun yang ingin Anda daftarkan.",
     "checkingCapabilities": "Memeriksa ketersediaan peran...",
     "ownerAlreadyExists": "Akun Pemilik sudah terdaftar di sistem.",
     "continueToForm": "Lanjut ke Isian Data",
     "fillRegistrationData": "Isi Data Pendaftaran",
-    "firstOwnerDesc": "Daftarkan akun Pemilik pertama untuk mengaktifkan sistem Kebun Melon.",
-    "adminRegistrationDesc": "Daftarkan diri Anda untuk mengajukan akses Admin Kebun Melon.",
+    "firstOwnerDesc": "Daftarkan akun Pemilik pertama untuk mengaktifkan sistem.",
+    "adminRegistrationDesc": "Daftarkan diri Anda untuk mengajukan akses Admin.",
     "registerAsOwner": "Daftar Sebagai Pemilik (Owner)",
     "registerAsAdmin": "Daftar Sebagai Admin",
     "alreadyHaveAccount": "Sudah punya akun?",
@@ -312,7 +312,7 @@
     "offlineStatus": "Terputus",
     "staleStatus": "Terputus",
     "siteLocation": "Lokasi Lahan / Site",
-    "mainSiteDefault": "Kebun Melon Utama",
+    "mainSiteDefault": "Lahan Melon Utama",
     "connectionStatus": "Status Koneksi",
     "sensorTitle": "Pemantauan & Manajemen Sensor",
     "sensorSubtitle": "Silakan pilih salah satu node perangkat sensor pada pemilih perangkat di atas untuk melihat telemetry dan status pemantauan secara real-time.",
@@ -767,7 +767,7 @@
     "title": "Pengaturan",
     "languagePreferences": "Preferensi Bahasa",
     "selectLanguage": "Pilih Bahasa",
-    "languageModalDesc": "Pilih bahasa tampilan antarmuka Kebun Melon.",
+    "languageModalDesc": "Pilih bahasa tampilan antarmuka.",
     "activeLanguage": "Bahasa Aktif",
     "changeLanguage": "Ubah Bahasa",
     "savingLanguage": "Memperbarui bahasa...",

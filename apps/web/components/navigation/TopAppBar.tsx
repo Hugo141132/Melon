@@ -107,7 +107,7 @@ export default function TopAppBar({ showDeviceSelector = true }: TopAppBarProps)
           >
             <Image
               src="/logo2.webp"
-              alt="Kebun Melon"
+              alt="Melon"
               width={35}
               height={28}
               className="h-7 sm:h-8 w-auto object-contain"

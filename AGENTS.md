@@ -236,6 +236,25 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
   - Summary: Reconciled transactional email asset delivery and customer-facing brand presentation across all Resend email templates:
     - Cross-Client Email Logo Rendering: Resolved rendering discrepancies between webmail clients (Gmail dark mode/image proxy inversion vs Zimbra/Outlook). Created an email-safe PNG logo asset (`public/logo1-email.png`, synchronized to `apps/web/public/` and `docs/assets/`), preserving website WebP assets (`logo1.webp`, `logo2.webp`) unchanged. Preserved MIME inline attachment via `cid:logo1` in `apps/web/lib/email/resend.ts`.
     - Branding Text Alignment: Standardized all customer-facing email branding from "Kebun Melon" to "Melon Governance" across all Resend transactional email templates (verification code, password reset, account suspension, account reactivation, and permanent deletion), updating subjects, sender display name (`Melon Governance <noreply@melonmadura.my.id>`), HTML headers, logo alt text, and footer copyright statements. Internal technical identifiers, routes, and database models remain untouched. Updated email test suites in `apps/web/test/unit/resend-email.test.ts`. Verified 100% test pass rate (13/13 tests) and zero TypeScript errors.
+- 2026-09-21 Frontend Branding Copy Cleanup & Role Label Standardization Record:
+  - Status: `DONE` (Completed 2026-09-21)
+  - Frontend impact: `MINOR`
+  - Selected UI direction: `Premium Minimal Ops`
+  - Existing color template: `UNCHANGED`
+  - Selected motion effects: `None`
+  - 21st.dev MCP: `NOT REQUIRED`
+  - Summary: Removed remaining visible UI text containing "Kebun Melon" across frontend registration, auth, settings, and navigation components, and standardized the registration role label to "OWNER / PIC".
+    - Registration & Auth Text: Streamlined role selection subtitle (`chooseRoleSubtitle`), Owner registration description (`firstOwnerDesc`), and Admin registration description (`adminRegistrationDesc`) in both Indonesian (`apps/web/messages/id.json`) and English (`apps/web/messages/en.json`).
+    - Registration Role Label: Removed redundant hardcoded `(Owner)` parenthetical suffix from `apps/web/app/(auth)/register/register-view.tsx` line 240, cleanly rendering `{tUsers('ownerRole')}` as `"OWNER / PIC"` across both languages without altering role values, RBAC logic, or availability indicators.
+    - Language Selector Modal & Devices: Cleaned modal description text (`settings.languageModalDesc`) in both languages and default site name (`devices.mainSiteDefault`) in `id.json`.
+    - Status Guard & Settings: Streamlined status guard footer text (`apps/web/app/(auth)/status/page.tsx`) to "Secure Account Access Guard" and settings version indicator (`apps/web/app/setting/page.tsx`) to "v1.0.0".
+    - Logo Alt Attributes: Standardized logo `alt` attributes to "Melon" across auth views (`register`, `login`, `forgot-password`, `reset-password`, `verify-email`) and shell navigation (`TopAppBar`, `Sidebar`).
+    - Invariants Preserved: The subtitle sentence "Manage your melon farm with ease" / "Kelola lahan melon Anda dengan lebih mudah" was kept strictly unchanged. No layout, styling, components, routes, backend, database, Supabase, staging, or deployment configs were modified.
+    - Verification Results:
+      - TypeScript Check: `npm run typecheck:web` (`tsc --noEmit`) passed with 0 errors across `apps/web`.
+      - Unit Tests: Added dedicated regression test suite `apps/web/test/unit/branding-cleanup.test.tsx` (7/7 tests passed).
+      - Full Workspace Tests: `npm test` executed across all 4 monorepo packages (`apps/web`, `apps/iot-gateway`, `packages/database`, `packages/contracts`) with 100% pass rate (125/125 test suites, 1,300/1,300 tests passed).
+      - Playwright Browser Verification: Navigated to `/register` in both Indonesian (`locale=id`) and English (`locale=en`); confirmed role card title renders exactly `"OWNER / PIC"` and all visible "Kebun Melon" copy is completely absent.
 
 #### TASK-0215 Governance Record
 

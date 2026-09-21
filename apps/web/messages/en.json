@@ -1,6 +1,6 @@
 {
   "system": {
-    "title": "Kebun Melon Monitoring",
+    "title": "Melon Monitoring",
     "status": "System Active"
   },
   "common": {
@@ -86,13 +86,13 @@
     "step1Of2": "Step 1 of 2",
     "step2Of2": "Step 2 of 2 — Role: {role}",
     "chooseRoleTitle": "Choose Account Role Type",
-    "chooseRoleSubtitle": "Select the account type you want to register at Kebun Melon.",
+    "chooseRoleSubtitle": "Select the account type you want to register.",
     "checkingCapabilities": "Checking role availability...",
     "ownerAlreadyExists": "An Owner account is already registered in the system.",
     "continueToForm": "Continue to Form",
     "fillRegistrationData": "Fill Registration Details",
-    "firstOwnerDesc": "Register the first Owner account to activate Kebun Melon system.",
-    "adminRegistrationDesc": "Register to request Kebun Melon Admin access.",
+    "firstOwnerDesc": "Register the first Owner account to activate the system.",
+    "adminRegistrationDesc": "Register to request Admin access.",
     "registerAsOwner": "Register as Owner",
     "registerAsAdmin": "Register as Admin",
     "alreadyHaveAccount": "Already have an account?",
@@ -767,7 +767,7 @@
     "title": "Settings",
     "languagePreferences": "Language Preferences",
     "selectLanguage": "Select Language",
-    "languageModalDesc": "Select the display language for Kebun Melon interface.",
+    "languageModalDesc": "Select the display language for the interface.",
     "activeLanguage": "Active Language",
     "changeLanguage": "Change Language",
     "savingLanguage": "Updating language...",

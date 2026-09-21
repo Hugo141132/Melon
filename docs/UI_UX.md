@@ -151,6 +151,33 @@ The 2026-09-21 user management refinement standardizes role presentation and iso
    - Consistently applied across filter dropdown options, user list table row badges, and user detail modal views.
    - Owner role remains designated as **`OWNER / PIC`** (Person in Charge).
 
+### 1.8 Customer-Facing Branding Copy Cleanup & Role Label Standardization Governance (2026-09-21)
+The 2026-09-21 branding refinement streamlines customer-facing typography and normalizes registration role presentation:
+- **Frontend impact:** `MINOR`
+- **Selected UI direction:** `Premium Minimal Ops`
+- **Existing color template:** `UNCHANGED`
+- **Selected motion effects:** `None`
+- **21st.dev MCP:** `NOT REQUIRED`
+
+#### Presentation and Branding Rules
+1. **Removal of Customer-Facing "Kebun Melon" Labels:**
+   - Textual labels containing `"Kebun Melon"` are removed from interactive views and replaced with streamlined ops copy:
+     - Registration Role Subtitle (`auth.chooseRoleSubtitle`): `"Tentukan jenis akun yang ingin Anda daftarkan."` / `"Select the account type you want to register."`
+     - Owner Option Description (`auth.firstOwnerDesc`): `"Daftarkan akun Pemilik pertama untuk mengaktifkan sistem."` / `"Register the first Owner account to activate the system."`
+     - Admin Option Description (`auth.adminRegistrationDesc`): `"Daftarkan diri Anda untuk mengajukan akses Admin."` / `"Register to request Admin access."`
+     - Language Modal Description (`settings.languageModalDesc`): `"Pilih bahasa tampilan antarmuka."` / `"Select the display language for the interface."`
+     - Status Guard Footer (`apps/web/app/(auth)/status/page.tsx`): Cleaned to `"Secure Account Access Guard"`.
+     - Settings Metadata (`apps/web/app/setting/page.tsx`): Version display streamlined to `"v1.0.0"`.
+2. **Registration Role Label Standardization (`OWNER / PIC`):**
+   - In `apps/web/app/(auth)/register/register-view.tsx`, the redundant parenthetical `(Owner)` suffix was removed from the role choice button heading.
+   - The role title consumes `{tUsers('ownerRole')}` directly, rendering cleanly as **`OWNER / PIC`** in both Indonesian and English, perfectly matching the design standard in `/users`.
+   - Admin choice card continues to render **`ADMINISTRATOR`** via `{tUsers('adminRole')}`.
+3. **Logo Image Accessibility Standard:**
+   - Image fallback `alt` attributes on primary brand assets (`/logo1.webp` and `/logo2.webp`) across authentication views (`/login`, `/register`, `/forgot-password`, `/reset-password`, `/verify-email`) and shell navigation (`TopAppBar`, `Sidebar`) are standardized to `"Melon"`.
+4. **Preserved Invariants:**
+   - Subtitle copy `"Manage your melon farm with ease"` / `"Kelola lahan melon Anda dengan lebih mudah"` is strictly preserved unchanged.
+   - All layout structures, Tailwind classes, interaction models, and route protection rules remain untouched.
+
 ---
 
 

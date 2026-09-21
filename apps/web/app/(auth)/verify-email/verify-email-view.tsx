@@ -466,7 +466,7 @@ export default function VerifyEmailView() {
         </Link>
         <Image
           src="/logo1.webp"
-          alt="Kebun Melon"
+          alt="Melon"
           width={140}
           height={28}
           className="h-7 w-auto object-contain"

@@ -70,7 +70,7 @@ export default function Sidebar({ isOpen, onClose, onMouseEnter, onMouseLeave }:
           >
             <Image
               src="/logo2.webp"
-              alt="Kebun Melon"
+              alt="Melon"
               width={32}
               height={32}
               className="w-8 h-8 object-contain flex-shrink-0"

@@ -234,9 +234,7 @@ function StatusContent() {
       </main>
 
       <footer className="mt-[32px] text-center">
-        <p className="text-[14px] leading-[20px] text-outline">
-          Kebun Melon System &bull; Secure Account Access Guard
-        </p>
+        <p className="text-[14px] leading-[20px] text-outline">Secure Account Access Guard</p>
       </footer>
     </div>
   );

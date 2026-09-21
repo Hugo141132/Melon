@@ -944,6 +944,13 @@ Implemented complete Owner User Management:
   - Fixed Gmail dark mode and image proxy distortions by introducing dedicated email-safe PNG asset `public/logo1-email.png` (synchronized to `apps/web/public/` and `docs/assets/`), preserving website WebP assets while maintaining MIME inline attachment flow via `cid:logo1`.
   - Standardized customer-facing branding from "Kebun Melon" to "Melon Governance" across all Resend transactional email templates (verification code, password reset, account suspension, reactivation, and deletion), updating subjects, sender display name (`Melon Governance <noreply@melonmadura.my.id>`), HTML headers, logo alt text, and footer copyright statements.
   - Updated test assertions in `apps/web/test/unit/resend-email.test.ts`.
+- Frontend UI visible text branding cleanup & role label standardization (2026-09-21):
+  - Removed visible occurrences of "Kebun Melon" across registration/auth screens (`apps/web/messages/id.json`, `apps/web/messages/en.json`), status guard footer (`apps/web/app/(auth)/status/page.tsx`), and settings app version display (`apps/web/app/setting/page.tsx`).
+  - Standardized visible registration role label: Removed redundant `(Owner)` parenthetical suffix from `apps/web/app/(auth)/register/register-view.tsx`, rendering clean `"OWNER / PIC"` via `{tUsers('ownerRole')}` across Indonesian and English without altering role enums or logic.
+  - Standardized logo image `alt` attributes to "Melon" across authentication views and shell navigation.
+  - Strictly preserved the sentence "Manage your melon farm with ease" / "Kelola lahan melon Anda dengan lebih mudah" unchanged.
+  - Added regression test suite `apps/web/test/unit/branding-cleanup.test.tsx` (7/7 tests passed).
+  - Verified 0 TypeScript errors (`npm run typecheck:web`), 100% full workspace test pass rate (125/125 test suites, 1,300/1,300 tests passed), and Playwright browser verification confirming exact `"OWNER / PIC"` role label on `/register`.
 
 ### Acceptance Criteria
 

@@ -96,7 +96,7 @@ export default function SettingPage() {
 
         {/* App Metadata */}
         <div className="text-center opacity-60 pt-2 animate-fade-in">
-          <p className="text-[12px] text-app-on-surface-variant">Kebun Melon v1.0.0</p>
+          <p className="text-[12px] text-app-on-surface-variant">v1.0.0</p>
         </div>
       </main>
     </div>

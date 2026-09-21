@@ -196,7 +196,7 @@ export default function LoginView() {
           <div className="flex justify-center mb-4">
             <Image
               src="/logo1.webp"
-              alt="Kebun Melon"
+              alt="Melon"
               width={240}
               height={48}
               className="h-9 w-auto object-contain"
