@@ -127,11 +127,29 @@ The 2026-09-20 brand reconciliation aligns institutional partner identities and 
    - **Asset Specification:** KING Agro wisata circular emblem (`docs/assets/logo2.webp` and served from `apps/web/public/logo2.webp`).
    - **Top Navigation (`TopAppBar.tsx`):** Renders the circular emblem as the interactive sidebar drawer trigger (`h-7 sm:h-8`, `w-auto`, `unoptimized`). The redundant adjacent text label `"Kebun Melon"` is removed to maintain a clean minimal ops header.
    - **Sidebar Header (`Sidebar.tsx`):** Displayed adjacent to the dynamic farm/user title in the drawer header (`w-8 h-8`, `unoptimized`).
-3. **Email MIME Inline Delivery:**
-   - Transactional emails sent via Resend embed `logo1.webp` as an inline attachment (`contentId: 'logo1'`, `src="cid:logo1"`), guaranteeing display in webmail clients regardless of external image proxy configurations or local host origins.
+3. **Email MIME Inline Delivery & Cross-Client Asset:**
+   - Transactional emails sent via Resend embed a dedicated email-safe PNG asset (`apps/web/public/logo1-email.png`, 800×240 32-bit RGBA) as an inline attachment (`contentId: 'logo1'`, `src="cid:logo1"`). This prevents Gmail dark mode color inversion and transparent image proxy distortions while preserving website `.webp` assets (`/logo1.webp`, `/logo2.webp`) unchanged.
+   - Customer-facing email branding uniformly displays **"Melon Governance"** across subjects, headers, logo alt text, and footer copyright statements.
 4. **Next.js Transition & Layout Stability:**
    - Root layout contains `data-scroll-behavior="smooth"` on `<html>` to maintain instant page transitions without scroll lag.
    - Responsive images with dynamic Tailwind dimensions declare `style={{ width: 'auto' }}` to prevent dev aspect-ratio warnings.
+
+### 1.7 User Management Role Presentation & Security Filtering Governance (2026-09-21)
+The 2026-09-21 user management refinement standardizes role presentation and isolates unverified accounts (`DEC-AUTH-111`):
+- **Frontend impact:** `MINOR`
+- **Selected UI direction:** `Premium Minimal Ops`
+- **Existing color template:** `UNCHANGED`
+- **Selected motion effects:** `None`
+- **21st.dev MCP:** `NOT REQUIRED`
+
+#### Presentation and Filtering Rules
+1. **Unverified Account Isolation:**
+   - Accounts registered with unverified email addresses (`emailVerifiedAt IS NULL`) are omitted from Owner User Management (`/users`).
+   - Backed by repository-level query filtering in `UserRepository.getUsers` and defensive frontend checks in `apps/web/app/users/page.tsx` before state rendering.
+2. **Standardized Role Typography (`ADMINISTRATOR`):**
+   - Admin role presentation is unified to uppercase **`ADMINISTRATOR`** in bilingual localization dictionaries (`roleAdminLabel` in `apps/web/messages/id.json` and `apps/web/messages/en.json`).
+   - Consistently applied across filter dropdown options, user list table row badges, and user detail modal views.
+   - Owner role remains designated as **`OWNER / PIC`** (Person in Charge).
 
 ---
 

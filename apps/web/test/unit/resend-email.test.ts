@@ -64,7 +64,7 @@ describe('TASK-0213 Resend Email Service Unit Tests', () => {
 
   it('dispatches email via Resend client when configured', async () => {
     process.env.RESEND_API_KEY = 're_test_key_12345';
-    process.env.RESEND_FROM_EMAIL = 'Kebun Melon <noreply@kebunmelon.id>';
+    process.env.RESEND_FROM_EMAIL = 'Melon Governance <noreply@melonmadura.my.id>';
     (process.env as Record<string, string | undefined>).NODE_ENV = 'development';
 
     const sendMock = vi.fn().mockResolvedValue({
@@ -89,9 +89,9 @@ describe('TASK-0213 Resend Email Service Unit Tests', () => {
 
     expect(sendMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        from: 'Kebun Melon <noreply@kebunmelon.id>',
+        from: 'Melon Governance <noreply@melonmadura.my.id>',
         to: ['farmer@example.com'],
-        subject: 'Atur Ulang Kata Sandi — Kebun Melon',
+        subject: 'Atur Ulang Kata Sandi — Melon Governance',
       })
     );
   });
@@ -172,7 +172,7 @@ describe('TASK-0213 Resend Email Service Unit Tests', () => {
 
   it('sendVerificationEmail dispatches 6-digit code via Resend client', async () => {
     process.env.RESEND_API_KEY = 're_test_key_12345';
-    process.env.RESEND_FROM_EMAIL = 'Kebun Melon <noreply@kebunmelon.id>';
+    process.env.RESEND_FROM_EMAIL = 'Melon Governance <noreply@melonmadura.my.id>';
     (process.env as Record<string, string | undefined>).NODE_ENV = 'development';
 
     const sendMock = vi.fn().mockResolvedValue({
@@ -198,16 +198,16 @@ describe('TASK-0213 Resend Email Service Unit Tests', () => {
 
     expect(sendMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        from: 'Kebun Melon <noreply@kebunmelon.id>',
+        from: 'Melon Governance <noreply@melonmadura.my.id>',
         to: ['farmer@example.com'],
-        subject: 'Kode Verifikasi: 849201 — Kebun Melon',
+        subject: 'Kode Verifikasi: 849201 — Melon Governance',
       })
     );
   });
 
   it('retries on rate limit (429) and succeeds on subsequent attempt', async () => {
     process.env.RESEND_API_KEY = 're_test_key_12345';
-    process.env.RESEND_FROM_EMAIL = 'Kebun Melon <noreply@kebunmelon.id>';
+    process.env.RESEND_FROM_EMAIL = 'Melon Governance <noreply@melonmadura.my.id>';
     (process.env as Record<string, string | undefined>).NODE_ENV = 'development';
 
     let attemptCount = 0;
@@ -243,7 +243,7 @@ describe('TASK-0213 Resend Email Service Unit Tests', () => {
 
   it('dispatches account reactivation email with custom reason via Resend', async () => {
     process.env.RESEND_API_KEY = 're_test_key_12345';
-    process.env.RESEND_FROM_EMAIL = 'Kebun Melon <noreply@kebunmelon.id>';
+    process.env.RESEND_FROM_EMAIL = 'Melon Governance <noreply@melonmadura.my.id>';
     (process.env as Record<string, string | undefined>).NODE_ENV = 'development';
 
     const sendMock = vi.fn().mockResolvedValue({
@@ -268,9 +268,9 @@ describe('TASK-0213 Resend Email Service Unit Tests', () => {
     expect(result.id).toBe('email_reactivate_123');
     expect(sendMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        from: 'Kebun Melon <noreply@kebunmelon.id>',
+        from: 'Melon Governance <noreply@melonmadura.my.id>',
         to: ['farmer@example.com'],
-        subject: 'Akun Kebun Melon Anda Telah Diaktifkan Kembali',
+        subject: 'Akun Melon Governance Anda Telah Diaktifkan Kembali',
         text: expect.stringContaining('Selesai masa audit internal'),
       })
     );
@@ -278,7 +278,7 @@ describe('TASK-0213 Resend Email Service Unit Tests', () => {
 
   it('dispatches account reactivation email with default restoration notice when reason is omitted', async () => {
     process.env.RESEND_API_KEY = 're_test_key_12345';
-    process.env.RESEND_FROM_EMAIL = 'Kebun Melon <noreply@kebunmelon.id>';
+    process.env.RESEND_FROM_EMAIL = 'Melon Governance <noreply@melonmadura.my.id>';
     (process.env as Record<string, string | undefined>).NODE_ENV = 'development';
 
     const sendMock = vi.fn().mockResolvedValue({
@@ -303,9 +303,9 @@ describe('TASK-0213 Resend Email Service Unit Tests', () => {
     expect(result.id).toBe('email_reactivate_default_456');
     expect(sendMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        from: 'Kebun Melon <noreply@kebunmelon.id>',
+        from: 'Melon Governance <noreply@melonmadura.my.id>',
         to: ['farmer@example.com'],
-        subject: 'Your Kebun Melon Account Has Been Reactivated',
+        subject: 'Your Melon Governance Account Has Been Reactivated',
         text: expect.stringContaining('Account reactivated by OWNER / PIC.'),
       })
     );
@@ -313,7 +313,7 @@ describe('TASK-0213 Resend Email Service Unit Tests', () => {
 
   it('dispatches account suspension email with default reason when omitted', async () => {
     process.env.RESEND_API_KEY = 're_test_key_12345';
-    process.env.RESEND_FROM_EMAIL = 'Kebun Melon <noreply@kebunmelon.id>';
+    process.env.RESEND_FROM_EMAIL = 'Melon Governance <noreply@melonmadura.my.id>';
     (process.env as Record<string, string | undefined>).NODE_ENV = 'development';
 
     const sendMock = vi.fn().mockResolvedValue({
@@ -338,9 +338,9 @@ describe('TASK-0213 Resend Email Service Unit Tests', () => {
     expect(result.id).toBe('email_suspend_default_789');
     expect(sendMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        from: 'Kebun Melon <noreply@kebunmelon.id>',
+        from: 'Melon Governance <noreply@melonmadura.my.id>',
         to: ['farmer@example.com'],
-        subject: 'Your Kebun Melon Account Has Been Suspended',
+        subject: 'Your Melon Governance Account Has Been Suspended',
         text: expect.stringContaining('Account suspended by OWNER / PIC.'),
       })
     );
@@ -348,7 +348,7 @@ describe('TASK-0213 Resend Email Service Unit Tests', () => {
 
   it('dispatches account deletion email with default reason when omitted', async () => {
     process.env.RESEND_API_KEY = 're_test_key_12345';
-    process.env.RESEND_FROM_EMAIL = 'Kebun Melon <noreply@kebunmelon.id>';
+    process.env.RESEND_FROM_EMAIL = 'Melon Governance <noreply@melonmadura.my.id>';
     (process.env as Record<string, string | undefined>).NODE_ENV = 'development';
 
     const sendMock = vi.fn().mockResolvedValue({
@@ -373,10 +373,64 @@ describe('TASK-0213 Resend Email Service Unit Tests', () => {
     expect(result.id).toBe('email_delete_default_101');
     expect(sendMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        from: 'Kebun Melon <noreply@kebunmelon.id>',
+        from: 'Melon Governance <noreply@melonmadura.my.id>',
         to: ['farmer@example.com'],
-        subject: 'Account Deletion Notification — Kebun Melon',
+        subject: 'Account Deletion Notification — Melon Governance',
         text: expect.stringContaining('Account permanently deleted by OWNER / PIC.'),
+      })
+    );
+  });
+
+  it('provides dedicated email-safe PNG logo attachment with solid background for email clients', async () => {
+    const { getLogoAttachment, getEmailLogoUrl } = await import('../../lib/email/resend');
+    const attachment = getLogoAttachment();
+
+    expect(attachment).toBeDefined();
+    expect(attachment?.filename).toBe('logo1-email.png');
+    expect(attachment?.contentType).toBe('image/png');
+    expect(attachment?.contentId).toBe('logo1');
+    expect(attachment?.content).toBeInstanceOf(Buffer);
+    expect(attachment?.content.length).toBeGreaterThan(1000);
+
+    // Verify PNG magic number bytes (0x89 0x50 0x4E 0x47)
+    expect(attachment?.content[0]).toBe(0x89);
+    expect(attachment?.content[1]).toBe(0x50);
+    expect(attachment?.content[2]).toBe(0x4e);
+    expect(attachment?.content[3]).toBe(0x47);
+
+    // Verify CID reference is returned
+    expect(getEmailLogoUrl()).toBe('cid:logo1');
+  });
+
+  it('automatically attaches email-safe logo CID to Resend email payload', async () => {
+    process.env.RESEND_API_KEY = 're_test_key_12345';
+    process.env.RESEND_FROM_EMAIL = 'Melon Governance <noreply@melonmadura.my.id>';
+    (process.env as Record<string, string | undefined>).NODE_ENV = 'development';
+
+    const sendMock = vi.fn().mockResolvedValue({
+      data: { id: 'email_with_logo_attachment' },
+      error: null,
+    });
+
+    (Resend as unknown as any).mockImplementation(function (this: any) {
+      this.emails = { send: sendMock };
+    });
+
+    const { sendVerificationEmail } = await import('../../lib/email/resend');
+    await sendVerificationEmail({
+      toEmail: 'farmer@example.com',
+      code: '654321',
+    });
+
+    expect(sendMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        attachments: expect.arrayContaining([
+          expect.objectContaining({
+            filename: 'logo1-email.png',
+            contentType: 'image/png',
+            contentId: 'logo1',
+          }),
+        ]),
       })
     );
   });

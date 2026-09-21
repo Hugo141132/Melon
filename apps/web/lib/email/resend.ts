@@ -62,7 +62,7 @@ function isRetryableError(error: any): boolean {
 }
 
 /**
- * Cached inline attachment representation of logo1.webp.
+ * Cached inline attachment representation of logo1-email.png (with fallback to logo1.webp).
  */
 let cachedLogoAttachment:
   { filename: string; content: Buffer; contentType: string; contentId: string } | null | undefined;
@@ -74,13 +74,33 @@ export function getLogoAttachment():
   }
 
   try {
-    const candidatePaths = [
+    // Prefer dedicated email-safe PNG asset with solid background for universal client rendering (Gmail, Outlook, Zimbra)
+    const pngCandidatePaths = [
+      path.join(process.cwd(), 'apps/web/public/logo1-email.png'),
+      path.join(process.cwd(), 'public/logo1-email.png'),
+      path.join(process.cwd(), 'docs/assets/logo1-email.png'),
+    ];
+
+    for (const p of pngCandidatePaths) {
+      if (fs.existsSync(p)) {
+        cachedLogoAttachment = {
+          filename: 'logo1-email.png',
+          content: fs.readFileSync(p),
+          contentType: 'image/png',
+          contentId: 'logo1',
+        };
+        return cachedLogoAttachment;
+      }
+    }
+
+    // Fallback to logo1.webp if PNG asset is not found
+    const webpCandidatePaths = [
       path.join(process.cwd(), 'apps/web/public/logo1.webp'),
       path.join(process.cwd(), 'public/logo1.webp'),
       path.join(process.cwd(), 'docs/assets/logo1.webp'),
     ];
 
-    for (const p of candidatePaths) {
+    for (const p of webpCandidatePaths) {
       if (fs.existsSync(p)) {
         cachedLogoAttachment = {
           filename: 'logo1.webp',
@@ -177,7 +197,7 @@ export function buildTrustedResetUrl(rawToken: string): string {
 }
 
 /**
- * Builds trusted public URL or CID reference for email header branding logo (logo1.webp).
+ * Builds trusted public URL or CID reference for email header branding logo (logo1-email.png).
  * Uses CID inline attachment when available, eliminating dependency on localhost image proxying in Gmail/Outlook.
  */
 export function getEmailLogoUrl(): string {
@@ -192,7 +212,7 @@ export function getEmailLogoUrl(): string {
     process.env.APP_URL ||
     'http://localhost:3000';
   const baseUrl = rawBaseUrl.replace(/\/+$/, '');
-  return `${baseUrl}/logo1.webp`;
+  return `${baseUrl}/logo1-email.png`;
 }
 
 /**
@@ -207,13 +227,13 @@ function getEmailHtml(
   const logoUrl = getEmailLogoUrl();
 
   const subject = isId
-    ? 'Atur Ulang Kata Sandi — Kebun Melon'
-    : 'Reset Your Password — Kebun Melon';
+    ? 'Atur Ulang Kata Sandi — Melon Governance'
+    : 'Reset Your Password — Melon Governance';
 
   const greeting = isId ? `Halo ${name || 'Pengguna'},` : `Hello ${name || 'User'},`;
   const intro = isId
-    ? 'Kami menerima permintaan untuk mengatur ulang kata sandi akun Kebun Melon Anda. Klik tombol di bawah ini untuk membuat kata sandi baru:'
-    : 'We received a request to reset the password for your Kebun Melon account. Click the button below to create a new password:';
+    ? 'Kami menerima permintaan untuk mengatur ulang kata sandi akun Melon Governance Anda. Klik tombol di bawah ini untuk membuat kata sandi baru:'
+    : 'We received a request to reset the password for your Melon Governance account. Click the button below to create a new password:';
   const buttonText = isId ? 'Atur Ulang Kata Sandi' : 'Reset Password';
   const expiryNotice = isId
     ? 'Tautan ini hanya berlaku sekali dan akan kadaluwarsa dalam 1 menit.'
@@ -247,7 +267,7 @@ function getEmailHtml(
 <body>
   <div class="container">
     <div class="header">
-      <img src="${logoUrl}" alt="Kebun Melon" width="220" height="44" style="height: 40px; width: auto; max-width: 220px; display: inline-block; object-fit: contain; margin: 0 auto;" />
+      <img src="${logoUrl}" alt="Melon Governance" width="220" height="44" style="height: 40px; width: auto; max-width: 220px; display: inline-block; object-fit: contain; margin: 0 auto;" />
     </div>
     <div class="content">
       <p><strong>${greeting}</strong></p>
@@ -263,7 +283,7 @@ function getEmailHtml(
       </div>
     </div>
     <div class="footer">
-      <p>© ${new Date().getFullYear()} Kebun Melon Monitoring System. All rights reserved.</p>
+      <p>© ${new Date().getFullYear()} Melon Governance Monitoring System. All rights reserved.</p>
     </div>
   </div>
 </body>
@@ -271,7 +291,7 @@ function getEmailHtml(
   `.trim();
 
   const text = `
-Kebun Melon
+Melon Governance
 ==============================
 
 ${greeting}
@@ -283,7 +303,7 @@ ${resetUrl}
 ${expiryNotice}
 ${ignoreNotice}
 
-© ${new Date().getFullYear()} Kebun Melon Monitoring System.
+© ${new Date().getFullYear()} Melon Governance Monitoring System.
   `.trim();
 
   return { subject, html, text };
@@ -376,22 +396,22 @@ function getVerificationCodeEmailHtml(
   const logoUrl = getEmailLogoUrl();
 
   const subject = isId
-    ? `Kode Verifikasi: ${code} — Kebun Melon`
-    : `Verification Code: ${code} — Kebun Melon`;
+    ? `Kode Verifikasi: ${code} — Melon Governance`
+    : `Verification Code: ${code} — Melon Governance`;
 
   const greeting = isId ? `Halo ${name || 'Pengguna'},` : `Hello ${name || 'User'},`;
   const intro = isId
-    ? 'Terima kasih telah mendaftar di Kebun Melon. Masukkan 6 digit kode verifikasi berikut pada halaman verifikasi email Anda untuk mengonfirmasi kepemilikan akun:'
-    : 'Thank you for registering at Kebun Melon. Enter the following 6-digit verification code on the email verification page to confirm your account ownership:';
+    ? 'Terima kasih telah mendaftar di Melon Governance. Masukkan 6 digit kode verifikasi berikut pada halaman verifikasi email Anda untuk mengonfirmasi kepemilikan akun:'
+    : 'Thank you for registering at Melon Governance. Enter the following 6-digit verification code on the email verification page to confirm your account ownership:';
   const expiryNotice = isId
     ? 'Kode verifikasi ini berlaku selama 1 menit dan hanya dapat digunakan sekali.'
     : 'This verification code is valid for 1 minute and can only be used once.';
   const securityNotice = isId
-    ? 'Jangan bagikan kode ini kepada siapa pun. Tim Kebun Melon tidak akan pernah meminta kode verifikasi Anda.'
-    : 'Do not share this code with anyone. Kebun Melon team will never ask for your verification code.';
+    ? 'Jangan bagikan kode ini kepada siapa pun. Tim Melon Governance tidak akan pernah meminta kode verifikasi Anda.'
+    : 'Do not share this code with anyone. Melon Governance team will never ask for your verification code.';
   const ignoreNotice = isId
-    ? 'Jika Anda tidak mendaftar di Kebun Melon, silakan abaikan email ini.'
-    : 'If you did not register at Kebun Melon, please ignore this email.';
+    ? 'Jika Anda tidak mendaftar di Melon Governance, silakan abaikan email ini.'
+    : 'If you did not register at Melon Governance, please ignore this email.';
 
   const html = `
 <!DOCTYPE html>
@@ -415,7 +435,7 @@ function getVerificationCodeEmailHtml(
 <body>
   <div class="container">
     <div class="header">
-      <img src="${logoUrl}" alt="Kebun Melon" width="220" height="44" style="height: 40px; width: auto; max-width: 220px; display: inline-block; object-fit: contain; margin: 0 auto;" />
+      <img src="${logoUrl}" alt="Melon Governance" width="220" height="44" style="height: 40px; width: auto; max-width: 220px; display: inline-block; object-fit: contain; margin: 0 auto;" />
     </div>
     <div class="content">
       <p><strong>${greeting}</strong></p>
@@ -430,7 +450,7 @@ function getVerificationCodeEmailHtml(
       <p style="color: #64748b; font-size: 14px;">${ignoreNotice}</p>
     </div>
     <div class="footer">
-      <p>© ${new Date().getFullYear()} Kebun Melon Monitoring System. All rights reserved.</p>
+      <p>© ${new Date().getFullYear()} Melon Governance Monitoring System. All rights reserved.</p>
     </div>
   </div>
 </body>
@@ -438,7 +458,7 @@ function getVerificationCodeEmailHtml(
   `.trim();
 
   const text = `
-Kebun Melon
+Melon Governance
 ==============================
 
 ${greeting}
@@ -454,7 +474,7 @@ ${expiryNotice}
 ${securityNotice}
 ${ignoreNotice}
 
-© ${new Date().getFullYear()} Kebun Melon Monitoring System.
+© ${new Date().getFullYear()} Melon Governance Monitoring System.
   `.trim();
 
   return { subject, html, text };
@@ -547,22 +567,22 @@ function getEmailChangeCodeEmailHtml(
   const logoUrl = getEmailLogoUrl();
 
   const subject = isId
-    ? `Kode Verifikasi Perubahan Email: ${code} — Kebun Melon`
-    : `Email Change Verification Code: ${code} — Kebun Melon`;
+    ? `Kode Verifikasi Perubahan Email: ${code} — Melon Governance`
+    : `Email Change Verification Code: ${code} — Melon Governance`;
 
   const greeting = isId ? `Halo ${name || 'Pengguna'},` : `Hello ${name || 'User'},`;
   const intro = isId
-    ? 'Kami menerima permintaan untuk mengubah alamat email akun Kebun Melon Anda. Masukkan 6 digit kode verifikasi berikut untuk mengonfirmasi perubahan email ini:'
-    : 'We received a request to change the email address for your Kebun Melon account. Enter the following 6-digit verification code to confirm this email change:';
+    ? 'Kami menerima permintaan untuk mengubah alamat email akun Melon Governance Anda. Masukkan 6 digit kode verifikasi berikut untuk mengonfirmasi perubahan email ini:'
+    : 'We received a request to change the email address for your Melon Governance account. Enter the following 6-digit verification code to confirm this email change:';
   const expiryNotice = isId
     ? 'Kode verifikasi ini berlaku selama 1 menit dan hanya dapat digunakan sekali.'
     : 'This verification code is valid for 1 minute and can only be used once.';
   const securityNotice = isId
-    ? 'Jangan bagikan kode ini kepada siapa pun. Tim Kebun Melon tidak akan pernah meminta kode verifikasi Anda.'
-    : 'Do not share this code with anyone. Kebun Melon team will never ask for your verification code.';
+    ? 'Jangan bagikan kode ini kepada siapa pun. Tim Melon Governance tidak akan pernah meminta kode verifikasi Anda.'
+    : 'Do not share this code with anyone. Melon Governance team will never ask for your verification code.';
   const ignoreNotice = isId
-    ? 'Jika Anda tidak meminta perubahan alamat email di Kebun Melon, silakan abaikan email ini. Alamat email Anda saat ini tidak akan berubah.'
-    : 'If you did not request to change your email address on Kebun Melon, please ignore this email. Your current email address will remain unchanged.';
+    ? 'Jika Anda tidak meminta perubahan alamat email di Melon Governance, silakan abaikan email ini. Alamat email Anda saat ini tidak akan berubah.'
+    : 'If you did not request to change your email address on Melon Governance, please ignore this email. Your current email address will remain unchanged.';
 
   const html = `
 <!DOCTYPE html>
@@ -586,7 +606,7 @@ function getEmailChangeCodeEmailHtml(
 <body>
   <div class="container">
     <div class="header">
-      <img src="${logoUrl}" alt="Kebun Melon" width="220" height="44" style="height: 40px; width: auto; max-width: 220px; display: inline-block; object-fit: contain; margin: 0 auto;" />
+      <img src="${logoUrl}" alt="Melon Governance" width="220" height="44" style="height: 40px; width: auto; max-width: 220px; display: inline-block; object-fit: contain; margin: 0 auto;" />
     </div>
     <div class="content">
       <p><strong>${greeting}</strong></p>
@@ -601,7 +621,7 @@ function getEmailChangeCodeEmailHtml(
       <p style="color: #64748b; font-size: 14px;">${ignoreNotice}</p>
     </div>
     <div class="footer">
-      <p>© ${new Date().getFullYear()} Kebun Melon Monitoring System. All rights reserved.</p>
+      <p>© ${new Date().getFullYear()} Melon Governance Monitoring System. All rights reserved.</p>
     </div>
   </div>
 </body>
@@ -609,7 +629,7 @@ function getEmailChangeCodeEmailHtml(
   `.trim();
 
   const text = `
-Kebun Melon
+Melon Governance
 ==============================
 
 ${greeting}
@@ -625,7 +645,7 @@ ${expiryNotice}
 ${securityNotice}
 ${ignoreNotice}
 
-© ${new Date().getFullYear()} Kebun Melon Monitoring System.
+© ${new Date().getFullYear()} Melon Governance Monitoring System.
   `.trim();
 
   return { subject, html, text };
@@ -734,13 +754,13 @@ function getAccountSuspensionEmailHtml(
   const logoUrl = getEmailLogoUrl();
 
   const subject = isId
-    ? 'Akun Kebun Melon Anda Ditangguhkan'
-    : 'Your Kebun Melon Account Has Been Suspended';
+    ? 'Akun Melon Governance Anda Ditangguhkan'
+    : 'Your Melon Governance Account Has Been Suspended';
 
   const greeting = isId ? `Halo ${name || 'Pengguna'},` : `Hello ${name || 'User'},`;
   const intro = isId
-    ? 'Akun Anda di Kebun Melon Monitoring System telah ditangguhkan oleh OWNER / PIC.'
-    : 'Your account on the Kebun Melon Monitoring System has been suspended by OWNER / PIC.';
+    ? 'Akun Anda di Melon Governance Monitoring System telah ditangguhkan oleh OWNER / PIC.'
+    : 'Your account on the Melon Governance Monitoring System has been suspended by OWNER / PIC.';
   const reasonLabel = isId ? 'Alasan Penangguhan:' : 'Reason for Suspension:';
   const sessionNotice = isId
     ? 'Semua sesi aktif Anda telah dicabut secara otomatis. Anda tidak dapat mengakses sistem selama status akun ditangguhkan.'
@@ -765,7 +785,7 @@ function getAccountSuspensionEmailHtml(
           <!-- Header -->
           <tr>
             <td style="padding: 32px 32px 24px; text-align: left; border-bottom: 1px solid #F3F4F6;">
-              <img src="${logoUrl}" alt="Kebun Melon" width="180" height="36" style="height: 32px; width: auto; max-width: 180px; display: block; object-fit: contain;" />
+              <img src="${logoUrl}" alt="Melon Governance" width="180" height="36" style="height: 32px; width: auto; max-width: 180px; display: block; object-fit: contain;" />
             </td>
           </tr>
           <!-- Body -->
@@ -801,7 +821,7 @@ function getAccountSuspensionEmailHtml(
           <!-- Footer -->
           <tr>
             <td style="padding: 24px 32px; background-color: #FAFAFA; border-top: 1px solid #F3F4F6; text-align: left; font-size: 13px; color: #9CA3AF; line-height: 1.5;">
-              <p style="margin: 0;">© ${new Date().getFullYear()} Kebun Melon Monitoring System.</p>
+              <p style="margin: 0;">© ${new Date().getFullYear()} Melon Governance Monitoring System.</p>
             </td>
           </tr>
         </table>
@@ -826,7 +846,7 @@ ${sessionNotice}
 
 ${appealNotice}
 
-© ${new Date().getFullYear()} Kebun Melon Monitoring System.
+© ${new Date().getFullYear()} Melon Governance Monitoring System.
   `.trim();
 
   return { subject, html, text };
@@ -842,20 +862,20 @@ function getAccountDeletionEmailHtml(
   const logoUrl = getEmailLogoUrl();
 
   const subject = isId
-    ? 'Pemberitahuan Penghapusan Akun — Kebun Melon'
-    : 'Account Deletion Notification — Kebun Melon';
+    ? 'Pemberitahuan Penghapusan Akun — Melon Governance'
+    : 'Account Deletion Notification — Melon Governance';
 
   const greeting = isId ? `Halo ${name || 'Pengguna'},` : `Hello ${name || 'User'},`;
   const intro = isId
-    ? 'Akun Anda di Kebun Melon Monitoring System telah dihapus secara permanen oleh OWNER / PIC.'
-    : 'Your account on the Kebun Melon Monitoring System has been permanently deleted by OWNER / PIC.';
+    ? 'Akun Anda di Melon Governance Monitoring System telah dihapus secara permanen oleh OWNER / PIC.'
+    : 'Your account on the Melon Governance Monitoring System has been permanently deleted by OWNER / PIC.';
   const reasonLabel = isId ? 'Alasan Penghapusan:' : 'Reason for Deletion:';
   const deletionNotice = isId
     ? 'Tindakan ini bersifat permanen dan tidak dapat dibatalkan. Semua sesi aktif, hak akses perangkat, dan preferensi akun Anda telah dihapus secara penuh dari sistem.'
     : 'This action is permanent and irreversible. All of your active sessions, device assignments, and account preferences have been completely purged from the system.';
   const thankYouNotice = isId
-    ? 'Terima kasih atas kontribusi Anda selama menggunakan layanan Kebun Melon.'
-    : 'Thank you for your contributions during your time with Kebun Melon.';
+    ? 'Terima kasih atas kontribusi Anda selama menggunakan layanan Melon Governance.'
+    : 'Thank you for your contributions during your time with Melon Governance.';
 
   const html = `
 <!DOCTYPE html>
@@ -873,7 +893,7 @@ function getAccountDeletionEmailHtml(
           <!-- Header -->
           <tr>
             <td style="padding: 32px 32px 24px; text-align: left; border-bottom: 1px solid #F3F4F6;">
-              <img src="${logoUrl}" alt="Kebun Melon" width="180" height="36" style="height: 32px; width: auto; max-width: 180px; display: block; object-fit: contain;" />
+              <img src="${logoUrl}" alt="Melon Governance" width="180" height="36" style="height: 32px; width: auto; max-width: 180px; display: block; object-fit: contain;" />
             </td>
           </tr>
           <!-- Body -->
@@ -909,7 +929,7 @@ function getAccountDeletionEmailHtml(
           <!-- Footer -->
           <tr>
             <td style="padding: 24px 32px; background-color: #FAFAFA; border-top: 1px solid #F3F4F6; text-align: left; font-size: 13px; color: #9CA3AF; line-height: 1.5;">
-              <p style="margin: 0;">© ${new Date().getFullYear()} Kebun Melon Monitoring System.</p>
+              <p style="margin: 0;">© ${new Date().getFullYear()} Melon Governance Monitoring System.</p>
             </td>
           </tr>
         </table>
@@ -934,7 +954,7 @@ ${deletionNotice}
 
 ${thankYouNotice}
 
-© ${new Date().getFullYear()} Kebun Melon Monitoring System.
+© ${new Date().getFullYear()} Melon Governance Monitoring System.
   `.trim();
 
   return { subject, html, text };
@@ -1098,13 +1118,13 @@ function getAccountReactivationEmailHtml(
   const logoUrl = getEmailLogoUrl();
 
   const subject = isId
-    ? 'Akun Kebun Melon Anda Telah Diaktifkan Kembali'
-    : 'Your Kebun Melon Account Has Been Reactivated';
+    ? 'Akun Melon Governance Anda Telah Diaktifkan Kembali'
+    : 'Your Melon Governance Account Has Been Reactivated';
 
   const greeting = isId ? `Halo ${name || 'Pengguna'},` : `Hello ${name || 'User'},`;
   const intro = isId
-    ? 'Akun Anda di Kebun Melon Monitoring System telah diaktifkan kembali oleh OWNER / PIC.'
-    : 'Your account on the Kebun Melon Monitoring System has been reactivated by OWNER / PIC.';
+    ? 'Akun Anda di Melon Governance Monitoring System telah diaktifkan kembali oleh OWNER / PIC.'
+    : 'Your account on the Melon Governance Monitoring System has been reactivated by OWNER / PIC.';
 
   const reasonLabel = isId ? 'Alasan / Catatan:' : 'Reason / Notes:';
 
@@ -1131,7 +1151,7 @@ function getAccountReactivationEmailHtml(
           <!-- Header -->
           <tr>
             <td style="padding: 32px 32px 24px; text-align: left; border-bottom: 1px solid #F3F4F6;">
-              <img src="${logoUrl}" alt="Kebun Melon" width="180" height="36" style="height: 32px; width: auto; max-width: 180px; display: block; object-fit: contain;" />
+              <img src="${logoUrl}" alt="Melon Governance" width="180" height="36" style="height: 32px; width: auto; max-width: 180px; display: block; object-fit: contain;" />
             </td>
           </tr>
           <!-- Body -->
@@ -1167,7 +1187,7 @@ function getAccountReactivationEmailHtml(
           <!-- Footer -->
           <tr>
             <td style="padding: 24px 32px; background-color: #FAFAFA; border-top: 1px solid #F3F4F6; text-align: left; font-size: 13px; color: #9CA3AF; line-height: 1.5;">
-              <p style="margin: 0;">© ${new Date().getFullYear()} Kebun Melon Monitoring System.</p>
+              <p style="margin: 0;">© ${new Date().getFullYear()} Melon Governance Monitoring System.</p>
             </td>
           </tr>
         </table>
@@ -1192,7 +1212,7 @@ ${accessNotice}
 
 ${supportNotice}
 
-© ${new Date().getFullYear()} Kebun Melon Monitoring System.
+© ${new Date().getFullYear()} Melon Governance Monitoring System.
   `.trim();
 
   return { subject, html, text };

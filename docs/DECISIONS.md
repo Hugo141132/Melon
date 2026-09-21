@@ -36,7 +36,7 @@
 
 | Subsystem | Decision IDs | Status | Approved Policy |
 |---|---|---|---|
-| **Authentication** | `DEC-AUTH-001` to `DEC-AUTH-012`, `DEC-AUTH-102` to `DEC-AUTH-108` | **APPROVED** | HTTP-only secure cookies (`HttpOnly`, `Secure`, `SameSite=Strict`), PostgreSQL session table, 30m idle / 8h absolute maximum lifetime, CLI Owner seed, no public Owner creation, mandatory 6-digit email verification, 15m password recovery, verified self-email change, single active session enforcement, and Prisma relationLoadStrategy WAN login latency optimization. |
+| **Authentication** | `DEC-AUTH-001` to `DEC-AUTH-012`, `DEC-AUTH-102` to `DEC-AUTH-111` | **APPROVED** | HTTP-only secure cookies (`HttpOnly`, `Secure`, `SameSite=Strict`), PostgreSQL session table, 30m idle / 8h absolute maximum lifetime, CLI Owner seed, no public Owner creation, mandatory 6-digit email verification, 1m unified expiry & cooldown, verified self-email change, single active session enforcement, cross-client email PNG logo & 'Melon Governance' branding, and Owner User Management email verification isolation with ADMINISTRATOR role presentation. |
 | **RBAC** | `DEC-RBAC-013` to `DEC-RBAC-019` | **APPROVED** | Owner has global device visibility. Admins have mandatory per-device assignments; device assignment automatically grants both monitoring and faucet control. Owners manage assignments. No separate per-user-device `canControl` permission in v1. |
 | **Devices** | `DEC-DEV-020` to `DEC-DEV-034` | **APPROVED** | Multi-protocol and dual-broker architecture: Soil & Water quality monitoring telemetry via dedicated HiveMQ Cloud broker over TLS (`DEC-DEV-033`), Water Tank monitoring via direct 2-tier gateway on dedicated EMQX Cloud broker (`DEC-DEV-032`). Shared INA219 electrical monitoring via REST/Wi-Fi. Per-device credentials/ACLs, no anonymous access, no direct browser-to-MQTT. Offline threshold: **TBD**. Stale threshold: **TBD**. In-app device creation / Add Device removed (`DEC-DEV-027`). External `deviceId` editable by OWNER only; internal DB UUID immutable; canonical `deviceId` strictly hidden from ADMIN in UI & API (`DEC-DEV-028`). Previously/last-accessed device history & persistent restoration removed while preserving all telemetry/command/assignment/audit history (`DEC-DEV-029`). Hard delete of devices permanently removed in favor of `DEACTIVATED` / `ACTIVE` lifecycle (`DEC-DEV-030`). Permanent external hardware topics (`irigasi/melon/...`) adopted as canonical MQTT contract for single water tank node (`DEC-DEV-032`). User-facing connection status normalized strictly to Connected vs Disconnected (`DEC-DEV-034`). |
 | **Monitoring** | `DEC-MON-036` to `DEC-MON-050`, `DEC-MON-085` to `DEC-MON-091` | **APPROVED** | Three distinct monitoring domains: 1) Soil monitoring (NPK, Temp, Moisture, pH, EC in `µS/cm`, status), 2) Water Quality monitoring (pH, TDS in ppm, EC in `µS/cm`, status), 3) Water Tank monitoring (Tank Vol in `L`, 0 L–2200 L scale per `DEC-MON-089`, status; Flow rate deleted per `DEC-MON-089`). Canonical EC unit standardized directly in `µS/cm` without multiplier conversions across storage, API, UI, simulator, and ML inference (`DEC-MON-091`). Soil & Water Quality ML classification is ingested from an external ML team's Supabase project over read-only PostgREST HTTPS (`ExternalPredictionClient`), mapped dynamically via `device_external_mappings`, and hybrid MQTT recommendations are published asynchronously via `apps/iot-gateway` without local ML compute (`DEC-MON-090`). Raw telemetry remains immutable. 90-day retention TTL with chunked batch maintenance (`DEC-MON-048` / `TASK-0913`). |
@@ -1116,3 +1116,59 @@ The following facts are supported by the verified decisions governance of `TASK-
      - No modifications to device client IDs (`melon-esp32-tanah1`, `melon-esp32-air1`, `water-tank-node-zi37gz`).
      - No modifications to database models or frontend views.
 <!-- TASK-0416 Reconciled: 2026-09-20 -->
+
+---
+
+## DEC-AUTH-110: Transactional Email Cross-Client Rendering & Brand Identity Alignment
+- **Status:** APPROVED & IMPLEMENTED (2026-09-21)
+- **Related Task IDs:** `TASK-0214`
+- **Context:**
+  Transactional emails sent via Resend embed the institutional logo as an inline MIME attachment (`contentId: 'logo1'`). While standard webmail clients like Zimbra rendered the original WebP asset (`logo1.webp`) accurately, Gmail (across web and mobile platforms) applied aggressive image proxy preprocessing and dark mode color inversion on transparent WebP assets. This resulted in the logo appearing dark, inverted, or visually corrupted. Furthermore, customer-facing emails featured inconsistent legacy branding terms ("Kebun Melon") across subjects and footers rather than the standardized organizational identity.
+- **Decision & Implementation Directives:**
+  1. **Dedicated Email-Safe PNG Logo Asset**:
+     - Introduced `public/logo1-email.png` (synchronized to `apps/web/public/logo1-email.png` and `docs/assets/logo1-email.png`).
+     - Standardized to 800×240 32-bit RGBA PNG with solid, contrast-safe bounds to prevent Gmail dark mode inversion, color shifts, or image corruption.
+     - Preserved all website assets (`logo1.webp` and `logo2.webp`) completely unchanged to retain modern WebP performance on web pages.
+  2. **Preserved MIME Inline Attachment (`cid:logo1`)**:
+     - `apps/web/lib/email/resend.ts` continues using Resend inline attachments with `contentId: 'logo1'`, reading from `logo1-email.png` with `contentType: 'image/png'`.
+     - Completely eliminates dependence on external image proxying or broken image icons behind corporate email security gateways.
+  3. **Standardized Brand Presentation ("Melon Governance")**:
+     - Standardized all customer-facing transactional email copy to **"Melon Governance"** across all Resend email templates:
+       - Registration email verification (`sendVerificationEmail`).
+       - Password recovery reset code (`sendPasswordResetEmail`).
+       - Account suspension notice (`sendAccountSuspendedEmail`).
+       - Account reactivation notice (`sendAccountReactivationEmail`).
+       - Permanent deletion notice (`sendAccountDeletedEmail`).
+     - Aligned email subjects, sender display name (`Melon Governance <noreply@melonmadura.my.id>`), HTML email headers, logo alt text (`Melon Governance Logo`), and footer copyright statements (`© 2026 Melon Governance. All rights reserved.`).
+     - Internal database schemas, API routes, contracts, and package identifiers remain strictly untouched.
+<!-- TASK-0214 Reconciled: 2026-09-21 -->
+
+---
+
+## DEC-AUTH-111: Owner User Management Verification Status Isolation & Role Presentation
+- **Status:** APPROVED & IMPLEMENTED (2026-09-21)
+- **Related Task IDs:** `TASK-0212`
+- **Context:**
+  Previously, registered Admin accounts that had not yet completed email verification (`emailVerifiedAt IS NULL`) appeared in the Owner User Management dashboard (`/users`) with `PENDING_APPROVAL` status. While unverified accounts were already filtered from the active Owner Approval Queue (`/approvals`), exposing unverified applicants in the User Management list created administrative confusion and introduced the risk of executing premature lifecycle actions (e.g. suspend, delete) on accounts that had not yet proven ownership of their email address. In addition, the Admin role presentation was displayed in mixed case ("Administrator"), inconsistent with uppercase operations styling.
+- **Decision & Implementation Directives:**
+  1. **Repository-Level Query Filtering**:
+     - In `UserRepository.getUsers` (`packages/database/src/user-repository.ts`), unconditionally exclude unverified pending accounts from the default unfiltered user list:
+       ```typescript
+       where.NOT = [{ accountStatus: AccountStatus.PENDING_APPROVAL, emailVerifiedAt: null }];
+       ```
+     - When explicitly filtered by `accountStatus = 'PENDING_APPROVAL'`, enforce:
+       ```typescript
+       where.emailVerifiedAt = { not: null };
+       ```
+     - Guarantees that unverified accounts are physically omitted from PostgreSQL query results regardless of pagination or sort orders.
+  2. **Single User Lookup Guard**:
+     - In `UserRepository.getUserManagementById`, return `null` if the requested user record is in `PENDING_APPROVAL` status and `emailVerifiedAt === null`.
+     - `GET /api/v1/users/{userId}` consequently returns HTTP 404 with error code `USER_NOT_FOUND`, preventing direct unauthorized or premature inspection of unverified accounts.
+  3. **Defensive Frontend Filtering**:
+     - In `apps/web/app/users/page.tsx` (`fetchUsers`), implemented client-side defensive filtering ensuring that any account in `PENDING_APPROVAL` with `emailVerifiedAt === null` is filtered from component state before rendering.
+  4. **Standardized Role Presentation (`ADMINISTRATOR`)**:
+     - Standardized the Admin role display label to uppercase **`ADMINISTRATOR`** in bilingual localization dictionaries (`roleAdminLabel` in `apps/web/messages/id.json` and `apps/web/messages/en.json`).
+     - Unified role presentation across filter dropdown options, user list table badges, and user detail modal views.
+     - Preserved Owner account presentation strictly as `OWNER / PIC`.
+<!-- TASK-0212 Reconciled: 2026-09-21 -->
+

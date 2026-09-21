@@ -159,7 +159,7 @@ describe('TASK-0212 User Management UI Improvements', () => {
     const options = Array.from(roleSelect.querySelectorAll('option')).map((o) => o.textContent);
     expect(options).toContain('Semua Peran');
     expect(options).toContain('OWNER / PIC');
-    expect(options).toContain('Administrator');
+    expect(options).toContain('ADMINISTRATOR');
 
     // Strict requirement: no redundant concatenated '(OWNER)' or '(ADMIN)'
     expect(options).not.toContain('Pemilik / PIC');
@@ -418,7 +418,7 @@ describe('TASK-0212 User Management UI Improvements', () => {
 
     const roleLabel = screen.getByText('Peran');
     const roleValue = roleLabel.parentElement?.querySelector('.sm\\:col-span-2');
-    expect(roleValue?.textContent).toBe('Administrator');
+    expect(roleValue?.textContent).toBe('ADMINISTRATOR');
   });
 
   it('8. Single account reactivation triggers confirmation modal and submits activate endpoint', async () => {

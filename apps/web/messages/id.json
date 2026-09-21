@@ -601,7 +601,7 @@
     "noUsersFound": "Tidak ada pengguna ditemukan",
     "noUsersSubtitle": "Coba sesuaikan kata kunci pencarian atau filter status.",
     "roleOwnerLabel": "OWNER / PIC",
-    "roleAdminLabel": "Administrator",
+    "roleAdminLabel": "ADMINISTRATOR",
     "bulkDeleteTitle": "Hapus Permanen Akun Terpilih",
     "bulkDeleteDesc": "Tindakan ini bersifat permanen dan tidak dapat dibatalkan. Semua data, sesi login, dan hak akses dari akun terpilih akan dihapus selamanya dari sistem.",
     "bulkDeleteWarning": "Peringatan: Tindakan ini permanen dan tidak dapat dibatalkan!",

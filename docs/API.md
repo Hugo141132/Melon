@@ -1061,6 +1061,8 @@ Response item:
 }
 ```
 
+> **Email Verification Invariant (`DEC-AUTH-111`):** Unverified accounts (`emailVerifiedAt IS NULL`) are strictly excluded at the repository level (`UserRepository.getUsers`). Only accounts that have verified their email ownership (`emailVerifiedAt IS NOT NULL`) are returned in user listings.
+
 ---
 
 ## 12.2 Get User
@@ -1071,6 +1073,8 @@ GET /api/v1/users/{userId}
 
 **Authentication:** Required
 **Permission:** `profilee.other.read`
+
+> **Unverified Account Guard (`DEC-AUTH-111`):** If the requested `userId` belongs to an account in `PENDING_APPROVAL` with `emailVerifiedAt === null`, `UserRepository.getUserManagementById` returns `null` and the endpoint responds with HTTP 404 (`USER_NOT_FOUND`), preventing premature inspection of unverified registrations.
 
 Response:
 

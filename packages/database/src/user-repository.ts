@@ -1504,8 +1504,17 @@ export class UserRepository {
 
     if (options?.accountStatus) {
       where.accountStatus = options.accountStatus;
+      if (options.accountStatus === AccountStatus.PENDING_APPROVAL) {
+        where.emailVerifiedAt = { not: null };
+      }
     } else {
       where.accountStatus = { not: AccountStatus.DEACTIVATED };
+      where.NOT = [
+        {
+          accountStatus: AccountStatus.PENDING_APPROVAL,
+          emailVerifiedAt: null,
+        },
+      ];
     }
 
     if (options?.role) {
@@ -1616,6 +1625,10 @@ export class UserRepository {
     });
 
     if (!user) return null;
+
+    if (user.accountStatus === AccountStatus.PENDING_APPROVAL && !user.emailVerifiedAt) {
+      return null;
+    }
 
     return toPublicSafeUserDto(this.mapPrismaUserToRawDbUser(user));
   }

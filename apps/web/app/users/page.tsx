@@ -269,7 +269,10 @@ export default function UserManagementPage() {
         const json = await res.json();
 
         if (json.success) {
-          setUsers(json.data || []);
+          const safeUsers = (json.data || []).filter(
+            (u: UserDto) => !(u.accountStatus === 'PENDING_APPROVAL' && !u.emailVerifiedAt)
+          );
+          setUsers(safeUsers);
           if (json.meta?.pagination) {
             setPagination(json.meta.pagination);
           }

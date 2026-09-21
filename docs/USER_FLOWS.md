@@ -150,7 +150,7 @@ flowchart TD
 ```mermaid
 flowchart TD
     A[Owner opens User Management] --> B[Server verifies OWNER]
-    B --> C[Load permitted users]
+    B --> C[Load permitted users: emailVerifiedAt IS NOT NULL]
     C --> D[Owner selects user or multiple accounts]
     D --> E[Review profile and status]
     E --> F{Owner action}
@@ -777,21 +777,21 @@ flowchart TD
 ## Flow 15 — Owner Views Another User's profilee
 
 **Primary actor:** Owner
-**Preconditions:** Active Owner; target user exists within scope.
+**Preconditions:** Active Owner; target user exists within scope and has completed email verification (`emailVerifiedAt IS NOT NULL`). (Unverified accounts are strictly omitted from `/users` and single-lookup endpoints).
 **Trigger:** Owner selects a user.
 
 **Main success flow:**
 
 1. The server verifies role and `profilee.other.read`.
-2. The server verifies target-user scope.
+2. The server verifies target-user scope and verified status (`emailVerifiedAt IS NOT NULL`).
 3. The server returns permitted profilee and access data.
-4. The frontend displays role, status, device assignments, and approval history as allowed.
+4. The frontend displays role (standardized as `ADMINISTRATOR` or `OWNER / PIC`), status, device assignments, and approval history as allowed.
 
 **Alternative flows:** Target is another Owner; behaviour is `TBD`.
-**Error flows:** Out-of-scope target returns forbidden or concealed not-found.
+**Error flows:** Out-of-scope target or unverified email registration returns 404 Not Found (`USER_NOT_FOUND`).
 **Postconditions:** No data changes.
 **Required permissions:** `profilee.other.read`.
-**Relevant account statuses:** Owner `ACTIVE`; target any retained status.
+**Relevant account statuses:** Owner `ACTIVE`; target any verified retained status (`PENDING_APPROVAL`, `ACTIVE`, `SUSPENDED`).
 **UI states:** Loading, user profilee, not found, forbidden.
 **Audit events:** Optional sensitive profilee view.
 **Open decisions:** Multiple-Owner management.

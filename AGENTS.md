@@ -227,6 +227,15 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
 - Selected motion effects: `Skeleton loading`, `Modal`
 - 21st.dev MCP: `NOT REQUIRED`
 - Summary: Redesigned email verification into a secure 6-digit numeric verification code flow (`{ email, code }` with 15-minute expiry and `sha256(userId:code)` database token hashing). Audited Resend email service and added exponential backoff retry with jitter (up to 3 attempts) for HTTP 429 rate limits, 5xx server errors, and network timeouts while keeping tokens redacted from logs. Updated verification email HTML/plain text templates with prominent monospace code box and security instructions. Implemented `/verify-email` UI with 6-digit code input, target email display and switcher, and 60-second resend cooldown timer persisted via `sessionStorage`. Removed decorative illustration frame and unused `Image` import from `/reset-password` conforming strictly to `Premium Minimal Ops`. Preserved backward-compatible legacy token auto-verification. Verified 100% test pass rate across 31 unit test suites (255/255 tests) and TypeScript typecheck (0 errors across 4 monorepo workspaces).
+- 2026-09-21 Resend Transactional Email Logo Rendering & Branding Alignment Record:
+  - Frontend impact: `NONE`
+  - Selected UI direction: `N/A`
+  - Existing color template: `UNCHANGED`
+  - Selected motion effects: `None`
+  - 21st.dev MCP: `NOT REQUIRED`
+  - Summary: Reconciled transactional email asset delivery and customer-facing brand presentation across all Resend email templates:
+    - Cross-Client Email Logo Rendering: Resolved rendering discrepancies between webmail clients (Gmail dark mode/image proxy inversion vs Zimbra/Outlook). Created an email-safe PNG logo asset (`public/logo1-email.png`, synchronized to `apps/web/public/` and `docs/assets/`), preserving website WebP assets (`logo1.webp`, `logo2.webp`) unchanged. Preserved MIME inline attachment via `cid:logo1` in `apps/web/lib/email/resend.ts`.
+    - Branding Text Alignment: Standardized all customer-facing email branding from "Kebun Melon" to "Melon Governance" across all Resend transactional email templates (verification code, password reset, account suspension, account reactivation, and permanent deletion), updating subjects, sender display name (`Melon Governance <noreply@melonmadura.my.id>`), HTML headers, logo alt text, and footer copyright statements. Internal technical identifiers, routes, and database models remain untouched. Updated email test suites in `apps/web/test/unit/resend-email.test.ts`. Verified 100% test pass rate (13/13 tests) and zero TypeScript errors.
 
 #### TASK-0215 Governance Record
 
@@ -264,6 +273,18 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
     - Lifecycle Action Modals: Removed distracting warning/notice callout boxes from all lifecycle action modals, keeping strictly action title, target user info, optional reason textarea with counter, and confirmation buttons.
     - Email Notifications via Resend: Dispatched notification emails for account suspension, reactivation, and permanent deletion with flush-left layout, proportional typography, and natural word wrapping.
     - Audit Trail & Data Integrity: Transactionally hard-deleted user rows and account-owned records upon deletion, anonymized `actorUserId` in historical audit logs, recorded structured audit logs (`account.suspended`, `account.reactivated`, `account.deleted`), and revoked active sessions. Verified 100% test pass rate across all related unit/integration test suites (59/59 tests passed) and zero TypeScript errors.
+- 2026-09-21 Owner User Management Verification Status Filtering & Role Label Standardization:
+  - Frontend impact: `MINOR`
+  - Selected UI direction: `Premium Minimal Ops`
+  - Existing color template: `UNCHANGED`
+  - Selected motion effects: `None`
+  - 21st.dev MCP: `NOT REQUIRED`
+  - Summary: Hardened Owner User Management visibility rules and role presentation under `TASK-0212`:
+    - Unverified Account Visibility Restriction: Prevented unverified registered accounts from appearing in Owner User Management (`/users`). Only accounts that have completed email verification (`emailVerifiedAt !== null`) and hold appropriate approval status (`PENDING_APPROVAL`, `ACTIVE`, `SUSPENDED`) are visible.
+    - Repository-Level Query Filtering: In `packages/database/src/user-repository.ts`, updated `getUsers` to strictly exclude unverified pending accounts in the default unfiltered query (`where.NOT = [{ accountStatus: AccountStatus.PENDING_APPROVAL, emailVerifiedAt: null }]`) and enforce `where.emailVerifiedAt = { not: null }` when filtered by `accountStatus = 'PENDING_APPROVAL'`. Updated `getUserManagementById` to return `null` if the user is in `PENDING_APPROVAL` with `emailVerifiedAt === null`, causing `GET /api/v1/users/[userId]` to return HTTP 404 `USER_NOT_FOUND`.
+    - Frontend Defensive Safeguard: In `apps/web/app/users/page.tsx`, added defensive client-side filtering in `fetchUsers` ensuring unverified pending accounts are never rendered even if present in an external payload.
+    - Role Display Text Standardization: Updated `roleAdminLabel` in `apps/web/messages/id.json` and `apps/web/messages/en.json` from `Administrator` to `ADMINISTRATOR`. Standardized role display across filter dropdowns, table row badges, and user detail modals.
+    - Verification & Automated Tests: Added dedicated test suite `Owner User Management Visibility & Verification Invariants` in `packages/database/test/user-repository.test.ts` (4/4 tests passed), updated UI test assertions in `apps/web/test/unit/users-bulk-delete-ui.test.tsx` (8/8 passed), added tests for `ADMINISTRATOR` badge and defensive filtering in `apps/web/test/unit/users-page.test.tsx` (4/4 passed), verified API route tests in `apps/web/app/api/v1/users/test/route.test.ts` (28/28 passed), and confirmed 0 TypeScript typecheck errors across all 4 monorepo packages. Live development database query verified unverified applicant `hihi` is cleanly excluded.
 
 #### TASK-0217 Governance Record
 

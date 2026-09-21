@@ -803,6 +803,13 @@ Implemented complete Owner User Management:
   - Notification Emails via Resend:
     - Added reactivation email notification (`sendAccountReactivationEmail`), joining existing suspension and deletion emails.
     - Fixed email typography: removed multi-line template literal indentation and monospace styling, replacing with flush-left layout, proportional typography, and natural word wrapping.
+- Implemented Owner User Management Verification Status Filtering & Role Label Standardization on 2026-09-21:
+  - Restricted User Management visibility: Accounts registered but not yet email-verified (`emailVerifiedAt IS NULL`) are strictly prevented from appearing in Owner User Management (`/users`).
+  - Repository-Level Query Enforcement: Updated `UserRepository.getUsers` in `packages/database/src/user-repository.ts` to exclude unverified pending accounts in the default list (`where.NOT = [{ accountStatus: AccountStatus.PENDING_APPROVAL, emailVerifiedAt: null }]`) and when filtered by `accountStatus = 'PENDING_APPROVAL'` (`where.emailVerifiedAt = { not: null }`).
+  - Single User Inspection Guard: Updated `UserRepository.getUserManagementById` to return `null` if the account is in `PENDING_APPROVAL` with `emailVerifiedAt === null`, causing `GET /api/v1/users/{userId}` to return HTTP 404 `USER_NOT_FOUND`.
+  - Client-Side Defense: Added defensive filter in `apps/web/app/users/page.tsx` (`fetchUsers`) ensuring unverified pending accounts cannot be held in component state.
+  - Role Label Standardization: Updated `roleAdminLabel` in `apps/web/messages/id.json` and `apps/web/messages/en.json` from `Administrator` to `ADMINISTRATOR` across filter dropdowns, table row badges, and user detail modals.
+  - Test Verification: Added `Owner User Management Visibility & Verification Invariants` test suite to `packages/database/test/user-repository.test.ts` (4/4 passed), updated `apps/web/test/unit/users-bulk-delete-ui.test.tsx` (8/8 passed), added `ADMINISTRATOR` badge and defensive exclusion tests in `apps/web/test/unit/users-page.test.tsx` (4/4 passed), and verified API route tests in `apps/web/app/api/v1/users/test/route.test.ts` (28/28 passed).
 
 ### Acceptance Criteria
 
@@ -815,6 +822,8 @@ Implemented complete Owner User Management:
 - Actions are audited with actor ID, target user ID, timestamp, and resolved reason.
 - Notification emails are dispatched for account suspension, reactivation, and permanent deletion.
 - Modal dialogs omit warning/notice boxes and present clean, focused action controls.
+- Unverified accounts (`emailVerifiedAt IS NULL`) in `PENDING_APPROVAL` status are strictly excluded from Owner User Management listing and single-lookup endpoints.
+- Role display for Admin is standardized as `ADMINISTRATOR` across filter dropdowns, table badges, and detail views.
 
 ---
 
@@ -931,6 +940,10 @@ Implemented complete Owner User Management:
 - Integrated server-side guest guard (`DEC-AUTH-103`) redirecting authenticated users visiting `/verify-email` to `/`.
 - Added bilingual translation keys to `messages/id.json` and `messages/en.json` (100% key and placeholder parity).
 - Extended Resend email service (`apps/web/lib/email/resend.ts`) with bounded exponential backoff retries for transient errors and rate limits (429), and updated bilingual verification code email templates (`sendVerificationEmail`).
+- Transactional email cross-client logo rendering and branding update (2026-09-21):
+  - Fixed Gmail dark mode and image proxy distortions by introducing dedicated email-safe PNG asset `public/logo1-email.png` (synchronized to `apps/web/public/` and `docs/assets/`), preserving website WebP assets while maintaining MIME inline attachment flow via `cid:logo1`.
+  - Standardized customer-facing branding from "Kebun Melon" to "Melon Governance" across all Resend transactional email templates (verification code, password reset, account suspension, reactivation, and deletion), updating subjects, sender display name (`Melon Governance <noreply@melonmadura.my.id>`), HTML headers, logo alt text, and footer copyright statements.
+  - Updated test assertions in `apps/web/test/unit/resend-email.test.ts`.
 
 ### Acceptance Criteria
 
@@ -946,6 +959,8 @@ Implemented complete Owner User Management:
 - [x] Server-side guest guard: Authenticated users navigating to `/verify-email` and `/reset-password` are redirected to `/` with zero UI flash.
 - [x] Auth UI compliance: Removed decorative illustration frames from `/reset-password` and `/verify-email` conforming to `Premium Minimal Ops`.
 - [x] Full I18N support: Bilingual verification UI and email templates with 100% key parity across `id` and `en`.
+- [x] Transactional email logo cross-client consistency: Dedicated PNG logo eliminates dark mode and transparent image distortions in Gmail and major email clients while preserving WebP on web pages.
+- [x] Transactional email brand identity: Customer-facing emails uniformly feature "Melon Governance" branding across subjects, headers, and footers.
 
 ---
 

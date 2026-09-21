@@ -3079,3 +3079,60 @@ The following verification gates, test results, and staging deployment evidence 
 - Actuator physical valve control remains strictly locked under `ENABLE_FAUCET_CONTROL=false`.
 - Physical ESP32 hardware telemetry remains `PENDING_HARDWARE_FIRMWARE_LOGS` pending firmware source code (`.ino`) and serial runtime log audit from the hardware team.
 <!-- TASK-0414 Testing Evidence Reconciled: 2026-09-19 -->
+
+---
+
+## 35.11 Transactional Email Cross-Client Logo & Branding Alignment, and Owner User Management Verification Status Filtering Evidence (2026-09-21)
+
+The following verification gates, automated test results, and visual/database evidence were evaluated for Resend transactional email improvements and Owner User Management security filtering (`TASK-0214`, `TASK-0212`, `DEC-AUTH-110`, `DEC-AUTH-111`):
+
+### 1. Scope of Changes & Invariant Verification
+- **Cross-Client Email Logo Rendering & Asset Integrity (`DEC-AUTH-110`):**
+  - Problem resolved: WebP logo (`logo1.webp`) rendered transparent bounds unpredictably in Gmail (desktop/mobile image proxy color inversion), while rendering correctly in Zimbra.
+  - Fix: Added dedicated email-safe PNG asset `apps/web/public/logo1-email.png` (800×240, 32-bit RGBA, solid contrast-safe bounding).
+  - Invariant preserved: Website assets (`logo1.webp`, `logo2.webp`) remain completely untouched in modern WebP format. MIME inline attachment flow (`cid:logo1`) is preserved in `apps/web/lib/email/resend.ts`.
+- **Transactional Email Brand Identity ("Melon Governance"):**
+  - Customer-facing branding across all Resend email templates standardized to "Melon Governance" in email subjects, sender display name (`Melon Governance <noreply@melonmadura.my.id>`), HTML email headers, logo alt text, and footer copyright statements.
+  - Affected templates: verification email, password reset email, account suspended notice, account reactivated notice, and permanent deletion notice.
+  - Internal technical identifiers, database names, and API route structures remain untouched.
+- **Owner User Management Verification Status Filtering (`DEC-AUTH-111`):**
+  - Problem resolved: Unverified registered accounts (`emailVerifiedAt IS NULL`) previously appeared in `/users`.
+  - Repository-level filter: `UserRepository.getUsers` excludes unverified pending accounts in the default unfiltered query (`where.NOT = [{ accountStatus: AccountStatus.PENDING_APPROVAL, emailVerifiedAt: null }]`) and enforces `where.emailVerifiedAt = { not: null }` when querying `accountStatus = 'PENDING_APPROVAL'`.
+  - Single-user lookup guard: `UserRepository.getUserManagementById` returns `null` if the account is in `PENDING_APPROVAL` with `emailVerifiedAt === null`, returning HTTP 404 `USER_NOT_FOUND` from `GET /api/v1/users/{userId}`.
+  - Defensive frontend filtering: `apps/web/app/users/page.tsx` (`fetchUsers`) filters any unverified account before storing in component state.
+  - Role presentation: Standardized Admin role display label to uppercase `ADMINISTRATOR` in `messages/id.json` and `messages/en.json` across filter dropdowns, table row badges, and user detail modals.
+
+### 2. Evidence-Backed Automated Test Results
+- **Database Repository Tests (`packages/database/test/user-repository.test.ts`):**
+  - Result: **15/15 tests passed** (100%, exit code 0).
+  - Dedicated suite `Owner User Management Visibility & Verification Invariants`:
+    - `getUsers (unfiltered) excludes accounts that have not verified their email`: PASSED.
+    - `getUsers (filtered by PENDING_APPROVAL) returns only email-verified accounts`: PASSED.
+    - `getUsers returns verified accounts in ACTIVE and SUSPENDED statuses`: PASSED.
+    - `getUserManagementById returns null for unverified accounts in PENDING_APPROVAL`: PASSED.
+- **Frontend UI Test Suites (Vitest):**
+  - `apps/web/test/unit/users-page.test.tsx`: **6/6 passed** (100%).
+    - Verifies instant Owner access and role-hydrated rendering.
+    - Verifies Admin access displays 403 Forbidden screen.
+    - Verifies uppercase `ADMINISTRATOR` badge rendering for admin accounts.
+    - Verifies client-side defensive exclusion of unverified accounts.
+  - `apps/web/test/unit/users-bulk-delete-ui.test.tsx`: **8/8 passed** (100%).
+    - Verifies bulk delete bar, selection counters, modal triggers, and updated `ADMINISTRATOR` badge assertions.
+  - `apps/web/test/unit/resend-email.test.ts`: **10/10 passed** (100%).
+    - Verifies inline PNG logo attachment with `cid:logo1` and `contentType: 'image/png'`.
+    - Verifies "Melon Governance" sender display name, HTML headers, and footer branding.
+    - Verifies retry mechanism and error handling.
+- **API Route Integration Tests (`apps/web/app/api/v1/users/test/route.test.ts`):**
+  - Result: **28/28 passed** (100%, exit code 0).
+  - Verifies pagination, search, status filtering, and RBAC authorization.
+- **Monorepo Static Typecheck (`npm run typecheck`):**
+  - Result: **0 errors** across all 4 monorepo packages (`@kebun-melon/contracts`, `@kebun-melon/database`, `@kebun-melon/iot-gateway`, `@kebun-melon/web`), exit code 0.
+
+### 3. Live Development Database & Browser Verification Evidence
+- **Supabase DEV Query Check:**
+  - Executed query against development database containing unverified applicant account `hihi` (`emailVerifiedAt: null`, `accountStatus: 'PENDING_APPROVAL'`).
+  - Result: Unverified account was cleanly omitted from `getUsers` default and filtered queries, while verified accounts were returned.
+- **Email HTML Rendering Inspection:**
+  - Generated and inspected rendered HTML artifact with `cid:logo1` referencing `logo1-email.png` across light and dark background contexts, verifying sharp, non-inverted institutional colors and consistent "Melon Governance" typography.
+<!-- TASK-0212 and TASK-0214 Testing Evidence Reconciled: 2026-09-21 -->
+

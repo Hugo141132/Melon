@@ -601,7 +601,7 @@
     "noUsersFound": "No users found",
     "noUsersSubtitle": "Try adjusting your search keywords or status filters.",
     "roleOwnerLabel": "OWNER / PIC",
-    "roleAdminLabel": "Administrator",
+    "roleAdminLabel": "ADMINISTRATOR",
     "bulkDeleteTitle": "Permanently Delete Selected Accounts",
     "bulkDeleteDesc": "This action is permanent and irreversible. All data, active sessions, and access rights of the selected accounts will be permanently wiped from the system.",
     "bulkDeleteWarning": "Warning: This action is permanent and irreversible!",

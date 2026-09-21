@@ -1222,4 +1222,136 @@ describe('UserRepository Unit Tests', () => {
       );
     });
   });
+
+  describe('Owner User Management Visibility & Verification Invariants', () => {
+    it('getUsers excludes unverified PENDING_APPROVAL accounts in default list', async () => {
+      const mockFindMany = vi.fn().mockResolvedValue([]);
+      const mockCount = vi.fn().mockResolvedValue(0);
+
+      const mockPrisma: any = {
+        user: {
+          findMany: mockFindMany,
+          count: mockCount,
+        },
+      };
+
+      const repo = new UserRepository(mockPrisma);
+      await repo.getUsers();
+
+      expect(mockFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            accountStatus: { not: AccountStatus.DEACTIVATED },
+            NOT: [
+              {
+                accountStatus: AccountStatus.PENDING_APPROVAL,
+                emailVerifiedAt: null,
+              },
+            ],
+          }),
+        })
+      );
+      expect(mockCount).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            accountStatus: { not: AccountStatus.DEACTIVATED },
+            NOT: [
+              {
+                accountStatus: AccountStatus.PENDING_APPROVAL,
+                emailVerifiedAt: null,
+              },
+            ],
+          }),
+        })
+      );
+    });
+
+    it('getUsers with accountStatus=PENDING_APPROVAL enforces emailVerifiedAt not null', async () => {
+      const mockFindMany = vi.fn().mockResolvedValue([]);
+      const mockCount = vi.fn().mockResolvedValue(0);
+
+      const mockPrisma: any = {
+        user: {
+          findMany: mockFindMany,
+          count: mockCount,
+        },
+      };
+
+      const repo = new UserRepository(mockPrisma);
+      await repo.getUsers({ accountStatus: AccountStatus.PENDING_APPROVAL });
+
+      expect(mockFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            accountStatus: AccountStatus.PENDING_APPROVAL,
+            emailVerifiedAt: { not: null },
+          }),
+        })
+      );
+      expect(mockCount).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            accountStatus: AccountStatus.PENDING_APPROVAL,
+            emailVerifiedAt: { not: null },
+          }),
+        })
+      );
+    });
+
+    it('getUserManagementById returns null for unverified PENDING_APPROVAL accounts', async () => {
+      const mockPrisma: any = {
+        user: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: 'usr-unverified',
+            fullName: 'Unverified Admin',
+            email: 'unverified@example.com',
+            username: 'unverified',
+            accountStatus: AccountStatus.PENDING_APPROVAL,
+            emailVerifiedAt: null,
+            lastLoginAt: null,
+            suspendedAt: null,
+            deactivatedAt: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            userRoles: [],
+          }),
+        },
+      };
+
+      const repo = new UserRepository(mockPrisma);
+      const result = await repo.getUserManagementById('usr-unverified');
+
+      expect(result).toBeNull();
+    });
+
+    it('getUserManagementById returns safe DTO for verified PENDING_APPROVAL accounts', async () => {
+      const validAdminId = 'a0000000-0000-0000-0000-000000000001';
+      const mockPrisma: any = {
+        user: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: validAdminId,
+            fullName: 'Verified Pending Admin',
+            email: 'verified@example.com',
+            username: 'verified_pending',
+            accountStatus: AccountStatus.PENDING_APPROVAL,
+            emailVerifiedAt: new Date('2026-09-21T03:00:00Z'),
+            lastLoginAt: null,
+            suspendedAt: null,
+            deactivatedAt: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            userRoles: [{ role: { code: 'ADMIN' }, revokedAt: null }],
+          }),
+        },
+      };
+
+      const repo = new UserRepository(mockPrisma);
+      const result = await repo.getUserManagementById(validAdminId);
+
+      expect(result).not.toBeNull();
+      expect(result?.id).toBe(validAdminId);
+      expect(result?.accountStatus).toBe(AccountStatus.PENDING_APPROVAL);
+      expect(result?.emailVerifiedAt).toBeDefined();
+    });
+  });
 });

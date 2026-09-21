@@ -140,4 +140,93 @@ describe('UserManagementPage Auth State Hydration & RBAC Scoping', () => {
     // Verification: /api/v1/users was NOT fetched by non-owner
     expect(global.fetch).not.toHaveBeenCalledWith(expect.stringContaining('/api/v1/users'));
   });
+
+  it('3. renders ADMINISTRATOR role badge for Admin users in user management table', async () => {
+    mockAuthContext = {
+      user: {
+        id: 'usr-owner-1',
+        fullName: 'Owner Kebun',
+        email: 'owner@kebunmelon.id',
+        accountStatus: 'ACTIVE',
+        activeRoles: [UserRole.OWNER],
+      },
+      role: UserRole.OWNER,
+      isAuthenticated: true,
+    };
+
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByText('Budi Santoso')).toBeInTheDocument();
+    });
+
+    // Verification: Admin user displays ADMINISTRATOR badge (present in role filter and user row badge)
+    const adminLabels = screen.getAllByText('ADMINISTRATOR');
+    expect(adminLabels.length).toBeGreaterThanOrEqual(1);
+    expect(adminLabels.some((el) => el.tagName === 'SPAN')).toBe(true);
+  });
+
+  it('4. excludes unverified PENDING_APPROVAL accounts defensively if present in API payload', async () => {
+    mockAuthContext = {
+      user: {
+        id: 'usr-owner-1',
+        fullName: 'Owner Kebun',
+        email: 'owner@kebunmelon.id',
+        accountStatus: 'ACTIVE',
+        activeRoles: [UserRole.OWNER],
+      },
+      role: UserRole.OWNER,
+      isAuthenticated: true,
+    };
+
+    const mixedUsers = [
+      ...mockUsers,
+      {
+        id: 'usr-unverified-admin',
+        fullName: 'Unverified Applicant',
+        email: 'unverified@example.com',
+        username: 'unverified_guy',
+        accountStatus: 'PENDING_APPROVAL',
+        emailVerifiedAt: null,
+        lastLoginAt: null,
+        suspendedAt: null,
+        deactivatedAt: null,
+        createdAt: '2026-09-20T00:00:00.000Z',
+        updatedAt: '2026-09-20T00:00:00.000Z',
+        activeRoles: ['ADMIN'],
+      },
+    ];
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/v1/users')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              success: true,
+              data: mixedUsers,
+              meta: {
+                pagination: {
+                  page: 1,
+                  pageSize: 10,
+                  totalItems: 2,
+                  totalPages: 1,
+                },
+              },
+            }),
+        });
+      }
+      return Promise.reject(new Error(`Unhandled fetch: ${url}`));
+    });
+
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByText('Budi Santoso')).toBeInTheDocument();
+    });
+
+    // Verification: Unverified applicant is filtered out and never rendered
+    expect(screen.queryByText('Unverified Applicant')).not.toBeInTheDocument();
+  });
 });
