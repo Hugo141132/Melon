@@ -180,4 +180,37 @@ describe('ProfilePage Auth State Hydration and I18N', () => {
     const changeEmailButtons = screen.getAllByRole('button', { name: 'Change Email' });
     expect(changeEmailButtons).toHaveLength(1);
   });
+
+  it('verifies three-dot menu and avatar edit pencil overlay are absent and avatar is display-only', () => {
+    mockAuthContext = {
+      user: {
+        id: 'usr-1',
+        fullName: 'Budi Santoso',
+        email: 'budi@example.com',
+        accountStatus: 'ACTIVE',
+        activeRoles: [UserRole.ADMIN],
+      },
+      role: UserRole.ADMIN,
+      isAuthenticated: true,
+    };
+
+    const { container } = render(
+      <NextIntlClientProvider locale="en" messages={enMessages}>
+        <ProfilePage />
+      </NextIntlClientProvider>
+    );
+
+    // 1. Top-right three-dot menu button is absent
+    const headerButtons = container.querySelectorAll('header button');
+    expect(headerButtons).toHaveLength(0);
+
+    // 2. Avatar edit button is absent
+    expect(screen.queryByRole('button', { name: 'Avatar' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /edit/i })).not.toBeInTheDocument();
+
+    // 3. Monogram initial avatar is rendered display-only
+    const avatar = screen.getByTestId('user-avatar');
+    expect(avatar).toBeInTheDocument();
+    expect(screen.getByTestId('user-avatar-initial')).toHaveTextContent('B');
+  });
 });

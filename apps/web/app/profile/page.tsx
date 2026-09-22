@@ -1,12 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
+import UserAvatar from '@/components/auth/UserAvatar';
 import { useState, useEffect } from 'react';
 import {
   ArrowLeft,
-  MoreVertical,
-  Edit2,
   Lock,
   Smartphone,
   LogOut,
@@ -235,7 +233,7 @@ export default function ProfilePage() {
     <div className="bg-app-surface text-app-on-surface min-h-dvh pb-32 font-sans">
       {/* Top AppBar */}
       <header className="bg-app-surface sticky top-0 z-50 w-full shadow-sm">
-        <div className="flex justify-between items-center px-[1rem] py-[8px] w-full h-16">
+        <div className="flex items-center px-[1rem] py-[8px] w-full h-16">
           <div className="flex items-center gap-4">
             <Link
               href="/setting"
@@ -245,9 +243,6 @@ export default function ProfilePage() {
             </Link>
             <h1 className="text-[20px] font-bold text-app-on-surface">{tProfile('title')}</h1>
           </div>
-          <button className="active:scale-95 transition-transform p-2 cursor-pointer">
-            <MoreVertical size={22} className="text-app-primary" />
-          </button>
         </div>
       </header>
 
@@ -264,20 +259,7 @@ export default function ProfilePage() {
         <section className="space-y-[1rem]">
           {/* Avatar */}
           <div className="flex flex-col items-center gap-4 mb-8">
-            <div className="relative">
-              <div className="w-28 h-28 rounded-full border-4 border-white soft-elevation overflow-hidden bg-app-surface-container">
-                <Image
-                  src={USER_PROFILE.avatar}
-                  alt={fullName || user?.fullName || USER_PROFILE.name}
-                  width={112}
-                  height={112}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-              <button className="absolute bottom-0 right-0 bg-app-primary text-white p-2 rounded-full shadow-lg border-2 border-white active:scale-90 transition-transform cursor-pointer">
-                <Edit2 size={14} />
-              </button>
-            </div>
+            <UserAvatar name={fullName || user?.fullName || USER_PROFILE.name} size="lg" />
             <div className="flex items-center gap-2 px-4 py-1.5 bg-app-on-primary-container text-app-primary rounded-full">
               <CheckCircle size={16} fill="currentColor" />
               <span className="text-[14px] font-semibold">

@@ -2251,6 +2251,14 @@ The following facts are verified in the user flow implementations regarding `TAS
 **Required permissions:** `profilee.password.update.self`.
 **Audit events:** `auth.password.changed`.
 
+---
+
+## Profile Avatar Standardization and Display-Only Affordances Implementation Note (Reconciled 2026-09-22)
+
+The following facts are verified in the user flow implementations regarding Profile Avatar Standardization (`TASK-0217` / `TASK-0211`):
+- **Consistent Monogram Avatars:** Across `TopAppBar`, `/setting`, and `/profile`, avatars consistently render uppercase initial monograms derived from the user's full name or email (using reusable `UserAvatar`), eliminating external blank placeholder images.
+- **Display-Only Avatar Experience:** On `/profile`, the monogram avatar is strictly display-only. Unimplemented avatar edit affordances (pencil overlay button and top-right three-dot menu) are removed, preventing confusion with non-existent upload features.
+- **Invariants Maintained:** No database migrations, Supabase Storage buckets, or API changes are introduced. Form editing remains strictly scoped to allowlisted textual fields (Full Name, Username) and authenticated workflows (Change Password modal, Change Email modal).
 
 ---
 

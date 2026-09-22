@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { USER_PROFILE } from '@/lib/constants';
+import UserAvatar from '../auth/UserAvatar';
 import DeviceSelector from './DeviceSelector';
 import Sidebar from './Sidebar';
 import { useAuth } from '@/context/AuthContext';
@@ -26,7 +26,6 @@ export default function TopAppBar({ showDeviceSelector = true }: TopAppBarProps)
 
   const { user } = useAuth();
   const userDisplayName = user?.fullName || user?.email || '';
-  const initial = userDisplayName ? userDisplayName.charAt(0).toUpperCase() : null;
 
   const clearHoverTimer = useCallback(() => {
     if (hoverTimerRef.current) {
@@ -124,20 +123,8 @@ export default function TopAppBar({ showDeviceSelector = true }: TopAppBarProps)
 
         {/* Right Side Actions */}
         <div className="flex items-center justify-end gap-3 flex-shrink-0 min-w-0 z-10">
-          <Link href="/profile" className="cursor-pointer">
-            <div className="w-8 h-8 rounded-full overflow-hidden border border-app-primary/20 ring-2 ring-app-primary/10 flex items-center justify-center bg-app-primary text-on-primary font-bold text-xs">
-              {initial ? (
-                initial
-              ) : (
-                <Image
-                  src={USER_PROFILE.avatar}
-                  alt={userDisplayName || 'User Profile'}
-                  width={32}
-                  height={32}
-                  className="w-full h-full object-cover"
-                />
-              )}
-            </div>
+          <Link href="/profile" className="cursor-pointer" aria-label="Profile">
+            <UserAvatar name={userDisplayName} size="sm" />
           </Link>
         </div>
       </header>

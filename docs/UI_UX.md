@@ -1504,7 +1504,12 @@ The profile management interface (`/profile`) is reconciled to provide secure, p
   - Upon successful verification, active `AuthContext` is synchronized immediately without requiring full-page reload or re-login.
 - **Accessibility & Touch Targets:** Form inputs and action buttons enforce standard 44px minimum touch targets, proper ARIA labels (`aria-labelledby`, `aria-describedby`), and clear focus rings.
 - **Change Email Action Deduplication (Reconciled 2026-09-11):** Resolved duplicated "Change Email" action labels on `/profile`. The initial implementation of `TASK-0216` placed the trigger button in two locations: (1) adjacent to the read-only email field in the Personal Info form, and (2) inside the Email Verification Status card under Account & Session Security. To adhere to clean UI separation of concerns, the trigger was retained solely adjacent to the email input field (`{/* Email (Read-Only with Change Email Action) */}`), and permanently removed from the Email Verification Status card. Security cards strictly represent operational account status badges (*"Terverifikasi"* / *"Verified"*), preventing redundant action triggers.
-<!-- Profile Security UI/UX Reconciled: 2026-08-29; Refined 2026-09-11 -->
+- **Profile Avatar Standardization and Display-Only Affordance (Reconciled 2026-09-22):**
+  - **Standardized Monogram Avatar:** Replaced the legacy static external placeholder avatar image (`USER_PROFILE.avatar`) across `TopAppBar`, `/setting`, and `/profile` with a unified, lightweight `UserAvatar` component (`apps/web/components/auth/UserAvatar.tsx`) supporting `sm` (32px), `md` (64px), and `lg` (112px). Generates dynamic uppercase monogram initials from user full name or email with a Lucide `User` icon fallback.
+  - **Header Action Cleanup:** Removed the unused top-right three-dot menu button (`MoreVertical`) from `/profile`, aligning the header cleanly to the left with the back navigation link and page title.
+  - **Display-Only Avatar:** Removed the avatar edit pencil button overlay (`Edit2`), rendering the profile avatar strictly display-only without confusing, non-functional editing affordances.
+  - **Invariants Preserved:** Conforms strictly to `Premium Minimal Ops`. Zero Supabase Storage bucket dependencies, zero database schema migrations, and zero API changes. Staging environment untouched.
+<!-- Profile Security UI/UX Reconciled: 2026-08-29; Refined 2026-09-11; Avatar Standardized 2026-09-22 -->
 
 ---
 

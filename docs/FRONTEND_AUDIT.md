@@ -18,6 +18,12 @@
 > - **Logo Image Fallbacks**: Aligned Next.js image `alt` attributes from `"Kebun Melon"` to `"Melon"` across `/login`, `/register`, `/forgot-password`, `/reset-password`, `/verify-email`, `TopAppBar`, and `Sidebar`.
 > - **Invariants Preserved**: The login subtitle sentence `"Manage your melon farm with ease"` / `"Kelola lahan melon Anda dengan lebih mudah"` was preserved verbatim. All layouts, color tokens, and navigation routes remain strictly unchanged.
 > - **Verification**: Added regression test suite `apps/web/test/unit/branding-cleanup.test.tsx` (7/7 passed), passed full workspace test suite (125/125 test suites, 1,300/1,300 tests), passed TypeScript typecheck (`tsc --noEmit`, 0 errors), and verified exact label rendering on `/register` via Playwright.
+>
+> **Reconciliation Note (2026-09-22 Profile Picture & Avatar Standardization):** Standardized user avatar display across application views matching the authenticated user monogram initial style from `TopAppBar` (`Frontend impact: MINOR`). Selected UI direction: `Premium Minimal Ops`. Existing color template: `UNCHANGED`. Selected motion effects: `None`. 21st.dev MCP: `NOT REQUIRED`.
+> - **Unified Component**: Created reusable `UserAvatar` (`apps/web/components/auth/UserAvatar.tsx`) supporting `sm` (32px), `md` (64px), and `lg` (112px) sizes, rendering dynamic uppercase initials from user full name or email, with a styled Lucide `User` icon fallback.
+> - **Placeholder Elimination**: Replaced the static, external Pinterest placeholder image (`USER_PROFILE.avatar`) across `TopAppBar`, `/setting`, and `/profile` with dynamic `UserAvatar`.
+> - **Display-Only Affordance Polish**: Streamlined `/profile` header by removing the top-right three-dot action button (`MoreVertical`) and removed the pencil/edit icon overlay button (`Edit2`), rendering the monogram avatar in a clean, display-only manner conforming to `Premium Minimal Ops`.
+> - **Invariants Preserved**: Zero backend, database schema, or Supabase storage changes. Verified 100% test pass rate across 128 test suites (1,317/1,317 tests passed) and 0 TypeScript typecheck errors.
 
 ---
 

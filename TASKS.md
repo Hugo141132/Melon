@@ -1036,6 +1036,11 @@ Implemented complete Owner User Management:
    - **AuthContext & User Greeting Fix:** Resolved blank user greeting ("Welcome ") after login by removing redundant `router.refresh()` in `login-view.tsx` and guarding `AuthContext` from stale SSR `initialSession=null` clobbering.
    - **Same-Client Session Recovery:** Enabled re-login recovery when `session_token` cookie is deleted/lost on the same browser (via token hash matching or identical IP + User-Agent), while preserving strict 409 rejection of different devices.
    - **Performance Results:** Expected `POST /api/v1/auth/login` duration drops from ~3.6–4.2s to ~1.6–2.0s without sacrificing transactional safety or concurrency.
+7. **2026-09-22 Profile Avatar Standardization & UI Affordance Cleanup:**
+   - **Avatar Standardization:** Replaced static, external placeholder image (`USER_PROFILE.avatar`) with reusable monogram initial `UserAvatar` component (`apps/web/components/auth/UserAvatar.tsx`) across `TopAppBar`, `/setting`, and `/profile`.
+   - **Profile UI Affordance Cleanup:** Removed top-right three-dot menu button (`MoreVertical`) and avatar edit pencil overlay (`Edit2`) from `/profile`, rendering the avatar strictly display-only.
+   - **Persistence & Backend Invariants:** Zero database schema modifications, zero Supabase Storage additions, zero API changes, and no staging environment redeployment.
+   - **Verification:** Added `apps/web/test/unit/user-avatar.test.tsx` (5/5 passed), updated `apps/web/test/unit/profile-page.test.tsx` (5/5 passed), passed full unit test suite (53 test files, 422/422 tests passed), and verified monorepo TypeScript typecheck (0 errors).
 
 ### Acceptance Criteria
 
@@ -1052,6 +1057,9 @@ Implemented complete Owner User Management:
 - [x] Same-client recovery succeeds after cookie loss while different-device logins are rejected.
 - [x] Targeted unit tests (`session-service.test.ts` 8/8, `auth-context-hydration.test.tsx` 6/6, `route_protection.test.ts` 13/13) and monorepo typecheck pass with 0 errors.
 - [x] Containerized staging environment rebuilt and verified via Playwright MCP. Final 5 pre-commit CI gates (`test:coverage`, `test:integration`, `check:quality`, `test`, `test:e2e`) pending manual execution before commit.
+- [x] Static blank placeholder avatar replaced with dynamic monogram initial `UserAvatar` across `TopAppBar`, `/setting`, and `/profile`.
+- [x] Profile top-right three-dot menu and avatar edit pencil overlay are removed, rendering avatar strictly display-only.
+- [x] Zero database migrations, Supabase Storage buckets, or backend API changes introduced.
 
 ---
 

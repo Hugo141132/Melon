@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
+import UserAvatar from '@/components/auth/UserAvatar';
 import TopAppBar from '@/components/navigation/TopAppBar';
 import { SettingsLocaleSwitcher } from '@/components/settings/locale-switcher';
 import { USER_PROFILE } from '@/lib/constants';
@@ -50,15 +50,7 @@ export default function SettingPage() {
       <main className="pt-20 px-[1rem] max-w-2xl mx-auto w-full space-y-5">
         {/* User Summary Card */}
         <section className="flex items-center gap-4 bg-app-surface-container-lowest p-5 rounded-xl soft-elevation-lg border border-app-outline-variant/30 animate-fade-in">
-          <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-app-primary-fixed flex-shrink-0">
-            <Image
-              src={USER_PROFILE.avatar}
-              alt={user?.fullName || USER_PROFILE.name}
-              width={64}
-              height={64}
-              className="w-full h-full object-cover"
-            />
-          </div>
+          <UserAvatar name={user?.fullName || USER_PROFILE.name} size="md" />
           <div>
             <h2 className="text-[24px] leading-8 font-bold text-app-primary">
               {user?.fullName || USER_PROFILE.name}
