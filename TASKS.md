@@ -1280,6 +1280,13 @@ BATTERY_MONITORING
 **Status:** `DONE`
 **Dependencies:** `TASK-0302`, `TASK-0209`
 **Completed:** 2026-07-31 — Implemented management of User ↔ Device assignment relationships. Owner can assign devices to Admin users and revoke assignments (`assignedBy`, `assignedAt`, `revokedAt`). Historical revoked rows are retained in PostgreSQL (`revokedAt IS NOT NULL`), and single active assignment per (user_id, device_id) is enforced by partial unique index `user_device_access_active_user_device_unique`. Active assigned devices display cleanly in the Owner management UI, with instant UI updates on revocation, and revoked devices immediately becoming available for reassignment. Added comprehensive unit and integration test coverage across contract, API, database repository, and frontend layers.
+**Device Access Revocation Enforcement & Server Authorization Reconciliation (2026-09-22):**
+- Resolved authorization gap where an Admin retained device view access after Owner revoked the assignment in `user_device_access` (`revokedAt IS NOT NULL`) upon page refresh.
+- Implemented `validateServerDeviceAccess` in `apps/web/lib/auth/server-device-guard.ts` enforcing server boundary authorization checks on `/soil`, `/water`, and `/controls`.
+- Rejects unassigned or revoked Admin access with HTTP 403 `DEVICE_NOT_ASSIGNED`.
+- Renders dedicated `DeviceAccessForbidden` UI state displaying human-readable device names (using session storage cache or domain fallbacks) rather than exposing raw database UUIDs.
+- Cleanses client-side cache and context via `markDeviceRevoked` in `DeviceContext.tsx`.
+- Verified with unit tests in `apps/web/test/unit/server-device-guard.test.ts` (6/6 passed) and `apps/web/test/unit/device-revocation-ui.test.tsx` (5/5 passed).
 
 ### Work
 
@@ -1317,6 +1324,11 @@ revokedAt
 - Confirmed `POST /api/v1/devices` creation path remains completely removed (`DEC-DEV-027`).
 - Verified query performance on Supabase staging DB: index-only scan on `user_device_access_active_user_device_unique` (`revokedAt IS NULL`), index scans on `devices_pkey` and `device_capabilities`, zero N+1 queries, zero performance regression, and zero schema/index changes required.
 - Verified 100% test pass rate across 5 test suites (58/58 tests: 24/24 route tests, 10/10 repository tests, 7/7 contract tests, 6/6 page tests, 11/11 selector tests), Semgrep scan (0 findings), and TypeScript typecheck (0 errors).
+**Device Access Revocation & Forbidden UI State Reconciliation (2026-09-22):**
+- Server-side authorization guard (`validateServerDeviceAccess`) enforces active device assignments across `/soil`, `/water`, and `/controls` during SSR and page navigation.
+- Unassigned or revoked Admin requests fail closed with HTTP 403 `DEVICE_NOT_ASSIGNED`.
+- Renders `DeviceAccessForbidden` component displaying human-readable device names from session storage cache or domain fallbacks, preventing raw database UUID leakage.
+- Cleanses client-side context state via `markDeviceRevoked` to terminate telemetry polling and reset selected device to `null`.
 
 ### Work
 

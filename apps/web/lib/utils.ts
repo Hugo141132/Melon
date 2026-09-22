@@ -51,12 +51,13 @@ export function formatDeviceDisplayName(
     'Device',
   ];
 
-  // If deviceName is missing, matches raw deviceId, follows raw node ID pattern, or matches known system default label
+  // If deviceName is missing, matches raw deviceId, follows raw node ID pattern, is a UUID, or matches known system default label
   const isDefaultName =
     !name ||
     (device.deviceId && name === device.deviceId) ||
     /^(soil|water|water-quality|water-tank)-node-[a-z0-9_-]+$/i.test(name) ||
     /^[a-z0-9_-]+-[a-z0-9]{5,}$/i.test(name) ||
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(name) ||
     KNOWN_DEFAULT_LABELS.includes(name);
 
   if (isDefaultName) {

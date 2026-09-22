@@ -2199,4 +2199,63 @@ The production environment implements strict separation between existing shared 
 - **Safety Invariant:** `ENABLE_FAUCET_CONTROL=false` strictly preserved across staging containers.
 <!-- Production DNS & Email Sending Architecture Reconciled: 2026-09-20 -->
 
+---
+
+## Device Access Revocation Enforcement & Server Guard Architecture Note (Reconciled 2026-09-22)
+
+This section defines the architecture for server-side device authorization enforcement and the handling of revoked device states:
+
+### 1. Server-Side Guard Architecture (`validateServerDeviceAccess`)
+
+To eliminate the authorization vulnerability where an Admin user could retain telemetry or control access after an Owner revoked their assignment in PostgreSQL (`user_device_access`), device authorization is enforced authoritatively at the server component boundary:
+
+```text
+Browser Navigation / Refresh (GET /soil?deviceId=...)
+                 │
+                 ▼
+   [Next.js Server Page Component]
+                 │
+                 ▼
+   [validateServerDeviceAccess] (@/lib/auth/server-device-guard)
+                 │
+                 ├─► 1. requireSession() & requireActiveAccount()
+                 │      (Redirects unauthenticated to /login, non-active to /status)
+                 │
+                 ├─► 2. Role = OWNER?
+                 │      └─► ALLOW: Global device scope across all registered devices.
+                 │
+                 └─► 3. Role = ADMIN?
+                        └─► Query user_device_access (userId, deviceId, revokedAt IS NULL)
+                            ├─► Active Record Exists: ALLOW.
+                            └─► Missing or Revoked: DENY (HTTP 403 DEVICE_NOT_ASSIGNED).
+                                      │
+                                      ▼
+                        [DeviceAccessForbidden Component]
+                        ├─► Displays Human-Readable Device Title (No Raw UUIDs)
+                        ├─► Evicts Device from sessionStorage Cache
+                        ├─► markDeviceRevoked (selectedDevice = null)
+                        └─► Primary Recovery CTA (Navigate to /dashboard)
+```
+
+### 2. Authorization Scoping & Domain Segregation
+- **Owner Global Authority:** Owner accounts access any registered device across the fleet without requiring a row in `user_device_access`. Device type matching is verified to prevent cross-domain rendering (e.g. soil device loaded on `/water`).
+- **Admin Assignment Boundary:** Admin accounts require a verified assignment row in `user_device_access` where `revokedAt IS NULL`. If revoked (`revokedAt IS NOT NULL`) or never assigned, the server immediately rejects access with status 403 and error code `DEVICE_NOT_ASSIGNED`.
+
+### 3. Privacy & Raw Database UUID Concealment
+- In accordance with `DEC-DEV-028` and anti-enumeration invariants, internal database UUIDs (e.g., `3216f033-4c21-4b19-adc6-365854c31704`) are strictly masked from the user interface during error states.
+- The `DeviceAccessForbidden` component resolves human-readable names through a multi-tier fallback:
+  1. **Cached Name:** Name retrieved from `sessionStorage['kebun_melon_device_cache']` stored during active navigation prior to revocation.
+  2. **In-Memory Selection:** `selectedDeviceRef.current?.deviceName` if present.
+  3. **Domain Fallback:** Localized domain titles: `Node Sensor Tanah` on `/soil`, `Node Kualitas Air` on `/water`, and `Node Tangki Air` on `/controls`.
+  4. **Generic Fallback:** `Node Perangkat` / `Device Node`.
+
+### 4. Client Context State Synchronization & Cache Pruning
+- When `DeviceAccessForbidden` mounts on the client:
+  - Calls `markDeviceRevoked(attemptedDeviceId)` on `DeviceContext`.
+  - Clears `selectedDevice` to `null` if the revoked device is currently selected.
+  - Deletes the revoked device record from `sessionStorage['kebun_melon_device_cache']`.
+  - Removes the device from the active `devices` state array.
+  - Automatically terminates all real-time SSE subscriptions and background prediction polling intervals for the revoked device.
+<!-- Device Access Revocation Architecture Reconciled: 2026-09-22 -->
+
 

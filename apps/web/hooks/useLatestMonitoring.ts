@@ -15,7 +15,8 @@ export interface UseLatestMonitoringResult {
 }
 
 export function useLatestMonitoring(): UseLatestMonitoringResult {
-  const { selectedDeviceId, selectedDevice, updateDeviceStatus } = useDeviceContext();
+  const { selectedDeviceId, selectedDevice, updateDeviceStatus, markDeviceRevoked } =
+    useDeviceContext();
   const [snapshot, setSnapshot] = useState<LatestMonitoringSnapshotDto | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isRevalidating, setIsRevalidating] = useState<boolean>(false);
@@ -54,6 +55,9 @@ export function useLatestMonitoring(): UseLatestMonitoringResult {
             setError('Sesi telah berakhir. Silakan login kembali.');
           } else if (response.status === 403) {
             setError('Anda tidak memiliki akses ke data pemantauan perangkat ini.');
+            if (markDeviceRevoked && selectedDeviceId) {
+              markDeviceRevoked(selectedDeviceId);
+            }
           } else if (response.status === 404) {
             setError('Perangkat tidak ditemukan.');
           } else {

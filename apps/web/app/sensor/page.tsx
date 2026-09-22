@@ -5,12 +5,11 @@ import { useRouter } from 'next/navigation';
 import TopAppBar from '@/components/navigation/TopAppBar';
 import { useDeviceContext } from '@/context/DeviceContext';
 import { Sprout, Droplets, Database, ChevronRight } from 'lucide-react';
-import { formatDeviceDisplayName } from '@/lib/utils';
 import { useTranslations } from 'next-intl';
 
 export default function SensorPage() {
   const tDevices = useTranslations('devices');
-  const { devices, selectedDevice, selectDevice, isLoading, error } = useDeviceContext();
+  const { devices, selectDevice, isLoading, error } = useDeviceContext();
   const router = useRouter();
 
   const soilDevices = devices.filter((d) => d.deviceType === 'SOIL_NODE');
@@ -42,19 +41,6 @@ export default function SensorPage() {
               </p>
             </div>
           </div>
-
-          {selectedDevice && (
-            <div className="mt-3 p-3 bg-app-surface-container rounded-xl flex items-center justify-between text-xs">
-              <span className="font-semibold text-app-on-surface">
-                {tDevices('sensorSelectedDevice', {
-                  deviceName: formatDeviceDisplayName(selectedDevice, tDevices),
-                })}
-              </span>
-              <span className="font-mono text-[11px] text-app-primary font-bold px-2 py-0.5 bg-app-primary/10 rounded-lg">
-                {selectedDevice.deviceType}
-              </span>
-            </div>
-          )}
         </section>
 
         {/* Category Navigation Cards */}

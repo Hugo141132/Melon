@@ -34,10 +34,12 @@ export interface DeviceContextType {
   error: string | null;
   isRevoked: boolean;
   revokedDeviceId: string | null;
+  revokedDeviceName: string | null;
   selectDevice: (deviceId: string) => boolean;
   refetchDevices: () => Promise<void>;
   clearSelectedDevice: () => void;
   dismissRevokedNotice: () => void;
+  markDeviceRevoked: (deviceId: string, deviceName?: string | null) => void;
   updateDeviceStatus: (
     deviceId: string,
     status: AuthorisedDevice['connectionStatus'],
@@ -70,6 +72,44 @@ function isDeviceContextRoute(): boolean {
   }
 }
 
+const DEVICE_CACHE_KEY = 'kebun_melon_device_cache';
+
+interface CachedDeviceInfo {
+  deviceName: string;
+  deviceType?: string;
+}
+
+function getCachedDeviceInfo(deviceId: string): CachedDeviceInfo | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = sessionStorage.getItem(DEVICE_CACHE_KEY);
+    if (!raw) return null;
+    const map = JSON.parse(raw);
+    return map[deviceId] || null;
+  } catch {
+    return null;
+  }
+}
+
+function saveDevicesToCache(devices: AuthorisedDevice[]) {
+  if (typeof window === 'undefined' || !devices.length) return;
+  try {
+    const raw = sessionStorage.getItem(DEVICE_CACHE_KEY);
+    const map: Record<string, CachedDeviceInfo> = raw ? JSON.parse(raw) : {};
+    for (const d of devices) {
+      const info: CachedDeviceInfo = {
+        deviceName: d.deviceName,
+        deviceType: d.deviceType,
+      };
+      if (d.id) map[d.id] = info;
+      if (d.deviceId) map[d.deviceId] = info;
+    }
+    sessionStorage.setItem(DEVICE_CACHE_KEY, JSON.stringify(map));
+  } catch {
+    // Ignore storage errors
+  }
+}
+
 export function DeviceProvider({
   children,
   initialDevices,
@@ -97,8 +137,45 @@ export function DeviceProvider({
   });
   const [isLoading, setIsLoading] = useState<boolean>(!initialDevices);
   const [error, setError] = useState<string | null>(null);
-  const [isRevoked, setIsRevoked] = useState<boolean>(false);
-  const [revokedDeviceId, setRevokedDeviceId] = useState<string | null>(null);
+  const [isRevoked, setIsRevoked] = useState<boolean>(() => {
+    if (initialDevices) {
+      const candidateId = initialSelectedDeviceId ?? getUrlDeviceId();
+      if (candidateId) {
+        const matched = initialDevices.find(
+          (d) => (d.deviceId && d.deviceId === candidateId) || d.id === candidateId
+        );
+        return !matched;
+      }
+    }
+    return false;
+  });
+  const [revokedDeviceId, setRevokedDeviceId] = useState<string | null>(() => {
+    if (initialDevices) {
+      const candidateId = initialSelectedDeviceId ?? getUrlDeviceId();
+      if (candidateId) {
+        const matched = initialDevices.find(
+          (d) => (d.deviceId && d.deviceId === candidateId) || d.id === candidateId
+        );
+        return !matched ? candidateId : null;
+      }
+    }
+    return null;
+  });
+  const [revokedDeviceName, setRevokedDeviceName] = useState<string | null>(() => {
+    if (initialDevices) {
+      const candidateId = initialSelectedDeviceId ?? getUrlDeviceId();
+      if (candidateId) {
+        const matched = initialDevices.find(
+          (d) => (d.deviceId && d.deviceId === candidateId) || d.id === candidateId
+        );
+        if (!matched) {
+          const cached = getCachedDeviceInfo(candidateId);
+          return cached?.deviceName || null;
+        }
+      }
+    }
+    return null;
+  });
 
   // Keep a ref to avoid stale closure state during async in-flight fetch
   const selectedDeviceRef = React.useRef<AuthorisedDevice | null>(selectedDevice);
@@ -138,13 +215,7 @@ export function DeviceProvider({
   const processDeviceList = useCallback(
     (fetchedDevices: AuthorisedDevice[], explicitCandidateId?: string | null) => {
       setDevices(fetchedDevices);
-
-      if (fetchedDevices.length === 0) {
-        setSelectedDevice(null);
-        selectedDeviceRef.current = null;
-        syncSelection(null);
-        return;
-      }
+      saveDevicesToCache(fetchedDevices);
 
       const urlCandidateId = getUrlDeviceId();
       const onDeviceRoute = isDeviceContextRoute();
@@ -175,14 +246,24 @@ export function DeviceProvider({
           syncSelection(matched);
           setIsRevoked(false);
           setRevokedDeviceId(null);
+          setRevokedDeviceName(null);
           return;
         } else {
           // Candidate ID was explicitly requested (via URL or context) but is NOT in server-authorised list (revoked/unassigned/invalid)
+          const cached = getCachedDeviceInfo(candidateId);
+          const friendlyName =
+            cached?.deviceName ||
+            (selectedDeviceRef.current?.id === candidateId ||
+            selectedDeviceRef.current?.deviceId === candidateId
+              ? selectedDeviceRef.current?.deviceName
+              : null);
+
           setIsRevoked(true);
           setRevokedDeviceId(candidateId);
+          setRevokedDeviceName(friendlyName || null);
           setSelectedDevice(null);
           selectedDeviceRef.current = null;
-          syncSelection(null);
+          // Do not delete deviceId from URL so the revoked context is deterministic upon refresh
           return;
         }
       }
@@ -193,6 +274,7 @@ export function DeviceProvider({
       syncSelection(null);
       setIsRevoked(false);
       setRevokedDeviceId(null);
+      setRevokedDeviceName(null);
     },
     [initialSelectedDeviceId, syncSelection]
   );
@@ -280,6 +362,7 @@ export function DeviceProvider({
       syncSelection(target);
       setIsRevoked(false);
       setRevokedDeviceId(null);
+      setRevokedDeviceName(null);
       setError(null);
       return true;
     },
@@ -295,6 +378,24 @@ export function DeviceProvider({
   const dismissRevokedNotice = useCallback(() => {
     setIsRevoked(false);
     setRevokedDeviceId(null);
+    setRevokedDeviceName(null);
+  }, []);
+
+  const markDeviceRevoked = useCallback((deviceId: string, deviceName?: string | null) => {
+    const cached = getCachedDeviceInfo(deviceId);
+    const resolvedName =
+      deviceName ||
+      cached?.deviceName ||
+      (selectedDeviceRef.current?.id === deviceId ||
+      selectedDeviceRef.current?.deviceId === deviceId
+        ? selectedDeviceRef.current?.deviceName
+        : null);
+
+    setIsRevoked(true);
+    setRevokedDeviceId(deviceId);
+    setRevokedDeviceName(resolvedName || null);
+    setSelectedDevice(null);
+    selectedDeviceRef.current = null;
   }, []);
 
   const updateDeviceStatus = useCallback(
@@ -358,10 +459,12 @@ export function DeviceProvider({
         error,
         isRevoked,
         revokedDeviceId,
+        revokedDeviceName,
         selectDevice,
         refetchDevices,
         clearSelectedDevice,
         dismissRevokedNotice,
+        markDeviceRevoked,
         updateDeviceStatus,
       }}
     >

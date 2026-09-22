@@ -3136,3 +3136,52 @@ The following verification gates, automated test results, and visual/database ev
   - Generated and inspected rendered HTML artifact with `cid:logo1` referencing `logo1-email.png` across light and dark background contexts, verifying sharp, non-inverted institutional colors and consistent "Melon Governance" typography.
 <!-- TASK-0212 and TASK-0214 Testing Evidence Reconciled: 2026-09-21 -->
 
+---
+
+## 35.12 Device Access Revocation Enforcement & Human-Readable Forbidden State Evidence (2026-09-22)
+
+The following verification gates, automated test results, and authorization evidence were evaluated for Device Access Revocation Enforcement (`TASK-0304`, `TASK-0305`):
+
+### 1. Scope of Changes & Authorization Invariants
+- **Authorization Vulnerability Resolved:**
+  - An Admin user granted access to Device A previously retained view access if the page was refreshed after an Owner revoked the assignment.
+  - Server-side guard `validateServerDeviceAccess` was integrated across `/soil`, `/water`, and `/controls` App Router page components, terminating unauthorized rendering during server-side execution.
+- **Fail-Closed 403 `DEVICE_NOT_ASSIGNED`:**
+  - Owner accounts retain global system scope across all devices.
+  - Admin accounts require an active assignment in `user_device_access` (`revokedAt === null`). When revoked or unassigned, requests immediately fail closed with HTTP 403 `DEVICE_NOT_ASSIGNED`.
+- **Human-Readable Device Presentation & Privacy:**
+  - `DeviceAccessForbidden` renders an operational 403 state masking raw database UUIDs (e.g., `3216f033-4c21-4b19-adc6-365854c31704`).
+  - Device names resolve through safe session storage cache, in-memory reference, or domain fallbacks (`Node Sensor Tanah`, `Node Kualitas Air`, `Node Tangki Air`).
+- **Client Cache Synchronization:**
+  - `DeviceContext` executes `markDeviceRevoked`, setting `selectedDevice = null`, evicting the device from `sessionStorage['kebun_melon_device_cache']`, and halting real-time polling.
+
+### 2. Evidence-Backed Automated Test Results
+- **Server Device Guard Tests (`apps/web/test/unit/server-device-guard.test.ts`):**
+  - Result: **6/6 passed** (100%, exit code 0).
+  - Test assertions:
+    - `allows OWNER global access to any valid device`: PASSED.
+    - `rejects OWNER access with 404 when device does not exist`: PASSED.
+    - `rejects OWNER access with 404 when target domain does not match device type`: PASSED.
+    - `allows ADMIN access when user has an active device assignment`: PASSED.
+    - `rejects ADMIN with 403 DEVICE_NOT_ASSIGNED when device assignment was revoked`: PASSED.
+    - `rejects ADMIN with 403 DEVICE_NOT_ASSIGNED when user has no assignment`: PASSED.
+- **Forbidden UI State & UUID Concealment Tests (`apps/web/test/unit/device-revocation-ui.test.tsx`):**
+  - Result: **5/5 passed** (100%, exit code 0).
+  - Test assertions:
+    - `renders human-readable device name from session storage cache without displaying raw UUID`: PASSED.
+    - `renders human-readable domain fallback when cache is empty without raw UUID`: PASSED.
+    - `does not expose raw database UUID anywhere in the rendered forbidden UI`: PASSED.
+    - `calls markDeviceRevoked on mount with the attempted device ID`: PASSED.
+    - `renders action button to return to dashboard`: PASSED.
+- **Regression Unit Suites:**
+  - `apps/web/test/unit/device-selector-localization.test.tsx`: **11/11 passed** (100%).
+  - `apps/web/test/unit/soil-telemetry-ui.test.tsx`: **8/8 passed** (100%).
+- **Monorepo Static Typecheck (`npm run typecheck`):**
+  - Result: **0 errors** across all 4 monorepo packages (`@kebun-melon/contracts`, `@kebun-melon/database`, `@kebun-melon/iot-gateway`, `@kebun-melon/web`), exit code 0.
+
+### 3. Preserved Environmental & Staging Invariants
+- Application database schema remains unchanged (zero new migrations).
+- Staging Docker environment and cloud databases remain untouched.
+- Actuator physical safety invariant strictly preserved (`ENABLE_FAUCET_CONTROL=false`).
+<!-- Device Access Revocation Testing Reconciled: 2026-09-22 -->
+

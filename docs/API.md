@@ -1902,6 +1902,12 @@ INVALID
 UNAVAILABLE
 ```
 
+Error responses:
+- `401 Unauthorized`: `UNAUTHENTICATED`, `INVALID_SESSION`
+- `403 Forbidden`: `ACCOUNT_NOT_ACTIVE`, `DEVICE_NOT_ASSIGNED` (unassigned or revoked Admin access)
+- `404 Not Found`: `DEVICE_NOT_FOUND`
+- `500 Internal Server Error`: `INTERNAL_ERROR`
+
 ---
 
 ## 16.2 Get Latest Soil Reading
@@ -3490,4 +3496,24 @@ The external ML inference pipeline classifies soil and irrigation water telemetr
    - `riskScore <= 30` with all parameters in good range $\to$ **`baik`** (`optimal`)
 
 <!-- Latest Prediction API Reconciled: 2026-09-19 -->
+
+---
+
+## Device Access Revocation Enforcement & 403 Error Contract Implementation Note (Reconciled 2026-09-22)
+
+The following specifications govern server-side device access validation across application APIs:
+- **Server Device Guard (`validateServerDeviceAccess`):** Evaluated across API route handlers and SSR page components (`/soil`, `/water`, `/controls`).
+- **403 Forbidden (`DEVICE_NOT_ASSIGNED`):** When an authenticated `ADMIN` user requests data or actions for a device without an active assignment record in `user_device_access` (or where `revokedAt IS NOT NULL`), the server immediately halts processing and returns HTTP 403 Forbidden:
+  ```json
+  {
+    "success": false,
+    "error": {
+      "code": "DEVICE_NOT_ASSIGNED",
+      "message": "Device not assigned to user or access has been revoked."
+    }
+  }
+  ```
+- **Concealment Invariants:** The error payload never reveals internal device registration secrets, canonical identifiers (`DEC-DEV-028`), or existence proofs for inaccessible devices.
+- **Frontend Page Integration:** Page routes (`/soil`, `/water`, `/controls`) capture the 403 status and render the dedicated `DeviceAccessForbidden` component displaying a human-readable device name instead of leaking database UUIDs.
+<!-- Device Access Revocation API Reconciled: 2026-09-22 -->
 

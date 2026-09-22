@@ -9,6 +9,7 @@ import { useLatestMonitoring } from '@/hooks/useLatestMonitoring';
 import { useHistoricalMonitoring } from '@/hooks/useHistoricalMonitoring';
 import { useLatestPrediction } from '@/hooks/useLatestPrediction';
 import RecommendationCard from '@/components/monitoring/RecommendationCard';
+import DeviceAccessForbidden from '@/components/navigation/DeviceAccessForbidden';
 import { CheckCircle, TrendingUp, Cpu, Clock, AlertTriangle, Info } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
@@ -133,7 +134,7 @@ export default function SoilPage() {
   const tSoil = useTranslations('soil');
   const tCommon = useTranslations('common');
   const tDevices = useTranslations('devices');
-  const { selectedDevice } = useDeviceContext();
+  const { selectedDevice, isRevoked, revokedDeviceId, revokedDeviceName } = useDeviceContext();
   const { snapshot, isStale } = useLatestMonitoring();
 
   const deviceType = selectedDevice?.deviceType;
@@ -285,6 +286,16 @@ export default function SoilPage() {
       color: '#0891b2',
     },
   ];
+
+  if (isRevoked) {
+    return (
+      <DeviceAccessForbidden
+        deviceId={revokedDeviceId}
+        deviceName={revokedDeviceName}
+        deviceType="SOIL_NODE"
+      />
+    );
+  }
 
   return (
     <div className="bg-app-surface text-app-on-surface min-h-dvh pb-24">

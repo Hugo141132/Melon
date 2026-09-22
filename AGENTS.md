@@ -437,6 +437,21 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
   - 21st.dev MCP: `NOT REQUIRED`
   - Summary: Reconciled device connection status naming and filtering across the global header `DeviceSelector`, `/soil`, `/water`, `/controls` (`WaterTankMonitoringCard`, `FaucetPresetSelector`, `FaucetConfirmationModal`), and `DashboardView` per `DEC-DEV-034` and `DEC-UIUX-106`. Enforced two canonical user-facing connection states: Connected (`ONLINE`) and Disconnected (`OFFLINE`, `STALE`, `UNKNOWN`), completely eliminating the intermediate "Stale" label from user-facing badges, dots, and tabs. Added frontend normalization utilities (`normalizeConnectionStatus`, `getConnectionStatusLabel`, `getConnectionStatusDotColor`) in `apps/web/lib/utils.ts`. Standardized semantic dot indicators strictly to emerald (`bg-emerald-500`) for Connected and rose (`bg-rose-500`) for Disconnected. Updated selector quick status filter tabs to All / Connected / Disconnected (`Semua` / `Terhubung` / `Terputus`), with `Disconnected` capturing both offline and stale devices. Preserved internal backend telemetry freshness evaluation (`TELEMETRY_STALE_THRESHOLD_MS = 60000`) and MQTT ingestion logic intact. Verified 100% test pass rate across 82 test files (687/687 tests in `@kebun-melon/web`), 0 TypeScript typecheck errors across all 4 monorepo packages, and zero staging modifications.
 
+#### TASK-0304 / TASK-0305 Governance Record
+
+`TASK-0304` / `TASK-0305` device access revocation enforcement & human-readable 403 forbidden state record:
+- Status: `DONE` (Completed 2026-09-22)
+- Frontend impact: `MINOR`
+- Selected UI direction: `Premium Minimal Ops`
+- Existing color template: `UNCHANGED`
+- Selected motion effects: `Card hover`, `Button hover`
+- 21st.dev MCP: `NOT REQUIRED`
+- Summary: Implemented end-to-end device access revocation enforcement across server and client boundaries, eliminating an authorization loophole where an Admin user could continue viewing device telemetry on `/soil`, `/water`, or `/controls` after an Owner revoked their assignment in `user_device_access`:
+  - Server-Side Device Authorization Guard (`validateServerDeviceAccess` in `apps/web/lib/auth/server-device-guard.ts`): Enforces authoritative checks during server-side rendering and route requests. Global device access is preserved for `OWNER` users, while `ADMIN` users require an active `user_device_access` assignment (`revokedAt === null`). When an Admin requests a revoked or unassigned device, the server rejects access fail-closed with HTTP 403 `DEVICE_NOT_ASSIGNED`.
+  - Human-Readable 403 Forbidden UI State (`apps/web/components/navigation/DeviceAccessForbidden.tsx`): Replaced raw database UUID presentation (e.g. `3216f033-4c21-4b19-adc6-365854c31704`) with formatted human-readable device names. Resolves display names via multi-tier fallback: (1) cached device name in `sessionStorage['kebun_melon_device_cache']` captured while the device was active; (2) in-memory `selectedDeviceRef` name; (3) localized domain fallback (`Node Sensor Tanah` on `/soil`, `Node Kualitas Air` on `/water`, `Node Tangki Air` on `/controls`); (4) default `Node Perangkat` / `Device Node`.
+  - Client-Side Revoked Device Handling (`apps/web/context/DeviceContext.tsx`): Integrated `markDeviceRevoked(attemptedDeviceId)` which automatically clears active device selection to `null` if the revoked device is selected, purges the device from active context state and `sessionStorage`, and terminates telemetry and prediction polling.
+  - Automated Tests & Verification: Added unit test suites `apps/web/test/unit/server-device-guard.test.ts` (6/6 passed) and `apps/web/test/unit/device-revocation-ui.test.tsx` (5/5 passed). Verified 100% test pass rate across all device selector and telemetry UI suites and 0 TypeScript errors across the monorepo.
+
 #### TASK-0411 Governance Record
 
 `TASK-0411` hardware MQTT topic reconciliation and direct gateway migration record:

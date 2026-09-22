@@ -1019,6 +1019,37 @@ flowchart TD
 
 ---
 
+## Flow 22.1 — Admin Attempts Access to Revoked or Unassigned Device
+
+**Primary actor:** Admin
+**Preconditions:** Device assignment has been revoked by Owner (`user_device_access.revokedAt IS NOT NULL`) or was never granted.
+**Trigger:** Admin navigates to `/soil`, `/water`, or `/controls` with `?deviceId=<deviceId>` or refreshes an active monitoring page after access was revoked.
+
+**Main success flow (Denial & Recovery):**
+
+1. The Admin loads the page (e.g., hard refresh or direct link with query parameter).
+2. The server-side page component executes `validateServerDeviceAccess(deviceId, targetDomain)`.
+3. The server inspects the authenticated session and detects role `ADMIN`.
+4. The server queries `user_device_access` for `(userId, deviceId)` where `revokedAt IS NULL`.
+5. Because the assignment has `revokedAt !== null` (or does not exist), the server rejects the request with HTTP 403 `DEVICE_NOT_ASSIGNED`.
+6. The page renders the dedicated `DeviceAccessForbidden` operational error state.
+7. **Human-Readable Presentation:** The interface displays the human-friendly device name (resolved from session cache, in-memory reference, or domain fallback like `Node Sensor Tanah`, `Node Kualitas Air`, or `Node Tangki Air`), strictly masking raw database UUIDs.
+8. **Client Cache Invalidation:** The `DeviceAccessForbidden` component mounts and executes `markDeviceRevoked(attemptedDeviceId)`:
+   - Clears active `selectedDevice` in `DeviceContext` to `null`.
+   - Evicts the revoked device from `sessionStorage['kebun_melon_device_cache']` and in-memory lists.
+   - Halts all real-time telemetry streaming and ML recommendation polling.
+9. **User Recovery CTA:** The user is provided with a primary action button ("Kembali ke Dashboard" / "Back to Dashboard") directing to `/dashboard`, or can select another authorized device from the header.
+
+**Alternative flows:** Owner accesses the device: Owner holds global access, request succeeds.
+**Error flows:** Device does not exist: returns HTTP 404 `DEVICE_NOT_FOUND` via `notFound()`.
+**Postconditions:** Admin cannot view telemetry or control actuators for the revoked device. Client cache is pruned.
+**Required permissions:** Missing required assignment.
+**Relevant account statuses:** Admin `ACTIVE`.
+**UI states:** `DeviceAccessForbidden` card, lock icon, clear warning message, return to dashboard CTA.
+**Audit events:** Access denial logged where applicable.
+
+---
+
 ## Flow 22A — Owner Deactivates a Device
 
 **Primary actor:** Owner
@@ -2309,3 +2340,14 @@ The water-tank monitoring and control flow on `/controls` is reconciled:
   - When the reservoir is empty, `0 L` is explicitly displayed with a 0% progress fill.
   - When telemetry is resolving or unavailable, clean placeholder and skeleton states display without fabricating flow rates or actuator movements.
 <!-- Water Tank UI User Flows Reconciled: 2026-09-09 -->
+
+---
+
+## Device Access Revocation & Forbidden UI State User Flows Note (Reconciled 2026-09-22)
+
+The following facts are verified in the user flow architecture regarding device access revocation:
+- **Zero Refresh Leakage:** When an Owner revokes an Admin's device access, an Admin page refresh or direct URL navigation immediately hits the server guard `validateServerDeviceAccess`, preventing unauthorized telemetry or control UI rendering.
+- **Fail-Closed 403 State:** Access is blocked with HTTP 403 `DEVICE_NOT_ASSIGNED` and renders `DeviceAccessForbidden`.
+- **Human-Readable Device Presentation:** Raw database UUIDs are never exposed to the user in the forbidden UI state; friendly cached names or localized domain titles (`Node Sensor Tanah`, etc.) are rendered.
+- **Client Cache Eviction:** `markDeviceRevoked` executes on mount, setting `selectedDevice = null`, deleting cached device entries in `sessionStorage`, and terminating background polling.
+<!-- Device Access Revocation User Flows Reconciled: 2026-09-22 -->

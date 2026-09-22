@@ -8,6 +8,7 @@ import { useLatestMonitoring } from '@/hooks/useLatestMonitoring';
 import { useHistoricalMonitoring } from '@/hooks/useHistoricalMonitoring';
 import { useLatestPrediction } from '@/hooks/useLatestPrediction';
 import RecommendationCard from '@/components/monitoring/RecommendationCard';
+import DeviceAccessForbidden from '@/components/navigation/DeviceAccessForbidden';
 import { CheckCircle, TrendingUp, Cpu, Clock, AlertTriangle } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
@@ -97,7 +98,7 @@ export default function WaterPage() {
   const tSoil = useTranslations('soil');
   const tCommon = useTranslations('common');
   const tDevices = useTranslations('devices');
-  const { selectedDevice } = useDeviceContext();
+  const { selectedDevice, isRevoked, revokedDeviceId, revokedDeviceName } = useDeviceContext();
   const { snapshot, isStale } = useLatestMonitoring();
 
   const deviceType = selectedDevice?.deviceType;
@@ -151,6 +152,16 @@ export default function WaterPage() {
     !isTelemetryStale && waterData && (phVal !== null || tdsVal !== null || ecVal !== null)
   );
   const statusLabel = waterData?.status || tCommon('optimal');
+
+  if (isRevoked) {
+    return (
+      <DeviceAccessForbidden
+        deviceId={revokedDeviceId}
+        deviceName={revokedDeviceName}
+        deviceType="WATER_QUALITY_NODE"
+      />
+    );
+  }
 
   return (
     <div className="bg-app-surface text-app-on-surface min-h-dvh pb-24">

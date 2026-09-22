@@ -671,15 +671,16 @@ Every device request shall verify:
 - Device is active and controllable.
 - Faucet control is enabled (`ENABLE_FAUCET_CONTROL=true`).
 
-### 12.3 Access Revocation
+### 12.3 Access Revocation and Server Boundary Enforcement
 
-When device access is revoked:
+When device access is revoked by an Owner:
 
-- New API requests shall fail.
-- Live event streams shall stop.
-- Cached access shall be invalidated.
-- Control commands shall not be accepted.
-- The event shall be audited.
+- **Authoritative Server Validation (`validateServerDeviceAccess`):** Every device-scoped request (SSR page render, REST API query, command execution) independently validates that the user possesses an active assignment (`user_device_access.revokedAt IS NULL`). UI hiding alone is never treated as a security boundary.
+- **Fail-Closed 403 Rejection:** Requests by Admin users for revoked or unassigned devices fail immediately with HTTP 403 `DEVICE_NOT_ASSIGNED`.
+- **Hardware & Database UUID Concealment:** Error presentations and 403 states strictly mask raw internal database UUIDs (e.g., `3216f033-4c21-4b19-adc6-365854c31704`), presenting human-friendly device names or domain fallbacks to eliminate identifier enumeration and leakage.
+- **Client Cache & Stream Invalidation:** The frontend context (`markDeviceRevoked`) purges the revoked device from `sessionStorage` cache, clears active selection to `null`, and terminates SSE subscriptions and polling routines.
+- **Actuation Lock:** Actuation commands for revoked devices are rejected before entering database queues.
+- **Audit Logging:** Revocation events and unauthorized access attempts are recorded in structured audit logs.
 
 ---
 
@@ -1812,4 +1813,15 @@ The following security controls govern MQTT communication across staging and pro
 - **Revoked Device Access Termination:** Revoked or unauthorized credentials are rejected fail-closed (`Connection refused: Not authorized`). Compromised or decommissioned devices can be disconnected dynamically via EMQX client management API/MCP tools (`disconnect_client`).
 - **Automated Verification:** Verified via automated runner `npm run mqtt:verify:prod` (`scripts/verify-production-mqtt.ts`) and Vitest test suite `apps/iot-gateway/src/__tests__/production-mqtt-security.test.ts`.
 <!-- TASK-0907 Security Reconciled: 2026-09-11 -->
+
+---
+
+## Device Access Revocation Enforcement Security Controls Note (Reconciled 2026-09-22)
+
+The following security controls are verified and active regarding device access revocation enforcement:
+- **Server Guard Enforcement (`SEC-RBAC-002`):** `validateServerDeviceAccess` protects `/soil`, `/water`, and `/controls` against post-revocation refresh loopholes, asserting that an Admin's device access requires an active database assignment record (`revokedAt === null`).
+- **Anti-Enumeration & UUID Masking:** 403 Forbidden UI views never expose raw database UUIDs. Device names are resolved through safe session caches or localized domain fallbacks (`Node Sensor Tanah`, `Node Kualitas Air`, `Node Tangki Air`).
+- **Zero Stale Polling:** Client-side cache eviction (`markDeviceRevoked`) removes revoked device keys from browser session storage and halts background telemetry polling.
+- **Owner Scope Invariant:** Owner accounts maintain global visibility across all registered devices without requiring per-device assignment records.
+<!-- Device Access Revocation Security Reconciled: 2026-09-22 -->
 

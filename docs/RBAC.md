@@ -700,6 +700,18 @@ An Admin shall not gain access by:
 - Modifying frontend state.
 - Reusing data from another user's browser session.
 
+### 13.5 Device Access Revocation Enforcement
+
+When an Owner revokes an Admin user's assignment to a device, the system shall guarantee immediate and authoritative revocation across all application layers:
+
+1. **Server-Side Boundary Enforcement:** Server-side route handlers and SSR page guards (`validateServerDeviceAccess`) validate active assignment status on every request. Relying solely on client UI hiding or optimistic caching is strictly prohibited.
+2. **Role Authority Differentiation:**
+   - **`OWNER`:** Holds global system-wide device access across all active devices. Owner access is independent of `user_device_access` records.
+   - **`ADMIN`:** Requires an active assignment record in `user_device_access` where `revokedAt IS NULL`. If `revokedAt` is set or no assignment exists, access is denied fail-closed.
+3. **403 Forbidden Contract (`DEVICE_NOT_ASSIGNED`):** Any attempt by an Admin user to view telemetry, history, recommendations, or actuator controls for a revoked or unassigned device results in HTTP 403 Forbidden with error code `DEVICE_NOT_ASSIGNED`.
+4. **Human-Readable Device Access Forbidden State:** When access is rejected at the page level (`/soil`, `/water`, `/controls`), the system renders a dedicated `DeviceAccessForbidden` view. To prevent information leakage and maintain clean UX, the UI displays human-readable device names (or domain fallbacks such as `Node Sensor Tanah`, `Node Kualitas Air`, `Node Tangki Air`) and strictly avoids exposing internal database UUIDs.
+5. **Client Cache & Polling Termination:** Upon encountering a revoked device, the frontend context (`DeviceContext`) marks the device as revoked, removes it from cached session storage (`kebun_melon_device_cache`), clears active device selection to `null`, and terminates all active telemetry or prediction polling loops.
+
 ---
 
 ## 14. Monitoring Permissions
@@ -1329,4 +1341,14 @@ The login performance optimization and session recovery mechanism (`DEC-AUTH-108
   - Accounts with `accountStatus` in `PENDING_APPROVAL`, `REJECTED`, `SUSPENDED`, or `DEACTIVATED` remain blocked from login and session issuance prior to entering any transaction path.
 <!-- Login Optimization & Role Loading RBAC Reconciled: 2026-09-05 -->
 
+---
 
+## Device Access Revocation Enforcement & Server Authorization RBAC Note (Reconciled 2026-09-22)
+
+The following facts are verified in the authorization architecture regarding device access revocation enforcement:
+- **Server Guard Primacy:** `validateServerDeviceAccess` in `@/lib/auth/server-device-guard` enforces that device authorization is evaluated server-side before rendering `/soil`, `/water`, and `/controls` pages or returning telemetry payloads.
+- **Admin Assignment Boundary:** Active assignment requires a valid record in `user_device_access` where `revokedAt IS NULL`. Revoked rows (`revokedAt IS NOT NULL`) and missing assignments return HTTP 403 `DEVICE_NOT_ASSIGNED`.
+- **Owner Scope Invariant:** Owner accounts retain global access to all registered active devices across the farm, independent of individual user-device assignments.
+- **Privacy & UUID Concealment:** The `DeviceAccessForbidden` UI state masks raw database UUIDs (e.g. `3216f033-4c21-4b19-adc6-365854c31704`), presenting human-friendly device names or domain-based titles.
+- **Client Cache Synchronization:** Frontend context safely evicts revoked devices from `sessionStorage` and component state to eliminate stale background polling.
+<!-- Device Access Revocation RBAC Reconciled: 2026-09-22 -->
