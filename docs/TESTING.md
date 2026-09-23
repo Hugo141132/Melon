@@ -2108,16 +2108,28 @@ The following facts are verified in test suites and runtime verification regardi
 Automated unit, contract, error handling, and simulated performance sanity verification for the gateway command publisher:
 
 ### Agent-Executed Automated Tests
-1. **Targeted Publisher Test Suite Pass (`apps/iot-gateway/src/__tests__/command-publisher.test.ts`):** 10/10 tests passed (100% path pass rate):
+1. **Targeted Publisher Test Suite Pass (`apps/iot-gateway/src/__tests__/command-publisher.test.ts`):** **14/14 tests passed (100% path pass rate)**:
    - Direct `publishCommand` canonical topic routing (`agriculture/{environment}/{siteId}/{deviceId}/command/faucet`), QoS 1, and `retain=false`.
+   - Direct hardware topic routing (`irigasi/melon/kontrol/valve` with `"ON"` / `"OFF"` strings and `irigasi/melon/setting/otomasi`) per `DEC-DEV-032`.
    - `DISPENSE` payload construction with valid `phase`, `plantCount >= 1`, and server-persisted `targetVolumeMl` integer (without publisher-side recalculation).
    - `OPEN` and `CLOSE` command payload construction with strict omission of `phase`, `plantCount`, and `targetVolumeMl`.
    - Expired `QUEUED` command transition to `EXPIRED` without publishing.
    - Non-`WATER_TANK_NODE` device filtering and missing `siteId` rejection (skipped without state corruption).
    - Atomic database transition from `QUEUED` to `SENT` with unique `messageId` and topic metadata only upon confirmed MQTT publication.
    - MQTT failure error recovery leaving command status untouched as `QUEUED` in database with `0` false `SENT` marks.
-2. **Gateway Contract Test Suite Pass (`command-publisher.test.ts` + `topic-router.test.ts`):** 42/42 tests passed cleanly.
-3. **Static Typecheck:** Clean `npx tsc --noEmit -p apps/iot-gateway/tsconfig.json` pass with 0 errors.
+   - **Stale SENT Command Timeout Sweep (`DEC-CTRL-094`):**
+     - Periodic `sweepStaleSentCommands()` transitions expired `SENT` commands (`now >= expiresAt`) to `TIMEOUT` (`COMMAND_EXPIRED_TIMEOUT`).
+     - Non-expired `SENT` commands remain untouched in status `SENT`.
+     - Increments `metricsCollector.incrementCommandTimeouts()` and emits realtime `faucet.command.updated` event.
+     - Safe error recovery when database update fails/rejects during sweep, logging the error and proceeding without throwing or halting the poller.
+2. **Gateway Contract & Faucet Test Suites Pass:** 123/123 tests passed cleanly across all faucet test suites:
+   - `command-publisher.test.ts`: 14/14
+   - `acknowledgement-processor.test.ts`: 25/25
+   - `faucet-event-processor.test.ts`: 32/32
+   - `faucet-control-ui.test.tsx`: 27/27
+   - `faucet-command-repository.test.ts`: 25/25
+3. **Static Typecheck:** Clean `npm run typecheck` pass across all 4 monorepo workspaces with 0 errors.
+4. **Hardware-in-the-Loop Status:** End-to-end verification with physical NodeMCU/ESP8266 hardware in the farm field remains pending hardware deployment and power-on (`TASK-0811`).
 
 ### Local Simulated Performance Sanity Results (Mocked/In-Memory Infrastructure)
 *Note: The following measurements represent local simulated sanity testing on mocked/in-memory infrastructure and do NOT constitute live WAN EMQX/TLS benchmarks (deferred to formal TASK-1007 performance testing):*
@@ -2125,7 +2137,7 @@ Automated unit, contract, error handling, and simulated performance sanity verif
 - **Burst Batch Processing (500 commands in batches of 50):** ~67.0 cmds/sec (Batch p50: 745.58 ms, Batch p95: 829.48 ms).
 - **Sustained Soak (2,000 commands across 40 batches):** ~66.7 cmds/sec with zero memory leaks (Heap delta: +3.34 MB, RSS delta: +3.84 MB).
 - **Safety Under Fault Injection:** 0 duplicate publications, 0 false `SENT` transitions; 20 queued commands safely preserved during simulated broker disconnect and published successfully upon reconnection.
-<!-- TASK-0804 Reconciled: 2026-08-20 -->
+<!-- TASK-0804 Reconciled: 2026-09-23 -->
 
 ---
 

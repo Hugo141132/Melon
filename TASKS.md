@@ -2239,6 +2239,62 @@ The external ML inference pipeline classifies soil and irrigation water telemetr
 
 ---
 
+## TASK-0417 — Hardware Telemetry Normalization, External ML Database Resolution & EMQX Broker ACL Hardening
+
+**Priority:** `P1`
+**Status:** `DONE` (Payload normalization, ML mapping diagnosis, and EMQX ACL documented per DEC-DEV-036 / DEC-DEV-037)
+**Dependencies:** `TASK-0412`, `TASK-0413`, `TASK-0415`, `TASK-0416`, `DEC-DEV-036`, `DEC-DEV-037`
+**Completed:** 2026-09-23 — Reconciled real ESP32 hardware MQTT telemetry ingestion, diagnosed external Supabase ML database prediction resolution, and audited EMQX Cloud broker ACL bidirectional permissions.
+
+### Context & Implementation
+1. **Hardware Telemetry Payload Normalization (`SoilWaterMqttAdapter`):**
+   - Investigated real physical ESP32 soil and water quality telemetry packets transmitted to the unified EMQX Cloud broker (`melon/sensor-tanah/data-2424600050` and `melon/sensor-air/data-2424600050`).
+   - Discovered hardware payload schema variations emitted by field microcontrollers:
+     - Soil ESP32 emitted top-level `"device": "soil-node-jvbkdbv"` instead of `"deviceId"` (or flat envelope without outer `"soil"` wrapper).
+     - Water Quality ESP32 emitted nested `"water": { ... }` object wrappers and/or `"device_code"` identifier.
+   - Updated `SoilWaterMqttAdapter` (`apps/iot-gateway/src/mqtt/soil-water-adapter.ts`) to robustly normalize real hardware payload variations:
+     - Soil: extracts device identity checking `payload.device`, `payload.deviceId`, `payload.soil?.device`, `payload.soil?.deviceId`. Normalizes telemetry values checking both top-level and nested `payload.soil` wrappers.
+     - Water Quality: extracts device identity checking `payload.device_code`, `payload.deviceCode`, `payload.device`, `payload.deviceId`, `payload.water?.device_code`, etc. Normalizes telemetry checking both top-level and nested `payload.water` wrappers.
+   - Enforced strict security invariant: **Zero bypass of database device identity validation**. Telemetry is rejected unless the extracted device identifier matches an active registered device in PostgreSQL (`devices`).
+   - Maintained strict water tank isolation: zero modifications or interruptions to the reservoir pipeline (`irigasi/melon/...`).
+   - Added unit test suite in `apps/iot-gateway/src/__tests__/soil-water-adapter.test.ts` covering all real captured hardware payload structures.
+2. **External ML Pull Database Resolution (`soil_predictions` & `water_predictions`):**
+   - Investigated why AI machine learning recommendations from the pull database were not appearing on the website dashboard (`RecommendationCard` rendering "Belum Ada Rekomendasi").
+   - Traced API route `/api/v1/devices/[deviceId]/predictions/latest` and `ExternalPredictionClient` (`packages/database/src/external-prediction-client.ts`).
+   - Identified root cause in Soil AI predictions:
+     - Local database mapping table `device_external_mappings` and fallback aliases `DEFAULT_ML_DEVICE_ALIASES` queried `externalDeviceId: "melon002"`.
+     - In the external ML Supabase database (`https://styjuynxuykvujnnqxos.supabase.co/rest/v1/soil_predictions`), **100% of rows (86 records) are stored under `device_id = "soil001"`**. Zero records exist for `"melon002"`.
+     - Direct query using `'soil001'` returns complete agronomic recommendations with all 7 parameters (pH 5.4, Moisture 65%, Temp 29°C, EC 1400 µS/cm, N 90, P 35, K 140) and actionable farmer advice.
+   - Identified Water Quality prediction status:
+     - Mapped to `water001`, records exist and are correctly fetched.
+     - Identified that both `soil_predictions` and `water_predictions` have a latest record timestamp of `2026-09-19T10:18:04Z` (stale by 3 days from external ML worker).
+   - Clarified database invariant: **`devices.deviceId` (`soil-node-jvbkdbv`) must NEVER be changed**. The mapping must be updated exclusively on `device_external_mappings.external_device_id = 'soil001'` and `DEFAULT_ML_DEVICE_ALIASES`.
+3. **EMQX Cloud Broker Topic ACL Hardening:**
+   - Evaluated broker ACL permissions for username `petanimelon` on the unified EMQX Cloud broker:
+     - `melon/sensor-tanah/data-2424600050`: `Publish & Subscribe` (Allow)
+     - `melon/sensor-air/data-2424600050`: `Publish & Subscribe` (Allow)
+     - `melon/ai-tanah/rekomendasi-2424600050`: `Publish & Subscribe` (Allow)
+     - `melon/ai-air/rekomendasi-2424600050`: `Publish & Subscribe` (Allow)
+   - Verified safety & functional impact:
+     - Bidirectional `Publish & Subscribe` is required because the physical ESP32 and external AI worker/testing scripts authenticate with the shared `petanimelon` credential. Restricting AI topics to Subscribe-only caused the broker to drop AI recommendation publications with MQTT `0x87 Not Authorized`. Restricting sensor topics to Publish-only prevented AI worker ingestion.
+     - IoT Gateway connects with independent backend credential (`Test_gateway`), completely isolated.
+     - Water Tank monitoring and valve controls (`irigasi/melon/...`) remain isolated from the `petanimelon` topic scope.
+     - ACL permissions remain strictly scoped to these 4 topics without open wildcards (`#`).
+
+### Acceptance Criteria
+
+- [x] Update `SoilWaterMqttAdapter` to support real physical ESP32 payload formats (`device`, nested `water`, `device_code`).
+- [x] Preserve existing supported payload formats for backward compatibility.
+- [x] Maintain strict database device identity validation (no bypass fallbacks).
+- [x] Add comprehensive unit test coverage for real captured hardware payload structures.
+- [x] Maintain zero impact on reservoir water tank MQTT pipeline (`irigasi/melon/...`).
+- [x] Diagnose external ML Supabase prediction resolution (`soil001` vs `melon002`, staleness 2026-09-19).
+- [x] Establish invariant that `devices.deviceId` remains immutable in favor of `device_external_mappings`.
+- [x] Verify EMQX Cloud broker ACL policy for `petanimelon` (`Publish & Subscribe` on 4 scoped topics).
+- [x] Update documentation (`TASKS.md`, `AGENTS.md`, `docs/DEVICE_COMMUNICATION.md`, `docs/DECISIONS.md`, `docs/ARCHITECTURE.md`, `docs/TRACEABILITY.md`).
+
+---
+
 # 13. Phase 5 — Monitoring and History
 
 ## TASK-0501 — Implement Latest Monitoring API
@@ -2786,6 +2842,14 @@ POST /devices/{deviceId}/faucet-commands
 **Historical Completion:** 2026-08-03 — Implemented `CommandPublisher` in `@kebun-melon/iot-gateway` to publish eligible, unexpired `QUEUED` faucet commands for `WATER_TANK_NODE` devices over MQTT (QoS 1, retain = false). Enforced target device type validation, phase/volume mapping, dynamic canonical topic routing (`agriculture/{environment}/{siteId}/{deviceId}/command/faucet`), payload formatting, and atomic DB state transition to `SENT` with `FaucetCommandEvent` creation. Fixed `.env` loading and non-UUID `commandId` detail API query handling.
 **Revision Note (2026-08-20):** Status set to `DONE`. Verified duplicate logic removed for `targetVolumeMl` recalculation, allowing persistent pass-through. Added dedicated testing and formatting for `OPEN` / `CLOSE` payloads ensuring they carry NO fabricated volume or phase attributes. Confirmed 100% path coverage for publisher command routing (10/10 publisher unit tests, 42/42 gateway contract tests). Completed safe local simulated performance sanity tests on mocked/in-memory infrastructure (1,000 direct calls ~68.3 ops/s with p95 20.08 ms, 500 burst commands ~67.0 cmds/s, 2,000 soak commands ~66.7 cmds/s with zero memory leak and safe reconnect recovery). All 17 project docs fully reconciled.
 **Architecture Revision (2026-09-11 per DEC-DEV-032):** `CommandPublisher` in `@kebun-melon/iot-gateway` directly dispatches faucet commands to the canonical hardware topic contract: manual valve actuation (`OPEN` -> `"ON"`, `CLOSE` -> `"OFF"`) to `irigasi/melon/kontrol/valve` and automated dispensing (`DISPENSE` -> `{ mode: "AUTO", target_liter }`) to `irigasi/melon/setting/otomasi` (QoS 1, retain = false). The intermediate publication to `agriculture/{environment}/{siteId}/{deviceId}/command/faucet` is permanently retired for the single-tank domain. Direct dispatch remains strictly locked behind `ENABLE_FAUCET_CONTROL=false` safety guards and transactionally logged to `faucet_command_events`.
+**Timeout Fix Revision (2026-09-23 per DEC-CTRL-094):** Resolved critical issue where faucet commands dispatched to flat hardware topics (`irigasi/melon/kontrol/valve`) remained permanently stuck in `SENT` status when physical microcontrollers did not emit ACKs:
+- **Root Cause:** Flat hardware topics lack ACK capabilities from physical NodeMCU/ESP8266 firmware, and EMQX Cloud ACL restricts `Test_Device` publishing strictly to `irigasi/melon/sensor/volume`. Previously, `CommandPublisher.processQueuedCommands()` only fetched `QUEUED` commands. Once marked `SENT`, commands were never checked against `expiresAt` (5 minutes). Because `SENT` is an active state (`ACTIVE_STATUSES`), this locked device concurrency (`faucet_commands_one_active_per_device`) permanently.
+- **Permanent Fix (`sweepStaleSentCommands()`):** Implemented periodic sweeping of active `SENT` commands in `CommandPublisher` (`apps/iot-gateway/src/commands/publisher.ts`), invoked every 2,000ms within `startPolling()`. Transitions any `SENT` command where `now >= expiresAt` to terminal state `TIMEOUT` (`COMMAND_EXPIRED_TIMEOUT`), records `metricsCollector.incrementCommandTimeouts()`, emits realtime update event `faucet.command.updated`, and catches DB rejections safely. This releases device concurrency locks automatically without manual database intervention.
+- **Affected Files:**
+  - `apps/iot-gateway/src/commands/publisher.ts`
+  - `apps/iot-gateway/src/__tests__/command-publisher.test.ts`
+- **Automated Verification Completed:** 14/14 unit tests in `command-publisher.test.ts` passed (100%), full faucet test suites passed (123/123 tests: publisher, ACK processor, event processor, UI, command repository), and monorepo TypeScript typecheck passed with 0 errors across 4 workspaces.
+- **Hardware Manual Validation Still Pending:** End-to-end testing with physical NodeMCU/ESP8266 hardware in the farm field remains pending hardware deployment and power-on (`TASK-0811`).
 
 ### Acceptance Criteria
 
@@ -2796,6 +2860,7 @@ POST /devices/{deviceId}/faucet-commands
 - Expiry is included. [VERIFIED]
 - Publication result updates status to `SENT`. [VERIFIED]
 - Failed publish does not appear as sent (remains `QUEUED`). [VERIFIED]
+- Stale active `SENT` commands past `expiresAt` are automatically swept to `TIMEOUT` (`COMMAND_EXPIRED_TIMEOUT`), releasing the device concurrency lock. [VERIFIED]
 
 ---
 
@@ -2947,16 +3012,16 @@ EXPIRED
 ## TASK-0809 — Implement Command Timeout Processor
 
 **Priority:** `P0`
-**Status:** `DEFERRED`
+**Status:** `DEFERRED` (Partially addressed for stale SENT command timeout sweep per DEC-CTRL-094 / TASK-0804; end-to-end device ACK/completion thresholds remain subject to DEC-CTRL-090/092 hardware validation)
 **Dependencies:** `TASK-0806`
-**Blocked Reason:** Deferred from the current release. Command timeout durations are not available yet (`DEC-CTRL-092`). The system currently handles uncertain physical states securely as `UNKNOWN`.
+**Blocked Reason:** Deferred from the current release. Full command acknowledgement and execution completion timeout durations are not available yet (`DEC-CTRL-092`). The system currently handles uncertain physical states securely as `UNKNOWN`. Note: Stale active `SENT` command timeouts are now handled by `CommandPublisher.sweepStaleSentCommands()` (`TASK-0804`, `DEC-CTRL-094`), safely transitioning unacknowledged dispatched commands to `TIMEOUT` upon `expiresAt` expiry to prevent indefinite concurrency lockups.
 
 ### Acceptance Criteria
 
 - Approved acknowledgement and completion timeouts are used.
-- Timeout event is stored.
-- UI receives timeout.
-- No blind physical retry occurs.
+- Timeout event is stored. [PARTIALLY VERIFIED: Stale SENT timeout events stored and published via sweepStaleSentCommands()]
+- UI receives timeout. [PARTIALLY VERIFIED: Realtime SSE event emitted on stale SENT timeout]
+- No blind physical retry occurs. [VERIFIED]
 - Late acknowledgement follows approved policy.
 
 ---

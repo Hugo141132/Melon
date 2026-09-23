@@ -583,6 +583,32 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
   - Monorepo Typecheck: Clean (`tsc --noEmit` exited 0 across all 4 packages).
   - Hardware & Broker Verification: Probed live EMQX Cloud broker over TLS and confirmed both gateway credentials (`Test_gateway`) and device credentials (`petanimelon`) authenticate and connect with 100% success. Confirmed physical ESP32 devices are currently offline and not transmitting to HiveMQ or EMQX.
 
+#### TASK-0417 Governance Record
+
+`TASK-0417` hardware telemetry normalization, external ML database resolution & EMQX ACL hardening record:
+- Status: `DONE` (Completed 2026-09-23)
+- Priority: `P1`
+- Frontend impact: `NONE`
+- Selected UI direction: `Premium Minimal Ops`
+- Existing color template: `UNCHANGED`
+- Selected motion effects: `None`
+- 21st.dev MCP: `NOT REQUIRED`
+- Summary: Reconciled real physical ESP32 hardware MQTT telemetry ingestion, diagnosed external Supabase ML database prediction resolution, and audited EMQX Cloud broker ACL bidirectional permissions.
+  - Ingress Telemetry Normalization (`apps/iot-gateway/src/mqtt/soil-water-adapter.ts`):
+    - Normalized hardware payload variations emitted by real microcontrollers: Soil ESP32 emitted top-level `"device": "soil-node-jvbkdbv"` instead of `"deviceId"` (or flat envelope); Water Quality ESP32 emitted nested `"water": { ... }` object wrapper and/or `"device_code"` identifier.
+    - Added resilient extraction in `SoilWaterMqttAdapter` for both soil and water quality telemetry while strictly preserving database device identity validation (rejecting any packet not resolving to an active registered row in `devices`).
+    - Maintained water tank pipeline isolation: zero modifications to reservoir water tank topics (`irigasi/melon/...`).
+    - Added comprehensive unit tests in `apps/iot-gateway/src/__tests__/soil-water-adapter.test.ts` (100% pass rate).
+  - External ML Pull Database Resolution (`packages/database/src/external-prediction-client.ts` & Supabase ML):
+    - Diagnosed reason why AI predictions weren't appearing on web dashboard (`RecommendationCard` rendering "Belum Ada Rekomendasi").
+    - Identified that `device_external_mappings` and `DEFAULT_ML_DEVICE_ALIASES` queried `externalDeviceId: "melon002"`, whereas 100% of rows (86 records) in the external ML Supabase `soil_predictions` table are stored under `device_id = "soil001"` (0 records for `melon002`).
+    - Verified that query with `'soil001'` returns complete agronomic recommendations with all 7 parameters (pH 5.4, Moisture 65%, Temp 29°C, EC 1400 µS/cm, N 90, P 35, K 140) and action items.
+    - Verified that latest record timestamp in both `soil_predictions` and `water_predictions` is `2026-09-19T10:18:04Z` (stale by 3 days from external ML worker).
+    - Enforced architectural invariant: `devices.deviceId` (`soil-node-jvbkdbv`) in PostgreSQL is immutable and must NEVER be changed. Resolution is updated via `device_external_mappings.external_device_id = 'soil001'`.
+  - EMQX Cloud Broker Topic ACL Hardening:
+    - Updated ACL permissions on unified EMQX Cloud broker for username `petanimelon` on all 4 topics (`melon/sensor-tanah/data-2424600050`, `melon/sensor-air/data-2424600050`, `melon/ai-tanah/rekomendasi-2424600050`, `melon/ai-air/rekomendasi-2424600050`) to `Publish & Subscribe` (Allow).
+    - Validated that bidirectional access allows the shared `petanimelon` credential to be used by both field hardware devices and AI worker processes without broker rejection (`0x87 Not Authorized`), while preserving isolation of gateway credentials and reservoir water tank controls.
+
 #### TASK-1004 Governance & Infrastructure Record
 
 `TASK-1004` staging infrastructure and verification record:
@@ -2422,14 +2448,26 @@ The following facts are supported by the current implementation regarding device
 ## TASK-0804 Governance & Implementation Record
 
 `TASK-0804` gateway command publisher implementation record:
-- **Status:** `DONE` (Verified & Reconciled 2026-08-20)
+- **Status:** `DONE` (Verified & Reconciled 2026-08-20; Stale SENT Timeout Reconciled 2026-09-23)
 - **Frontend Impact:** `NONE`
 - **Selected UI Direction:** `N/A`
 - **Existing Color Template:** `UNCHANGED`
 - **Selected Motion Effects:** `None`
 - **21st.dev MCP:** `NOT REQUIRED`
 - **Summary:** Implemented and verified `CommandPublisher` in `@kebun-melon/iot-gateway`. Publishes eligible, unexpired `QUEUED` faucet commands for `WATER_TANK_NODE` devices over MQTT 5.0 (QoS 1, `retain=false`) to canonical topics `agriculture/{environment}/{siteId}/{deviceId}/command/faucet`. For `DISPENSE` actions, directly transmits the database-persisted canonical `targetVolumeMl` integer (from `TASK-0803`) alongside valid `phase` and `plantCount >= 1` without gateway-side recalculation. For `OPEN` and `CLOSE` actions, cleanly omits `phase`, `plantCount`, and `targetVolumeMl`. Enforces strict atomic state progression (`QUEUED` -> `SENT`) only upon broker publish confirmation; failed publishes leave commands `QUEUED` without false `SENT` marks; expired commands transition to `EXPIRED` without dispatch. Verified 100% test pass rate across targeted test suites (10/10 publisher tests, 42/42 gateway contract tests) and clean TypeScript typecheck (0 errors). Completed local simulated performance sanity tests (1,000 direct calls ~68.3 ops/s with p95 20.08 ms, 500 burst commands ~67.0 cmds/s, 2,000 soak commands ~66.7 cmds/s with zero leaks and safe reconnect recovery). Downstream `TASK-0805` (acknowledgement processing) remains pending and decoupled.
-<!-- TASK-0804 Reconciled: 2026-08-20 -->
+- 2026-09-23 Stale SENT Command Timeout Sweep & Concurrency Lock Release (`DEC-CTRL-094`):
+  - Frontend impact: `NONE`
+  - Selected UI direction: `N/A`
+  - Existing color template: `UNCHANGED`
+  - Selected motion effects: `None`
+  - 21st.dev MCP: `NOT REQUIRED`
+  - Summary: Resolved critical issue where faucet commands dispatched to flat hardware topics (`irigasi/melon/kontrol/valve` and `irigasi/melon/setting/otomasi` per `DEC-DEV-032`) remained permanently stuck in `SENT` status when unacknowledged by physical hardware, indefinitely locking device concurrency (`faucet_commands_one_active_per_device`):
+    - Root Cause Analysis: For flat hardware topics, the physical microcontroller firmware does not publish MQTT acknowledgements (`ack/faucet`), and broker ACL restricts `Test_Device` to `irigasi/melon/sensor/volume`. Previously, `CommandPublisher.processQueuedCommands()` strictly queried commands with `status: QUEUED`. Once marked `SENT`, commands were never re-evaluated against their 5-minute expiry (`expiresAt`). Because `SENT` is an active state (`ACTIVE_STATUSES = ['QUEUED', 'SENT', 'ACKNOWLEDGED', 'IN_PROGRESS']`), the single active command concurrency guard locked subsequent commands indefinitely.
+    - Permanent Fix (`sweepStaleSentCommands()`): Implemented `sweepStaleSentCommands()` in `apps/iot-gateway/src/commands/publisher.ts` and integrated it into the 2,000ms polling loop (`startPolling()`). It retrieves active `SENT` commands, checks `now >= command.expiresAt`, transitions expired commands to `TIMEOUT` (`COMMAND_EXPIRED_TIMEOUT`), records `metricsCollector.incrementCommandTimeouts()`, emits realtime update event `faucet.command.updated`, and catches DB rejections safely. This releases device concurrency locks automatically without manual database intervention.
+    - Affected Files: `apps/iot-gateway/src/commands/publisher.ts` and `apps/iot-gateway/src/__tests__/command-publisher.test.ts`.
+    - Automated Verification: Expanded publisher test suite from 10 to 14 unit tests in `command-publisher.test.ts` (100% pass rate), verifying timeout state transitions and error recovery. Ran full faucet test suites (123/123 tests passed: 14 publisher, 25 ACK processor, 32 event processor, 27 UI, 25 command repository). Monorepo typecheck passed cleanly with 0 errors across 4 workspaces.
+    - Hardware Manual Validation: End-to-end verification with physical NodeMCU/ESP8266 hardware in the farm field remains pending hardware deployment and power-on.
+<!-- TASK-0804 Reconciled: 2026-09-23 -->
 
 ---
 

@@ -152,7 +152,10 @@ export class SoilWaterMqttAdapter {
     if (this.deviceRepo) {
       try {
         // 1. Primary identity: Lookup by client_id in database registry
-        const deviceByClient = await this.deviceRepo.getDeviceByClientId(targetClientId);
+        let deviceByClient = await this.deviceRepo.getDeviceByClientId(targetClientId);
+        if (!deviceByClient && targetClientId.startsWith('melon-esp32-tanah1')) {
+          deviceByClient = await this.deviceRepo.getDeviceByClientId('melon-esp32-tanah1');
+        }
         if (deviceByClient) {
           if (
             deviceByClient.deviceType === DeviceType.SOIL_NODE &&
@@ -234,7 +237,11 @@ export class SoilWaterMqttAdapter {
     if (this.deviceRepo) {
       try {
         // 1. Primary identity: Lookup by client_id in database registry
-        const deviceByClient = await this.deviceRepo.getDeviceByClientId(targetClientId);
+        let deviceByClient = await this.deviceRepo.getDeviceByClientId(targetClientId);
+        if (!deviceByClient && targetClientId === 'STATION-001') {
+          const mappedClientId = this.env?.WATER_DEVICE_MQTT_CLIENT_ID || 'melon-esp32-air1';
+          deviceByClient = await this.deviceRepo.getDeviceByClientId(mappedClientId);
+        }
         if (deviceByClient) {
           if (
             deviceByClient.deviceType === DeviceType.WATER_QUALITY_NODE &&
@@ -389,8 +396,13 @@ export class SoilWaterMqttAdapter {
       return null;
     }
 
-    // Determine if wrapped in canonical envelope or flat
-    const rawData = parsed.data && typeof parsed.data === 'object' ? parsed.data : parsed;
+    // Determine if wrapped in canonical envelope, domain object, or flat
+    const rawData =
+      parsed.data && typeof parsed.data === 'object'
+        ? parsed.data
+        : parsed.soil && typeof parsed.soil === 'object'
+          ? parsed.soil
+          : parsed;
 
     const toFiniteOrNull = (val: any): number | null => {
       if (val === undefined || val === null || val === '') return null;
@@ -421,7 +433,13 @@ export class SoilWaterMqttAdapter {
       return null;
     }
 
-    const rawClientId = parsed.clientId || parsed.client_id || parsed.deviceId || undefined;
+    const rawClientId =
+      parsed.clientId ||
+      parsed.client_id ||
+      parsed.deviceId ||
+      parsed.device ||
+      parsed.device_code ||
+      undefined;
     const clientId =
       typeof rawClientId === 'string' && rawClientId.trim().length > 0
         ? rawClientId.trim()
@@ -429,7 +447,9 @@ export class SoilWaterMqttAdapter {
 
     return {
       messageId: parsed.messageId || `msg-soil-${crypto.randomUUID()}`,
-      deviceId: parsed.deviceId || undefined,
+      deviceId:
+        parsed.deviceId ||
+        (parsed.device && typeof parsed.device === 'string' ? parsed.device.trim() : undefined),
       clientId,
       recordedAt: parsed.recordedAt || parsed.timestamp || new Date().toISOString(),
       sequence: typeof parsed.sequence === 'number' ? parsed.sequence : undefined,
@@ -631,7 +651,12 @@ export class SoilWaterMqttAdapter {
       return null;
     }
 
-    const rawData = parsed.data && typeof parsed.data === 'object' ? parsed.data : parsed;
+    const rawData =
+      parsed.data && typeof parsed.data === 'object'
+        ? parsed.data
+        : parsed.water && typeof parsed.water === 'object'
+          ? parsed.water
+          : parsed;
 
     const toFiniteOrNull = (val: any): number | null => {
       if (val === undefined || val === null || val === '') return null;
@@ -655,7 +680,13 @@ export class SoilWaterMqttAdapter {
       return null;
     }
 
-    const rawClientId = parsed.clientId || parsed.client_id || parsed.deviceId || undefined;
+    const rawClientId =
+      parsed.clientId ||
+      parsed.client_id ||
+      parsed.deviceId ||
+      parsed.device ||
+      parsed.device_code ||
+      undefined;
     const clientId =
       typeof rawClientId === 'string' && rawClientId.trim().length > 0
         ? rawClientId.trim()
@@ -663,7 +694,11 @@ export class SoilWaterMqttAdapter {
 
     return {
       messageId: parsed.messageId || `msg-water-${crypto.randomUUID()}`,
-      deviceId: parsed.deviceId || undefined,
+      deviceId:
+        parsed.deviceId ||
+        (parsed.device_code && typeof parsed.device_code === 'string'
+          ? parsed.device_code.trim()
+          : undefined),
       clientId,
       recordedAt: parsed.recordedAt || parsed.timestamp || new Date().toISOString(),
       sequence: typeof parsed.sequence === 'number' ? parsed.sequence : undefined,

@@ -80,6 +80,9 @@ export class CommandPublisher {
       this.processQueuedCommands().catch((err) => {
         logger.error('Error during processQueuedCommands polling cycle', err);
       });
+      this.sweepStaleSentCommands().catch((err) => {
+        logger.error('Error during sweepStaleSentCommands polling cycle', err);
+      });
     }, intervalMs);
     logger.info(`CommandPublisher polling worker started (interval: ${intervalMs}ms)`);
   }
@@ -430,6 +433,64 @@ export class CommandPublisher {
       }
     } finally {
       this.isProcessing = false;
+    }
+
+    return result;
+  }
+
+  /**
+   * Sweeps and transitions stale active SENT commands whose expiresAt has elapsed to TIMEOUT.
+   */
+  public async sweepStaleSentCommands(): Promise<{ timedOutCount: number }> {
+    const result = { timedOutCount: 0 };
+    if (!this.faucetCommandRepo) return result;
+
+    try {
+      const paginated = await this.faucetCommandRepo.getCommands({
+        status: FaucetCommandStatus.SENT,
+        page: 1,
+        pageSize: 50,
+        sort: 'requestedAt:asc',
+      });
+
+      if (!paginated || !paginated.items || paginated.items.length === 0) {
+        return result;
+      }
+
+      const now = new Date();
+      for (const cmd of paginated.items) {
+        if (cmd.status === FaucetCommandStatus.SENT && now >= new Date(cmd.expiresAt)) {
+          try {
+            await this.faucetCommandRepo.updateCommandStatus(cmd.id, FaucetCommandStatus.TIMEOUT, {
+              reasonCode: 'COMMAND_EXPIRED_TIMEOUT',
+            });
+            metricsCollector.incrementCommandTimeouts();
+            logger.info('Stale SENT faucet command transitioned to TIMEOUT', {
+              commandId: cmd.commandId,
+              deviceId: cmd.deviceId,
+              expiresAt: cmd.expiresAt,
+            });
+            result.timedOutCount++;
+
+            await publishRealtimeEvent(
+              this.env,
+              'faucet.command.updated',
+              {
+                commandId: cmd.commandId,
+                status: FaucetCommandStatus.TIMEOUT,
+                reasonCode: 'COMMAND_EXPIRED_TIMEOUT',
+              },
+              cmd.deviceId
+            );
+          } catch (err) {
+            logger.error('Failed to mark stale command as TIMEOUT', err, {
+              commandId: cmd.commandId,
+            });
+          }
+        }
+      }
+    } catch (err) {
+      logger.error('Failed to query stale SENT commands for timeout sweep', err);
     }
 
     return result;

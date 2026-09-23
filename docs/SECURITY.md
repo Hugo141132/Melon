@@ -788,6 +788,11 @@ The UI shall not display `COMPLETED` or assume valve state closure merely becaus
 
 A timeout shall record `physicalOutcome = 'UNKNOWN'` without claiming known physical completion.
 
+- **Automated Stale Command Timeout Sweep (`DEC-CTRL-094`):** When commands are dispatched to hardware topics (such as flat topic `irigasi/melon/kontrol/valve`) or when devices fail to return an MQTT acknowledgement, active commands in status `SENT` that exceed their expiry (`now >= expiresAt`, default 5 minutes) are swept periodically (every 2,000ms) by the gateway (`CommandPublisher.sweepStaleSentCommands()`) to terminal state `TIMEOUT` with failure reason `COMMAND_EXPIRED_TIMEOUT`.
+- **Safe Concurrency Lock Release:** The system enforces a strict single active command limit per device (`faucet_commands_one_active_per_device` spanning `QUEUED`, `SENT`, `ACKNOWLEDGED`, `IN_PROGRESS`). Automatic transition of stale `SENT` commands to `TIMEOUT` safely releases the concurrency lock, preventing denial-of-service where a lost device ACK permanently prevents any subsequent authorized valve commands.
+- **Zero Blind Retries:** Timed-out commands are immutable terminal records. The system never executes automatic physical retries or speculative republishing. Any further actuation requires conscious user action.
+- **Audit & Observability:** All automated timeout transitions persist audit events to `faucet_command_events`, increment the `command_timeouts_total` metric, and broadcast real-time events (`faucet.command.updated`) to connected UI clients.
+
 ### 13.10 Concurrent Commands
 
 Enforced as exactly one active faucet command (`QUEUED`, `SENT`, `ACKNOWLEDGED`, `IN_PROGRESS`) per device via partial unique index `faucet_commands_one_active_per_device`.

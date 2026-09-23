@@ -81,7 +81,7 @@
 | `TEST-CTRL-001` | Preset volume mapping contract tests | `docs/TESTING.md` | `DEC-CTRL-051` | `TASK-0802` | `TEST-CTRL-001` | `VERIFIED` |
 | `TEST-CTRL-002` | Faucet command state machine transition tests | `docs/TESTING.md` | `DEC-CTRL-051` | `TASK-0806` | `TEST-CTRL-002` | `VERIFIED` |
 | `TEST-CTRL-003` | Faucet command idempotency and duplicate tests | `docs/TESTING.md` | `DEC-CTRL-051` | `TASK-0808` | `TEST-CTRL-003` | `IMPLEMENTED` |
-| `TEST-CTRL-004` | Faucet command timeout and expiry handling tests | `docs/TESTING.md` | `DEC-CTRL-051` | `TASK-0809` | `TEST-CTRL-004` | `DEFERRED` |
+| `TEST-CTRL-004` | Faucet command timeout and expiry handling tests | `docs/TESTING.md` | `DEC-CTRL-051`, `DEC-CTRL-094` | `TASK-0804`, `TASK-0809` | `TEST-CTRL-004` | `PARTIALLY_VERIFIED` |
 | `TEST-CTRL-005` | Faucet control feature flag and dual sign-off tests | `docs/TESTING.md` | `DEC-CTRL-067` | `TASK-0801` | `TEST-CTRL-005` | `READY_FOR_IMPLEMENTATION` |
 
 ---
@@ -102,15 +102,16 @@ The following facts are verified in the traceability matrix regarding device sel
 
 ---
 
-## Gateway Command Publishing Traceability Implementation Note (Reconciled 2026-08-20)
+## Gateway Command Publishing Traceability Implementation Note (Reconciled 2026-08-20; Stale SENT Timeout Reconciled 2026-09-23)
 
 The following facts are verified in the traceability matrix regarding `TASK-0804` (`CommandPublisher` in `@kebun-melon/iot-gateway`):
-- **Implementation Status:** `TASK-0804` is implemented and verified (`apps/iot-gateway/src/__tests__/command-publisher.test.ts`, 10/10 tests passed; gateway contract suites 42/42 passed).
+- **Implementation Status:** `TASK-0804` is implemented and verified (`apps/iot-gateway/src/__tests__/command-publisher.test.ts`, 14/14 tests passed; full faucet suites 123/123 passed).
 - **Target Volume Passthrough:** For `DISPENSE` actions, the publisher consumes the canonical integer `targetVolumeMl` persisted during `TASK-0803` API command creation without recalculating from `phase` or `plantCount`.
-- **Manual Control Schema:** Cleanly formats `OPEN` and `CLOSE` commands by omitting `phase`, `plantCount`, and `targetVolumeMl`.
+- **Manual Control Schema:** Cleanly formats `OPEN` and `CLOSE` commands by omitting `phase`, `plantCount`, and `targetVolumeMl` (and mapping to `"ON"` / `"OFF"` strings on direct hardware topics per `DEC-DEV-032`).
 - **State Progression:** Atomically transitions database status from `QUEUED` to `SENT` only after broker confirms publication. Expired commands are marked `EXPIRED` without transmission.
-- **Dependency Isolation:** Downstream tasks (`TASK-0806` command state machine, `TASK-1003` MQTT E2E test suites) remain distinct and pending.
-<!-- TASK-0804 Reconciled: 2026-08-20 -->
+- **Stale SENT Command Timeout Sweep (`DEC-CTRL-094`):** Implemented `sweepStaleSentCommands()` in `apps/iot-gateway/src/commands/publisher.ts`, sweeping active `SENT` commands whose `expiresAt` has passed without receiving an ACK to terminal state `TIMEOUT` (`COMMAND_EXPIRED_TIMEOUT`), emitting realtime SSE events, and safely releasing the single active command concurrency lock (`faucet_commands_one_active_per_device`).
+- **Dependency Isolation & Pending Validation:** Downstream tasks (`TASK-0806` command state machine, `TASK-1003` MQTT E2E test suites) remain distinct; physical hardware manual validation on the farm remains pending hardware readiness (`TASK-0811`).
+<!-- TASK-0804 Reconciled: 2026-09-23 -->
 
 ---
 
@@ -704,4 +705,33 @@ The following facts are verified in the traceability matrix regarding the Resend
   - Zero database schema modifications or migrations executed.
   - Zero automated server deployments or git commits executed.
 <!-- Resend Custom Domain Traceability Reconciled: 2026-09-20 -->
+
+---
+
+## Soil & Water Quality Ingress Normalization, External ML Database Resolution & EMQX ACL Hardening Traceability Note (TASK-0417 / Reconciled 2026-09-23)
+
+The following facts are verified in the traceability matrix regarding `TASK-0417` (Hardware Ingress Payload Normalization, External ML Database Resolution, and EMQX Broker ACL Hardening):
+- **Traceability Baseline:** Governed by `PRD-FR-041`, `DEC-DEV-035`, `DEC-DEV-036`, `DEC-DEV-037`, `docs/DEVICE_COMMUNICATION.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, `docs/DATABASE.md`, and `docs/SECURITY.md`.
+- **Ingress Telemetry Normalization (`DEC-DEV-036`):**
+  - Updated `SoilWaterMqttAdapter` (`apps/iot-gateway/src/mqtt/soil-water-adapter.ts`) to normalize field microcontroller payload variations:
+    - Soil ESP32: supports top-level `"device": "soil-node-jvbkdbv"` and flat numeric metrics, alongside canonical `{ deviceId, soil: { ... } }` envelopes.
+    - Water Quality ESP32: supports nested `"water": { ... }` object wrapper and `"device_code"` identifier, alongside canonical `{ deviceId, water: { ... } }` envelopes.
+  - **Zero-Bypass Device Validation Invariant:** Telemetry is rejected unless candidate identifiers resolve to an active registered row in PostgreSQL `devices`.
+  - Added unit test suite in `apps/iot-gateway/src/__tests__/soil-water-adapter.test.ts` covering real field payloads (100% pass rate).
+  - Maintained complete isolation of reservoir water tank pipeline (`irigasi/melon/...`).
+- **External ML Database Resolution & Invariant Integrity (`DEC-DEV-037`):**
+  - Diagnosed why AI predictions were not rendering on the web dashboard (`RecommendationCard` rendering "Belum Ada Rekomendasi").
+  - Discovered that 100% of records (86 rows) in external ML Supabase `soil_predictions` are keyed by `device_id = "soil001"`, whereas Melon's mapping table referenced `"melon002"`.
+  - Verified that query with `'soil001'` returns complete agronomic recommendations with all 7 parameters and action advice.
+  - Verified that latest record timestamp in both `soil_predictions` and `water_predictions` is `2026-09-19T10:18:04Z` (stale by 3 days from external ML worker).
+  - Enforced architectural invariant: `devices.deviceId` (`soil-node-jvbkdbv`) in PostgreSQL is immutable and must NEVER be changed. Decoupling is managed strictly through `device_external_mappings.external_device_id = 'soil001'`.
+- **EMQX Cloud Broker Topic ACL Hardening (`DEC-DEV-037`):**
+  - Configured username `petanimelon` on unified EMQX Cloud broker with `Publish & Subscribe` (Allow) on all 4 canonical topics:
+    - `melon/sensor-tanah/data-2424600050`
+    - `melon/sensor-air/data-2424600050`
+    - `melon/ai-tanah/rekomendasi-2424600050`
+    - `melon/ai-air/rekomendasi-2424600050`
+  - Validated that bidirectional access enables both physical field microcontrollers and external AI worker processes using the shared credential to operate without broker rejection (`0x87 Not Authorized`), while strictly isolating backend gateway credentials and water tank actuator controls.
+<!-- TASK-0417 Traceability Reconciled: 2026-09-23 -->
+
 

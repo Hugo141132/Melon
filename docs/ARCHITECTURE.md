@@ -2258,4 +2258,48 @@ Browser Navigation / Refresh (GET /soil?deviceId=...)
   - Automatically terminates all real-time SSE subscriptions and background prediction polling intervals for the revoked device.
 <!-- Device Access Revocation Architecture Reconciled: 2026-09-22 -->
 
+---
+
+## External ML Prediction Resolution & Ingress Normalization Architecture Note (TASK-0417 / Reconciled 2026-09-23)
+
+This section defines the architectural invariants governing external machine learning prediction ingestion, device identity resolution, and MQTT hardware telemetry normalization:
+
+### 1. External ML Prediction Decoupling & Resolution Boundary
+
+```text
+Authenticated Client (Web Browser)
+        │
+        ▼
+Next.js API Handler: GET /api/v1/devices/[deviceId]/predictions/latest
+        │
+        ├─► 1. Session & RBAC Verification (requireSession, requireDeviceViewAccess)
+        │
+        ├─► 2. Resolve Canonical Device Entity: DeviceRepository.getDeviceByCanonicalId(deviceId)
+        │      (Resolves database UUID id: "3216f033-4c21-4b19-adc6-365854c31704", deviceId: "soil-node-jvbkdbv")
+        │
+        ├─► 3. Decouple External ID: DeviceRepository.getActiveExternalDeviceId(device.id, 'SOIL', 'EXTERNAL_ML')
+        │      (Queries device_external_mappings table -> returns external_device_id: "soil001")
+        │
+        ├─► 4. ExternalPredictionClient.getLatestSoilPrediction("soil001")
+        │      │
+        │      ▼
+        │   External ML Supabase PostgREST: GET /rest/v1/soil_predictions?device_id=eq.soil001
+        │   (Cached 30s TTL in memory; handles fallback and schema verification)
+        │
+        └─► 5. Mask internal URLs/keys; return sanitized SoilPredictionDto to Frontend
+```
+
+### 2. Device Identifier Immutability Invariant (`DEC-DEV-037`)
+- **Melon `devices.deviceId` Immutability:** The internal database record `devices.deviceId` (e.g., `soil-node-jvbkdbv`) is the canonical hardware anchor across the entire Melon architecture. It binds MQTT subscriptions, RBAC access control rows (`user_device_access`), telemetry readings, and audit trails. It MUST NOT be modified to match external third-party or ML service identifiers.
+- **Dynamic Mapping via `device_external_mappings`:** All external service identifiers are stored in the decoupled relation `device_external_mappings`. For Soil AI predictions, `external_device_id` maps to `"soil001"` (the authoritative device identifier in the external ML Supabase database).
+- **Graceful Fallback:** In development environments without populated mapping tables, `DEFAULT_ML_DEVICE_ALIASES` in `ExternalPredictionClient` maps known local hardware aliases to `"soil001"` and `"water001"`.
+
+### 3. Hardware Telemetry Ingress Normalization & Security Invariants (`DEC-DEV-036`)
+- **Adapter Ingress Handling:** `SoilWaterMqttAdapter` in `apps/iot-gateway` handles live telemetry packets arriving on `melon/sensor-tanah/data-2424600050` and `melon/sensor-air/data-2424600050`.
+- **Envelope Normalization:** Supports both top-level and nested telemetry wrappers (extracting `"device"`, `"device_code"`, and nested `"soil"` or `"water"` blocks) to accommodate field ESP32 firmware variations.
+- **Strict Device Identity Validation:** Ingress normalization strictly extracts candidate identifiers and verifies them against registered PostgreSQL `devices`. Telemetry from unrecognized or deactivated devices is rejected and logged, preserving the zero-trust device perimeter.
+- **Actuator & Topic Isolation:** The reservoir water tank monitoring and faucet control pipeline (`irigasi/melon/...`) remains on a completely dedicated, isolated pipeline and is never modified by sensor telemetry adapter changes.
+<!-- External ML & Ingress Normalization Architecture Reconciled: 2026-09-23 -->
+
+
 

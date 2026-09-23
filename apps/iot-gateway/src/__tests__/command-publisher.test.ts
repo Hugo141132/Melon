@@ -794,5 +794,78 @@ describe('TASK-0804: CommandPublisher (Gateway Command Publisher)', () => {
       expect(mockFaucetCommandRepo.updateCommandStatus).not.toHaveBeenCalled();
       expect(metricsCollector.getSnapshot().commands.failuresTotal).toBe(1);
     });
+
+    it('sweeps and transitions expired SENT commands to TIMEOUT', async () => {
+      const expiredSentCommand = {
+        id: 'cmd-db-uuid-sent-expired',
+        commandId: 'cmd-sent-exp-1',
+        deviceId: 'water-tank-01',
+        status: FaucetCommandStatus.SENT,
+        expiresAt: new Date(Date.now() - 60000), // Expired 1 min ago
+      };
+
+      const unexpiredSentCommand = {
+        id: 'cmd-db-uuid-sent-active',
+        commandId: 'cmd-sent-active-1',
+        deviceId: 'water-tank-01',
+        status: FaucetCommandStatus.SENT,
+        expiresAt: new Date(Date.now() + 240000), // Active for 4 more mins
+      };
+
+      const mockFaucetCommandRepo = {
+        getCommands: vi.fn().mockResolvedValue({
+          items: [expiredSentCommand, unexpiredSentCommand],
+          pagination: { page: 1, pageSize: 50, totalItems: 2, totalPages: 1 },
+        }),
+        updateCommandStatus: vi.fn().mockResolvedValue({
+          ...expiredSentCommand,
+          status: FaucetCommandStatus.TIMEOUT,
+        }),
+      } as any;
+
+      const publisher = new CommandPublisher({
+        env,
+        mqttClient: { isConnected: () => true } as any,
+        faucetCommandRepo: mockFaucetCommandRepo,
+      });
+
+      const res = await publisher.sweepStaleSentCommands();
+
+      expect(res.timedOutCount).toBe(1);
+      expect(mockFaucetCommandRepo.updateCommandStatus).toHaveBeenCalledTimes(1);
+      expect(mockFaucetCommandRepo.updateCommandStatus).toHaveBeenCalledWith(
+        'cmd-db-uuid-sent-expired',
+        FaucetCommandStatus.TIMEOUT,
+        { reasonCode: 'COMMAND_EXPIRED_TIMEOUT' }
+      );
+    });
+
+    it('handles updateCommandStatus rejection gracefully during sweep without throwing', async () => {
+      const expiredSentCommand = {
+        id: 'cmd-db-uuid-sent-error',
+        commandId: 'cmd-sent-err-1',
+        deviceId: 'water-tank-01',
+        status: FaucetCommandStatus.SENT,
+        expiresAt: new Date(Date.now() - 60000),
+      };
+
+      const mockFaucetCommandRepo = {
+        getCommands: vi.fn().mockResolvedValue({
+          items: [expiredSentCommand],
+          pagination: { page: 1, pageSize: 50, totalItems: 1, totalPages: 1 },
+        }),
+        updateCommandStatus: vi.fn().mockRejectedValue(new Error('Database lock timeout')),
+      } as any;
+
+      const publisher = new CommandPublisher({
+        env,
+        mqttClient: { isConnected: () => true } as any,
+        faucetCommandRepo: mockFaucetCommandRepo,
+      });
+
+      // Must not throw error
+      await expect(publisher.sweepStaleSentCommands()).resolves.toEqual({ timedOutCount: 0 });
+      expect(mockFaucetCommandRepo.updateCommandStatus).toHaveBeenCalledTimes(1);
+    });
   });
 });

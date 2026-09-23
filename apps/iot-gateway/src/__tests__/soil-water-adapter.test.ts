@@ -251,6 +251,57 @@ describe('SoilWaterMqttAdapter (TASK-0412 / Soil & Water MQTT Ingestion)', () =>
       );
     });
 
+    it('ingests real captured hardware soil payload using "device" and N, P, K, temp, moisture, ec, ph', async () => {
+      const livePayload = {
+        device: 'melon-esp32-tanah1',
+        N: 9,
+        P: 13,
+        K: 31,
+        temp: 28.9,
+        moisture: 16.7,
+        ec: 194,
+        ph: 6.9,
+      };
+
+      const result = await adapter.handleInboundSoilData(Buffer.from(JSON.stringify(livePayload)));
+
+      expect(result.success).toBe(true);
+      expect(mockTelemetryRepo.ingestSoilReading).toHaveBeenCalledWith(
+        expect.objectContaining({
+          deviceId: 'melon-esp32-tanah1',
+          nitrogen: 9,
+          phosphorus: 13,
+          potassium: 31,
+          temperature: 28.9,
+          moisture: 16.7,
+          ec: 194,
+          ph: 6.9,
+        })
+      );
+    });
+
+    it('ingests hardware soil payload when device client ID includes hardware chip/MAC suffix', async () => {
+      const livePayload = {
+        device: 'melon-esp32-tanah1-7d077000',
+        N: 9,
+        P: 13,
+        K: 31,
+        temp: 28.9,
+        moisture: 16.7,
+        ec: 194,
+        ph: 6.9,
+      };
+
+      const result = await adapter.handleInboundSoilData(Buffer.from(JSON.stringify(livePayload)));
+
+      expect(result.success).toBe(true);
+      expect(mockTelemetryRepo.ingestSoilReading).toHaveBeenCalledWith(
+        expect.objectContaining({
+          deviceId: 'melon-esp32-tanah1',
+        })
+      );
+    });
+
     it('handles duplicate message gracefully without throwing', async () => {
       mockTelemetryRepo.ingestSoilReading.mockResolvedValueOnce({
         readingId: 'soil-reading-dup',
@@ -436,6 +487,54 @@ describe('SoilWaterMqttAdapter (TASK-0412 / Soil & Water MQTT Ingestion)', () =>
           status: 'CRITICAL',
         })
       );
+    });
+
+    it('ingests real captured hardware water quality payload using "water" object and "device_code"', async () => {
+      const livePayload = {
+        water: {
+          ph: 14.08,
+          tds: 76,
+          ec: 82,
+          battery: 50,
+        },
+        device_code: 'STATION-001',
+        latitude: -7.197,
+        longitude: 113.239,
+        system_voltage: 8.164,
+        system_current_mA: null,
+        system_power_mW: 0,
+      };
+
+      const result = await adapter.handleInboundWaterData(Buffer.from(JSON.stringify(livePayload)));
+
+      expect(result.success).toBe(true);
+      expect(mockTelemetryRepo.ingestWaterReading).toHaveBeenCalledWith(
+        expect.objectContaining({
+          deviceId: 'melon-esp32-air1',
+          ph: 14.08,
+          tds: 76,
+          ec: 82,
+        })
+      );
+    });
+
+    it('rejects water quality payload with unknown device_code without bypassing validation', async () => {
+      const unknownPayload = {
+        water: {
+          ph: 7.0,
+          tds: 100,
+          ec: 1.0,
+        },
+        device_code: 'UNKNOWN_STATION_999',
+      };
+
+      const result = await adapter.handleInboundWaterData(
+        Buffer.from(JSON.stringify(unknownPayload))
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.reason).toBe('UNKNOWN_DEVICE_CLIENT_ID');
+      expect(mockTelemetryRepo.ingestWaterReading).not.toHaveBeenCalled();
     });
 
     it('rejects malformed water quality payload', async () => {

@@ -260,6 +260,20 @@ The system consolidates all MQTT communication onto a single unified EMQX Cloud 
   - Live probe confirmed 0 active client connections and 0 messages on legacy HiveMQ, verifying that hardware traffic has ceased on the fallback broker.
 - **Client ID Collision Avoidance:** Gateway client uses static, non-colliding client ID (`MQTT_GATEWAY_CLIENT_ID=Test_Gateway` or `gateway-kebun-melon-dev-local-01` for primary EMQX). Hardware devices use MAC-derived or configured IDs (`melon-esp32-tanah1`, `melon-esp32-air1`, `water-tank-node-zi37gz`) and authenticate via `petanimelon` or `Test_Device`.
 - **Staging Isolation:** Staging environments remain 100% isolated containerized deployments and are untouched by local development broker testing.
+- **Broker ACL Policies & Scoping (`DEC-DEV-037`):**
+  - **Hardware / AI Worker Credential (`petanimelon`):** Configured with explicit `Publish & Subscribe` (Allow) permissions on the 4 canonical soil & water quality topics:
+    - `melon/sensor-tanah/data-2424600050`
+    - `melon/sensor-air/data-2424600050`
+    - `melon/ai-tanah/rekomendasi-2424600050`
+    - `melon/ai-air/rekomendasi-2424600050`
+    - *Rationale:* ESP32 hardware devices publish raw sensor readings, while the external ML worker process subscribes to sensor telemetry and publishes AI predictions. Since field devices and AI test scripts authenticate using `petanimelon`, granting bidirectional `Publish & Subscribe` on these 4 topics prevents broker rejection (`0x87 Not Authorized`). Topic permissions remain strictly scoped without wildcard (`#`) exposure.
+  - **Backend Gateway Service (`Test_gateway`):** Confidential backend credential with Pub/Sub permissions across all monitored telemetry topics and command topics.
+  - **Water Tank Device (`Test_Device`):** Authorized strictly to publish `irigasi/melon/sensor/volume` and subscribe to `irigasi/melon/kontrol/valve` and `irigasi/melon/setting/otomasi`.
+- **Hardware Telemetry Ingress Normalization (`DEC-DEV-036`):**
+  - `SoilWaterMqttAdapter` transparently normalizes real field ESP32 microcontroller payload variations:
+    - **Soil Telemetry:** Supports top-level `"device": "soil-node-jvbkdbv"` and flat numeric metrics, alongside canonical envelope wrappers (`{ deviceId, soil: { ... } }`).
+    - **Water Quality Telemetry:** Supports nested `"water": { ... }` object wrappers and alternative key identifiers (`"device_code"` or `"device"`), alongside flat camelCase envelopes.
+  - **Zero-Bypass Device Validation:** The adapter extracts candidate device identifiers and rigorously queries PostgreSQL (`devices`). Any telemetry with an unmapped, unregistered, or inactive device ID is rejected immediately, preventing forged telemetry injection.
 
 
 ### 5.3 IoT Gateway
@@ -576,6 +590,10 @@ Per user-approved decision `DEC-DEV-032`, the system formally supersedes the int
    - Dual written sign-off (Project Owner + Hardware Lead) remains mandatory before physical control activation in production.
    - REST API flows for Soil Quality and Water Quality remain 100% untouched.
    - Database schema, user RBAC, session authentication, and transactional audit logging remain 100% unchanged.
+5. **Automated Stale SENT Command Timeout Handling (`DEC-CTRL-094` / `TASK-0804`):**
+   - Flat hardware topics (`irigasi/melon/kontrol/valve`) do not provide device acknowledgement channels (`ack/faucet`), and EMQX Cloud broker ACLs explicitly restrict the hardware credential (`Test_Device`) from publishing to arbitrary topics.
+   - When commands are dispatched and marked `SENT`, if no ACK is received before the command reaches its expiry timestamp (`expiresAt`), the IoT Gateway's periodic sweeper (`CommandPublisher.sweepStaleSentCommands()`, running every 2,000ms) automatically transitions the command to terminal state `TIMEOUT` (`COMMAND_EXPIRED_TIMEOUT`).
+   - This releases the single active command concurrency lock (`faucet_commands_one_active_per_device`), preventing permanent command lockouts while maintaining strict safe failure behavior (`physicalOutcome = 'UNKNOWN'`).
 
 #### 8.4.4 Hardware Team Browser Prototype Security & Architectural Audit
 
@@ -2372,16 +2390,18 @@ The monitoring UUID and history regression fix (`TASK-0306`, `TASK-0501`, `TASK-
  
 ---
 
-## Gateway Command Publishing Implementation Note (Reconciled 2026-08-20)
+## Gateway Command Publishing Implementation Note (Reconciled 2026-08-20; Stale SENT Timeout Reconciled 2026-09-23)
 
 The following facts are supported by the verified implementation of `TASK-0804` (`CommandPublisher` in `@kebun-melon/iot-gateway`):
-- **Topic Routing & QoS:** Commands are published to canonical topics `agriculture/{environment}/{siteId}/{deviceId}/command/faucet` with QoS 1 and `retain=false`.
+- **Topic Routing & QoS:** Commands are published to canonical topics `agriculture/{environment}/{siteId}/{deviceId}/command/faucet` or direct hardware topics `irigasi/melon/kontrol/valve` (per `DEC-DEV-032`) with QoS 1 and `retain=false`.
 - **Target Device Scope:** Command publishing is restricted to verified `WATER_TANK_NODE` devices with `accountStatus = ACTIVE` and valid non-empty `siteId`.
 - **Payload Schema Conformance:**
   - `DISPENSE`: Transmits `schemaVersion: '1.0'`, `commandId`, `deviceId`, `siteId`, `action: 'DISPENSE'`, valid `phase`, `plantCount >= 1`, persisted integer `targetVolumeMl` (no publisher-side recalculation), `requestedAt`, and `expiresAt`.
-  - `OPEN` / `CLOSE`: Transmits clean manual action payload omitting `phase`, `plantCount`, and `targetVolumeMl`.
-- **State Progression:** Atomically transitions database status from `QUEUED` to `SENT` only after broker confirms publication. Expired commands are marked `EXPIRED` without transmission. Disconnected/failed broker states keep commands `QUEUED` with zero false `SENT` marks.
-<!-- TASK-0804 Reconciled: 2026-08-20 -->
+  - `OPEN` / `CLOSE`: Transmits clean manual action payload omitting `phase`, `plantCount`, and `targetVolumeMl` (or `"ON"` / `"OFF"` strings on direct hardware topics).
+- **State Progression & Stale SENT Timeout Sweep (`DEC-CTRL-094`):**
+  - Atomically transitions database status from `QUEUED` to `SENT` only after broker confirms publication. Expired commands are marked `EXPIRED` without transmission. Disconnected/failed broker states keep commands `QUEUED` with zero false `SENT` marks.
+  - Active `SENT` commands whose `expiresAt` has passed without receiving an ACK are automatically swept by `sweepStaleSentCommands()` every 2,000ms to terminal state `TIMEOUT` (`COMMAND_EXPIRED_TIMEOUT`), safely releasing the device concurrency lock (`faucet_commands_one_active_per_device`) and emitting realtime SSE updates.
+<!-- TASK-0804 Reconciled: 2026-09-23 -->
 
 ---
 

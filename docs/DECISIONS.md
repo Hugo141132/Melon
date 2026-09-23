@@ -38,7 +38,7 @@
 |---|---|---|---|
 | **Authentication** | `DEC-AUTH-001` to `DEC-AUTH-012`, `DEC-AUTH-102` to `DEC-AUTH-111` | **APPROVED** | HTTP-only secure cookies (`HttpOnly`, `Secure`, `SameSite=Strict`), PostgreSQL session table, 30m idle / 8h absolute maximum lifetime, CLI Owner seed, no public Owner creation, mandatory 6-digit email verification, 1m unified expiry & cooldown, verified self-email change, single active session enforcement, cross-client email PNG logo & 'Melon Governance' branding, and Owner User Management email verification isolation with ADMINISTRATOR role presentation. |
 | **RBAC** | `DEC-RBAC-013` to `DEC-RBAC-019` | **APPROVED** | Owner has global device visibility. Admins have mandatory per-device assignments; device assignment automatically grants both monitoring and faucet control. Owners manage assignments. No separate per-user-device `canControl` permission in v1. |
-| **Devices** | `DEC-DEV-020` to `DEC-DEV-034` | **APPROVED** | Multi-protocol and dual-broker architecture: Soil & Water quality monitoring telemetry via dedicated HiveMQ Cloud broker over TLS (`DEC-DEV-033`), Water Tank monitoring via direct 2-tier gateway on dedicated EMQX Cloud broker (`DEC-DEV-032`). Shared INA219 electrical monitoring via REST/Wi-Fi. Per-device credentials/ACLs, no anonymous access, no direct browser-to-MQTT. Offline threshold: **TBD**. Stale threshold: **TBD**. In-app device creation / Add Device removed (`DEC-DEV-027`). External `deviceId` editable by OWNER only; internal DB UUID immutable; canonical `deviceId` strictly hidden from ADMIN in UI & API (`DEC-DEV-028`). Previously/last-accessed device history & persistent restoration removed while preserving all telemetry/command/assignment/audit history (`DEC-DEV-029`). Hard delete of devices permanently removed in favor of `DEACTIVATED` / `ACTIVE` lifecycle (`DEC-DEV-030`). Permanent external hardware topics (`irigasi/melon/...`) adopted as canonical MQTT contract for single water tank node (`DEC-DEV-032`). User-facing connection status normalized strictly to Connected vs Disconnected (`DEC-DEV-034`). |
+| **Devices** | `DEC-DEV-020` to `DEC-DEV-037` | **APPROVED** | Unified EMQX Cloud broker architecture (`DEC-DEV-035` superseding `DEC-DEV-033`): all soil, water quality, and reservoir water tank telemetry consolidated onto EMQX Cloud with HiveMQ fallback permanently retired. Direct 2-tier gateway for single water tank node (`DEC-DEV-032`). Resilient hardware payload normalization in `SoilWaterMqttAdapter` supporting real ESP32 envelopes (`device`, nested `water`, `device_code`) while strictly preserving database device identity validation (`DEC-DEV-036`). External ML prediction resolution decoupled from immutable `devices.deviceId` via `device_external_mappings.external_device_id = 'soil001'`, and EMQX broker ACL policy granting scoped bidirectional `Publish & Subscribe` for `petanimelon` (`DEC-DEV-037`). User-facing connection status normalized strictly to Connected vs Disconnected (`DEC-DEV-034`). In-app device creation removed (`DEC-DEV-027`). External `deviceId` editable by OWNER only (`DEC-DEV-028`). Zero hard deletion in favor of `DEACTIVATED` / `ACTIVE` (`DEC-DEV-030`). |
 | **Monitoring** | `DEC-MON-036` to `DEC-MON-050`, `DEC-MON-085` to `DEC-MON-091` | **APPROVED** | Three distinct monitoring domains: 1) Soil monitoring (NPK, Temp, Moisture, pH, EC in `µS/cm`, status), 2) Water Quality monitoring (pH, TDS in ppm, EC in `µS/cm`, status), 3) Water Tank monitoring (Tank Vol in `L`, 0 L–2200 L scale per `DEC-MON-089`, status; Flow rate deleted per `DEC-MON-089`). Canonical EC unit standardized directly in `µS/cm` without multiplier conversions across storage, API, UI, simulator, and ML inference (`DEC-MON-091`). Soil & Water Quality ML classification is ingested from an external ML team's Supabase project over read-only PostgREST HTTPS (`ExternalPredictionClient`), mapped dynamically via `device_external_mappings`, and hybrid MQTT recommendations are published asynchronously via `apps/iot-gateway` without local ML compute (`DEC-MON-090`). Raw telemetry remains immutable. 90-day retention TTL with chunked batch maintenance (`DEC-MON-048` / `TASK-0913`). |
 | **Faucet Control** | `DEC-CTRL-051` to `DEC-CTRL-067` | **APPROVED** | Max 1 active command/device, no auto retries, `ENABLE_FAUCET_CONTROL=false` default, dual written sign-off (Owner + Hardware Lead) required before production activation. Duplicate command IDs never re-dispense. Timeout ≠ completion. ACK timeout, completion timeout, expiry duration: **TBD**. Cancellation/stop support: **TBD**. |
 | **I18N** | `DEC-I18N-068` to `DEC-I18N-074` | **APPROVED** | Default `id` (Bahasa Indonesia), `en` fallback, mandatory centered language-selection gate for unauthenticated visitors without valid locale (`English` -> `en`, `Bahasa Indonesia` -> `id`), cookie-based non-prefixed routing (no URL path pollution), subsequent language changes strictly in Settings (`/settings`), UTC storage with `Asia/Jakarta` (WIB) presentation. |
@@ -399,6 +399,60 @@
   3. **Independent Health Reporting**: Health probes (`/health`, `/ready`) report both `emqx` and `hivemq` connection states independently.
   4. **Isolation Invariant**: Zero database schema changes; zero modifications to containerized staging deployments.
 
+#### DEC-DEV-035: Consolidation of Soil & Water Quality Telemetry onto Unified EMQX Cloud Broker & Retirement of HiveMQ Secondary Broker
+* **Related Task IDs**: `TASK-0415`, `TASK-0416`
+* **Related Documentation**: `docs/DEVICE_COMMUNICATION.md` §5.2.1, `docs/ARCHITECTURE.md` §4.1, `AGENTS.md` §2
+* **Status**: **APPROVED (2026-09-20 — Supersedes DEC-DEV-033)**
+* **Context**:
+  - `DEC-DEV-033` introduced a dual-broker architecture connecting to HiveMQ Cloud as a secondary broker for Soil and Water Quality ESP32 microcontrollers.
+  - To streamline operations, eliminate dual-broker connection overhead, and align all IoT traffic onto a single cloud infrastructure, all domains were consolidated onto the primary EMQX Cloud broker.
+* **Approved Decision**:
+  1. **Unified Broker Architecture**: All telemetry domains (Soil, Water Quality, and Reservoir Water Tank) and outbound AI recommendations communicate via the single unified EMQX Cloud broker.
+  2. **Retirement of Secondary Broker**: HiveMQ Cloud fallback configuration (`SOIL_WATER_MQTT_*`) and secondary client instantiation in `apps/iot-gateway` are permanently removed.
+  3. **Gateway Simplification**: `SoilWaterMqttAdapter` binds unconditionally to the primary EMQX gateway client.
+  4. **Health Probe Normalization**: Gateway `/ready` and `/internal/v1/ready` endpoints report single unified EMQX status without dual-broker branching.
+
+#### DEC-DEV-036: Soil & Water Quality Hardware Telemetry Payload Normalization & Safe Ingress Invariants
+* **Related Task IDs**: `TASK-0417`
+* **Related Documentation**: `docs/DEVICE_COMMUNICATION.md` §5.2.1, §8.4; `docs/ARCHITECTURE.md` §4.1; `docs/SECURITY.md` §5
+* **Status**: **APPROVED (2026-09-23)**
+* **Context**:
+  - Live field testing with physical ESP32 microcontrollers revealed slight schema variations emitted by microcontroller firmware:
+    - Soil ESP32 emitted top-level `"device": "soil-node-jvbkdbv"` instead of `"deviceId"`, and flat telemetry keys without an outer `"soil"` object wrapper.
+    - Water Quality ESP32 emitted nested `"water": { ... }` object wrappers and/or `"device_code"` instead of canonical camelCase keys.
+  - The IoT Gateway rejected these packets, preventing live field telemetry from displaying on the web application.
+* **Approved Decision**:
+  1. **Resilient Payload Normalization**: `SoilWaterMqttAdapter` normalizes incoming hardware telemetry envelopes transparently:
+     - Soil: resolves device identity checking `payload.device`, `payload.deviceId`, `payload.soil?.device`, `payload.soil?.deviceId`. Normalizes telemetry values checking both top-level and nested `payload.soil` wrappers.
+     - Water Quality: resolves device identity checking `payload.device_code`, `payload.deviceCode`, `payload.device`, `payload.deviceId`, `payload.water?.device_code`. Normalizes telemetry checking both top-level and nested `payload.water` wrappers.
+  2. **Device Identity Invariant (Zero Validation Bypass)**:
+     - The adapter MUST NOT introduce permissive fallbacks that bypass database device validation.
+     - Every incoming packet MUST resolve to an active, registered device in PostgreSQL (`devices`) via canonical `deviceId`, `clientId`, or internal UUID. Packets with unknown or unassigned device identifiers are rejected and logged.
+  3. **Domain Isolation**: Zero modifications or interruptions to the reservoir water tank telemetry pipeline (`irigasi/melon/...`).
+  4. **Backward Compatibility**: Pre-existing canonical envelope shapes (`{ deviceId, soil: { ... } }`, `{ deviceId, water: { ... } }`) remain fully supported.
+
+#### DEC-DEV-037: External ML Prediction Mapping Decoupling Invariant & EMQX Broker ACL Policy
+* **Related Task IDs**: `TASK-0417`
+* **Related Documentation**: `docs/DEVICE_COMMUNICATION.md` §5.2.1; `docs/ARCHITECTURE.md` §4.1; `docs/DATABASE.md` §3.3
+* **Status**: **APPROVED (2026-09-23)**
+* **Context**:
+  - Soil AI predictions from the external ML Supabase database were not rendering on the web dashboard.
+  - Investigation discovered that 100% of rows (86 records) in the external ML `soil_predictions` table were recorded under `device_id = "soil001"`, whereas Melon's mapping table and fallback aliases referenced `"melon002"`.
+  - In addition, broker ACL permissions for username `petanimelon` on the 4 soil/water topics originally restricted AI topics to Subscribe-only and sensor topics to Publish-only. Because field devices and external AI worker/testing clients share the `petanimelon` credential, this caused broker rejections (`0x87 Not Authorized`) when publishing AI recommendations or subscribing to raw telemetry.
+* **Approved Decision**:
+  1. **Melon Device ID Immutability Invariant**:
+     - The canonical `deviceId` in Melon's PostgreSQL `devices` table (`soil-node-jvbkdbv`) is immutable and MUST NEVER be altered to match external ML identifiers.
+     - Changing `devices.deviceId` would break hardware MQTT topic bindings, RBAC user permissions, historical telemetry associations, and audit trail integrity.
+  2. **Mapping Table Authority**:
+     - All external ML identity decoupling is handled strictly through the `device_external_mappings` table (`external_device_id = 'soil001'`) and `DEFAULT_ML_DEVICE_ALIASES` in `packages/database/src/external-prediction-client.ts`.
+  3. **EMQX Broker ACL Bidirectional Policy**:
+     - The username `petanimelon` on the unified EMQX Cloud broker is configured with `Publish & Subscribe` permissions on the 4 scoped topics:
+       - `melon/sensor-tanah/data-2424600050`
+       - `melon/sensor-air/data-2424600050`
+       - `melon/ai-tanah/rekomendasi-2424600050`
+       - `melon/ai-air/rekomendasi-2424600050`
+     - This policy guarantees uninhibited communication for shared field and AI worker clients while preserving strict topic containment (no `#` wildcard access) and complete isolation of IoT Gateway backend credentials (`Test_gateway`) and water tank control topics (`irigasi/melon/...`).
+
 #### DEC-MON-087: Historical Query API Range Bounds, Pagination Limits & Aggregation Policy
 * **Related Task IDs**: `TASK-0503`
 * **Related Documentation**: `docs/API.md` §17, `docs/DATABASE.md` §8.5, `AGENTS.md` §2
@@ -470,6 +524,17 @@
   3. **Dedicated Audit Trail**: Manual valve commands are recorded in the audit trail with specific event keys: `faucet.command.open.created` for `OPEN` and `faucet.command.close.created` for `CLOSE`.
   4. **Authoritative Physical State Tracking**: Physical valve position is strictly mapped from terminal confirmation events (`COMPLETED OPEN` $\rightarrow$ `OPEN`, `COMPLETED CLOSE` $\rightarrow$ `CLOSED`, `COMPLETED DISPENSE` $\rightarrow$ `UNKNOWN`, all in-flight/failed/timeout states $\rightarrow$ `UNKNOWN`).
   5. **Fail-Safe Behavior on Connection Loss (UNRESOLVED / BLOCKING)**: Automatic fail-safe behavior (auto-closing valve upon broker/network/gateway disconnect during manual OPEN) remains **UNRESOLVED / TBD** on physical hardware firmware. The software architecture isolates this risk by reporting physical state as `UNKNOWN` and enforcing `ENABLE_FAUCET_CONTROL=false` by default until dual written production sign-off is achieved.
+
+#### DEC-CTRL-094: Automated Timeout Sweep for Stale Active SENT Commands
+* **Related Task IDs**: `TASK-0804`, `TASK-0809`
+* **Related Documentation**: `docs/DEVICE_COMMUNICATION.md` §8.4.5, `docs/SECURITY.md` §13.9, `docs/TESTING.md` §46
+* **Status**: **APPROVED BY USER (2026-09-23)**
+* **Approved Decision**:
+  1. **Automated Sweep Execution**: The IoT Gateway `CommandPublisher` periodically executes `sweepStaleSentCommands()` during its active polling loop (every 2,000ms alongside `processQueuedCommands()`).
+  2. **Terminal Timeout Transition**: Active commands in status `SENT` whose `expiresAt` timestamp has elapsed (`now >= expiresAt`) are immediately transitioned to terminal state `TIMEOUT` with failure reason `COMMAND_EXPIRED_TIMEOUT`.
+  3. **Concurrency Lock Release**: Because `SENT` is an active state guarded by the single active command per device constraint (`faucet_commands_one_active_per_device`), transitioning stale `SENT` commands to `TIMEOUT` automatically and safely frees the lock, permitting subsequent authorized commands without requiring manual database operator intervention.
+  4. **Auditability & Observability**: Swept timeouts record an audit event in `faucet_command_events`, increment the gateway metric counter `command_timeouts_total`, and emit a real-time event (`faucet.command.updated`) to notify connected web clients and update `FaucetHistoryTable`.
+  5. **Physical Outcome Decoupling**: In accordance with `DEC-CTRL-051` and `SECURITY.md` §13.9, timed-out commands strictly maintain `physicalOutcome = 'UNKNOWN'` without claiming completion or assuming physical valve state.
 
 ---
 
@@ -746,6 +811,16 @@ The following facts are supported by the verified decisions governance of `TASK-
 - **Decision Compliance:** Complies with `DEC-CTRL-051` (Faucet Command Concurrency) and `DEC-CTRL-093` (Semantic Duplicate Command Protection).
 - **Idempotency Protection:** Transactional execution compares `deviceId`, `action`, `phase`, and `plantCount` to ensure exact intent matching. Duplicates differing in parameters yield 409 Conflict.
 <!-- TASK-0808 Reconciled: 2026-08-20 -->
+
+---
+
+## Stale SENT Command Timeout Decisions Implementation Note (Reconciled 2026-09-23)
+
+The following facts are supported by the verified decisions governance of `TASK-0804` and `TASK-0809` (`CommandPublisher.sweepStaleSentCommands()` in `@kebun-melon/iot-gateway`):
+- **Decision Compliance:** Complies with `DEC-CTRL-051` (Faucet Command Concurrency), `DEC-DEV-032` (Direct 2-Tier Hardware MQTT Contract), and `DEC-CTRL-094` (Automated Timeout Sweep for Stale Active SENT Commands).
+- **Concurrency Lock Release:** Resolves the lockup vulnerability where commands dispatched to flat hardware topics (`irigasi/melon/kontrol/valve`) remained in `SENT` indefinitely because microcontrollers lack MQTT ACK capabilities. Active `SENT` commands past `expiresAt` (5m) are transitioned automatically to terminal status `TIMEOUT`, restoring device availability for subsequent authorized operations.
+- **Fail-Safe Invariants:** Timed-out commands record `physicalOutcome = 'UNKNOWN'`, emit real-time telemetry updates, and never trigger blind physical retries.
+<!-- TASK-0804 / TASK-0809 Reconciled: 2026-09-23 -->
 
 ---
 
