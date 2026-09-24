@@ -257,4 +257,11 @@
       transform: translateY(0);
     }
   }
+
+  /* ─── Reusable Ambient Organic Background Layer System ────── */
+  .min-h-dvh.bg-app-surface,
+  .min-h-dvh.bg-surface,
+  .min-h-dvh.bg-background {
+    background-color: transparent;
+  }
 }

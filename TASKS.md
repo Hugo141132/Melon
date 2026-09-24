@@ -951,6 +951,12 @@ Implemented complete Owner User Management:
   - Strictly preserved the sentence "Manage your melon farm with ease" / "Kelola lahan melon Anda dengan lebih mudah" unchanged.
   - Added regression test suite `apps/web/test/unit/branding-cleanup.test.tsx` (7/7 tests passed).
   - Verified 0 TypeScript errors (`npm run typecheck:web`), 100% full workspace test pass rate (125/125 test suites, 1,300/1,300 tests passed), and Playwright browser verification confirming exact `"OWNER / PIC"` role label on `/register`.
+- Registration page visual integration and root browser title update (2026-09-24, DEC-UIUX-107, DEC-UIUX-108):
+  - Refined registration view (`apps/web/app/(auth)/register/register-view.tsx`): Integrated the detached floating header into the primary card container, aligning navigation back button, view title (`Account Registration`), step indicator, institutional partner logo (`/logo1.webp`), solid role choice cards with controlled green accents (`border-2 border-primary`), form fields (`h-[52px]`), and footer switch into a grounded card hierarchy (`bg-surface-container-lowest`, `border border-outline-variant/60`, `shadow-[0_4px_24px_rgba(0,0,0,0.06)]`, `rounded-2xl`).
+  - Strict prohibition of glassmorphism: Eliminated all `backdrop-blur` and translucent cards in favor of 100% solid white surfaces.
+  - Calibrated organic mesh background (`apps/web/components/layout/AppBackground.tsx`): Reduced background visual dominance via a gentle agricultural pastel palette (`#f3f7f0` to `#ddecd8`) with soft translucency (`opacity 0.15 - 0.35`) and center-focused radial luminance, ensuring non-blocking inlined vector SVG (<2KB) and zero layout shift (CLS = 0).
+  - Standardized root application browser title metadata (`apps/web/app/layout.tsx`): Updated `title.default` and `title.template` from `"Kebun Melon - Smart Farming"` to `"Melon Governance"`.
+  - Staging impact: Frontend and documentation only. No Supabase database migration, edge function deployment, or container update required.
 
 ### Acceptance Criteria
 
@@ -968,6 +974,8 @@ Implemented complete Owner User Management:
 - [x] Full I18N support: Bilingual verification UI and email templates with 100% key parity across `id` and `en`.
 - [x] Transactional email logo cross-client consistency: Dedicated PNG logo eliminates dark mode and transparent image distortions in Gmail and major email clients while preserving WebP on web pages.
 - [x] Transactional email brand identity: Customer-facing emails uniformly feature "Melon Governance" branding across subjects, headers, and footers.
+- [x] Registration grounded visual integration: Detached floating header integrated into solid card container adhering to `Premium Minimal Ops` without glassmorphism or backdrop blur (`DEC-UIUX-107`).
+- [x] Application browser title metadata: Root Next.js metadata default title and template standardized to `"Melon Governance"` (`DEC-UIUX-108`).
 
 ---
 

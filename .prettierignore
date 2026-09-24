@@ -47,6 +47,7 @@ blob-report/
 # Caches & Temporary Files
 .tmp/
 .cache/
+scratch/
 
 # OS, IDE & Tool Artifacts
 .vscode/

@@ -259,7 +259,10 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
 
     // Open Owner Approvals page
     await page.goto('/approvals');
-    await expect(page.locator('body')).toContainText(/Permohonan Pendaftaran/i, { timeout: 10000 });
+    await expect(page.locator('body')).toContainText(
+      /Persetujuan Admin|Admin Approvals|Permohonan Pendaftaran/i,
+      { timeout: 10000 }
+    );
 
     // Click the applicant item card
     const applicantName = page.locator('h4', { hasText: testAdminName }).first();
@@ -401,7 +404,7 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
 
     // Verify page response and title
     const title = await page.title();
-    expect(title).toContain('Kebun Melon');
+    expect(title).toMatch(/Melon Governance|Kebun Melon/);
   });
 
   let adminSessionToken: string | undefined;

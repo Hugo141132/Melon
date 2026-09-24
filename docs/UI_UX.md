@@ -178,9 +178,32 @@ The 2026-09-21 branding refinement streamlines customer-facing typography and no
    - Subtitle copy `"Manage your melon farm with ease"` / `"Kelola lahan melon Anda dengan lebih mudah"` is strictly preserved unchanged.
    - All layout structures, Tailwind classes, interaction models, and route protection rules remain untouched.
 
+### 1.9 Registration Page Visual Integration & Browser Title Metadata Governance (2026-09-24)
+The 2026-09-24 visual integration unifies the registration view into a grounded card hierarchy and aligns root browser title metadata (`DEC-UIUX-107`, `DEC-UIUX-108`):
+- **Frontend impact:** `MINOR`
+- **Selected UI direction:** `Premium Minimal Ops`
+- **Existing color template:** `UNCHANGED`
+- **Selected motion effects:** `Button hover`
+- **21st.dev MCP:** `VALIDATED & APPLIED` (Lightweight structural inspiration for clean border-anchored card hierarchy)
+
+#### Presentation and Structure Rules
+1. **Unified Structural Card Hierarchy (`apps/web/app/(auth)/register/register-view.tsx`):**
+   - **Elimination of Floating Header:** The previously detached `<header className="top-0 sticky bg-background ...">` is integrated directly into the top of the registration card container.
+   - **Grounded Surface:** Replaces floating detached bento segments with a unified, solid container (`bg-surface-container-lowest`), clean borders (`border border-outline-variant/60`), subtle elevation (`shadow-[0_4px_24px_rgba(0,0,0,0.06)]`), and `rounded-2xl`.
+   - **Internal Visual Flow:** Back navigation button, view title (`Account Registration`), step indicator, and institutional partner logo (`/logo1.webp`) align cohesively within the card header.
+   - **Role Cards & Inputs:** Role option cards (`OWNER / PIC` and `ADMINISTRATOR`) feature solid surfaces with controlled green accents (`border-2 border-primary` on selection, emerald badge checkmarks). Form inputs and submission buttons maintain high-touch ergonomics (`h-[52px]`).
+2. **Strict Prohibition of Glassmorphism:**
+   - No `backdrop-blur`, semi-transparent cards, or heavy raster background images. Surfaces remain 100% solid white (`#ffffff` / `bg-surface-container-lowest`), ensuring maximum legibility, contrast, and zero layout shift.
+3. **Calibrated Background Mesh (`apps/web/components/layout/AppBackground.tsx`):**
+   - Calibrated organic vector curves to a calm, non-dominant agricultural palette (`#f3f7f0` to `#ddecd8`) with soft translucency (`opacity 0.15 - 0.35`) and subtle center-focused radial luminance (`from-white/30 via-transparent to-transparent`).
+   - Pure inlined vector SVG (<2KB) with zero network requests and zero runtime layout shifts (CLS = 0).
+4. **Browser Tab Title Metadata Standardization (`apps/web/app/layout.tsx`):**
+   - Standardized root Next.js App Router metadata `title.default` and `title.template` from `"Kebun Melon - Smart Farming"` to `"Melon Governance"`.
+   - Unifies the browser tab title across all pages that inherit root metadata (e.g. `/register`, `/login`) to display `"Melon Governance"`.
+5. **Staging Impact**:
+   - Frontend and documentation only. No Supabase database migration, edge function deployment, or container update required.
+
 ---
-
-
 
 ## 2. Source-of-Truth Hierarchy
 

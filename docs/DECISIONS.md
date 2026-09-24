@@ -1247,3 +1247,52 @@ The following facts are supported by the verified decisions governance of `TASK-
      - Preserved Owner account presentation strictly as `OWNER / PIC`.
 <!-- TASK-0212 Reconciled: 2026-09-21 -->
 
+---
+
+## DEC-UIUX-107: Registration Page Visual Integration & Grounded Card Hierarchy
+- **Status:** APPROVED & IMPLEMENTED (2026-09-24)
+- **Related Task IDs:** `TASK-0203`, `TASK-0214`
+- **Context:**
+  The registration screen (`apps/web/app/(auth)/register/register-view.tsx`) previously rendered an isolated sticky `<header>` outside `<main>`, causing a detached, floating top navigation bar separate from the form card. Additionally, foreground components felt disconnected against the organic green background. The interface required visual integration without introducing glassmorphism, transparent milky cards, or backdrop blur filters.
+- **Decision & Implementation Directives:**
+  1. **Unified Structural Card Container**:
+     - Integrated the navigation back button, view title (`Account Registration`), step indicator, and institutional logo (`/logo1.webp`) into the primary card header.
+     - Anchored the container as a grounded, solid surface (`bg-surface-container-lowest`), subtle elevation (`shadow-[0_4px_24px_rgba(0,0,0,0.06)]`), and clean borders (`border border-outline-variant/60`, `rounded-2xl`).
+  2. **Strict Prohibition of Glassmorphism**:
+     - No `backdrop-blur` or semi-transparent cards. All surfaces are 100% solid, maintaining high contrast and crisp typography.
+  3. **Calibrated Background Dominance**:
+     - Calibrated the organic vector mesh in `AppBackground.tsx` to a calm agricultural palette (`#f3f7f0` to `#ddecd8`) with soft translucency (`opacity 0.15 - 0.35`) and center-focused radial luminance, preventing the background from overpowering operational content.
+  4. **Preservation of Core Architecture & Responsive Invariants**:
+     - Zero changes to validation schemas, translation dictionaries, or API endpoints. Touch target ergonomics (`h-[52px]`) and mobile responsiveness (`390px` to desktop) verified.
+  5. **Staging Impact**:
+     - Frontend/documentation only. No Supabase migrations, edge function deployments, or container updates required.
+<!-- Reconciled: 2026-09-24 -->
+
+---
+
+## DEC-UIUX-108: Application Root Title & Metadata Standardization ("Melon Governance")
+- **Status:** APPROVED & IMPLEMENTED (2026-09-24)
+- **Related Task IDs:** `TASK-0214`
+- **Context:**
+  Following the standardization of customer-facing transactional emails (`DEC-AUTH-110`) and frontend copy to "Melon Governance", the root Next.js metadata default title in `apps/web/app/layout.tsx` still defined `"Kebun Melon - Smart Farming"`, causing the browser tab to display legacy branding on views lacking route-level titles (e.g., `/register`, `/login`).
+- **Decision & Implementation Directives:**
+  1. **Root Layout Metadata Standardization**:
+     - In `apps/web/app/layout.tsx`, updated `metadata.title` to:
+       ```typescript
+       export const metadata: Metadata = {
+         title: {
+           default: 'Melon Governance',
+           template: '%s | Melon Governance',
+         },
+         // ...
+       };
+       ```
+  2. **Browser Tab Title Verification**:
+     - Browser tab title verified via browser evaluation to display `"Melon Governance"` across authentication views.
+  3. **Scope & Invariants**:
+     - Strictly frontend metadata configuration. No modifications to Supabase configuration, database schemas, API routes, authentication logic, environment variables, or container configurations.
+  4. **Staging Impact**:
+     - Frontend/documentation only. No Supabase migrations, edge function deployments, or container updates required.
+<!-- Reconciled: 2026-09-24 -->
+
+

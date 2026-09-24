@@ -255,6 +255,23 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
       - Unit Tests: Added dedicated regression test suite `apps/web/test/unit/branding-cleanup.test.tsx` (7/7 tests passed).
       - Full Workspace Tests: `npm test` executed across all 4 monorepo packages (`apps/web`, `apps/iot-gateway`, `packages/database`, `packages/contracts`) with 100% pass rate (125/125 test suites, 1,300/1,300 tests passed).
       - Playwright Browser Verification: Navigated to `/register` in both Indonesian (`locale=id`) and English (`locale=en`); confirmed role card title renders exactly `"OWNER / PIC"` and all visible "Kebun Melon" copy is completely absent.
+- 2026-09-24 Registration Visual Integration & Browser Title Metadata Record:
+  - Status: `DONE` (Completed 2026-09-24)
+  - Frontend impact: `MINOR`
+  - Selected UI direction: `Premium Minimal Ops`
+  - Existing color template: `UNCHANGED`
+  - Selected motion effects: `Button hover`
+  - 21st.dev MCP: `VALIDATED & APPLIED` (Lightweight structural inspiration for clean border-anchored card hierarchy)
+  - Summary: Refined the registration page visual integration into a grounded card hierarchy and standardized the root application browser tab title metadata (`DEC-UIUX-107`, `DEC-UIUX-108`):
+    - Registration Visual Integration: Eliminated the detached, floating `<header>` from `apps/web/app/(auth)/register/register-view.tsx` and unified the top navigation, view title, step indicator, and institutional partner logo (`/logo1.webp`) inside the primary card container (`bg-surface-container-lowest`, `border border-outline-variant/60`, `shadow-[0_4px_24px_rgba(0,0,0,0.06)]`, `rounded-2xl`).
+    - Grounded Surfaces & Zero Glassmorphism: Preserved strictly solid, opaque surfaces without `backdrop-blur`, translucent glass cards, or heavy animations, maintaining high-contrast readability across responsive viewports (`390px` mobile to desktop).
+    - Calibrated Organic Background: Reduced background visual dominance in `AppBackground.tsx` and mesh SVGs via a gentle agricultural pastel palette (`#f3f7f0` to `#ddecd8`) with soft translucency (`opacity 0.15 - 0.35`) and center-focused radial luminance, ensuring CLS = 0 and pure vector SVG (<2KB) execution.
+    - Browser Title Metadata Standardization: Updated Next.js root metadata (`apps/web/app/layout.tsx`) `title.default` and `title.template` from `"Kebun Melon - Smart Farming"` to `"Melon Governance"`.
+    - Verification Results:
+      - TypeScript Check: `npm run typecheck:web` (`tsc --noEmit`) passed with 0 errors across `apps/web`.
+      - Unit Tests: All 87 test suites in `apps/web` passed (including `app-background.test.tsx` and `branding-cleanup.test.tsx`).
+      - Browser Title Verification: Evaluated `document.title` on `/register` and `/login` via Playwright, confirming `"Melon Governance"`.
+    - Staging Impact: Frontend and documentation only. No Supabase database migration, edge function deployment, or container update required.
 
 #### TASK-0215 Governance Record
 

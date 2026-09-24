@@ -13,6 +13,7 @@ import {
 import idMessages from '@/messages/id.json';
 import enMessages from '@/messages/en.json';
 import { getSessionOrNull } from '@/lib/auth/rbac';
+import AppBackground from '@/components/layout/AppBackground';
 
 // Re-evaluated layout message bundle
 const MESSAGES = {
@@ -35,8 +36,8 @@ async function getLayoutLocaleAndMessages() {
 
 export const metadata: Metadata = {
   title: {
-    default: 'Kebun Melon - Smart Farming',
-    template: '%s | Kebun Melon',
+    default: 'Melon Governance',
+    template: '%s | Melon Governance',
   },
   description:
     'Kelola lahan melon Anda dengan lebih mudah. Monitor NPK, air, dan kesehatan tanaman secara real-time.',
@@ -55,7 +56,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   return (
     <html lang={locale} data-scroll-behavior="smooth">
-      <body className="min-h-dvh font-sans antialiased">
+      <body className="min-h-dvh font-sans antialiased relative">
+        <AppBackground />
         <NextIntlClientProvider locale={locale} messages={messages}>
           <AuthProvider initialSession={session}>
             <DeviceProvider>{children}</DeviceProvider>
