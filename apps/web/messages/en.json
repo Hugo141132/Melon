@@ -846,6 +846,12 @@
     "staleNotice": "Telemetry data is stale — recommendation is based on earlier data.",
     "offlineNotice": "Device is offline — recommendation reflects last known data.",
     "advisoryDisclaimer": "Recommendations are agronomic advice and do not automatically control water pumps.",
-    "lastUpdated": "Updated {time}"
+    "lastUpdated": "Updated {time}",
+    "badgeAiIntelligence": "Agronomic AI Intelligence",
+    "summaryTitle": "AI Diagnostic Summary",
+    "impactPrefix": "Impact",
+    "detectedCount": "{count} Issues",
+    "actionsCount": "{count} Steps",
+    "currentValue": "Value"
   }
 }

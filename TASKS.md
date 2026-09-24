@@ -2035,21 +2035,30 @@ This task integrates an external prediction adapter into the Melon application t
      - [x] Provide `pb-24` mobile navigation bar clearance on `/water`.
      - [x] Add 20 unit tests across `use-latest-prediction.test.ts` (5/5), `recommendation-card.test.tsx` (7/7), and `soil-telemetry-ui.test.tsx` (8/8).
      - [x] Verify full web suite pass rate (83/83 test files, 697/697 tests passed) and zero TypeScript errors across 4 workspaces.
+     - [x] **2026-09-24 Soft Bento Dashboard & Bilingual Telemetry Refinement (DONE):**
+       - Redesigned `RecommendationCard.tsx` from `Premium Minimal Ops` to `Soft Bento Dashboard` direction inspired by 21st.dev MCP.
+       - Implemented dedicated translation helper `apps/web/lib/recommendation-i18n.ts` for parameter names, issues, impacts, actions, and summary messages.
+       - Standardized `recommendation` namespace in `messages/id.json` and `messages/en.json` (20 keys, 100% key parity).
+       - Expanded `recommendation-card.test.tsx` to 9 tests with dedicated English and Indonesian locale validation.
+       - Verified 100% test pass rate across all 129 test files (1,328 tests passed) and 0 typecheck errors.
      - **Changed Files:**
        - `apps/web/hooks/useLatestPrediction.ts` (NEW: polling hook with race-condition guard)
-       - `apps/web/components/monitoring/RecommendationCard.tsx` (NEW: 4-state reusable UI card)
+       - `apps/web/components/monitoring/RecommendationCard.tsx` (REFINED: Soft Bento Dashboard UI card with bilingual support)
+       - `apps/web/lib/recommendation-i18n.ts` (NEW: bilingual telemetry and ML translation helper)
        - `apps/web/app/soil/page.tsx` (MODIFIED: integrated RecommendationCard for soil domain)
        - `apps/web/app/water/page.tsx` (MODIFIED: integrated RecommendationCard for water domain with pb-24)
-       - `apps/web/messages/id.json` (MODIFIED: 14 Indonesian recommendation keys)
-       - `apps/web/messages/en.json` (MODIFIED: 14 English recommendation keys, 100% parity)
+       - `apps/web/messages/id.json` (MODIFIED: 20 Indonesian recommendation keys)
+       - `apps/web/messages/en.json` (MODIFIED: 20 English recommendation keys, 100% parity)
        - `apps/web/test/unit/use-latest-prediction.test.ts` (NEW: 5 hook unit tests)
-       - `apps/web/test/unit/recommendation-card.test.tsx` (NEW: 7 card unit tests)
+       - `apps/web/test/unit/recommendation-card.test.tsx` (REFINED: 9 card unit tests including bilingual suites)
        - `apps/web/test/unit/soil-telemetry-ui.test.tsx` (MODIFIED: updated mock routing and added integration test)
      - **Verification Evidence:**
-       - *Focused Unit Tests (PASSED):* 20/20 passed (100%) across `recommendation-card.test.tsx`, `use-latest-prediction.test.ts`, `soil-telemetry-ui.test.tsx`.
-       - *Full Web Workspace Suite (PASSED):* 83/83 test files passed, 697/697 tests passed (100%).
+       - *Focused Unit Tests (PASSED):* 22/22 passed (100%) across `recommendation-card.test.tsx` (9/9), `use-latest-prediction.test.ts` (5/5), `soil-telemetry-ui.test.tsx` (8/8).
+       - *Full Web Workspace Suite (PASSED):* 87/87 test files passed, 730/730 tests passed (100%).
+       - *Monorepo Test Suite (PASSED):* 129/129 test files passed, 1,328/1,328 tests passed (100%).
+       - *Translation Completeness Check (PASSED):* `npm run i18n:check` verified 100% key parity.
        - *Static Typecheck (PASSED):* `npm run typecheck` passed with 0 errors across 4 workspaces (`contracts`, `database`, `iot-gateway`, `web`).
-       - *Visual & State Verification:* Verified loading skeleton (`aria-busy="true"`), empty state (`Belum Ada Rekomendasi`), populated states (Optimal emerald, Warning amber, Critical rose), stale/offline warning banner, and advisory safety disclaimer.
+       - *Visual & State Verification:* Verified Soft Bento Dashboard cards, loading skeleton (`aria-busy="true"`), empty state (`Belum Ada Rekomendasi`), populated states (Optimal emerald, Warning amber, Critical rose), stale/offline warning banner, and advisory safety disclaimer.
 
 ### 4. Audited ML Classification Standards & Threshold Matrix
 

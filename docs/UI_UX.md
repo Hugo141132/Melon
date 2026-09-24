@@ -36,20 +36,29 @@ All Next.js App Router layouts, operational views, cards, modals, controls, and 
 ### 1.3 TASK-0413 Phase D — Dynamic Dashboard Recommendation Cards Governance & UI Specification
 `TASK-0413 Phase D` binds external ML predictions and agronomic recommendations to the Soil (`/soil`) and Water Quality (`/water`) monitoring views:
 - **Frontend impact:** `MINOR`
-- **Selected UI direction:** `Premium Minimal Ops`
+- **Selected UI direction:** `Soft Bento Dashboard` (Reconciled 2026-09-24 from `Premium Minimal Ops`)
 - **Existing color template:** `UNCHANGED`
 - **Selected motion effects:** `Skeleton loading`, `Card hover`, `Healthy status`, `Critical alert`
-- **21st.dev MCP:** `NOT REQUIRED`
+- **21st.dev MCP:** `VALIDATED & APPLIED` (Inspired by modern bento dashboard cards, metric pills, and AI recommendation structures)
 
-#### Presentation and State Rules
-1. **Visual Hierarchy & Tokens**: The card reuses established tokens (`bg-app-surface-container-lowest`, `soft-elevation`, `border-app-outline-variant/20`, `rounded-xl`, `p-5`, `text-app-on-surface`, `text-app-on-surface-variant`). Card title uses domain-specific headers (`Rekomendasi Pemupukan & Tanah` / `Rekomendasi Kualitas Air`) preceded by a subtle `Sparkles` icon.
-2. **Four Operational States**:
-   - *Loading Skeleton State*: Displays a pulsing placeholder (`animate-pulse`) with `aria-busy="true"` adhering to non-blocking UX.
-   - *Empty / Unavailable State*: Renders clean empty notification (`Belum Ada Rekomendasi` / `No Recommendations Yet`) with informational helper text without disrupting the dashboard structure.
-   - *Populated State*: Displays classification pill badge (`Optimal` in emerald `bg-emerald-500/10 text-emerald-700`, `Peringatan` in amber `bg-amber-500/10 text-amber-800`, `Kritis` in rose `bg-rose-500/10 text-rose-700`), rounded confidence percentage (`Keyakinan {value}%`), bold summary text, diagnostic issue cards, and suggested farmer action items.
+#### Presentation and State Rules (Soft Bento Dashboard)
+1. **Visual Hierarchy & Tokens**:
+   - The card utilizes an elevated, softly structured container (`rounded-2xl`, `p-5 sm:p-6`, `border-app-outline-variant/30`, `bg-app-surface-container-lowest`, `shadow-[0_4px_24px_rgba(0,0,0,0.04)]`).
+   - Card title includes a domain-specific header preceded by an AI intelligence badge (`Agronomic AI Intelligence` / `Kecerdasan AI Agronomi`).
+   - Status pill cluster integrates a confidence indicator with an activity pulse icon and a classification pill with a status indicator dot (`Optimal` in emerald, `Peringatan` in amber, `Kritis` in rose).
+2. **AI Diagnostic Summary Card**:
+   - Dedicated bento summary callout card with a color accent border matching prediction severity, delivering clear diagnostic assessments without mixed-language phrasing.
+3. **Responsive Bento Sub-Grid**:
+   - Arranged as a responsive grid (`grid-cols-1 lg:grid-cols-12 gap-5`):
+     - *Detected Issues Sub-Grid* (`lg:col-span-7`): Parameter diagnostic cards with localized parameter names, current sensor values with units (e.g. `%`, `°C`, `µS/cm`, `ppm`, `mg/kg`), problem severity tags, and agronomic impact callout boxes with localized labels (`Impact` / `Dampak`).
+     - *Suggested Actions Sub-Grid* (`lg:col-span-5`): Agronomic action checklist cards with interactive step indicators and hover effects, or optimal reassurance state with checkmark badge.
+4. **Four Operational States**:
+   - *Loading Skeleton State*: Displays a pulsing bento grid placeholder (`animate-pulse`) with `aria-busy="true"`.
+   - *Empty / Unavailable State*: Renders clean empty notification (`Belum Ada Rekomendasi` / `No Recommendations Yet`) with informational helper box without disrupting dashboard structure.
+   - *Populated State*: Displays full bento intelligence layout with badges, summary, issues, and action checklist.
    - *Stale / Offline Notice*: Renders an inline amber warning banner when sensor telemetry is stale or device connection is offline.
-3. **Advisory Safety Disclaimer (Mandatory)**: Every card includes an explicit footer note: `"Rekomendasi bersifat saran agronomi dan tidak mengontrol pompa air secara otomatis."` (`advisoryDisclaimer`), enforcing `DEC-MON-090` / `ENABLE_FAUCET_CONTROL=false` safety guarantees.
-4. **Mobile Layout Clearance**: `/water` page padding is bounded to `pb-24` ensuring complete clearance above fixed mobile navigation bars across all responsive viewports.
+5. **Advisory Safety Disclaimer (Mandatory)**: Every card includes an explicit footer note: `"Rekomendasi bersifat saran agronomi dan tidak mengontrol pompa air secara otomatis."` (`advisoryDisclaimer`), enforcing `DEC-MON-090` / `ENABLE_FAUCET_CONTROL=false` safety guarantees.
+6. **Mobile Layout Clearance**: `/water` page padding is bounded to `pb-24` ensuring complete clearance above fixed mobile navigation bars across all responsive viewports.
 
 ### 1.4 Language Gate & Login Screen UI Refinements Governance & UI Specification (2026-09-19)
 The 2026-09-19 UI refinements optimize the entry experience for agricultural workers and farmer groups:

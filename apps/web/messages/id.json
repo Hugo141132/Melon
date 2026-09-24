@@ -846,6 +846,12 @@
     "staleNotice": "Data telemetri kedaluwarsa — rekomendasi berdasarkan data sebelumnya.",
     "offlineNotice": "Perangkat offline — rekomendasi mencerminkan data terakhir.",
     "advisoryDisclaimer": "Rekomendasi bersifat saran agronomi dan tidak mengontrol pompa air secara otomatis.",
-    "lastUpdated": "Diperbarui {time}"
+    "lastUpdated": "Diperbarui {time}",
+    "badgeAiIntelligence": "Kecerdasan AI Agronomi",
+    "summaryTitle": "Ringkasan Diagnosis AI",
+    "impactPrefix": "Dampak",
+    "detectedCount": "{count} Masalah",
+    "actionsCount": "{count} Langkah",
+    "currentValue": "Nilai"
   }
 }

@@ -564,6 +564,20 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
     - Water Optimal: `pH: 6.2, TDS: 420 ppm, EC: 450 µS/cm` $\to$ `optimal`.
     - Water Warning: `pH: 6.2, TDS: 420 ppm, EC: 900 µS/cm` $\to$ `warning`.
     - Water Critical: `pH: 6.2, TDS: 420 ppm, EC: 2200 µS/cm` $\to$ `kritis`.
+- 2026-09-24 Soft Bento Dashboard & Bilingual Telemetry Governance Record:
+  - Status: `DONE` (Completed 2026-09-24)
+  - Frontend impact: `MINOR`
+  - Selected UI direction: `Soft Bento Dashboard` (Departing from `Premium Minimal Ops` per task specification)
+  - Existing color template: `UNCHANGED`
+  - Selected motion effects: `Skeleton loading`, `Card hover`, `Healthy status`, `Critical alert`
+  - 21st.dev MCP: `VALIDATED & APPLIED` (Inspired by bento dashboard cards, metric pills, and AI recommendation structures)
+  - Summary: Refined the Machine Learning Recommendation UI component (`apps/web/components/monitoring/RecommendationCard.tsx`) into a modern, polished agricultural intelligence dashboard component:
+    - Soft Bento Dashboard Layout: Elevated outer card container (`rounded-2xl`, `p-5 sm:p-6`, `border-app-outline-variant/30`, `bg-app-surface-container-lowest`, `shadow-[0_4px_24px_rgba(0,0,0,0.04)]`) with high-tech AI micro-badge (`badgeAiIntelligence`), title, confidence pill with activity pulse, severity pill badge with indicator dot, distinct AI diagnostic summary callout card with severity accent border, and a responsive bento sub-grid (`lg:grid-cols-12`).
+    - Detected Issues Sub-Grid (`lg:col-span-7`): Parameter diagnostic cards rendering bilingual parameter names, sensor values with units (`%`, `°C`, `µS/cm`, `ppm`, `mg/kg`), problem severity tags, and agronomic impact callout boxes with localized labels (`Impact` / `Dampak`).
+    - Suggested Actions Sub-Grid (`lg:col-span-5`): Action checklist cards with interactive step indicators and hover effects, or optimal reassurance state with checkmark badge.
+    - Full Internationalization Consistency: Implemented `apps/web/lib/recommendation-i18n.ts` translation helper for canonical ML strings, parameter names, diagnostic problems, impacts, action checklists, and summary phrases. Added 6 new keys to `messages/id.json` and `messages/en.json` maintaining 100% key and ICU placeholder parity. Completely eliminated mixed-language leaks (such as "parameter soil" in Indonesian or Indonesian labels in English) while keeping backend canonical values untouched.
+    - Invariants Preserved: Stale warning banner, 4 operational states, mobile responsiveness, and mandatory advisory disclaimer (`advisoryDisclaimer`) strictly maintained.
+    - Verification Results: 9/9 tests passed in `recommendation-card.test.tsx` (including English and Indonesian full render tests), translation completeness passed (`npm run i18n:check`), TypeScript typecheck passed with 0 errors across `apps/web`, and all monorepo test suites passed (129 files, 1,328 tests passed).
 
 #### TASK-0415 Governance Record
 
