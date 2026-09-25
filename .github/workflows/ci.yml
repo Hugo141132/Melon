@@ -35,6 +35,7 @@ jobs:
       NODE_ENV: test
       CI: 'true'
       DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/kebun_melon_test?schema=public
+      DIRECT_URL: postgresql://postgres:postgrespassword@localhost:5432/kebun_melon_test?schema=public
       JWT_SECRET: ci-test-jwt-secret-key-at-least-32-chars-long
       NEXTAUTH_SECRET: ci-test-nextauth-secret-at-least-32-chars-long
       FIRST_OWNER_PROVISIONING_SECRET: ci-test-provisioning-secret-at-least-32-chars-long
