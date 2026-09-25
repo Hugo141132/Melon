@@ -1,15 +1,16 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@kebun-melon/database';
 import {
-  loginUser,
-  InvalidCredentialsError,
+  verifySessionRecoveryChallenge,
+  InvalidRecoveryOtpError,
+  ExpiredRecoveryOtpError,
+  MaxRecoveryAttemptsExceededError,
+  ChallengeNotFoundError,
   AccountStatusForbiddenError,
   SESSION_COOKIE_NAME,
   SESSION_ABSOLUTE_LIFETIME_SECONDS,
-  UnverifiedEmailError,
-  ActiveSessionExistsError,
 } from '@kebun-melon/database';
-import { AccountStatus, LoginInputSchema } from '@kebun-melon/contracts';
+import { SessionRecoveryVerifyInputSchema } from '@kebun-melon/contracts';
 import { ZodError } from 'zod';
 import {
   checkRateLimit,
@@ -18,17 +19,17 @@ import {
   applyRateLimitToResponse,
 } from '@/lib/rate-limit';
 import { validateServerEnv } from '@/lib/env/server';
-import { extractSessionTokenFromRequest } from '@/lib/auth/rbac';
 
 export async function POST(request: Request) {
-  const requestId = `req-${Date.now()}`;
+  const requestId = `req-rec-ver-${Date.now()}`;
   const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || undefined;
   const userAgent = request.headers.get('user-agent') || undefined;
 
   const env = validateServerEnv();
   const clientIp = getClientIp(request);
+
   const rateLimitInfo = checkRateLimit(clientIp, {
-    keyPrefix: 'login',
+    keyPrefix: 'session-recovery-verify',
     limit: env.RATE_LIMIT_LOGIN_MAX,
     windowMs: env.RATE_LIMIT_WINDOW_MS,
   });
@@ -38,13 +39,11 @@ export async function POST(request: Request) {
   }
 
   try {
-    const existingToken = await extractSessionTokenFromRequest(request);
-    const body = LoginInputSchema.parse(await request.json().catch(() => ({})));
-    const result = await loginUser(prisma, body, {
+    const body = SessionRecoveryVerifyInputSchema.parse(await request.json().catch(() => ({})));
+    const result = await verifySessionRecoveryChallenge(prisma, body, {
       ipAddress,
       userAgent,
       requestId,
-      existingToken,
     });
 
     const primaryRole = result.user.activeRoles[0] ?? 'ADMIN';
@@ -70,6 +69,7 @@ export async function POST(request: Request) {
       { status: 200 }
     );
 
+    // Set new session HttpOnly cookie
     response.cookies.set(SESSION_COOKIE_NAME, result.rawToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -96,75 +96,80 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     } else if (
-      error instanceof InvalidCredentialsError ||
-      error?.name === 'InvalidCredentialsError'
+      error instanceof InvalidRecoveryOtpError ||
+      error?.name === 'InvalidRecoveryOtpError'
     ) {
       errResponse = NextResponse.json(
         {
           success: false,
           error: {
-            code: 'INVALID_CREDENTIALS',
+            code: 'INVALID_OTP',
+            message: error.message,
+            remainingAttempts: error.remainingAttempts,
+          },
+          meta: { requestId },
+        },
+        { status: 400 }
+      );
+    } else if (
+      error instanceof ExpiredRecoveryOtpError ||
+      error?.name === 'ExpiredRecoveryOtpError'
+    ) {
+      errResponse = NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'OTP_EXPIRED',
             message: error.message,
           },
           meta: { requestId },
         },
-        { status: 401 }
+        { status: 410 }
+      );
+    } else if (
+      error instanceof MaxRecoveryAttemptsExceededError ||
+      error?.name === 'MaxRecoveryAttemptsExceededError'
+    ) {
+      errResponse = NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'MAX_ATTEMPTS_EXCEEDED',
+            message: error.message,
+          },
+          meta: { requestId },
+        },
+        { status: 429 }
+      );
+    } else if (
+      error instanceof ChallengeNotFoundError ||
+      error?.name === 'ChallengeNotFoundError'
+    ) {
+      errResponse = NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'CHALLENGE_NOT_FOUND',
+            message: error.message,
+          },
+          meta: { requestId },
+        },
+        { status: 404 }
       );
     } else if (
       error instanceof AccountStatusForbiddenError ||
       error?.name === 'AccountStatusForbiddenError'
     ) {
-      let code = 'ACCOUNT_FORBIDDEN';
-      if (error.status === AccountStatus.PENDING_APPROVAL) {
-        code = 'ACCOUNT_PENDING_APPROVAL';
-      } else if (error.status === AccountStatus.APPROVED) {
-        code = 'ACCOUNT_APPROVED_NOT_ACTIVE';
-      } else if (error.status === AccountStatus.REJECTED) {
-        code = 'ACCOUNT_REJECTED';
-      } else if (error.status === AccountStatus.SUSPENDED) {
-        code = 'ACCOUNT_SUSPENDED';
-      } else if (error.status === AccountStatus.DEACTIVATED) {
-        code = 'ACCOUNT_DEACTIVATED';
-      }
-
       errResponse = NextResponse.json(
         {
           success: false,
           error: {
-            code,
+            code: 'ACCOUNT_FORBIDDEN',
             message: error.message,
           },
           meta: { requestId },
         },
         { status: 403 }
-      );
-    } else if (error instanceof UnverifiedEmailError || error?.name === 'UnverifiedEmailError') {
-      errResponse = NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: 'EMAIL_NOT_VERIFIED',
-            message: error.message,
-          },
-          meta: { requestId },
-        },
-        { status: 403 }
-      );
-    } else if (
-      error instanceof ActiveSessionExistsError ||
-      error?.name === 'ActiveSessionExistsError'
-    ) {
-      errResponse = NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: 'ACTIVE_SESSION_EXISTS',
-            message: error.message,
-            canRecover: true,
-          },
-          meta: { requestId },
-        },
-        { status: 409 }
       );
     } else {
       errResponse = NextResponse.json(
@@ -172,13 +177,14 @@ export async function POST(request: Request) {
           success: false,
           error: {
             code: 'INTERNAL_ERROR',
-            message: 'An unexpected internal error occurred during login.',
+            message: 'An unexpected internal error occurred while verifying recovery code.',
           },
           meta: { requestId },
         },
         { status: 500 }
       );
     }
+
     applyRateLimitToResponse(errResponse, rateLimitInfo);
     return errResponse;
   }

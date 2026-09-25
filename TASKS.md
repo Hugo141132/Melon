@@ -1177,6 +1177,60 @@ Unified all authentication token validity lifetimes and UI resend cooldown timer
 
 ---
 
+## TASK-0218 — OTP-Based Single-Session Force-Recovery Flow
+
+**Priority:** `P0`
+**Status:** `DONE`
+**Dependencies:** `TASK-0204`, `TASK-0217`, `DEC-AUTH-107`
+**Completed:** 2026-09-25 (Implementation, database migration, API routes, email notification, UI modal, and test suites complete; 100% test pass rate across all auth and database test suites)
+
+### Work
+
+1. **Database Schema & Migration (`packages/database`):**
+   - Added `SessionRecoveryChallenge` model with fields `id (UUID)`, `userId`, `otpHash (CHAR 64)`, `expiresAt`, `maxAttempts (3)`, `attempts`, `usedAt`, `createdAt`.
+   - Created Prisma migration `20260925150000_add_session_recovery_challenges` and deployed to PostgreSQL 17 Singapore Dev (`unbyxlkrzqlafolxcypi`).
+   - Configured Prisma dual-connection architecture (`directUrl = env("DIRECT_URL")`) in `packages/database/prisma/schema.prisma` so CLI migrations use port 5432 (Session Mode Pooler / direct) supporting `pg_advisory_lock`, while runtime continues on port 6543 (Transaction Pooler).
+2. **Contracts (`packages/contracts`):**
+   - Added `AuditEventKey.AUTH_SESSION_FORCE_RECOVERED = 'auth.session.force_recovered'`.
+   - Added `SessionRecoveryChallengeInputSchema` and `SessionRecoveryVerifyInputSchema`.
+3. **Session Recovery Service (`packages/database/src/session-service.ts`):**
+   - Added `hashRecoveryOtp(challengeId, otp)` with SHA-256 salted hashing.
+   - Added `createSessionRecoveryChallenge(prisma, input)` requiring valid credentials and unrevoked active session before generating 60-second 6-digit OTP.
+   - Added `verifySessionRecoveryChallenge(prisma, input, metadata)` with timing-safe comparison, 3-attempt limit, and atomic interactive transaction that locks the user row (`SELECT id FROM users WHERE id = $1 FOR UPDATE`), marks challenge used, revokes all previous active sessions, creates exactly one new session, and writes synchronous audit log.
+4. **Email Delivery via Resend (`apps/web/lib/email/resend.ts`):**
+   - Added `sendSessionRecoveryOtpEmail` with bilingual HTML/text templates, brand header "Melon Governance", inline PNG attachment, monospace 6-digit OTP box, 60-second expiration notice, and security warning.
+5. **API Routes (`apps/web`):**
+   - Updated `POST /api/v1/auth/login` to return HTTP 409 `ACTIVE_SESSION_EXISTS` with metadata `canRecover: true`.
+   - Created `POST /api/v1/auth/session-recovery/challenge`.
+   - Created `POST /api/v1/auth/session-recovery/verify` setting new HttpOnly `session_token` cookie.
+6. **Frontend UI (`apps/web/app/(auth)/login/login-view.tsx`):**
+   - Consolidated `ACTIVE_SESSION_EXISTS` alert copy into a direct question as primary text (*"Your account currently has an active session on another browser or device. Would you like to terminate that session and sign in on this device?"* / *"Akun Anda saat ini memiliki sesi aktif di browser atau perangkat lain. Apakah Anda ingin mengakhiri sesi tersebut dan masuk di perangkat ini?"*), removing duplicate secondary body text.
+   - Added Session Recovery Modal appearing on "Send Recovery Code" click, featuring auto-focused 6-digit OTP input, live 60-second countdown timer, resend button upon expiry, and safe cancel dismissal.
+   - Added bilingual translation keys to `messages/id.json` and `messages/en.json`.
+7. **Test Suites & Verification:**
+   - `packages/database/test/session-recovery.test.ts` (13/13 tests passed)
+   - `apps/web/test/unit/login-view-recovery.test.tsx` (6/6 tests passed)
+   - `apps/web/app/api/v1/auth/session-recovery/challenge/test/route.test.ts` (7/7 tests passed)
+   - `apps/web/app/api/v1/auth/session-recovery/verify/test/route.test.ts` (8/8 tests passed)
+   - All existing session tests (`session-service.test.ts`, `session-revocation.unit.test.ts`, `login/test/route.test.ts`) remain 100% passing (34/34 tests across 5 suites).
+   - Monorepo TypeScript typecheck: 0 errors across 4 packages.
+   - Manual end-to-end browser verification passed.
+
+### Acceptance Criteria
+
+- [x] Active session returns HTTP 409 `ACTIVE_SESSION_EXISTS` with `canRecover: true` without revoking existing session.
+- [x] Requesting challenge requires valid email and password.
+- [x] OTP is 6 digits, salted, hashed via SHA-256 (not stored plaintext), and valid for 60 seconds.
+- [x] Verification is single-use and limited to max 3 attempts.
+- [x] Successful verification atomically row-locks user, marks challenge consumed, revokes previous active sessions, creates single active session, sets HttpOnly cookie, and writes `auth.session.force_recovered` audit log.
+- [x] Strict single active session invariant ($\le 1$) preserved (`DEC-AUTH-107`).
+- [x] Modal UI on `/login` handles challenge creation, OTP input, 60s countdown timer, resend upon expiry, and successful redirect.
+- [x] Consolidated recovery alert copy in login view renders clean single message without duplicate body text.
+- [x] Prisma dual-connection architecture (`directUrl`) configured and deployed on Dev without hanging.
+- [x] All automated tests pass and monorepo TypeScript typecheck has 0 errors.
+
+---
+
 # 11. Phase 3 — Device Registry and Access
 
 ## TASK-0301 — Implement Site Model

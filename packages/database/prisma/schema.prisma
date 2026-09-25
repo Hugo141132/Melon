@@ -7,8 +7,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // -----------------------------------------------------------------------------
@@ -103,6 +104,7 @@ model User {
   sessions             Session[]
   passwordResetTokens  PasswordResetToken[]
   emailVerificationTokens EmailVerificationToken[]
+  sessionRecoveryChallenges SessionRecoveryChallenge[]
   actedAuditLogs       AuditLog[]             @relation("AuditLogActor")
 
   @@index([accountStatus], map: "users_account_status_idx")
@@ -584,6 +586,23 @@ model EmailVerificationToken {
   @@index([userId], map: "email_verification_tokens_user_id_idx")
   @@index([expiresAt], map: "email_verification_tokens_expires_at_idx")
   @@map("email_verification_tokens")
+}
+
+model SessionRecoveryChallenge {
+  id          String    @id @default(uuid()) @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  otpHash     String    @map("otp_hash") @db.VarChar(128)
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(3) @map("max_attempts")
+  expiresAt   DateTime  @map("expires_at") @db.Timestamptz
+  consumedAt  DateTime? @map("consumed_at") @db.Timestamptz
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "session_recovery_challenges_user_id_idx")
+  @@index([expiresAt], map: "session_recovery_challenges_expires_at_idx")
+  @@map("session_recovery_challenges")
 }
 
 // -----------------------------------------------------------------------------

@@ -7,6 +7,8 @@ import {
   toPublicSafeUserDto,
   normaliseEmail,
   LoginInputSchema,
+  SessionRecoveryChallengeInputSchema,
+  SessionRecoveryVerifyInputSchema,
   RawDbUserWithRoles,
   AuditEventKey,
 } from '@kebun-melon/contracts';
@@ -40,9 +42,44 @@ export class UnverifiedEmailError extends Error {
 }
 
 export class ActiveSessionExistsError extends Error {
-  constructor() {
+  constructor(public readonly canRecover = true) {
     super('An active session already exists for this account.');
     this.name = 'ActiveSessionExistsError';
+  }
+}
+
+export class ExpiredRecoveryOtpError extends Error {
+  constructor() {
+    super('The recovery code has expired. Please request a new code.');
+    this.name = 'ExpiredRecoveryOtpError';
+  }
+}
+
+export class InvalidRecoveryOtpError extends Error {
+  constructor(public readonly remainingAttempts: number) {
+    super(`Invalid recovery code. ${remainingAttempts} attempt(s) remaining.`);
+    this.name = 'InvalidRecoveryOtpError';
+  }
+}
+
+export class MaxRecoveryAttemptsExceededError extends Error {
+  constructor() {
+    super('Maximum verification attempts exceeded. Please request a new recovery code.');
+    this.name = 'MaxRecoveryAttemptsExceededError';
+  }
+}
+
+export class ChallengeNotFoundError extends Error {
+  constructor() {
+    super('Recovery challenge not found or already consumed.');
+    this.name = 'ChallengeNotFoundError';
+  }
+}
+
+export class NoActiveSessionToRecoverError extends Error {
+  constructor() {
+    super('No active session exists to recover. Please log in normally.');
+    this.name = 'NoActiveSessionToRecoverError';
   }
 }
 
@@ -142,45 +179,10 @@ export async function loginUser(
       );
 
       if (activeSessions.length > 0) {
-        const existingSession = activeSessions[0];
-        const isTokenMatch =
-          Boolean(metadata?.existingToken) &&
-          existingSession.sessionTokenHash === hashSessionToken(metadata!.existingToken!);
-
-        let isPreviousTokenMatch = false;
-        if (!isTokenMatch && metadata?.existingToken) {
-          const previousTokenHash = hashSessionToken(metadata.existingToken);
-          const previousSession = await tx.session.findFirst({
-            where: {
-              userId: user.id,
-              sessionTokenHash: previousTokenHash,
-            },
-          });
-          if (previousSession) {
-            isPreviousTokenMatch = true;
-          }
-        }
-
-        const isClientEnvironmentMatch =
-          Boolean(metadata?.ipAddress) &&
-          Boolean(metadata?.userAgent) &&
-          existingSession.ipAddress === metadata!.ipAddress &&
-          existingSession.userAgent === metadata!.userAgent;
-
-        if (isTokenMatch || isPreviousTokenMatch || isClientEnvironmentMatch) {
-          // Same-client session recovery / rotation: revoke previous active and stale sessions
-          await tx.session.updateMany({
-            where: {
-              userId: user.id,
-              revokedAt: null,
-            },
-            data: {
-              revokedAt: now,
-            },
-          });
-        } else {
-          throw new ActiveSessionExistsError();
-        }
+        // Strict single active session policy (DEC-AUTH-107 / SEC-AUTH-007):
+        // Reject any new login attempt when an active session already exists,
+        // preserving the live session intact without revocation.
+        throw new ActiveSessionExistsError();
       } else if (existingSessions.length > 0) {
         // All unrevoked sessions are stale / expired / idle: prune them in a single batch
         await tx.session.updateMany({
@@ -484,4 +486,255 @@ export async function verifyStreamSessionActive(
 ): Promise<boolean> {
   const validated = await validateSession(prisma, rawToken);
   return validated !== null;
+}
+
+/**
+ * Hashes a recovery OTP combined with its challenge ID using SHA-256.
+ * The raw OTP is never stored in plaintext in the database.
+ */
+export function hashRecoveryOtp(challengeId: string, otp: string): string {
+  return crypto.createHash('sha256').update(`${challengeId}:${otp}`).digest('hex');
+}
+
+export interface SessionRecoveryChallengeResult {
+  challengeId: string;
+  rawOtp: string;
+  user: PublicSafeUserDto;
+  expiresAt: Date;
+  expiresInSeconds: number;
+}
+
+/**
+ * Creates a single-use 60-second OTP challenge for forced session recovery.
+ * Requires valid email and password to prevent unauthorized OTP dispatch.
+ */
+export async function createSessionRecoveryChallenge(
+  prisma: PrismaClient,
+  rawInput: unknown,
+  _metadata?: LoginMetadata
+): Promise<SessionRecoveryChallengeResult> {
+  const input = SessionRecoveryChallengeInputSchema.parse(rawInput);
+  const normalised = normaliseEmail(input.email);
+
+  const user = await prisma.user.findUnique({
+    where: { email: normalised },
+    include: {
+      userRoles: {
+        where: { revokedAt: null },
+        include: { role: true },
+      },
+    },
+  });
+
+  if (!user) {
+    throw new InvalidCredentialsError();
+  }
+
+  const isPasswordValid = await verifyPassword(user.passwordHash, input.password);
+  if (!isPasswordValid) {
+    throw new InvalidCredentialsError();
+  }
+
+  if (user.accountStatus !== AccountStatus.ACTIVE) {
+    throw new AccountStatusForbiddenError(user.accountStatus as AccountStatus);
+  }
+
+  const activeRoles: UserRole[] = user.userRoles
+    .filter((ur) => ur.revokedAt === null && ur.role?.code)
+    .map((ur) => ur.role.code as UserRole);
+
+  const primaryRole = activeRoles[0] ?? UserRole.ADMIN;
+  if (primaryRole === UserRole.OWNER && !user.emailVerifiedAt) {
+    throw new UnverifiedEmailError();
+  }
+
+  const now = new Date();
+  const activeSession = await prisma.session.findFirst({
+    where: {
+      userId: user.id,
+      revokedAt: null,
+      expiresAt: { gt: now },
+    },
+  });
+
+  if (!activeSession) {
+    throw new NoActiveSessionToRecoverError();
+  }
+
+  const rawOtp = crypto.randomInt(100000, 1000000).toString();
+  const challengeId = crypto.randomUUID();
+  const otpHash = hashRecoveryOtp(challengeId, rawOtp);
+  const expiresAt = new Date(now.getTime() + 60 * 1000); // 60 seconds
+
+  await prisma.$transaction(async (tx) => {
+    // Invalidate existing pending challenges for this user
+    await tx.sessionRecoveryChallenge.updateMany({
+      where: {
+        userId: user.id,
+        consumedAt: null,
+      },
+      data: {
+        consumedAt: now,
+      },
+    });
+
+    // Create new challenge
+    await tx.sessionRecoveryChallenge.create({
+      data: {
+        id: challengeId,
+        userId: user.id,
+        otpHash,
+        expiresAt,
+        maxAttempts: 3,
+        attempts: 0,
+      },
+    });
+  });
+
+  return {
+    challengeId,
+    rawOtp,
+    user: toPublicSafeUserDto(user as any),
+    expiresAt,
+    expiresInSeconds: 60,
+  };
+}
+
+/**
+ * Verifies a session recovery challenge OTP.
+ * On success, atomically revokes all existing active sessions, creates a new session,
+ * writes an audit log, and returns the new raw session token.
+ */
+export async function verifySessionRecoveryChallenge(
+  prisma: PrismaClient,
+  rawInput: unknown,
+  metadata?: LoginMetadata
+): Promise<LoginResult> {
+  const input = SessionRecoveryVerifyInputSchema.parse(rawInput);
+  const now = new Date();
+
+  const challenge = await prisma.sessionRecoveryChallenge.findUnique({
+    where: { id: input.challengeId },
+    include: {
+      user: {
+        include: {
+          userRoles: {
+            where: { revokedAt: null },
+            include: { role: true },
+          },
+        },
+      },
+    },
+  });
+
+  if (!challenge || challenge.consumedAt !== null) {
+    throw new ChallengeNotFoundError();
+  }
+
+  if (challenge.attempts >= challenge.maxAttempts) {
+    throw new MaxRecoveryAttemptsExceededError();
+  }
+
+  if (now > challenge.expiresAt) {
+    throw new ExpiredRecoveryOtpError();
+  }
+
+  const expectedHash = hashRecoveryOtp(challenge.id, input.otp);
+  const isMatch =
+    challenge.otpHash.length === expectedHash.length &&
+    crypto.timingSafeEqual(Buffer.from(challenge.otpHash), Buffer.from(expectedHash));
+
+  if (!isMatch) {
+    const newAttempts = challenge.attempts + 1;
+    const isExceeded = newAttempts >= challenge.maxAttempts;
+    await prisma.sessionRecoveryChallenge.update({
+      where: { id: challenge.id },
+      data: {
+        attempts: newAttempts,
+        consumedAt: isExceeded ? now : null,
+      },
+    });
+
+    if (isExceeded) {
+      throw new MaxRecoveryAttemptsExceededError();
+    }
+    throw new InvalidRecoveryOtpError(challenge.maxAttempts - newAttempts);
+  }
+
+  // OTP verified: execute atomic session recovery in locked transaction
+  const user = challenge.user;
+  if (user.accountStatus !== AccountStatus.ACTIVE) {
+    throw new AccountStatusForbiddenError(user.accountStatus as AccountStatus);
+  }
+
+  const rawToken = crypto.randomBytes(32).toString('hex');
+  const sessionTokenHash = hashSessionToken(rawToken);
+  const expiresAt = new Date(now.getTime() + SESSION_ABSOLUTE_LIFETIME_MS);
+  const sessionId = crypto.randomUUID();
+
+  await prisma.$transaction(async (tx) => {
+    // 1. Lock user row to prevent concurrent race conditions
+    await tx.$executeRaw`SELECT id FROM users WHERE id = ${user.id}::uuid FOR UPDATE`;
+
+    // 2. Mark challenge consumed
+    await tx.sessionRecoveryChallenge.update({
+      where: { id: challenge.id },
+      data: { consumedAt: now },
+    });
+
+    // 3. Revoke all previous active sessions
+    await tx.session.updateMany({
+      where: {
+        userId: user.id,
+        revokedAt: null,
+      },
+      data: {
+        revokedAt: now,
+      },
+    });
+
+    // 4. Create new single active session
+    await tx.session.create({
+      data: {
+        id: sessionId,
+        userId: user.id,
+        sessionTokenHash,
+        expiresAt,
+        ipAddress: metadata?.ipAddress ?? null,
+        userAgent: metadata?.userAgent ?? null,
+      },
+    });
+
+    // 5. Synchronous audit log
+    await tx.auditLog.create({
+      data: {
+        eventKey: AuditEventKey.AUTH_SESSION_FORCE_RECOVERED,
+        actorUserId: user.id,
+        targetType: 'User',
+        targetId: user.id,
+        result: 'SUCCESS',
+        metadata: {
+          sessionId,
+          recoveryMethod: 'EMAIL_OTP',
+          challengeId: challenge.id,
+        },
+        requestId: metadata?.requestId ?? null,
+        ipAddress: metadata?.ipAddress ?? 'unknown',
+        userAgent: metadata?.userAgent ?? 'unknown',
+      },
+    });
+  });
+
+  // Non-blocking lastLoginAt update
+  prisma.user
+    .update({
+      where: { id: user.id },
+      data: { lastLoginAt: now },
+    })
+    .catch(() => {});
+
+  return {
+    rawToken,
+    user: toPublicSafeUserDto(user as any),
+  };
 }

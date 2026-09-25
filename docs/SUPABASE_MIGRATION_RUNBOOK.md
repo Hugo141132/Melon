@@ -554,3 +554,36 @@ Per formal Owner decision, Mumbai is no longer needed or retained as an operatio
    - An independent, encrypted cold-storage backup of Singapore is verified.
    - The project Owner signs off in writing.
 5. **Deletion Action:** Once all gates are formally satisfied, delete Mumbai projects via Supabase Dashboard Settings and archive documentation references. Projects shall NOT be deleted in this turn.
+
+---
+
+## 11. Prisma Dual-Connection Architecture for Supabase Poolers (DEC-AUTH-112)
+
+### 11.1 Problem Statement: Transaction Pooler Migration Hangs
+When running Prisma CLI schema migrations (`npx prisma migrate deploy`, `npx prisma migrate status`) against Supabase managed PostgreSQL, connecting via the standard transaction pooler causes the migration process to hang indefinitely:
+- **Port 6543 (Transaction Mode Pooler):** Uses PgBouncer in transaction pooling mode. PgBouncer transaction mode assigns server connections on a per-transaction basis. It strictly disallows session-level features, specifically PostgreSQL session-level advisory locks (`pg_advisory_lock`), which the Prisma migration engine uses to serialize schema changes across concurrent runners.
+- **Port 5432 (Session Mode Pooler / Direct):** Assigns a dedicated PostgreSQL connection for the duration of the client session, fully supporting session-level advisory locks, prepared statements, and DDL schema modifications.
+
+### 11.2 Architectural Resolution: Prisma `directUrl`
+In `packages/database/prisma/schema.prisma`, configure dual connections:
+```prisma
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+```
+
+### 11.3 Environment Configuration Standard
+1. **Application Runtime (`DATABASE_URL`):**
+   - Connects through Supabase Transaction Pooler (port `6543`) with `?pgbouncer=true&connection_limit=15`.
+   - Used by Next.js web application and IoT gateway for high-throughput, low-connection overhead transactional queries.
+2. **Prisma Migrations (`DIRECT_URL`):**
+   - Connects through Supabase Session Pooler or direct PostgreSQL port (`5432`).
+   - Automatically used exclusively by Prisma CLI migration commands (`prisma migrate dev`, `prisma migrate deploy`, `prisma migrate status`).
+   - Completely eliminates command hangs without manual shell environment overrides or risk of running application queries against session mode connections.
+
+### 11.4 Operational Verification
+- Run `npx prisma migrate status --schema=packages/database/prisma/schema.prisma`.
+- Command connects via `directUrl`, acquires advisory lock, validates `_prisma_migrations`, and returns within ~1.5s with exit code 0.
+<!-- DEC-AUTH-112 Runbook Documented: 2026-09-25 -->

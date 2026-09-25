@@ -368,3 +368,32 @@ export const VerifyEmailChangeInputSchema = z
   .strict();
 
 export type VerifyEmailChangeInput = z.infer<typeof VerifyEmailChangeInputSchema>;
+
+/**
+ * Public input schema for requesting a session recovery OTP challenge.
+ * Requires user credentials (email + password) to prevent unauthorized OTP generation.
+ */
+export const SessionRecoveryChallengeInputSchema = z
+  .object({
+    email: z.string().trim().email('Invalid email address format.'),
+    password: z.string().min(1, 'Password is required.'),
+  })
+  .strict();
+
+export type SessionRecoveryChallengeInput = z.infer<typeof SessionRecoveryChallengeInputSchema>;
+
+/**
+ * Public input schema for verifying session recovery OTP challenge.
+ * Requires 6-digit numeric OTP and challengeId.
+ */
+export const SessionRecoveryVerifyInputSchema = z
+  .object({
+    challengeId: z.string().uuid('Invalid challenge ID format.'),
+    otp: z
+      .string()
+      .trim()
+      .regex(/^\d{6}$/, 'OTP must be exactly 6 digits.'),
+  })
+  .strict();
+
+export type SessionRecoveryVerifyInput = z.infer<typeof SessionRecoveryVerifyInputSchema>;

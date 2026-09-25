@@ -167,8 +167,18 @@
     "resendCodeFailed": "Gagal mengirim ulang kode verifikasi. Silakan coba lagi nanti.",
     "pendingApprovalMessage": "Permintaan akun Admin Anda sedang menunggu persetujuan dari Pemilik (Owner).",
     "goToStatusPage": "Lihat Status Akun",
-    "activeSessionExists": "Sesi aktif sudah ada untuk akun ini. Sesi simultan tidak diizinkan.",
-    "passwordChangedSuccess": "Kata sandi berhasil diubah! Silakan masuk kembali dengan kata sandi baru Anda."
+    "activeSessionExists": "Akun Anda saat ini memiliki sesi aktif di peramban atau perangkat lain. Apakah Anda ingin mengakhiri sesi tersebut dan masuk di perangkat ini?",
+    "passwordChangedSuccess": "Kata sandi berhasil diubah! Silakan masuk kembali dengan kata sandi baru Anda.",
+    "sessionRecoveryTitle": "Pemulihan Sesi Aktif",
+    "sessionRecoveryPrompt": "Akun Anda saat ini memiliki sesi aktif di peramban atau perangkat lain. Apakah Anda ingin mengakhiri sesi tersebut dan masuk di perangkat ini?",
+    "sendRecoveryCode": "Kirim Kode Pemulihan",
+    "sessionRecoverySubtitle": "Masukkan 6 digit kode pemulihan yang dikirim ke email terdaftar Anda untuk mengonfirmasi pengakhiran sesi sebelumnya.",
+    "codeSentTo": "Kode dikirim ke {email}",
+    "confirmAndRecoverSession": "Konfirmasi & Pulihkan Sesi",
+    "recoveryCodeExpiryNotice": "Kode berlaku selama 60 detik dan hanya dapat digunakan 1 kali.",
+    "recoverySuccess": "Sesi berhasil dipulihkan. Mengalihkan...",
+    "recoveryFailed": "Gagal memulihkan sesi.",
+    "maxAttemptsReached": "Batas percobaan terlampaui. Silakan minta kode baru."
   },
   "navigation": {
     "home": "Beranda",

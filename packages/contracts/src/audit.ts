@@ -22,6 +22,7 @@ export enum AuditEventKey {
   AUTH_LOGIN_SUCCESS = 'auth.login.success',
   AUTH_LOGIN_FAILED = 'auth.login.failed',
   AUTH_LOGOUT = 'auth.logout',
+  AUTH_SESSION_FORCE_RECOVERED = 'auth.session.force_recovered',
   AUTH_PASSWORD_RESET_REQUESTED = 'auth.password_reset.requested',
   AUTH_PASSWORD_RESET_COMPLETED = 'auth.password_reset.completed',
   AUTH_PASSWORD_RESET_FAILED = 'auth.password_reset.failed',

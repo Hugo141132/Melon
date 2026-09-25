@@ -114,13 +114,25 @@ flowchart TD
     B -- No --> C[Return safe authentication error]
     B -- Yes --> D[Load canonical account status]
     D --> E{Status}
-    E -- ACTIVE --> F[Create authenticated session]
+    E -- ACTIVE --> S{Active session exists?}
     E -- PENDING_APPROVAL --> G[Show awaiting approval]
     E -- APPROVED --> H[Apply activation policy TBD]
     E -- REJECTED --> I[Show rejected status]
     E -- SUSPENDED --> J[Show suspended status]
     E -- DEACTIVATED --> K[Show deactivated status]
-    F --> L[Load role, permissions, and device scope]
+    S -- No --> F[Create authenticated session]
+    S -- Yes --> R[Return HTTP 409 ACTIVE_SESSION_EXISTS]
+    R --> BANNER[Display consolidated recovery alert banner]
+    BANNER --> REC{User requests session recovery?}
+    REC -- No --> KEEP[Preserve existing active session]
+    REC -- Yes --> CHAL[POST /session-recovery/challenge with credentials]
+    CHAL --> OTP[Send 6-digit numeric OTP via Resend email]
+    OTP --> MODAL[Display recovery modal with 60s countdown]
+    MODAL --> VER{User submits 6-digit OTP}
+    VER -- Valid code <= 60s --> ATOM[Atomic transaction with row lock: revoke old session + create new session]
+    VER -- Invalid code / Expired --> ERR[Increment attempts / Burn challenge on 3 fails]
+    ATOM --> L[Load role, permissions, and device scope]
+    F --> L
     L --> M[Open authorised dashboard]
 ```
 
@@ -531,8 +543,8 @@ flowchart TD
 3. The server verifies status `ACTIVE`.
 4. The server verifies `emailVerifiedAt IS NOT NULL` (returns HTTP 403 `EMAIL_NOT_VERIFIED` if null).
 5. The server checks for existing active sessions (`revokedAt IS NULL`, `< 8h`, idle `< 30m`).
-   - If an active session exists on the **same client** (matching `existingToken` hash or matching IP and User-Agent), the server rotates the session safely without 409 conflict (`DEC-AUTH-108`).
-   - If an active session exists on a **different client/device**, the server rejects the login attempt with HTTP 409 Conflict (`ACTIVE_SESSION_EXISTS`) and preserves the existing session (`DEC-AUTH-107`).
+   - If an active session already exists, the server rejects the login attempt with HTTP 409 Conflict (`ACTIVE_SESSION_EXISTS`), preserves the existing active session, and returns recovery metadata (`{ canRecover: true }`) (`DEC-AUTH-107`, `DEC-AUTH-110`). Spoofable IP/User-Agent heuristic matching is permanently eliminated.
+   - If no active session exists, the server proceeds to session creation.
 6. The server creates a secure session, atomically updates `lastLoginAt`, and synchronously logs `auth.login.success` within the transaction under user row lock (`DEC-AUTH-108`).
 7. The server loads permissions and active roles using stable relational mapping.
 8. The frontend receives the response, immediately hydrates `AuthContext` with the authenticated user, and pushes route transition (`router.push('/dashboard')`) without blocking on redundant `router.refresh()`.
@@ -541,14 +553,13 @@ flowchart TD
 **Alternative flows:**
 
 - No devices are assigned; dashboard opens with a no-assigned-devices state.
-- Legitimate same-client re-login after cookie expiration or browser data clearance automatically recovers without requiring manual logout from the previous session.
 
 **Error flows:**
 
-- Invalid credentials.
-- Active session already exists on another client: displays localized conflict error (*"Akun sedang aktif di perangkat lain"* / *"Account is currently active in another session"*); existing session remains active.
-- Authentication service failure.
-- Account changed to suspended before session creation.
+- Invalid credentials: returns generic safe authentication error.
+- Active session already exists (`ACTIVE_SESSION_EXISTS`): displays consolidated recovery alert banner (*"Your account currently has an active session on another browser or device. Would you like to terminate that session and sign in on this device?"* / *"Akun Anda saat ini memiliki sesi aktif di browser atau perangkat lain. Apakah Anda ingin mengakhiri sesi tersebut dan masuk di perangkat ini?"*) with action button *"Send Recovery Code"* / *"Kirim Kode Pemulihan"*. User can initiate Flow 8b.
+- Authentication service failure: returns safe 500 error.
+- Account changed to suspended before session creation: returns 403 `ACCOUNT_SUSPENDED`.
 
 **Performance Characteristics (`DEC-AUTH-108`):**
 - Login API execution: ~1.2–1.6s (reduced from ~3.6–4.2s).
@@ -557,8 +568,62 @@ flowchart TD
 **Postconditions:** Admin has an authenticated session with current permissions.
 **Required permissions:** None beyond active account eligibility.
 **Relevant account statuses:** `ACTIVE`.
-**UI states:** Login, loading, dashboard, no devices.
-**Audit events:** `auth.login.success`; failures as appropriate.
+**UI states:** Login, loading, recovery banner, dashboard, no devices.
+**Audit events:** `auth.login.success`; `auth.login.failed` as appropriate.
+
+---
+
+## Flow 8b — Single-Session Force-Recovery via 6-Digit OTP (FLOW-AUTH-029 / TASK-0218 / DEC-AUTH-110)
+
+**Primary actor:** Owner or Admin with `accountStatus = ACTIVE`
+**Preconditions:** User has valid credentials but encounters HTTP 409 `ACTIVE_SESSION_EXISTS` on login (e.g. previous browser cookies were wiped, private window was closed, or switching devices).
+**Trigger:** User clicks "Send Recovery Code" / "Kirim Kode Pemulihan" on the consolidated login recovery banner.
+
+**Main success flow:**
+
+1. The user views the consolidated alert banner on the login page informing them of the active session.
+2. The user clicks "Send Recovery Code".
+3. The frontend submits `POST /api/v1/auth/session-recovery/challenge` with `{ email, password }`.
+4. The server:
+   - Verifies the user's password using Argon2id to ensure the request is authenticated.
+   - Checks that an active session genuinely exists (`revokedAt IS NULL`, unexpired, idle `< 30m`).
+   - Generates a 6-digit numeric CSPRNG code (`100000`–`999999`).
+   - Computes `sha256(challengeId:otp)` and stores it in `session_recovery_challenges` with 60-second expiration (`expires_at = NOW() + 60s`).
+   - Dispatches a transactional recovery email via Resend (`Melon Madura <noreply@melonmadura.my.id>`) with the 6-digit code.
+   - Returns HTTP 200 with `{ challengeId, expiresInSeconds: 60, targetEmail }`.
+5. The frontend displays the Session Recovery Modal dialog, rendering:
+   - Modal title: *"Session Recovery Code"* / *"Kode Pemulihan Sesi"*.
+   - Target recipient email masked for privacy.
+   - 6-digit numeric input with auto-focus.
+   - Active 60-second countdown timer.
+   - Action buttons: *"Verify & Terminate Other Session"* and *"Cancel"*.
+6. The user receives the recovery email, copies the 6-digit code, enters it in the modal, and submits the form.
+7. The frontend submits `POST /api/v1/auth/session-recovery/verify` with `{ email, challengeId, code }`.
+8. The server processes verification inside an atomic interactive transaction with row-level locking (`SELECT id FROM users WHERE id = $1 FOR UPDATE`):
+   - Validates challenge existence, unexpired status (`NOW() < expires_at`), unused status (`used_at IS NULL`), and attempt limit (`attempts < max_attempts`).
+   - Compares candidate hash with stored hash using `crypto.timingSafeEqual`.
+   - Marks challenge as consumed (`used_at = NOW()`).
+   - Atomically revokes all prior active sessions for the user (`revoked_at = NOW()`).
+   - Creates a new active session and sets the HttpOnly session cookie.
+   - Updates `users.last_login_at = NOW()`.
+   - Synchronously writes `auth.session.force_recovered` audit log capturing user ID, displaced session ID, IP, and User-Agent.
+   - Returns HTTP 200 with `{ user, session }`.
+9. The frontend receives HTTP 200, updates `AuthContext`, closes the recovery modal, and navigates seamlessly to `/dashboard`.
+10. If the displaced previous device makes subsequent requests, its session resolves as revoked, redirecting it cleanly to `/login`.
+
+**Alternative & Error flows:**
+
+- **Incorrect Code (< 3 attempts):** Server increments `attempts` counter, returns HTTP 400 `INVALID_OTP` with remaining attempt count. Modal displays inline error feedback.
+- **Exceeded Attempt Limit (3 failed attempts):** Server marks challenge expired/burned, returns HTTP 429 `MAX_ATTEMPTS_EXCEEDED`. Modal requires requesting a new code.
+- **Expired Challenge (> 60 seconds):** Server returns HTTP 410 `CHALLENGE_EXPIRED`. Modal shows expired message and enables "Resend Code" after cooldown.
+- **User Cancels Modal:** Modal closes, existing active session remains completely untouched on the other device, and login form is restored.
+- **Rate Limit Triggered:** Excess challenge requests (> 3/min per IP/user) return HTTP 429 `RATE_LIMIT_EXCEEDED`.
+
+**Postconditions:** Old session revoked; new session active on current device; single-session invariant ($\le 1$) preserved.
+**Required permissions:** None beyond active account credentials and email OTP verification.
+**Relevant account statuses:** `ACTIVE`.
+**UI states:** Consolidated alert banner, recovery modal, 60s countdown, error states, dashboard.
+**Audit events:** `auth.session.recovery_challenge`; `auth.session.force_recovered`.
 **Open decisions:** Session duration and multi-factor authentication.
 
 ---

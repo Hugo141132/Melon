@@ -34,10 +34,15 @@ async function main() {
     validateTestDatabaseUrl(existingUrl);
     console.log('[INIT] Using validated test database URL from environment.');
     console.log('[SEED] Running RBAC seed on existing test database...');
-    run(`npx tsx prisma/seed.ts`, { DATABASE_URL: existingUrl, TEST_DATABASE_URL: existingUrl });
+    run(`npx tsx prisma/seed.ts`, {
+      DATABASE_URL: existingUrl,
+      DIRECT_URL: existingUrl,
+      TEST_DATABASE_URL: existingUrl,
+    });
     run(`npx vitest run --config vitest.integration.config.mts`, {
       TEST_DATABASE_URL: existingUrl,
       DATABASE_URL: existingUrl,
+      DIRECT_URL: existingUrl,
     });
     return;
   }
@@ -80,17 +85,24 @@ async function main() {
 
     // 3. Apply migrations using the dynamically constructed database URL
     console.log('[3/5] Applying Prisma migrations...');
-    run(`npx prisma migrate deploy --schema=prisma/schema.prisma`, { DATABASE_URL: testDbUrl });
+    run(`npx prisma migrate deploy --schema=prisma/schema.prisma`, {
+      DATABASE_URL: testDbUrl,
+      DIRECT_URL: testDbUrl,
+    });
 
     // 4. Run RBAC seed
     console.log('[4/5] Running RBAC seed...');
-    run(`npx tsx prisma/seed.ts`, { DATABASE_URL: testDbUrl });
+    run(`npx tsx prisma/seed.ts`, {
+      DATABASE_URL: testDbUrl,
+      DIRECT_URL: testDbUrl,
+    });
 
     // 5. Execute integration tests with process-isolated TEST_DATABASE_URL
     console.log('[5/5] Executing database integration test suite (serial)...');
     run(`npx vitest run --config vitest.integration.config.mts`, {
       TEST_DATABASE_URL: testDbUrl,
       DATABASE_URL: testDbUrl,
+      DIRECT_URL: testDbUrl,
     });
 
     console.log('--- REPRODUCIBLE DOCKER INTEGRATION TEST SUCCEEDED ---');

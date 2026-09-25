@@ -167,8 +167,18 @@
     "resendCodeFailed": "Failed to resend verification code. Please try again later.",
     "pendingApprovalMessage": "Your Admin account request is currently pending approval by an Owner.",
     "goToStatusPage": "View Account Status",
-    "activeSessionExists": "An active session already exists for this account. Concurrent sessions are not permitted.",
-    "passwordChangedSuccess": "Password changed successfully! Please log in again with your new password."
+    "activeSessionExists": "Your account currently has an active session on another browser or device. Would you like to terminate that session and sign in on this device?",
+    "passwordChangedSuccess": "Password changed successfully! Please log in again with your new password.",
+    "sessionRecoveryTitle": "Active Session Recovery",
+    "sessionRecoveryPrompt": "Your account currently has an active session on another browser or device. Would you like to terminate that session and sign in on this device?",
+    "sendRecoveryCode": "Send Recovery Code",
+    "sessionRecoverySubtitle": "Enter the 6-digit recovery code sent to your registered email to confirm terminating the previous session.",
+    "codeSentTo": "Code sent to {email}",
+    "confirmAndRecoverSession": "Confirm & Recover Session",
+    "recoveryCodeExpiryNotice": "Code is valid for 60 seconds and can only be used once.",
+    "recoverySuccess": "Session recovered successfully. Redirecting...",
+    "recoveryFailed": "Failed to recover session.",
+    "maxAttemptsReached": "Maximum attempts reached. Please request a new code."
   },
   "navigation": {
     "home": "Home",

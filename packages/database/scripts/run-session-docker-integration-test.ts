@@ -65,11 +65,17 @@ async function main() {
 
     // 3. Apply migrations using the dynamically constructed database URL
     console.log('[3/5] Applying Prisma migrations...');
-    run(`npx prisma migrate deploy --schema=prisma/schema.prisma`, { DATABASE_URL: testDbUrl });
+    run(`npx prisma migrate deploy --schema=prisma/schema.prisma`, {
+      DATABASE_URL: testDbUrl,
+      DIRECT_URL: testDbUrl,
+    });
 
     // 4. Run RBAC seed
     console.log('[4/5] Running RBAC seed...');
-    run(`npx tsx prisma/seed.ts`, { DATABASE_URL: testDbUrl });
+    run(`npx tsx prisma/seed.ts`, {
+      DATABASE_URL: testDbUrl,
+      DIRECT_URL: testDbUrl,
+    });
 
     // 5. Execute session integration tests with process-isolated TEST_DATABASE_URL
     console.log('[5/5] Executing session service integration test suite...');
@@ -78,6 +84,7 @@ async function main() {
       {
         TEST_DATABASE_URL: testDbUrl,
         DATABASE_URL: testDbUrl,
+        DIRECT_URL: testDbUrl,
       }
     );
 

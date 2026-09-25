@@ -205,6 +205,7 @@ SELECT json_build_object(
         $sessionUrl = "postgresql://${escapedUser}:${escapedPass}@${pHost}:${pPort}/${TargetDb}${sslQuery}"
 
         $env:DATABASE_URL = $sessionUrl
+        $env:DIRECT_URL = $sessionUrl
         $deploySuccess = $false
 
         try {

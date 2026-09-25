@@ -1292,3 +1292,198 @@ export async function sendAccountReactivationEmail(
     };
   }
 }
+
+export interface SendSessionRecoveryOtpEmailInput {
+  toEmail: string;
+  recipientName?: string;
+  code: string;
+  locale?: string;
+  requestId?: string;
+}
+
+export interface SendSessionRecoveryOtpEmailResult {
+  success: boolean;
+  emailSent: boolean;
+  simulated?: boolean;
+  id?: string;
+  error?: string;
+}
+
+/**
+ * Generates bilingual HTML content for 6-digit single-session force-recovery OTP.
+ */
+function getSessionRecoveryOtpEmailHtml(
+  name: string,
+  code: string,
+  locale: string
+): { subject: string; html: string; text: string } {
+  const isId = locale === 'id';
+  const logoUrl = getEmailLogoUrl();
+
+  const subject = isId
+    ? `Kode Pemulihan Sesi: ${code} — Melon Governance`
+    : `Session Recovery Code: ${code} — Melon Governance`;
+
+  const greeting = isId ? `Halo ${name || 'Pengguna'},` : `Hello ${name || 'User'},`;
+  const intro = isId
+    ? 'Kami mendeteksi sesi aktif lain pada akun Melon Governance Anda. Untuk mengakhiri sesi aktif sebelumnya dan melanjutkan login pada perangkat ini, masukkan 6 digit kode pemulihan berikut:'
+    : 'We detected another active session on your Melon Governance account. To terminate the previous session and proceed with signing in on this device, enter the following 6-digit recovery code:';
+  const expiryNotice = isId
+    ? 'Kode pemulihan ini berlaku selama 1 menit (60 detik) dan hanya dapat digunakan satu kali.'
+    : 'This recovery code is valid for 1 minute (60 seconds) and can only be used once.';
+  const warningNotice = isId
+    ? 'PERINGATAN: Memasukkan kode ini akan secara otomatis mengakhiri (logout) sesi aktif di perangkat atau peramban lain.'
+    : 'WARNING: Entering this code will automatically terminate (log out) any active session on other devices or browsers.';
+  const securityNotice = isId
+    ? 'Jangan bagikan kode ini kepada siapa pun. Tim Melon Governance tidak akan pernah meminta kode ini.'
+    : 'Do not share this code with anyone. Melon Governance team will never ask for this code.';
+  const ignoreNotice = isId
+    ? 'Jika Anda tidak mencoba masuk atau tidak meminta pemulihan sesi, segera ubah kata sandi akun Anda.'
+    : 'If you did not attempt to sign in or request session recovery, change your account password immediately.';
+
+  const html = `
+<!DOCTYPE html>
+<html lang="${isId ? 'id' : 'en'}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${subject}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f4f7f4; margin: 0; padding: 24px; color: #1e293b; }
+    .container { max-width: 560px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 32px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+    .header { text-align: center; margin-bottom: 24px; }
+    .header img { height: 40px; width: auto; max-width: 220px; display: inline-block; object-fit: contain; margin: 0 auto; }
+    .content { font-size: 16px; line-height: 1.6; }
+    .code-box { text-align: center; margin: 28px 0; }
+    .code-card { display: inline-block; background-color: #fef2f2; border: 2px dashed #dc2626; border-radius: 12px; padding: 18px 36px; }
+    .code-text { font-size: 38px; font-weight: 800; letter-spacing: 8px; color: #991b1b; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace; margin: 0; }
+    .footer { margin-top: 32px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-size: 13px; color: #64748b; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <img src="${logoUrl}" alt="Melon Governance" width="220" height="44" style="height: 40px; width: auto; max-width: 220px; display: inline-block; object-fit: contain; margin: 0 auto;" />
+    </div>
+    <div class="content">
+      <p><strong>${greeting}</strong></p>
+      <p>${intro}</p>
+      <div class="code-box">
+        <div class="code-card">
+          <p class="code-text">${code}</p>
+        </div>
+      </div>
+      <p style="color: #991b1b; font-weight: 600; font-size: 14px; text-align: center;">${expiryNotice}</p>
+      <div style="background-color: #fffbeb; border-left: 4px solid #f59e0b; padding: 12px; margin: 20px 0; border-radius: 4px;">
+        <p style="color: #92400e; font-size: 13px; margin: 0; font-weight: 600;">${warningNotice}</p>
+      </div>
+      <p style="color: #64748b; font-size: 14px;">${securityNotice}</p>
+      <p style="color: #64748b; font-size: 14px;">${ignoreNotice}</p>
+    </div>
+    <div class="footer">
+      <p>© ${new Date().getFullYear()} Melon Governance Monitoring System. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>
+  `.trim();
+
+  const text = `
+Melon Governance
+==============================
+
+${greeting}
+
+${intro}
+
+KODE PEMULIHAN SESI / SESSION RECOVERY CODE:
+-----------------------------------------------------------------
+${code}
+-----------------------------------------------------------------
+
+${expiryNotice}
+
+${warningNotice}
+
+${securityNotice}
+${ignoreNotice}
+
+© ${new Date().getFullYear()} Melon Governance Monitoring System.
+  `.trim();
+
+  return { subject, html, text };
+}
+
+/**
+ * Sends a 6-digit session recovery OTP email via Resend with exponential backoff retry.
+ */
+export async function sendSessionRecoveryOtpEmail(
+  input: SendSessionRecoveryOtpEmailInput
+): Promise<SendSessionRecoveryOtpEmailResult> {
+  const reqLogger = logger.child({
+    requestId: input.requestId,
+  });
+
+  const env = validateServerEnv();
+  const locale = input.locale || env.DEFAULT_LOCALE || 'id';
+  const name = input.recipientName || '';
+
+  const { subject, html, text } = getSessionRecoveryOtpEmailHtml(name, input.code, locale);
+
+  const apiKey = env.RESEND_API_KEY || process.env.RESEND_API_KEY;
+  const fromEmail =
+    env.RESEND_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || DEFAULT_RESEND_FROM_EMAIL;
+
+  if (!apiKey || env.NODE_ENV === 'test' || process.env.NODE_ENV === 'test') {
+    reqLogger.info('Simulated session recovery OTP email delivery to ' + input.toEmail);
+    return {
+      success: true,
+      emailSent: false,
+      simulated: true,
+    };
+  }
+
+  try {
+    const resend = new Resend(apiKey);
+    const result = await sendWithRetry(
+      resend,
+      {
+        from: fromEmail,
+        to: [input.toEmail],
+        subject,
+        html,
+        text,
+      },
+      reqLogger
+    );
+
+    if (!result.success) {
+      reqLogger.error(
+        'Resend delivery reported error for session recovery OTP: ' +
+          (result.error || 'Unknown error')
+      );
+      return {
+        success: false,
+        emailSent: false,
+        error: result.error,
+      };
+    }
+
+    reqLogger.info('Session recovery OTP email dispatched successfully via Resend');
+    return {
+      success: true,
+      emailSent: true,
+      id: result.id,
+    };
+  } catch (err: any) {
+    reqLogger.error(
+      'Unexpected exception during Resend session recovery OTP email dispatch: ' +
+        (err?.message || String(err))
+    );
+    return {
+      success: false,
+      emailSent: false,
+      error: err?.message || 'Email delivery failed',
+    };
+  }
+}

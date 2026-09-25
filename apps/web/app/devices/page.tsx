@@ -52,7 +52,7 @@ export default function DeviceRegistryPage() {
   const tDevices = useTranslations('devices');
   const tCommon = useTranslations('common');
   const locale = useLocale();
-  const { role } = useAuth();
+  const { role, setUser, invalidateSession } = useAuth();
   const isOwner = role === 'OWNER';
 
   // List state
@@ -102,6 +102,12 @@ export default function DeviceRegistryPage() {
         if (typeFilter !== 'ALL') queryParams.set('deviceType', typeFilter);
 
         const res = await fetch(`/api/v1/devices?${queryParams.toString()}`);
+        if (res.status === 401) {
+          setUser?.(null);
+          invalidateSession?.();
+          window.location.href = '/login?redirect=/devices';
+          return;
+        }
         const json = await res.json();
 
         if (json.success) {

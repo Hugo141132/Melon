@@ -628,9 +628,52 @@ POST /api/v1/auth/login
   └── 4. Non-blocking user.update({ lastLoginAt }) ────────────── Asynchronous (0ms critical path)
 ```
 
-**Frontend Hydration & Recovery:**
+**Frontend Hydration & Invariant Enforcement:**
 1. **Client AuthContext Hydration:** Upon receiving the login response, `login-view.tsx` immediately updates `AuthContext` with the authenticated user and navigates via `router.push()`. Redundant `router.refresh()` is eliminated, and `AuthContext` guards against stale SSR `initialSession=null` overwriting client-authenticated state, ensuring immediate display of the user greeting ("Welcome [user]").
-2. **Same-Client Session Recovery:** When a browser's `session_token` cookie is cleared or expired on the same client, authentication re-verifies via token hash matching or identical IP and User-Agent, gracefully rotating the session while maintaining strict rejection (HTTP 409) against concurrent logins from different devices (`DEC-AUTH-107`).
+2. **Deterministic Rejection Over Heuristics (DEC-AUTH-112):** Ambient IP and User-Agent heuristics for session matching are retired because spoofable headers undermine single-session security. Instead, any incoming login with valid credentials while an active session exists deterministically returns HTTP 409 `ACTIVE_SESSION_EXISTS` with `canRecover: true`, preserving the existing session until explicit user verification.
+
+### 9.6 OTP-Based Single-Session Force-Recovery Architecture (DEC-AUTH-112 / TASK-0218)
+
+To solve orphaned sessions (e.g., user cleared cookies or closed incognito window without logging out) while maintaining strict single active session security ($\le 1$), an out-of-band 6-digit OTP challenge flow is implemented:
+
+```text
+1. Normal Login Attempt
+   POST /api/v1/auth/login
+   ├── Credentials Valid + Active Session Exists
+   └── Returns HTTP 409 Conflict { error: "ACTIVE_SESSION_EXISTS", canRecover: true }
+
+2. Challenge Generation
+   POST /api/v1/auth/session-recovery/challenge (requires email + password)
+   ├── Validates credentials and verifies active session exists
+   ├── Generates CSPRNG 6-digit numeric OTP (valid for 60 seconds)
+   ├── Stores sha256(challengeId:otp) in session_recovery_challenges
+   └── Dispatches transactional email via Resend ("Melon Governance")
+
+3. Challenge Verification & Session Displacement
+   POST /api/v1/auth/session-recovery/verify { challengeId, otp }
+   ├── Verifies OTP with timing-safe comparison (max 3 attempts)
+   ├── Interactive $transaction with user row lock (SELECT ... FOR UPDATE):
+   │     ├── Marks challenge consumed (usedAt = NOW())
+   │     ├── Revokes all previous active sessions (revokedAt = NOW())
+   │     ├── Creates exactly 1 new active session
+   │     └── Writes synchronous audit log (auth.session.force_recovered)
+   ├── Sets HttpOnly session_token cookie
+   └── Client hydrates AuthContext and redirects to dashboard
+```
+
+### 9.7 Prisma Dual-Connection Architecture (DEC-AUTH-112)
+
+Supabase Transaction Mode PgBouncer (port 6543) does not support PostgreSQL session-level advisory locks (`pg_advisory_lock`), which caused Prisma migration CLI commands (`prisma migrate deploy`, `prisma migrate status`) to hang indefinitely. 
+
+To resolve this while preserving pooling efficiency for production application traffic:
+
+```text
+Prisma CLI (Migrations)      ──>  DIRECT_URL (Port 5432, Session Pooler / Direct)  ──>  Advisory Locks Supported
+Application Runtime (Web/API) ──>  DATABASE_URL (Port 6543, Transaction Pooler)     ──>  Low Connection Overhead
+```
+
+- `DATABASE_URL` (`env("DATABASE_URL")`): Configured on port 6543 (transaction pooler) with `pgbouncer=true&connection_limit=15`, dedicated to Next.js server runtime queries.
+- `DIRECT_URL` (`env("DIRECT_URL")`): Configured as `directUrl = env("DIRECT_URL")` in `schema.prisma` on port 5432 (session pooler / direct connection), enabling advisory lock acquisition for CLI migrations without hanging.
 
 ---
 

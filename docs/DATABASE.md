@@ -65,6 +65,12 @@ Under `TASK-0412` and `DEC-MON-086`:
 - Applied and verified on Dev database (PostgreSQL 17 Singapore `unbyxlkrzqlafolxcypi`).
 - Zero data loss: `water_readings` contained 0 rows prior to migration. Staging migration remains deferred until formal release cutover.
 
+### 2.4 TASK-0218 Database Migration: session_recovery_challenges & Dual-Connection Architecture
+Under `TASK-0218` and `DEC-AUTH-110`:
+- **New Model & Migration:** Added `session_recovery_challenges` table via migration `20260925150000_add_session_recovery_challenges` to support out-of-band 6-digit OTP verification for clearing orphaned sessions when cookies are deleted.
+- **Applied & Verified on Singapore Dev:** Successfully deployed migration to PostgreSQL 17 Singapore Dev (`unbyxlkrzqlafolxcypi`). Verified 8 columns, foreign key cascade to `users(id)`, and indexes on `user_id` and `expires_at`.
+- **Prisma Dual-Connection Configuration:** Configured `directUrl = env("DIRECT_URL")` in `packages/database/prisma/schema.prisma`. Application runtime maintains high-concurrency connection through Supabase Transaction Pooler (`DATABASE_URL` on port `6543`), while Prisma CLI migration operations route via `DIRECT_URL` (port `5432` Session Mode Pooler / direct) which supports PostgreSQL session-level advisory locks (`pg_advisory_lock`). Staging deployment follows identical dual-connection runbook.
+
 ---
 
 
@@ -545,7 +551,7 @@ Stores active authentication sessions with server-managed revocation and single 
   - Stable Relation Query Loading: Replaced experimental `relationLoadStrategy: 'join'` with Prisma's standard relation loader to prevent query-engine panics under concurrency, backed by covering indexes on foreign keys.
   - Streamlined Active Check: Evaluates unrevoked sessions via `findMany({ where: { userId, revokedAt: null } })`, eliminating blind table writes on clean logins.
   - Synchronous State & Audit Integrity: `user.update({ lastLoginAt })` and `auditLog.create` remain strictly synchronous inside the interactive transaction under the acquired user row lock (`FOR UPDATE`).
-  - Same-Client Recovery: Re-authenticates without 409 if session cookie is missing/expired on the same device (matching `existingToken` or IP + User-Agent).
+  - Replaced Heuristic Recovery with Explicit OTP Verification (`DEC-AUTH-110` / `TASK-0218`): Spoofable IP and User-Agent heuristic matching has been permanently retired. Any legitimate client wishing to displace or recover an active orphaned session (e.g. after browser cookies are cleared) must complete the out-of-band cryptographic OTP challenge flow via `session_recovery_challenges`.
 
 ### Recommended Indexes
 
@@ -569,6 +575,38 @@ INDEX user_preferences_default_device_id_idx ON user_preferences (default_device
 INDEX alert_acknowledgements_user_id_idx ON alert_acknowledgements (acknowledged_by_user_id)
 INDEX alert_acknowledgements_alert_id_idx ON alert_acknowledgements (alert_id)
 INDEX alerts_device_id_idx ON alerts (device_id)
+```
+
+---
+
+## 6.10 `session_recovery_challenges` (DB-AUTH-008 / DEC-AUTH-110 / TASK-0218)
+
+Stores cryptographic hashes for single-use OTP challenges generated during single-session force-recovery.
+
+| Column | Type | Nullable | Notes |
+|---|---|---:|---|
+| `id` | UUID | No | Primary key (`DEFAULT gen_random_uuid()`) |
+| `user_id` | UUID | No | Foreign key referencing `users(id) ON DELETE CASCADE` |
+| `otp_hash` | VARCHAR(64) | No | Cryptographic SHA-256 hex digest of the challenge-salted OTP (`sha256(challengeId:otp)`) |
+| `expires_at` | TIMESTAMPTZ | No | Challenge expiration timestamp (60-second lifetime) |
+| `attempts` | INTEGER | No | Failed verification attempts counter (`DEFAULT 0`) |
+| `max_attempts` | INTEGER | No | Maximum allowed attempts before burning the challenge (`DEFAULT 3`) |
+| `used_at` | TIMESTAMPTZ | Yes | Timestamp when the challenge was successfully consumed (`NULL` until used) |
+| `created_at` | TIMESTAMPTZ | No | Challenge generation timestamp (`DEFAULT NOW()`) |
+
+### Constraints & Security Rules
+
+- **Raw Code Storage Forbidden**: The raw 6-digit numeric CSPRNG code is NEVER stored in plaintext or logged; only the salted SHA-256 hash `sha256(challengeId:otp)` is persisted.
+- **Short TTL & Single-Use**: Expiration is strictly 60 seconds (`NOW() + 60s`). Upon successful verification, the challenge is immediately marked with `used_at = NOW()`. Expired or consumed challenges cannot be replayed.
+- **Attempt Throttling**: A hard limit of 3 failed attempts is enforced. Reaching 3 failed attempts immediately burns the challenge (`attempts >= max_attempts`).
+- **Atomic Session Displacement**: Verification runs inside an interactive transaction with row lock (`SELECT id FROM users WHERE id = $1 FOR UPDATE`), revoking prior active sessions (`revoked_at = NOW()`), creating a new session, updating `last_login_at`, and writing `auth.session.force_recovered` audit log synchronously.
+- **Foreign Key Cascade**: Associated records are cascade-deleted on user deletion (`ON DELETE CASCADE`).
+
+### Recommended Indexes
+
+```text
+INDEX session_recovery_challenges_user_id_idx ON session_recovery_challenges (user_id)
+INDEX session_recovery_challenges_expires_at_idx ON session_recovery_challenges (expires_at)
 ```
 
 ---

@@ -501,20 +501,45 @@ Controls may include:
 
 To prevent credential sharing, concurrent operational conflicts, and session hijacking risks, the system strictly enforces a single active session policy:
 
-- **Maximum 1 Active Session**: Each user account is permitted exactly one valid active session at any given time.
+- **Maximum 1 Active Session**: Each user account is permitted at most one valid active session at any given time (`activeSessions <= 1`).
 - **Denial & Preservation Semantics**: When valid credentials (`email` + `password`) are provided during `POST /api/v1/auth/login`, if an active session already exists (where `revokedAt IS NULL`, `NOW() < expiresAt`, and `NOW() - lastSeenAt <= 30m`), the login request is rejected with HTTP 409 Conflict (`ACTIVE_SESSION_EXISTS`).
-- **Existing Session Integrity**: The existing valid active session is NEVER revoked, invalidated, or downgraded by the rejected concurrent login attempt from a different device.
-- **Same-Client Session Recovery**: When a legitimate client attempts to re-login after local cookie clearance or expiration on the same browser, the session service verifies identity via `existingToken` hash comparison or matching client environment (`ipAddress` + `userAgent`). Upon match, previous sessions are rotated safely without triggering an HTTP 409 lock-out.
+- **Existing Session Integrity**: The existing valid active session is NEVER revoked, invalidated, or downgraded by a rejected concurrent login attempt from another browser or device.
+- **Elimination of IP/User-Agent Heuristics**: Dynamic or heuristic client matching (e.g. relying on matching IP and User-Agent) has been permanently eliminated per `DEC-AUTH-110` / `TASK-0218`. Such heuristics are unreliable across mobile carriers, VPNs, and dynamic NAT, and introduce impersonation risks. Instead, legitimate users reclaiming their account MUST complete explicit out-of-band OTP verification.
 - **Automatic Stale Session Cleanup**: Expired (`NOW() >= expiresAt`), idle-timed-out (`NOW() - lastSeenAt > 30m`), or revoked sessions are soft-revoked inside the transaction and do not block subsequent logins.
-- **Database Concurrency Guarantee**: Single active session checks are executed atomically inside a PostgreSQL/Prisma transaction using user row locking (`SELECT id FROM users ... FOR UPDATE`) and indexed lookups on `sessions(user_id, revoked_at, expires_at)`.
+- **Database Concurrency Guarantee**: Single active session checks are executed atomically inside a PostgreSQL/Prisma transaction using user row locking (`SELECT id FROM users WHERE id = $1 FOR UPDATE`) and indexed lookups on `sessions(user_id, revoked_at, expires_at)`.
 
 ### 9.7 Login Transaction Atomicity, Audit Durability & WAN Latency Optimization (DEC-AUTH-108)
 
 Security controls governing the login performance optimization:
 
-- **Stable Relation Query Loading**: Replaced experimental `relationLoadStrategy: 'join'` with Prisma's thread-safe standard relation loader, avoiding Rust query-engine runtime panics under concurrent logins.
+- **Stable Relation Query Loading**: Standard Prisma relation loading is used in place of experimental join loading strategies to guarantee thread safety and engine stability under concurrent requests.
 - **Synchronous Audit Log & State Durability**: `tx.auditLog.create` and `tx.user.update({ lastLoginAt })` remain strictly synchronous inside the interactive database transaction (`AUTH_LOGIN_SUCCESS`) under the acquired row lock (`SELECT id FROM users FOR UPDATE`). If audit logging fails, the transaction rolls back, ensuring zero partial state or orphan sessions.
-- **Fail-Closed Session Recovery**: Client environment matching requires both identical IP address and exact User-Agent string. In any ambiguous or mismatched scenario without a valid token hash, the system defaults to fail-closed rejection with HTTP 409.
+- **Fail-Closed Concurrent Guard**: In any ambiguous, concurrent, or conflicting scenario, the system defaults to fail-closed rejection with HTTP 409 `ACTIVE_SESSION_EXISTS`, returning recovery availability metadata (`canRecover: true`).
+
+### 9.8 OTP-Based Single-Session Force-Recovery Security (DEC-AUTH-110 / TASK-0218)
+
+When a user's browser cookie is deleted, cleared, or lost (e.g. private browsing closed, browser data wiped, or machine restarted), their previous session may remain active in the database until idle timeout (30 minutes) or absolute expiration (8 hours). Under strict single-session rules, this orphaned session blocks the legitimate user from logging back in. To resolve this without weakening security or falling back to spoofable heuristics, the system provides a cryptographic OTP-based force-recovery flow:
+
+- **Pre-Authentication Barrier**: `POST /api/v1/auth/session-recovery/challenge` requires valid email and password credentials. An unauthenticated attacker cannot trigger recovery codes or spam account holders.
+- **Active Session Prerequisite**: Challenge creation checks if an active session genuinely exists. If no active session exists, the endpoint directs the client to standard login.
+- **Cryptographic Code Generation & Hashing**:
+  - A 6-digit numeric OTP (`100000`–`999999`) is generated via Node.js `crypto.randomInt`.
+  - The plaintext OTP is NEVER stored in the database, logged, or serialized into responses.
+  - The database persists only a salted SHA-256 hash: `sha256(challengeId:otp)` in `session_recovery_challenges.otp_hash`. Salting with the challenge UUID prevents pre-computed rainbow table or cross-challenge correlation attacks.
+- **Short TTL & Single-Use**:
+  - The challenge strictly expires after **60 seconds** (`expires_at = NOW() + 60s`).
+  - Upon successful verification, the challenge is immediately marked with `used_at = NOW()`. A used challenge cannot be reused or replayed.
+- **Brute-Force & Attempt Throttling**:
+  - A hard limit of **3 verification attempts** (`max_attempts = 3`) is enforced per challenge.
+  - Each invalid submission increments the `attempts` counter. Upon reaching the limit, the challenge is immediately burned/expired.
+  - Verification uses `crypto.timingSafeEqual` between the candidate hash and stored hash to eliminate timing side-channel attacks.
+- **Atomic Session Displacement**:
+  - Verification (`POST /api/v1/auth/session-recovery/verify`) executes in an interactive transaction with an exclusive row lock (`SELECT id FROM users WHERE id = $1 FOR UPDATE`).
+  - Inside the lock: the challenge is marked used, all existing active sessions for the user are revoked (`revoked_at = NOW()`), a new active session is created and assigned to the user, and an audit log (`auth.session.force_recovered`) is durably written.
+- **Anti-Abuse & Rate Limiting**:
+  - Challenge generation is rate-limited to **3 requests per minute** per IP and per user account.
+  - Verification submissions are rate-limited to **5 requests per minute** per IP.
+  - Transactional OTP email delivery via Resend uses bounded exponential backoff retry for network resilience with recipient and code redaction.
 
 ---
 

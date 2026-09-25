@@ -51,15 +51,13 @@ describe('Session Service Unit Tests', () => {
     expect(sessionExistsErr.name).toBe('ActiveSessionExistsError');
   });
 
-  it('4. loginUser rotates session when existingToken matches active session hash', async () => {
-    const rawExistingToken = 'existing-raw-token-12345678901234';
-    const existingHash = hashSessionToken(rawExistingToken);
+  it('4. loginUser creates a new session and succeeds on first login when no active session exists', async () => {
     const mockHash = await hashPassword('ValidPassword123!');
 
     const mockUser = {
       id: '11111111-1111-1111-1111-111111111111',
-      email: 'rotate.user@example.com',
-      fullName: 'Rotate User',
+      email: 'first.user@example.com',
+      fullName: 'First User',
       passwordHash: mockHash,
       accountStatus: AccountStatus.ACTIVE,
       emailVerifiedAt: new Date(),
@@ -68,27 +66,12 @@ describe('Session Service Unit Tests', () => {
       userRoles: [{ revokedAt: null, role: { code: 'ADMIN' } }],
     };
 
-    const mockActiveSession = {
-      id: 'session-old-1',
-      sessionTokenHash: existingHash,
-      userId: mockUser.id,
-      expiresAt: new Date(Date.now() + 3600000),
-      lastSeenAt: new Date(),
-      revokedAt: null,
-    };
-
-    const updatedSessions: any[] = [];
     const createdSessions: any[] = [];
 
     const mockTx = {
       $executeRaw: vi.fn().mockResolvedValue(1),
       session: {
-        updateMany: vi.fn().mockImplementation((args) => {
-          updatedSessions.push(args);
-          return { count: 1 };
-        }),
-        findMany: vi.fn().mockResolvedValue([mockActiveSession]),
-        findFirst: vi.fn().mockResolvedValue(mockActiveSession),
+        findMany: vi.fn().mockResolvedValue([]),
         create: vi.fn().mockImplementation((args) => {
           createdSessions.push(args.data);
           return args.data;
@@ -114,20 +97,12 @@ describe('Session Service Unit Tests', () => {
 
     const result = await loginUser(
       mockPrisma,
-      { email: 'rotate.user@example.com', password: 'ValidPassword123!' },
-      { existingToken: rawExistingToken }
+      { email: 'first.user@example.com', password: 'ValidPassword123!' },
+      { ipAddress: '192.168.1.100', userAgent: 'Chrome/120' }
     );
 
     expect(result.rawToken).toBeDefined();
-    expect(result.user.email).toBe('rotate.user@example.com');
-    // Verify old session was revoked via updateMany
-    expect(mockTx.session.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { userId: mockUser.id, revokedAt: null },
-        data: expect.objectContaining({ revokedAt: expect.any(Date) }),
-      })
-    );
-    // Verify new session was created
+    expect(result.user.email).toBe('first.user@example.com');
     expect(createdSessions.length).toBe(1);
     expect(createdSessions[0].userId).toBe(mockUser.id);
   });
@@ -283,13 +258,13 @@ describe('Session Service Unit Tests', () => {
     expect(mockTx.session.create).toHaveBeenCalled();
   });
 
-  it('7. loginUser allows same-client session recovery when cookie is lost/cleared but IP and User-Agent match', async () => {
+  it('7. loginUser rejects with ActiveSessionExistsError for multi-tab/window scenario with identical IP and User-Agent', async () => {
     const mockHash = await hashPassword('ValidPassword123!');
 
     const mockUser = {
       id: '33333333-3333-3333-3333-333333333333',
-      email: 'recovery.user@example.com',
-      fullName: 'Recovery User',
+      email: 'multitab.user@example.com',
+      fullName: 'MultiTab User',
       passwordHash: mockHash,
       accountStatus: AccountStatus.ACTIVE,
       emailVerifiedAt: new Date(),
@@ -299,84 +274,60 @@ describe('Session Service Unit Tests', () => {
     };
 
     const mockActiveSession = {
-      id: 'session-recovery-1',
-      sessionTokenHash: hashSessionToken('lost-token-on-browser'),
+      id: 'session-tab-1',
+      sessionTokenHash: hashSessionToken('active-token-tab-1'),
       userId: mockUser.id,
       expiresAt: new Date(Date.now() + 3600000),
       lastSeenAt: new Date(),
       revokedAt: null,
       ipAddress: '203.0.113.195',
-      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
     };
-
-    const updatedSessions: any[] = [];
-    const createdSessions: any[] = [];
 
     const mockTx = {
       $executeRaw: vi.fn().mockResolvedValue(1),
       session: {
-        updateMany: vi.fn().mockImplementation((args) => {
-          updatedSessions.push(args);
-          return { count: 1 };
-        }),
+        updateMany: vi.fn(),
         findMany: vi.fn().mockResolvedValue([mockActiveSession]),
-        findFirst: vi.fn().mockResolvedValue(mockActiveSession),
-        create: vi.fn().mockImplementation((args) => {
-          createdSessions.push(args.data);
-          return args.data;
-        }),
-      },
-      user: {
-        update: vi.fn().mockResolvedValue(mockUser),
-      },
-      auditLog: {
-        create: vi.fn().mockResolvedValue({ id: 'audit-recovery' }),
+        create: vi.fn(),
       },
     };
 
     const mockPrisma: any = {
       user: {
         findUnique: vi.fn().mockResolvedValue(mockUser),
-        update: vi.fn().mockResolvedValue(mockUser),
       },
       $transaction: vi.fn().mockImplementation(async (callback) => {
         return callback(mockTx);
       }),
     };
 
-    // Request arrives with NO existingToken (lost/deleted cookie), but identical IP and User-Agent
-    const result = await loginUser(
-      mockPrisma,
-      { email: 'recovery.user@example.com', password: 'ValidPassword123!' },
-      {
-        ipAddress: '203.0.113.195',
-        userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-      }
-    );
+    // Second tab or window on same browser/device sends identical IP and User-Agent
+    await expect(
+      loginUser(
+        mockPrisma,
+        { email: 'multitab.user@example.com', password: 'ValidPassword123!' },
+        {
+          ipAddress: '203.0.113.195',
+          userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        }
+      )
+    ).rejects.toThrow(ActiveSessionExistsError);
 
-    expect(result.rawToken).toBeDefined();
-    expect(result.user.email).toBe('recovery.user@example.com');
-    // Old session should be revoked
-    expect(mockTx.session.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { userId: mockUser.id, revokedAt: null },
-        data: expect.objectContaining({ revokedAt: expect.any(Date) }),
-      })
-    );
-    // New session created
-    expect(createdSessions.length).toBe(1);
-    expect(createdSessions[0].userId).toBe(mockUser.id);
+    // Existing active session must NOT be revoked or modified
+    expect(mockTx.session.updateMany).not.toHaveBeenCalled();
+    expect(mockTx.session.create).not.toHaveBeenCalled();
   });
 
-  it('8. loginUser allows same-client session recovery when previous session token for this user is provided', async () => {
+  it('8. loginUser rejects with ActiveSessionExistsError even when existingToken is provided while session is active', async () => {
     const mockHash = await hashPassword('ValidPassword123!');
-    const previousToken = 'previous-valid-session-token-user-1';
-    const previousTokenHash = hashSessionToken(previousToken);
+    const activeRawToken = 'active-token-user-1';
+    const activeTokenHash = hashSessionToken(activeRawToken);
 
     const mockUser = {
       id: '44444444-4444-4444-4444-444444444444',
-      email: 'prev.token@example.com',
-      fullName: 'Prev Token User',
+      email: 'samecookie.user@example.com',
+      fullName: 'Same Cookie User',
       passwordHash: mockHash,
       accountStatus: AccountStatus.ACTIVE,
       emailVerifiedAt: new Date(),
@@ -386,75 +337,45 @@ describe('Session Service Unit Tests', () => {
     };
 
     const mockActiveSession = {
-      id: 'session-active-different-hash',
-      sessionTokenHash: hashSessionToken('active-token-hash-xyz'),
+      id: 'session-active-1',
+      sessionTokenHash: activeTokenHash,
       userId: mockUser.id,
       expiresAt: new Date(Date.now() + 3600000),
       lastSeenAt: new Date(),
       revokedAt: null,
       ipAddress: '10.0.0.1',
-      userAgent: 'Unknown UA',
+      userAgent: 'Chrome/120',
     };
-
-    const mockPreviousSession = {
-      id: 'session-prev-1',
-      sessionTokenHash: previousTokenHash,
-      userId: mockUser.id,
-      expiresAt: new Date(Date.now() - 3600000),
-      revokedAt: new Date(Date.now() - 3600000),
-    };
-
-    const updatedSessions: any[] = [];
-    const createdSessions: any[] = [];
 
     const mockTx = {
       $executeRaw: vi.fn().mockResolvedValue(1),
       session: {
-        updateMany: vi.fn().mockImplementation((args) => {
-          updatedSessions.push(args);
-          return { count: 1 };
-        }),
+        updateMany: vi.fn(),
         findMany: vi.fn().mockResolvedValue([mockActiveSession]),
-        findFirst: vi
-          .fn()
-          .mockResolvedValueOnce(mockActiveSession) // active check
-          .mockResolvedValueOnce(mockPreviousSession), // previousToken check
-        create: vi.fn().mockImplementation((args) => {
-          createdSessions.push(args.data);
-          return args.data;
-        }),
-      },
-      user: {
-        update: vi.fn().mockResolvedValue(mockUser),
-      },
-      auditLog: {
-        create: vi.fn().mockResolvedValue({ id: 'audit-prev' }),
+        create: vi.fn(),
       },
     };
 
     const mockPrisma: any = {
       user: {
         findUnique: vi.fn().mockResolvedValue(mockUser),
-        update: vi.fn().mockResolvedValue(mockUser),
       },
       $transaction: vi.fn().mockImplementation(async (callback) => {
         return callback(mockTx);
       }),
     };
 
-    const result = await loginUser(
-      mockPrisma,
-      { email: 'prev.token@example.com', password: 'ValidPassword123!' },
-      { existingToken: previousToken }
-    );
+    // Submitting login with existing token when active session exists
+    await expect(
+      loginUser(
+        mockPrisma,
+        { email: 'samecookie.user@example.com', password: 'ValidPassword123!' },
+        { existingToken: activeRawToken }
+      )
+    ).rejects.toThrow(ActiveSessionExistsError);
 
-    expect(result.rawToken).toBeDefined();
-    expect(result.user.email).toBe('prev.token@example.com');
-    expect(mockTx.session.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { userId: mockUser.id, revokedAt: null },
-      })
-    );
-    expect(createdSessions.length).toBe(1);
+    // Existing active session must NOT be revoked or modified
+    expect(mockTx.session.updateMany).not.toHaveBeenCalled();
+    expect(mockTx.session.create).not.toHaveBeenCalled();
   });
 });

@@ -1295,4 +1295,41 @@ The following facts are supported by the verified decisions governance of `TASK-
      - Frontend/documentation only. No Supabase migrations, edge function deployments, or container updates required.
 <!-- Reconciled: 2026-09-24 -->
 
+---
+
+## DEC-AUTH-112: OTP-Based Single-Session Force-Recovery Flow & Prisma Dual-Connection Architecture
+- **Status:** APPROVED & IMPLEMENTED (2026-09-25)
+- **Related Task IDs:** `TASK-0217`, `TASK-0218`
+- **Context:**
+  Under `TASK-0217` (`DEC-AUTH-107`), the application strictly enforces a single active session limit ($\le 1$). While this prevents concurrent session collision and credential sharing, an operational failure mode emerged: when users clear browser cookies, close private browsing windows, or switch devices, their existing session remains active in the PostgreSQL database until idle timeout (30 minutes) or absolute expiration (8 hours). Previous attempts at same-client heuristic matching (comparing IP address and User-Agent) proved fragile across dynamic mobile IP changes, NAT environments, and browser updates, while opening an impersonation attack surface. The system required a secure, out-of-band method for legitimate users to displace orphaned sessions without weakening single-session guarantees.
+  Additionally, running Prisma CLI migrations (`prisma migrate`) directly against the Supabase Transaction Pooler (`DATABASE_URL` on port 6543) caused migration commands to hang indefinitely because PgBouncer transaction pooling does not support PostgreSQL session-level advisory locks (`pg_advisory_lock`).
+- **Decision & Implementation Directives:**
+  1. **Strict Single Active Session Preservation**:
+     - Maintained `activeSessions <= 1` invariant at all times.
+     - Login with valid credentials when an active session exists returns HTTP 409 Conflict with error code `ACTIVE_SESSION_EXISTS` and metadata `{ canRecover: true }`.
+     - The existing session is preserved and never automatically revoked or downgraded by the concurrent attempt.
+  2. **Elimination of IP/User-Agent Heuristics**:
+     - Dynamic IP and User-Agent matching has been permanently retired. All session displacements require explicit out-of-band cryptographic verification.
+  3. **Cryptographic OTP Force-Recovery Flow**:
+     - `POST /api/v1/auth/session-recovery/challenge` requires pre-authenticated credentials (`email`, `password`) and an existing active session.
+     - Generates 6-digit numeric CSPRNG code (`100000`–`999999`) and persists only challenge-salted SHA-256 hash `sha256(challengeId:otp)` in `session_recovery_challenges.otp_hash`. Plaintext OTP is never stored in DB or logged.
+     - Dispatches code via Resend transactional email with `expires_at = NOW() + 60s`.
+     - `POST /api/v1/auth/session-recovery/verify` validates code with `crypto.timingSafeEqual`, throttles to max 3 attempts before burning challenge, and runs an atomic transaction under user row lock (`SELECT id FROM users WHERE id = $1 FOR UPDATE`) to revoke old sessions, create new session, set HttpOnly cookie, and emit `auth.session.force_recovered` audit log.
+  4. **Consolidated UI Copy & Modal Experience**:
+     - Consolidated `ACTIVE_SESSION_EXISTS` alert copy in `apps/web/app/(auth)/login/login-view.tsx` into a direct actionable question (*"Your account currently has an active session on another browser or device. Would you like to terminate that session and sign in on this device?"* / *"Akun Anda saat ini memiliki sesi aktif di browser atau perangkat lain. Apakah Anda ingin mengakhiri sesi tersebut dan masuk di perangkat ini?"*).
+     - Removed redundant secondary body text from the alert.
+     - Rendered clean session recovery modal with auto-focused 6-digit input, 60s countdown timer, and safe cancel action.
+  5. **Prisma Dual-Connection Architecture (`directUrl`)**:
+     - In `packages/database/prisma/schema.prisma`, configured:
+       ```prisma
+       datasource db {
+         provider  = "postgresql"
+         url       = env("DATABASE_URL")
+         directUrl = env("DIRECT_URL")
+       }
+       ```
+     - Application runtime queries continue using high-concurrency Supabase Transaction Pooler (`DATABASE_URL` on port 6543).
+     - Prisma CLI schema migrations route via `DIRECT_URL` (port 5432 Session Mode Pooler / direct) which fully supports PostgreSQL session-level advisory locks (`pg_advisory_lock`), eliminating command hangs.
+<!-- TASK-0217 and TASK-0218 Reconciled: 2026-09-25 -->
+
 

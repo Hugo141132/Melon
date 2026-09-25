@@ -55,7 +55,7 @@ export default function UserManagementPage() {
   const tCommon = useTranslations('common');
   const tAuth = useTranslations('auth');
 
-  const { role, user: currentUser } = useAuth();
+  const { role, user: currentUser, setUser, invalidateSession } = useAuth();
   const isOwner = role === 'OWNER';
 
   // List state
@@ -266,6 +266,12 @@ export default function UserManagementPage() {
         if (roleFilter !== 'ALL') params.set('role', roleFilter);
 
         const res = await fetch(`/api/v1/users?${params.toString()}`);
+        if (res.status === 401) {
+          setUser?.(null);
+          invalidateSession?.();
+          window.location.href = '/login?redirect=/users';
+          return;
+        }
         const json = await res.json();
 
         if (json.success) {

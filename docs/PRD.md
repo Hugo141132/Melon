@@ -277,6 +277,19 @@ The profile management interface (`/profile`) shall:
 - Omit client IP address and User-Agent from display to prevent unapproved PII leakage.
 - Wire "Change Password" directly to existing endpoint `POST /api/v1/auth/change-password`, revoking all active sessions and redirecting to `/login` upon success.
 
+### 6.10 Single Active Session Enforcement & OTP Force-Recovery (DEC-AUTH-107 / DEC-AUTH-112)
+
+The session security model shall:
+
+- Enforce a strict single active session policy per user account ($\le 1$). Concurrent active sessions across multiple browsers, devices, or tabs are prohibited (`DEC-AUTH-107`).
+- Reject login attempts for accounts with an existing active session with HTTP 409 Conflict (`ACTIVE_SESSION_EXISTS`) and metadata `canRecover: true`, preserving the existing live session without revocation.
+- Prevent multi-window and concurrent login race conditions using database row-level locking (`SELECT id FROM users WHERE id = $1 FOR UPDATE`) inside an interactive `$transaction`.
+- Automatically soft-revoke idle-timed-out (`> 30m`) and expired (`> 8h`) sessions upon new login attempts.
+- Support out-of-band force-recovery (`DEC-AUTH-112` / `TASK-0218`) via single-use 6-digit numeric OTP delivered to the account email to safely resolve orphaned sessions (e.g., cleared cookies or closed incognito tabs).
+- Require valid password credentials prior to issuing a recovery challenge (`POST /api/v1/auth/session-recovery/challenge`).
+- Enforce a 60-second OTP expiration, maximum 3 verification attempts, timing-safe verification, and salted SHA-256 OTP hashing (`sha256(challengeId:otp)`).
+- Atomically revoke existing sessions, create a single new session, and write an immutable audit log (`auth.session.force_recovered`) upon successful verification (`POST /api/v1/auth/session-recovery/verify`).
+
 ---
 
 ## 7. Product Scope

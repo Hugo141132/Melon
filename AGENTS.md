@@ -322,6 +322,24 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
     - Role Display Text Standardization: Updated `roleAdminLabel` in `apps/web/messages/id.json` and `apps/web/messages/en.json` from `Administrator` to `ADMINISTRATOR`. Standardized role display across filter dropdowns, table row badges, and user detail modals.
     - Verification & Automated Tests: Added dedicated test suite `Owner User Management Visibility & Verification Invariants` in `packages/database/test/user-repository.test.ts` (4/4 tests passed), updated UI test assertions in `apps/web/test/unit/users-bulk-delete-ui.test.tsx` (8/8 passed), added tests for `ADMINISTRATOR` badge and defensive filtering in `apps/web/test/unit/users-page.test.tsx` (4/4 passed), verified API route tests in `apps/web/app/api/v1/users/test/route.test.ts` (28/28 passed), and confirmed 0 TypeScript typecheck errors across all 4 monorepo packages. Live development database query verified unverified applicant `hihi` is cleanly excluded.
 
+#### TASK-0218 Governance Record
+
+`TASK-0218` OTP-based single-session force-recovery flow record:
+- Status: `DONE` (Implemented & Verified 2026-09-25)
+- Priority: `P0` (Security-critical session enforcement & lockout recovery)
+- Frontend impact: `MINOR`
+- Selected UI direction: `Premium Minimal Ops`
+- Existing color template: `UNCHANGED`
+- Selected motion effects: `Modal`, `Button hover`
+- 21st.dev MCP: `NOT REQUIRED`
+- Summary: Implemented OTP-based single-session force-recovery flow conforming to `DEC-AUTH-107`, `DEC-AUTH-112`, and strict single active session security (max active sessions = 1).
+  - Challenge Invariant & Credentials Gate: When a user attempts to log in with valid credentials while an active unrevoked session exists, `POST /api/v1/auth/login` returns HTTP 409 `ACTIVE_SESSION_EXISTS` with metadata `canRecover: true` without revoking the pre-existing session.
+  - OTP Challenge Generation (`POST /api/v1/auth/session-recovery/challenge`): Requires valid email and password to prevent unauthorized OTP generation. Validates existence of an active session to recover. Generates a secure single-use 6-digit numeric OTP with 60-second expiration. Salts OTP with `challengeId` and hashes using SHA-256 (`otpHash`), ensuring raw OTP is never stored in the database. Dispatches transactional recovery email with Resend.
+  - Challenge Verification & Displacement (`POST /api/v1/auth/session-recovery/verify`): Validates OTP using timing-safe comparison. Limits verification to 3 attempts (on 3rd failure, challenge is immediately consumed). Upon successful verification, an atomic transaction row-locks the user (`SELECT ... FOR UPDATE`), marks challenge consumed, revokes all previous active sessions (`revokedAt = NOW()`), creates a new single active session, sets HttpOnly `session_token` cookie, and records a synchronous audit log with event key `auth.session.force_recovered`.
+  - Frontend Recovery Modal & Consolidated Alert Copy: Refined `ACTIVE_SESSION_EXISTS` alert copy into a single, cohesive message ("Your account currently has an active session on another browser or device. Would you like to terminate that session and sign in on this device?"), eliminating duplicate secondary text. Integrated an accessible, high-contrast modal on `/login` that appears when HTTP 409 is returned, supporting a confirmation step and OTP input step with a live 60-second countdown timer, resend action upon timer expiry, and automatic session hydration and redirect on recovery success.
+  - Prisma Dual-Connection Architecture: Configured `directUrl = env("DIRECT_URL")` on PostgreSQL session pooler (port 5432) in `schema.prisma` to support PostgreSQL session-level advisory locks (`pg_advisory_lock`) required by Prisma Migrate, while retaining `DATABASE_URL` (port 6543 Transaction Pooler) for production runtime queries. Applied migration `20260925150000_add_session_recovery_challenges` cleanly to live development database (`unbyxlkrzqlafolxcypi`).
+  - Verification: Added test suites `packages/database/test/session-recovery.test.ts` (13/13 passed), `apps/web/test/unit/login-view-recovery.test.tsx` (6/6 passed), `apps/web/app/api/v1/auth/session-recovery/challenge/test/route.test.ts` (7/7 passed), and `apps/web/app/api/v1/auth/session-recovery/verify/test/route.test.ts` (8/8 passed). All 34 tests across 5 session suites passed (100%). Monorepo typecheck passed with 0 errors across 4 workspaces (`@kebun-melon/iot-gateway`, `@kebun-melon/web`, `@kebun-melon/contracts`, `@kebun-melon/database`).
+
 #### TASK-0217 Governance Record
 
 `TASK-0217` single active session enforcement and profile security UI record:

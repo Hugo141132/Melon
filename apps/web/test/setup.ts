@@ -77,6 +77,21 @@ vi.mock('next-intl', () => {
   };
 });
 
+vi.mock('next/navigation', () => {
+  return {
+    usePathname: () => '/',
+    useRouter: () => ({
+      push: vi.fn(),
+      prefetch: vi.fn(),
+      refresh: vi.fn(),
+      replace: vi.fn(),
+      back: vi.fn(),
+      forward: vi.fn(),
+    }),
+    useSearchParams: () => new URLSearchParams(),
+  };
+});
+
 // Reset rate limits and DOM after each test to prevent cross-test pollution
 beforeEach(() => {
   clearRateLimitStore();

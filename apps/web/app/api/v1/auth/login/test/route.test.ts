@@ -139,4 +139,29 @@ describe('POST /api/v1/auth/login Route Handler Unit Tests', () => {
     expect(json.success).toBe(false);
     expect(json.error.code).toBe('ACTIVE_SESSION_EXISTS');
   });
+
+  it('6. Returns 409 Conflict ACTIVE_SESSION_EXISTS on multi-tab/window attempt with identical IP and User-Agent', async () => {
+    vi.spyOn(dbModule, 'loginUser').mockRejectedValueOnce(new dbModule.ActiveSessionExistsError());
+
+    const req = new Request('http://localhost:3000/api/v1/auth/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-forwarded-for': '203.0.113.195',
+        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0',
+        cookie: 'session_token=existing-active-token',
+      },
+      body: JSON.stringify({
+        email: 'user@example.com',
+        password: 'ValidPassword123!',
+      }),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(409);
+
+    const json = await res.json();
+    expect(json.success).toBe(false);
+    expect(json.error.code).toBe('ACTIVE_SESSION_EXISTS');
+  });
 });

@@ -489,15 +489,35 @@ ACCOUNT_REJECTED
 ACCOUNT_SUSPENDED
 ACCOUNT_DEACTIVATED
 EMAIL_NOT_VERIFIED
-ACTIVE_SESSION_EXISTS (HTTP 409 Conflict - single active session policy per DEC-AUTH-107)
+ACTIVE_SESSION_EXISTS (HTTP 409 Conflict - single active session policy per DEC-AUTH-107 / TASK-0217)
 ```
 
-Server rules & performance profile (`DEC-AUTH-108`):
+Active session conflict response (`HTTP 409 Conflict`):
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "ACTIVE_SESSION_EXISTS",
+    "message": "An active session already exists for this account. Concurrent sessions are not permitted.",
+    "details": {
+      "canRecover": true
+    }
+  },
+  "meta": {
+    "requestId": "req-login-1727280000001"
+  }
+}
+```
+
+Server rules & performance profile (`DEC-AUTH-107`, `DEC-AUTH-108`, `DEC-AUTH-110`):
 
 - **Thread-Safe Relation Lookup**: Uses Prisma's standard stable relation loader to load user, active assignments, and role codes, avoiding experimental query engine panics under concurrent requests.
-- **Interactive Transaction**: Uses advisory row lock (`FOR UPDATE`), checks unrevoked sessions in 1 round trip (`findMany`), creates rotated session, atomically updates `lastLoginAt`, and synchronously commits `AUTH_LOGIN_SUCCESS` audit log (~1,200ms).
+- **Interactive Transaction with Row-Level Locking**: Uses an exclusive row-level lock (`SELECT id FROM users WHERE id = ... FOR UPDATE`), checks unrevoked sessions in 1 round trip (`findMany`), creates rotated session, atomically updates `lastLoginAt`, and synchronously commits `AUTH_LOGIN_SUCCESS` audit log (~1,200ms).
+- **Strict Single Active Session Enforcement (`DEC-AUTH-107` / `TASK-0217`)**: Each user account is strictly limited to at most 1 active, non-expired, non-revoked session. Multi-device, multi-browser, or multi-tab logins while an active session exists are denied with HTTP 409 Conflict without invalidating or terminating the existing session.
+- **No IP/User-Agent Heuristic Matching**: IP and User-Agent heuristic matching has been permanently superseded by the explicit OTP session recovery challenge (`DEC-AUTH-110` / `TASK-0218`).
+- **Recovery Availability**: When HTTP 409 is returned, the response includes `details: { canRecover: true }`, signaling the frontend to present the single-session recovery flow (`POST /api/v1/auth/session-recovery/challenge`).
 - **Latency Expectation**: Reduced from ~3.6–4.2s to ~1.6–2.0s without transactional compromises.
-- **Same-Client Recovery**: If client presents an active session with matching `existingToken` or matching IP and User-Agent, previous session is rotated cleanly without 409 conflict. Concurrent logins from different devices remain strictly blocked with HTTP 409.
 
 ---
 
@@ -799,6 +819,135 @@ Server rules:
 Possible errors:
 - `400 Bad Request`: `VALIDATION_ERROR` (invalid email)
 - `429 Too Many Requests`: `TOO_MANY_REQUESTS`
+
+---
+
+## 10.10 Session Recovery Challenge (DEC-AUTH-110 / TASK-0218)
+
+```http
+POST /api/v1/auth/session-recovery/challenge
+```
+
+**Authentication:** Public / Requires Valid Account Credentials
+**Rate Limit:** Login rate limit (`RATE_LIMIT_LOGIN_MAX`, default: 5 requests/minute per IP)
+
+Request:
+
+```json
+{
+  "email": "user@example.com",
+  "password": "ValidPassword123!"
+}
+```
+
+Response (HTTP 200 OK):
+
+```json
+{
+  "success": true,
+  "data": {
+    "challengeId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "expiresAt": "2026-09-25T08:00:00.000Z",
+    "expiresInSeconds": 60,
+    "maskedEmail": "u***r@example.com"
+  },
+  "meta": {
+    "requestId": "req-rec-chal-1727280000002"
+  }
+}
+```
+
+Server rules:
+- Validates request payload using `SessionRecoveryChallengeInputSchema` (`email` and `password`).
+- Verifies credentials via `verifyPassword`. Throws `InvalidCredentialsError` (HTTP 401) on mismatch; unauthenticated callers cannot trigger OTP dispatch or challenge records.
+- Verifies user account status is `ACTIVE`. Throws `AccountStatusForbiddenError` (HTTP 403) for non-active states.
+- If primary role is `OWNER`, verifies `emailVerifiedAt` is present. Throws `UnverifiedEmailError` (HTTP 403) if unverified.
+- Asserts an active, unrevoked session exists for the user (`revokedAt = null`, `expiresAt > NOW()`). If no active session exists, throws `NoActiveSessionToRecoverError` (HTTP 400).
+- Generates a secure 6-digit numeric OTP via `crypto.randomInt(100000, 1000000)`.
+- Salts OTP with `challengeId` and stores only SHA-256 hash `sha256(`${challengeId}:${rawOtp}`)` in `session_recovery_challenges.otp_hash`. Plaintext OTP is never stored in the database.
+- Sets expiration strictly to 60 seconds (`expiresAt = Date.now() + 60_000`).
+- Transactionally invalidates previous unconsumed challenges for this user (`consumedAt = NOW()`).
+- Dispatches bilingual recovery OTP email via Resend (`sendSessionRecoveryOtpEmail`) with branded layout, inline logo (`cid:logo1`), monospace OTP box, 60s expiration notice, and security alert.
+
+Possible errors:
+- `400 Bad Request`: `VALIDATION_ERROR`, `NO_ACTIVE_SESSION`
+- `401 Unauthorized`: `INVALID_CREDENTIALS`
+- `403 Forbidden`: `ACCOUNT_PENDING_APPROVAL`, `ACCOUNT_SUSPENDED`, `ACCOUNT_DEACTIVATED`, `EMAIL_NOT_VERIFIED`
+- `429 Too Many Requests`: `TOO_MANY_REQUESTS`
+- `500 Internal Server Error`: `INTERNAL_ERROR`
+
+---
+
+## 10.11 Session Recovery Verify (DEC-AUTH-110 / TASK-0218)
+
+```http
+POST /api/v1/auth/session-recovery/verify
+```
+
+**Authentication:** Public / Requires Challenge ID & 6-Digit OTP
+**Rate Limit:** Login rate limit (`RATE_LIMIT_LOGIN_MAX`, default: 5 requests/minute per IP)
+
+Request:
+
+```json
+{
+  "challengeId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "otp": "849201"
+}
+```
+
+Response (HTTP 200 OK):
+
+```json
+{
+  "success": true,
+  "data": {
+    "session": {
+      "user": {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "email": "user@example.com",
+        "fullName": "User Name",
+        "role": "OWNER",
+        "activeRoles": ["OWNER"],
+        "accountStatus": "ACTIVE"
+      },
+      "expiresAt": "2026-09-25T08:30:00.000Z"
+    }
+  },
+  "meta": {
+    "requestId": "req-rec-ver-1727280000003"
+  }
+}
+```
+
+Set-Cookie Header:
+```text
+Set-Cookie: session_token=<token>; Path=/; HttpOnly; SameSite=Lax; Max-Age=1800; Priority=High
+```
+
+Server rules:
+- Validates request payload using `SessionRecoveryVerifyInputSchema` (`challengeId: UUID`, `otp: ^\d{6}$`).
+- Finds `session_recovery_challenges` record by `id`. If missing or already consumed (`consumedAt != null`), throws `ChallengeNotFoundError` (HTTP 404).
+- Checks expiration (`expiresAt < NOW()`). If expired, throws `ExpiredRecoveryOtpError` (HTTP 400).
+- Tracks attempt count: increments `attempts`. If `attempts >= maxAttempts` (3), immediately burns the challenge (`consumedAt = NOW()`) and throws `MaxRecoveryAttemptsExceededError` (HTTP 429).
+- Performs timing-safe comparison: `crypto.timingSafeEqual(Buffer.from(candidateHash), Buffer.from(challenge.otpHash))`.
+- If hash mismatches, records incremented attempts and throws `InvalidRecoveryOtpError` (HTTP 400) with remaining attempts count.
+- On successful match: executes atomic PostgreSQL transaction (`prisma.$transaction`):
+  1. Acquires exclusive row-level lock on user: `SELECT id FROM users WHERE id = $1 FOR UPDATE`.
+  2. Consumes challenge: `consumedAt = NOW()`.
+  3. Soft-revokes all existing active sessions for this user across all devices: `UPDATE sessions SET revoked_at = NOW() WHERE user_id = $1 AND revoked_at IS NULL`.
+  4. Generates high-entropy 256-bit CSPRNG session token.
+  5. Inserts new active session into `sessions` table.
+  6. Synchronously records structured audit log `auth.session.force_recovered` with actor user, IP, and User-Agent.
+- Issues secure, HttpOnly `session_token` cookie.
+- Guarantees strict single active session invariant ($\le 1$) is never violated even under concurrent attempts.
+
+Possible errors:
+- `400 Bad Request`: `VALIDATION_ERROR`, `INVALID_OTP`, `EXPIRED_OTP`
+- `404 Not Found`: `CHALLENGE_NOT_FOUND`
+- `409 Conflict`: `NO_ACTIVE_SESSION`
+- `429 Too Many Requests`: `MAX_RECOVERY_ATTEMPTS_EXCEEDED`, `TOO_MANY_REQUESTS`
+- `500 Internal Server Error`: `INTERNAL_ERROR`
 
 ---
 

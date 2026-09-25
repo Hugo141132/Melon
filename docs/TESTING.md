@@ -3197,3 +3197,65 @@ The following verification gates, automated test results, and authorization evid
 - Actuator physical safety invariant strictly preserved (`ENABLE_FAUCET_CONTROL=false`).
 <!-- Device Access Revocation Testing Reconciled: 2026-09-22 -->
 
+---
+
+## 35.13 TASK-0217 & TASK-0218 Single Active Session Enforcement & OTP Force-Recovery Evidence (2026-09-25)
+
+The following verification gates, automated test results, database migrations, and manual flow evidence were evaluated for Strict Single Active Session Enforcement (`TASK-0217`, `DEC-AUTH-107`) and OTP-Based Single-Session Force-Recovery Flow (`TASK-0218`, `DEC-AUTH-110`):
+
+### 1. Scope of Implementation & Security Invariants
+- **Strict Single Active Session Policy (`TASK-0217` / `DEC-AUTH-107`):**
+  - Enforced a hard limit of at most one active session per user account (`activeSessions <= 1`).
+  - Concurrent login attempts with valid credentials return HTTP 409 `ACTIVE_SESSION_EXISTS` with metadata `{ canRecover: true }`, preserving the existing active session without downgrade.
+  - Interactive PostgreSQL transaction under an exclusive row lock (`SELECT id FROM users WHERE id = $1 FOR UPDATE`) prevents concurrent login race conditions.
+  - Automatically prunes stale, expired (`NOW() >= expires_at`), or idle-timed-out (`NOW() - last_seen_at > 30m`) sessions without blocking clean logins.
+- **Cryptographic OTP Force-Recovery Flow (`TASK-0218` / `DEC-AUTH-110`):**
+  - Resolves orphaned active sessions created when users clear browser cookies or close private browsing windows without logging out.
+  - Permanently eliminates spoofable IP and User-Agent heuristic client matching in favor of explicit out-of-band email OTP verification.
+  - Requires valid password authentication before generating an OTP challenge, preventing spam or unauthenticated denial-of-service against account holders.
+  - Generates 6-digit numeric CSPRNG code (`100000`–`999999`) and persists only challenge-salted SHA-256 hash `sha256(challengeId:otp)` in `session_recovery_challenges.otp_hash`. Plaintext OTP is never stored in the database or logged.
+  - Enforces strict 60-second TTL (`expires_at = NOW() + 60s`) and a hard limit of 3 failed attempts (`max_attempts = 3`) before burning the challenge.
+  - Verification uses `crypto.timingSafeEqual` and executes atomic session displacement inside a database transaction with user row lock (`FOR UPDATE`), revoking old active sessions (`revoked_at = NOW()`), creating a new session, updating `last_login_at`, and writing `auth.session.force_recovered` audit log synchronously.
+- **Consolidated UI Copy & Modal Experience:**
+  - Consolidated `ACTIVE_SESSION_EXISTS` alert copy in `apps/web/app/(auth)/login/login-view.tsx` into a direct actionable question (*"Your account currently has an active session on another browser or device. Would you like to terminate that session and sign in on this device?"* / *"Akun Anda saat ini memiliki sesi aktif di browser atau perangkat lain. Apakah Anda ingin mengakhiri sesi tersebut dan masuk di perangkat ini?"*).
+  - Completely eliminated duplicate secondary body text.
+  - Integrated dedicated recovery modal with auto-focused 6-digit input, 60s countdown timer, masked recipient email, and safe cancel dismissal.
+- **Prisma Dual-Connection Architecture:**
+  - Configured `directUrl = env("DIRECT_URL")` in `packages/database/prisma/schema.prisma`.
+  - Application runtime maintains high-concurrency connection through Supabase Transaction Pooler (`DATABASE_URL` on port 6543), while Prisma CLI migrations route via `DIRECT_URL` (port 5432 Session Mode Pooler / direct) which supports PostgreSQL advisory locks (`pg_advisory_lock`).
+
+### 2. Evidence-Backed Automated Test Results
+- **Session Recovery Service Tests (`packages/database/test/session-recovery.test.ts`):**
+  - Result: **13/13 passed** (100%, exit code 0).
+  - Test assertions:
+    - `creates a session recovery challenge when password is valid and active session exists`: PASSED.
+    - `rejects challenge creation when credentials are invalid`: PASSED.
+    - `rejects challenge creation when no active session exists`: PASSED.
+    - `burns challenge after 3 failed verification attempts`: PASSED.
+    - `rejects expired challenges (> 60s)`: PASSED.
+    - `successfully verifies valid OTP and executes atomic session displacement with row lock`: PASSED.
+    - `synchronously writes auth.session.force_recovered audit log with displaced session ID`: PASSED.
+- **API Route Integration Tests:**
+  - `apps/web/app/api/v1/auth/session-recovery/challenge/test/route.test.ts`: **7/7 passed** (100%).
+  - `apps/web/app/api/v1/auth/session-recovery/verify/test/route.test.ts`: **8/8 passed** (100%).
+- **Frontend UI & Modal Vitest Suites:**
+  - `apps/web/test/unit/login-view-recovery.test.tsx`: **6/6 passed** (100%).
+    - Verifies consolidated alert message rendering and absence of duplicate body text.
+    - Verifies recovery modal display on "Send Recovery Code" click.
+    - Verifies 60-second countdown timer and 6-digit input behavior.
+    - Verifies safe modal cancellation without revoking active sessions.
+- **Monorepo Static Typecheck (`npm run typecheck`):**
+  - Result: **0 errors** across all 4 monorepo packages (`@kebun-melon/contracts`, `@kebun-melon/database`, `@kebun-melon/iot-gateway`, `@kebun-melon/web`), exit code 0.
+
+### 3. Live Development Database & Manual Verification Evidence
+- **Supabase Singapore Dev Migration Deployment:**
+  - Successfully applied `20260925150000_add_session_recovery_challenges` to PostgreSQL 17 Singapore Dev (`unbyxlkrzqlafolxcypi`).
+  - Verified `session_recovery_challenges` table structure, 8 columns, foreign key cascade to `users(id)`, and indexes on `user_id` and `expires_at`.
+- **Manual End-to-End Verification in Browser:**
+  - Authenticated as Owner on primary browser session (`ACTIVE` session established).
+  - Attempted login on secondary incognito browser session -> Encountered HTTP 409 `ACTIVE_SESSION_EXISTS` with consolidated recovery alert.
+  - Clicked "Send Recovery Code" -> Received 6-digit recovery code via transactional Resend email.
+  - Entered 6-digit code in recovery modal within 60s countdown -> Verification succeeded immediately, primary browser session was cleanly revoked, secondary browser received active session and navigated to `/dashboard`.
+  - Reloading primary browser session redirected cleanly to `/login` with expired session feedback.
+<!-- TASK-0217 and TASK-0218 Testing Evidence Reconciled: 2026-09-25 -->
+

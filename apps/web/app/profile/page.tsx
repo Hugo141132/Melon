@@ -31,7 +31,7 @@ export default function ProfilePage() {
   const tProfile = useTranslations('profile');
   const tCommon = useTranslations('common');
   const tAuth = useTranslations('auth');
-  const { user, isAuthenticated, updateUser } = useAuth();
+  const { user, isAuthenticated, updateUser, setUser, invalidateSession } = useAuth();
 
   const [profile, setProfile] = useState<UserProfileState | null>(
     user
@@ -96,7 +96,10 @@ export default function ProfilePage() {
         const res = await fetch('/api/v1/me');
 
         if (res.status === 401 || res.status === 403) {
-          if (isMounted && !user) {
+          if (isMounted) {
+            setUser?.(null);
+            invalidateSession?.();
+            setProfile(null);
             setUnauthenticated(true);
             setLoading(false);
           }
@@ -154,6 +157,9 @@ export default function ProfilePage() {
       });
 
       if (res.status === 401 || res.status === 403) {
+        setUser?.(null);
+        invalidateSession?.();
+        setProfile(null);
         setUnauthenticated(true);
         setSaving(false);
         return;
@@ -193,7 +199,7 @@ export default function ProfilePage() {
   };
 
   // 1. Unauthenticated state
-  if (unauthenticated && !user) {
+  if (unauthenticated || !user) {
     return (
       <div className="bg-app-surface text-app-on-surface min-h-dvh flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl p-6 max-w-sm w-full text-center space-y-4 soft-elevation">

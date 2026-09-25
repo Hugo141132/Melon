@@ -213,4 +213,51 @@ describe('ProfilePage Auth State Hydration and I18N', () => {
     expect(avatar).toBeInTheDocument();
     expect(screen.getByTestId('user-avatar-initial')).toHaveTextContent('B');
   });
+
+  it('displays session expired screen and invalidates auth state when /api/v1/me returns 401', async () => {
+    const mockSetUser = vi.fn();
+    const mockInvalidateSession = vi.fn();
+
+    mockAuthContext = {
+      user: {
+        id: 'usr-1',
+        fullName: 'Budi Santoso',
+        email: 'budi@example.com',
+        accountStatus: 'ACTIVE',
+        activeRoles: [UserRole.ADMIN],
+      },
+      role: UserRole.ADMIN,
+      isAuthenticated: true,
+      setUser: mockSetUser,
+      invalidateSession: mockInvalidateSession,
+    };
+
+    global.fetch = vi.fn().mockImplementation(() =>
+      Promise.resolve({
+        ok: false,
+        status: 401,
+        json: () =>
+          Promise.resolve({
+            success: false,
+            error: { code: 'UNAUTHENTICATED', message: 'Session expired' },
+          }),
+      })
+    );
+
+    render(
+      <NextIntlClientProvider locale="id" messages={idMessages}>
+        <ProfilePage />
+      </NextIntlClientProvider>
+    );
+
+    // Verify session invalidation is called
+    await vi.waitFor(() => {
+      expect(mockSetUser).toHaveBeenCalledWith(null);
+    });
+    expect(mockInvalidateSession).toHaveBeenCalled();
+
+    // Verify session expired screen appears
+    expect(screen.getByText('Sesi Berakhir')).toBeInTheDocument();
+    expect(screen.getByText(/Sesi Anda telah berakhir/i)).toBeInTheDocument();
+  });
 });

@@ -65,6 +65,7 @@ export function initializeTestDatabase(dbUrl: string): void {
   const scopedEnv = {
     ...process.env,
     DATABASE_URL: validated,
+    DIRECT_URL: validated,
     TEST_DATABASE_URL: validated,
     E2E_DATABASE_URL: validated,
   };

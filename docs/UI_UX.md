@@ -212,6 +212,30 @@ The 2026-09-24 visual integration unifies the registration view into a grounded 
 5. **Staging Impact**:
    - Frontend and documentation only. No Supabase database migration, edge function deployment, or container update required.
 
+### 1.10 Single-Session Conflict Alert Consolidation & OTP Recovery Modal Governance (TASK-0217 / TASK-0218 / DEC-AUTH-110)
+The 2026-09-25 authentication UX enhancement streamlines the `ACTIVE_SESSION_EXISTS` alert presentation and introduces a dedicated single-session recovery modal:
+- **Frontend impact:** `MINOR`
+- **Selected UI direction:** `Premium Minimal Ops`
+- **Existing color template:** `UNCHANGED`
+- **Selected motion effects:** `Modal`, `Button hover`
+- **21st.dev MCP:** `NOT REQUIRED`
+
+#### Presentation and Interaction Rules
+1. **Consolidated Active Session Alert Banner (`apps/web/app/(auth)/login/login-view.tsx`):**
+   - **Streamlined Single-Message Copy:** Replaced the redundant two-sentence warning stack with a direct, user-actionable message displayed directly in the alert error surface:
+     - Indonesian: *"Akun Anda saat ini memiliki sesi aktif di browser atau perangkat lain. Apakah Anda ingin mengakhiri sesi tersebut dan masuk di perangkat ini?"*
+     - English: *"Your account currently has an active session on another browser or device. Would you like to terminate that session and sign in on this device?"*
+   - **Elimination of Duplicate Body Text:** The secondary duplicate description text inside the alert is completely removed, eliminating visual clutter and redundant reading overhead.
+   - **Action Affordance:** The primary recovery button is cleanly anchored within the alert banner:
+     - Label: `"Send Recovery Code"` / `"Kirim Kode Pemulihan"`.
+     - Styling: Follows `Premium Minimal Ops` with high-contrast amber/yellow accent container (`bg-amber-600 hover:bg-amber-700 text-white font-medium rounded-lg text-sm px-4 py-2`).
+2. **Session Recovery Modal Dialog:**
+   - **Ergonomic Modal Structure:** Follows standard dialog overlay conventions with smooth fade/scale enter animation (`Modal` motion effect).
+   - **Contextual Masked Email:** Displays the destination email address with privacy masking so the user knows where the verification code was dispatched.
+   - **6-Digit Numeric Code Input:** Monospace, letter-spaced numeric input (`text-center tracking-widest text-2xl font-mono`) with automatic focus, numeric keyboard mode (`inputMode="numeric"`), and auto-trimming.
+   - **Real-Time 60-Second Countdown:** Displays live decrementing timer (`01:00` down to `00:00`) indicating OTP expiration. When expired, the input is disabled and a resend action becomes available after cooldown.
+   - **Accessible Action Controls:** Primary confirmation button (*"Verify & Terminate Other Session"* / *"Verifikasi & Akhiri Sesi Lain"*) and subtle Cancel button (*"Batal"* / *"Cancel"*). Canceling safely dismisses the modal without modifying or revoking the active session on the other device.
+
 ---
 
 ## 2. Source-of-Truth Hierarchy

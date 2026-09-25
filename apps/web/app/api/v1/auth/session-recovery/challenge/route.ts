@@ -1,15 +1,13 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@kebun-melon/database';
 import {
-  loginUser,
+  createSessionRecoveryChallenge,
   InvalidCredentialsError,
   AccountStatusForbiddenError,
-  SESSION_COOKIE_NAME,
-  SESSION_ABSOLUTE_LIFETIME_SECONDS,
   UnverifiedEmailError,
-  ActiveSessionExistsError,
+  NoActiveSessionToRecoverError,
 } from '@kebun-melon/database';
-import { AccountStatus, LoginInputSchema } from '@kebun-melon/contracts';
+import { AccountStatus, SessionRecoveryChallengeInputSchema } from '@kebun-melon/contracts';
 import { ZodError } from 'zod';
 import {
   checkRateLimit,
@@ -18,17 +16,24 @@ import {
   applyRateLimitToResponse,
 } from '@/lib/rate-limit';
 import { validateServerEnv } from '@/lib/env/server';
-import { extractSessionTokenFromRequest } from '@/lib/auth/rbac';
+import { sendSessionRecoveryOtpEmail } from '@/lib/email/resend';
+
+function maskEmail(email: string): string {
+  const [local, domain] = email.split('@');
+  if (!domain || !local) return email;
+  if (local.length <= 2) {
+    return `${local[0]}***@${domain}`;
+  }
+  return `${local[0]}***${local[local.length - 1]}@${domain}`;
+}
 
 export async function POST(request: Request) {
-  const requestId = `req-${Date.now()}`;
-  const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || undefined;
-  const userAgent = request.headers.get('user-agent') || undefined;
-
+  const requestId = `req-rec-chal-${Date.now()}`;
   const env = validateServerEnv();
   const clientIp = getClientIp(request);
+
   const rateLimitInfo = checkRateLimit(clientIp, {
-    keyPrefix: 'login',
+    keyPrefix: 'session-recovery-challenge',
     limit: env.RATE_LIMIT_LOGIN_MAX,
     windowMs: env.RATE_LIMIT_WINDOW_MS,
   });
@@ -38,30 +43,26 @@ export async function POST(request: Request) {
   }
 
   try {
-    const existingToken = await extractSessionTokenFromRequest(request);
-    const body = LoginInputSchema.parse(await request.json().catch(() => ({})));
-    const result = await loginUser(prisma, body, {
-      ipAddress,
-      userAgent,
-      requestId,
-      existingToken,
-    });
+    const body = SessionRecoveryChallengeInputSchema.parse(await request.json().catch(() => ({})));
+    const result = await createSessionRecoveryChallenge(prisma, body);
 
-    const primaryRole = result.user.activeRoles[0] ?? 'ADMIN';
+    // Dispatch OTP email via Resend
+    await sendSessionRecoveryOtpEmail({
+      toEmail: result.user.email,
+      recipientName: result.user.fullName,
+      code: result.rawOtp,
+      locale: env.DEFAULT_LOCALE || 'id',
+      requestId,
+    });
 
     const response = NextResponse.json(
       {
         success: true,
         data: {
-          user: {
-            id: result.user.id,
-            fullName: result.user.fullName,
-            email: result.user.email,
-            role: primaryRole,
-            activeRoles: result.user.activeRoles,
-            accountStatus: result.user.accountStatus,
-            preferredLocale: 'id',
-          },
+          challengeId: result.challengeId,
+          expiresAt: result.expiresAt.toISOString(),
+          expiresInSeconds: result.expiresInSeconds,
+          maskedEmail: maskEmail(result.user.email),
         },
         meta: {
           requestId,
@@ -69,14 +70,6 @@ export async function POST(request: Request) {
       },
       { status: 200 }
     );
-
-    response.cookies.set(SESSION_COOKIE_NAME, result.rawToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      path: '/',
-      maxAge: SESSION_ABSOLUTE_LIFETIME_SECONDS, // 8 hours
-    });
 
     applyRateLimitToResponse(response, rateLimitInfo);
     return response;
@@ -151,20 +144,19 @@ export async function POST(request: Request) {
         { status: 403 }
       );
     } else if (
-      error instanceof ActiveSessionExistsError ||
-      error?.name === 'ActiveSessionExistsError'
+      error instanceof NoActiveSessionToRecoverError ||
+      error?.name === 'NoActiveSessionToRecoverError'
     ) {
       errResponse = NextResponse.json(
         {
           success: false,
           error: {
-            code: 'ACTIVE_SESSION_EXISTS',
+            code: 'NO_ACTIVE_SESSION',
             message: error.message,
-            canRecover: true,
           },
           meta: { requestId },
         },
-        { status: 409 }
+        { status: 400 }
       );
     } else {
       errResponse = NextResponse.json(
@@ -172,13 +164,14 @@ export async function POST(request: Request) {
           success: false,
           error: {
             code: 'INTERNAL_ERROR',
-            message: 'An unexpected internal error occurred during login.',
+            message: 'An unexpected internal error occurred while generating recovery code.',
           },
           meta: { requestId },
         },
         { status: 500 }
       );
     }
+
     applyRateLimitToResponse(errResponse, rateLimitInfo);
     return errResponse;
   }
