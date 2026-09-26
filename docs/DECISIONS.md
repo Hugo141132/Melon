@@ -54,7 +54,7 @@
 |---|---|---|---|---|
 | `DEC-AUTH-010` | Email Verification | `P2` | Disabled in v1 (Admin accounts created by direct Owner approval) | None for internal/admin releases |
 | `DEC-AUTH-012` | Owner Account MFA | `P2` | Disabled in v1 (Strong password + session security enforced) | MFA can be added in Phase 9 security hardening |
-| `DEC-DEV-026` | Multi-Site Management | `P2` | Database schema includes optional `site_id`, UI defaults to primary site | Multi-site UI selector deferred to Phase 11 |
+| `DEC-DEV-026` | Multi-Site Management | `P2` | Database schema includes optional `site_id`, UI defaults to primary site (`site-01`) | Canonical default site (`site-01`) seeded idempotently and all devices associated via `seed.ts` (`TASK-0109`); multi-site UI selector deferred to Phase 11 |
 | `DEC-INF-077` | Redis Cache & Message Broker | `P2` | PostgreSQL for session state; SSE in-memory transport in v1 | Redis optional until multi-instance Gateway scale required |
 | `DEC-AUD-101` | Radix UI Dependency Cleanup | `P2` | Keep installed Radix packages in `package.json` | Used in Phase 2 for auth dialogs and tab components |
 

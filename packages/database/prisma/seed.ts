@@ -344,7 +344,32 @@ export async function seedRBAC(prisma: PrismaClient) {
   };
 }
 
-async function seedCanonicalDevices(prisma: PrismaClient) {
+export const CANONICAL_DEFAULT_SITE = {
+  siteCode: 'site-01',
+  name: 'Kebun Utama (Site 01)',
+  description: 'Primary cultivation site for melon monitoring and irrigation control',
+};
+
+export async function seedCanonicalSites(prisma: PrismaClient) {
+  const site = await prisma.site.upsert({
+    where: { siteCode: CANONICAL_DEFAULT_SITE.siteCode },
+    update: {
+      name: CANONICAL_DEFAULT_SITE.name,
+      description: CANONICAL_DEFAULT_SITE.description,
+      isActive: true,
+    },
+    create: {
+      siteCode: CANONICAL_DEFAULT_SITE.siteCode,
+      name: CANONICAL_DEFAULT_SITE.name,
+      description: CANONICAL_DEFAULT_SITE.description,
+      isActive: true,
+    },
+  });
+
+  return site;
+}
+
+export async function seedCanonicalDevices(prisma: PrismaClient, siteId: string) {
   const devices = [
     {
       deviceId: 'soil-node-001',
@@ -372,11 +397,13 @@ async function seedCanonicalDevices(prisma: PrismaClient) {
       update: {
         name: d.name,
         deviceType: d.deviceType,
+        siteId: siteId,
       },
       create: {
         deviceId: d.deviceId,
         name: d.name,
         deviceType: d.deviceType,
+        siteId: siteId,
       },
     });
 
@@ -397,6 +424,8 @@ async function seedCanonicalDevices(prisma: PrismaClient) {
       });
     }
   }
+
+  return { devicesCount: devices.length };
 }
 
 async function main() {
@@ -419,11 +448,15 @@ async function main() {
       `Successfully seeded ${result.rolesCount} roles and ${result.permissionsCount} permissions.`
     );
 
+    console.log('Seeding canonical default site...');
+    const site = await seedCanonicalSites(prisma);
+    console.log(`Successfully seeded canonical site '${site.siteCode}' (${site.id}).`);
+
     console.log('Seeding canonical system devices...');
-    await seedCanonicalDevices(prisma);
+    await seedCanonicalDevices(prisma, site.id);
     console.log('Successfully seeded 3 canonical devices.');
   } catch (error) {
-    console.error('Error seeding RBAC data:', error);
+    console.error('Error seeding database data:', error);
     process.exitCode = 1;
   } finally {
     await prisma.$disconnect();

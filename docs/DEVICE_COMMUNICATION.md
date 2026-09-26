@@ -333,7 +333,7 @@ Minimum identity fields:
 |---|---|---:|---|
 | `deviceId` | String | Yes | Unique external canonical hardware identifier (Owner-editable per `DEC-DEV-028`; internal DB UUID immutable) |
 | `clientId` | String | No | Unique hardware MQTT Client ID used by physical device (e.g. `melon-esp32-tanah1`, `melon-esp32-air1`). Primary identity for MQTT dynamic device resolution (`TASK-0412`). Decouples physical hardware identity from database record to allow device replacement without code changes |
-| `siteId` | String | Yes or TBD | Site, project, or location identifier |
+| `siteId` | String | Yes | Canonical site identifier (`site-01`). Mapped to `sites.site_code` and `devices.site_id`. Enforced fail-closed across MQTT topic and payload validation (`TASK-0109`). |
 | `deviceName` | String | No | User-facing device name stored by backend |
 | `deviceType` | Enum | Yes | Device capability category |
 | `firmwareVersion` | String | Recommended | Installed firmware version |

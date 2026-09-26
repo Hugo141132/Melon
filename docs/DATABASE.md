@@ -613,23 +613,27 @@ INDEX session_recovery_challenges_expires_at_idx ON session_recovery_challenges 
 
 # 7. Sites and Device Registry
 
-## 7.1 `sites` (DB-DEV-003)
+## 7.1 `sites` (DB-DEV-003 / TASK-0109)
 
 Stores project, field, or operational site information.
 
 | Column | Type | Nullable | Notes |
 |---|---|---:|---|
 | `id` | UUID | No | Primary key |
-| `site_code` | VARCHAR(100) | No | Unique stable code |
-| `name` | VARCHAR(200) | No | User-facing name |
-| `description` | TEXT | Yes | |
+| `site_code` | VARCHAR(100) | No | Unique stable code (canonical default: `site-01`) |
+| `name` | VARCHAR(200) | No | User-facing name (canonical: `'Kebun Utama (Site 01)'` / *"Lahan Melon Utama"*) |
+| `description` | TEXT | Yes | Primary cultivation site for melon monitoring and irrigation control |
 | `latitude` | NUMERIC(9,6) | Yes | Optional site coordinate |
 | `longitude` | NUMERIC(9,6) | Yes | Optional site coordinate |
 | `is_active` | BOOLEAN | No | Default true |
 | `created_at` | TIMESTAMPTZ | No | |
 | `updated_at` | TIMESTAMPTZ | No | |
 
-Whether sites are required in version 1 is `TBD`, but the schema is recommended because multiple devices are confirmed.
+### Canonical Site Seeding & Governance (`TASK-0109` / `DEC-DEV-026`)
+
+- **Single Default Site Baseline**: The v1 system operates on a single canonical default farm site (`siteCode: 'site-01'`). Multi-site UI management is explicitly deferred to Phase 11 (`TASK-1105` / `DEC-DEV-026`).
+- **Deterministic Bootstrapping**: `seedCanonicalSites(prisma)` in `packages/database/prisma/seed.ts` idempotently upserts the canonical `site-01` record.
+- **Fail-Closed Validation Requirement**: All devices in the field send telemetry referencing `siteId: 'site-01'`. The IoT Gateway enforces `device.siteId === parsedTopic.siteId` fail-closed. Populating the canonical site upon database initialization guarantees telemetry is never rejected due to an unseeded site table.
 
 ---
 
@@ -641,7 +645,7 @@ Stores registered ESP32/NodeMCU devices. Devices are provisioned out-of-band / v
 |---|---|---:|---|
 | `id` | UUID | No | Internal immutable primary key (`DEC-DEV-028`) |
 | `device_id` | VARCHAR(150) | No | Unique canonical hardware identity (Owner-editable; concealed from Admin per `DEC-DEV-028`) |
-| `site_id` | UUID | Yes | Foreign key to `sites` |
+| `site_id` | UUID | Yes | Foreign key to `sites.id` (associated to `site-01` by default via `seedCanonicalDevices` per `TASK-0109`) |
 | `name` | VARCHAR(200) | No | User-facing device name |
 | `device_type` | VARCHAR(60) | No | Canonical type |
 | `account_status` | VARCHAR(30) | No | Device lifecycle state |

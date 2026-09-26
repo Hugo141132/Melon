@@ -265,7 +265,8 @@ Responsibilities:
 - Persist users.
 - Persist roles and permissions.
 - Persist account statuses.
-- Persist device records.
+- Persist sites (canonical default `site-01` seeded via `seedCanonicalSites` per `TASK-0109`).
+- Persist device records (associated with canonical `siteId` foreign key).
 - Persist device assignments.
 - Persist telemetry.
 - Persist faucet commands.

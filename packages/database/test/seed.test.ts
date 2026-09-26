@@ -1,6 +1,12 @@
 import { PrismaClient } from '@prisma/client';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { CANONICAL_PERMISSIONS, seedRBAC } from '../prisma/seed';
+import {
+  CANONICAL_DEFAULT_SITE,
+  CANONICAL_PERMISSIONS,
+  seedCanonicalDevices,
+  seedCanonicalSites,
+  seedRBAC,
+} from '../prisma/seed';
 
 describe('Permanent RBAC Database Seed & Idempotency Test', () => {
   const testDbUrl = process.env.TEST_DATABASE_URL;
@@ -142,5 +148,64 @@ describe('Permanent RBAC Database Seed & Idempotency Test', () => {
       expect(p.code.toLowerCase()).not.toContain('cancontrol');
       expect(p.code.toLowerCase()).not.toContain('faucet_control_all');
     }
+  });
+
+  it('6. seedCanonicalSites creates the canonical default site idempotently', async () => {
+    const site1 = await seedCanonicalSites(prisma);
+    expect(site1).toBeDefined();
+    expect(site1.siteCode).toBe(CANONICAL_DEFAULT_SITE.siteCode);
+    expect(site1.name).toBe(CANONICAL_DEFAULT_SITE.name);
+    expect(site1.isActive).toBe(true);
+
+    const siteCountAfterFirst = await prisma.site.count({
+      where: { siteCode: CANONICAL_DEFAULT_SITE.siteCode },
+    });
+    expect(siteCountAfterFirst).toBe(1);
+
+    // Idempotent re-run
+    const site2 = await seedCanonicalSites(prisma);
+    expect(site2.id).toBe(site1.id);
+
+    const siteCountAfterSecond = await prisma.site.count({
+      where: { siteCode: CANONICAL_DEFAULT_SITE.siteCode },
+    });
+    expect(siteCountAfterSecond).toBe(1);
+  });
+
+  it('7. seedCanonicalDevices associates all canonical devices with canonical siteId', async () => {
+    const site = await seedCanonicalSites(prisma);
+    const result = await seedCanonicalDevices(prisma, site.id);
+    expect(result.devicesCount).toBe(3);
+
+    const seededDevices = await prisma.device.findMany({
+      where: {
+        deviceId: {
+          in: ['soil-node-001', 'water-quality-node-001', 'water-tank-node-zi37gz'],
+        },
+      },
+      include: {
+        site: true,
+      },
+    });
+
+    expect(seededDevices.length).toBe(3);
+    for (const d of seededDevices) {
+      expect(d.siteId).toBe(site.id);
+      expect(d.site).toBeDefined();
+      expect(d.site?.siteCode).toBe(CANONICAL_DEFAULT_SITE.siteCode);
+    }
+
+    // Re-run for idempotency
+    const result2 = await seedCanonicalDevices(prisma, site.id);
+    expect(result2.devicesCount).toBe(3);
+
+    const devicesCountAfterSecond = await prisma.device.count({
+      where: {
+        deviceId: {
+          in: ['soil-node-001', 'water-quality-node-001', 'water-tank-node-zi37gz'],
+        },
+      },
+    });
+    expect(devicesCountAfterSecond).toBe(3);
   });
 });

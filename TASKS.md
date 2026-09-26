@@ -473,6 +473,34 @@ Add checks for:
 
 ---
 
+## TASK-0109 — Seed Canonical Default Site and Associate Devices
+
+**Priority:** `P1`
+**Status:** `DONE`
+**Dependencies:** `TASK-0104`, `TASK-0105`
+**Completed:** 2026-09-26 — Resolved the cross-environment device connectivity parity discrepancy and implemented permanent database initialization consistency. In Phase 1, reconciled the staging Supabase database (`ihgoxqdncepbcrqkchxu`) by creating canonical default site `site-01` (`d31b05fb-5cb9-4120-96d8-3c04dfff1c56`) and associating all staging devices to it, immediately restoring physical reservoir telemetry ingestion and `ONLINE` connection status in Docker staging while preserving IoT Gateway fail-closed validation intact. In Phase 2, implemented deterministic canonical default site (`siteCode: 'site-01'`, name: `'Kebun Utama (Site 01)'`) bootstrapping and device foreign key association in `packages/database/prisma/seed.ts`. Created `seedCanonicalSites(prisma)` using idempotent `prisma.site.upsert` and updated `seedCanonicalDevices(prisma, siteId)` to assign `siteId` on both create and update for all canonical devices (`SOIL_NODE`, `WATER_QUALITY_NODE`, `WATER_TANK_NODE`). Added automated unit and integration tests in `packages/database/test/seed.test.ts` (verifying canonical site creation, device-to-site relation resolution, and seed idempotency). Verified 100% test pass rate across disposable Docker test runner (`npm run db:test:integration`), full monorepo test suite (132 test files, 1,356/1,356 tests passed), and monorepo TypeScript typecheck (0 errors across 4 workspaces).
+
+### Work
+
+- Conduct device connectivity parity investigation across DEV and containerized STAGING Docker environments.
+- Reconcile staging database with canonical site record and device `siteId` foreign keys (Phase 1 Data Reconciliation).
+- Define `CANONICAL_DEFAULT_SITE` constant (`siteCode: 'site-01'`) in `packages/database/prisma/seed.ts` (Phase 2 Permanent Seed Consistency).
+- Implement `seedCanonicalSites(prisma: PrismaClient)` using idempotent `prisma.site.upsert`.
+- Update `seedCanonicalDevices(prisma: PrismaClient, siteId: string)` to bind all canonical devices to `siteId`.
+- Update `main()` in `seed.ts` to execute `seedRBAC` $\to$ `seedCanonicalSites` $\to$ `seedCanonicalDevices`.
+- Add test assertions in `packages/database/test/seed.test.ts` verifying site creation, device-to-site linking, and seed idempotency.
+
+### Acceptance Criteria
+
+- Canonical default site (`siteCode: 'site-01'`) is seeded idempotently.
+- All seeded canonical devices (`soil-node-001`, `water-quality-node-001`, `water-tank-node-zi37gz`) have non-null `siteId` pointing to the canonical site.
+- Running seed multiple times produces 0 duplicate sites, 0 duplicate devices, and preserves foreign key integrity.
+- IoT Gateway fail-closed siteId validation is fully preserved with zero security bypasses.
+- Staging device connectivity issue is resolved without requiring application code changes or staging rebuilds.
+- Monorepo TypeScript typecheck passes with 0 errors.
+
+---
+
 # 10. Phase 2 — Authentication, Approval, and RBAC
 
 ## TASK-0201 — Implement User Account Model

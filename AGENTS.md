@@ -340,6 +340,42 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
   - Prisma Dual-Connection Architecture: Configured `directUrl = env("DIRECT_URL")` on PostgreSQL session pooler (port 5432) in `schema.prisma` to support PostgreSQL session-level advisory locks (`pg_advisory_lock`) required by Prisma Migrate, while retaining `DATABASE_URL` (port 6543 Transaction Pooler) for production runtime queries. Applied migration `20260925150000_add_session_recovery_challenges` cleanly to live development database (`unbyxlkrzqlafolxcypi`).
   - Verification: Added test suites `packages/database/test/session-recovery.test.ts` (13/13 passed), `apps/web/test/unit/login-view-recovery.test.tsx` (6/6 passed), `apps/web/app/api/v1/auth/session-recovery/challenge/test/route.test.ts` (7/7 passed), and `apps/web/app/api/v1/auth/session-recovery/verify/test/route.test.ts` (8/8 passed). All 34 tests across 5 session suites passed (100%). Monorepo typecheck passed with 0 errors across 4 workspaces (`@kebun-melon/iot-gateway`, `@kebun-melon/web`, `@kebun-melon/contracts`, `@kebun-melon/database`).
 
+#### TASK-0109 Governance Record
+
+`TASK-0109` canonical default site seeding and device environment parity record:
+- Status: `DONE` (Implemented & Verified 2026-09-26)
+- Priority: `P1` (Database foundation, reproducibility, and environment parity)
+- Dependencies: `TASK-0104`, `TASK-0105`
+- Frontend impact: `NONE`
+- Selected UI direction: `N/A`
+- Existing color template: `UNCHANGED`
+- Selected motion effects: `None`
+- 21st.dev MCP: `NOT REQUIRED`
+- Summary: Addressed and resolved the cross-environment device connectivity parity discrepancy and implemented permanent database initialization consistency.
+  - Root Cause Analysis:
+    - In local development (`npm run dev`), the Water Tank device was detected as `ONLINE` because the development database already had a site record and valid device associations.
+    - In containerized staging Docker (`kebun-melon-staging-gateway`), the Water Tank device was not detected as `ONLINE`. Investigation revealed that the staging database `sites` table was empty (`0` rows) and all staging `devices.site_id` values were `NULL`. When physical reservoir telemetry arrived on `agriculture/staging/site-01/...`, the IoT Gateway evaluated `device.siteId !== parsedTopic.siteId` (`null !== 'site-01'`) and failed closed, rejecting telemetry ingestion to protect data integrity.
+  - Phase 1 Resolution (Staging Data Reconciliation):
+    - Executed non-disruptive, direct staging database data reconciliation on Supabase Staging (`ihgoxqdncepbcrqkchxu`): created canonical site record `Site (siteCode: 'site-01', name: 'Kebun Utama (Site 01)', ID: 'd31b05fb-5cb9-4120-96d8-3c04dfff1c56')` and associated all active devices (`water-tank-node-uqiwue`, `soil-node-biuc2f`, `water-quality-f2hf9ern`) to this `siteId`.
+    - Restarted containerized gateway (`kebun-melon-staging-gateway`); live telemetry ingestion resumed immediately, updating `connectionStatus = ONLINE` and `lastSeenAt` continuously without errors.
+    - Strict fail-closed validation in IoT Gateway was preserved 100% without code bypasses.
+  - Phase 2 Resolution (Permanent Environment Consistency via Seed):
+    - Identified that `packages/database/prisma/seed.ts` originally lacked site seeding entirely and seeded canonical devices without foreign key `siteId` links.
+    - Added `CANONICAL_DEFAULT_SITE = { siteCode: 'site-01', name: 'Kebun Utama (Site 01)', description: 'Primary cultivation site for melon monitoring and irrigation control' }`.
+    - Implemented `seedCanonicalSites(prisma: PrismaClient)` using idempotent `prisma.site.upsert`.
+    - Updated `seedCanonicalDevices(prisma: PrismaClient, siteId: string)` to bind canonical devices (`SOIL_NODE`, `WATER_QUALITY_NODE`, `WATER_TANK_NODE`) to `siteId` on both create and update.
+    - Enforced strict foreign key execution order in `main()`: `seedRBAC` $\to$ `seedCanonicalSites` $\to$ `seedCanonicalDevices(prisma, site.id)`.
+    - Maintained clean package boundaries: seed helpers remain internal to `seed.ts` (not leaked into `packages/database/src/index.ts`).
+  - Verification Results:
+    - TypeScript Typecheck: `npm run typecheck` passed with 0 errors across all 4 monorepo packages (`@kebun-melon/iot-gateway`, `@kebun-melon/web`, `@kebun-melon/contracts`, `@kebun-melon/database`).
+    - Database Integration Tests: `npm run db:test:integration` executed all 16 migrations and the updated seed on a fresh disposable PostgreSQL 15 container. All 7 test files (60/60 tests) passed, including all 7 seed test cases verifying site creation, foreign key resolution, and seed idempotency.
+    - Monorepo Unit Tests: `npm test` executed across all workspaces with a 100% pass rate (132 test files, 1,356/1,356 tests passed).
+    - Code Style & Formatting: `npx prettier --check` passed with 0 warnings.
+  - Future Agent & Developer Guidance:
+    - **Never Create Devices Without Site Association:** Any device seeded, registered, or provisioned must always be explicitly associated with a canonical `Site` (`siteCode: 'site-01'`).
+    - **Never Bypass Gateway Site Validation:** The IoT Gateway's siteId validation rule (`device.siteId === parsedTopic.siteId`) is a core security invariant and must remain strictly fail-closed. Do not add fallback bypasses (e.g. allowing `null` siteId to accept telemetry).
+    - **Preserve Single Default Site Baseline:** Multi-site management is intentionally deferred to Phase 11 (`TASK-1105` / `DEC-DEV-026`). All sensors and actuators belong to the primary cultivation site (`site-01`).
+
 #### TASK-0217 Governance Record
 
 `TASK-0217` single active session enforcement and profile security UI record:
