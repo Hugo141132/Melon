@@ -782,11 +782,19 @@ This section provides the authoritative operational guide for the hardware engin
 | Function | Canonical Topic | Direction | QoS | Retain | Wire Payload Format |
 |---|---|---|:---:|:---:|---|
 | **Volume Telemetry** | `irigasi/melon/sensor/volume` | Device $\rightarrow$ Broker | 0 or 1 | `false` | Raw number (`"125.5"` or `125.5`) or JSON: `{"volume": 125.5}` |
-| **Manual Valve** | `irigasi/melon/kontrol/valve` | Broker $\rightarrow$ Device | 1 | `false` | String: `"ON"` (Open valve) or `"OFF"` (Close valve) |
+| **Manual Valve Actuation** | `irigasi/melon/kontrol/valve` | Broker $\rightarrow$ Device | 1 | `false` | String: `"ON"` (Open valve), `"OFF"` (Close valve), or `"STATUS"` (Status query) |
+| **Physical Valve Feedback** | `irigasi/melon/kontrol/valve` | Device $\rightarrow$ Broker | 1 | `false` | String: `"OPEN"` (Valve physically open) or `"CLOSED"` (Valve physically closed) |
 | **Automation** | `irigasi/melon/setting/otomasi` | Broker $\rightarrow$ Device | 1 | `false` | JSON: `{"mode": "AUTO", "target_liter": 1.5}` |
 
-4. **Firmware Safety Mandatory Requirements:**
-   - **Watchdog / Disconnect Auto-Close:** If Wi-Fi or MQTT connection drops while the valve is open, the ESP32 firmware **MUST** automatically close the valve within 5 seconds to prevent tank overflow or flooding.
+4. **Canonical Topic Invariance:**
+   - Current MQTT topics remain strictly unchanged:
+     - `irigasi/melon/kontrol/valve`
+     - `irigasi/melon/setting/otomasi`
+     - `irigasi/melon/sensor/volume`
+   - No alternative or newly fabricated topics shall be introduced for water tank valve monitoring, commands, or status queries.
+
+5. **Firmware Safety Mandatory Requirements:**
+   - **Watchdog / Disconnect Auto-Close:** If Wi-Fi or MQTT connection drops while the valve is open, the ESP32/ESP8266 firmware **MUST** automatically close the valve within 5 seconds to prevent tank overflow or flooding.
    - **Single-Node Invariant:** Production deployment operates strictly with **one** physical water tank node.
    - **Zero Retain:** Hardware shall never publish with `retain: true`.
 
@@ -913,6 +921,51 @@ During development verification with live hardware transmissions on `irigasi/mel
   - Staging environment remains completely untouched.
   - Dedicated production EMQX Cloud broker remains completely untouched.
   - No environment files (`.env`) were modified.
+
+#### 8.4.11 Physical Valve Hardware Feedback Ingestion, Status Query Contract & Validation Status (TASK-0811)
+
+##### 1. Canonical MQTT Topic Invariance
+All faucet irrigation, manual valve actuation, status queries, and physical valve state feedback operate strictly on the existing canonical MQTT topics:
+- **Actuation & Physical State Feedback:** `irigasi/melon/kontrol/valve` (QoS 1, retain = `false`)
+- **Automated Irrigation Settings:** `irigasi/melon/setting/otomasi` (QoS 1, retain = `false`)
+- **Reservoir Volume Telemetry:** `irigasi/melon/sensor/volume` (QoS 0 or 1, retain = `false`)
+
+No new or alternate topics shall be introduced.
+
+##### 2. Current Firmware Limitations
+- **No Active Query Support:** Microcontroller hardware running the un-updated firmware (`ProgramBaru.ino`) only checks for `"ON"` or `"OFF"` commands. Any other message (such as `"STATUS"`) is ignored and drops through without execution or response.
+- **Actuation-Coupled Feedback Only:** The current hardware emits physical state feedback (`"OPEN"` or `"CLOSED"`) on `irigasi/melon/kontrol/valve` strictly upon executing a state-changing relay command (`digitalWrite(RELAY_PIN, ...)`). The system cannot proactively query the physical valve state on boot or during idle periods until the firmware is updated.
+
+##### 3. Expected Future Capabilities (Firmware Update ECR-2026-002)
+The hardware team has been provided with an updated firmware implementation in `sensor/water tank/ProgramBaru/ProgramBaru.ino` delivering:
+1. **Non-Destructive `STATUS` Request Handling:**
+   - Inbound topic: `irigasi/melon/kontrol/valve`
+   - Inbound payload: `"STATUS"`
+   - Microcontroller behavior: Reads current internal `valveState` boolean without toggling the physical relay pin, and immediately publishes back on `irigasi/melon/kontrol/valve`:
+     - `"OPEN"` if valve is open (relay active)
+     - `"CLOSED"` if valve is closed (relay inactive)
+2. **Startup & Reconnect Valve State Announcement:**
+   - Immediately upon establishing or re-establishing MQTT connection, the firmware automatically publishes its current physical valve state (`"OPEN"` or `"CLOSED"`) to `irigasi/melon/kontrol/valve`.
+   - Allows the IoT Gateway and Web UI to immediately synchronize physical valve state after device reboot or network reconnection without sending blind actuation commands.
+
+##### 4. IoT Gateway Software Architecture & Command Bridging (Completed)
+The software implementation under `TASK-0811` in `@kebun-melon/iot-gateway` (`HardwareMqttAdapter`) is complete and verified:
+- **Topic Subscription:** Subscribes to `irigasi/melon/kontrol/valve` on the primary EMQX Cloud broker.
+- **Echo Filtering:** Discriminated outbound commands (`"ON"`, `"OFF"`, `"STATUS"`) from inbound hardware feedback (`"OPEN"`, `"CLOSED"`).
+- **Command State Machine Bridging:** Active in-flight commands transition `SENT` $\rightarrow$ `ACKNOWLEDGED` $\rightarrow$ `IN_PROGRESS` $\rightarrow$ `COMPLETED`:
+  - `OPEN` command: Completes upon receiving `"OPEN"`, setting authoritative physical valve state to `OPEN`.
+  - `CLOSE` command: Completes upon receiving `"CLOSED"`, setting authoritative physical valve state to `CLOSED`.
+  - `DISPENSE` command: Transitions to `IN_PROGRESS` upon `"OPEN"`, and completes upon `"CLOSED"` (`actualVolumeMl = targetVolumeMl`).
+- **Timeout Protection:** Integrated with `sweepStaleSentCommands()`, sweeping unacknowledged commands older than 5 minutes to terminal state `TIMEOUT` (`COMMAND_EXPIRED_TIMEOUT`) to prevent concurrency deadlocks.
+- **Frontend Realtime Updates:** UI (`FaucetControlPanel`, `FaucetStatusCard`) consumes authoritative physical states (`OPEN`, `CLOSED`, `UNKNOWN`) via real-time SSE.
+- **Automated Verification:** 100% test pass across 31 gateway adapter tests, 340 gateway tests, and 27 web faucet UI tests with zero TypeScript errors.
+
+##### 5. Hardware Validation Status & Gating
+- **Software Implementation:** Complete.
+- **Automated Tests:** Passed.
+- **Hardware Team Firmware Update:** Pending. The hardware team has not yet updated or flashed the physical device.
+- **Physical Validation:** Real device bench testing, irrigation volume measurement, and manual valve open/close control cannot be fully validated end-to-end until the hardware team confirms and flashes the firmware update.
+- **Safety Invariant:** `ENABLE_FAUCET_CONTROL=false` strictly enforced in all production environments.
 
 ---
 

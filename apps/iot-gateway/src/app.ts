@@ -31,6 +31,7 @@ import { logger } from './observability/logger';
 import {
   DeviceRepository,
   TelemetryRepository,
+  FaucetCommandRepository,
   prisma as defaultPrisma,
 } from '@kebun-melon/database';
 
@@ -48,6 +49,7 @@ export interface AppOptions {
   soilWaterAdapter?: SoilWaterMqttAdapter;
   deviceRepo?: DeviceRepository;
   telemetryRepo?: TelemetryRepository;
+  faucetCommandRepo?: FaucetCommandRepository;
 }
 
 // In-memory rate limit store for gateway HTTP endpoints
@@ -140,10 +142,13 @@ export function buildApp(options: AppOptions): {
     options.deviceRepo ?? (defaultPrisma ? new DeviceRepository(defaultPrisma) : undefined);
   const telemetryRepo =
     options.telemetryRepo ?? (defaultPrisma ? new TelemetryRepository(defaultPrisma) : undefined);
+  const faucetCommandRepo =
+    options.faucetCommandRepo ??
+    (defaultPrisma ? new FaucetCommandRepository(defaultPrisma) : undefined);
 
   soilWaterAdapter.bind(options.env, mqttClient, telemetryRepo, deviceRepo);
 
-  hardwareAdapter.bind(options.env, mqttClient, hardwareMqttClient, deviceRepo);
+  hardwareAdapter.bind(options.env, mqttClient, hardwareMqttClient, deviceRepo, faucetCommandRepo);
   commandPublisher.bind(options.env, mqttClient, hardwareAdapter);
   acknowledgementProcessor.bind(options.env, mqttClient);
   faucetEventProcessor.bind(options.env, mqttClient);

@@ -78,6 +78,13 @@ export function getAuthoritativePhysicalStateFromCommand(
 
   // Only terminal COMPLETED commands establish physical state
   if (cmd.status === 'COMPLETED') {
+    const completionEvent = cmd.events?.find((e) => e.eventStatus === 'COMPLETED');
+    const reportedPhysicalState =
+      completionEvent?.metadata?.physicalState || completionEvent?.metadata?.reportedState;
+    if (reportedPhysicalState === 'OPEN' || reportedPhysicalState === 'CLOSED') {
+      return reportedPhysicalState;
+    }
+
     if (cmd.action === 'OPEN') {
       return 'OPEN';
     }

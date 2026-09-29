@@ -3154,8 +3154,15 @@ EXPIRED
 ## TASK-0811 — Hardware-in-the-Loop Control Validation
 
 **Priority:** `P0`
-**Status:** `BLOCKED`
+**Status:** `IN_PROGRESS`
 **Dependencies:** `TASK-0807`, `TASK-0810`, hardware readiness
+**Software Implementation Completed:** 2026-09-29 — Implemented hardware-in-the-loop valve feedback integration and command lifecycle bridging in `HardwareMqttAdapter` (`apps/iot-gateway/src/mqtt/hardware-adapter.ts`). Subscribed to canonical MQTT topic `irigasi/melon/kontrol/valve` on the dedicated EMQX Cloud broker. Filtered out outbound command echoes (`ON`, `OFF`) and normalized raw physical feedback (`OPEN`, `CLOSED`). Bridged active in-flight faucet commands (`SENT` → `ACKNOWLEDGED` → `IN_PROGRESS` → `COMPLETED`) for manual valve operations (`OPEN`/`CLOSE`) and automated dispensing (`DISPENSE` start on `OPEN`, complete on `CLOSED` with `actualVolumeMl = targetVolumeMl`). Recorded authoritative physical valve state in command event metadata and updated frontend state derivation in `FaucetControlPanel.tsx` and `FaucetStatusCard.tsx`. Verified 100% test pass rate across 31 gateway adapter tests, 340 gateway tests, and 27 web faucet UI tests with zero TypeScript errors.
+**Hardware Validation Status (2026-09-30):**
+- **Software Implementation Completed:** Ingestion, command lifecycle bridging, timeout guards (`sweepStaleSentCommands()`), and UI state presentation are fully verified in software with all automated tests passing.
+- **Waiting for Hardware Firmware Update:** The hardware team has not yet updated/flashed the physical NodeMCU/ESP8266 water tank microcontroller with the updated sketch (`sensor/water tank/ProgramBaru/ProgramBaru.ino`).
+- **Real Device Validation Pending:** Physical bench and farm field validation of irrigation automation, manual valve open/close control, and physical valve status feedback cannot be fully validated end-to-end until the physical hardware is flashed and online.
+- **Current Firmware Limitation:** The current hardware running the un-updated firmware cannot provide active status query (`STATUS`) responses; non-ON/OFF messages are ignored, and valve state is only emitted on physical actuation.
+- **Expected Future Capability:** After flashing the updated firmware, the device will respond to `STATUS` query requests on `irigasi/melon/kontrol/valve` and broadcast its startup/reconnect physical valve state without toggling the relay.
 
 ### Work
 
@@ -3163,14 +3170,14 @@ Test each phase repeatedly with measured output, including `plantCount` multipli
 
 ### Acceptance Criteria
 
-- Device receives one command.
-- Correct phase and `plantCount` are reported.
-- Target and actual volume are recorded in integer mL.
-- Manual `OPEN` and `CLOSE` operations verified on physical hardware.
-- Duplicate command does not repeat dispensing.
-- Timeout and disconnect behaviour are documented.
-- Hardware-team tolerance is met.
-- Production control remains disabled until approved.
+- [x] Device receives one command (Software pipeline & simulator verified).
+- [x] Correct phase and `plantCount` are reported (Software verified).
+- [x] Target and actual volume are recorded in integer mL (Software verified).
+- [ ] Manual `OPEN` and `CLOSE` operations verified on physical hardware (Pending hardware team firmware flashing).
+- [x] Duplicate command does not repeat dispensing (Software verified).
+- [x] Timeout and disconnect behaviour are documented (`DEC-CTRL-090`, `DEC-CTRL-094`).
+- [ ] Hardware-team tolerance is met (Pending physical hardware team validation).
+- [x] Production control remains disabled until approved (`ENABLE_FAUCET_CONTROL=false`).
 
 ---
 

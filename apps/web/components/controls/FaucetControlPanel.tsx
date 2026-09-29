@@ -33,6 +33,14 @@ export function deriveAuthoritativePhysicalState(
     return 'UNKNOWN';
   }
 
+  // Check if hardware-reported physical state exists in metadata or completion events
+  const completionEvent = latestCompleted.events?.find((e) => e.eventStatus === 'COMPLETED');
+  const reportedPhysicalState =
+    completionEvent?.metadata?.physicalState || completionEvent?.metadata?.reportedState;
+  if (reportedPhysicalState === 'OPEN' || reportedPhysicalState === 'CLOSED') {
+    return reportedPhysicalState;
+  }
+
   if (latestCompleted.action === 'OPEN') {
     return 'OPEN';
   }

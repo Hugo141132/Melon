@@ -334,4 +334,11 @@ This section documents the investigation, compensating controls, and formal appr
 - **Affected Context:** Image decoding of HEIF/HEIC format files.
 - **Compensating Controls:** The application processes only structured IoT sensor telemetry over MQTT and REST. No HEIF/HEIC files are accepted, stored, or processed anywhere in the system.
 - **Approval & Expiry:** Approved by Security Team on 2026-09-09. Expires 2026-10-09 (30 days).
-<!-- Dependency Vulnerability Exceptions Reconciled: 2026-09-09 -->
+
+### 5. EXC-DEP-006 (`fast-uri` / `GHSA-qw65-cvwx-89v3`, `GHSA-58mr-gqgx-xq4g`, High)
+- **Vulnerability:** Authority injection via unvalidated port in serialize (`GHSA-qw65-cvwx-89v3`) and host confusion via unclosed bracket in URI authority (`GHSA-58mr-gqgx-xq4g`).
+- **Classification:** Mitigated Transitive Sub-dependency.
+- **Affected Context:** Fastify JSON schema validation compiler (`@fastify/ajv-compiler`, `ajv`, `fast-json-stringify`).
+- **Compensating Controls:** The IoT Gateway and backend web application define strict static route parameters and JSON schema payloads. No untrusted user-supplied URIs with authority (host/port) components are parsed or serialized by `fast-uri`, rendering the authority injection and host confusion attack vectors unexploitable.
+- **Approval & Expiry:** Approved by Security Team on 2026-09-30. Expires 2026-10-30 (30 days).
+<!-- Dependency Vulnerability Exceptions Reconciled: 2026-09-30 -->

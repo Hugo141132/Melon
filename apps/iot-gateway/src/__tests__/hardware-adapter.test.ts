@@ -271,11 +271,12 @@ describe('HardwareMqttAdapter (TASK-0411 / Hardware Compatibility Layer)', () =>
   });
 
   describe('5. Lifecycle & Subscription Handling', () => {
-    it('subscribes to permanent hardware volume topic when started', async () => {
+    it('subscribes to permanent hardware volume and valve topics when started', async () => {
       await adapter.start();
-      expect(mockHardwareClient.subscribe).toHaveBeenCalledWith(
-        PERMANENT_HARDWARE_TOPICS.topicVolume
-      );
+      expect(mockHardwareClient.subscribe).toHaveBeenCalledWith([
+        PERMANENT_HARDWARE_TOPICS.topicVolume,
+        PERMANENT_HARDWARE_TOPICS.topicValve,
+      ]);
     });
 
     it('does not subscribe when HARDWARE_ADAPTER_ENABLED is false', async () => {
@@ -405,6 +406,211 @@ describe('HardwareMqttAdapter (TASK-0411 / Hardware Compatibility Layer)', () =>
       expect(parsedPayload.deviceId).toBe('water-tank-uqiwue');
       expect(parsedPayload.siteId).toBe('d31b05fb-5cb9-4120-96d8-3c04dfff1c56');
       expect(parsedPayload.data.tankVolume).toBe(165.5);
+    });
+  });
+
+  describe('7. Hardware Valve Feedback Normalization & Lifecycle Bridging (TASK-0811)', () => {
+    it('filters out outbound command echoes ("ON", "OFF")', () => {
+      expect(adapter.normalizeRawValveFeedback('ON')).toBeNull();
+      expect(adapter.normalizeRawValveFeedback('OFF')).toBeNull();
+      expect(adapter.normalizeRawValveFeedback(Buffer.from('on'))).toBeNull();
+      expect(adapter.normalizeRawValveFeedback(Buffer.from('off'))).toBeNull();
+    });
+
+    it('normalizes valid raw valve states ("OPEN", "CLOSED")', () => {
+      expect(adapter.normalizeRawValveFeedback('OPEN')).toBe('OPEN');
+      expect(adapter.normalizeRawValveFeedback('closed')).toBe('CLOSED');
+      expect(adapter.normalizeRawValveFeedback('  open  ')).toBe('OPEN');
+      expect(adapter.normalizeRawValveFeedback(Buffer.from('CLOSED'))).toBe('CLOSED');
+      expect(adapter.normalizeRawValveFeedback(JSON.stringify({ state: 'OPEN' }))).toBe('OPEN');
+      expect(adapter.normalizeRawValveFeedback(JSON.stringify({ valve: 'CLOSED' }))).toBe('CLOSED');
+      expect(adapter.normalizeRawValveFeedback('UNKNOWN_VALUE')).toBeNull();
+      expect(adapter.normalizeRawValveFeedback('')).toBeNull();
+    });
+
+    it('subscribes to both volume and valve topics on start()', async () => {
+      await adapter.start();
+      expect(mockHardwareClient.subscribe).toHaveBeenCalledWith([
+        PERMANENT_HARDWARE_TOPICS.topicVolume,
+        PERMANENT_HARDWARE_TOPICS.topicValve,
+      ]);
+    });
+
+    it('transitions active OPEN command from SENT -> ACKNOWLEDGED -> IN_PROGRESS -> COMPLETED on OPEN feedback', async () => {
+      const mockFaucetCommandRepo = {
+        getCommands: vi.fn().mockResolvedValue({
+          items: [
+            {
+              commandId: 'cmd-open-001',
+              deviceId: 'water-tank-node-zi37gz',
+              action: 'OPEN',
+              status: 'SENT',
+            },
+          ],
+        }),
+        updateCommandStatus: vi.fn().mockResolvedValue({}),
+      };
+
+      const valveAdapter = new HardwareMqttAdapter({
+        env: mockEnv,
+        mqttClient: mockInternalClient,
+        hardwareMqttClient: mockHardwareClient,
+        faucetCommandRepo: mockFaucetCommandRepo as any,
+        targetDeviceId: 'water-tank-node-zi37gz',
+      });
+
+      const res = await valveAdapter.handleInboundHardwareValve('OPEN');
+      expect(res.success).toBe(true);
+      expect(res.commandId).toBe('cmd-open-001');
+      expect(res.newStatus).toBe('COMPLETED');
+
+      // State progression: SENT -> ACKNOWLEDGED -> IN_PROGRESS -> COMPLETED
+      expect(mockFaucetCommandRepo.updateCommandStatus).toHaveBeenCalledWith(
+        'cmd-open-001',
+        'ACKNOWLEDGED',
+        expect.objectContaining({ messageId: expect.stringContaining('ack') })
+      );
+      expect(mockFaucetCommandRepo.updateCommandStatus).toHaveBeenCalledWith(
+        'cmd-open-001',
+        'IN_PROGRESS',
+        expect.objectContaining({ messageId: expect.stringContaining('prog') })
+      );
+      expect(mockFaucetCommandRepo.updateCommandStatus).toHaveBeenCalledWith(
+        'cmd-open-001',
+        'COMPLETED',
+        expect.objectContaining({
+          metadata: expect.objectContaining({
+            reportedState: 'OPEN',
+            physicalState: 'OPEN',
+            source: 'hardware_feedback',
+          }),
+        })
+      );
+    });
+
+    it('transitions active CLOSE command from SENT -> ACKNOWLEDGED -> IN_PROGRESS -> COMPLETED on CLOSED feedback', async () => {
+      const mockFaucetCommandRepo = {
+        getCommands: vi.fn().mockResolvedValue({
+          items: [
+            {
+              commandId: 'cmd-close-002',
+              deviceId: 'water-tank-node-zi37gz',
+              action: 'CLOSE',
+              status: 'SENT',
+            },
+          ],
+        }),
+        updateCommandStatus: vi.fn().mockResolvedValue({}),
+      };
+
+      const valveAdapter = new HardwareMqttAdapter({
+        env: mockEnv,
+        mqttClient: mockInternalClient,
+        hardwareMqttClient: mockHardwareClient,
+        faucetCommandRepo: mockFaucetCommandRepo as any,
+        targetDeviceId: 'water-tank-node-zi37gz',
+      });
+
+      const res = await valveAdapter.handleInboundHardwareValve('CLOSED');
+      expect(res.success).toBe(true);
+      expect(res.commandId).toBe('cmd-close-002');
+      expect(res.newStatus).toBe('COMPLETED');
+
+      expect(mockFaucetCommandRepo.updateCommandStatus).toHaveBeenCalledWith(
+        'cmd-close-002',
+        'COMPLETED',
+        expect.objectContaining({
+          metadata: expect.objectContaining({
+            reportedState: 'CLOSED',
+            physicalState: 'CLOSED',
+            source: 'hardware_feedback',
+          }),
+        })
+      );
+    });
+
+    it('transitions DISPENSE command to IN_PROGRESS on OPEN and COMPLETED on CLOSED', async () => {
+      const mockFaucetCommandRepo = {
+        getCommands: vi.fn(),
+        updateCommandStatus: vi.fn().mockResolvedValue({}),
+      };
+
+      const valveAdapter = new HardwareMqttAdapter({
+        env: mockEnv,
+        mqttClient: mockInternalClient,
+        hardwareMqttClient: mockHardwareClient,
+        faucetCommandRepo: mockFaucetCommandRepo as any,
+        targetDeviceId: 'water-tank-node-zi37gz',
+      });
+
+      // 1. OPEN feedback while SENT -> advances to IN_PROGRESS
+      mockFaucetCommandRepo.getCommands.mockResolvedValueOnce({
+        items: [
+          {
+            commandId: 'cmd-dispense-003',
+            deviceId: 'water-tank-node-zi37gz',
+            action: 'DISPENSE',
+            targetVolumeMl: 1000,
+            status: 'SENT',
+          },
+        ],
+      });
+
+      const openRes = await valveAdapter.handleInboundHardwareValve('OPEN');
+      expect(openRes.success).toBe(true);
+      expect(openRes.newStatus).toBe('IN_PROGRESS');
+      expect(mockFaucetCommandRepo.updateCommandStatus).toHaveBeenCalledWith(
+        'cmd-dispense-003',
+        'IN_PROGRESS',
+        expect.any(Object)
+      );
+
+      // 2. CLOSED feedback while IN_PROGRESS -> advances to COMPLETED with actualVolumeMl
+      mockFaucetCommandRepo.getCommands.mockResolvedValueOnce({
+        items: [
+          {
+            commandId: 'cmd-dispense-003',
+            deviceId: 'water-tank-node-zi37gz',
+            action: 'DISPENSE',
+            targetVolumeMl: 1000,
+            status: 'IN_PROGRESS',
+          },
+        ],
+      });
+
+      const closedRes = await valveAdapter.handleInboundHardwareValve('CLOSED');
+      expect(closedRes.success).toBe(true);
+      expect(closedRes.newStatus).toBe('COMPLETED');
+      expect(mockFaucetCommandRepo.updateCommandStatus).toHaveBeenCalledWith(
+        'cmd-dispense-003',
+        'COMPLETED',
+        expect.objectContaining({
+          actualVolumeMl: 1000,
+          metadata: expect.objectContaining({
+            reportedState: 'CLOSED',
+            physicalState: 'CLOSED',
+          }),
+        })
+      );
+    });
+
+    it('safely handles valve feedback when no active in-flight commands exist', async () => {
+      const mockFaucetCommandRepo = {
+        getCommands: vi.fn().mockResolvedValue({ items: [] }),
+      };
+
+      const valveAdapter = new HardwareMqttAdapter({
+        env: mockEnv,
+        mqttClient: mockInternalClient,
+        hardwareMqttClient: mockHardwareClient,
+        faucetCommandRepo: mockFaucetCommandRepo as any,
+        targetDeviceId: 'water-tank-node-zi37gz',
+      });
+
+      const res = await valveAdapter.handleInboundHardwareValve('CLOSED');
+      expect(res.success).toBe(true);
+      expect(res.reason).toBe('NO_ACTIVE_COMMAND');
+      expect(res.state).toBe('CLOSED');
     });
   });
 });

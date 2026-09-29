@@ -13,13 +13,15 @@ import {
 import { AllowedEnvironment } from './router';
 import {
   FaucetCommandAction,
+  FaucetCommandStatus,
   ReservoirTelemetryPayload,
   MonitoringStatus,
   DeviceType,
 } from '@kebun-melon/contracts';
 import { logger } from '../observability/logger';
 import { metricsCollector } from '../observability/metrics';
-import { DeviceRepository } from '@kebun-melon/database';
+import { DeviceRepository, FaucetCommandRepository } from '@kebun-melon/database';
+import { publishRealtimeEvent } from '../events/webhook';
 
 export interface HardwareAdapterOptions {
   env?: GatewayEnv;
@@ -27,8 +29,18 @@ export interface HardwareAdapterOptions {
   hardwareMqttClient?: GatewayMqttClient;
   telemetryProcessor?: TelemetryProcessor;
   deviceRepo?: DeviceRepository;
+  faucetCommandRepo?: FaucetCommandRepository;
   targetDeviceId?: string;
   targetSiteId?: string;
+}
+
+export interface HandleHardwareValveResult {
+  success: boolean;
+  state?: 'OPEN' | 'CLOSED';
+  commandId?: string;
+  previousStatus?: string;
+  newStatus?: string;
+  reason?: string;
 }
 
 export interface IngestHardwareVolumeResult {
@@ -52,6 +64,7 @@ export class HardwareMqttAdapter {
   private hardwareClient: GatewayMqttClient | null = null;
   private telemetryProcessor: TelemetryProcessor;
   private deviceRepo: DeviceRepository | null = null;
+  private faucetCommandRepo: FaucetCommandRepository | null = null;
   private targetDeviceId: string;
   private targetSiteId: string;
   private sequenceCounter = 0;
@@ -65,6 +78,7 @@ export class HardwareMqttAdapter {
     this.hardwareClient = options.hardwareMqttClient || null;
     this.telemetryProcessor = options.telemetryProcessor || defaultTelemetryProcessor;
     this.deviceRepo = options.deviceRepo || null;
+    this.faucetCommandRepo = options.faucetCommandRepo || null;
     this.targetDeviceId =
       options.targetDeviceId ||
       options.env?.WATER_TANK_DEVICE_ID ||
@@ -77,13 +91,17 @@ export class HardwareMqttAdapter {
     env: GatewayEnv,
     internalClient: GatewayMqttClient,
     hardwareClient?: GatewayMqttClient,
-    deviceRepo?: DeviceRepository
+    deviceRepo?: DeviceRepository,
+    faucetCommandRepo?: FaucetCommandRepository
   ): void {
     this.env = env;
     this.internalClient = internalClient;
     this.hardwareClient = hardwareClient || null;
     if (deviceRepo) {
       this.deviceRepo = deviceRepo;
+    }
+    if (faucetCommandRepo) {
+      this.faucetCommandRepo = faucetCommandRepo;
     }
     if (env.WATER_TANK_DEVICE_ID) {
       this.targetDeviceId = env.WATER_TANK_DEVICE_ID;
@@ -182,24 +200,35 @@ export class HardwareMqttAdapter {
 
     if (this.isSubscribed) return;
 
-    const topic = PERMANENT_HARDWARE_TOPICS.topicVolume;
+    const volumeTopic = PERMANENT_HARDWARE_TOPICS.topicVolume;
+    const valveTopic = PERMANENT_HARDWARE_TOPICS.topicValve;
 
     try {
-      await client.subscribe(topic);
+      await client.subscribe([volumeTopic, valveTopic]);
       this.unsubscribeFn = client.onMessage((receivedTopic, payload) => {
-        if (receivedTopic === topic) {
+        if (receivedTopic === volumeTopic) {
           this.handleInboundHardwareVolume(payload).catch((err) => {
             logger.error('Unhandled error processing hardware volume message', err, {
+              topic: receivedTopic,
+            });
+          });
+        } else if (receivedTopic === valveTopic) {
+          this.handleInboundHardwareValve(payload).catch((err) => {
+            logger.error('Unhandled error processing hardware valve feedback message', err, {
               topic: receivedTopic,
             });
           });
         }
       });
       this.isSubscribed = true;
-      logger.info('HardwareMqttAdapter subscribed to external volume topic', { topic });
+      logger.info('HardwareMqttAdapter subscribed to external volume and valve topics', {
+        volumeTopic,
+        valveTopic,
+      });
     } catch (err: any) {
-      logger.error('Failed to subscribe HardwareMqttAdapter to external volume topic', err, {
-        topic,
+      logger.error('Failed to subscribe HardwareMqttAdapter to external topics', err, {
+        volumeTopic,
+        valveTopic,
       });
     }
   }
@@ -479,6 +508,391 @@ export class HardwareMqttAdapter {
         translated,
       };
     }
+  }
+
+  /**
+   * Normalizes incoming raw valve feedback from hardware.
+   * - Filters out outbound command echoes ('ON', 'OFF') returning null.
+   * - Maps 'OPEN' -> 'OPEN', 'CLOSED' -> 'CLOSED'.
+   * - Supports JSON payloads with state/valve/status.
+   */
+  public normalizeRawValveFeedback(rawPayload: Buffer | string): 'OPEN' | 'CLOSED' | null {
+    const rawStr = (Buffer.isBuffer(rawPayload) ? rawPayload.toString('utf-8') : rawPayload).trim();
+
+    if (!rawStr) {
+      return null;
+    }
+
+    const upper = rawStr.toUpperCase();
+
+    // Ignore outbound commands / echo
+    if (upper === 'ON' || upper === 'OFF') {
+      logger.debug('Hardware valve feedback ignored outbound command echo', { payload: upper });
+      return null;
+    }
+
+    if (upper === 'OPEN') {
+      return 'OPEN';
+    }
+
+    if (upper === 'CLOSED') {
+      return 'CLOSED';
+    }
+
+    // Also handle possible JSON feedback {"state":"OPEN"} or {"valve":"CLOSED"} or {"status":"OPEN"}
+    if (rawStr.startsWith('{') && rawStr.endsWith('}')) {
+      try {
+        const parsed = JSON.parse(rawStr);
+        if (typeof parsed === 'object' && parsed !== null) {
+          const candidate =
+            parsed.state ??
+            parsed.valve ??
+            parsed.status ??
+            parsed.STATE ??
+            parsed.VALVE ??
+            parsed.STATUS;
+          if (candidate !== undefined && candidate !== null) {
+            const val = String(candidate).trim().toUpperCase();
+            if (val === 'OPEN') return 'OPEN';
+            if (val === 'CLOSED') return 'CLOSED';
+          }
+        }
+      } catch {
+        // Fallback
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Handles inbound hardware valve feedback ('OPEN' / 'CLOSED') on irigasi/melon/kontrol/valve.
+   * Bridges active in-flight faucet commands: SENT -> ACKNOWLEDGED -> IN_PROGRESS -> COMPLETED
+   * and records authoritative physical state metadata.
+   */
+  public async handleInboundHardwareValve(
+    rawPayload: Buffer | string
+  ): Promise<HandleHardwareValveResult> {
+    const valveState = this.normalizeRawValveFeedback(rawPayload);
+    if (!valveState) {
+      metricsCollector.incrementMessagesInvalid();
+      logger.debug('Hardware valve message ignored or unrecognized format', {
+        rawPayload: Buffer.isBuffer(rawPayload) ? rawPayload.toString('utf-8') : rawPayload,
+      });
+      return {
+        success: false,
+        reason: 'IGNORED_OR_INVALID_FEEDBACK',
+      };
+    }
+
+    metricsCollector.incrementAcknowledgements();
+
+    if (!this.faucetCommandRepo) {
+      logger.warn('Hardware valve feedback received but faucetCommandRepo is not bound', {
+        valveState,
+      });
+      return {
+        success: false,
+        state: valveState,
+        reason: 'FAUCET_COMMAND_REPO_NOT_BOUND',
+      };
+    }
+
+    const canonicalDeviceId = await this.resolveTargetDeviceId();
+    let resolvedDbDeviceId: string | undefined;
+
+    if (this.deviceRepo) {
+      try {
+        const device = await this.deviceRepo.getDeviceByCanonicalId(canonicalDeviceId);
+        if (device) {
+          resolvedDbDeviceId = device.id;
+        }
+      } catch (err) {
+        logger.error('Failed to resolve device record for valve feedback', err, {
+          canonicalDeviceId,
+        });
+      }
+    }
+
+    // Look for active faucet commands for the device
+    const deviceIdsToSearch = [resolvedDbDeviceId, canonicalDeviceId].filter((id): id is string =>
+      Boolean(id)
+    );
+
+    let activeCommands: any[] = [];
+    for (const devId of deviceIdsToSearch) {
+      try {
+        const res = await this.faucetCommandRepo.getCommands({
+          deviceId: devId,
+          page: 1,
+          pageSize: 10,
+          sort: 'requestedAt:desc',
+        });
+        if (res.items && res.items.length > 0) {
+          activeCommands = res.items.filter((c) =>
+            [
+              FaucetCommandStatus.SENT,
+              FaucetCommandStatus.ACKNOWLEDGED,
+              FaucetCommandStatus.IN_PROGRESS,
+            ].includes(c.status as FaucetCommandStatus)
+          );
+          if (activeCommands.length > 0) {
+            break;
+          }
+        }
+      } catch (err) {
+        logger.error('Error fetching faucet commands for device', err, { devId });
+      }
+    }
+
+    if (activeCommands.length === 0) {
+      logger.info('Hardware valve feedback received with no active in-flight commands', {
+        valveState,
+        canonicalDeviceId,
+      });
+      return {
+        success: true,
+        state: valveState,
+        reason: 'NO_ACTIVE_COMMAND',
+      };
+    }
+
+    // Most recent active command
+    const targetCommand = activeCommands[0];
+    const initialStatus = targetCommand.status as FaucetCommandStatus;
+    const action = targetCommand.action;
+    const messageId = `hw-feedback-${crypto.randomUUID()}`;
+    const recordedAt = new Date();
+
+    const metadata = {
+      reportedState: valveState,
+      physicalState: valveState,
+      source: 'hardware_feedback',
+      canonicalDeviceId,
+    };
+
+    try {
+      if (action === FaucetCommandAction.OPEN) {
+        if (valveState === 'OPEN') {
+          // Transition: SENT -> ACKNOWLEDGED -> IN_PROGRESS -> COMPLETED
+          if (targetCommand.status === FaucetCommandStatus.SENT) {
+            await this.faucetCommandRepo.updateCommandStatus(
+              targetCommand.commandId,
+              FaucetCommandStatus.ACKNOWLEDGED,
+              { messageId: `${messageId}-ack`, recordedAt }
+            );
+          }
+          if (
+            targetCommand.status === FaucetCommandStatus.SENT ||
+            targetCommand.status === FaucetCommandStatus.ACKNOWLEDGED
+          ) {
+            await this.faucetCommandRepo.updateCommandStatus(
+              targetCommand.commandId,
+              FaucetCommandStatus.IN_PROGRESS,
+              { messageId: `${messageId}-prog`, recordedAt }
+            );
+          }
+          await this.faucetCommandRepo.updateCommandStatus(
+            targetCommand.commandId,
+            FaucetCommandStatus.COMPLETED,
+            { messageId: `${messageId}-comp`, recordedAt, metadata }
+          );
+
+          await publishRealtimeEvent(
+            this.env,
+            'faucet.command.updated',
+            {
+              commandId: targetCommand.commandId,
+              status: FaucetCommandStatus.COMPLETED,
+              metadata,
+            },
+            canonicalDeviceId
+          );
+
+          logger.info('Faucet OPEN command COMPLETED via hardware feedback', {
+            commandId: targetCommand.commandId,
+            valveState,
+          });
+
+          return {
+            success: true,
+            state: valveState,
+            commandId: targetCommand.commandId,
+            previousStatus: initialStatus,
+            newStatus: FaucetCommandStatus.COMPLETED,
+          };
+        }
+      } else if (action === FaucetCommandAction.CLOSE) {
+        if (valveState === 'CLOSED') {
+          // Transition: SENT -> ACKNOWLEDGED -> IN_PROGRESS -> COMPLETED
+          if (targetCommand.status === FaucetCommandStatus.SENT) {
+            await this.faucetCommandRepo.updateCommandStatus(
+              targetCommand.commandId,
+              FaucetCommandStatus.ACKNOWLEDGED,
+              { messageId: `${messageId}-ack`, recordedAt }
+            );
+          }
+          if (
+            targetCommand.status === FaucetCommandStatus.SENT ||
+            targetCommand.status === FaucetCommandStatus.ACKNOWLEDGED
+          ) {
+            await this.faucetCommandRepo.updateCommandStatus(
+              targetCommand.commandId,
+              FaucetCommandStatus.IN_PROGRESS,
+              { messageId: `${messageId}-prog`, recordedAt }
+            );
+          }
+          await this.faucetCommandRepo.updateCommandStatus(
+            targetCommand.commandId,
+            FaucetCommandStatus.COMPLETED,
+            { messageId: `${messageId}-comp`, recordedAt, metadata }
+          );
+
+          await publishRealtimeEvent(
+            this.env,
+            'faucet.command.updated',
+            {
+              commandId: targetCommand.commandId,
+              status: FaucetCommandStatus.COMPLETED,
+              metadata,
+            },
+            canonicalDeviceId
+          );
+
+          logger.info('Faucet CLOSE command COMPLETED via hardware feedback', {
+            commandId: targetCommand.commandId,
+            valveState,
+          });
+
+          return {
+            success: true,
+            state: valveState,
+            commandId: targetCommand.commandId,
+            previousStatus: initialStatus,
+            newStatus: FaucetCommandStatus.COMPLETED,
+          };
+        }
+      } else if (action === FaucetCommandAction.DISPENSE) {
+        if (valveState === 'OPEN') {
+          // Dispensing has started! SENT -> ACKNOWLEDGED -> IN_PROGRESS
+          if (targetCommand.status === FaucetCommandStatus.SENT) {
+            await this.faucetCommandRepo.updateCommandStatus(
+              targetCommand.commandId,
+              FaucetCommandStatus.ACKNOWLEDGED,
+              { messageId: `${messageId}-ack`, recordedAt }
+            );
+          }
+          if (
+            targetCommand.status === FaucetCommandStatus.SENT ||
+            targetCommand.status === FaucetCommandStatus.ACKNOWLEDGED
+          ) {
+            await this.faucetCommandRepo.updateCommandStatus(
+              targetCommand.commandId,
+              FaucetCommandStatus.IN_PROGRESS,
+              { messageId: `${messageId}-prog`, recordedAt, metadata }
+            );
+          }
+
+          await publishRealtimeEvent(
+            this.env,
+            'faucet.command.updated',
+            {
+              commandId: targetCommand.commandId,
+              status: FaucetCommandStatus.IN_PROGRESS,
+              metadata,
+            },
+            canonicalDeviceId
+          );
+
+          logger.info('Faucet DISPENSE command IN_PROGRESS via hardware OPEN feedback', {
+            commandId: targetCommand.commandId,
+          });
+
+          return {
+            success: true,
+            state: valveState,
+            commandId: targetCommand.commandId,
+            previousStatus: initialStatus,
+            newStatus: FaucetCommandStatus.IN_PROGRESS,
+          };
+        } else if (valveState === 'CLOSED') {
+          // Dispensing has finished! Advance to COMPLETED
+          if (targetCommand.status === FaucetCommandStatus.SENT) {
+            await this.faucetCommandRepo.updateCommandStatus(
+              targetCommand.commandId,
+              FaucetCommandStatus.ACKNOWLEDGED,
+              { messageId: `${messageId}-ack`, recordedAt }
+            );
+          }
+          if (
+            targetCommand.status === FaucetCommandStatus.SENT ||
+            targetCommand.status === FaucetCommandStatus.ACKNOWLEDGED
+          ) {
+            await this.faucetCommandRepo.updateCommandStatus(
+              targetCommand.commandId,
+              FaucetCommandStatus.IN_PROGRESS,
+              { messageId: `${messageId}-prog`, recordedAt }
+            );
+          }
+
+          const actualVolumeMl = targetCommand.targetVolumeMl ?? undefined;
+          await this.faucetCommandRepo.updateCommandStatus(
+            targetCommand.commandId,
+            FaucetCommandStatus.COMPLETED,
+            {
+              messageId: `${messageId}-comp`,
+              recordedAt,
+              actualVolumeMl,
+              metadata,
+            }
+          );
+
+          await publishRealtimeEvent(
+            this.env,
+            'faucet.command.updated',
+            {
+              commandId: targetCommand.commandId,
+              status: FaucetCommandStatus.COMPLETED,
+              actualVolumeMl,
+              metadata,
+            },
+            canonicalDeviceId
+          );
+
+          logger.info('Faucet DISPENSE command COMPLETED via hardware CLOSED feedback', {
+            commandId: targetCommand.commandId,
+            actualVolumeMl,
+          });
+
+          return {
+            success: true,
+            state: valveState,
+            commandId: targetCommand.commandId,
+            previousStatus: initialStatus,
+            newStatus: FaucetCommandStatus.COMPLETED,
+          };
+        }
+      }
+    } catch (err) {
+      logger.error('Failed to transition faucet command status from hardware feedback', err, {
+        commandId: targetCommand.commandId,
+        action,
+        valveState,
+      });
+      return {
+        success: false,
+        state: valveState,
+        commandId: targetCommand.commandId,
+        reason: (err as any)?.message || 'STATE_TRANSITION_FAILED',
+      };
+    }
+
+    return {
+      success: true,
+      state: valveState,
+      commandId: targetCommand.commandId,
+      reason: 'UNMATCHED_ACTION_STATE',
+    };
   }
 }
 

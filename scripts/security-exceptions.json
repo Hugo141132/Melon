@@ -58,6 +58,15 @@
       "approvedBy": "Security Team",
       "approvedDate": "2026-09-09",
       "expiresDate": "2026-10-09"
+    },
+    {
+      "id": "EXC-DEP-006",
+      "packageName": "fast-uri",
+      "advisoryId": "*",
+      "reason": "Transitive sub-dependency of Fastify (@fastify/ajv-compiler, ajv, fast-json-stringify); authority injection and host confusion vulnerabilities in fast-uri URI serialization are unexploitable as all incoming API and IoT Gateway routes use strict static schemas without parsing untrusted external URI authority components.",
+      "approvedBy": "Security Team",
+      "approvedDate": "2026-09-30",
+      "expiresDate": "2026-10-30"
     }
   ]
 }

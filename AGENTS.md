@@ -2693,4 +2693,39 @@ The following facts are supported by the current implementation regarding device
     - Strictly verified `ENABLE_FAUCET_CONTROL=false` safety invariant across all staging services.
 <!-- Staging Deployment Reconciled: 2026-09-20 -->
 
+---
+
+## TASK-0811 Governance, Faucet Hardware Feedback & Physical Valve State Validation Record
+
+`TASK-0811` hardware-in-the-loop control validation and physical valve status tracking record:
+- **Status:** `IN_PROGRESS` (Software Implementation & Automated Tests Completed; Physical Hardware Validation Pending Hardware Team Firmware Update)
+- **Frontend impact:** `MINOR` (Preserved existing controls, tokens, and modal flows; updated badge to reflect authoritative physical valve status)
+- **Selected UI direction:** `Premium Minimal Ops`
+- **Existing color template:** `UNCHANGED`
+- **Selected motion effects:** `None`
+- **21st.dev MCP:** `NOT REQUIRED`
+- **Summary:**
+  - **Software Implementation Completed (`apps/iot-gateway` & `apps/web`):**
+    - Subscribed `HardwareMqttAdapter` in `@kebun-melon/iot-gateway` to the canonical hardware valve topic `irigasi/melon/kontrol/valve` on the primary EMQX Cloud broker over WSS/TLS.
+    - Implemented echo discrimination: outbound actuator commands (`"ON"`, `"OFF"`, `"STATUS"`) are filtered out, while raw physical feedback (`"OPEN"`, `"CLOSED"`) is parsed and normalized.
+    - Bridged active in-flight faucet commands (`SENT` $\rightarrow$ `ACKNOWLEDGED` $\rightarrow$ `IN_PROGRESS` $\rightarrow$ `COMPLETED`) for manual valve operations (`OPEN` completes on `"OPEN"`, `CLOSE` completes on `"CLOSED"`) and automated irrigation (`DISPENSE` marks `IN_PROGRESS` on `"OPEN"`, completes on `"CLOSED"` with `actualVolumeMl = targetVolumeMl`).
+    - Stored authoritative physical valve state in database command event metadata, eliminating permanent `SENT` UI state locks and enabling `FaucetControlPanel` and `FaucetStatusCard` to present true physical valve states (`OPEN`, `CLOSED`, `UNKNOWN`).
+    - Guarded against unacknowledged commands with `sweepStaleSentCommands()` running every 2,000ms to sweep expired active commands to `TIMEOUT`.
+    - Automated test verification passed 100%: 31/31 unit tests in `apps/iot-gateway/src/__tests__/hardware-adapter.test.ts`, 340 gateway tests, and 27 web faucet UI tests in `apps/web/test/unit/faucet-control-ui.test.tsx` with zero TypeScript errors across all monorepo packages.
+  - **Firmware Change Request (ECR-2026-002 in `sensor/water tank/ProgramBaru/ProgramBaru.ino`):**
+    - Canonical MQTT topics remain strictly unchanged:
+      - `irigasi/melon/kontrol/valve` (actuator control, physical feedback, status queries)
+      - `irigasi/melon/setting/otomasi` (automated irrigation settings)
+      - `irigasi/melon/sensor/volume` (water tank volume telemetry)
+    - Added non-destructive `STATUS` query support: device answers with current physical state (`"OPEN"` or `"CLOSED"`) without actuating the relay pin.
+    - Added startup and reconnect physical valve state announcement: publishes initial physical state immediately after connecting to MQTT broker.
+    - Preserved exact payload contracts: commands `"ON"`, `"OFF"`; feedback `"OPEN"`, `"CLOSED"`.
+  - **Hardware Team Dependency & Current Firmware Limitation:**
+    - **Current Hardware Limitation:** The physical NodeMCU/ESP8266 microcontroller currently in the field runs earlier firmware that does not support active status queries (`STATUS`). It only emits physical feedback upon physical relay switching.
+    - **Hardware Team Response Pending:** The updated sketch has been prepared, but the hardware team has not yet updated or flashed the physical device.
+    - **Physical Validation Gating:** End-to-end irrigation dispensing, manual open/close physical relay switching, and live physical valve status monitoring cannot be fully verified on the physical hardware until the hardware team confirms and flashes the firmware update.
+    - **Safety Invariant:** `ENABLE_FAUCET_CONTROL=false` strictly enforced across all environments. Physical actuation remains blocked until dual written sign-off is completed.
+<!-- TASK-0811 Reconciled: 2026-09-30 -->
+
+
 

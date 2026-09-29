@@ -777,6 +777,32 @@ describe('deriveAuthoritativePhysicalState and formatLitersDisplay Helpers', () 
 
     // 6. Empty list -> UNKNOWN
     expect(deriveAuthoritativePhysicalState([], null)).toBe('UNKNOWN');
+
+    // 7. Completed DISPENSE with hardware-confirmed physicalState in completion event metadata -> CLOSED
+    expect(
+      deriveAuthoritativePhysicalState(
+        [
+          {
+            id: '7',
+            commandId: '7',
+            idempotencyKey: '7',
+            deviceId: 'd1',
+            action: 'DISPENSE',
+            status: 'COMPLETED',
+            requestedAt: '',
+            events: [
+              {
+                id: 'evt-7',
+                eventStatus: 'COMPLETED',
+                createdAt: '',
+                metadata: { physicalState: 'CLOSED', reportedState: 'CLOSED' },
+              },
+            ],
+          },
+        ],
+        null
+      )
+    ).toBe('CLOSED');
   });
 
   it('correctly maps command physical state in getAuthoritativePhysicalStateFromCommand', () => {
@@ -815,6 +841,27 @@ describe('deriveAuthoritativePhysicalState and formatLitersDisplay Helpers', () 
         requestedAt: '',
       })
     ).toBe('UNKNOWN');
+
+    // Completed DISPENSE with hardware feedback metadata
+    expect(
+      getAuthoritativePhysicalStateFromCommand({
+        id: '3b',
+        commandId: '3b',
+        idempotencyKey: '3b',
+        deviceId: 'd1',
+        action: 'DISPENSE',
+        status: 'COMPLETED',
+        requestedAt: '',
+        events: [
+          {
+            id: 'evt-3b',
+            eventStatus: 'COMPLETED',
+            createdAt: '',
+            metadata: { physicalState: 'CLOSED' },
+          },
+        ],
+      })
+    ).toBe('CLOSED');
 
     expect(
       getAuthoritativePhysicalStateFromCommand({
