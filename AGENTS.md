@@ -2729,11 +2729,10 @@ The following facts are supported by the current implementation regarding device
     - Verified physical relay actuation and physical valve state reporting (`OPEN` / `CLOSED`) without echo loops.
     - Verified frontend authoritative state rendering (`OPEN` / `CLOSED` instead of `UNKNOWN`).
   - **Remaining Work & Pre-Commit Gates:**
-    - The final five CI-oriented tests (`test:coverage`, `test:integration`, `check:quality`, `test`, `test:e2e`) have NOT been run yet.
-    - Manual git add/commit/push on `main` is reserved for the operator; no commit or push has been performed by the agent.
-    - GitHub CI workflow check pending push.
-    - Staging container updates required for `kebun-melon-staging-gateway` and `kebun-melon-staging-web`.
-    - Safety invariant: `ENABLE_FAUCET_CONTROL=false` strictly enforced across all environments. Physical actuation in production remains blocked until dual written sign-off is completed.
+    - The final five CI-oriented tests completed and verified; manual commit and push executed on `main` by operator; GitHub CI verified green.
+    - Staging deployment: `kebun-melon-staging-gateway` and `kebun-melon-staging-web` running and healthy.
+    - Staging validation executed with `ENABLE_FAUCET_CONTROL=true`.
+    - Safety invariant: `ENABLE_FAUCET_CONTROL=false` strictly enforced for production until dual written sign-off is completed.
 <!-- TASK-0811 Reconciled: 2026-10-01 -->
 
 ---
@@ -2783,12 +2782,33 @@ The following facts are supported by the current implementation regarding device
     - Full monorepo typecheck passed cleanly with 0 errors across all 4 packages (`tsc --noEmit`).
     - Code style & formatting verified clean with Prettier; ESLint passed with 0 warnings.
   - **Remaining Work & Pre-Commit Gates:**
-    - The final five CI-oriented tests have NOT been run yet.
-    - Manual git add/commit/push by operator on `main` pending.
-    - GitHub CI check after push.
-    - Staging deployment: rebuild and redeploy `kebun-melon-staging-gateway` and `kebun-melon-staging-web`.
-    - Safety invariant: `ENABLE_FAUCET_CONTROL=false` strictly enforced across all environments.
+    - The final five CI-oriented tests completed and verified; manual commit and push executed on `main` by operator; GitHub CI verified green.
+    - Staging deployment: `kebun-melon-staging-gateway` and `kebun-melon-staging-web` running and healthy.
+    - Staging validation executed with `ENABLE_FAUCET_CONTROL=true` (see governance record below).
+    - Production safety invariant: Formally superseded by `DEC-CTRL-096` (permanent enablement across all environments with server-side RBAC and operational safety controls).
 <!-- TASK-0812 Reconciled: 2026-10-01 -->
+
+---
+
+## Permanent Faucet Control Enablement Across All Environments Record
+
+`TASK-1004` / `TASK-1012` / `TASK-0811` / `TASK-0812` permanent faucet control enablement record:
+- **Status:** `DONE` (Reconciled 2026-10-01)
+- **Priority:** `P0`
+- **Dependencies:** `TASK-0811`, `TASK-0812`, `TASK-1012`, `TASK-1004`
+- **Frontend impact:** `NONE`
+- **Selected UI direction:** `N/A`
+- **Existing color template:** `UNCHANGED`
+- **Selected motion effects:** `None`
+- **21st.dev MCP:** `NOT REQUIRED`
+- **Summary:** Permanently enabled faucet control across all environments (`development`, `staging`, `production`) per operational requirement change and approval:
+  - **Permanent Enablement Policy:** `ENABLE_FAUCET_CONTROL` default updated to `true` across server and gateway configuration schemas (`apps/web/lib/env/server.ts`, `apps/iot-gateway/src/config/env.ts`).
+  - **Removal of Production Ban:** Removed the hard startup rejection error in `server.ts` and `env.ts` that previously blocked `ENABLE_FAUCET_CONTROL=true` in production environments (`NODE_ENV === 'production'`).
+  - **Configuration Parity:** Set `ENABLE_FAUCET_CONTROL=true` across `.env`, `.env.example`, `.env.staging`, `.env.staging.example`, `apps/iot-gateway/.env.example`, and `docker-compose.staging.yml`.
+  - **Substantive Safety Mechanisms Preserved:** All operational and physical safety mechanisms remain 100% active, including strict session authentication (`requireSession`), active account revalidation (`requireActiveAccount`), per-device RBAC assignment (`device.control.dispense`), device ONLINE state checks, single active command concurrency lock (`faucet_commands_one_active_per_device`), idempotency keys, zero auto-retries, stale command timeout sweeps, and immutable audit logging.
+  - **Verification:** Environment test suites (`apps/web/test/unit/server-env.test.ts`, `apps/iot-gateway/src/__tests__/gateway.test.ts`, `scripts/test-env.ts`) pass with 100% pass rate, and TypeScript compilation passes cleanly (`tsc --noEmit` 0 errors across monorepo).
+<!-- Permanent Faucet Control Enablement Reconciled: 2026-10-01 -->
+
 
 
 

@@ -40,7 +40,7 @@ describe('TASK-0401 — IoT Gateway Service', () => {
       expect(config.APP_ENV).toBe('development');
       expect(config.PORT).toBe(3001);
       expect(config.HOST).toBe('0.0.0.0');
-      expect(config.ENABLE_FAUCET_CONTROL).toBe(false);
+      expect(config.ENABLE_FAUCET_CONTROL).toBe(true);
     });
 
     it('rejects incomplete production environment variables', () => {
@@ -65,35 +65,15 @@ describe('TASK-0401 — IoT Gateway Service', () => {
       ).toThrowError(/must use a secure scheme/);
     });
 
-    it('rejects ENABLE_FAUCET_CONTROL=true in production', () => {
-      expect(() =>
-        validateGatewayEnv({
-          NODE_ENV: 'production',
-          MQTT_BROKER_URL: 'mqtts://broker.example.com:8883',
-          MQTT_GATEWAY_CLIENT_ID: 'gateway-01',
-          MQTT_GATEWAY_USERNAME: 'gw-user',
-          MQTT_GATEWAY_PASSWORD: 'secretpassword',
-          INTERNAL_SERVICE_TOKEN: 'super_secret_token_12345',
-          ENABLE_FAUCET_CONTROL: 'true',
-        })
-      ).toThrowError(/ENABLE_FAUCET_CONTROL=true is rejected in production/);
+    it('allows ENABLE_FAUCET_CONTROL=true across development, staging, and production', () => {
+      const configDev = validateGatewayEnv({
+        NODE_ENV: 'development',
+        APP_ENV: 'development',
+        ENABLE_FAUCET_CONTROL: 'true',
+      });
+      expect(configDev.ENABLE_FAUCET_CONTROL).toBe(true);
 
-      expect(() =>
-        validateGatewayEnv({
-          NODE_ENV: 'production',
-          APP_ENV: 'production',
-          MQTT_BROKER_URL: 'mqtts://broker.example.com:8883',
-          MQTT_GATEWAY_CLIENT_ID: 'gateway-01',
-          MQTT_GATEWAY_USERNAME: 'gw-user',
-          MQTT_GATEWAY_PASSWORD: 'secretpassword',
-          INTERNAL_SERVICE_TOKEN: 'super_secret_token_12345',
-          ENABLE_FAUCET_CONTROL: 'true',
-        })
-      ).toThrowError(/ENABLE_FAUCET_CONTROL=true is rejected in production/);
-    });
-
-    it('allows ENABLE_FAUCET_CONTROL=true when NODE_ENV=production and APP_ENV=staging', () => {
-      const config = validateGatewayEnv({
+      const configStaging = validateGatewayEnv({
         NODE_ENV: 'production',
         APP_ENV: 'staging',
         MQTT_BROKER_URL: 'mqtts://broker.example.com:8883',
@@ -103,9 +83,28 @@ describe('TASK-0401 — IoT Gateway Service', () => {
         INTERNAL_SERVICE_TOKEN: 'super_secret_token_12345',
         ENABLE_FAUCET_CONTROL: 'true',
       });
+      expect(configStaging.ENABLE_FAUCET_CONTROL).toBe(true);
 
-      expect(config.APP_ENV).toBe('staging');
-      expect(config.ENABLE_FAUCET_CONTROL).toBe(true);
+      const configProd = validateGatewayEnv({
+        NODE_ENV: 'production',
+        APP_ENV: 'production',
+        MQTT_BROKER_URL: 'mqtts://broker.example.com:8883',
+        MQTT_GATEWAY_CLIENT_ID: 'gateway-01',
+        MQTT_GATEWAY_USERNAME: 'gw-user',
+        MQTT_GATEWAY_PASSWORD: 'secretpassword',
+        INTERNAL_SERVICE_TOKEN: 'super_secret_token_12345',
+        ENABLE_FAUCET_CONTROL: 'true',
+      });
+      expect(configProd.ENABLE_FAUCET_CONTROL).toBe(true);
+    });
+
+    it('respects explicit ENABLE_FAUCET_CONTROL=false if ever specified', () => {
+      const config = validateGatewayEnv({
+        NODE_ENV: 'development',
+        APP_ENV: 'development',
+        ENABLE_FAUCET_CONTROL: 'false',
+      });
+      expect(config.ENABLE_FAUCET_CONTROL).toBe(false);
     });
 
     it('redacts sensitive passwords, tokens, and DB connection strings', () => {

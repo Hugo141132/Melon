@@ -16,7 +16,7 @@ services:
       - PORT=3000
       - HOSTNAME=0.0.0.0
       - INTERNAL_GATEWAY_URL=http://iot-gateway:3001
-      - ENABLE_FAUCET_CONTROL=false
+      - ENABLE_FAUCET_CONTROL=true
     networks:
       - melon-staging-network
     depends_on:
@@ -46,7 +46,7 @@ services:
       - PORT=3001
       - HOST=0.0.0.0
       - WEB_APP_URL=http://web:3000
-      - ENABLE_FAUCET_CONTROL=false
+      - ENABLE_FAUCET_CONTROL=true
     networks:
       - melon-staging-network
     healthcheck:

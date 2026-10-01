@@ -1827,7 +1827,7 @@ The following security and integrity controls govern the water-tank monitoring i
 - **Surface Area Minimization:** Completely eliminated the unused flow rate parameter (`flowRate`, `flow_rate`, `WATER_FLOW_RATE`) across schema, contracts, APIs, and UI, eliminating dead telemetry ingestion pathways and unused input surface area.
 - **Strict Mathematical Clamping:** Volume progress percentage calculation strictly enforces upper and lower boundary clamping: $\text{clamp}((\text{tankVolume} / 2200) \times 100, 0, 100)$, preventing CSS buffer/percentage overflow, division-by-zero, or NaN/Infinity injection attacks in client presentation components.
 - **Fail-Safe Telemetry Handling:** Explicit zero volumes (`0 L`), missing/null telemetry (`- L`), and offline sensor states render safely without crashing React component trees or fabricating active flow/pressure.
-- **Actuator Invariance:** Faucet control safety flag `ENABLE_FAUCET_CONTROL=false` remains strictly enforced across all environments.
+- **Actuator Operational Governance:** Faucet control is permanently enabled (`ENABLE_FAUCET_CONTROL=true`, `DEC-CTRL-096`) across all environments, with physical and operational safety enforced via server-side authorization (`device.control.dispense`), device online checks, single active command concurrency limits, and full audit trails.
 <!-- Water Tank UI Security Reconciled: 2026-09-09 -->
 
 ---
@@ -1866,4 +1866,21 @@ The following security controls govern physical valve feedback communication ove
 - **Single-Node Invariant:** Production deployment operates strictly with one physical water tank node, eliminating cross-actuator broadcast risks on flat topics.
 - **Automated Verification:** Verified via automated runner `npm run mqtt:verify:prod` (`scripts/verify-production-mqtt.ts`) and Vitest test suite `apps/iot-gateway/src/__tests__/production-mqtt-security.test.ts` (15/15 passed).
 <!-- Valve Feedback MQTT ACL Reconciled: 2026-10-01 -->
+
+---
+
+## Permanent Faucet Control Enablement & Operational Safety Architecture Note (DEC-CTRL-096 / TASK-1004 / Reconciled 2026-10-01)
+
+The following security controls and architecture govern the permanent enablement of faucet control:
+- **Historical Staging Validation Requirement:** Faucet control was initially disabled (`ENABLE_FAUCET_CONTROL=false`) prior to staging validation to maintain baseline safety locks; staging validation of end-to-end critical flows (`TASK-1004` Flows 8, 9, 10; `TASK-0811`; `TASK-0812`) was executed and passed with `ENABLE_FAUCET_CONTROL=true`.
+- **Permanent Multi-Environment Enablement (`DEC-CTRL-096`):** Faucet control is permanently enabled (`ENABLE_FAUCET_CONTROL=true`) across all environments (development, staging, and production). Environment configuration templates (`.env.example`, `.env.staging`, `.env.staging.example`, `apps/iot-gateway/.env.example`) and Zod schemas (`apps/web/lib/env/server.ts`, `apps/iot-gateway/src/config/env.ts`) default to `true`. The production startup ban was formally removed.
+- **Physical & Operational Security Invariants Preserved:** Operational safety does not rely on a global environment toggle. Substantive physical security remains strictly enforced at every layer:
+  1. **Strict RBAC & Account Active Guards:** Only authenticated users holding `ACTIVE` accounts with `device.control.dispense` permission and active device assignment can initiate commands.
+  2. **Device State Verification:** Commands require the device to be active, controllable (`WATER_TANK_NODE`), and `ONLINE`.
+  3. **Single Active Command Concurrency Lock:** PostgreSQL partial unique index `faucet_commands_one_active_per_device` prevents concurrent command execution per device.
+  4. **Idempotency & Zero Auto-Retries:** Commands require valid `Idempotency-Key` headers; client UI performs zero blind auto-retries.
+  5. **Durable Persistence & Audit Trail:** Every command is persisted in `faucet_commands` as `QUEUED` and recorded to `AuditLog` before MQTT publication.
+  6. **Automated Timeout Sweeps:** Commands unacknowledged or uncompleted after 5 minutes are transitioned to `TIMEOUT` by scheduled workers.
+<!-- Faucet Control Security Reconciled: 2026-10-01 -->
+
 

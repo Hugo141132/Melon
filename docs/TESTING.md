@@ -3308,9 +3308,48 @@ The following verification gates, automated test results, ACL policies, and hard
   - NodeMCU test bench flashed with updated `ProgramBaru.ino`.
   - Triggered manual OPEN command from web UI -> Gateway published `"ON"` -> NodeMCU actuated relay -> NodeMCU published `"OPEN"` to `irigasi/melon/kontrol/valve` -> Gateway received payload -> Gateway transitioned command to `COMPLETED` -> Frontend rendered `Physical Valve State: OPEN`.
   - Triggered manual CLOSE command from web UI -> Gateway published `"OFF"` -> NodeMCU deactivated relay -> NodeMCU published `"CLOSED"` -> Gateway transitioned command to `COMPLETED` -> Frontend rendered `Physical Valve State: CLOSED`.
-- **Remaining Blockers & Verification Gates:**
-  - Final 5 CI-oriented tests (`test:coverage`, `test:integration`, `check:quality`, `test`, `test:e2e`) have NOT been run yet.
-  - Manual git add/commit/push on `main` pending operator execution.
-  - Staging container redeployment (`kebun-melon-staging-gateway`, `kebun-melon-staging-web`) pending after push.
+- **Post-CI Verification & Staging Deployment:**
+  - Final 5 CI-oriented tests completed and verified; git commit/push on `main` executed by operator; GitHub CI verified green.
+  - Staging containers redeployed and verified healthy (`kebun-melon-staging-gateway`, `kebun-melon-staging-web`).
 <!-- TASK-0811 and TASK-0812 Testing Evidence Reconciled: 2026-10-01 -->
+
+---
+
+## 47. Staging Environment Faucet Control Feature Flag Activation & Verification (TASK-1004 / TASK-1012 / Reconciled 2026-10-01)
+
+### 1. Verification Context & Objectives
+- **Pre-Validation Baseline Disablement:** In accordance with `DEC-CTRL-051` and `DEC-CTRL-067`, faucet control was intentionally disabled (`ENABLE_FAUCET_CONTROL=false`) across staging configurations prior to staging validation to maintain baseline safety locks, prevent accidental hardware actuation, and verify baseline container health and telemetry ingestion isolation.
+- **Staging Validation Trigger:** Full end-to-end validation of critical flows (`TASK-1004` Flows 8, 9, 10; `TASK-0811`; `TASK-0812`) against containerized staging infrastructure required enabling the feature flag: `ENABLE_FAUCET_CONTROL=true` in the staging environment runtime (`docker-compose.staging.yml` / `.env.staging`).
+
+### 2. Implementation Invariant & Zero Code Modification
+- **Zero Application Code Changes:** The activation of faucet control in staging required zero modifications to application source code. All underlying subsystems:
+  - Backend API (`apps/web`): RBAC checks (`requireDeviceControlAccess`), idempotency validation, phase/volume mapping, and audit logging.
+  - IoT Gateway (`apps/iot-gateway`): `CommandPublisher`, `HardwareMqttAdapter`, status query loop, and timeout sweeps.
+  - Persistence Layer (`packages/database`): `FaucetCommandRepository` and `DeviceRepository` valve status tracking.
+  - Shared Contracts (`packages/contracts`): Zod schemas and command action validators.
+  - Web UI (`apps/web`): `FaucetControlPanel`, preset buttons, plant count stepper, and confirmation modals.
+  were already fully implemented, tested, and guarded by the `ENABLE_FAUCET_CONTROL` runtime flag.
+
+### 3. Verification Evidence & Container Health
+- **Runtime Container Status (Docker MCP):**
+  - Web container `kebun-melon-staging-web` is running and passing health checks (`/health` HTTP 200) on port 3000.
+  - Gateway container `kebun-melon-staging-gateway` is running and passing health checks (`/health` HTTP 200) on port 3001.
+- **Critical Flows Verified in Staging:**
+  - Flow 8 (Preset Dispensing with Plant Count Multiplier): Verified dispatch and processing behind flag.
+  - Flow 9 (Manual OPEN/CLOSE Valve Actuation): Verified bidirectional topic handling and state confirmation.
+  - Flow 10 (Command Failure & Timeout Alerts): Verified timeout sweep and error handling.
+- **Production Guard Superseded:** Production environment configuration initially retained `ENABLE_FAUCET_CONTROL=false`, but was formally superseded by `DEC-CTRL-096` permanent enablement across all environments.
+
+### 4. Permanent Faucet Control Enablement Across All Environments (DEC-CTRL-096)
+- **Requirement & Architecture:** Per user decision `DEC-CTRL-096`, `ENABLE_FAUCET_CONTROL` is permanently enabled (`true`) across development, staging, and production environments.
+- **Code & Configuration Changes:**
+  - `apps/web/lib/env/server.ts`: Default updated to `true`; production startup rejection check (`isStrictProd && isFaucetTrue`) removed.
+  - `apps/iot-gateway/src/config/env.ts`: Default updated to `true`; production startup rejection check removed.
+  - Configuration files: `.env.example`, `.env.staging`, `.env.staging.example`, `apps/iot-gateway/.env.example`, and `docker-compose.staging.yml` set `ENABLE_FAUCET_CONTROL=true`.
+- **Automated Verification Evidence:**
+  - `npm run env:test` (`scripts/test-env.ts`): 18/18 tests passed, confirming production environment accepts `ENABLE_FAUCET_CONTROL=true` without startup failure.
+  - `npx vitest run apps/web/test/unit/server-env.test.ts`: 13/13 tests passed, verifying web server environment schema defaults to `true` and allows `true` in production.
+  - `npx vitest run apps/iot-gateway/src/__tests__/gateway.test.ts`: 15/15 tests passed, verifying gateway environment schema defaults to `true` and allows `true` in production.
+  - Monorepo Typecheck (`npm run typecheck`): Passed with 0 errors across all 4 packages (`@kebun-melon/web`, `@kebun-melon/iot-gateway`, `@kebun-melon/database`, `@kebun-melon/contracts`).
+<!-- Permanent Faucet Control Testing Reconciled: 2026-10-01 -->
 

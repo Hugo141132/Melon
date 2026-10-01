@@ -171,7 +171,7 @@ The following facts are verified in the traceability matrix regarding `TASK-0810
 - **Implementation Status:** `TASK-0810` is implemented and verified (`packages/contracts/src/__tests__/audit.test.ts` 9/9 passed, `packages/database/src/__tests__/faucet-command-repository.test.ts` 23/23 passed, full faucet suite 114/114 passed, full monorepo suite 955/955 passed, typecheck 0 errors, lint 0 errors).
 - **Requirements & Decoupling:** Fulfills `DEC-CTRL-090` by supporting discrete `OPEN` and `CLOSE` actions, enforcing strict absence of volume/phase parameters, and recording dedicated audit events (`faucet.command.open.created`, `faucet.command.close.created`).
 - **Physical Valve State Integrity:** Physical state confirmation is deterministically bounded (`COMPLETED OPEN` → `OPEN`, `COMPLETED CLOSE` → `CLOSED`, `COMPLETED DISPENSE` → `UNKNOWN`, in-flight/failed → `UNKNOWN`), preventing false claims of closed valves after dispensing.
-- **Fail-Safe Policy Demarcation:** Hardware fail-safe valve behavior upon connection loss remains an explicit `UNRESOLVED / TBD` item (`DEC-CTRL-090`), isolated safely by software state mapping and `ENABLE_FAUCET_CONTROL=false` environment gating.
+- **Fail-Safe Policy Demarcation:** Hardware fail-safe valve behavior upon connection loss remains an explicit `UNRESOLVED / TBD` item (`DEC-CTRL-090`), isolated safely by software state mapping and operational security layers (subsequently superseded by `DEC-CTRL-096` permanent enablement).
 <!-- TASK-0810 Reconciled: 2026-08-21 -->
 
 ---
@@ -181,7 +181,7 @@ The following facts are verified in the traceability matrix regarding `TASK-0810
 The following facts are verified in the traceability matrix regarding `TASK-1001` (Complete Unit Test Suite across Monorepo):
 - **Implementation Status:** `TASK-1001` is implemented and verified (`102` test files passed, `958/958` tests passed, >99.6% line coverage in `@kebun-melon/contracts`, clean pre-commit quality gate `npm run check:quality`).
 - **Domain Coverage Verified:** Covers all 8 mandatory acceptance domains: account status decisions, RBAC permission checks, device access isolation, telemetry validation (`BAT` parameter omitted per `DEC-MON-086`), phase/volume calculations, command state machine deterministic transitions, idempotency deduplication, and bilingual locale parity (`DEC-I18N-068`).
-- **Safety Flags & Decisions:** `ENABLE_FAUCET_CONTROL=false` safety default is maintained, and uncertain/timeout states are strictly asserted as `UNKNOWN` without inventing timeout thresholds (`DEC-CTRL-092`).
+- **Safety Flags & Decisions:** Baseline safety default was maintained (subsequently permanently enabled across all environments per `DEC-CTRL-096`), and uncertain/timeout states are strictly asserted as `UNKNOWN` without inventing timeout thresholds (`DEC-CTRL-092`).
 <!-- TASK-1001 Reconciled: 2026-08-21 -->
 
 ---
@@ -762,10 +762,27 @@ The following facts are verified in the traceability matrix regarding `TASK-0811
   - Active in-flight command states (`QUEUED`, `SENT`, `ACKNOWLEDGED`, `IN_PROGRESS`) strictly render `UNKNOWN`.
   - Terminal `COMPLETED` commands render confirmed hardware state from `completionEvent.metadata.reportedState` / `physicalState`.
   - Initial `/controls` page load hydrates persisted physical state via `GET /api/v1/devices/{deviceId}/valve-status`.
-- **Remaining Blockers & Verification Gates:**
-  - Final 5 CI-oriented tests (`test:coverage`, `test:integration`, `check:quality`, `test`, `test:e2e`) have NOT been run yet.
-  - Manual git add/commit/push on `main` pending operator execution.
-  - Staging container redeployment (`kebun-melon-staging-gateway`, `kebun-melon-staging-web`) pending after push.
+- **Deployment & Verification Post-CI:**
+  - Final 5 CI-oriented tests completed; git commit/push on `main` executed by operator; GitHub CI verified green.
+  - Staging containers redeployed and verified healthy (`kebun-melon-staging-gateway`, `kebun-melon-staging-web`).
 <!-- TASK-0811 and TASK-0812 Traceability Reconciled: 2026-10-01 -->
+
+---
+
+## Permanent Faucet Control Enablement Traceability Note (DEC-CTRL-096 / TASK-1004 / Reconciled 2026-10-01)
+
+The following facts are verified in the traceability matrix regarding the permanent enablement of faucet control (`DEC-CTRL-096`):
+- **Traceability Baseline:** Governed by `PRD-FR-040`, `DEC-CTRL-051`, `DEC-CTRL-067`, `DEC-CTRL-095`, `DEC-CTRL-096`, `docs/SECURITY.md`, `docs/DEVICE_COMMUNICATION.md`, `docs/TESTING.md`, and `docs/DECISIONS.md`.
+- **Permanent Multi-Environment Enablement:** Gating feature flag default updated to `true` across Zod configuration schemas in `@kebun-melon/web` (`apps/web/lib/env/server.ts`) and `@kebun-melon/iot-gateway` (`apps/iot-gateway/src/config/env.ts`). Production startup rejection logic was removed.
+- **Staging & Runtime Configuration:** Configured `ENABLE_FAUCET_CONTROL=true` in `docker-compose.staging.yml`, `.env.staging`, `.env.staging.example`, `.env.example`, and `apps/iot-gateway/.env.example`.
+- **Preserved Operational Safety:** Operational safety is fully preserved via server-side authorization:
+  1. Strict RBAC requiring active authentication and `device.control.dispense`.
+  2. Controllable device state verification (`WATER_TANK_NODE` active and `ONLINE`).
+  3. Single-command concurrency lock enforced by PostgreSQL partial unique index `faucet_commands_one_active_per_device`.
+  4. Client idempotency key headers and zero blind retries.
+  5. Durable PostgreSQL queue persistence and audit logging prior to MQTT command dispatch.
+  6. 5-minute timeout sweeps for unacknowledged commands.
+- **Verification Gates Passed:** Monorepo typecheck (0 errors across 4 packages), environment validation tests (18/18 passed in `scripts/test-env.ts`), gateway unit tests (15/15 passed), and web server env unit tests (13/13 passed).
+<!-- Permanent Faucet Control Feature Flag Traceability Reconciled: 2026-10-01 -->
 
 

@@ -356,3 +356,18 @@ This section documents the investigation, compensating controls, and formal appr
 - **Compensating Controls:** `next/og` and `ImageResponse` are completely unused throughout the entire application codebase. The operational dashboard processes only structured numerical IoT telemetry, static SVG illustrations, and dynamic initials monograms, completely eliminating the attack surface.
 - **Approval & Expiry:** Approved by Security Team on 2026-10-01. Expires 2026-11-01 (31 days).
 <!-- Dependency Vulnerability Exceptions Reconciled: 2026-10-01 -->
+
+---
+
+## DEC-CTRL-096: Permanent Faucet Control Enablement Audit Baseline (Recorded: 2026-10-01)
+
+The permanent enablement of faucet control (`ENABLE_FAUCET_CONTROL=true`) across all environments (development, staging, and production) was audited and introduced zero security exceptions, zero new secrets, and zero new dependencies:
+- **Zero Security Exceptions:** Adheres strictly to `SEC-OPS-001` (zero unapproved secrets) and `SEC-OPS-004` (zero unapproved high vulnerabilities). Zero security exceptions registered in `scripts/security-exceptions.json`.
+- **Compensating Security Controls:** The permanent enablement of the environment flag (`DEC-CTRL-096`) leaves all substantive physical and operational safety layers fully intact:
+  1. **Strict RBAC & Active Account Guards:** Server-side authorization requires active authentication, active account status (`requireActiveAccount`), active device assignment, and `device.control.dispense` permission.
+  2. **Device State Verification:** Commands require the target device to be active, controllable (`WATER_TANK_NODE`), and `ONLINE`.
+  3. **Concurrency Protection:** Single active command per device enforced by PostgreSQL partial unique index `faucet_commands_one_active_per_device`.
+  4. **Idempotency & Replay Defense:** Idempotency key headers prevent duplication; zero client-side automatic retries.
+  5. **Durable Persistence & Audit Trail:** Commands are persisted as `QUEUED` and recorded to `AuditLog` prior to MQTT publication.
+  6. **Automated Timeout Sweeps:** Stale unacknowledged commands are transitioned to `TIMEOUT` after 5 minutes by background sweepers.
+<!-- Permanent Faucet Control Security Exceptions Reconciled: 2026-10-01 -->

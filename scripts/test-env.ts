@@ -16,10 +16,10 @@ function assert(cond: boolean, msg: string) {
   }
 }
 
-// 1. Missing flag defaults to false
+// 1. Missing flag defaults to true
 try {
   const env = validateServerEnv({});
-  assert(env.ENABLE_FAUCET_CONTROL === false, 'ENABLE_FAUCET_CONTROL defaults to false');
+  assert(env.ENABLE_FAUCET_CONTROL === true, 'ENABLE_FAUCET_CONTROL defaults to true');
 } catch (e: any) {
   assert(false, 'ENABLE_FAUCET_CONTROL default failed: ' + e.message);
 }
@@ -56,19 +56,22 @@ try {
   assert(e.message.includes('ENABLE_FAUCET_CONTROL'), 'Invalid boolean correctly fails validation');
 }
 
-// 5. Production ENABLE_FAUCET_CONTROL=true fails
+// 5. Production ENABLE_FAUCET_CONTROL=true is allowed
 try {
-  validateServerEnv({
+  const env = validateServerEnv({
     NODE_ENV: 'production',
     APP_ENV: 'production',
+    INTERNAL_GATEWAY_URL: 'https://gateway.internal:3001',
+    INTERNAL_SERVICE_TOKEN: 'super_secret_token_12345',
+    APP_URL: 'https://melonmadura.my.id',
     ENABLE_FAUCET_CONTROL: 'true',
   });
-  assert(false, 'Production ENABLE_FAUCET_CONTROL=true must fail');
-} catch (e: any) {
   assert(
-    e.message.includes('ENABLE_FAUCET_CONTROL=true is rejected in production'),
-    'Production ENABLE_FAUCET_CONTROL=true correctly rejected'
+    env.ENABLE_FAUCET_CONTROL === true,
+    'Production ENABLE_FAUCET_CONTROL=true correctly accepted'
   );
+} catch (e: any) {
+  assert(false, 'Production ENABLE_FAUCET_CONTROL=true failed: ' + e.message);
 }
 
 // 6. Error messages do not contain secret values
@@ -77,7 +80,9 @@ try {
   validateServerEnv({
     NODE_ENV: 'production',
     APP_ENV: 'production',
-    ENABLE_FAUCET_CONTROL: 'true',
+    INTERNAL_GATEWAY_URL: 'http://localhost:3001', // Should trigger production error (cannot use localhost)
+    INTERNAL_SERVICE_TOKEN: 'super_secret_token_12345',
+    APP_URL: 'https://melonmadura.my.id',
     MY_SECRET: secretValue,
   });
   assert(false, 'Production error trigger');

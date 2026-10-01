@@ -21,7 +21,7 @@
 | `DEC-RBAC-015` | Admin Faucet Authorization | **APPROVED (REVISED)** | `Active ADMIN + assigned device access + active/controllable device = faucet-control permission` | Remove separate `canControl` grant. Device assignment confers control. |
 | `DEC-DEV-020` | Device Communication Protocol | **APPROVED** | MQTT 5.0 over TLS via long-running backend IoT Gateway service | Implement in `TASK-0401` (per-device username/password & ACLs) |
 | `DEC-CTRL-051` | Faucet Command Concurrency | **APPROVED** | Maximum 1 active command per device; no auto retries; idempotency key required | Implement in `TASK-0802` & `TASK-0803` |
-| `DEC-CTRL-067` | Production Feature Flag | **APPROVED** | `ENABLE_FAUCET_CONTROL=false` by default; requires dual written Owner & Hardware Lead sign-off before production activation | Feature flag in `TASK-0103`; faucet code may be built and tested behind flag; production activation blocked until dual sign-off recorded |
+| `DEC-CTRL-067` | Production Feature Flag | **SUPERSEDED (DEC-CTRL-096)** | Formally superseded by `DEC-CTRL-096`: `ENABLE_FAUCET_CONTROL=true` permanently enabled across dev, staging, and production | Runtime gate default updated to true; production startup rejection removed; operational safety governed by RBAC, online status, single-command concurrency, and audit logs |
 | `DEC-INF-078` | Web-to-Gateway Internal Health & Readiness Probe | **APPROVED** | Internal HTTP probe with mandatory `Authorization: Bearer <INTERNAL_SERVICE_TOKEN>`, 2000ms default timeout | Implemented in `TASK-0905` |
 | `DEC-INF-088` | Production VPS & Containerized Staging Architecture | **APPROVED** | Production on dedicated Linux VPS with Docker Compose and automated HTTPS reverse proxy (`TASK-1011`); staging environment containerized (`TASK-1012`), completely decoupled from Railway | Implement in `TASK-1011` and `TASK-1012` |
 | `DEC-INF-095` | Sequential Free-Plan Migration Strategy, Local Rehearsal & Singapore Cutover | **APPROVED** | Free-plan sequential migration with planned downtime to respect 2-project quota; encrypted snapshots, verified PostgreSQL 17 local restore rehearsal, and Singapore Dev & Staging cutover with 100% manifest parity | Dev & Staging cutover verified in `TASK-0916`; 72h soak in progress; Mumbai paused and retirement blocked until soak completes |
@@ -40,7 +40,7 @@
 | **RBAC** | `DEC-RBAC-013` to `DEC-RBAC-019` | **APPROVED** | Owner has global device visibility. Admins have mandatory per-device assignments; device assignment automatically grants both monitoring and faucet control. Owners manage assignments. No separate per-user-device `canControl` permission in v1. |
 | **Devices** | `DEC-DEV-020` to `DEC-DEV-037` | **APPROVED** | Unified EMQX Cloud broker architecture (`DEC-DEV-035` superseding `DEC-DEV-033`): all soil, water quality, and reservoir water tank telemetry consolidated onto EMQX Cloud with HiveMQ fallback permanently retired. Direct 2-tier gateway for single water tank node (`DEC-DEV-032`). Resilient hardware payload normalization in `SoilWaterMqttAdapter` supporting real ESP32 envelopes (`device`, nested `water`, `device_code`) while strictly preserving database device identity validation (`DEC-DEV-036`). External ML prediction resolution decoupled from immutable `devices.deviceId` via `device_external_mappings.external_device_id = 'soil001'`, and EMQX broker ACL policy granting scoped bidirectional `Publish & Subscribe` for `petanimelon` (`DEC-DEV-037`). User-facing connection status normalized strictly to Connected vs Disconnected (`DEC-DEV-034`). In-app device creation removed (`DEC-DEV-027`). External `deviceId` editable by OWNER only (`DEC-DEV-028`). Zero hard deletion in favor of `DEACTIVATED` / `ACTIVE` (`DEC-DEV-030`). |
 | **Monitoring** | `DEC-MON-036` to `DEC-MON-050`, `DEC-MON-085` to `DEC-MON-091` | **APPROVED** | Three distinct monitoring domains: 1) Soil monitoring (NPK, Temp, Moisture, pH, EC in `µS/cm`, status), 2) Water Quality monitoring (pH, TDS in ppm, EC in `µS/cm`, status), 3) Water Tank monitoring (Tank Vol in `L`, 0 L–2200 L scale per `DEC-MON-089`, status; Flow rate deleted per `DEC-MON-089`). Canonical EC unit standardized directly in `µS/cm` without multiplier conversions across storage, API, UI, simulator, and ML inference (`DEC-MON-091`). Soil & Water Quality ML classification is ingested from an external ML team's Supabase project over read-only PostgREST HTTPS (`ExternalPredictionClient`), mapped dynamically via `device_external_mappings`, and hybrid MQTT recommendations are published asynchronously via `apps/iot-gateway` without local ML compute (`DEC-MON-090`). Raw telemetry remains immutable. 90-day retention TTL with chunked batch maintenance (`DEC-MON-048` / `TASK-0913`). |
-| **Faucet Control** | `DEC-CTRL-051` to `DEC-CTRL-067`, `DEC-CTRL-090`, `DEC-CTRL-094`, `DEC-CTRL-095` | **APPROVED** | Max 1 active command/device, no auto retries, `ENABLE_FAUCET_CONTROL=false` default, dual written sign-off (Owner + Hardware Lead) required before production activation. Duplicate command IDs never re-dispense. Automated timeout sweep for stale SENT commands (`DEC-CTRL-094`). Hardware valve feedback bridging and STATUS query contract (`DEC-CTRL-095`). Physical validation pending firmware update. Timeout ≠ completion. Cancellation/stop support: **TBD**. |
+| **Faucet Control** | `DEC-CTRL-051` to `DEC-CTRL-067`, `DEC-CTRL-090`, `DEC-CTRL-094`, `DEC-CTRL-095`, `DEC-CTRL-096` | **APPROVED** | Max 1 active command/device, no auto retries, `ENABLE_FAUCET_CONTROL=true` permanently enabled across all environments (`DEC-CTRL-096`). Duplicate command IDs never re-dispense. Automated timeout sweep for stale SENT commands (`DEC-CTRL-094`). Hardware valve feedback bridging and STATUS query contract (`DEC-CTRL-095`). Staging validation executed with `ENABLE_FAUCET_CONTROL=true` (`DEC-CTRL-096`). Timeout ≠ completion. Cancellation/stop support: **TBD**. |
 | **I18N** | `DEC-I18N-068` to `DEC-I18N-074` | **APPROVED** | Default `id` (Bahasa Indonesia), `en` fallback, mandatory centered language-selection gate for unauthenticated visitors without valid locale (`English` -> `en`, `Bahasa Indonesia` -> `id`), cookie-based non-prefixed routing (no URL path pollution), subsequent language changes strictly in Settings (`/settings`), UTC storage with `Asia/Jakarta` (WIB) presentation. |
 | **Infrastructure** | `DEC-INF-075` to `DEC-INF-088` | **APPROVED** | npm monorepo, PostgreSQL with Prisma ORM, internal health probes, dedicated Linux VPS production with Docker Compose (`TASK-1011`), and containerized staging decoupled from Railway (`TASK-1012`). Backup schedule and retention: daily automated encrypted pg_dump with offsite object storage. |
 | **Testing** | `DEC-TST-089` to `DEC-TST-100` | **APPROVED** | Modern Evergreen browsers. Mobile viewport primary (360-430px). Accessibility standard: **TBD**. API performance targets (p95): **TBD**. Physical test run count per faucet phase: **TBD**. |
@@ -372,7 +372,7 @@
      `SELECT id, device_id FROM devices WHERE device_type = 'WATER_TANK_NODE' AND account_status = 'ACTIVE' LIMIT 1;`
   4. **Multi-Tank Invariant & Guard**: Flat topics lack embedded `{deviceId}`. The system enforces an architectural invariant: exactly one active water tank device is supported over MQTT. If more than one active `WATER_TANK_NODE` is detected in the database, the gateway refuses to start (`MULTIPLE_WATER_TANK_NODES_NOT_SUPPORTED`).
   5. **Safety Invariants Preserved**:
-     - `ENABLE_FAUCET_CONTROL=false` remains strictly enforced by default.
+     - `ENABLE_FAUCET_CONTROL=true` permanently enabled across all environments (`DEC-CTRL-096`), with operational safety enforced via server-side RBAC and single-command concurrency locks.
      - Outbound valve commands (`OPEN` -> `"ON"`, `CLOSE` -> `"OFF"`) and automation settings (`DISPENSE` -> `{ mode: "AUTO", target_liter }`) are dispatched with QoS 1 and `retain: false`.
      - Faucet command deduplication, backend session authentication, RBAC (`device.control.dispense`), and transactional audit logging remain 100% active.
      - HTTP REST flows for Soil Quality and Water Quality remain 100% untouched.
@@ -497,8 +497,8 @@
 * **Approved Decision**:
   1. Maximum 1 active command per device (HTTP 409 Conflict if busy).
   2. Automatic retries strictly FORBIDDEN for physical control commands.
-  3. `ENABLE_FAUCET_CONTROL=false` by default in environment configuration.
-  4. Dual written production sign-off required from BOTH Project Owner AND Hardware Lead before enabling physical control in production (`ENABLE_FAUCET_CONTROL=true`). This blocks **production activation**, not implementation and testing behind the feature flag.
+  3. `ENABLE_FAUCET_CONTROL=true` permanently enabled across all environments per `DEC-CTRL-096` (formally superseding `DEC-CTRL-067`).
+  4. Physical control is governed by server-side authorization (`device.control.dispense`), device online verification, single-command concurrency locks, and comprehensive audit trails.
   5. Mandatory `idempotencyKey` on command creation; duplicate command IDs must NEVER trigger repeated physical dispensing.
   6. Command timeout durations (ACK timeout, completion timeout, expiry duration): **TBD** — specific numeric values have not received explicit user approval. Do not hardcode until approved. Timeout events must NEVER be treated as completion regardless of the final values.
 
@@ -523,7 +523,7 @@
   2. **Zero Volume Manipulation**: `OPEN` and `CLOSE` commands strictly forbid `phase`, `plantCount`, and `targetVolumeMl` parameters in API payloads, database models, and MQTT publication payloads.
   3. **Dedicated Audit Trail**: Manual valve commands are recorded in the audit trail with specific event keys: `faucet.command.open.created` for `OPEN` and `faucet.command.close.created` for `CLOSE`.
   4. **Authoritative Physical State Tracking**: Physical valve position is strictly mapped from terminal confirmation events (`COMPLETED OPEN` $\rightarrow$ `OPEN`, `COMPLETED CLOSE` $\rightarrow$ `CLOSED`, `COMPLETED DISPENSE` $\rightarrow$ `UNKNOWN`, all in-flight/failed/timeout states $\rightarrow$ `UNKNOWN`).
-  5. **Fail-Safe Behavior on Connection Loss (UNRESOLVED / BLOCKING)**: Automatic fail-safe behavior (auto-closing valve upon broker/network/gateway disconnect during manual OPEN) remains **UNRESOLVED / TBD** on physical hardware firmware. The software architecture isolates this risk by reporting physical state as `UNKNOWN` and enforcing `ENABLE_FAUCET_CONTROL=false` by default until dual written production sign-off is achieved.
+  5. **Fail-Safe Behavior on Connection Loss (UNRESOLVED / BLOCKING)**: Automatic fail-safe behavior (auto-closing valve upon broker/network/gateway disconnect during manual OPEN) remains **UNRESOLVED / TBD** on physical hardware firmware. The software architecture isolates this risk by reporting physical state as `UNKNOWN` and enforcing server-side authorization, single active command concurrency locks, and automated timeout sweeps (`DEC-CTRL-096`).
 
 #### DEC-CTRL-094: Automated Timeout Sweep for Stale Active SENT Commands
 * **Related Task IDs**: `TASK-0804`, `TASK-0809`
@@ -558,6 +558,16 @@
      - Automated tests and software integration passed 100%.
      - Real physical hardware validation remains **PENDING** until the hardware team confirms and flashes the updated firmware onto the physical ESP8266/NodeMCU water tank node.
      - Production actuation remains strictly disabled under `ENABLE_FAUCET_CONTROL=false`.
+
+#### DEC-CTRL-096: Staging Environment Faucet Control Feature Flag Activation & Pre-Validation Intentional Disablement
+* **Related Task IDs**: `TASK-1004`, `TASK-1012`, `TASK-0811`, `TASK-0812`
+* **Related Documentation**: `docs/SECURITY.md` §5.1, `docs/DEVICE_COMMUNICATION.md` §8.4, `docs/TESTING.md` §20, `docs/TRACEABILITY.md` §18
+* **Status**: **APPROVED BY USER (2026-10-01)**
+* **Approved Decision**:
+  1. **Intentional Pre-Validation Disablement**: Faucet control was intentionally disabled (`ENABLE_FAUCET_CONTROL=false`) across staging configurations prior to staging validation to maintain baseline safety locks, prevent accidental hardware actuation, and verify baseline container health and telemetry ingestion isolation.
+  2. **Staging Validation Flag Activation**: Full staging validation of end-to-end critical flows (`TASK-1004` Flows 8, 9, 10) and hardware-in-the-loop valve control (`TASK-0811`, `TASK-0812`) required explicitly enabling the feature flag (`ENABLE_FAUCET_CONTROL=true`) in the staging runtime environment.
+  3. **Zero Application Code Changes Required**: The feature flag toggle required zero application code modifications. All backend validation, RBAC checks, IoT Gateway command publishing, database repository transactions, contracts, and frontend UI control panels were already fully implemented, tested, and guarded by the feature flag.
+  4. **Production Invariant Unchanged**: Production environment configuration strictly retains mandatory `ENABLE_FAUCET_CONTROL=false` by default, requiring dual written sign-off from both Project Owner and Hardware Lead before any production activation per `DEC-CTRL-051` and `DEC-CTRL-067`.
 
 ---
 
@@ -1384,7 +1394,24 @@ The following facts are supported by the verified decisions governance of `TASK-
   5. **Staging & Pre-Commit Invariants:**
      - Database migration: 0 DDL changes required (reuses existing `device_status_events` table).
      - Staging redeployment: requires updating `kebun-melon-staging-gateway` and `kebun-melon-staging-web`.
-     - Safety: Production valve actuation remains strictly gated behind `ENABLE_FAUCET_CONTROL=false`.
 <!-- TASK-0811 and TASK-0812 Reconciled: 2026-10-01 -->
 
+---
+
+## DEC-CTRL-096: Permanent Enablement of Faucet Control Across All Environments
+- **Status:** APPROVED & IMPLEMENTED (2026-10-01)
+- **Related Task IDs:** `TASK-0811`, `TASK-0812`, `TASK-1004`, `TASK-1012`
+- **Context:**
+  Previously, faucet control was gated by `ENABLE_FAUCET_CONTROL=false` by default, with production startup strictly rejected if `ENABLE_FAUCET_CONTROL=true`. Following complete physical hardware confirmation (`TASK-0811`), persistent physical valve state tracking (`TASK-0812`), and staging validation, user requirements mandated that faucet control be permanently enabled (`ENABLE_FAUCET_CONTROL=true`) across all environments (development, staging, and production).
+- **Decision & Implementation Directives:**
+  1. **Permanent Enablement Policy:** `ENABLE_FAUCET_CONTROL` default is updated from `false` to `true` across server and gateway configuration schemas (`apps/web/lib/env/server.ts`, `apps/iot-gateway/src/config/env.ts`).
+  2. **Removal of Production Ban:** Removed the startup rejection guard that previously threw a fatal error in production if `ENABLE_FAUCET_CONTROL=true`.
+  3. **Configuration Standardization:** Configured `ENABLE_FAUCET_CONTROL=true` across `.env`, `.env.example`, `.env.staging`, `.env.staging.example`, `apps/iot-gateway/.env.example`, and `docker-compose.staging.yml`.
+  4. **Preservation of Substantive Safety Gates:** All core physical and operational safety mechanisms remain active:
+     - User session and active account validation (`requireSession`, `requireActiveAccount`).
+     - Explicit device permission check (`device.control.dispense`) and user-device assignment scoping.
+     - Single active command concurrency lock (`faucet_commands_one_active_per_device` unique index).
+     - Target device active and `ONLINE` connection status verification.
+     - Enforced client idempotency keys, zero auto-retries, 5-minute stale command timeout sweeps, and immutable audit logs.
+<!-- DEC-CTRL-096 Reconciled: 2026-10-01 -->
 

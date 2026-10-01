@@ -30,7 +30,7 @@ Kebun Melon is designed to manage agricultural sensor networks and irrigation in
      - **Phase 1:** 300 mL (UI: 0.3 L)
      - **Phase 2:** 1,000 mL (UI: 1.0 L)
      - **Phase 3:** 1,500 mL (UI: 1.5 L)
-   - Mandatory server-side safety flag: `ENABLE_FAUCET_CONTROL=false` by default. Dual written sign-off (Owner + Hardware Lead) is required before production physical activation.
+   - Server-side safety & authorization: Faucet control is permanently enabled (`ENABLE_FAUCET_CONTROL=true`, `DEC-CTRL-096`) across development, staging, and production. Physical and operational safety is strictly governed by RBAC (`device.control.dispense`), controllable device assignment, online status checks, single-command concurrency locks, and comprehensive audit trails.
 
 5. **User Roles & Account Governance:**
    - Exactly two system roles: `OWNER / PIC` (Person in Charge / Penanggung Jawab) and `ADMIN`.
@@ -179,7 +179,7 @@ Populate the `.env` file with genuine development credentials:
 - `MQTT_BROKER_URL`: EMQX Cloud broker endpoint (`wss://<host>:8084/mqtt`).
 - `MQTT_GATEWAY_USERNAME` & `MQTT_GATEWAY_PASSWORD`: Gateway MQTT credentials.
 - `RESEND_API_KEY`: API key for email delivery via Resend.
-- `ENABLE_FAUCET_CONTROL=false`: Enforce safety lock during development.
+- `ENABLE_FAUCET_CONTROL=true`: Faucet control enabled across all environments (`DEC-CTRL-096`).
 
 ### 3. Generate Database Client & Seed First Owner
 
@@ -304,9 +304,9 @@ curl -i http://localhost:3001/health
 
 ## 9. Safety Invariants & Release Governance
 
-1. **Physical Faucet Safety Lock:**
-   - `ENABLE_FAUCET_CONTROL=false` is enforced across all environments by default.
-   - Dual written authorization from both the **Owner** and **Hardware Lead** is strictly required before enabling physical actuation in production.
+1. **Physical Faucet Safety & Operational Governance:**
+   - `ENABLE_FAUCET_CONTROL=true` is permanently enabled across all environments (`DEC-CTRL-096`).
+   - Actuator safety is enforced by strict server-side RBAC (`device.control.dispense`), active account verification, single-command concurrency lock, online device verification, idempotency keys, zero auto-retries, 5-minute timeout sweeps, and immutable audit logs.
 2. **Untranslated Canonical Values:**
    - Database enums, API fields, MQTT topic paths, audit event keys, raw measurements, and scientific symbols (`N`, `P`, `K`, `pH`, `EC`, `TDS`, `ESP32`, `NodeMCU`, `MQTT`, `mL`, `L`, `°C`, `ppm`, `µS/cm`) are never translated or localized.
 3. **No Direct Browser MQTT Connection:**

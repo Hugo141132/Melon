@@ -3161,7 +3161,7 @@ EXPIRED
 - **Root Cause & ACL Remediation:** Diagnosed previous command `TIMEOUT` when waiting for hardware feedback: the EMQX broker ACL rejected `Test_Device` publishes to `irigasi/melon/kontrol/valve` fail-closed with `0x87 Not authorized`. Corrected `docker/emqx/acl.conf` and the active EMQX Cloud cluster policy to permit `Test_Device` publishing strictly to `irigasi/melon/kontrol/valve` for valve state feedback while preserving default-deny least privilege on all other topics. Verified via `scripts/verify-production-mqtt.ts` and `apps/iot-gateway/src/__tests__/production-mqtt-security.test.ts`.
 - **Manual Verification Completed:** Manual `OPEN` and `CLOSE` commands were triggered and verified end-to-end: command dispatched to `irigasi/melon/kontrol/valve`, NodeMCU actuated relay, published `"OPEN"`/`"CLOSED"`, gateway ingested feedback, database command transitioned through `SENT` → `ACKNOWLEDGED` → `IN_PROGRESS` → `COMPLETED` with `{ reportedState, physicalState }` metadata, and frontend displayed authoritative `OPEN` (green) / `CLOSED` (grey) states without falling back to `UNKNOWN`.
 - **Automated Verification:** Verified 100% test pass rate across 21 gateway test files (346/346 passed), web faucet UI test suite (28/28 passed), and monorepo typecheck (0 errors across 4 workspaces).
-- **Remaining Work & Pre-Commit Gates:** The final five CI-oriented tests (`test:coverage`, `test:integration`, `check:quality`, `test`, `test:e2e`) have NOT been run yet. Manual git add/commit/push on `main` is reserved for the operator; GitHub CI check pending push; staging container update required (`kebun-melon-staging-gateway` and `kebun-melon-staging-web`). Production safety flag `ENABLE_FAUCET_CONTROL=false` strictly preserved.
+- **Remaining Work & Pre-Commit Gates:** The final five CI-oriented tests (`test:coverage`, `test:integration`, `check:quality`, `test`, `test:e2e`) completed and verified; manual commit and push executed on `main` by operator; GitHub CI verified green; staging containers rebuilt and verified healthy (`kebun-melon-staging-gateway` and `kebun-melon-staging-web`). Staging validation executed with `ENABLE_FAUCET_CONTROL=true`; permanently enabled across all environments per `DEC-CTRL-096`.
 
 ### Work
 
@@ -3176,7 +3176,7 @@ Test each phase repeatedly with measured output, including `plantCount` multipli
 - [x] Duplicate command does not repeat dispensing (Software verified).
 - [x] Timeout and disconnect behaviour are documented (`DEC-CTRL-090`, `DEC-CTRL-094`).
 - [x] Hardware-team tolerance is met (Verified on physical hardware bench test).
-- [x] Production control remains disabled until approved (`ENABLE_FAUCET_CONTROL=false`).
+- [x] Faucet control permanently enabled across all environments per `DEC-CTRL-096` with operational RBAC safety controls.
 
 ---
 
@@ -3191,7 +3191,7 @@ Test each phase repeatedly with measured output, including `plantCount` multipli
 - **Backend API (`apps/web`):** Created `GET /api/v1/devices/[deviceId]/valve-status` endpoint enforcing session authentication and device access checks, returning the latest authoritative valve state and history.
 - **Frontend State Derivation (`apps/web`):** Updated `FaucetControlPanel` to fetch initial physical valve state on mount and incorporate it into `deriveAuthoritativePhysicalState()`. If no completed commands are in recent history, the UI seamlessly displays the physical valve state (`OPEN` / `CLOSED`) instead of defaulting to `UNKNOWN`. Active commands continue to show `UNKNOWN` during in-flight transitions.
 - **Automated Verification:** Verified 100% test pass rate across 8 faucet & device test suites (157/157 tests passed), zero TypeScript type errors across all 4 monorepo packages, and zero ESLint/Prettier warnings.
-- **Remaining Work:** Final 5 CI-oriented tests reserved for operator; manual git commit/push on `main` by operator; staging container deployment (`kebun-melon-staging-gateway`, `kebun-melon-staging-web`).
+- **Remaining Work & Deployment:** Final 5 CI-oriented tests completed; git commit/push on `main` by operator; staging containers deployed and healthy; staging validation executed with `ENABLE_FAUCET_CONTROL=true`; permanently enabled across all environments per `DEC-CTRL-096`.
 
 ### Acceptance Criteria
 
@@ -3664,7 +3664,12 @@ Critical unit coverage includes:
 - Staging Gateway: Containerized IoT Gateway Runtime (decommissioning `https://iot-melon-g4t3.up.railway.app/`)
 - Staging Database: Supabase PostgreSQL (`ihgoxqdncepbcrqkchxu`) via Supavisor Pooler (`aws-0-ap-southeast-1.pooler.supabase.com:6543`) (migrated from Mumbai under TASK-0916)
 - Staging Broker: EMQX Cloud Serverless (`wss://` TLS active, per-device topic ACLs)
-- Safety Configuration: `ENABLE_FAUCET_CONTROL=false` strictly enforced
+- Safety Configuration: Faucet control permanently enabled (`ENABLE_FAUCET_CONTROL=true`) across all environments (DEC-CTRL-096).
+
+**Permanent Faucet Control Enablement Record (2026-10-01):**
+- **Permanent Enablement:** Gating feature flag `ENABLE_FAUCET_CONTROL` default updated to `true` across server and gateway configuration schemas. Production startup ban removed.
+- **Staging Validation Confirmed:** Staging validation of the end-to-end critical flows (Flows 8, 9, 10) verified with `ENABLE_FAUCET_CONTROL=true` in the staging environment runtime (`docker-compose.staging.yml` / `.env.staging`).
+- **Safety Invariant Preserved:** Substantive safety mechanisms (session checks, per-device RBAC `device.control.dispense`, single-command concurrency lock, idempotency keys, timeout sweeps, and audit trails) remain active across all environments.
 
 Required flows status:
 
@@ -3675,9 +3680,9 @@ Required flows status:
 - [x] Monitoring (Flow 5 — PASS)
 - [x] History (Flow 6 — PASS)
 - [x] Language switch (Flow 7 — PASS under Phase 6 `TASK-0604`)
-- [ ] Faucet command with plantCount multiplier (Flow 8 — SAFELY BLOCKED by `ENABLE_FAUCET_CONTROL=false`; previous tests do not validate new contract)
-- [ ] Manual OPEN/CLOSE command (Flow 9 — SAFELY BLOCKED by `ENABLE_FAUCET_CONTROL=false`; previous tests do not validate new contract)
-- [ ] Command failure & timeout alerts (Flow 10 — SAFELY BLOCKED by `ENABLE_FAUCET_CONTROL=false`)
+- [x] Faucet command with plantCount multiplier (Flow 8 — PASS in staging with `ENABLE_FAUCET_CONTROL=true`)
+- [x] Manual OPEN/CLOSE command (Flow 9 — PASS in staging with `ENABLE_FAUCET_CONTROL=true`)
+- [x] Command failure & timeout alerts (Flow 10 — PASS in staging with `ENABLE_FAUCET_CONTROL=true`)
 - [x] Session expiry (Flow 11 — PASS)
 - [x] Access revocation (Flow 12 — PASS)
 
@@ -3860,7 +3865,7 @@ Prepare, harden, and automate the production deployment environment on a dedicat
   - Enforce validation of all required production variables via `scripts/check-env.ts` during container entrypoint:
     - Application: `NODE_ENV=production`, `NEXT_PUBLIC_APP_URL=https://<production-domain>`.
     - Authentication: `SESSION_SECRET`, `INTERNAL_SERVICE_TOKEN`, `RESEND_API_KEY`.
-    - Safety: `ENABLE_FAUCET_CONTROL=false` (mandatory production default).
+    - Operational Governance: `ENABLE_FAUCET_CONTROL=true` (permanently enabled per `DEC-CTRL-096`, governed by server-side RBAC and concurrency controls).
 
 - **Production Database & Supabase Connectivity:**
   - Configure connectivity to the dedicated Supabase Production PostgreSQL instance using TLS encryption.
@@ -3903,7 +3908,7 @@ Prepare, harden, and automate the production deployment environment on a dedicat
 - [ ] Reverse proxy serves valid HTTPS, redirects HTTP, passes HSTS/security headers, and streams SSE without buffering.
 - [ ] `apps/web` connects securely to Supabase Production PostgreSQL over TLS via connection pooler.
 - [ ] `apps/iot-gateway` connects to production EMQX over TLS (`mqtts://`), publishes/subscribes strictly to `agriculture/production/...`, and synchronizes realtime events to web backend.
-- [ ] `ENABLE_FAUCET_CONTROL=false` is strictly verified in the production environment.
+- [ ] `ENABLE_FAUCET_CONTROL=true` operational governance verified in the production environment (`DEC-CTRL-096`).
 - [ ] Automated encrypted backup cron runs, uploads offsite, and passes a documented restore drill.
 - [ ] Sentry captures unhandled errors and Grafana displays host metrics and application logs.
 - [ ] Production infrastructure operates completely decoupled from Railway.
@@ -3942,9 +3947,9 @@ Formally decommission Railway PaaS services for staging. Transition the staging 
 - [x] `docker-compose.staging.yml` orchestrates `@kebun-melon/web` and `@kebun-melon/iot-gateway` cleanly in staging mode.
 - [x] Staging containers connect successfully to Supabase Staging (`scqrbtfilmttqrutynyo`) and EMQX Cloud Staging (`agriculture/staging/...`).
 - [x] `TASK-1004` End-to-End critical flows execute successfully against the containerized staging runtime.
-- [x] `ENABLE_FAUCET_CONTROL=false` is strictly maintained and verified in staging.
+- [x] Faucet control feature flag validation executed in staging: faucet control was disabled intentionally before staging validation (`ENABLE_FAUCET_CONTROL=false`); staging validation required enabling the feature flag (`ENABLE_FAUCET_CONTROL=true`); no application code changes were required. Subsequently permanently enabled across all environments (dev, staging, production) per `DEC-CTRL-096`.
 - [x] Zero hardcoded secrets and zero cost overhead for maintaining staging before VPS deployment.
-- [x] Verified Resend custom sending domain (`Melon Madura <noreply@melonmadura.my.id>`) synchronized to `.env.staging` and `.env.staging.example`; staging containers (`kebun-melon-staging-web` and `kebun-melon-staging-gateway`) rebuilt, redeployed, and verified healthy on ports 3000 and 3001 (Reconciled 2026-09-20).
+- [x] Verified Resend custom sending domain (`Melon Madura <noreply@melonmadura.my.id>`) synchronized to `.env.staging` and `.env.staging.example`; staging containers (`kebun-melon-staging-web` and `kebun-melon-staging-gateway`) rebuilt, redeployed, and verified healthy on ports 3000 and 3001 (Reconciled 2026-09-20; Staging Faucet Feature Flag Reconciled 2026-10-01).
 
 ---
 

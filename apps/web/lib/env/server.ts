@@ -17,14 +17,14 @@ export const serverEnvSchema = z.object({
   ENABLE_FAUCET_CONTROL: z
     .preprocess(
       (val) => {
-        if (val === undefined || val === null || val === '') return false;
+        if (val === undefined || val === null || val === '') return true;
         if (val === 'true' || val === '1') return true;
         if (val === 'false' || val === '0') return false;
         return val;
       },
       z.boolean({ invalid_type_error: 'ENABLE_FAUCET_CONTROL must be boolean (true/false)' })
     )
-    .default(false),
+    .default(true),
   RATE_LIMIT_LOGIN_MAX: z
     .preprocess((val) => (val ? parseInt(String(val), 10) : 5), z.number().int().min(1))
     .default(5),
@@ -72,13 +72,6 @@ export function validateServerEnv(
     env.APP_ENV === 'production' || (env.NODE_ENV === 'production' && env.APP_ENV !== 'staging');
   const isTest =
     env.NODE_ENV === 'test' || env.APP_ENV === 'test' || process.env.NODE_ENV === 'test';
-  const isFaucetTrue = env.ENABLE_FAUCET_CONTROL === 'true' || env.ENABLE_FAUCET_CONTROL === '1';
-
-  if (isStrictProd && isFaucetTrue) {
-    throw new Error(
-      'Production enablement error: ENABLE_FAUCET_CONTROL=true is rejected in production until formal written sign-off activation gate is implemented.'
-    );
-  }
 
   if (isStrictProd) {
     if (!env.INTERNAL_GATEWAY_URL) {

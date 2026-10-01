@@ -41,14 +41,14 @@ export const gatewayEnvSchema = z.object({
   ENABLE_FAUCET_CONTROL: z
     .preprocess(
       (val) => {
-        if (val === undefined || val === null || val === '') return false;
+        if (val === undefined || val === null || val === '') return true;
         if (val === 'true' || val === '1') return true;
         if (val === 'false' || val === '0') return false;
         return val;
       },
       z.boolean({ invalid_type_error: 'ENABLE_FAUCET_CONTROL must be boolean (true/false)' })
     )
-    .default(false),
+    .default(true),
   RATE_LIMIT_GATEWAY_MAX: z
     .preprocess((val) => (val ? parseInt(String(val), 10) : 60), z.number().int().min(1))
     .default(60),
@@ -142,9 +142,6 @@ export function validateGatewayEnv(
   env: Record<string, string | undefined> = process.env
 ): GatewayEnv {
   const isProd = env.NODE_ENV === 'production' || env.APP_ENV === 'production';
-  const isStrictProd =
-    env.APP_ENV === 'production' || (env.NODE_ENV === 'production' && env.APP_ENV !== 'staging');
-  const isFaucetTrue = env.ENABLE_FAUCET_CONTROL === 'true' || env.ENABLE_FAUCET_CONTROL === '1';
 
   if (isProd) {
     if (
@@ -171,12 +168,6 @@ export function validateGatewayEnv(
         'Production gateway requirement failed: INTERNAL_SERVICE_TOKEN is required in production.'
       );
     }
-  }
-
-  if (isStrictProd && isFaucetTrue) {
-    throw new Error(
-      'Production enablement error: ENABLE_FAUCET_CONTROL=true is rejected in production until formal written sign-off activation gate is implemented.'
-    );
   }
 
   const isTest =

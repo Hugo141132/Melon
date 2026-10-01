@@ -6,7 +6,7 @@
 > **Target Environments:** Development (`dev`) and Staging (`staging`)  
 > **Source Region:** AWS Mumbai (`ap-south-1`)  
 > **Destination Region:** AWS Singapore (`ap-southeast-1`)  
-> **Safety Invariance:** `ENABLE_FAUCET_CONTROL=false` strictly enforced across all environments  
+> **Safety Invariance:** Strict operational command drain & maintenance freeze protocol (`DEC-CTRL-096`)  
 
 ---
 
@@ -212,7 +212,7 @@ SELECT count(*) AS missing_app_privilege_count FROM missing_app_privileges;
 - **Operational Blocker Recorded:** In-flight command draining cannot be handled automatically by stopping only the publisher.
 
 ### 4.3 Mandatory Shutdown Protocol & Operator Device Reconciliation
-1. **Freeze Web Ingress First:** Confirm `ENABLE_FAUCET_CONTROL=false` in `.env`, `.env.staging`, and `docker-compose.staging.yml`. This blocks `POST /api/v1/devices/[deviceId]/faucet-commands`.
+1. **Freeze Web Ingress First:** Temporarily set `ENABLE_FAUCET_CONTROL=false` in `.env`, `.env.staging`, and `docker-compose.staging.yml` during migration maintenance windows. This blocks `POST /api/v1/devices/[deviceId]/faucet-commands`.
 2. **Query Non-Terminal Commands:**
    ```sql
    SELECT id, device_id, action, status, requested_at, updated_at
@@ -231,7 +231,7 @@ SELECT count(*) AS missing_app_privilege_count FROM missing_app_privileges;
    ```powershell
    docker compose -f docker-compose.staging.yml stop iot-gateway
    ```
-6. **Replay Prevention:** Retain `ENABLE_FAUCET_CONTROL=false` across all environments to guarantee zero command generation or replay during reconnect.
+6. **Replay Prevention:** Retain temporary `ENABLE_FAUCET_CONTROL=false` freeze across all environments during database operations until verification gates pass, preventing premature command replay.
 
 
 ---

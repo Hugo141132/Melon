@@ -208,7 +208,7 @@ Operational preparation and local rehearsal for the Supabase PostgreSQL migratio
 
 - **Broker & Ingress Unaffected:** Direct TLS connectivity to EMQX Cloud (`apps/iot-gateway`) and REST ingestion endpoints (`POST /api/v1/devices/{deviceId}/telemetry/*`) continue operating as specified.
 - **Latency Optimization:** Colocating database persistence in Singapore alongside target compute regions reduces query and transactional write round-trip latency from gateway and web backend services upon eventual cutover.
-- **Pre-Cutover Command Freeze:** During planned live migration cutover, a write-freeze window will be enforced on faucet-control dispatch (`ENABLE_FAUCET_CONTROL=false` safety lock) to prevent in-flight command dispatch or partial state persistence across database instances.
+- **Pre-Cutover Command Freeze:** During planned live migration cutover, a write-freeze window will be enforced on faucet-control dispatch to prevent in-flight command dispatch or partial state persistence across database instances.
 - **Rehearsal Isolation:** Local restore rehearsals (validating 26 tables, 28 foreign keys, and snapshot parity) were executed completely isolated from live device traffic, with zero live device or broker connections.
 
 ---
@@ -253,7 +253,7 @@ The system consolidates all MQTT communication onto a single unified EMQX Cloud 
     - Reservoir telemetry (`irigasi/melon/sensor/volume`), valve actuation (`irigasi/melon/kontrol/valve`), automation setting (`irigasi/melon/setting/otomasi`).
     - Soil inbound (`melon/sensor-tanah/data-2424600050`), water inbound (`melon/sensor-air/data-2424600050`), outbound AI recommendations (`melon/ai-tanah/rekomendasi-2424600050`, `melon/ai-air/rekomendasi-2424600050`).
   - **Gateway Client:** Primary client connects once to EMQX; `SoilWaterMqttAdapter` binds unconditionally to this primary client (`apps/iot-gateway/src/app.ts`).
-  - **Safety:** Obeying strict safety lock `ENABLE_FAUCET_CONTROL=false`.
+  - **Safety:** Obeying server-side authorization and safety controls (`ENABLE_FAUCET_CONTROL=true`, `DEC-CTRL-096`).
 - **Retirement of Secondary Broker Fallback (`TASK-0416` / `DEC-DEV-035`):**
   - Obsolete `SOIL_WATER_MQTT_*` environment variables have been removed from the IoT Gateway runtime.
   - No secondary MQTT client is instantiated.
@@ -551,7 +551,7 @@ topicOtomasi = "irigasi/melon/setting/otomasi"
    - Canonical reservoir telemetry is structured under `telemetry/reservoir`, whereas hardware uses `sensor/volume`.
    - Topics must be in English and lowercase without translated words (`kontrol` and `otomasi` violate `DEV-TOPIC-003`).
 5. **Out-of-Scope Autonomous Actuation (`topicOtomasi`):**
-   `irigasi/melon/setting/otomasi` suggests autonomous device-side automation rules. No autonomous physical actuation is supported or permitted in this release. All faucet commands require human initiation by an authenticated Owner or assigned Admin through backend RBAC, durable audit logging, and `ENABLE_FAUCET_CONTROL=false` safety locks.
+   `irigasi/melon/setting/otomasi` suggests autonomous device-side automation rules. No autonomous physical actuation is supported or permitted in this release. All faucet commands require human initiation by an authenticated Owner or assigned Admin through backend RBAC, durable audit logging, and operational safety locks (`DEC-CTRL-096`).
 6. **Missing Lifecycle & Feedback Channels:**
    The hardware proposal defines no topics for:
    - Device command acknowledgement (`ack/faucet` - `ACCEPTED` / `REJECTED`).
@@ -571,7 +571,7 @@ The hardware team is **NOT** required to rename these topics. The system adopts 
 - **Canonical Internal Contracts Remain Immutable:** The core database schema, Prisma models, shared contracts (`@kebun-melon/contracts`), Web APIs, SSE streams, and frontend remain strictly bound to canonical multi-tenant routing.
 - **Explicit Context Requirement & Isolation:** Ingress telemetry on `irigasi/melon/sensor/volume` is mapped to canonical `telemetry/reservoir` only when authenticated publisher identity (username/client certificate) maps deterministically to `{ environment, siteId, deviceId }`. Bare, unauthenticated, or unmapped messages are rejected fail-closed.
 - **Anti-Republish Loop Protection:** The gateway checks ingress message origins to prevent infinite forwarding loops between external and internal topics.
-- **Safety Lock Enforced:** Retaining `topicValve` and `topicOtomasi` names does NOT authorize activating them. `ENABLE_FAUCET_CONTROL=false` safety defaults remain active. All valve actuation requires backend RBAC, durable database command records, and audit logging.
+- **Safety Governance Enforced:** Retaining `topicValve` and `topicOtomasi` names does NOT authorize arbitrary activation. All valve actuation strictly requires backend RBAC, durable database command records, and audit logging.
 
 #### 8.4.5 Direct 2-Tier Canonical Hardware MQTT Contract (DEC-DEV-032)
 
@@ -586,7 +586,7 @@ Per user-approved decision `DEC-DEV-032`, the system formally supersedes the int
 3. **Deterministic Device Binding**:
    Because flat topics lack embedded device IDs, the gateway binds directly to the single active `WATER_TANK_NODE` in the database, resolved via `WATER_TANK_DEVICE_ID` environment configuration with database query fallback (`SELECT id, device_id FROM devices WHERE device_type = 'WATER_TANK_NODE' AND account_status = 'ACTIVE' LIMIT 1`).
 4. **Safety & Security Invariants**:
-   - `ENABLE_FAUCET_CONTROL=false` default safety lock remains strictly active.
+   - Permanent enablement of faucet control (`ENABLE_FAUCET_CONTROL=true`, `DEC-CTRL-096`) backed by server-side RBAC and single-command concurrency locks.
    - Dual written sign-off (Project Owner + Hardware Lead) remains mandatory before physical control activation in production.
    - REST API flows for Soil Quality and Water Quality remain 100% untouched.
    - Database schema, user RBAC, session authentication, and transactional audit logging remain 100% unchanged.
@@ -610,7 +610,7 @@ An audit of this prototype against system specifications identifies the followin
 1. **Direct Browser Valve Publishing is Incompatible with System Architecture (`ARCHITECTURE.md` §3.2, `SECURITY.md` §13):**
    - Direct browser-to-broker connections are strictly prohibited (`DEVICE_COMMUNICATION.md` §3).
    - In the prototype, any web visitor can open developer tools or click UI buttons to actuate physical valves with **zero authentication**, **zero role authorization**, and **zero device assignment verification**.
-   - Direct publishing completely bypasses the server-side safety flag `ENABLE_FAUCET_CONTROL=false`, creating immediate physical hazard.
+   - Direct publishing completely bypasses server-side RBAC and authorization guards, creating immediate physical hazard.
    - It bypasses PostgreSQL transaction durability: no audit log is created, no command record is queued, and no operator attribution is recorded.
    - It has no idempotency or replay protection: multiple button clicks or network retries will execute uncontrolled repeated actuations.
 2. **Conflict with Completed Flow-Rate Removal (`TASK-0410`, `DEC-MON-089`):**
@@ -858,7 +858,7 @@ For initial hardware bench-testing and integration verification prior to product
 
 4. **Security Invariants & Production Transition:**
    - `broker.emqx.io` is strictly an unauthenticated development sandbox and is **NEVER** permitted in production or staging environments.
-   - The IoT Gateway retains its server-side safety flag `ENABLE_FAUCET_CONTROL=false`, rejecting physical actuation attempts until formally activated.
+   - The IoT Gateway enforces server-side authentication, RBAC, and single active command concurrency limits for all physical actuation attempts (`DEC-CTRL-096`).
    - Before deploying hardware to production, the hardware team must switch firmware configuration from `broker.emqx.io:8084` to the dedicated EMQX Cloud cluster (`he100b10.ala.asia-southeast1.emqxsl.com:8084`), configure credentials (`Test_Device`), and adhere to the broker ACLs specified in §8.4.7–8.4.8.
 
 #### 8.4.10 End-to-End Telemetry Pipeline, Freshness Lifecycle & UI Reconciliation
@@ -992,6 +992,12 @@ The software implementation under `TASK-0811` in `@kebun-melon/iot-gateway` (`Ha
 - **Hardware Team Firmware Update:** Pending. The hardware team has not yet updated or flashed the physical device.
 - **Physical Validation:** Real device bench testing, irrigation volume measurement, and manual valve open/close control cannot be fully validated end-to-end until the hardware team confirms and flashes the firmware update.
 - **Safety Invariant:** `ENABLE_FAUCET_CONTROL=false` strictly enforced in all production environments.
+
+##### 6. Staging Environment Feature Flag Activation & Pre-Validation Intentional Disablement (DEC-CTRL-096)
+- **Intentional Pre-Validation Disablement:** Faucet control was disabled intentionally (`ENABLE_FAUCET_CONTROL=false`) across staging configurations prior to staging validation to maintain baseline safety locks, prevent accidental hardware actuation, and verify baseline container health and telemetry ingestion isolation.
+- **Staging Validation Requirement:** Full staging validation of end-to-end critical flows (`TASK-1004` Flows 8, 9, 10) and hardware-in-the-loop valve control (`TASK-0811`, `TASK-0812`) required explicitly enabling the feature flag (`ENABLE_FAUCET_CONTROL=true`) in the staging runtime environment (`docker-compose.staging.yml` / `.env.staging`).
+- **Zero Application Code Changes Required:** The feature flag toggle required zero application code modifications. All backend validation, RBAC checks, IoT Gateway command publishing, database repository transactions, contracts, and frontend UI control panels were already fully implemented, tested, and guarded by the feature flag.
+- **Production Guard:** Production environment configuration strictly retains mandatory `ENABLE_FAUCET_CONTROL=false` by default, requiring dual written sign-off from both Project Owner and Hardware Lead before any production activation per `DEC-CTRL-051` and `DEC-CTRL-067`.
 
 ---
 

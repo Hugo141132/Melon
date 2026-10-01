@@ -57,7 +57,7 @@ All Next.js App Router layouts, operational views, cards, modals, controls, and 
    - *Empty / Unavailable State*: Renders clean empty notification (`Belum Ada Rekomendasi` / `No Recommendations Yet`) with informational helper box without disrupting dashboard structure.
    - *Populated State*: Displays full bento intelligence layout with badges, summary, issues, and action checklist.
    - *Stale / Offline Notice*: Renders an inline amber warning banner when sensor telemetry is stale or device connection is offline.
-5. **Advisory Safety Disclaimer (Mandatory)**: Every card includes an explicit footer note: `"Rekomendasi bersifat saran agronomi dan tidak mengontrol pompa air secara otomatis."` (`advisoryDisclaimer`), enforcing `DEC-MON-090` / `ENABLE_FAUCET_CONTROL=false` safety guarantees.
+5. **Advisory Safety Disclaimer (Mandatory)**: Every card includes an explicit footer note: `"Rekomendasi bersifat saran agronomi dan tidak mengontrol pompa air secara otomatis."` (`advisoryDisclaimer`), enforcing `DEC-MON-090` advisory-only safety guarantees (AI guidance never automatically triggers physical actuation).
 6. **Mobile Layout Clearance**: `/water` page padding is bounded to `pb-24` ensuring complete clearance above fixed mobile navigation bars across all responsive viewports.
 
 ### 1.4 Language Gate & Login Screen UI Refinements Governance & UI Specification (2026-09-19)
@@ -814,7 +814,7 @@ Displays the authoritative physical valve status at the header:
 
 Controls are disabled with a clear notice banner when:
 - user lacks `device.control.dispense`;
-- feature flag `ENABLE_FAUCET_CONTROL` is `false`;
+- feature flag `ENABLE_FAUCET_CONTROL` is `false` (permanently `true` by default per `DEC-CTRL-096`);
 - no device is selected;
 - selected device is offline or not a `WATER_TANK_NODE`;
 - an active command (`QUEUED`, `SENT`, `ACKNOWLEDGED`, `IN_PROGRESS`) is in progress.

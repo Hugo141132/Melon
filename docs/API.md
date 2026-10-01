@@ -37,10 +37,10 @@ The API shall support:
 - Real-time update endpoints.
 - Health and readiness checks.
 
-Note: All telemetry sources (soil, water quality, and reservoir water volume & status) are ingested through the IoT Gateway service via MQTT over TLS. Faucet control commands are dispatched via EMQX under strict `ENABLE_FAUCET_CONTROL=false` safety defaults.
+Note: All telemetry sources (soil, water quality, and reservoir water volume & status) are ingested through the IoT Gateway service via MQTT over TLS. Faucet control commands are dispatched via EMQX under permanent enablement (`ENABLE_FAUCET_CONTROL=true`, `DEC-CTRL-096`) backed by strict server-side RBAC and concurrency safety guards.
 
 ### 2.1 TASK-0914 Architectural Reconciliation
-Direct EMQX Cloud TLS connectivity applies to the MQTT reservoir telemetry and faucet-control boundary handled by `apps/iot-gateway`. REST API interfaces, endpoints, error responses, and `ENABLE_FAUCET_CONTROL=false` safety defaults remain untouched.
+Direct EMQX Cloud TLS connectivity applies to the MQTT reservoir telemetry and faucet-control boundary handled by `apps/iot-gateway`. REST API interfaces, endpoints, error responses, and operational safety defaults remain untouched.
 
 ### 2.2 TASK-0412 Soil & Water Quality Ingestion Migration to MQTT & REST Route Retirement
 Under `TASK-0412` and `DEC-DEV-033`, soil and water quality monitoring devices transitioned from direct REST API ingestion (`POST /api/v1/devices/{deviceId}/telemetry/soil` and `.../water`) to dedicated MQTT over TLS topics (`melon/sensor-tanah/data-2424600050` and `melon/sensor-air/data-2424600050`) handled by `SoilWaterMqttAdapter` in `apps/iot-gateway`:
@@ -2286,7 +2286,7 @@ Server validation:
 1. Active session.
 2. Active account.
 3. Control permission (`device.control.dispense`).
-4. Feature flag enabled (`ENABLE_FAUCET_CONTROL=true`).
+4. Feature flag enabled (`ENABLE_FAUCET_CONTROL=true`, permanently enabled by default per `DEC-CTRL-096`).
 5. Device assignment.
 6. Device capability `FAUCET_CONTROL`.
 7. Device is active.
@@ -3659,7 +3659,7 @@ GET /api/v1/devices/{deviceId}/predictions/latest
   - `data: null` with `meta.status: 'UNAVAILABLE'` $\to$ Renders clean empty guidance state (`Belum Ada Rekomendasi`).
   - Error responses (401, 403, 404, 500) $\to$ Renders localized operational error state without crashing dashboard views.
   - Telemetry freshness: Correlated with `isTelemetryStale` / `isOffline` to display an inline warning notice banner.
-- **Actuator Invariant:** Recommendations are strictly advisory and never trigger physical actuators or dispensing commands (`ENABLE_FAUCET_CONTROL=false`).
+- **Actuator Invariant:** Recommendations are strictly advisory and never automatically trigger physical actuators or dispensing commands.
 
 ### 5. Audited ML Classification Thresholds & Agronomic Standards Matrix (TASK-0413 / Reconciled 2026-09-19)
 

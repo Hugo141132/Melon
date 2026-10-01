@@ -59,7 +59,7 @@ This document specifies operational guidelines and system boundaries for coding 
   - Phase 1 → `300 mL`
   - Phase 2 → `1,000 mL`
   - Phase 3 → `1,500 mL`
-- **Safety Flags**: Faucet control operations are strictly blocked when `ENABLE_FAUCET_CONTROL=false` is set in the environment.
+- **Operational Gating**: Faucet control is permanently enabled (`ENABLE_FAUCET_CONTROL=true`, `DEC-CTRL-096`) across all environments, with operations safely governed by RBAC (`device.control.dispense`), device online checks, and single-command concurrency locks.
 - **User Flow**: User selects phase only → explicit confirmation modal required → server maps phase to target volume → persistent `QUEUED` record created with `idempotencyKey` → MQTT dispatch via IoT gateway.
 
 ---
@@ -94,4 +94,4 @@ This document specifies operational guidelines and system boundaries for coding 
   - Web Hosting: Railway PaaS (`melon-monitor.up.railway.app`)
   - Database: Supabase PostgreSQL (`aws-0-ap-south-1.pooler.supabase.com:6543`)
   - MQTT Broker: EMQX Cloud Serverless (`wss://` TLS)
-  - Safety Enforced: `ENABLE_FAUCET_CONTROL=false`
+  - Safety Enforced: `ENABLE_FAUCET_CONTROL=true` (permanently enabled across all environments per `DEC-CTRL-096`)
