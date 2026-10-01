@@ -16,39 +16,40 @@ import { useTranslations } from 'next-intl';
 
 export function deriveAuthoritativePhysicalState(
   recentCommands: FaucetCommandDto[],
-  activeCommand: FaucetCommandDto | null
+  activeCommand: FaucetCommandDto | null,
+  initialValveState?: AuthoritativePhysicalState
 ): AuthoritativePhysicalState {
   // If an active command is currently in flight, physical state is transitioning/unknown
   if (activeCommand && ACTIVE_COMMAND_STATUSES.includes(activeCommand.status)) {
     return 'UNKNOWN';
   }
 
-  if (!recentCommands || recentCommands.length === 0) {
-    return 'UNKNOWN';
-  }
-
   // Look for the most recent completed command
-  const latestCompleted = recentCommands.find((c) => c.status === 'COMPLETED');
-  if (!latestCompleted) {
-    return 'UNKNOWN';
+  const latestCompleted = recentCommands?.find((c) => c.status === 'COMPLETED');
+  if (latestCompleted) {
+    // Check if hardware-reported physical state exists in metadata or completion events
+    const completionEvent = latestCompleted.events?.find((e) => e.eventStatus === 'COMPLETED');
+    const reportedPhysicalState =
+      completionEvent?.metadata?.physicalState || completionEvent?.metadata?.reportedState;
+    if (reportedPhysicalState === 'OPEN' || reportedPhysicalState === 'CLOSED') {
+      return reportedPhysicalState;
+    }
+
+    if (latestCompleted.action === 'OPEN') {
+      return 'OPEN';
+    }
+    if (latestCompleted.action === 'CLOSE') {
+      return 'CLOSED';
+    }
+
+    // Completed DISPENSE does NOT confirm closed valve without sensor confirmation
   }
 
-  // Check if hardware-reported physical state exists in metadata or completion events
-  const completionEvent = latestCompleted.events?.find((e) => e.eventStatus === 'COMPLETED');
-  const reportedPhysicalState =
-    completionEvent?.metadata?.physicalState || completionEvent?.metadata?.reportedState;
-  if (reportedPhysicalState === 'OPEN' || reportedPhysicalState === 'CLOSED') {
-    return reportedPhysicalState;
+  // Fallback to initial hardware physical valve state when no completed commands exist
+  if (initialValveState && (initialValveState === 'OPEN' || initialValveState === 'CLOSED')) {
+    return initialValveState;
   }
 
-  if (latestCompleted.action === 'OPEN') {
-    return 'OPEN';
-  }
-  if (latestCompleted.action === 'CLOSE') {
-    return 'CLOSED';
-  }
-
-  // Completed DISPENSE does NOT confirm closed valve without sensor confirmation
   return 'UNKNOWN';
 }
 
@@ -76,6 +77,7 @@ export default function FaucetControlPanel() {
   // Active command & API state
   const [activeCommand, setActiveCommand] = useState<FaucetCommandDto | null>(null);
   const [recentCommands, setRecentCommands] = useState<FaucetCommandDto[]>([]);
+  const [initialValveState, setInitialValveState] = useState<AuthoritativePhysicalState>('UNKNOWN');
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -111,16 +113,37 @@ export default function FaucetControlPanel() {
     }
   }, []);
 
-  // Fetch active command strictly when selectedDevice changes
+  // Fetch standalone physical valve status directly from hardware status records
+  const fetchValveStatus = useCallback(async (targetDeviceId: string) => {
+    if (!targetDeviceId) {
+      setInitialValveState('UNKNOWN');
+      return;
+    }
+    try {
+      const res = await fetch(`/api/v1/devices/${encodeURIComponent(targetDeviceId)}/valve-status`);
+      const json = await res.json();
+      if (json.success && json.data) {
+        if (json.data.physicalState === 'OPEN' || json.data.physicalState === 'CLOSED') {
+          setInitialValveState(json.data.physicalState);
+        }
+      }
+    } catch {
+      // Ignore background network error
+    }
+  }, []);
+
+  // Fetch active command & initial valve status strictly when selectedDevice changes
   useEffect(() => {
     const devId = selectedDevice?.deviceId || selectedDevice?.id;
     if (devId) {
       fetchRecentCommands(devId);
+      fetchValveStatus(devId);
     } else {
       setActiveCommand(null);
       setRecentCommands([]);
+      setInitialValveState('UNKNOWN');
     }
-  }, [selectedDevice?.deviceId, selectedDevice?.id, fetchRecentCommands]);
+  }, [selectedDevice?.deviceId, selectedDevice?.id, fetchRecentCommands, fetchValveStatus]);
 
   // Stable callback for status updates from card
   const handleCommandUpdated = useCallback((updated: FaucetCommandDto) => {
@@ -232,7 +255,11 @@ export default function FaucetControlPanel() {
     }
   };
 
-  const physicalState = deriveAuthoritativePhysicalState(recentCommands, activeCommand);
+  const physicalState = deriveAuthoritativePhysicalState(
+    recentCommands,
+    activeCommand,
+    initialValveState
+  );
 
   return (
     <div className="space-y-6" data-testid="faucet-control-panel">

@@ -1355,4 +1355,36 @@ The following facts are supported by the verified decisions governance of `TASK-
      - Prisma CLI schema migrations route via `DIRECT_URL` (port 5432 Session Mode Pooler / direct) which fully supports PostgreSQL session-level advisory locks (`pg_advisory_lock`), eliminating command hangs.
 <!-- TASK-0217 and TASK-0218 Reconciled: 2026-09-25 -->
 
+---
+
+## DEC-CTRL-095: Single-Topic Real Hardware Confirmation, Broker ACL Remediation & Persistent Physical Valve State Tracking
+- **Status:** APPROVED & IMPLEMENTED (2026-10-01)
+- **Related Task IDs:** `TASK-0811`, `TASK-0812`
+- **Context:**
+  Previous iterations of reservoir faucet control either relied on simulated synthetic lifecycles or encountered command timeouts (`COMMAND_EXPIRED_TIMEOUT`) when waiting for physical hardware confirmation from the NodeMCU microcontroller. The platform required authentic end-to-end physical relay feedback without introducing new MQTT topics, violating broker least-privilege security policies, altering database schemas, or leaving frontend users with ambiguous `UNKNOWN` physical state indicators upon page load.
+- **Decision & Implementation Directives:**
+  1. **Single-Topic Bidirectional Invariant (`irigasi/melon/kontrol/valve`):**
+     - Retained exactly one canonical MQTT topic for all reservoir valve interactions. No secondary or separate ACK/state topics were created.
+     - Wire Commands (Gateway $\rightarrow$ Device): `"ON"` (open), `"OFF"` (close), `"STATUS"` (non-destructive query).
+     - Wire Feedback (Device $\rightarrow$ Gateway): `"OPEN"`, `"CLOSED"`.
+     - Firmware Echo Suppression: In `ProgramBaru.ino`, `callback()` immediately returns if the message is not `"ON"`, `"OFF"`, or `"STATUS"`, ignoring self-published feedback and protecting automated dispensing mode (`isAutoMode`).
+  2. **EMQX Broker ACL Least-Privilege Remediation:**
+     - Root-cause analysis of prior command timeouts revealed that the default-deny ACL policy on the EMQX broker rejected `Test_Device` publishes to `irigasi/melon/kontrol/valve` with MQTT 5.0 `0x87 Not authorized`.
+     - Updated `docker/emqx/acl.conf` and the production EMQX Cloud cluster policy to permit `Test_Device` to publish strictly to `irigasi/melon/kontrol/valve`.
+     - Least privilege is preserved: `Test_Device` is strictly forbidden from publishing to automation settings (`irigasi/melon/setting/otomasi`) or subscribing to telemetry topics (`irigasi/melon/sensor/volume`, `#`).
+  3. **Decoupled Physical State Persistence (`device_status_events`):**
+     - Persisted physical valve transitions into `device_status_events` (`reasonCode: 'VALVE_FEEDBACK'`, `'VALVE_STARTUP'`), safely isolating physical telemetry from immutable `faucet_commands`.
+     - Enforced atomic latest-5 record retention per device for valve status records, preventing table bloat.
+     - Preserved `faucet_commands` and `faucet_command_events` immutability for user-initiated command lifecycle audit history only.
+  4. **Initial State Hydration & Frontend State Derivation:**
+     - Created `GET /api/v1/devices/{deviceId}/valve-status` endpoint with session and device access checks.
+     - Updated `FaucetControlPanel` to fetch initial valve status on component mount.
+     - In `deriveAuthoritativePhysicalState()`, active commands evaluate to `UNKNOWN`; completed commands in memory take priority as recent transition facts; if no completed commands exist, the UI safely falls back to the initial physical state (`OPEN` / `CLOSED`) instead of defaulting to `UNKNOWN`.
+     - Real-time updates via SSE (`faucet.command.updated`, `faucet.valve.updated`) refresh physical state dynamically.
+  5. **Staging & Pre-Commit Invariants:**
+     - Database migration: 0 DDL changes required (reuses existing `device_status_events` table).
+     - Staging redeployment: requires updating `kebun-melon-staging-gateway` and `kebun-melon-staging-web`.
+     - Safety: Production valve actuation remains strictly gated behind `ENABLE_FAUCET_CONTROL=false`.
+<!-- TASK-0811 and TASK-0812 Reconciled: 2026-10-01 -->
+
 

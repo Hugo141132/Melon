@@ -294,10 +294,10 @@ export async function runProductionMqttVerification(): Promise<{
       });
     });
 
-    // 4e. Device FORBIDDEN from publishing valve control
-    const pubValveDenied = await new Promise<boolean>((resolve) => {
-      deviceClient?.publish('irigasi/melon/kontrol/valve', 'ON', { qos: 1 }, (err) => {
-        resolve(Boolean(err)); // True if error (rejected by ACL)
+    // 4e. Device ALLOWED to publish valve feedback (TASK-0811 / TASK-0812)
+    const pubValveAllowed = await new Promise<boolean>((resolve) => {
+      deviceClient?.publish('irigasi/melon/kontrol/valve', 'OPEN', { qos: 1 }, (err) => {
+        resolve(!err);
       });
     });
 
@@ -318,7 +318,7 @@ export async function runProductionMqttVerification(): Promise<{
       subSettingAllowed &&
       subTelemetryDenied &&
       pubVolumeAllowed &&
-      pubValveDenied &&
+      pubValveAllowed &&
       pubSettingDenied;
 
     results.push({
@@ -326,8 +326,8 @@ export async function runProductionMqttVerification(): Promise<{
       criterion: 'Topic ACL Isolates Each Device',
       passed: deviceAclPassed,
       message: deviceAclPassed
-        ? 'Device topic ACL isolates device: Publishes volume telemetry, subscribes to valve/setting, rejects cross-topic pub/sub fail-closed'
-        : `FAIL: Device ACL violation detected (subValve=${subValveAllowed}, subSetting=${subSettingAllowed}, subTelemetryDenied=${subTelemetryDenied}, pubVolume=${pubVolumeAllowed}, pubValveDenied=${pubValveDenied}, pubSettingDenied=${pubSettingDenied})`,
+        ? 'Device topic ACL isolates device: Publishes volume telemetry & valve feedback, subscribes to valve/setting, rejects cross-topic pub/sub fail-closed'
+        : `FAIL: Device ACL violation detected (subValve=${subValveAllowed}, subSetting=${subSettingAllowed}, subTelemetryDenied=${subTelemetryDenied}, pubVolume=${pubVolumeAllowed}, pubValveAllowed=${pubValveAllowed}, pubSettingDenied=${pubSettingDenied})`,
     });
   }
 

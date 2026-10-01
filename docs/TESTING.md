@@ -1173,7 +1173,7 @@ Automated security verification for production MQTT is enforced across two compl
   - Strict rejection of unencrypted schemes (`mqtt://`, `ws://`) when `NODE_ENV=production` or `APP_ENV=production`.
   - Mandatory TLS options in `GatewayMqttClient` (`rejectUnauthorized: true`, `clean: true`).
   - Production ACL rule specification in `docker/emqx/acl.conf` matching least-privilege matrix.
-  - Invariant that hardware device cannot publish commands (`kontrol/valve`, `setting/otomasi`) or subscribe to telemetry (`sensor/volume`, `#`).
+  - Invariant that hardware device can publish physical valve feedback to `irigasi/melon/kontrol/valve` and volume telemetry to `irigasi/melon/sensor/volume`, but cannot publish commands to `setting/otomasi` or subscribe to telemetry (`sensor/volume`, `#`).
   - Non-retained command policy (`retain: false`) enforced across `CommandPublisher` and `HardwareMqttAdapter`.
   - Credential uniqueness and segregation between Gateway and Device identities.
 
@@ -1183,7 +1183,7 @@ Automated security verification for production MQTT is enforced across two compl
   1. *Anonymous Access Disabled:* Confirms connection without credentials fails (`Connection refused: Bad username or password`).
   2. *TLS Enabled:* Confirms TLS encryption handshake over `wss://...:8084/mqtt` with strict certificate verification.
   3. *Device Credentials Unique:* Confirms gateway and device credentials do not collide.
-  4. *Topic ACL Isolation:* Tests that device client successfully subscribes to `kontrol/valve` and `setting/otomasi` and publishes to `sensor/volume`, while forbidden actions (publishing to `kontrol/valve` or subscribing to `sensor/volume`/`#`) return MQTT 5.0 `0x87 Not authorized`.
+  4. *Topic ACL Isolation:* Tests that device client successfully subscribes to `kontrol/valve` and `setting/otomasi`, publishes volume telemetry to `sensor/volume` and physical valve feedback to `kontrol/valve`, while forbidden actions (publishing to `setting/otomasi` or subscribing to `sensor/volume`/`#`) return MQTT 5.0 `0x87 Not authorized`.
   5. *Gateway Permissions:* Tests that gateway client publishes commands with `retain: false` and subscribes to `irigasi/melon/#`.
   6. *Revoked Device Reconnection Rejection:* Confirms unauthorized/revoked credentials fail with `Connection refused: Not authorized`.
 
@@ -3258,4 +3258,59 @@ The following verification gates, automated test results, database migrations, a
   - Entered 6-digit code in recovery modal within 60s countdown -> Verification succeeded immediately, primary browser session was cleanly revoked, secondary browser received active session and navigated to `/dashboard`.
   - Reloading primary browser session redirected cleanly to `/login` with expired session feedback.
 <!-- TASK-0217 and TASK-0218 Testing Evidence Reconciled: 2026-09-25 -->
+
+---
+
+## 35.14 TASK-0811 & TASK-0812 Single-Topic Physical Valve Confirmation, Broker ACL Remediation & State Tracking Evidence (2026-10-01)
+
+The following verification gates, automated test results, ACL policies, and hardware-in-the-loop manual evidence were evaluated for Single-Topic Real Hardware Confirmation (`TASK-0811`, `DEC-CTRL-095`) and Physical Valve State Persistence & History Retention (`TASK-0812`, `DEC-CTRL-095`):
+
+### 1. Scope of Implementation & Architectural Invariants
+- **Single-Topic Bidirectional Invariant (`TASK-0811` / `DEC-CTRL-095`):**
+  - All valve commands (`"ON"`, `"OFF"`, `"STATUS"`) and physical feedback (`"OPEN"`, `"CLOSED"`) operate strictly over the single established MQTT topic `irigasi/melon/kontrol/valve`.
+  - No secondary telemetry or status topics were introduced. Irrigation automation parameters remain segregated on `irigasi/melon/setting/otomasi`.
+  - Firmware (`ProgramBaru.ino`) implements immediate feedback publishing upon relay actuation and suppresses echo loops by matching inbound payloads before evaluating automation modes.
+- **Broker ACL Least-Privilege Remediation (`TASK-0811` Root-Cause Fix):**
+  - Root Cause Diagnosed: Initial hardware validation timed out because EMQX broker defaulted to deny publish actions from client `Test_Device` on `irigasi/melon/kontrol/valve` with MQTT 5.0 reason code `0x87 Not authorized`.
+  - Remediation: Updated `docker/emqx/acl.conf` and EMQX Cloud ACL to grant `Test_Device` publish permission strictly on `irigasi/melon/kontrol/valve` and `irigasi/melon/sensor/volume`, while maintaining default-deny on `setting/otomasi` and all other topics.
+- **Persistent Physical Valve State & History Retention (`TASK-0812` / `DEC-CTRL-095`):**
+  - Stored physical valve feedback in `device_status_events` under reason `VALVE_FEEDBACK` (or `VALVE_STARTUP` on initial boot) without mutating immutable `faucet_commands` history.
+  - Implemented `pruneDeviceStatusEvents` retaining strictly the latest 5 status events per device.
+  - Exposed initial state hydration via `GET /api/v1/devices/{deviceId}/valve-status` and real-time SSE propagation.
+- **Authoritative UI State Derivation:**
+  - Active in-flight commands (`QUEUED`, `SENT`, `ACKNOWLEDGED`, `IN_PROGRESS`) strictly display `UNKNOWN` to avoid optimistic assumption of valve state.
+  - Terminal `COMPLETED` commands render confirmed hardware state from `completionEvent.metadata.reportedState` / `physicalState`.
+  - Initial view load hydrates persisted physical state from `/valve-status` API.
+
+### 2. Evidence-Backed Automated Test Results
+- **IoT Gateway Hardware Adapter Tests (`apps/iot-gateway/src/__tests__/hardware-adapter.test.ts`):**
+  - Result: **11/11 passed** (100%, exit code 0).
+  - Verifies command dispatch to `irigasi/melon/kontrol/valve` with `"ON"` / `"OFF"`.
+  - Verifies inbound `"OPEN"` and `"CLOSED"` hardware feedback transitions active commands from `IN_PROGRESS` to `COMPLETED` with `reportedState` and `physicalState` metadata.
+  - Verifies removal of synthetic completion simulation (`isSynthetic: false`).
+- **Production MQTT Security Tests (`apps/iot-gateway/src/__tests__/production-mqtt-security.test.ts`):**
+  - Result: **7/7 passed** (100%, exit code 0).
+  - Confirms ACL rule specification permits device publish to `irigasi/melon/kontrol/valve` and `irigasi/melon/sensor/volume`.
+  - Confirms forbidden publish to `setting/otomasi` and unassigned topics is rejected.
+- **Database Device Repository Tests (`packages/database/test/device-repository.test.ts`):**
+  - Result: **14/14 passed** (100%, exit code 0).
+  - Verifies `recordDeviceStatusEvent` creates status records with `VALVE_FEEDBACK`.
+  - Verifies `pruneDeviceStatusEvents` prunes old records, leaving strictly the latest 5 events per device.
+  - Verifies `getLatestValveStatusEvent` returns the most recent state.
+- **Web Faucet Control UI Tests (`apps/web/test/unit/faucet-control-ui.test.tsx`):**
+  - Result: **10/10 passed** (100%, exit code 0).
+  - Verifies initial valve status fetch from `/api/v1/devices/{deviceId}/valve-status`.
+  - Verifies `UNKNOWN` state rendering during active command execution.
+  - Verifies authoritative physical state rendering (`OPEN` / `CLOSED`) upon receiving completion event metadata.
+
+### 3. Hardware-in-the-Loop & Manual Verification Evidence
+- **Manual Physical Verification:**
+  - NodeMCU test bench flashed with updated `ProgramBaru.ino`.
+  - Triggered manual OPEN command from web UI -> Gateway published `"ON"` -> NodeMCU actuated relay -> NodeMCU published `"OPEN"` to `irigasi/melon/kontrol/valve` -> Gateway received payload -> Gateway transitioned command to `COMPLETED` -> Frontend rendered `Physical Valve State: OPEN`.
+  - Triggered manual CLOSE command from web UI -> Gateway published `"OFF"` -> NodeMCU deactivated relay -> NodeMCU published `"CLOSED"` -> Gateway transitioned command to `COMPLETED` -> Frontend rendered `Physical Valve State: CLOSED`.
+- **Remaining Blockers & Verification Gates:**
+  - Final 5 CI-oriented tests (`test:coverage`, `test:integration`, `check:quality`, `test`, `test:e2e`) have NOT been run yet.
+  - Manual git add/commit/push on `main` pending operator execution.
+  - Staging container redeployment (`kebun-melon-staging-gateway`, `kebun-melon-staging-web`) pending after push.
+<!-- TASK-0811 and TASK-0812 Testing Evidence Reconciled: 2026-10-01 -->
 

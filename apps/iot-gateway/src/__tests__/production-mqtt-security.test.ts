@@ -200,13 +200,18 @@ describe('TASK-0907: Configure Production MQTT TLS and ACLs', () => {
       expect(content).toContain('{deny, all}.');
     });
 
-    it('confirms device cannot publish commands or subscribe to telemetry under ACL specification', () => {
+    it('confirms device can publish telemetry and valve feedback, but cannot publish settings or subscribe to telemetry under ACL specification', () => {
       const content = fs.readFileSync(aclConfPath, 'utf8');
 
-      // Device must NOT have publish permissions for commands
-      expect(content).not.toMatch(
+      // Device allows publish for volume telemetry and valve feedback
+      expect(content).toMatch(
+        /\{allow,\s*\{username,\s*"Test_Device"\}\s*,\s*publish,\s*\[[^\]]*sensor\/volume/
+      );
+      expect(content).toMatch(
         /\{allow,\s*\{username,\s*"Test_Device"\}\s*,\s*publish,\s*\[[^\]]*kontrol\/valve/
       );
+
+      // Device must NOT have publish permissions for automation settings
       expect(content).not.toMatch(
         /\{allow,\s*\{username,\s*"Test_Device"\}\s*,\s*publish,\s*\[[^\]]*setting\/otomasi/
       );

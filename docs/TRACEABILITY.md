@@ -736,4 +736,36 @@ The following facts are verified in the traceability matrix regarding `TASK-0417
   - Validated that bidirectional access enables both physical field microcontrollers and external AI worker processes using the shared credential to operate without broker rejection (`0x87 Not Authorized`), while strictly isolating backend gateway credentials and water tank actuator controls.
 <!-- TASK-0417 Traceability Reconciled: 2026-09-23 -->
 
+---
+
+## Single-Topic Real Hardware Confirmation, Broker ACL Remediation & Physical Valve State Persistence Traceability Note (TASK-0811, TASK-0812 / Reconciled 2026-10-01)
+
+The following facts are verified in the traceability matrix regarding `TASK-0811` (Single-Topic Real Hardware Confirmation) and `TASK-0812` (Physical Valve State Persistence & History Retention):
+- **Traceability Baseline:** Governed by `PRD-FR-040`, `DEC-CTRL-095`, `docs/DEVICE_COMMUNICATION.md`, `docs/API.md`, `docs/DATABASE.md`, `docs/SECURITY.md`, `docs/UI_UX.md`, and `docs/TESTING.md`.
+- **Implementation Status:**
+  - `TASK-0811`: Status: `DONE` (Implemented and manually verified against physical NodeMCU test bench; unit tests 11/11 in `apps/iot-gateway/src/__tests__/hardware-adapter.test.ts` and 7/7 in `apps/iot-gateway/src/__tests__/production-mqtt-security.test.ts` passed).
+  - `TASK-0812`: Status: `DONE` (Implemented and verified; unit tests 14/14 in `packages/database/test/device-repository.test.ts` and 10/10 in `apps/web/test/unit/faucet-control-ui.test.tsx` passed; `GET /api/v1/devices/{deviceId}/valve-status` verified).
+- **Single-Topic Wire Invariant (`DEC-CTRL-095`):**
+  - All valve control messages operate over the single established topic `irigasi/melon/kontrol/valve`.
+  - Commands from gateway: `"ON"`, `"OFF"`, and initial query `"STATUS"`.
+  - Physical state feedback from NodeMCU: `"OPEN"` and `"CLOSED"`.
+  - Irrigation automation remains segregated on `irigasi/melon/setting/otomasi`.
+  - Firmware (`ProgramBaru.ino`) suppresses echo feedback before evaluating automation rules.
+- **Broker ACL Least-Privilege Remediation:**
+  - Diagnosed prior command `TIMEOUT` root cause: EMQX broker default-deny policy rejected `Test_Device` publishes to `irigasi/melon/kontrol/valve` (`0x87 Not authorized`).
+  - Remediated `docker/emqx/acl.conf` and EMQX Cloud ACL rules to explicitly permit `Test_Device` to publish to `irigasi/melon/kontrol/valve` and `irigasi/melon/sensor/volume`, keeping `setting/otomasi` and unassigned topics denied.
+- **Persistent State & History Retention (`DEC-CTRL-095`):**
+  - Stored physical valve feedback in `device_status_events` with reason `VALVE_FEEDBACK` (or `VALVE_STARTUP`) and payload `{ valveState: "OPEN" | "CLOSED", source: "hardware" }`.
+  - Enforced `pruneDeviceStatusEvents` keeping strictly the latest 5 status events per device.
+  - Immutable `faucet_commands` history remains untouched.
+- **Authoritative UI Derivation & Initial Hydration:**
+  - Active in-flight command states (`QUEUED`, `SENT`, `ACKNOWLEDGED`, `IN_PROGRESS`) strictly render `UNKNOWN`.
+  - Terminal `COMPLETED` commands render confirmed hardware state from `completionEvent.metadata.reportedState` / `physicalState`.
+  - Initial `/controls` page load hydrates persisted physical state via `GET /api/v1/devices/{deviceId}/valve-status`.
+- **Remaining Blockers & Verification Gates:**
+  - Final 5 CI-oriented tests (`test:coverage`, `test:integration`, `check:quality`, `test`, `test:e2e`) have NOT been run yet.
+  - Manual git add/commit/push on `main` pending operator execution.
+  - Staging container redeployment (`kebun-melon-staging-gateway`, `kebun-melon-staging-web`) pending after push.
+<!-- TASK-0811 and TASK-0812 Traceability Reconciled: 2026-10-01 -->
+
 

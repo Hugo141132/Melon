@@ -28,6 +28,12 @@ describe('DeviceRepository Unit Tests (TASK-0302)', () => {
         upsert: vi.fn(),
         findMany: vi.fn(),
       },
+      deviceStatusEvent: {
+        create: vi.fn(),
+        findFirst: vi.fn(),
+        findMany: vi.fn(),
+        deleteMany: vi.fn(),
+      },
       $transaction: vi.fn(async (cb: any) => cb(mockPrisma)),
     };
 
@@ -637,6 +643,127 @@ describe('DeviceRepository Unit Tests (TASK-0302)', () => {
 
         const result = await repo.getExternalMappings('non-existent');
         expect(result).toEqual([]);
+      });
+    });
+
+    describe('Valve Status Events (TASK-0811)', () => {
+      const mockTankDevice = {
+        id: '99999999-9999-9999-9999-999999999999',
+        deviceId: 'water-tank-uqiwue',
+        name: 'Water Tank Node',
+        deviceType: DeviceType.WATER_TANK_NODE,
+        accountStatus: DeviceAccountStatus.ACTIVE,
+        connectionStatus: DeviceConnectionStatus.ONLINE,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      it('records a valve status event and enforces 5-record retention', async () => {
+        mockPrisma.device.findFirst.mockResolvedValue(mockTankDevice);
+        mockPrisma.deviceStatusEvent.create.mockResolvedValue({
+          id: 'event-uuid-1',
+          deviceId: mockTankDevice.id,
+          status: 'OPEN',
+          reasonCode: 'VALVE_FEEDBACK',
+          recordedAt: new Date('2026-09-30T10:00:00Z'),
+          receivedAt: new Date('2026-09-30T10:00:00Z'),
+          metadata: { physicalState: 'OPEN' },
+        });
+
+        // Mock 6 existing records so trimming triggers
+        mockPrisma.deviceStatusEvent.findMany.mockResolvedValue([
+          { id: 'ev-1' },
+          { id: 'ev-2' },
+          { id: 'ev-3' },
+          { id: 'ev-4' },
+          { id: 'ev-5' },
+        ]);
+        mockPrisma.deviceStatusEvent.deleteMany.mockResolvedValue({ count: 2 });
+
+        const result = await repo.recordValveStatusEvent(
+          'water-tank-uqiwue',
+          'OPEN',
+          'VALVE_FEEDBACK',
+          { physicalState: 'OPEN' }
+        );
+
+        expect(result.status).toBe('OPEN');
+        expect(result.deviceId).toBe('water-tank-uqiwue');
+        expect(mockPrisma.deviceStatusEvent.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              deviceId: mockTankDevice.id,
+              status: 'OPEN',
+              reasonCode: 'VALVE_FEEDBACK',
+            }),
+          })
+        );
+        expect(mockPrisma.deviceStatusEvent.deleteMany).toHaveBeenCalledWith({
+          where: {
+            deviceId: mockTankDevice.id,
+            reasonCode: { startsWith: 'VALVE_' },
+            id: { notIn: ['ev-1', 'ev-2', 'ev-3', 'ev-4', 'ev-5'] },
+          },
+        });
+      });
+
+      it('throws DeviceNotFoundError if target device does not exist', async () => {
+        mockPrisma.device.findFirst.mockResolvedValue(null);
+
+        await expect(repo.recordValveStatusEvent('unknown-tank', 'CLOSED')).rejects.toThrow(
+          DeviceNotFoundError
+        );
+      });
+
+      it('retrieves the latest physical valve status', async () => {
+        mockPrisma.device.findFirst.mockResolvedValue(mockTankDevice);
+        mockPrisma.deviceStatusEvent.findFirst.mockResolvedValue({
+          id: 'ev-latest',
+          deviceId: mockTankDevice.id,
+          status: 'CLOSED',
+          reasonCode: 'VALVE_FEEDBACK',
+          recordedAt: new Date('2026-09-30T10:05:00Z'),
+          receivedAt: new Date('2026-09-30T10:05:00Z'),
+        });
+
+        const status = await repo.getLatestValveStatus('water-tank-uqiwue');
+        expect(status).not.toBeNull();
+        expect(status?.status).toBe('CLOSED');
+      });
+
+      it('returns null if no valve status exists for device', async () => {
+        mockPrisma.device.findFirst.mockResolvedValue(mockTankDevice);
+        mockPrisma.deviceStatusEvent.findFirst.mockResolvedValue(null);
+
+        const status = await repo.getLatestValveStatus('water-tank-uqiwue');
+        expect(status).toBeNull();
+      });
+
+      it('retrieves valve status history up to specified limit', async () => {
+        mockPrisma.device.findFirst.mockResolvedValue(mockTankDevice);
+        mockPrisma.deviceStatusEvent.findMany.mockResolvedValue([
+          {
+            id: 'ev-1',
+            status: 'CLOSED',
+            reasonCode: 'VALVE_FEEDBACK',
+            recordedAt: new Date('2026-09-30T10:00:00Z'),
+            receivedAt: new Date('2026-09-30T10:00:00Z'),
+            metadata: {},
+          },
+          {
+            id: 'ev-2',
+            status: 'OPEN',
+            reasonCode: 'VALVE_FEEDBACK',
+            recordedAt: new Date('2026-09-30T09:50:00Z'),
+            receivedAt: new Date('2026-09-30T09:50:00Z'),
+            metadata: {},
+          },
+        ]);
+
+        const history = await repo.getValveStatusHistory('water-tank-uqiwue', 5);
+        expect(history).toHaveLength(2);
+        expect(history[0].status).toBe('CLOSED');
+        expect(history[1].status).toBe('OPEN');
       });
     });
   });

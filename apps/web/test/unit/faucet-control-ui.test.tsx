@@ -803,6 +803,47 @@ describe('deriveAuthoritativePhysicalState and formatLitersDisplay Helpers', () 
         null
       )
     ).toBe('CLOSED');
+
+    // 8. Empty recentCommands with initialValveState -> uses initialValveState
+    expect(deriveAuthoritativePhysicalState([], null, 'CLOSED')).toBe('CLOSED');
+    expect(deriveAuthoritativePhysicalState([], null, 'OPEN')).toBe('OPEN');
+    expect(deriveAuthoritativePhysicalState([], null, 'UNKNOWN')).toBe('UNKNOWN');
+
+    // 9. Active command in flight overrides initialValveState -> UNKNOWN
+    expect(
+      deriveAuthoritativePhysicalState(
+        [],
+        {
+          id: 'active-1',
+          commandId: 'active-1',
+          idempotencyKey: 'active-1',
+          deviceId: 'd1',
+          action: 'OPEN',
+          status: 'IN_PROGRESS',
+          requestedAt: '',
+        },
+        'CLOSED'
+      )
+    ).toBe('UNKNOWN');
+
+    // 10. Completed command takes precedence over initialValveState
+    expect(
+      deriveAuthoritativePhysicalState(
+        [
+          {
+            id: '1',
+            commandId: '1',
+            idempotencyKey: '1',
+            deviceId: 'd1',
+            action: 'OPEN',
+            status: 'COMPLETED',
+            requestedAt: '',
+          },
+        ],
+        null,
+        'CLOSED'
+      )
+    ).toBe('OPEN');
   });
 
   it('correctly maps command physical state in getAuthoritativePhysicalStateFromCommand', () => {

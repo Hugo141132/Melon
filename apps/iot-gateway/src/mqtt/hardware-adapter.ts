@@ -225,11 +225,41 @@ export class HardwareMqttAdapter {
         volumeTopic,
         valveTopic,
       });
+
+      // Prompt physical hardware for current valve status on initial subscription
+      setTimeout(() => {
+        this.requestHardwareValveStatus().catch(() => {});
+      }, 500);
     } catch (err: any) {
       logger.error('Failed to subscribe HardwareMqttAdapter to external topics', err, {
         volumeTopic,
         valveTopic,
       });
+    }
+  }
+
+  /**
+   * Sends an active STATUS query message to the hardware valve topic.
+   * ProgramBaru.ino responds with current physical state ('OPEN' / 'CLOSED')
+   * without toggling the relay.
+   */
+  public async requestHardwareValveStatus(): Promise<boolean> {
+    const client = this.getEffectiveHardwareClient();
+    if (!client || !client.isConnected()) {
+      return false;
+    }
+    const valveTopic = PERMANENT_HARDWARE_TOPICS.topicValve;
+    try {
+      await client.publish(valveTopic, Buffer.from('STATUS'), 0, false);
+      logger.info('Dispatched physical valve STATUS query to hardware topic', {
+        topic: valveTopic,
+      });
+      return true;
+    } catch (err: any) {
+      logger.error('Failed to dispatch valve STATUS query to hardware topic', err, {
+        topic: valveTopic,
+      });
+      return false;
     }
   }
 
@@ -650,6 +680,41 @@ export class HardwareMqttAdapter {
         valveState,
         canonicalDeviceId,
       });
+
+      // Persist physical valve state to device_status_events
+      if (this.deviceRepo) {
+        try {
+          await this.deviceRepo.recordValveStatusEvent(
+            resolvedDbDeviceId || canonicalDeviceId,
+            valveState,
+            'VALVE_FEEDBACK',
+            {
+              canonicalDeviceId,
+              source: 'hardware_feedback',
+              recordedAt: new Date().toISOString(),
+            }
+          );
+        } catch (dbErr) {
+          logger.error('Failed to persist unsolicited valve status event', dbErr, {
+            valveState,
+            canonicalDeviceId,
+          });
+        }
+      }
+
+      // Publish realtime event so connected web frontends receive updated valve state
+      await publishRealtimeEvent(
+        this.env,
+        'faucet.valve.updated',
+        {
+          deviceId: canonicalDeviceId,
+          physicalState: valveState,
+          source: 'hardware_feedback',
+          timestamp: new Date().toISOString(),
+        },
+        canonicalDeviceId
+      );
+
       return {
         success: true,
         state: valveState,
@@ -670,6 +735,17 @@ export class HardwareMqttAdapter {
       source: 'hardware_feedback',
       canonicalDeviceId,
     };
+
+    if (this.deviceRepo) {
+      this.deviceRepo
+        .recordValveStatusEvent(
+          resolvedDbDeviceId || canonicalDeviceId,
+          valveState,
+          'VALVE_FEEDBACK',
+          metadata
+        )
+        .catch(() => {});
+    }
 
     try {
       if (action === FaucetCommandAction.OPEN) {

@@ -2438,6 +2438,65 @@ This endpoint is reserved for explicit stop or emergency-stop behaviour if suppo
 
 ---
 
+## 18.7 Get Device Valve Status (TASK-0812)
+
+```http
+GET /api/v1/devices/{deviceId}/valve-status
+```
+
+**Authentication:** Required (`requireSession`)
+**Permission:** `device.read` (`requireDeviceViewAccess`)
+
+Fetches the latest authoritative physical valve state and recent status history from `device_status_events` for the specified water tank controller.
+
+Path parameters:
+- `deviceId`: Canonical device ID or database UUID.
+
+Response (HTTP 200 OK):
+
+```json
+{
+  "success": true,
+  "data": {
+    "deviceId": "water-tank-node-zi37gz",
+    "physicalState": "OPEN",
+    "latest": {
+      "id": "event-uuid-001",
+      "status": "OPEN",
+      "reasonCode": "VALVE_FEEDBACK",
+      "receivedAt": "2026-09-30T10:00:00.000Z",
+      "metadata": {
+        "rawPayload": "OPEN",
+        "topic": "irigasi/melon/kontrol/valve"
+      }
+    },
+    "history": [
+      {
+        "id": "event-uuid-001",
+        "status": "OPEN",
+        "reasonCode": "VALVE_FEEDBACK",
+        "receivedAt": "2026-09-30T10:00:00.000Z"
+      }
+    ]
+  },
+  "meta": {
+    "requestId": "req-valve-status-1790692407517",
+    "timestamp": "2026-09-30T10:00:01.000Z"
+  }
+}
+```
+
+Possible errors:
+
+```text
+UNAUTHORIZED (401)
+DEVICE_NOT_ASSIGNED (403)
+DEVICE_NOT_FOUND (404)
+INTERNAL_ERROR (500)
+```
+
+---
+
 # 19. Alert Endpoints (API-ALERT-001..API-ALERT-002)
 
 ## 19.1 List Alerts

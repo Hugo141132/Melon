@@ -1827,4 +1827,23 @@ The Device Management interface on `/devices`, parameter display presentation, c
   - Zero raw translation keys, English leaks, or Unicode emoji characters.
 <!-- Device Management UI/UX Reconciled: 2026-09-13 -->
 
+---
+
+## Physical Valve State Presentation & Control Panel Hydration UI/UX Note (TASK-0811 / TASK-0812 / Reconciled 2026-10-01)
+
+The Physical Valve State presentation on the `/controls` page (`FaucetControlPanel.tsx`), initial status hydration, and real-time state derivation are reconciled:
+- **Frontend Impact:** `MINOR`
+- **Selected UI Direction:** `Premium Minimal Ops`
+- **Existing Color Template:** `UNCHANGED` (Brand palette: emerald `#0d631b` active status tokens, neutral gray surface containers, muted outline variant borders)
+- **Selected Motion Effects:** `Button hover`, `Skeleton loading`
+- **21st.dev MCP:** `NOT REQUIRED` (reuses existing control card layouts, status badges, and typography tokens)
+- **Authoritative Physical Valve State Rendering:**
+  - **In-Flight Actuation Disambiguation:** During active command lifecycle phases (`QUEUED`, `SENT`, `ACKNOWLEDGED`, `IN_PROGRESS`), the UI strictly renders `UNKNOWN` with an indeterminate state badge. This prevents deceptive optimistic UI updates while the physical solenoid/relay is mechanically actuating.
+  - **Hardware Feedback Confirmation:** Upon receiving terminal `COMPLETED` events, the UI derives the verified physical state directly from event metadata (`completionEvent.metadata.reportedState` or `physicalState`), displaying **OPEN** (emerald badge with active pulse) or **CLOSED** (muted gray badge).
+  - **Initial View Mount Hydration:** On initial mount or active device selection, the panel calls `GET /api/v1/devices/{deviceId}/valve-status` to hydrate the latest confirmed hardware feedback persisted in `device_status_events`, eliminating blank or erroneous initial states without waiting for a new command.
+- **Bilingual Localization & Design Integrity:**
+  - Fully bound to existing translation keys under the `faucet.*` namespace in `messages/en.json` and `messages/id.json`.
+  - Zero layout shift, no added modal disruptions, and strict compliance with `Premium Minimal Ops`.
+<!-- Physical Valve State UI/UX Reconciled: 2026-10-01 -->
+
 

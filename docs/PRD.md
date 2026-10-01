@@ -553,10 +553,14 @@ The system shall provide the following faucet-control actions and presets on `/c
 - Direct manual valve actuation (`OPEN` / `CLOSE`) without phase or volume parameters.
 - Protected by distinct action-aware confirmation modals.
 
-#### C. Authoritative Physical State Indication
+#### C. Authoritative Physical State Indication (TASK-0811 / TASK-0812 / DEC-CTRL-095)
 
 - Displays authoritative valve physical state: `OPEN` (emerald), `CLOSED` (slate), or `UNKNOWN` (amber).
-- Derived exclusively from terminal completed commands: `COMPLETED OPEN` $\rightarrow$ `OPEN`, `COMPLETED CLOSE` $\rightarrow$ `CLOSED`, while active commands, failures, and `DISPENSE` completions strictly present `UNKNOWN`.
+- Authoritative derivation logic:
+  - **In-Flight Active Commands:** Display `UNKNOWN` to avoid false certainty during transit.
+  - **Terminal Completed Commands:** Prioritizes physical event metadata (`reportedState` / `physicalState`) confirming actual relay actuation: `OPEN` $\rightarrow$ `OPEN`, `CLOSED` $\rightarrow$ `CLOSED`.
+  - **Initial Physical State Hydration:** When no completed commands exist in active memory (e.g. on initial page mount or refresh), the UI fetches the persistent physical state from `GET /api/v1/devices/{deviceId}/valve-status` (backed by `device_status_events`), eliminating ambiguous default `UNKNOWN` badges.
+  - **Real-Time Synchronization:** Updates dynamically on Server-Sent Events (`faucet.command.updated` and `faucet.valve.updated`).
 
 ### 11.2 Control Workflow (PRD-FR-030 / TASK-0807)
 

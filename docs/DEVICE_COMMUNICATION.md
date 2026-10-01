@@ -735,6 +735,10 @@ User: Test_Device
   - Topic:  irigasi/melon/sensor/volume
   - Effect: Allow
 
+  - Action: Publish
+  - Topic:  irigasi/melon/kontrol/valve
+  - Effect: Allow
+
   - Action: Subscribe
   - Topic:  irigasi/melon/kontrol/valve
   - Effect: Allow
@@ -797,6 +801,28 @@ This section provides the authoritative operational guide for the hardware engin
    - **Watchdog / Disconnect Auto-Close:** If Wi-Fi or MQTT connection drops while the valve is open, the ESP32/ESP8266 firmware **MUST** automatically close the valve within 5 seconds to prevent tank overflow or flooding.
    - **Single-Node Invariant:** Production deployment operates strictly with **one** physical water tank node.
    - **Zero Retain:** Hardware shall never publish with `retain: true`.
+
+#### 8.4.8.1 Single-Topic Real Hardware Confirmation & ACL Least-Privilege Policy (TASK-0811 / TASK-0812)
+
+To ensure authoritative physical safety without introducing extraneous MQTT topics or changing database schemas, the platform enforces **Real Hardware Confirmation (Option B)** on the unified topic `irigasi/melon/kontrol/valve`:
+
+1. **Wire Commands & Echo Suppression:**
+   - **Gateway Outbound:** Dispatches primitive string commands (`"ON"` for OPEN, `"OFF"` for CLOSE, `"STATUS"` for non-destructive status queries) with QoS 1, `retain: false`.
+   - **Firmware Processing ([ProgramBaru.ino](file:///c:/Users/Puroh/Documents/Melon/sensor/water%20tank/ProgramBaru/ProgramBaru.ino)):** The NodeMCU/ESP8266 subscribes to `irigasi/melon/kontrol/valve`. Upon receipt:
+     - If payload is `"ON"`: engages relay and publishes `"OPEN"`.
+     - If payload is `"OFF"`: disengages relay and publishes `"CLOSED"`.
+     - If payload is `"STATUS"`: replies with current physical state (`"OPEN"` or `"CLOSED"`) without altering the relay pin.
+     - Echo suppression: In `callback()`, the firmware immediately ignores non-command payloads (`if (message != "ON" && message != "OFF" && message != "STATUS") return;`), preventing recursive echo actuation and protecting automation mode (`isAutoMode`).
+
+2. **Investigation & EMQX Broker ACL Remediation:**
+   - **Root Cause of Command TIMEOUT:** During initial testing, dispatched commands lingered in `SENT` until expiring with `COMMAND_EXPIRED_TIMEOUT`. Diagnostic tracing revealed that while the device received `"ON"` and switched the physical relay, its return publish (`"OPEN"`) on `irigasi/melon/kontrol/valve` was rejected fail-closed by the EMQX broker ACL with MQTT 5.0 `0x87 Not authorized`.
+   - **Least-Privilege Correction:** Rule 2 of `docker/emqx/acl.conf` and the active EMQX Cloud cluster policy were updated to grant `Test_Device` explicit Publish permission on `irigasi/melon/kontrol/valve`.
+   - **Security Invariance:** Least privilege is strictly maintained: `Test_Device` is strictly denied from publishing to irrigation automation settings (`irigasi/melon/setting/otomasi`) or subscribing to telemetry topics (`irigasi/melon/sensor/volume`, `#`).
+
+3. **Multi-Step FSM Progression & Real-Time Sync:**
+   - When an active command is in flight (`SENT`, `ACKNOWLEDGED`, `IN_PROGRESS`), incoming `"OPEN"` / `"CLOSED"` feedback transitions the command to `COMPLETED` (or `FAILED` if error).
+   - Inbound event metadata records `reportedState` and `physicalState` (`"OPEN"` / `"CLOSED"`), which is broadcast to web clients via Server-Sent Events (`faucet.command.updated`).
+   - If unsolicited feedback arrives when no command is in flight (`NO_ACTIVE_COMMAND`), the state is persisted to `device_status_events` (`reasonCode: 'VALVE_FEEDBACK'`, latest-5 retention) and broadcast via `faucet.valve.updated`.
 
 #### 8.4.9 Temporary Development & Integration Testbed (`broker.emqx.io:8084`)
 

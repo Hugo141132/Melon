@@ -1679,7 +1679,7 @@ No command is created until explicit modal confirmation.
 
 ---
 
-## Flow 41b — User Selects Manual OPEN / CLOSE Action (TASK-0807)
+## Flow 41b — User Selects Manual OPEN / CLOSE Action (TASK-0807, TASK-0811, TASK-0812)
 
 **Primary actor:** Authorised control user
 **Preconditions:** Control panel available; device online.
@@ -1691,7 +1691,11 @@ No command is created until explicit modal confirmation.
 2. For manual actions, `phase`, `plantCount`, and volume targets are omitted.
 3. User confirms action in the modal.
 4. The frontend dispatches `POST /api/v1/devices/{deviceId}/faucet-commands` with `{ action: 'OPEN' | 'CLOSE' }` and HTTP `Idempotency-Key` header.
-5. Active command status card renders `OPEN` or `CLOSE` action, displays `UNKNOWN` physical state, and begins 2.5s polling.
+5. Active command status card renders `OPEN` or `CLOSE` action, displays `UNKNOWN` physical state (avoiding premature optimistic assumptions while hardware moves), and begins 2.5s polling.
+6. The IoT Gateway dispatches wire command (`"ON"` for OPEN, `"OFF"` for CLOSE) to MQTT topic `irigasi/melon/kontrol/valve` with QoS 1, `retain: false`.
+7. The physical NodeMCU microcontroller actuates relay, publishes confirmed hardware state (`"OPEN"` or `"CLOSED"`) back to `irigasi/melon/kontrol/valve`, and suppresses its own echo loop.
+8. The gateway consumes feedback, persists physical state in `device_status_events` with `VALVE_FEEDBACK` (retaining latest-5 events), and transitions command to `COMPLETED` with `{ reportedState, physicalState }` metadata.
+9. Frontend receives completion, updates `Physical Valve State` to `OPEN` or `CLOSED`, and terminates polling.
 
 ---
 
@@ -1771,24 +1775,25 @@ No command is created until explicit modal confirmation.
 
 ---
 
-## Flow 45 — Faucet Command Completes Successfully
+## Flow 45 — Faucet Command Completes Successfully (TASK-0807, TASK-0811, TASK-0812)
 
 **Primary actor:** System and user
-**Preconditions:** Valid completion acknowledgement received.
-**Trigger:** Device reports completion.
+**Preconditions:** Valid completion acknowledgement received from hardware.
+**Trigger:** Device reports completion or physical valve feedback (`OPEN` / `CLOSED`) on `irigasi/melon/kontrol/valve`.
 
 **Main success flow:**
 
 1. The system verifies command ID and device ID.
-2. The system changes status to `COMPLETED`.
-3. The system stores actual volume if supplied.
+2. The system transitions status to `COMPLETED` and attaches verified hardware feedback metadata (`reportedState: 'OPEN' | 'CLOSED'`, `physicalState: 'OPEN' | 'CLOSED'`).
+3. The system stores actual volume if supplied (for automated `DISPENSE`).
 4. The system stores completion timestamp.
-5. The frontend displays success and final result.
-6. The event appears in control history.
+5. The system records physical valve state event in `device_status_events` under reason `VALVE_FEEDBACK` and prunes table to maintain strictly the latest 5 entries per device.
+6. The frontend displays success, updates `Physical Valve State` to `OPEN` or `CLOSED` from completion metadata, and refreshes control history.
+7. Subsequent page mounts or active device switches hydrate the physical state immediately via `GET /api/v1/devices/{deviceId}/valve-status`.
 
 **Alternative flows:** Actual volume is unavailable; show target and completion status only.
 **Error flows:** Duplicate completion is idempotently ignored or reconciled.
-**Postconditions:** Command is final and auditable.
+**Postconditions:** Command is final and auditable; latest physical state is persisted in `device_status_events`.
 **Required permissions:** Relevant control-history read.
 **Relevant account statuses:** Not dependent on current UI session.
 **UI states:** Completed.

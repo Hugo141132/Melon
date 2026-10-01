@@ -1838,7 +1838,7 @@ The following security controls govern MQTT communication across staging and pro
 - **Anonymous Connection Rejection:** Unauthenticated connections are globally disabled on the production EMQX Cloud cluster; anonymous connection attempts are rejected fail-closed with `Connection refused: Bad username or password`.
 - **Mandatory TLS Transport:** All production MQTT traffic operates over TLS (`wss://...:8084/mqtt` or `mqtts://...:8883`) with strict certificate verification (`rejectUnauthorized: true`). Unencrypted transport schemes (`mqtt://`, `ws://`) are rejected by environment validation guards.
 - **Client Identity & Credential Segregation:** Gateway client (`Test_gateway`) and hardware device node (`Test_Device`) use disjoint usernames, passwords, and client ID namespaces. Gateway credentials shall never be embedded in physical hardware firmware.
-- **Topic ACL Least-Privilege Matrix:** Enforces default-deny topic isolation defined in `docker/emqx/acl.conf`. Water tank hardware nodes are restricted to publishing volume telemetry (`irigasi/melon/sensor/volume`) and subscribing to operational commands (`irigasi/melon/kontrol/valve`, `irigasi/melon/setting/otomasi`). Hardware attempts to publish commands or subscribe to telemetry are denied fail-closed with MQTT 5.0 `0x87 Not authorized`.
+- **Topic ACL Least-Privilege Matrix:** Enforces default-deny topic isolation defined in `docker/emqx/acl.conf`. Water tank hardware nodes are restricted to publishing volume telemetry (`irigasi/melon/sensor/volume`) and physical valve state feedback (`irigasi/melon/kontrol/valve`), and subscribing to operational commands (`irigasi/melon/kontrol/valve`, `irigasi/melon/setting/otomasi`). Hardware attempts to publish to automation settings or subscribe to telemetry are denied fail-closed with MQTT 5.0 `0x87 Not authorized`.
 - **Gateway Permission Boundary & Non-Retained Policy:** Gateway holds pub/sub access to the irrigation namespace with a strict non-retained message policy (`retain: false` on commands) to prevent stale command execution upon device reconnection.
 - **Revoked Device Access Termination:** Revoked or unauthorized credentials are rejected fail-closed (`Connection refused: Not authorized`). Compromised or decommissioned devices can be disconnected dynamically via EMQX client management API/MCP tools (`disconnect_client`).
 - **Automated Verification:** Verified via automated runner `npm run mqtt:verify:prod` (`scripts/verify-production-mqtt.ts`) and Vitest test suite `apps/iot-gateway/src/__tests__/production-mqtt-security.test.ts`.
@@ -1854,4 +1854,16 @@ The following security controls are verified and active regarding device access 
 - **Zero Stale Polling:** Client-side cache eviction (`markDeviceRevoked`) removes revoked device keys from browser session storage and halts background telemetry polling.
 - **Owner Scope Invariant:** Owner accounts maintain global visibility across all registered devices without requiring per-device assignment records.
 <!-- Device Access Revocation Security Reconciled: 2026-09-22 -->
+
+---
+
+## Physical Valve Feedback MQTT ACL Least-Privilege Policy Note (TASK-0811 / TASK-0812 / Reconciled 2026-10-01)
+
+The following security controls govern physical valve feedback communication over MQTT:
+- **Investigation & Remediation of Command TIMEOUT:** In initial testing of hardware-in-the-loop valve control, dispatched commands lingered in `SENT` until timing out. Root cause analysis revealed that the default-deny EMQX broker ACL policy rejected return publishes from `Test_Device` on `irigasi/melon/kontrol/valve` (`0x87 Not authorized`).
+- **Targeted Least-Privilege Exception:** Rule 2 of `docker/emqx/acl.conf` and the production EMQX Cloud cluster policy were amended to permit `Test_Device` to publish strictly to `irigasi/melon/kontrol/valve`.
+- **Preservation of Topic Boundaries:** Least privilege is strictly preserved. `Test_Device` remains strictly forbidden from publishing to automation settings (`irigasi/melon/setting/otomasi`), publishing to unassigned topics, or subscribing to telemetry streams (`irigasi/melon/sensor/volume`, `#`).
+- **Single-Node Invariant:** Production deployment operates strictly with one physical water tank node, eliminating cross-actuator broadcast risks on flat topics.
+- **Automated Verification:** Verified via automated runner `npm run mqtt:verify:prod` (`scripts/verify-production-mqtt.ts`) and Vitest test suite `apps/iot-gateway/src/__tests__/production-mqtt-security.test.ts` (15/15 passed).
+<!-- Valve Feedback MQTT ACL Reconciled: 2026-10-01 -->
 

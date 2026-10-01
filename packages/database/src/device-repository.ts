@@ -615,4 +615,157 @@ export class DeviceRepository {
       updatedAt: m.updatedAt,
     }));
   }
+
+  /**
+   * Records a physical valve status event in device_status_events,
+   * and automatically trims older valve status records for this device
+   * to strictly preserve only the latest 5 records.
+   */
+  async recordValveStatusEvent(
+    deviceIdentifier: string,
+    status: 'OPEN' | 'CLOSED',
+    reasonCode: string = 'VALVE_FEEDBACK',
+    metadata?: any
+  ): Promise<{
+    id: string;
+    deviceId: string;
+    status: string;
+    reasonCode: string | null;
+    recordedAt: Date | null;
+    receivedAt: Date;
+    metadata: any;
+  }> {
+    const target = await this.getDeviceByCanonicalId(deviceIdentifier);
+    if (!target) {
+      throw new DeviceNotFoundError(
+        `Cannot record valve status: Device '${deviceIdentifier}' was not found.`
+      );
+    }
+
+    const now = new Date();
+    const created = await this.prisma.deviceStatusEvent.create({
+      data: {
+        deviceId: target.id,
+        status,
+        reasonCode,
+        recordedAt: now,
+        receivedAt: now,
+        messageId: `valve-status-${Date.now()}-${Math.random().toString(16).substring(2, 8)}`,
+        metadata: metadata ? metadata : { physicalState: status },
+      },
+    });
+
+    // Enforce retention invariant: Keep strictly latest 5 valve status records per device
+    try {
+      const recordsToKeep = await this.prisma.deviceStatusEvent.findMany({
+        where: {
+          deviceId: target.id,
+          reasonCode: { startsWith: 'VALVE_' },
+        },
+        orderBy: { receivedAt: 'desc' },
+        take: 5,
+        select: { id: true },
+      });
+
+      if (recordsToKeep.length >= 5) {
+        const keepIds = recordsToKeep.map((r) => r.id);
+        await this.prisma.deviceStatusEvent.deleteMany({
+          where: {
+            deviceId: target.id,
+            reasonCode: { startsWith: 'VALVE_' },
+            id: { notIn: keepIds },
+          },
+        });
+      }
+    } catch {
+      // Non-fatal trimming error
+    }
+
+    return {
+      id: created.id,
+      deviceId: target.deviceId,
+      status: created.status,
+      reasonCode: created.reasonCode,
+      recordedAt: created.recordedAt,
+      receivedAt: created.receivedAt,
+      metadata: created.metadata,
+    };
+  }
+
+  /**
+   * Retrieves the most recent physical valve status for a device.
+   */
+  async getLatestValveStatus(deviceIdentifier: string): Promise<{
+    status: 'OPEN' | 'CLOSED' | 'UNKNOWN';
+    recordedAt: Date | null;
+    receivedAt: Date | null;
+    reasonCode: string | null;
+  } | null> {
+    const target = await this.getDeviceByCanonicalId(deviceIdentifier);
+    if (!target) {
+      return null;
+    }
+
+    const latest = await this.prisma.deviceStatusEvent.findFirst({
+      where: {
+        deviceId: target.id,
+        reasonCode: { startsWith: 'VALVE_' },
+      },
+      orderBy: { receivedAt: 'desc' },
+    });
+
+    if (!latest) {
+      return null;
+    }
+
+    const normalizedStatus =
+      latest.status === 'OPEN' || latest.status === 'CLOSED' ? latest.status : 'UNKNOWN';
+
+    return {
+      status: normalizedStatus,
+      recordedAt: latest.recordedAt,
+      receivedAt: latest.receivedAt,
+      reasonCode: latest.reasonCode,
+    };
+  }
+
+  /**
+   * Retrieves up to N latest physical valve status records for a device.
+   */
+  async getValveStatusHistory(
+    deviceIdentifier: string,
+    limit: number = 5
+  ): Promise<
+    Array<{
+      id: string;
+      status: string;
+      reasonCode: string | null;
+      recordedAt: Date | null;
+      receivedAt: Date;
+      metadata: any;
+    }>
+  > {
+    const target = await this.getDeviceByCanonicalId(deviceIdentifier);
+    if (!target) {
+      return [];
+    }
+
+    const records = await this.prisma.deviceStatusEvent.findMany({
+      where: {
+        deviceId: target.id,
+        reasonCode: { startsWith: 'VALVE_' },
+      },
+      orderBy: { receivedAt: 'desc' },
+      take: Math.min(limit, 10),
+    });
+
+    return records.map((r) => ({
+      id: r.id,
+      status: r.status,
+      reasonCode: r.reasonCode,
+      recordedAt: r.recordedAt,
+      receivedAt: r.receivedAt,
+      metadata: r.metadata,
+    }));
+  }
 }

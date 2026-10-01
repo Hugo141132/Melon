@@ -341,4 +341,18 @@ This section documents the investigation, compensating controls, and formal appr
 - **Affected Context:** Fastify JSON schema validation compiler (`@fastify/ajv-compiler`, `ajv`, `fast-json-stringify`).
 - **Compensating Controls:** The IoT Gateway and backend web application define strict static route parameters and JSON schema payloads. No untrusted user-supplied URIs with authority (host/port) components are parsed or serialized by `fast-uri`, rendering the authority injection and host confusion attack vectors unexploitable.
 - **Approval & Expiry:** Approved by Security Team on 2026-09-30. Expires 2026-10-30 (30 days).
-<!-- Dependency Vulnerability Exceptions Reconciled: 2026-09-30 -->
+
+### 6. EXC-DEP-007 (`brace-expansion` / `GHSA-qhr7-859c-m2p7`, `GHSA-6j4f-fj2g-mc7p`, High)
+- **Vulnerability:** DoS via uncontrolled recursion on nested brace groups (`GHSA-qhr7-859c-m2p7`) and in `parseCommaParts` (`GHSA-6j4f-fj2g-mc7p`) causing stack exhaustion.
+- **Classification:** Mitigated Transitive Dev-Dependency.
+- **Affected Context:** Transitive dependency of ESLint and `@typescript-eslint` (`@eslint/eslintrc`, `minimatch`, `glob`) used strictly at development/lint time.
+- **Compensating Controls:** `brace-expansion` is not bundled into client or server production runtime bundles. No untrusted user-supplied glob expressions or brace syntax strings are accepted, evaluated, or parsed by the web application or IoT gateway.
+- **Approval & Expiry:** Approved by Security Team on 2026-10-01. Expires 2026-11-01 (31 days).
+
+### 7. EXC-DEP-008 (`next` / `GHSA-vcvr-r3jv-pc5j`, Critical)
+- **Vulnerability:** Remote Code Execution in `next/og` `ImageResponse` when evaluating untrusted inputs.
+- **Classification:** Mitigated Unused Sub-Feature.
+- **Affected Context:** `next/og` dynamic OpenGraph image generation.
+- **Compensating Controls:** `next/og` and `ImageResponse` are completely unused throughout the entire application codebase. The operational dashboard processes only structured numerical IoT telemetry, static SVG illustrations, and dynamic initials monograms, completely eliminating the attack surface.
+- **Approval & Expiry:** Approved by Security Team on 2026-10-01. Expires 2026-11-01 (31 days).
+<!-- Dependency Vulnerability Exceptions Reconciled: 2026-10-01 -->

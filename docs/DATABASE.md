@@ -819,6 +819,25 @@ ON device_status_events (device_id, message_id)
 WHERE message_id IS NOT NULL
 ```
 
+### 7.5.1 Physical Valve State Persistence & Retention Policy (TASK-0812)
+
+Under `TASK-0812`, `device_status_events` is used to persist physical valve state transitions and provide initial state retrieval without modifying the database schema:
+
+- **State Representation:**
+  - `status`: Normalized physical state (`'OPEN'` or `'CLOSED'`).
+  - `reason_code`:
+    - `'VALVE_FEEDBACK'`: Hardware reported state change on `irigasi/melon/kontrol/valve` without an active command in flight (`NO_ACTIVE_COMMAND`).
+    - `'VALVE_STARTUP'`: Hardware broadcast its physical state upon initial boot or broker reconnection.
+  - `metadata`: JSON payload containing `{ topic: 'irigasi/melon/kontrol/valve', rawPayload, processedAt }`.
+
+- **Strict Latest-5 Retention per Device:**
+  - In `DeviceRepository.recordValveStatusEvent`, an atomic retention sweep preserves strictly the latest 5 records per device where `reason_code LIKE 'VALVE_%'`.
+  - Older valve status events beyond the latest 5 are pruned immediately within the insertion transaction, preventing unbounded table growth.
+
+- **Command Isolation Invariant:**
+  - `faucet_commands` and `faucet_command_events` tables remain strictly immutable command lifecycle audit logs.
+  - Unsolicited physical valve state reports never create or mutate command records, maintaining strict decoupling between user intent and ambient physical state.
+
 ---
 
 # 8. Telemetry Tables

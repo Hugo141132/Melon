@@ -599,10 +599,18 @@ describe('HardwareMqttAdapter (TASK-0411 / Hardware Compatibility Layer)', () =>
         getCommands: vi.fn().mockResolvedValue({ items: [] }),
       };
 
+      const mockDeviceRepo = {
+        getDeviceByCanonicalId: vi
+          .fn()
+          .mockResolvedValue({ id: 'db-dev-1', deviceId: 'water-tank-node-zi37gz' }),
+        recordValveStatusEvent: vi.fn().mockResolvedValue({}),
+      };
+
       const valveAdapter = new HardwareMqttAdapter({
         env: mockEnv,
         mqttClient: mockInternalClient,
         hardwareMqttClient: mockHardwareClient,
+        deviceRepo: mockDeviceRepo as any,
         faucetCommandRepo: mockFaucetCommandRepo as any,
         targetDeviceId: 'water-tank-node-zi37gz',
       });
@@ -611,6 +619,32 @@ describe('HardwareMqttAdapter (TASK-0411 / Hardware Compatibility Layer)', () =>
       expect(res.success).toBe(true);
       expect(res.reason).toBe('NO_ACTIVE_COMMAND');
       expect(res.state).toBe('CLOSED');
+      expect(mockDeviceRepo.recordValveStatusEvent).toHaveBeenCalledWith(
+        'db-dev-1',
+        'CLOSED',
+        'VALVE_FEEDBACK',
+        expect.objectContaining({
+          canonicalDeviceId: 'water-tank-node-zi37gz',
+          source: 'hardware_feedback',
+        })
+      );
+    });
+
+    it('dispatches STATUS query to irigasi/melon/kontrol/valve when requested', async () => {
+      const valveAdapter = new HardwareMqttAdapter({
+        env: mockEnv,
+        mqttClient: mockInternalClient,
+        hardwareMqttClient: mockHardwareClient,
+      });
+
+      const res = await valveAdapter.requestHardwareValveStatus();
+      expect(res).toBe(true);
+      expect(mockHardwareClient.publish).toHaveBeenCalledWith(
+        'irigasi/melon/kontrol/valve',
+        expect.any(Buffer),
+        0,
+        false
+      );
     });
   });
 });

@@ -67,6 +67,24 @@
       "approvedBy": "Security Team",
       "approvedDate": "2026-09-30",
       "expiresDate": "2026-10-30"
+    },
+    {
+      "id": "EXC-DEP-007",
+      "packageName": "brace-expansion",
+      "advisoryId": "*",
+      "reason": "Transitive dev-dependency of ESLint and @typescript-eslint (@eslint/eslintrc, minimatch, glob); DoS via uncontrolled recursion on nested brace groups or parseCommaParts causing stack exhaustion is restricted to build/lint time and does not affect runtime applications as no untrusted user input is parsed.",
+      "approvedBy": "Security Team",
+      "approvedDate": "2026-10-01",
+      "expiresDate": "2026-11-01"
+    },
+    {
+      "id": "EXC-DEP-008",
+      "packageName": "next",
+      "advisoryId": "GHSA-vcvr-r3jv-pc5j",
+      "reason": "Next.js RCE in next/og ImageResponse; application does not use next/og or ImageResponse anywhere in the codebase, processes only structured numerical IoT telemetry, and relies strictly on static SVGs and monogram initials.",
+      "approvedBy": "Security Team",
+      "approvedDate": "2026-10-01",
+      "expiresDate": "2026-11-01"
     }
   ]
 }

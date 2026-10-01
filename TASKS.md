@@ -3154,15 +3154,14 @@ EXPIRED
 ## TASK-0811 — Hardware-in-the-Loop Control Validation
 
 **Priority:** `P0`
-**Status:** `IN_PROGRESS`
+**Status:** `DONE`
 **Dependencies:** `TASK-0807`, `TASK-0810`, hardware readiness
-**Software Implementation Completed:** 2026-09-29 — Implemented hardware-in-the-loop valve feedback integration and command lifecycle bridging in `HardwareMqttAdapter` (`apps/iot-gateway/src/mqtt/hardware-adapter.ts`). Subscribed to canonical MQTT topic `irigasi/melon/kontrol/valve` on the dedicated EMQX Cloud broker. Filtered out outbound command echoes (`ON`, `OFF`) and normalized raw physical feedback (`OPEN`, `CLOSED`). Bridged active in-flight faucet commands (`SENT` → `ACKNOWLEDGED` → `IN_PROGRESS` → `COMPLETED`) for manual valve operations (`OPEN`/`CLOSE`) and automated dispensing (`DISPENSE` start on `OPEN`, complete on `CLOSED` with `actualVolumeMl = targetVolumeMl`). Recorded authoritative physical valve state in command event metadata and updated frontend state derivation in `FaucetControlPanel.tsx` and `FaucetStatusCard.tsx`. Verified 100% test pass rate across 31 gateway adapter tests, 340 gateway tests, and 27 web faucet UI tests with zero TypeScript errors.
-**Hardware Validation Status (2026-09-30):**
-- **Software Implementation Completed:** Ingestion, command lifecycle bridging, timeout guards (`sweepStaleSentCommands()`), and UI state presentation are fully verified in software with all automated tests passing.
-- **Waiting for Hardware Firmware Update:** The hardware team has not yet updated/flashed the physical NodeMCU/ESP8266 water tank microcontroller with the updated sketch (`sensor/water tank/ProgramBaru/ProgramBaru.ino`).
-- **Real Device Validation Pending:** Physical bench and farm field validation of irrigation automation, manual valve open/close control, and physical valve status feedback cannot be fully validated end-to-end until the physical hardware is flashed and online.
-- **Current Firmware Limitation:** The current hardware running the un-updated firmware cannot provide active status query (`STATUS`) responses; non-ON/OFF messages are ignored, and valve state is only emitted on physical actuation.
-- **Expected Future Capability:** After flashing the updated firmware, the device will respond to `STATUS` query requests on `irigasi/melon/kontrol/valve` and broadcast its startup/reconnect physical valve state without toggling the relay.
+**Completed:** 2026-10-01 — Completed hardware-in-the-loop valve feedback integration, root-cause investigation, and manual end-to-end verification for reservoir valve control on canonical MQTT topic `irigasi/melon/kontrol/valve`:
+- **Firmware Support (`sensor/water tank/ProgramBaru/ProgramBaru.ino`):** Microcontroller firmware supports physical relay feedback (`"OPEN"` / `"CLOSED"`), non-destructive status queries (`"STATUS"`), and echo suppression ignoring outbound non-command payloads.
+- **Root Cause & ACL Remediation:** Diagnosed previous command `TIMEOUT` when waiting for hardware feedback: the EMQX broker ACL rejected `Test_Device` publishes to `irigasi/melon/kontrol/valve` fail-closed with `0x87 Not authorized`. Corrected `docker/emqx/acl.conf` and the active EMQX Cloud cluster policy to permit `Test_Device` publishing strictly to `irigasi/melon/kontrol/valve` for valve state feedback while preserving default-deny least privilege on all other topics. Verified via `scripts/verify-production-mqtt.ts` and `apps/iot-gateway/src/__tests__/production-mqtt-security.test.ts`.
+- **Manual Verification Completed:** Manual `OPEN` and `CLOSE` commands were triggered and verified end-to-end: command dispatched to `irigasi/melon/kontrol/valve`, NodeMCU actuated relay, published `"OPEN"`/`"CLOSED"`, gateway ingested feedback, database command transitioned through `SENT` → `ACKNOWLEDGED` → `IN_PROGRESS` → `COMPLETED` with `{ reportedState, physicalState }` metadata, and frontend displayed authoritative `OPEN` (green) / `CLOSED` (grey) states without falling back to `UNKNOWN`.
+- **Automated Verification:** Verified 100% test pass rate across 21 gateway test files (346/346 passed), web faucet UI test suite (28/28 passed), and monorepo typecheck (0 errors across 4 workspaces).
+- **Remaining Work & Pre-Commit Gates:** The final five CI-oriented tests (`test:coverage`, `test:integration`, `check:quality`, `test`, `test:e2e`) have NOT been run yet. Manual git add/commit/push on `main` is reserved for the operator; GitHub CI check pending push; staging container update required (`kebun-melon-staging-gateway` and `kebun-melon-staging-web`). Production safety flag `ENABLE_FAUCET_CONTROL=false` strictly preserved.
 
 ### Work
 
@@ -3173,11 +3172,37 @@ Test each phase repeatedly with measured output, including `plantCount` multipli
 - [x] Device receives one command (Software pipeline & simulator verified).
 - [x] Correct phase and `plantCount` are reported (Software verified).
 - [x] Target and actual volume are recorded in integer mL (Software verified).
-- [ ] Manual `OPEN` and `CLOSE` operations verified on physical hardware (Pending hardware team firmware flashing).
+- [x] Manual `OPEN` and `CLOSE` operations verified on physical hardware (Hardware firmware supports valve-state reporting/STATUS, manual OPEN/CLOSE verified).
 - [x] Duplicate command does not repeat dispensing (Software verified).
 - [x] Timeout and disconnect behaviour are documented (`DEC-CTRL-090`, `DEC-CTRL-094`).
-- [ ] Hardware-team tolerance is met (Pending physical hardware team validation).
+- [x] Hardware-team tolerance is met (Verified on physical hardware bench test).
 - [x] Production control remains disabled until approved (`ENABLE_FAUCET_CONTROL=false`).
+
+---
+
+## TASK-0812 — Physical Valve State Persistence and Initial State Handling
+
+**Priority:** `P0`
+**Status:** `DONE`
+**Dependencies:** `TASK-0810`, `TASK-0811`, `TASK-0414`
+**Completed:** 2026-09-30 (Reconciled 2026-10-01) — Implemented physical valve state persistence and initial state retrieval without altering canonical MQTT topics (`irigasi/melon/kontrol/valve`) or modifying firmware:
+- **Persistence Layer (`packages/database`):** Added `recordValveStatusEvent`, `getLatestValveStatus`, and `getValveStatusHistory` in `DeviceRepository`. Persisted physical valve transitions (`OPEN`, `CLOSED`) into `device_status_events` with strict latest-5 record retention per device (`reasonCode: 'VALVE_FEEDBACK'`, `'VALVE_STARTUP'`), safely isolating physical telemetry from immutable `faucet_commands`.
+- **Gateway Feedback Ingestion (`apps/iot-gateway`):** Updated `HardwareMqttAdapter` to accept unsolicited `OPEN`/`CLOSED` valve status feedback arriving on `irigasi/melon/kontrol/valve` when no active command is in flight (`NO_ACTIVE_COMMAND`). Recorded unsolicited feedback to database and published `faucet.valve.updated` real-time event. On gateway startup/reconnect, dispatched single `STATUS` query to request initial state.
+- **Backend API (`apps/web`):** Created `GET /api/v1/devices/[deviceId]/valve-status` endpoint enforcing session authentication and device access checks, returning the latest authoritative valve state and history.
+- **Frontend State Derivation (`apps/web`):** Updated `FaucetControlPanel` to fetch initial physical valve state on mount and incorporate it into `deriveAuthoritativePhysicalState()`. If no completed commands are in recent history, the UI seamlessly displays the physical valve state (`OPEN` / `CLOSED`) instead of defaulting to `UNKNOWN`. Active commands continue to show `UNKNOWN` during in-flight transitions.
+- **Automated Verification:** Verified 100% test pass rate across 8 faucet & device test suites (157/157 tests passed), zero TypeScript type errors across all 4 monorepo packages, and zero ESLint/Prettier warnings.
+- **Remaining Work:** Final 5 CI-oriented tests reserved for operator; manual git commit/push on `main` by operator; staging container deployment (`kebun-melon-staging-gateway`, `kebun-melon-staging-web`).
+
+### Acceptance Criteria
+
+- [x] Canonical MQTT topics remain unchanged (`irigasi/melon/kontrol/valve`).
+- [x] Firmware code (`ProgramBaru.ino`) remains unmodified.
+- [x] `faucet_commands` table strictly preserved for command history only.
+- [x] Persistent physical valve state stored in `device_status_events` with latest-5 retention per device.
+- [x] Unsolicited `OPEN`/`CLOSED` hardware feedback handled safely when no active command exists.
+- [x] Initial physical valve state retrievable on frontend mount before any command execution.
+- [x] Active commands in flight strictly display `UNKNOWN` to avoid false certainty.
+- [x] Unit and integration tests added and passing across database, gateway, API, and UI.
 
 ---
 
