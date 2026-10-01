@@ -54,7 +54,7 @@ describe('WaterTankMonitoringCard Component Tests', () => {
     expect(screen.getByText('2200 L')).toBeInTheDocument();
   });
 
-  it('renders live tank volume (L) and status badge when data is present', async () => {
+  it('renders live tank volume (L) without status label when data is present', async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
@@ -83,7 +83,7 @@ describe('WaterTankMonitoringCard Component Tests', () => {
 
     expect(await screen.findByText('450.50')).toBeInTheDocument();
     expect(screen.getByText('Volume Air Tangki')).toBeInTheDocument();
-    expect(screen.getByText('NORMAL')).toBeInTheDocument();
+    expect(screen.queryByText('NORMAL')).not.toBeInTheDocument();
     expect(screen.getByText('L')).toBeInTheDocument();
     expect(screen.getByText('0 L')).toBeInTheDocument();
     expect(screen.getByText('2200 L')).toBeInTheDocument();
@@ -129,7 +129,7 @@ describe('WaterTankMonitoringCard Component Tests', () => {
 
     expect(await screen.findByText('0')).toBeInTheDocument();
     expect(screen.getByText('Volume Air Tangki')).toBeInTheDocument();
-    expect(screen.getByText('EMPTY')).toBeInTheDocument();
+    expect(screen.queryByText('EMPTY')).not.toBeInTheDocument();
     expect(screen.queryByText('—')).not.toBeInTheDocument();
     expect(screen.getByText('0 L')).toBeInTheDocument();
     expect(screen.getByText('2200 L')).toBeInTheDocument();
@@ -276,7 +276,7 @@ describe('WaterTankMonitoringCard Component Tests', () => {
     );
 
     expect(await screen.findByText('—')).toBeInTheDocument();
-    expect(screen.getByText('FILLING')).toBeInTheDocument();
+    expect(screen.queryByText('FILLING')).not.toBeInTheDocument();
     expect(screen.queryByText('Aliran Lancar')).not.toBeInTheDocument();
     expect(screen.queryByText('Smooth Flow')).not.toBeInTheDocument();
   });

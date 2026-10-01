@@ -50,15 +50,27 @@ const FAUCET_PRESETS: FaucetPreset[] = [
   },
 ];
 
-export type AuthoritativePhysicalState = 'OPEN' | 'CLOSED' | 'UNKNOWN';
+import {
+  AuthoritativePhysicalState,
+  ValveTransitionState,
+  ACTIVE_VALVE_COMMAND_STATUSES,
+  deriveValveTransitionState,
+} from './faucet-transition';
+
+export {
+  type AuthoritativePhysicalState,
+  type ValveTransitionState,
+  ACTIVE_VALVE_COMMAND_STATUSES,
+  deriveValveTransitionState,
+};
 
 export interface FaucetPresetSelectorProps {
   selectedDevice: AuthorisedDevice | null;
   hasControlPermission?: boolean;
   isFeatureEnabled?: boolean;
   activeCommand?: {
-    id: string;
-    commandId: string;
+    id?: string;
+    commandId?: string;
     status: string;
     action?: string;
     phase?: number | null;
@@ -66,6 +78,10 @@ export interface FaucetPresetSelectorProps {
     targetVolumeMl?: number | null;
   } | null;
   physicalState?: AuthoritativePhysicalState;
+  isValveStatusLoading?: boolean;
+  isSubmitting?: boolean;
+  submittingAction?: 'DISPENSE' | 'OPEN' | 'CLOSE' | string | null;
+  transitionState?: ValveTransitionState;
   plantCount?: number;
   onPlantCountChange?: (count: number) => void;
   onSelectPreset: (
@@ -91,6 +107,10 @@ export default function FaucetPresetSelector({
   isFeatureEnabled = true,
   activeCommand = null,
   physicalState = 'UNKNOWN',
+  isValveStatusLoading = false,
+  isSubmitting = false,
+  submittingAction = null,
+  transitionState,
   plantCount: controlledPlantCount,
   onPlantCountChange,
   onSelectPreset,
@@ -99,6 +119,11 @@ export default function FaucetPresetSelector({
 }: FaucetPresetSelectorProps) {
   const tFaucet = useTranslations('faucet');
   const tDevices = useTranslations('devices');
+
+  const effectiveTransitionState =
+    transitionState !== undefined
+      ? transitionState
+      : deriveValveTransitionState(activeCommand, isSubmitting, submittingAction);
 
   // Local state for plant count if not controlled from parent
   const [internalPlantCount, setInternalPlantCount] = useState<number>(1);
@@ -166,10 +191,14 @@ export default function FaucetPresetSelector({
   const disabledReason = getDisabledReason();
   const isDisabled = disabledReason !== null;
 
-  // State-aware action disablement based on authoritative physical valve state
-  const isPresetDisabled = isDisabled || physicalState === 'CLOSED';
-  const isOpenDisabled = isDisabled || physicalState === 'OPEN';
-  const isCloseDisabled = isDisabled || physicalState === 'CLOSED';
+  // State-aware action disablement based on authoritative physical valve state and active transitions
+  const isTransitioning = effectiveTransitionState !== null;
+  const isPresetDisabled =
+    isDisabled || isValveStatusLoading || isTransitioning || physicalState === 'CLOSED';
+  const isOpenDisabled =
+    isDisabled || isValveStatusLoading || isTransitioning || physicalState === 'OPEN';
+  const isCloseDisabled =
+    isDisabled || isValveStatusLoading || isTransitioning || physicalState === 'CLOSED';
 
   return (
     <div className={cn('space-y-6', className)} data-testid="faucet-preset-selector">
@@ -381,28 +410,69 @@ export default function FaucetPresetSelector({
           {/* Authoritative Physical Faucet State Badge */}
           <div
             className={cn(
-              'px-3.5 py-1.5 rounded-xl border flex items-center gap-2 text-xs font-bold self-start sm:self-auto shadow-xs',
-              physicalState === 'OPEN' && 'bg-emerald-50 text-emerald-800 border-emerald-300',
-              physicalState === 'CLOSED' && 'bg-slate-100 text-slate-800 border-slate-300',
-              physicalState === 'UNKNOWN' && 'bg-amber-50 text-amber-900 border-amber-300'
+              'px-3.5 py-1.5 rounded-xl border flex items-center gap-2 text-xs font-bold self-start sm:self-auto shadow-xs transition-colors duration-200 motion-reduce:transition-none',
+              isValveStatusLoading
+                ? 'bg-app-surface-container/60 text-app-on-surface-variant border-app-outline-variant/30'
+                : effectiveTransitionState === 'OPENING'
+                  ? 'bg-sky-50 text-sky-800 border-sky-300'
+                  : effectiveTransitionState === 'CLOSING'
+                    ? 'bg-indigo-50 text-indigo-800 border-indigo-300'
+                    : effectiveTransitionState === 'DISPENSING'
+                      ? 'bg-cyan-50 text-cyan-800 border-cyan-300'
+                      : effectiveTransitionState === 'WAITING_CONFIRMATION'
+                        ? 'bg-blue-50 text-blue-800 border-blue-300'
+                        : physicalState === 'OPEN'
+                          ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                          : physicalState === 'CLOSED'
+                            ? 'bg-slate-100 text-slate-800 border-slate-300'
+                            : 'bg-amber-50 text-amber-900 border-amber-300'
             )}
             data-testid="authoritative-physical-state"
           >
             <span
               className={cn(
-                'w-2 h-2 rounded-full',
-                physicalState === 'OPEN' && 'bg-emerald-500 animate-pulse',
-                physicalState === 'CLOSED' && 'bg-slate-500',
-                physicalState === 'UNKNOWN' && 'bg-amber-500'
+                'w-2 h-2 rounded-full transition-colors duration-200 motion-reduce:transition-none',
+                isValveStatusLoading
+                  ? 'bg-app-outline-variant animate-pulse'
+                  : effectiveTransitionState === 'OPENING'
+                    ? 'bg-sky-500 animate-pulse motion-reduce:animate-none'
+                    : effectiveTransitionState === 'CLOSING'
+                      ? 'bg-indigo-500 animate-pulse motion-reduce:animate-none'
+                      : effectiveTransitionState === 'DISPENSING'
+                        ? 'bg-cyan-500 animate-pulse motion-reduce:animate-none'
+                        : effectiveTransitionState === 'WAITING_CONFIRMATION'
+                          ? 'bg-blue-500 animate-pulse motion-reduce:animate-none'
+                          : physicalState === 'OPEN'
+                            ? 'bg-emerald-500 animate-pulse'
+                            : physicalState === 'CLOSED'
+                              ? 'bg-slate-500'
+                              : 'bg-amber-500'
               )}
             />
-            <span>
-              {tFaucet('physicalStateTitle')}:{' '}
-              {physicalState === 'OPEN'
-                ? tFaucet('physicalStateOpen')
-                : physicalState === 'CLOSED'
-                  ? tFaucet('physicalStateClosed')
-                  : tFaucet('physicalStateUnknown')}
+            <span className="flex items-center gap-1.5">
+              <span>{tFaucet('physicalStateTitle')}:</span>
+              {isValveStatusLoading ? (
+                <span className="inline-flex items-center gap-1 font-medium text-app-on-surface-variant">
+                  <span className="inline-block h-3.5 w-16 bg-app-surface-container rounded animate-pulse align-middle" />
+                  <span className="sr-only">{tFaucet('physicalStateLoading')}</span>
+                </span>
+              ) : effectiveTransitionState === 'OPENING' ? (
+                <span>{tFaucet('physicalStateOpening')}</span>
+              ) : effectiveTransitionState === 'CLOSING' ? (
+                <span>{tFaucet('physicalStateClosing')}</span>
+              ) : effectiveTransitionState === 'DISPENSING' ? (
+                <span>{tFaucet('physicalStateDispensing')}</span>
+              ) : effectiveTransitionState === 'WAITING_CONFIRMATION' ? (
+                <span>{tFaucet('physicalStateWaitingConfirmation')}</span>
+              ) : (
+                <span>
+                  {physicalState === 'OPEN'
+                    ? tFaucet('physicalStateOpen')
+                    : physicalState === 'CLOSED'
+                      ? tFaucet('physicalStateClosed')
+                      : tFaucet('physicalStateUnknown')}
+                </span>
+              )}
             </span>
           </div>
         </div>

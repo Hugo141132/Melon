@@ -3353,3 +3353,47 @@ The following verification gates, automated test results, ACL policies, and hard
   - Monorepo Typecheck (`npm run typecheck`): Passed with 0 errors across all 4 packages (`@kebun-melon/web`, `@kebun-melon/iot-gateway`, `@kebun-melon/database`, `@kebun-melon/contracts`).
 <!-- Permanent Faucet Control Testing Reconciled: 2026-10-01 -->
 
+---
+
+## 48. Coordinated Dashboard Loading, Transition UX & Valve Control UI Refinements Testing Evidence (TASK-0813 / Reconciled 2026-10-01)
+
+### 1. Test Suite Coverage & Verification Scope
+Automated testing for `TASK-0813` covers coordinated dashboard loading, intermediate valve execution transition states, badge/label removals, translation key migrations, notification lifecycle updates, and full name relational actor attribution:
+
+- **Web Controls Loading & Layout Stability (`apps/web/test/unit/controls-loading-transition.test.tsx`):**
+  - Result: **19/19 passed** (100%, exit code 0).
+  - Asserts structural skeleton rendering on `/controls/loading.tsx` without layout shifts (CLS = 0).
+  - Verifies removal of the `WATER_TANK_NODE` device badge from both skeleton and live headers.
+  - Verifies initial resolving pill state (`bg-app-surface-container/60`, pulsing dot) during asynchronous hydration.
+  - Verifies intermediate command execution states: `OPENING` (*"Opening..."* / *"Membuka..."*), `CLOSING` (*"Closing..."* / *"Menutup..."*), `DISPENSING` (*"Dispensing..."* / *"Menyalurkan..."*), and `WAITING_CONFIRMATION` (*"Waiting for confirmation..."* / *"Menunggu konfirmasi..."*).
+  - Verifies synchronized transition states across `FaucetPresetSelector` and `FaucetStatusCard`.
+  - Verifies preservation of authoritative `UNKNOWN` badge when no command is in flight.
+  - Verifies notification message updates dynamically to `COMPLETED` success message instead of remaining frozen on `QUEUED`.
+- **Web Faucet Control UI & Actor Full Name (`apps/web/test/unit/faucet-control-ui.test.tsx`):**
+  - Result: **28/28 passed** (100%, exit code 0).
+  - Verifies user-facing copy standardization to Valve / Katup (*"Valve Command History"*, *"Valve Control"*, *"Irrigation Valve Node"*, *"Buka Katup"*, *"Tutup Katup"*).
+  - Verifies absence of `"NORMAL"` status label next to Tank Water Volume while preserving volume telemetry (`waterVolumeLiters`) and scale bounds.
+  - Verifies that `FaucetHistoryTable` renders the actor's full name (`item.initiatedByFullName`) in the table Actor column, with graceful fallback to role.
+- **Realtime Command History Table (`apps/web/test/unit/faucet-history-realtime.test.tsx`):**
+  - Result: **3/3 passed** (100%, exit code 0).
+  - Verifies Supabase realtime command channel subscription and status updates in `FaucetHistoryTable`.
+- **Database Repository Tests (`packages/database/src/__tests__/faucet-command-repository.test.ts`):**
+  - Result: **25/25 passed** (100%, exit code 0).
+  - Verifies that command creation, retrieval, and listing queries include `initiatedBy: { select: { fullName: true } }` and project `initiatedByFullName`.
+- **Shared Contracts Validation (`packages/contracts/src/__tests__/faucet.test.ts`):**
+  - Result: **6/6 passed** (100%, exit code 0).
+  - Verifies `FaucetCommandDtoSchema` validates optional `initiatedByFullName?: string | null`.
+- **Translation Parity (`npm run i18n:check`):**
+  - Result: **100% key and ICU placeholder parity** across all 17 namespaces in `messages/en.json` and `messages/id.json`.
+- **Monorepo Typecheck (`npm run typecheck`):**
+  - Result: **0 errors** across `@kebun-melon/contracts`, `@kebun-melon/database`, `@kebun-melon/iot-gateway`, and `@kebun-melon/web`.
+
+### 2. Performance & Invariant Summary
+- **Zero Additional API Calls:** Actor full name is eagerly selected via Prisma join in the existing command query, avoiding N+1 requests or separate user lookups.
+- **Zero Latency Overhead:** Transition state derivation (`deriveValveTransitionState`) and notification derivation (`getCommandStatusMessage`) are pure synchronous in-memory functions.
+- **Zero Bundle Size Increase:** Utilizes existing React hooks, Tailwind CSS tokens, and contracts.
+- **Deployment & Migration Notes:**
+  - Staging update required: **YES** (rebuild/deploy of containerized web service required).
+  - Database migration required: **NO** (foreign key relation and `full_name` column already exist in PostgreSQL).
+<!-- TASK-0813 Testing Evidence Reconciled: 2026-10-01 -->
+

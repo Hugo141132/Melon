@@ -113,6 +113,7 @@ export class FaucetCommandRepository {
       deviceId: command.deviceId,
       initiatedByUserId: command.initiatedByUserId,
       initiatedByRole: command.initiatedByRole as UserRole,
+      initiatedByFullName: command.initiatedBy?.fullName || null,
       action: command.action as FaucetCommandAction,
       phase: command.phase !== null ? command.phase : null,
       plantCount: command.plantCount !== null ? command.plantCount : null,
@@ -167,7 +168,10 @@ export class FaucetCommandRepository {
         // 1. Idempotency check inside transaction
         const existingKey = await tx.faucetCommand.findUnique({
           where: { idempotencyKey: input.idempotencyKey },
-          include: { events: { orderBy: { receivedAt: 'asc' } } },
+          include: {
+            events: { orderBy: { receivedAt: 'asc' } },
+            initiatedBy: { select: { fullName: true } },
+          },
         });
 
         if (existingKey) {
@@ -227,6 +231,9 @@ export class FaucetCommandRepository {
             expiresAt,
             idempotencyKey: input.idempotencyKey,
           },
+          include: {
+            initiatedBy: { select: { fullName: true } },
+          },
         });
 
         const evt = await tx.faucetCommandEvent.create({
@@ -280,7 +287,10 @@ export class FaucetCommandRepository {
       ) {
         const existingKey = await this.prisma.faucetCommand.findUnique({
           where: { idempotencyKey: input.idempotencyKey },
-          include: { events: { orderBy: { receivedAt: 'asc' } } },
+          include: {
+            events: { orderBy: { receivedAt: 'asc' } },
+            initiatedBy: { select: { fullName: true } },
+          },
         });
 
         if (existingKey) {
@@ -317,7 +327,10 @@ export class FaucetCommandRepository {
       where: isUuid
         ? { OR: [{ id: idOrCommandId }, { commandId: idOrCommandId }] }
         : { commandId: idOrCommandId },
-      include: { events: { orderBy: { receivedAt: 'asc' } } },
+      include: {
+        events: { orderBy: { receivedAt: 'asc' } },
+        initiatedBy: { select: { fullName: true } },
+      },
     });
 
     return command ? this.formatCommandDto(command) : null;
@@ -329,7 +342,10 @@ export class FaucetCommandRepository {
   async getCommandByIdempotencyKey(key: string): Promise<FaucetCommandDto | null> {
     const command = await this.prisma.faucetCommand.findUnique({
       where: { idempotencyKey: key },
-      include: { events: { orderBy: { receivedAt: 'asc' } } },
+      include: {
+        events: { orderBy: { receivedAt: 'asc' } },
+        initiatedBy: { select: { fullName: true } },
+      },
     });
 
     return command ? this.formatCommandDto(command) : null;
@@ -392,7 +408,10 @@ export class FaucetCommandRepository {
         skip,
         take: pageSize,
         orderBy: { [sortField]: sortOrder },
-        include: { events: { orderBy: { receivedAt: 'asc' } } },
+        include: {
+          events: { orderBy: { receivedAt: 'asc' } },
+          initiatedBy: { select: { fullName: true } },
+        },
       }),
     ]);
 
@@ -497,7 +516,10 @@ export class FaucetCommandRepository {
 
       const updated = await tx.faucetCommand.findUnique({
         where: { id: existing.id },
-        include: { events: { orderBy: { receivedAt: 'asc' } } },
+        include: {
+          events: { orderBy: { receivedAt: 'asc' } },
+          initiatedBy: { select: { fullName: true } },
+        },
       });
 
       return this.formatCommandDto(updated!);

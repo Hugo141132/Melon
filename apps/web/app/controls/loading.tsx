@@ -18,9 +18,6 @@ export default function ControlsLoading() {
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2">
                   <div className="h-5 w-36 bg-app-surface-container rounded" />
-                  <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded bg-app-surface-container text-app-on-surface-variant">
-                    WATER_TANK_NODE
-                  </span>
                 </div>
                 <div className="h-3 w-28 bg-app-surface-container rounded" />
               </div>

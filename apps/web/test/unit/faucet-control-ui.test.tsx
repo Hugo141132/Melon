@@ -163,7 +163,7 @@ describe('FaucetPresetSelector', () => {
     );
 
     expect(screen.getByTestId('manual-faucet-control-section')).toBeInTheDocument();
-    expect(screen.getByText('Kontrol Manual Keran')).toBeInTheDocument();
+    expect(screen.getByText('Kontrol Manual Katup')).toBeInTheDocument();
 
     const btnOpen = screen.getByTestId('btn-manual-open');
     const btnClose = screen.getByTestId('btn-manual-close');
@@ -429,10 +429,8 @@ describe('FaucetConfirmationModal', () => {
     );
 
     expect(screen.getByTestId('faucet-confirmation-modal')).toBeInTheDocument();
-    expect(screen.getByText('Konfirmasi Buka Keran')).toBeInTheDocument();
-    expect(
-      screen.getByText(/Apakah Anda yakin ingin membuka katup keran air/i)
-    ).toBeInTheDocument();
+    expect(screen.getByText('Konfirmasi Buka Katup')).toBeInTheDocument();
+    expect(screen.getByText(/Apakah Anda yakin ingin membuka katup air/i)).toBeInTheDocument();
 
     const confirmBtn = screen.getByTestId('btn-confirm-dispense');
     fireEvent.click(confirmBtn);
@@ -455,7 +453,7 @@ describe('FaucetConfirmationModal', () => {
     );
 
     expect(screen.getByTestId('faucet-confirmation-modal')).toBeInTheDocument();
-    expect(screen.getByText('Konfirmasi Tutup Keran')).toBeInTheDocument();
+    expect(screen.getByText('Konfirmasi Tutup Katup')).toBeInTheDocument();
 
     const confirmBtn = screen.getByTestId('btn-confirm-dispense');
     fireEvent.click(confirmBtn);
@@ -981,8 +979,53 @@ describe('FaucetHistoryTable', () => {
     const items = await screen.findAllByText('0.9 L');
     expect(items.length).toBeGreaterThan(0);
     expect(screen.getByText('(Fase 1 × 3)')).toBeInTheDocument();
-    expect(screen.getByText('Buka Keran')).toBeInTheDocument();
-    expect(screen.getByText('Tutup Keran')).toBeInTheDocument();
+    expect(screen.getByText('Buka Katup')).toBeInTheDocument();
+    expect(screen.getByText('Tutup Katup')).toBeInTheDocument();
+
+    fetchSpy.mockRestore();
+  });
+
+  it('renders user full name in Actor column when initiatedByFullName is provided', async () => {
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        data: {
+          items: [
+            {
+              id: 'h1',
+              commandId: 'cmd-h1',
+              deviceId: mockOnlineDevice.id,
+              action: 'DISPENSE',
+              phase: 1,
+              plantCount: 1,
+              targetVolumeMl: 300,
+              actualVolumeMl: 300,
+              status: 'COMPLETED',
+              requestedAt: '2026-08-20T10:00:00Z',
+              initiatedByRole: 'OWNER',
+              initiatedByFullName: 'Budi Santoso',
+            },
+            {
+              id: 'h2',
+              commandId: 'cmd-h2',
+              deviceId: mockOnlineDevice.id,
+              action: 'OPEN',
+              status: 'COMPLETED',
+              requestedAt: '2026-08-20T11:00:00Z',
+              initiatedByRole: 'ADMIN',
+              initiatedByFullName: null,
+            },
+          ],
+          meta: { pagination: { page: 1, pageSize: 10, totalItems: 2, totalPages: 1 } },
+        },
+      }),
+    } as Response);
+
+    render(<FaucetHistoryTable deviceId={mockOnlineDevice.deviceId!} />);
+
+    expect(await screen.findByText('Budi Santoso')).toBeInTheDocument();
+    expect(screen.getByText('ADMIN')).toBeInTheDocument();
 
     fetchSpy.mockRestore();
   });

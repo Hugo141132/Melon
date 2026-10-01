@@ -21,12 +21,18 @@ export function useLatestMonitoring(): UseLatestMonitoringResult {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isRevalidating, setIsRevalidating] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadedDeviceId, setLoadedDeviceId] = useState<string | null>(null);
   const activeDeviceIdRef = useRef<string | null>(selectedDeviceId);
+
+  const isInitialLoadingForDevice =
+    Boolean(selectedDeviceId) && loadedDeviceId !== selectedDeviceId;
+  const effectiveIsLoading = isLoading || isInitialLoadingForDevice;
 
   const fetchLatestSnapshot = useCallback(
     async (isInitial = false) => {
       if (!selectedDeviceId) {
         setSnapshot(null);
+        setLoadedDeviceId(null);
         setIsLoading(false);
         setIsRevalidating(false);
         setError(null);
@@ -85,12 +91,13 @@ export function useLatestMonitoring(): UseLatestMonitoringResult {
         }
       } finally {
         if (activeDeviceIdRef.current === selectedDeviceId) {
+          setLoadedDeviceId(selectedDeviceId);
           setIsLoading(false);
           setIsRevalidating(false);
         }
       }
     },
-    [selectedDeviceId]
+    [selectedDeviceId, markDeviceRevoked]
   );
 
   // Immediate data clearing on device switch
@@ -100,6 +107,7 @@ export function useLatestMonitoring(): UseLatestMonitoringResult {
     setError(null);
 
     if (!selectedDeviceId) {
+      setLoadedDeviceId(null);
       setIsLoading(false);
       setIsRevalidating(false);
       return;
@@ -148,7 +156,7 @@ export function useLatestMonitoring(): UseLatestMonitoringResult {
 
   return {
     snapshot,
-    isLoading,
+    isLoading: effectiveIsLoading,
     isRevalidating,
     isStale,
     connectionStatus: effectiveConnectionStatus,

@@ -79,6 +79,7 @@ export const FaucetCommandDtoSchema = z.object({
   deviceId: z.string().uuid(),
   initiatedByUserId: z.string().uuid(),
   initiatedByRole: z.nativeEnum(UserRole),
+  initiatedByFullName: z.string().nullable().optional(),
   action: z.nativeEnum(FaucetCommandAction),
   phase: z.number().int().nullable(),
   plantCount: z.number().int().nullable(),

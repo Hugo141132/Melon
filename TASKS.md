@@ -3206,6 +3206,88 @@ Test each phase repeatedly with measured output, including `plantCount` multipli
 
 ---
 
+## TASK-0813 — Coordinated Dashboard Loading Strategy & Production-Grade Valve Transition
+
+**Priority:** `P1`
+**Status:** `DONE`
+**Dependencies:** `TASK-0807`, `TASK-0812`
+**Completed:** 2026-10-01 — Implemented coordinated dashboard loading architecture, production-grade initial valve transition, seamless command execution transition UX, and valve control UI refinements on `/controls`:
+- **Root Cause Resolution & Coordinated Loading:** Identified and resolved 4-stage loading waterfall across Water Tank Node, Valve Status, Presets, Manual Controls, and Command History:
+  - Eliminated redundant duplicate API call by sharing `recentCommands` and pagination metadata from `FaucetControlPanel` directly to `FaucetHistoryTable` via `initialItems` and `initialPagination`, reducing initial `/faucet-commands` API queries by 50%.
+  - Coordinated parallel fetching in `FaucetControlPanel` via `Promise.allSettled([fetchRecentCommands, fetchValveStatus])`.
+  - Added synchronized loading state (`isCommandsLoading`) so `FaucetHistoryTable` renders skeleton rows in lockstep with the panel instead of flashing independent empty states.
+- **Production-Grade Initial Load Transition (21st.dev MCP Integration):**
+  - Replaced the initial amber `"UNKNOWN"` (`"TIDAK DIKETAHUI"`) badge display during initial loading with a calm, neutral resolving pill badge (`bg-app-surface-container/60`, `border-app-outline-variant/30`, pulsing indicator dot, and reserved-width skeleton pill matching 21st.dev `Skeleton Swap` / `Status Badge` patterns).
+  - Maintained zero layout shift (CLS = 0) with identical dimensions and geometry.
+  - Implemented smooth CSS color transition (`transition-colors duration-200 motion-reduce:transition-none`) to confirmed physical states (`OPEN` green, `CLOSED` slate, or confirmed `UNKNOWN` amber).
+  - Preserved backend data correctness as the single source of truth (`data-testid="authoritative-physical-state"` untouched).
+- **Seamless Command Execution Transition UX (Post-Submission Intermediate States & Cross-Component Synchronization):**
+  - Resolved the brief post-command `"Physical Valve State: Unknown"` amber blink when user sends an Open, Close, or Irrigation command while awaiting device MQTT confirmation:
+    - Unified the UI-level transition architecture via dedicated shared module `apps/web/components/controls/faucet-transition.ts` providing `deriveValveTransitionState(activeCommand, isSubmitting, submittingAction)`:
+      - `OPENING`: `bg-sky-50 text-sky-800 border-sky-300`, pulsing sky dot, `"Opening..."` / `"Membuka..."` with description `"Device is executing valve opening sequence."`.
+      - `CLOSING`: `bg-indigo-50 text-indigo-800 border-indigo-300`, pulsing indigo dot, `"Closing..."` / `"Menutup..."` with description `"Device is executing valve closing sequence."`.
+      - `DISPENSING`: `bg-cyan-50 text-cyan-800 border-cyan-300`, pulsing cyan dot, `"Dispensing..."` / `"Menyalurkan..."` with description `"Device is actively dispensing irrigation water."`.
+      - `WAITING_CONFIRMATION`: `bg-blue-50 text-blue-800 border-blue-300`, pulsing blue dot, `"Waiting for confirmation..."` / `"Menunggu konfirmasi..."` with description `"Command sent, waiting for device acknowledgement."`.
+    - **Cross-Component State Consistency:** Synchronized `transitionState` across both `FaucetPresetSelector` and `FaucetStatusCard` (Active Command Status / Irrigation Command Status section) via `FaucetControlPanel`, eliminating split-brain states where one section showed "Opening..." while another displayed "Unknown".
+    - **Genuine UNKNOWN Preservation:** When no command is in flight (`activeCommand = null`) and the device cannot confirm its physical position, the authoritative amber `"Physical Valve State: Unknown"` badge is strictly preserved.
+    - Zero artificial delay added, zero API latency overhead, zero CLS (identical badge height/padding), and full `prefers-reduced-motion` compliance.
+- **Water Tank UI Refinements:**
+  - Removed user-facing device identifier badge `"WATER_TANK_NODE"` from `WaterTankMonitoringCard.tsx` (loaded and skeleton headers) and `apps/web/app/controls/loading.tsx`. Kept internal backend/device identifiers (`device.deviceId`, `device.deviceType`) untouched.
+  - Removed `"NORMAL"` status label and icon from Tank Water Volume in `WaterTankMonitoringCard.tsx`, preserving telemetry volume readout (`waterVolumeLiters`), maximum tank capacity (`tankMaxVolumeLiters`), and visual progress gauge.
+- **Valve Terminology Migration:**
+  - Standardized user-facing copy from "Faucet" / "Keran" to "Valve" / "Katup" across `messages/en.json` and `messages/id.json`:
+    - "Faucet Command History" → "Valve Command History" / "Riwayat Perintah Katup"
+    - "Faucet Control" → "Valve Control" / "Kontrol Katup"
+    - "Irrigation Faucet Node" → "Irrigation Valve Node" / "Node Katup Irigasi"
+    - "Valve Irrigation Dose Presets" / "Preset Dosis Irigasi Katup"
+  - Preserved internal identifiers without renaming: API routes (`/api/v1/devices/[deviceId]/faucet-commands`), database table `faucet_commands`, MQTT topics (`irigasi/melon/...`), schemas, and code variables.
+- **Command Notification Lifecycle Fix:**
+  - Added dynamic notification derivation helper `getCommandStatusMessage(cmd)` in `FaucetControlPanel.tsx` and wired into `handleCommandUpdated`.
+  - When command transitions to `COMPLETED`, the toast notification updates dynamically to the completed message (`commandSuccess`), eliminating the stale initial `"Status awal: QUEUED"` message.
+  - Active execution (`EXECUTING`), queueing (`QUEUED`), and failures (`FAILED`) reflect current state accurately without breaking backend lifecycle events.
+- **Command History Actor Full Name Display:**
+  - Included `initiatedBy: { select: { fullName: true } }` in Prisma queries (`createCommand`, `getCommandById`, `getCommands`, `updateCommandStatus`) in `packages/database/src/faucet-command-repository.ts`.
+  - Added `initiatedByFullName?: string | null` to `FaucetCommandDtoSchema` in `@kebun-melon/contracts`.
+  - Rendered `{item.initiatedByFullName || item.initiatedByRole || tCommon('user')}` in `FaucetHistoryTable.tsx`.
+  - Sourced full name via database join with zero additional API calls or network latency.
+- **Smooth Dashboard Entry:** Added subtle `animate-fade-in` transitions to `WaterTankMonitoringCard` and `FaucetStatusCard` to eliminate abrupt layout snapping.
+- **Governance & Verification:**
+  - Frontend Impact: `MINOR`
+  - Selected UI direction: `Premium Minimal Ops`
+  - Existing color template: `UNCHANGED`
+  - Selected motion effects: `Skeleton loading`, `KPI refresh`, `Button hover`
+  - 21st.dev MCP: `REQUIRED` (Validated: Skeleton Swap #23557, Status Badge #521, Animated Status Badge #2498, and Styled Badges #29986 applied)
+  - Unit & Integration Tests:
+    - `apps/web/test/unit/controls-loading-transition.test.tsx`: 19/19 passed
+    - `apps/web/test/unit/faucet-control-ui.test.tsx`: 28/28 passed
+    - `apps/web/test/unit/faucet-history-realtime.test.tsx`: 3/3 passed
+    - `packages/database/src/__tests__/faucet-command-repository.test.ts`: 25/25 passed
+    - `packages/contracts/src/__tests__/faucet.test.ts`: 6/6 passed
+    - Translation parity check (`npm run i18n:check`): 100% key parity
+  - Monorepo Typecheck: 0 errors across 4 packages (`contracts`, `database`, `iot-gateway`, `web`).
+- **Deployment & Migration Notes:**
+  - Staging update required: **YES** (rebuild/deploy of containerized web service required).
+  - Database migration required: **NO** (relational foreign key and `full_name` column already exist in PostgreSQL).
+
+### Acceptance Criteria
+
+- [x] Dashboard sections appear consistently together without waterfall re-renders.
+- [x] Duplicate client fetching of faucet commands eliminated.
+- [x] Valve status displays neutral resolving state during initial load and transitions smoothly to authoritative state.
+- [x] Post-command submission displays contextual intermediate transition state (`Opening`, `Closing`, `Dispensing`, `Waiting for confirmation`) instead of alarming `"Unknown"`.
+- [x] All dashboard components (`FaucetPresetSelector`, `FaucetStatusCard`) display consistent, synchronized valve transition states simultaneously.
+- [x] Genuine device UNKNOWN state is preserved when no command is in flight.
+- [x] Backend physical valve state remains the authoritative source of truth.
+- [x] User-facing device identifier badge (`WATER_TANK_NODE`) removed from Water Tank UI.
+- [x] User-facing `NORMAL` volume status label removed from Water Tank UI while preserving volume telemetry.
+- [x] User-facing "Faucet" copy updated to "Valve" / "Katup" with internal identifiers intact.
+- [x] Command notification dynamically updates to completed message upon command resolution.
+- [x] Command history Actor column renders user's full name with zero extra API requests.
+- [x] Zero layout shift and zero bundle-size overhead added.
+- [x] Unit, contract, and database test suites pass 100%.
+
+---
+
 # 17. Phase 9 — Security and Observability
 
 ## TASK-0901 — Implement Security Headers

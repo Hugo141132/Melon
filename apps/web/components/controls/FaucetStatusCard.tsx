@@ -18,6 +18,7 @@ import {
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 import { formatLitersDisplay } from './FaucetPresetSelector';
+import { ValveTransitionState, deriveValveTransitionState } from './faucet-transition';
 
 export interface FaucetCommandEventDto {
   id: string;
@@ -53,6 +54,7 @@ export interface FaucetCommandDto {
   expiresAt?: string | null;
   initiatedByUserId?: string | null;
   initiatedByRole?: string | null;
+  initiatedByFullName?: string | null;
   events?: FaucetCommandEventDto[];
 }
 
@@ -61,6 +63,7 @@ export interface FaucetStatusCardProps {
   command: FaucetCommandDto;
   onCommandUpdated?: (updated: FaucetCommandDto) => void;
   className?: string;
+  transitionState?: ValveTransitionState;
 }
 
 export const ACTIVE_COMMAND_STATUSES = ['QUEUED', 'SENT', 'ACKNOWLEDGED', 'IN_PROGRESS'];
@@ -103,6 +106,7 @@ export default function FaucetStatusCard({
   command,
   onCommandUpdated,
   className,
+  transitionState: propTransitionState,
 }: FaucetStatusCardProps) {
   const tFaucet = useTranslations('faucet');
   const tCommon = useTranslations('common');
@@ -121,6 +125,10 @@ export default function FaucetStatusCard({
   const action = currentCommand.action || 'DISPENSE';
   const isDispense = action === 'DISPENSE';
   const physicalState = getAuthoritativePhysicalStateFromCommand(currentCommand);
+  const transitionState =
+    propTransitionState !== undefined
+      ? propTransitionState
+      : deriveValveTransitionState(currentCommand);
 
   // Sync prop command changes (e.g. when a new command is created)
   useEffect(() => {
@@ -397,30 +405,75 @@ export default function FaucetStatusCard({
       {/* Authoritative Physical State Indication */}
       <div
         className={cn(
-          'p-3 rounded-xl border text-xs flex items-center justify-between gap-2',
-          physicalState === 'OPEN' && 'bg-emerald-50/70 border-emerald-200 text-emerald-900',
-          physicalState === 'CLOSED' && 'bg-slate-50 border-slate-200 text-slate-900',
-          physicalState === 'UNKNOWN' && 'bg-amber-50/70 border-amber-200 text-amber-900'
+          'p-3 rounded-xl border text-xs flex items-center justify-between gap-2 transition-colors duration-200 motion-reduce:transition-none',
+          transitionState === 'OPENING'
+            ? 'bg-sky-50/70 border-sky-200 text-sky-900'
+            : transitionState === 'CLOSING'
+              ? 'bg-indigo-50/70 border-indigo-200 text-indigo-900'
+              : transitionState === 'DISPENSING'
+                ? 'bg-cyan-50/70 border-cyan-200 text-cyan-900'
+                : transitionState === 'WAITING_CONFIRMATION'
+                  ? 'bg-blue-50/70 border-blue-200 text-blue-900'
+                  : physicalState === 'OPEN'
+                    ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900'
+                    : physicalState === 'CLOSED'
+                      ? 'bg-slate-50 border-slate-200 text-slate-900'
+                      : 'bg-amber-50/70 border-amber-200 text-amber-900'
         )}
         data-testid="status-card-physical-state"
+        data-state={transitionState || physicalState}
       >
         <div className="flex items-center gap-2 font-medium">
+          <span
+            className={cn(
+              'w-2 h-2 rounded-full flex-shrink-0',
+              transitionState === 'OPENING'
+                ? 'bg-sky-500 animate-pulse motion-reduce:animate-none'
+                : transitionState === 'CLOSING'
+                  ? 'bg-indigo-500 animate-pulse motion-reduce:animate-none'
+                  : transitionState === 'DISPENSING'
+                    ? 'bg-cyan-500 animate-pulse motion-reduce:animate-none'
+                    : transitionState === 'WAITING_CONFIRMATION'
+                      ? 'bg-blue-500 animate-pulse motion-reduce:animate-none'
+                      : physicalState === 'OPEN'
+                        ? 'bg-emerald-500'
+                        : physicalState === 'CLOSED'
+                          ? 'bg-slate-400'
+                          : 'bg-amber-500'
+            )}
+          />
           <Activity size={15} />
           <span>{tFaucet('physicalStateTitle')}:</span>
           <span className="font-bold">
-            {physicalState === 'OPEN'
-              ? tFaucet('physicalStateOpen')
-              : physicalState === 'CLOSED'
-                ? tFaucet('physicalStateClosed')
-                : tFaucet('physicalStateUnknown')}
+            {transitionState === 'OPENING'
+              ? tFaucet('physicalStateOpening')
+              : transitionState === 'CLOSING'
+                ? tFaucet('physicalStateClosing')
+                : transitionState === 'DISPENSING'
+                  ? tFaucet('physicalStateDispensing')
+                  : transitionState === 'WAITING_CONFIRMATION'
+                    ? tFaucet('physicalStateWaitingConfirmation')
+                    : physicalState === 'OPEN'
+                      ? tFaucet('physicalStateOpen')
+                      : physicalState === 'CLOSED'
+                        ? tFaucet('physicalStateClosed')
+                        : tFaucet('physicalStateUnknown')}
           </span>
         </div>
         <span className="text-[10px] opacity-80 hidden sm:inline">
-          {physicalState === 'OPEN'
-            ? tFaucet('physicalStateOpenDesc')
-            : physicalState === 'CLOSED'
-              ? tFaucet('physicalStateClosedDesc')
-              : tFaucet('physicalStateUnknownDesc')}
+          {transitionState === 'OPENING'
+            ? tFaucet('physicalStateOpeningDesc')
+            : transitionState === 'CLOSING'
+              ? tFaucet('physicalStateClosingDesc')
+              : transitionState === 'DISPENSING'
+                ? tFaucet('physicalStateDispensingDesc')
+                : transitionState === 'WAITING_CONFIRMATION'
+                  ? tFaucet('physicalStateWaitingConfirmationDesc')
+                  : physicalState === 'OPEN'
+                    ? tFaucet('physicalStateOpenDesc')
+                    : physicalState === 'CLOSED'
+                      ? tFaucet('physicalStateClosedDesc')
+                      : tFaucet('physicalStateUnknownDesc')}
         </span>
       </div>
 

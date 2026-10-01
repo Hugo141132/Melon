@@ -1220,6 +1220,34 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
 - 21st.dev MCP: `NOT REQUIRED`
 - Summary: Configured and standardized the transactional email sender to use the verified custom sending domain `Melon Madura <noreply@melonmadura.my.id>` instead of the default Resend test sender (`onboarding@resend.dev`), satisfying `DEC-AUTH-102` and preparation for unrestricted recipient email delivery. Centralized the default sender constant in `apps/web/lib/email/resend.ts` via `export const DEFAULT_RESEND_FROM_EMAIL = 'Melon Madura <noreply@melonmadura.my.id>'`, replacing 6 duplicate hardcoded fallbacks across all transactional notification functions (`sendPasswordResetEmail`, `sendVerificationEmail`, `sendEmailChangeVerificationEmail`, `sendAccountSuspensionEmail`, `sendAccountDeletionEmail`, `sendAccountReactivationEmail`). Updated `serverEnvSchema` in `apps/web/lib/env/server.ts` to default `RESEND_FROM_EMAIL` to `'Melon Madura <noreply@melonmadura.my.id>'`, while strictly preserving the existing production guard that rejects `onboarding@resend.dev` in production. Updated example configuration `apps/web/.env.example` and active development environment files (`.env`, `apps/web/.env`). Synchronized staging environment configuration (`.env.staging`, `.env.staging.example`), rebuilt and redeployed the staging Docker Compose stack (`docker compose -f docker-compose.staging.yml up -d --build`), and verified all health probes healthy on ports 3000 and 3001. Added unit tests asserting default custom domain sender fallback and server environment defaults. Executed targeted Vitest suites (41/41 passed), `npm run env:check` (PASSED), `npm run typecheck` (0 errors across 4 workspaces), and `npm run i18n:check` (100% parity). Preserved remaining constraints: zero git commits, zero production deployments.
 
+#### TASK-0813 Governance Record
+
+`TASK-0813` coordinated dashboard loading, production-grade valve transitions, and valve control UI refinements record:
+- Status: `DONE` (Completed 2026-10-01)
+- Priority: `P1` (Dashboard loading coordination, transition UX, and operational usability)
+- Frontend impact: `MINOR`
+- Selected UI direction: `Premium Minimal Ops`
+- Existing color template: `UNCHANGED`
+- Selected motion effects: `Skeleton loading`, `KPI refresh`, `Button hover`
+- 21st.dev MCP: `REQUIRED` (Validated & Applied: Skeleton Swap #23557, Status Badge #521, Animated Status Badge #2498, and Styled Badges #29986)
+- Summary: Resolved dashboard loading waterfall, eliminated flash of default/unknown states, and implemented operational valve control UI refinements on `/controls`:
+  - **Coordinated Dashboard Loading:** Eliminated 4-stage waterfall loading across Water Tank Node, Valve Status, Presets, Manual Controls, and Command History. Reused fetched `recentCommands` and pagination metadata from `FaucetControlPanel` into `FaucetHistoryTable` via `initialItems` and `initialPagination`, reducing initial `/faucet-commands` API queries by 50%. Coordinated parallel requests via `Promise.allSettled`. Added synchronized `isCommandsLoading` skeleton rows in `FaucetHistoryTable`.
+  - **Neutral Initial Resolving State:** Replaced initial amber `"UNKNOWN"` (`"TIDAK DIKETAHUI"`) badge display during initial page hydration with a neutral resolving pill badge (`bg-app-surface-container/60`, `border-app-outline-variant/30`, pulsing indicator dot, and reserved-width skeleton pill). Smoothly transitions to confirmed physical states (`OPEN`, `CLOSED`, or authoritative `UNKNOWN`) with zero layout shift (CLS = 0).
+  - **Seamless Command Execution Transition UX:** Replaced the brief post-command `"Physical Valve State: Unknown"` amber blink when user sends an Open, Close, or Irrigation command with contextual intermediate states (`Opening...` / `Membuka...`, `Closing...` / `Menutup...`, `Dispensing...` / `Menyalurkan...`, `Waiting for confirmation...` / `Menunggu konfirmasi...`) derived via `apps/web/components/controls/faucet-transition.ts`. Synchronized transition states across `FaucetPresetSelector` and `FaucetStatusCard` simultaneously. Preserved genuine device `UNKNOWN` badge when no command is in flight.
+  - **Water Tank UI Refinements:** Removed user-facing device identifier badge (`WATER_TANK_NODE`) from `WaterTankMonitoringCard.tsx` (loaded view and skeleton) and route skeleton `apps/web/app/controls/loading.tsx`. Removed `"NORMAL"` status label and icon from Tank Water Volume, preserving telemetry volume display (`waterVolumeLiters`), maximum capacity (`tankMaxVolumeLiters`), and progress gauge.
+  - **Valve Terminology Migration:** Standardized user-facing copy from "Faucet" / "Keran" to "Valve" / "Katup" across `messages/en.json` and `messages/id.json` ("Valve Command History", "Valve Control", "Irrigation Valve Node", "Valve Irrigation Dose Presets"). Preserved internal identifiers without renaming: API routes (`/api/v1/devices/[deviceId]/faucet-commands`), database table `faucet_commands`, MQTT topics (`irigasi/melon/...`), schemas, and code variables.
+  - **Command Notification Lifecycle Fix:** Added dynamic helper `getCommandStatusMessage(cmd)` in `FaucetControlPanel.tsx` updating notifications via `handleCommandUpdated`. Completed commands immediately display the completed success message (`commandSuccess`), removing the stale initial `"Status awal: QUEUED"` notification upon execution settlement.
+  - **Command History Actor Full Name Display:** Included `initiatedBy: { select: { fullName: true } }` in Prisma queries in `packages/database/src/faucet-command-repository.ts` and added `initiatedByFullName?: string | null` to `FaucetCommandDtoSchema` in `@kebun-melon/contracts`. Rendered `{item.initiatedByFullName || item.initiatedByRole || tCommon('user')}` in `FaucetHistoryTable.tsx`, adding zero extra API calls or latency.
+  - **Verification Evidence:**
+    - Unit Tests: 19/19 passed in `apps/web/test/unit/controls-loading-transition.test.tsx`, 28/28 passed in `apps/web/test/unit/faucet-control-ui.test.tsx`, 3/3 passed in `apps/web/test/unit/faucet-history-realtime.test.tsx`.
+    - Database Tests: 25/25 passed in `packages/database/src/__tests__/faucet-command-repository.test.ts`.
+    - Contract Tests: 6/6 passed in `packages/contracts/src/__tests__/faucet.test.ts`.
+    - Translation Parity: 100% key parity via `npm run i18n:check`.
+    - Monorepo Typecheck: 0 errors across all 4 packages (`contracts`, `database`, `iot-gateway`, `web`).
+  - **Deployment & Migration Assessment:**
+    - Staging update required: **YES** (rebuild/deploy of containerized web service required).
+    - Database migration required: **NO** (relational foreign key and `full_name` column already exist).
+
 ---
 
 

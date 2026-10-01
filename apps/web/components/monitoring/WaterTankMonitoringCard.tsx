@@ -3,15 +3,7 @@
 import React from 'react';
 import { useDeviceContext } from '@/context/DeviceContext';
 import { useLatestMonitoring } from '@/hooks/useLatestMonitoring';
-import {
-  Database,
-  AlertTriangle,
-  RefreshCw,
-  Clock,
-  WifiOff,
-  CheckCircle2,
-  Waves,
-} from 'lucide-react';
+import { Database, AlertTriangle, RefreshCw, Clock, WifiOff, CheckCircle2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { cn, formatDeviceDisplayName } from '@/lib/utils';
 import { WATER_TANK_MAX_CAPACITY } from '@/lib/constants';
@@ -94,9 +86,6 @@ export function WaterTankMonitoringCard() {
                 ) : (
                   <div className="h-5 w-36 bg-app-surface-container rounded" />
                 )}
-                <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded bg-app-surface-container text-app-on-surface-variant">
-                  {selectedDevice?.deviceType || 'WATER_TANK_NODE'}
-                </span>
               </div>
               <div className="h-3 w-28 bg-app-surface-container rounded" />
             </div>
@@ -177,7 +166,7 @@ export function WaterTankMonitoringCard() {
     : 0;
 
   return (
-    <div className="space-y-4" data-testid="water-tank-monitoring-card">
+    <div className="space-y-4 animate-fade-in" data-testid="water-tank-monitoring-card">
       {/* Device Header Banner */}
       <div className="bg-app-surface-container-lowest rounded-2xl p-5 border border-app-outline-variant/30 soft-elevation-lg flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -193,9 +182,6 @@ export function WaterTankMonitoringCard() {
               <h2 className="text-[16px] font-bold text-app-on-surface">
                 {formatDeviceDisplayName(selectedDevice, tDevices)}
               </h2>
-              <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded bg-app-surface-container text-app-on-surface-variant">
-                {selectedDevice?.deviceType}
-              </span>
             </div>
             <p className="text-[11px] text-app-on-surface-variant flex items-center gap-1 mt-0.5">
               <Clock size={12} />
@@ -251,12 +237,6 @@ export function WaterTankMonitoringCard() {
               <h3 className="text-[14px] font-semibold text-app-on-surface-variant">
                 {tWater('tankVolume')}
               </h3>
-              {waterData?.status && shouldShowVolume && (
-                <div className="flex items-center gap-1 text-app-primary">
-                  <Waves size={14} />
-                  <span className="text-[12px] font-semibold">{waterData.status}</span>
-                </div>
-              )}
             </div>
             <div className="flex items-baseline gap-1">
               <span className="text-[28px] font-bold text-app-on-surface">

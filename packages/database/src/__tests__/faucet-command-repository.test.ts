@@ -43,6 +43,7 @@ describe('FaucetCommandRepository Unit & Integration Tests', () => {
     deviceId: mockDeviceId,
     initiatedByUserId: mockUserId,
     initiatedByRole: UserRole.ADMIN,
+    initiatedBy: { fullName: 'Hugo Boss' },
     action: 'DISPENSE',
     phase: 1,
     plantCount: 1,
@@ -122,12 +123,16 @@ describe('FaucetCommandRepository Unit & Integration Tests', () => {
 
       expect(mockPrisma.faucetCommand.findUnique).toHaveBeenCalledWith({
         where: { idempotencyKey: 'idem-001' },
-        include: { events: { orderBy: { receivedAt: 'asc' } } },
+        include: {
+          events: { orderBy: { receivedAt: 'asc' } },
+          initiatedBy: { select: { fullName: true } },
+        },
       });
       expect(result.phase).toBe(1);
       expect(result.targetVolumeMl).toBe(300);
       expect(result.status).toBe(FaucetCommandStatus.QUEUED);
       expect(result.events?.length).toBe(1);
+      expect(result.initiatedByFullName).toBe('Hugo Boss');
     });
 
     it('returns existing command when exact same idempotencyKey, deviceId, and phase are submitted', async () => {
@@ -581,9 +586,13 @@ describe('FaucetCommandRepository Unit & Integration Tests', () => {
 
       expect(mockPrisma.faucetCommand.findFirst).toHaveBeenCalledWith({
         where: { commandId: 'cmd-test-001' },
-        include: { events: { orderBy: { receivedAt: 'asc' } } },
+        include: {
+          events: { orderBy: { receivedAt: 'asc' } },
+          initiatedBy: { select: { fullName: true } },
+        },
       });
       expect(result?.commandId).toBe('cmd-test-001');
+      expect(result?.initiatedByFullName).toBe('Hugo Boss');
     });
 
     it('queries both id and commandId via OR when input is a valid UUID', async () => {
@@ -594,9 +603,13 @@ describe('FaucetCommandRepository Unit & Integration Tests', () => {
 
       expect(mockPrisma.faucetCommand.findFirst).toHaveBeenCalledWith({
         where: { OR: [{ id: validUuid }, { commandId: validUuid }] },
-        include: { events: { orderBy: { receivedAt: 'asc' } } },
+        include: {
+          events: { orderBy: { receivedAt: 'asc' } },
+          initiatedBy: { select: { fullName: true } },
+        },
       });
       expect(result?.id).toBe(validUuid);
+      expect(result?.initiatedByFullName).toBe('Hugo Boss');
     });
   });
 });

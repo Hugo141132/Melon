@@ -782,7 +782,34 @@ The following facts are verified in the traceability matrix regarding the perman
   4. Client idempotency key headers and zero blind retries.
   5. Durable PostgreSQL queue persistence and audit logging prior to MQTT command dispatch.
   6. 5-minute timeout sweeps for unacknowledged commands.
-- **Verification Gates Passed:** Monorepo typecheck (0 errors across 4 packages), environment validation tests (18/18 passed in `scripts/test-env.ts`), gateway unit tests (15/15 passed), and web server env unit tests (13/13 passed).
 <!-- Permanent Faucet Control Feature Flag Traceability Reconciled: 2026-10-01 -->
+
+---
+
+## Coordinated Dashboard Loading, Transition UX & Valve Control UI Refinements Traceability Note (TASK-0813 / Reconciled 2026-10-01)
+
+The following facts are verified in the traceability matrix regarding `TASK-0813`:
+- **Traceability Baseline:** Governed by `PRD-FR-040`, `DEC-CTRL-095`, `DEC-CTRL-096`, `docs/UI_UX.md` §12, `docs/DATABASE.md` §9.1, `docs/API.md` §18, `docs/TESTING.md`, and `TASKS.md`.
+- **Water Tank UI Refinement:**
+  - Removed user-facing device identifier badge `WATER_TANK_NODE` from `WaterTankMonitoringCard.tsx` (live and skeleton) and `/controls` loading view `loading.tsx`.
+  - Removed `NORMAL` status label and icon from Tank Water Volume; retained volume reading (`waterVolumeLiters`), maximum capacity (`tankMaxVolumeLiters`), and progress gauge.
+- **Valve Terminology Migration:**
+  - Standardized user-facing copy from "Faucet" / "Keran" to "Valve" / "Katup" across `messages/en.json` and `messages/id.json`.
+  - Internal backend identifiers (`/api/v1/devices/[deviceId]/faucet-commands`, `faucet_commands` DB table, MQTT topics, contracts) remain strictly unchanged.
+- **Command Lifecycle UX & Dynamic Notification Resolution:**
+  - Added intermediate transition states (`Opening...`, `Closing...`, `Dispensing...`, `Waiting for confirmation...`) in `apps/web/components/controls/faucet-transition.ts`, synchronized across `FaucetPresetSelector` and `FaucetStatusCard`.
+  - Fixed notification display: `getCommandStatusMessage` updates the notification toast upon reaching `COMPLETED`, removing the stale initial `"Status awal: QUEUED"` message.
+- **Command History Actor Attribution:**
+  - Actor column renders `item.initiatedByFullName` (falling back to role or user label).
+  - Selected via Prisma relational join `initiatedBy: { select: { fullName: true } }` in `packages/database/src/faucet-command-repository.ts` without extra HTTP or DB queries.
+- **Testing & Quality Evidence:**
+  - Unit Tests: 19/19 passed in `controls-loading-transition.test.tsx`, 28/28 passed in `faucet-control-ui.test.tsx`, 3/3 passed in `faucet-history-realtime.test.tsx`.
+  - Database & Contract Tests: 25/25 passed in `faucet-command-repository.test.ts`, 6/6 passed in `faucet.test.ts`. Total: 81/81 passed across 5 test suites.
+  - Typecheck: 0 errors across 4 monorepo packages.
+  - Translation Parity: 100% key parity via `npm run i18n:check`.
+- **Deployment & Migration Assessment:**
+  - Staging update required: **YES** (web container rebuild/deploy required for frontend, contracts, and repository updates).
+  - Database migration required: **NO** (Prisma relation and `full_name` column already exist in PostgreSQL).
+<!-- TASK-0813 Traceability Reconciled: 2026-10-01 -->
 
 

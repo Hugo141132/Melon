@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import FaucetPresetSelector, {
   AuthoritativePhysicalState,
   formatLitersDisplay,
+  deriveValveTransitionState,
 } from './FaucetPresetSelector';
 import FaucetPresetSelectorSkeleton from './FaucetPresetSelectorSkeleton';
 import FaucetConfirmationModal from './FaucetConfirmationModal';
@@ -77,19 +78,31 @@ export default function FaucetControlPanel() {
   // Active command & API state
   const [activeCommand, setActiveCommand] = useState<FaucetCommandDto | null>(null);
   const [recentCommands, setRecentCommands] = useState<FaucetCommandDto[]>([]);
+  const [commandsPagination, setCommandsPagination] = useState<any>(null);
   const [initialValveState, setInitialValveState] = useState<AuthoritativePhysicalState>('UNKNOWN');
+  const [isValveStatusLoading, setIsValveStatusLoading] = useState<boolean>(false);
+  const [isCommandsLoading, setIsCommandsLoading] = useState<boolean>(false);
+  const [loadedDeviceId, setLoadedDeviceId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  const devId = selectedDevice?.deviceId || selectedDevice?.id;
+  const isInitialLoadingForDevice = Boolean(devId) && loadedDeviceId !== devId;
+  const effectiveValveLoading = isValveStatusLoading || isInitialLoadingForDevice;
+  const effectiveCommandsLoading = isCommandsLoading || isInitialLoadingForDevice;
 
   // Stable recent command fetcher parameterized by device ID
   const fetchRecentCommands = useCallback(async (targetDeviceId: string) => {
     if (!targetDeviceId) {
       setActiveCommand(null);
       setRecentCommands([]);
+      setCommandsPagination(null);
+      setIsCommandsLoading(false);
       return;
     }
 
+    setIsCommandsLoading(true);
     try {
       const res = await fetch(
         `/api/v1/devices/${targetDeviceId}/faucet-commands?pageSize=10&sort=requestedAt:desc`
@@ -98,6 +111,9 @@ export default function FaucetControlPanel() {
       if (json.success && json.data?.items) {
         const items: FaucetCommandDto[] = json.data.items;
         setRecentCommands(items);
+        if (json.data.meta?.pagination) {
+          setCommandsPagination(json.data.meta.pagination);
+        }
 
         const active = items.find((c) => ACTIVE_COMMAND_STATUSES.includes(c.status));
         if (active) {
@@ -110,6 +126,8 @@ export default function FaucetControlPanel() {
       }
     } catch {
       // Ignore background error
+    } finally {
+      setIsCommandsLoading(false);
     }
   }, []);
 
@@ -117,8 +135,10 @@ export default function FaucetControlPanel() {
   const fetchValveStatus = useCallback(async (targetDeviceId: string) => {
     if (!targetDeviceId) {
       setInitialValveState('UNKNOWN');
+      setIsValveStatusLoading(false);
       return;
     }
+    setIsValveStatusLoading(true);
     try {
       const res = await fetch(`/api/v1/devices/${encodeURIComponent(targetDeviceId)}/valve-status`);
       const json = await res.json();
@@ -129,6 +149,8 @@ export default function FaucetControlPanel() {
       }
     } catch {
       // Ignore background network error
+    } finally {
+      setIsValveStatusLoading(false);
     }
   }, []);
 
@@ -136,28 +158,112 @@ export default function FaucetControlPanel() {
   useEffect(() => {
     const devId = selectedDevice?.deviceId || selectedDevice?.id;
     if (devId) {
-      fetchRecentCommands(devId);
-      fetchValveStatus(devId);
+      setIsValveStatusLoading(true);
+      setIsCommandsLoading(true);
+      // Coordinated parallel loading
+      Promise.allSettled([fetchRecentCommands(devId), fetchValveStatus(devId)]).then(() => {
+        setLoadedDeviceId(devId);
+      });
     } else {
       setActiveCommand(null);
       setRecentCommands([]);
+      setCommandsPagination(null);
       setInitialValveState('UNKNOWN');
+      setLoadedDeviceId(null);
+      setIsValveStatusLoading(false);
+      setIsCommandsLoading(false);
     }
   }, [selectedDevice?.deviceId, selectedDevice?.id, fetchRecentCommands, fetchValveStatus]);
 
-  // Stable callback for status updates from card
-  const handleCommandUpdated = useCallback((updated: FaucetCommandDto) => {
-    setActiveCommand(updated);
-    setRecentCommands((prev) => {
-      const index = prev.findIndex((c) => c.commandId === updated.commandId || c.id === updated.id);
-      if (index >= 0) {
-        const updatedList = [...prev];
-        updatedList[index] = updated;
-        return updatedList;
+  // Dynamic message derivation to ensure notifications reflect latest command lifecycle state
+  const getCommandStatusMessage = useCallback(
+    (cmd: FaucetCommandDto): { type: 'success' | 'error'; message: string } => {
+      const action = cmd.action || 'COMMAND';
+      const actionLabel =
+        action === 'DISPENSE'
+          ? tFaucet('commandActionDispense')
+          : action === 'OPEN'
+            ? tFaucet('commandActionOpen')
+            : tFaucet('commandActionClose');
+
+      if (cmd.status === 'COMPLETED') {
+        return { type: 'success', message: tFaucet('commandCompleted') };
       }
-      return [updated, ...prev];
-    });
-  }, []);
+
+      if (cmd.status === 'FAILED') {
+        return {
+          type: 'error',
+          message: cmd.failureReasonCode || tFaucet('commandFailed'),
+        };
+      }
+
+      if (cmd.status === 'TIMEOUT') {
+        return { type: 'error', message: tFaucet('commandTimeout') };
+      }
+
+      if (cmd.status === 'QUEUED') {
+        if (action === 'DISPENSE' && cmd.targetVolumeMl) {
+          const totalL = formatLitersDisplay(cmd.targetVolumeMl / 1000);
+          return {
+            type: 'success',
+            message: tFaucet('commandSentSuccess', { volume: `${totalL} L` }),
+          };
+        }
+        return {
+          type: 'success',
+          message: tFaucet('commandSentSuccessGeneric', { action }),
+        };
+      }
+
+      // Active execution statuses (SENT, ACKNOWLEDGED, IN_PROGRESS)
+      const statusKey =
+        cmd.status === 'IN_PROGRESS'
+          ? 'inProgress'
+          : cmd.status === 'ACKNOWLEDGED'
+            ? 'acknowledged'
+            : cmd.status === 'SENT'
+              ? 'sent'
+              : 'commandStatus';
+      const statusLabel = tFaucet(statusKey as any);
+      return {
+        type: 'success',
+        message: tFaucet('commandExecuting', {
+          action: actionLabel,
+          status: statusLabel,
+        }),
+      };
+    },
+    [tFaucet]
+  );
+
+  // Stable callback for status updates from card
+  const handleCommandUpdated = useCallback(
+    (updated: FaucetCommandDto) => {
+      setActiveCommand(updated);
+      setRecentCommands((prev) => {
+        const index = prev.findIndex(
+          (c) => c.commandId === updated.commandId || c.id === updated.id
+        );
+        if (index >= 0) {
+          const updatedList = [...prev];
+          updatedList[index] = updated;
+          return updatedList;
+        }
+        return [updated, ...prev];
+      });
+
+      // Update feedback notification to reflect latest status
+      const notif = getCommandStatusMessage(updated);
+      if (notif.type === 'error') {
+        setErrorMsg(notif.message);
+        setSuccessMsg(null);
+      } else {
+        setSuccessMsg(notif.message);
+        setErrorMsg(null);
+      }
+    },
+    [getCommandStatusMessage]
+  );
 
   // Open modal for DISPENSE preset
   const handleSelectPreset = useCallback(
@@ -236,11 +342,13 @@ export default function FaucetControlPanel() {
       const json = await res.json();
 
       if (json.success && json.data) {
-        if (action === 'DISPENSE' && json.data.targetVolumeMl) {
-          const totalL = formatLitersDisplay(json.data.targetVolumeMl / 1000);
-          setSuccessMsg(tFaucet('commandSentSuccess', { volume: `${totalL} L` }));
+        const notif = getCommandStatusMessage(json.data);
+        if (notif.type === 'error') {
+          setErrorMsg(notif.message);
+          setSuccessMsg(null);
         } else {
-          setSuccessMsg(tFaucet('commandSentSuccessGeneric', { action }));
+          setSuccessMsg(notif.message);
+          setErrorMsg(null);
         }
         setActiveCommand(json.data);
         setRecentCommands((prev) => [json.data, ...prev]);
@@ -260,6 +368,8 @@ export default function FaucetControlPanel() {
     activeCommand,
     initialValveState
   );
+
+  const transitionState = deriveValveTransitionState(activeCommand, submitting, modalAction);
 
   return (
     <div className="space-y-6" data-testid="faucet-control-panel">
@@ -293,6 +403,10 @@ export default function FaucetControlPanel() {
             isFeatureEnabled={isFeatureEnabled}
             activeCommand={activeCommand}
             physicalState={physicalState}
+            transitionState={transitionState}
+            isValveStatusLoading={effectiveValveLoading}
+            isSubmitting={submitting}
+            submittingAction={modalAction}
             plantCount={plantCount}
             onPlantCountChange={setPlantCount}
             onSelectPreset={handleSelectPreset}
@@ -302,11 +416,12 @@ export default function FaucetControlPanel() {
       )}
 
       {/* Active Command Status Card (If an active or recent command exists) */}
-      {selectedDevice && activeCommand && (
-        <section>
+      {selectedDevice && !isInitialLoadingForDevice && activeCommand && (
+        <section className="animate-fade-in">
           <FaucetStatusCard
             deviceId={selectedDevice.deviceId || selectedDevice.id}
             command={activeCommand}
+            transitionState={transitionState}
             onCommandUpdated={handleCommandUpdated}
           />
         </section>
@@ -315,7 +430,12 @@ export default function FaucetControlPanel() {
       {/* Execution History Table */}
       {selectedDevice ? (
         <section>
-          <FaucetHistoryTable deviceId={selectedDevice.deviceId || selectedDevice.id} />
+          <FaucetHistoryTable
+            deviceId={selectedDevice.deviceId || selectedDevice.id}
+            initialItems={recentCommands}
+            initialPagination={commandsPagination}
+            isLoading={effectiveCommandsLoading}
+          />
         </section>
       ) : isDeviceLoading ? (
         <section>

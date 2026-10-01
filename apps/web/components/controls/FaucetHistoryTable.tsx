@@ -30,32 +30,45 @@ export interface FaucetHistoryItem {
   completedAt?: string | null;
   initiatedByUserId?: string | null;
   initiatedByRole?: string | null;
+  initiatedByFullName?: string | null;
 }
 
 export interface FaucetHistoryTableProps {
   deviceId?: string | null;
   isLoading?: boolean;
+  initialItems?: FaucetHistoryItem[];
+  initialPagination?: {
+    page: number;
+    pageSize: number;
+    totalItems: number;
+    totalPages: number;
+  };
   className?: string;
 }
 
 export default function FaucetHistoryTable({
   deviceId,
   isLoading = false,
+  initialItems,
+  initialPagination,
   className,
 }: FaucetHistoryTableProps) {
   const tFaucet = useTranslations('faucet');
   const tCommon = useTranslations('common');
 
-  const [history, setHistory] = useState<FaucetHistoryItem[]>([]);
+  const [history, setHistory] = useState<FaucetHistoryItem[]>(() => initialItems || []);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
-  const [pagination, setPagination] = useState({
-    page: 1,
-    pageSize: 10,
-    totalItems: 0,
-    totalPages: 1,
-  });
+  const [pagination, setPagination] = useState(
+    () =>
+      initialPagination || {
+        page: 1,
+        pageSize: 10,
+        totalItems: initialItems?.length || 0,
+        totalPages: 1,
+      }
+  );
 
   const isTableLoading = loading || isLoading;
 
@@ -63,6 +76,19 @@ export default function FaucetHistoryTable({
   React.useEffect(() => {
     tFaucetRef.current = tFaucet;
   }, [tFaucet]);
+
+  // Synchronize history if initialItems updates from parent when at default filter & page
+  useEffect(() => {
+    if (initialItems && statusFilter === 'ALL' && pagination.page === 1) {
+      setHistory(initialItems);
+      if (initialPagination) {
+        setPagination(initialPagination);
+      }
+    }
+  }, [initialItems, initialPagination, statusFilter, pagination.page]);
+
+  const lastDeviceIdRef = React.useRef<string | null | undefined>(null);
+  const initialFetchSkippedRef = React.useRef<boolean>(false);
 
   const fetchHistory = useCallback(
     async (pageToFetch = 1) => {
@@ -100,12 +126,29 @@ export default function FaucetHistoryTable({
   );
 
   useEffect(() => {
-    if (deviceId) {
-      fetchHistory(1);
-    } else {
-      setHistory([]);
+    if (deviceId !== lastDeviceIdRef.current) {
+      lastDeviceIdRef.current = deviceId;
+      initialFetchSkippedRef.current = false;
     }
-  }, [deviceId, statusFilter, fetchHistory]);
+
+    if (!deviceId) {
+      setHistory([]);
+      return;
+    }
+
+    // Skip redundant initial fetch if parent already supplied coordinated initialItems
+    if (
+      initialItems &&
+      initialItems.length >= 0 &&
+      statusFilter === 'ALL' &&
+      !initialFetchSkippedRef.current
+    ) {
+      initialFetchSkippedRef.current = true;
+      return;
+    }
+
+    fetchHistory(1);
+  }, [deviceId, statusFilter, fetchHistory, initialItems]);
 
   const handleRealtimeEvent = useCallback(
     (name: string, data: any) => {
@@ -333,7 +376,9 @@ export default function FaucetHistoryTable({
                       {new Date(item.requestedAt).toLocaleString('id-ID')}
                     </td>
 
-                    <td className="p-3 font-medium">{item.initiatedByRole || tCommon('user')}</td>
+                    <td className="p-3 font-medium">
+                      {item.initiatedByFullName || item.initiatedByRole || tCommon('user')}
+                    </td>
                   </tr>
                 );
               })

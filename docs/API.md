@@ -2381,6 +2381,7 @@ Response:
       "userId": "user-002",
       "role": "ADMIN"
     },
+    "initiatedByFullName": "Admin Pertanian",
     "requestedAt": "2026-07-27T14:30:00+07:00",
     "sentAt": "2026-07-27T14:30:01+07:00",
     "acknowledgedAt": "2026-07-27T14:30:02+07:00",
@@ -2388,6 +2389,11 @@ Response:
   }
 }
 ```
+
+> [!NOTE]
+> **Valve Presentation & Internal API Preservation (`TASK-0813`):**
+> - The internal API route paths (`/api/v1/devices/{deviceId}/faucet-commands`), request schemas, database tables, and MQTT topics remain strictly unchanged. Only user-facing UI labels migrated from "Faucet" to "Valve".
+> - `FaucetCommandDto` includes `initiatedByFullName?: string | null` populated via relational user join (`initiatedBy: { select: { fullName: true } }`), allowing UI components (e.g. `FaucetHistoryTable`) to render user full names without secondary requests.
 
 ---
 

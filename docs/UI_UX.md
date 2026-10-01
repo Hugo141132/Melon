@@ -839,6 +839,43 @@ Clicking a preset or manual action opens a dedicated modal dialog:
 - **Tablet (768px)**: 2-column layout balancing preset grid and status card.
 - **Desktop (1280px+)**: Full responsive grid with paginated history table.
 
+### 12.7 Coordinated Dashboard Loading, Transition UX & Valve Refinements (TASK-0813)
+
+Implemented under `TASK-0813` to provide seamless operational monitoring, eliminate visual flash, and standardize valve control usability:
+
+1. **Coordinated Dashboard Loading:**
+   - Eliminated the 4-stage waterfall loading across the Water Tank card, valve status, presets, manual controls, and command history.
+   - Shared `recentCommands` and pagination metadata from `FaucetControlPanel` into `FaucetHistoryTable` (`initialItems`, `initialPagination`), reducing initial `/faucet-commands` API queries by 50%.
+   - Synchronized loading skeletons (`isCommandsLoading`) so table rows render in lockstep with the panel instead of flashing empty states.
+2. **Neutral Initial Resolving State (21st.dev MCP Patterns):**
+   - Replaced the initial amber `"UNKNOWN"` (`"TIDAK DIKETAHUI"`) badge display during initial page hydration with a neutral resolving pill badge (`bg-app-surface-container/60`, `border-app-outline-variant/30`, pulsing indicator dot, and reserved-width skeleton pill).
+   - Smoothly transitions via CSS (`transition-colors duration-200`) to confirmed physical states (`OPEN`, `CLOSED`, or authoritative `UNKNOWN`) with zero layout shift (CLS = 0).
+3. **Seamless Command Execution Transition UX:**
+   - Replaced the post-command submission amber `"Physical Valve State: Unknown"` blink while awaiting device MQTT confirmation with synchronized intermediate states:
+     - `OPENING`: `bg-sky-50 text-sky-800 border-sky-300`, pulsing sky dot, *"Opening..."* / *"Membuka..."*.
+     - `CLOSING`: `bg-indigo-50 text-indigo-800 border-indigo-300`, pulsing indigo dot, *"Closing..."* / *"Menutup..."*.
+     - `DISPENSING`: `bg-cyan-50 text-cyan-800 border-cyan-300`, pulsing cyan dot, *"Dispensing..."* / *"Menyalurkan..."*.
+     - `WAITING_CONFIRMATION`: `bg-blue-50 text-blue-800 border-blue-300`, pulsing blue dot, *"Waiting for confirmation..."* / *"Menunggu konfirmasi..."*.
+   - Synchronized `transitionState` across both `FaucetPresetSelector` and `FaucetStatusCard` simultaneously, eliminating split-brain states.
+   - Preserved genuine device `UNKNOWN` badge when no command is in flight.
+4. **Water Tank UI Refinements:**
+   - Removed user-facing device identifier badge (`WATER_TANK_NODE`) from `WaterTankMonitoringCard.tsx` (live view and skeleton) and route skeleton `apps/web/app/controls/loading.tsx`. Internal device IDs (`device.deviceId`, `device.deviceType`) remain intact.
+   - Removed `"NORMAL"` volume status label and icon from Tank Water Volume, preserving telemetry volume display (`waterVolumeLiters`), maximum capacity (`tankMaxVolumeLiters`), and progress gauge.
+5. **Valve Terminology Migration:**
+   - Standardized user-facing copy from "Faucet" / "Keran" to "Valve" / "Katup" across English and Indonesian dictionaries:
+     - *"Valve Command History"* / *"Riwayat Perintah Katup"*
+     - *"Valve Control"* / *"Kontrol Katup"*
+     - *"Irrigation Valve Node"* / *"Node Katup Irigasi"*
+     - *"Valve Irrigation Dose Presets"* / *"Preset Dosis Irigasi Katup"*
+   - Preserved internal identifiers without renaming: API routes (`/api/v1/devices/[deviceId]/faucet-commands`), database table `faucet_commands`, MQTT topics (`irigasi/melon/...`), schemas, and code variables.
+6. **Command Notification Lifecycle Fix:**
+   - Added dynamic notification derivation helper `getCommandStatusMessage(cmd)` in `FaucetControlPanel.tsx` updating notifications via `handleCommandUpdated`.
+   - Completed commands immediately display the completed success message (`commandSuccess`), removing the stale initial `"Status awal: QUEUED"` notification upon execution settlement.
+7. **Command History Actor Full Name Display:**
+   - Sourced actor full name via Prisma relation `initiatedBy: { select: { fullName: true } }` in `packages/database/src/faucet-command-repository.ts`.
+   - Rendered `{item.initiatedByFullName || item.initiatedByRole || tCommon('user')}` in `FaucetHistoryTable.tsx`.
+   - Zero additional API calls or network latency added.
+
 ---
 
 ## 13. Alerts and Notifications

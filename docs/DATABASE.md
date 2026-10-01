@@ -1130,6 +1130,7 @@ Rules:
 - `command_id` globally unique.
 - `idempotency_key` unique across records.
 - Partial unique index `faucet_commands_one_active_per_device` enforces maximum 1 active command in status `('QUEUED', 'SENT', 'ACKNOWLEDGED', 'IN_PROGRESS')` per device.
+- Relational Actor Attribution (`TASK-0813`): `initiated_by_user_id` references `users(id)`. Command queries (`getCommands`, `getCommandById`) project `initiatedBy: { select: { fullName: true } }` via Prisma relation `FaucetCommandInitiatedBy`, supplying `initiatedByFullName` directly to frontend history tables without secondary API calls or database schema changes.
 
 ### Indexes
 
