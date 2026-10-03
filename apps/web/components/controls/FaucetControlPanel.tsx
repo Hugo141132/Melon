@@ -25,25 +25,27 @@ export function deriveAuthoritativePhysicalState(
     return 'UNKNOWN';
   }
 
-  // Look for the most recent completed command
-  const latestCompleted = recentCommands?.find((c) => c.status === 'COMPLETED');
-  if (latestCompleted) {
-    // Check if hardware-reported physical state exists in metadata or completion events
-    const completionEvent = latestCompleted.events?.find((e) => e.eventStatus === 'COMPLETED');
-    const reportedPhysicalState =
-      completionEvent?.metadata?.physicalState || completionEvent?.metadata?.reportedState;
-    if (reportedPhysicalState === 'OPEN' || reportedPhysicalState === 'CLOSED') {
-      return reportedPhysicalState;
-    }
+  // Look for the most recent completed command that established a physical state
+  if (recentCommands && recentCommands.length > 0) {
+    for (const cmd of recentCommands) {
+      if (cmd.status === 'COMPLETED') {
+        const completionEvent = cmd.events?.find((e) => e.eventStatus === 'COMPLETED');
+        const reportedPhysicalState =
+          completionEvent?.metadata?.physicalState || completionEvent?.metadata?.reportedState;
+        if (reportedPhysicalState === 'OPEN' || reportedPhysicalState === 'CLOSED') {
+          return reportedPhysicalState;
+        }
 
-    if (latestCompleted.action === 'OPEN') {
-      return 'OPEN';
-    }
-    if (latestCompleted.action === 'CLOSE') {
-      return 'CLOSED';
-    }
+        if (cmd.action === 'OPEN') {
+          return 'OPEN';
+        }
+        if (cmd.action === 'CLOSE') {
+          return 'CLOSED';
+        }
 
-    // Completed DISPENSE does NOT confirm closed valve without sensor confirmation
+        // Completed DISPENSE does NOT confirm closed valve without sensor confirmation
+      }
+    }
   }
 
   // Fallback to initial hardware physical valve state when no completed commands exist
@@ -52,6 +54,36 @@ export function deriveAuthoritativePhysicalState(
   }
 
   return 'UNKNOWN';
+}
+
+export function deriveLastConfirmedAt(
+  recentCommands: FaucetCommandDto[],
+  activeCommand: FaucetCommandDto | null,
+  initialLastConfirmedAt?: Date | string | null
+): Date | string | null {
+  if (activeCommand && ACTIVE_COMMAND_STATUSES.includes(activeCommand.status)) {
+    return null;
+  }
+
+  if (recentCommands && recentCommands.length > 0) {
+    for (const cmd of recentCommands) {
+      if (cmd.status === 'COMPLETED') {
+        const completionEvent = cmd.events?.find((e) => e.eventStatus === 'COMPLETED');
+        const reportedPhysicalState =
+          completionEvent?.metadata?.physicalState || completionEvent?.metadata?.reportedState;
+        if (
+          reportedPhysicalState === 'OPEN' ||
+          reportedPhysicalState === 'CLOSED' ||
+          cmd.action === 'OPEN' ||
+          cmd.action === 'CLOSE'
+        ) {
+          return cmd.completedAt || completionEvent?.createdAt || cmd.requestedAt || null;
+        }
+      }
+    }
+  }
+
+  return initialLastConfirmedAt || null;
 }
 
 export default function FaucetControlPanel() {
@@ -80,6 +112,7 @@ export default function FaucetControlPanel() {
   const [recentCommands, setRecentCommands] = useState<FaucetCommandDto[]>([]);
   const [commandsPagination, setCommandsPagination] = useState<any>(null);
   const [initialValveState, setInitialValveState] = useState<AuthoritativePhysicalState>('UNKNOWN');
+  const [initialLastConfirmedAt, setInitialLastConfirmedAt] = useState<Date | string | null>(null);
   const [isValveStatusLoading, setIsValveStatusLoading] = useState<boolean>(false);
   const [isCommandsLoading, setIsCommandsLoading] = useState<boolean>(false);
   const [loadedDeviceId, setLoadedDeviceId] = useState<string | null>(null);
@@ -135,6 +168,7 @@ export default function FaucetControlPanel() {
   const fetchValveStatus = useCallback(async (targetDeviceId: string) => {
     if (!targetDeviceId) {
       setInitialValveState('UNKNOWN');
+      setInitialLastConfirmedAt(null);
       setIsValveStatusLoading(false);
       return;
     }
@@ -145,6 +179,9 @@ export default function FaucetControlPanel() {
       if (json.success && json.data) {
         if (json.data.physicalState === 'OPEN' || json.data.physicalState === 'CLOSED') {
           setInitialValveState(json.data.physicalState);
+        }
+        if (json.data.latest?.receivedAt || json.data.latest?.recordedAt) {
+          setInitialLastConfirmedAt(json.data.latest.receivedAt || json.data.latest.recordedAt);
         }
       }
     } catch {
@@ -169,6 +206,7 @@ export default function FaucetControlPanel() {
       setRecentCommands([]);
       setCommandsPagination(null);
       setInitialValveState('UNKNOWN');
+      setInitialLastConfirmedAt(null);
       setLoadedDeviceId(null);
       setIsValveStatusLoading(false);
       setIsCommandsLoading(false);
@@ -369,6 +407,12 @@ export default function FaucetControlPanel() {
     initialValveState
   );
 
+  const lastConfirmedAt = deriveLastConfirmedAt(
+    recentCommands,
+    activeCommand,
+    initialLastConfirmedAt
+  );
+
   const transitionState = deriveValveTransitionState(activeCommand, submitting, modalAction);
 
   return (
@@ -422,6 +466,8 @@ export default function FaucetControlPanel() {
             deviceId={selectedDevice.deviceId || selectedDevice.id}
             command={activeCommand}
             transitionState={transitionState}
+            lastConfirmedPhysicalState={physicalState}
+            lastConfirmedAt={lastConfirmedAt}
             onCommandUpdated={handleCommandUpdated}
           />
         </section>

@@ -9,7 +9,10 @@ import FaucetStatusCard, {
   getAuthoritativePhysicalStateFromCommand,
 } from '@/components/controls/FaucetStatusCard';
 import FaucetHistoryTable from '@/components/controls/FaucetHistoryTable';
-import { deriveAuthoritativePhysicalState } from '@/components/controls/FaucetControlPanel';
+import {
+  deriveAuthoritativePhysicalState,
+  deriveLastConfirmedAt,
+} from '@/components/controls/FaucetControlPanel';
 import { AuthorisedDevice } from '@/context/DeviceContext';
 
 const mockOnlineDevice: AuthorisedDevice = {
@@ -163,7 +166,7 @@ describe('FaucetPresetSelector', () => {
     );
 
     expect(screen.getByTestId('manual-faucet-control-section')).toBeInTheDocument();
-    expect(screen.getByText('Kontrol Manual Katup')).toBeInTheDocument();
+    expect(screen.getByText('Kontrol Manual Valve')).toBeInTheDocument();
 
     const btnOpen = screen.getByTestId('btn-manual-open');
     const btnClose = screen.getByTestId('btn-manual-close');
@@ -429,8 +432,8 @@ describe('FaucetConfirmationModal', () => {
     );
 
     expect(screen.getByTestId('faucet-confirmation-modal')).toBeInTheDocument();
-    expect(screen.getByText('Konfirmasi Buka Katup')).toBeInTheDocument();
-    expect(screen.getByText(/Apakah Anda yakin ingin membuka katup air/i)).toBeInTheDocument();
+    expect(screen.getByText('Konfirmasi Buka Valve')).toBeInTheDocument();
+    expect(screen.getByText(/Apakah Anda yakin ingin membuka valve air/i)).toBeInTheDocument();
 
     const confirmBtn = screen.getByTestId('btn-confirm-dispense');
     fireEvent.click(confirmBtn);
@@ -453,7 +456,7 @@ describe('FaucetConfirmationModal', () => {
     );
 
     expect(screen.getByTestId('faucet-confirmation-modal')).toBeInTheDocument();
-    expect(screen.getByText('Konfirmasi Tutup Katup')).toBeInTheDocument();
+    expect(screen.getByText('Konfirmasi Tutup Valve')).toBeInTheDocument();
 
     const confirmBtn = screen.getByTestId('btn-confirm-dispense');
     fireEvent.click(confirmBtn);
@@ -926,6 +929,165 @@ describe('deriveAuthoritativePhysicalState and formatLitersDisplay Helpers', () 
     expect(formatLitersDisplay(3.0)).toBe('3');
     expect(formatLitersDisplay(4.5)).toBe('4.5');
   });
+
+  describe('Timeout Physical Valve State Retention & Warnings', () => {
+    it('preserves last confirmed physical state when an active command times out', () => {
+      const timedOutCommand = {
+        id: 'cmd-timeout-1',
+        commandId: 'cmd-timeout-1',
+        idempotencyKey: 'k-1',
+        deviceId: 'd1',
+        action: 'OPEN',
+        status: 'TIMEOUT',
+        requestedAt: '2026-10-03T09:59:00Z',
+      };
+
+      const completedCloseCommand = {
+        id: 'cmd-completed-1',
+        commandId: 'cmd-completed-1',
+        idempotencyKey: 'k-0',
+        deviceId: 'd1',
+        action: 'CLOSE',
+        status: 'COMPLETED',
+        requestedAt: '2026-10-03T09:50:00Z',
+        completedAt: '2026-10-03T09:50:05Z',
+      };
+
+      // 1. With previous completed CLOSE command, returns CLOSED on timeout (not UNKNOWN)
+      expect(
+        deriveAuthoritativePhysicalState(
+          [timedOutCommand, completedCloseCommand],
+          timedOutCommand,
+          'UNKNOWN'
+        )
+      ).toBe('CLOSED');
+
+      // 2. With previous completed OPEN command, returns OPEN on timeout (not UNKNOWN)
+      const completedOpenCommand = {
+        ...completedCloseCommand,
+        action: 'OPEN',
+      };
+      expect(
+        deriveAuthoritativePhysicalState(
+          [timedOutCommand, completedOpenCommand],
+          timedOutCommand,
+          'UNKNOWN'
+        )
+      ).toBe('OPEN');
+
+      // 3. With no completed commands, but initialValveState was CLOSED, returns CLOSED on timeout
+      expect(deriveAuthoritativePhysicalState([timedOutCommand], timedOutCommand, 'CLOSED')).toBe(
+        'CLOSED'
+      );
+
+      // 4. In flight active command (e.g. IN_PROGRESS) returns UNKNOWN
+      const inProgressCommand = {
+        ...timedOutCommand,
+        status: 'IN_PROGRESS',
+      };
+      expect(
+        deriveAuthoritativePhysicalState(
+          [inProgressCommand, completedCloseCommand],
+          inProgressCommand,
+          'CLOSED'
+        )
+      ).toBe('UNKNOWN');
+    });
+
+    it('correctly derives lastConfirmedAt timestamp', () => {
+      const timedOutCommand = {
+        id: 'cmd-timeout-1',
+        commandId: 'cmd-timeout-1',
+        idempotencyKey: 'k-1',
+        deviceId: 'd1',
+        action: 'OPEN',
+        status: 'TIMEOUT',
+        requestedAt: '2026-10-03T09:59:00Z',
+      };
+
+      const completedCloseCommand = {
+        id: 'cmd-completed-1',
+        commandId: 'cmd-completed-1',
+        idempotencyKey: 'k-0',
+        deviceId: 'd1',
+        action: 'CLOSE',
+        status: 'COMPLETED',
+        requestedAt: '2026-10-03T09:50:00Z',
+        completedAt: '2026-10-03T09:50:05Z',
+      };
+
+      // Returns completedAt of the confirmed command
+      expect(
+        deriveLastConfirmedAt([timedOutCommand, completedCloseCommand], timedOutCommand, null)
+      ).toBe('2026-10-03T09:50:05Z');
+
+      // Falls back to initialLastConfirmedAt if no completed commands exist
+      expect(
+        deriveLastConfirmedAt([timedOutCommand], timedOutCommand, '2026-10-03T09:00:00Z')
+      ).toBe('2026-10-03T09:00:00Z');
+
+      // Returns null when an active command is in flight
+      const inProgress = { ...timedOutCommand, status: 'IN_PROGRESS' };
+      expect(
+        deriveLastConfirmedAt(
+          [inProgress, completedCloseCommand],
+          inProgress,
+          '2026-10-03T09:00:00Z'
+        )
+      ).toBeNull();
+    });
+
+    it('keeps Manual Valve Control focused strictly on confirmed physical state and excludes duplicate warning/timestamp', () => {
+      render(
+        <FaucetPresetSelector
+          selectedDevice={mockOnlineDevice}
+          hasControlPermission={true}
+          isFeatureEnabled={true}
+          physicalState="CLOSED"
+          onSelectPreset={vi.fn()}
+        />
+      );
+
+      // Must display CLOSED state (in Indonesian default: Tertutup)
+      expect(screen.getByText('Tertutup')).toBeInTheDocument();
+      // Must NOT display duplicate Warning badge or Last confirmed label (kept in FaucetStatusCard)
+      expect(screen.queryByText(/Perangkat tidak merespons/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Terakhir dikonfirmasi/)).not.toBeInTheDocument();
+      // Must NOT display technical state STALE or UNKNOWN
+      expect(screen.queryByText('STALE')).not.toBeInTheDocument();
+      expect(screen.queryByText('Tidak Diketahui')).not.toBeInTheDocument();
+    });
+
+    it('renders confirmed physical state and warning alert in FaucetStatusCard on TIMEOUT', () => {
+      const timedOutCommand = {
+        id: 'cmd-t1',
+        commandId: 'cmd-t1',
+        idempotencyKey: 'k-t1',
+        deviceId: mockOnlineDevice.deviceId!,
+        action: 'OPEN',
+        status: 'TIMEOUT',
+        requestedAt: '2026-10-03T09:55:00Z',
+      };
+
+      render(
+        <FaucetStatusCard
+          deviceId={mockOnlineDevice.deviceId!}
+          command={timedOutCommand}
+          lastConfirmedPhysicalState="CLOSED"
+          lastConfirmedAt="2026-10-03T09:50:00Z"
+        />
+      );
+
+      // Status card preserves physical state as Tertutup (CLOSED)
+      expect(screen.getByText('Tertutup')).toBeInTheDocument();
+      // Warning banner is rendered
+      expect(screen.getByTestId('status-card-timeout-warning')).toBeInTheDocument();
+      expect(screen.getByText(/Perangkat tidak merespons/)).toBeInTheDocument();
+      // Must NOT show UNKNOWN or STALE
+      expect(screen.queryByText('STALE')).not.toBeInTheDocument();
+      expect(screen.queryByText('Tidak Diketahui')).not.toBeInTheDocument();
+    });
+  });
 });
 
 describe('FaucetHistoryTable', () => {
@@ -979,8 +1141,8 @@ describe('FaucetHistoryTable', () => {
     const items = await screen.findAllByText('0.9 L');
     expect(items.length).toBeGreaterThan(0);
     expect(screen.getByText('(Fase 1 × 3)')).toBeInTheDocument();
-    expect(screen.getByText('Buka Katup')).toBeInTheDocument();
-    expect(screen.getByText('Tutup Katup')).toBeInTheDocument();
+    expect(screen.getByText('Buka Valve')).toBeInTheDocument();
+    expect(screen.getByText('Tutup Valve')).toBeInTheDocument();
 
     fetchSpy.mockRestore();
   });

@@ -4,19 +4,21 @@ import {
   prisma as defaultPrisma,
   FaucetCommandRepository,
   DeviceRepository,
+  AlertRepository,
 } from '@kebun-melon/database';
 import {
   FaucetCommandStatus,
   DeviceType,
   DeviceAccountStatus,
   FaucetCommandAction,
+  AlertSeverity,
 } from '@kebun-melon/contracts';
 import { GatewayMqttClient } from '../mqtt/client';
 import { GatewayEnv } from '../config/env';
 import { mqttTopicRouter, AllowedEnvironment } from '../mqtt/router';
 import { logger } from '../observability/logger';
 import { metricsCollector } from '../observability/metrics';
-import { publishRealtimeEvent } from '../events/webhook';
+import { publishRealtimeEvent, triggerAlertEmailDispatch } from '../events/webhook';
 import { HardwareMqttAdapter } from '../mqtt/hardware-adapter';
 
 export interface CommandPublisherOptions {
@@ -25,6 +27,7 @@ export interface CommandPublisherOptions {
   prisma?: PrismaClient;
   faucetCommandRepo?: FaucetCommandRepository;
   deviceRepo?: DeviceRepository;
+  alertRepo?: AlertRepository;
   hardwareAdapter?: HardwareMqttAdapter;
 }
 
@@ -39,6 +42,7 @@ export class CommandPublisher {
   private prisma: PrismaClient | null;
   private faucetCommandRepo: FaucetCommandRepository | null;
   private deviceRepo: DeviceRepository | null;
+  private alertRepo: AlertRepository | null;
   private mqttClient: GatewayMqttClient | null;
   private hardwareAdapter: HardwareMqttAdapter | null;
   private env: GatewayEnv | null;
@@ -54,6 +58,7 @@ export class CommandPublisher {
       options.faucetCommandRepo ?? (this.prisma ? new FaucetCommandRepository(this.prisma) : null);
     this.deviceRepo =
       options.deviceRepo ?? (this.prisma ? new DeviceRepository(this.prisma) : null);
+    this.alertRepo = options.alertRepo ?? (this.prisma ? new AlertRepository(this.prisma) : null);
   }
 
   /**
@@ -482,6 +487,37 @@ export class CommandPublisher {
               },
               cmd.deviceId
             );
+
+            if (this.alertRepo) {
+              try {
+                const timeoutAlert = await this.alertRepo.createCommandTimeoutAlert({
+                  deviceId: cmd.deviceId,
+                  commandId: cmd.commandId,
+                  severity: AlertSeverity.WARNING,
+                  reasonCode: 'COMMAND_EXPIRED_TIMEOUT',
+                  openedAt: now,
+                  metadata: {
+                    source: 'SWEEP_STALE_SENT_TIMEOUT',
+                    action: cmd.action,
+                    expiresAt: cmd.expiresAt,
+                  },
+                });
+
+                if (timeoutAlert?.id) {
+                  triggerAlertEmailDispatch(this.env, timeoutAlert.id).catch((err) => {
+                    logger.warn('Failed to trigger alert email dispatch for timeout', {
+                      alertId: timeoutAlert.id,
+                      error: err instanceof Error ? err.message : String(err),
+                    });
+                  });
+                }
+              } catch (alertErr) {
+                logger.error('Failed to create command timeout alert', alertErr, {
+                  commandId: cmd.commandId,
+                  deviceId: cmd.deviceId,
+                });
+              }
+            }
           } catch (err) {
             logger.error('Failed to mark stale command as TIMEOUT', err, {
               commandId: cmd.commandId,

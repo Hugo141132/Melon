@@ -74,6 +74,13 @@ enum AlertStatus {
   RESOLVED
 }
 
+enum AlertEmailDispatchStatus {
+  SENT
+  FAILED
+  DISABLED_BY_PREFERENCE
+  SIMULATED
+}
+
 // -----------------------------------------------------------------------------
 // 1. Identity and Access
 // -----------------------------------------------------------------------------
@@ -100,6 +107,7 @@ model User {
   assignedDevicesBy    UserDeviceAccess[]     @relation("UserDeviceAccessAssignedBy")
   initiatedCommands    FaucetCommand[]        @relation("FaucetCommandInitiatedBy")
   acknowledgedAlerts   AlertAcknowledgement[]
+  alertEmailDispatches AlertEmailDispatch[]
   userPreference       UserPreference?
   sessions             Session[]
   passwordResetTokens  PasswordResetToken[]
@@ -498,6 +506,7 @@ model Alert {
 
   device           Device?                @relation(fields: [deviceId], references: [id], onDelete: SetNull)
   acknowledgements AlertAcknowledgement[]
+  emailDispatches  AlertEmailDispatch[]
 
   @@index([deviceId], map: "alerts_device_id_idx")
   @@map("alerts")
@@ -514,9 +523,31 @@ model AlertAcknowledgement {
   alert          Alert @relation(fields: [alertId], references: [id], onDelete: Cascade)
   acknowledgedBy User  @relation(fields: [acknowledgedByUserId], references: [id], onDelete: Restrict)
 
+  @@unique([alertId, acknowledgedByUserId], map: "alert_acknowledgements_alert_user_idx")
   @@index([acknowledgedByUserId], map: "alert_acknowledgements_user_id_idx")
   @@index([alertId], map: "alert_acknowledgements_alert_id_idx")
   @@map("alert_acknowledgements")
+}
+
+model AlertEmailDispatch {
+  id             String                   @id @default(uuid()) @db.Uuid
+  alertId        String                   @map("alert_id") @db.Uuid
+  userId         String                   @map("user_id") @db.Uuid
+  deviceId       String?                  @map("device_id") @db.Uuid
+  recipientEmail String                   @map("recipient_email") @db.VarChar(320)
+  status         AlertEmailDispatchStatus
+  resendId       String?                  @map("resend_id") @db.VarChar(100)
+  errorMessage   String?                  @map("error_message")
+  dispatchedAt   DateTime                 @default(now()) @map("dispatched_at") @db.Timestamptz
+  createdAt      DateTime                 @default(now()) @map("created_at") @db.Timestamptz
+
+  alert Alert @relation(fields: [alertId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([alertId, userId], map: "alert_email_dispatches_alert_user_idx")
+  @@index([userId], map: "alert_email_dispatches_user_id_idx")
+  @@index([alertId], map: "alert_email_dispatches_alert_id_idx")
+  @@map("alert_email_dispatches")
 }
 
 // -----------------------------------------------------------------------------
@@ -528,8 +559,9 @@ model UserPreference {
   userId          String   @unique @map("user_id") @db.Uuid
   preferredLocale String   @default("en") @map("preferred_locale") @db.VarChar(10)
   timezone        String?  @default("Asia/Jakarta") @db.VarChar(100)
-  defaultDeviceId String?  @map("default_device_id") @db.Uuid
-  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+  defaultDeviceId    String?  @map("default_device_id") @db.Uuid
+  emailAlertsEnabled Boolean  @default(true) @map("email_alerts_enabled")
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)

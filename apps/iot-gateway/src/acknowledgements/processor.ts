@@ -17,7 +17,7 @@ import { GatewayEnv } from '../config/env';
 import { mqttTopicRouter } from '../mqtt/router';
 import { logger } from '../observability/logger';
 import { metricsCollector } from '../observability/metrics';
-import { publishRealtimeEvent } from '../events/webhook';
+import { publishRealtimeEvent, triggerAlertEmailDispatch } from '../events/webhook';
 
 export interface AcknowledgementProcessorOptions {
   env?: GatewayEnv;
@@ -323,7 +323,7 @@ export class AcknowledgementProcessor {
 
         if (this.alertRepo) {
           try {
-            await this.alertRepo.createCommandFailureAlert({
+            const failureAlert = await this.alertRepo.createCommandFailureAlert({
               deviceId: device.id,
               commandId: command.id,
               reasonCode,
@@ -334,6 +334,15 @@ export class AcknowledgementProcessor {
                 ackData: payload.data,
               },
             });
+
+            if (failureAlert?.id) {
+              triggerAlertEmailDispatch(this.env, failureAlert.id).catch((err) => {
+                logger.warn('Failed to trigger alert email dispatch on rejected ACK', {
+                  alertId: failureAlert.id,
+                  error: err instanceof Error ? err.message : String(err),
+                });
+              });
+            }
           } catch (alertErr) {
             logger.error('Failed to create command failure alert on rejected ACK', alertErr, {
               commandId: command.commandId,

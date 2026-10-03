@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import Sidebar from '@/components/navigation/Sidebar';
 import TopAppBar from '@/components/navigation/TopAppBar';
@@ -121,6 +121,7 @@ describe('Sidebar Navigation Header Display Name & Fallback', () => {
     expect(screen.getByText('Beranda')).toBeInTheDocument();
     expect(screen.getByText('Sensor')).toBeInTheDocument();
     expect(screen.getByText('Notifikasi')).toBeInTheDocument();
+    expect(screen.getByText('Notifikasi').closest('a')).toHaveAttribute('href', '/notifications');
 
     expect(screen.queryByText('Sensor Tanah')).not.toBeInTheDocument();
     expect(screen.queryByText('Kualitas Air')).not.toBeInTheDocument();
@@ -272,6 +273,38 @@ describe('Sidebar Alerts Notification Badge (Live Backend State)', () => {
     const badge = await screen.findByText('2');
     expect(badge).toBeInTheDocument();
     expect(badge).toHaveClass('bg-app-error');
+    expect(global.fetch).toHaveBeenCalledWith(
+      '/api/v1/alerts?status=OPEN&pageSize=100',
+      expect.anything()
+    );
+  });
+
+  it('renders alert badge count for open warning alerts (e.g. command timeouts) before acknowledgement', async () => {
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (typeof url === 'string' && url.includes('/api/v1/alerts')) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              success: true,
+              data: [
+                { id: 'warn-1', severity: 'WARNING', status: 'OPEN', alertType: 'COMMAND_TIMEOUT' },
+              ],
+              meta: { pagination: { totalItems: 1 } },
+            }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ success: true }) });
+    });
+
+    render(<Sidebar isOpen={true} onClose={mockClose} />);
+
+    const badge = await screen.findByText('1');
+    expect(badge).toBeInTheDocument();
+    expect(global.fetch).toHaveBeenCalledWith(
+      '/api/v1/alerts?status=OPEN&pageSize=100',
+      expect.anything()
+    );
   });
 
   it('hides alert badge when count is zero', async () => {
@@ -330,5 +363,46 @@ describe('Sidebar Alerts Notification Badge (Live Backend State)', () => {
     window.dispatchEvent(new CustomEvent('melon:alert-updated'));
 
     expect(await screen.findByText('1')).toBeInTheDocument();
+  });
+
+  it('renders top logo alert dot on TopAppBar when open alerts exist, and hides when zero', async () => {
+    mockUser = { fullName: 'Wahyu Prasetyo' };
+    mockRole = 'ADMIN';
+
+    const { rerender } = render(
+      <DeviceProvider initialDevices={mockDevices}>
+        <TopAppBar />
+      </DeviceProvider>
+    );
+
+    const alertDot = await screen.findByTestId('top-logo-alert-dot');
+    expect(alertDot).toBeInTheDocument();
+
+    // When alert count is 0
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (typeof url === 'string' && url.includes('/api/v1/alerts')) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              success: true,
+              data: [],
+              meta: { pagination: { totalItems: 0 } },
+            }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ success: true }) });
+    });
+
+    rerender(
+      <DeviceProvider initialDevices={mockDevices}>
+        <TopAppBar />
+      </DeviceProvider>
+    );
+    window.dispatchEvent(new CustomEvent('melon:alert-updated'));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('top-logo-alert-dot')).not.toBeInTheDocument();
+    });
   });
 });

@@ -10,6 +10,7 @@ import {
   UserRole,
   AuditEventKey,
   mapPhaseToVolume,
+  FAUCET_COMMAND_DEFAULT_TIMEOUT_MS,
 } from '@kebun-melon/contracts';
 import crypto from 'crypto';
 
@@ -160,7 +161,7 @@ export class FaucetCommandRepository {
     const now = input.requestedAt ? new Date(input.requestedAt) : new Date();
     const expiresAt = input.expiresAt
       ? new Date(input.expiresAt)
-      : new Date(now.getTime() + 5 * 60 * 1000);
+      : new Date(now.getTime() + FAUCET_COMMAND_DEFAULT_TIMEOUT_MS);
     const commandId = `cmd-${crypto.randomUUID()}`;
 
     try {

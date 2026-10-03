@@ -118,16 +118,16 @@ describe('Controls Page Loading & Layout Stability Tests', () => {
 
     // Preset selector is immediately visible
     expect(screen.getByTestId('faucet-preset-selector')).toBeInTheDocument();
-    expect(screen.getByText('Preset Dosis Irigasi Katup')).toBeInTheDocument();
+    expect(screen.getByText('Preset Dosis Irigasi Valve')).toBeInTheDocument();
 
     // History table container is rendered in place
     expect(screen.getByTestId('faucet-history-table')).toBeInTheDocument();
-    expect(screen.getByText('Riwayat Perintah Katup')).toBeInTheDocument();
+    expect(screen.getByText('Riwayat Perintah Valve')).toBeInTheDocument();
 
     // No jarring unselected message box flashing in place of history
     expect(
       screen.queryByText(
-        'Pilih perangkat dari dropdown navigasi di bagian atas untuk melihat riwayat perintah katup.'
+        'Pilih perangkat dari dropdown navigasi di bagian atas untuk melihat riwayat perintah valve.'
       )
     ).not.toBeInTheDocument();
 
@@ -140,7 +140,7 @@ describe('Controls Page Loading & Layout Stability Tests', () => {
     expect(screen.queryByText('Unknown')).not.toBeInTheDocument();
 
     // History table renders skeleton rows rather than flashing empty state
-    expect(screen.queryByText('Belum ada riwayat perintah katup')).not.toBeInTheDocument();
+    expect(screen.queryByText('Belum ada riwayat perintah valve')).not.toBeInTheDocument();
     expect(screen.queryByText('No valve command history yet')).not.toBeInTheDocument();
   });
 
@@ -170,7 +170,7 @@ describe('Controls Page Loading & Layout Stability Tests', () => {
     render(<FaucetHistoryTable deviceId={null} isLoading={true} />);
 
     expect(screen.getByTestId('faucet-history-table')).toBeInTheDocument();
-    expect(screen.getByText('Riwayat Perintah Katup')).toBeInTheDocument();
+    expect(screen.getByText('Riwayat Perintah Valve')).toBeInTheDocument();
     expect(screen.getByTestId('history-status-filter')).toBeInTheDocument();
     expect(screen.getByTestId('btn-refresh-history')).toBeInTheDocument();
 
@@ -179,7 +179,7 @@ describe('Controls Page Loading & Layout Stability Tests', () => {
     expect(screen.getByRole('columnheader', { name: /Volume Aktual/i })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: /Status/i })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: /Waktu Minta/i })).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: /Aktor/i })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /Operator/i })).toBeInTheDocument();
   });
 
   it('FaucetPresetSelector renders neutral loading status badge during valve status check without premature UNKNOWN warning', () => {

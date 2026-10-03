@@ -1548,47 +1548,121 @@ The application does NOT provide a "Delete Device" flow. Device removal from the
 
 **Main success flow:**
 
-1. The navigation sidebar fetches open critical alert count via `useAlertBadge` (`GET /api/v1/alerts?status=OPEN&severity=CRITICAL`) and renders the red counter badge when count > 0.
-2. The user navigates to `/notifikasi`.
+1. The navigation sidebar fetches open alert count via `useAlertBadge` (`GET /api/v1/alerts?status=OPEN`) and renders the red counter badge when count > 0. TopAppBar renders the alert dot indicator (`top-logo-alert-dot`).
+2. The user navigates to `/notifications` (legacy `/notifikasi` issues a 307 redirect).
 3. The server verifies `alert.read`.
-4. The server scopes alerts to authorised devices and user role.
-5. The frontend displays alert type, severity, device, timestamp, and status.
-6. The user may filter alerts where supported.
+4. The server scopes alerts to authorised devices and user role, computing `status` and `isAcknowledged` specifically for the calling user.
+5. The frontend displays alert type, severity, device, timestamp, and user-scoped acknowledgement status.
+6. The user may filter alerts by severity, device, and status (`OPEN`, `ACKNOWLEDGED`, `RESOLVED`).
 
-**Alternative flows:** No alerts; show empty state (sidebar badge is hidden).
+**Alternative flows:** No alerts; show empty state (sidebar badge and top dot are hidden).
 **Error flows:** Unauthorised device alerts are excluded.
-**Postconditions:** User sees only authorised alerts; sidebar badge reflects current open critical count.
+**Postconditions:** User sees only authorised alerts; sidebar badge reflects current user-scoped unread count.
 **Required permissions:** `alert.read`.
 **Relevant account statuses:** `ACTIVE`.
 **UI states:** Loading, list, empty, error.
 **Audit events:** Normally none.
-**Open decisions:** Alert categories and retention.
 
 ---
 
-## Flow 37 — User Acknowledges an Alert
+## Flow 37 — User Acknowledges an Alert (DEC-ALRT-097 / TASK-0704)
 
-**Primary actor:** Owner or permitted Admin
-**Preconditions:** Active alert exists; user has acknowledgement permission.
-**Trigger:** User confirms acknowledgement.
+**Primary actor:** Owner or permitted Admin  
+**Preconditions:** Active alert exists in operator's authorized scope; user has acknowledgement permission.  
+**Trigger:** User clicks 1-click direct "Acknowledge" button.
 
 **Main success flow:**
 
 1. The server verifies `alert.acknowledge`.
-2. The server verifies device scope.
-3. The server verifies alert is still acknowledgeable.
-4. The system records acknowledgement user and timestamp.
-5. The frontend updates alert state and dispatches `melon:alert-updated` event.
-6. The sidebar notification badge receives the event and decrements its live counter immediately without full page reload.
+2. The server verifies device scope (Owner has global scope; Admin has assigned-device scope).
+3. The server upserts an `AlertAcknowledgement` record linked to `[alertId, acknowledgedByUserId]`.
+4. The global `alert.status` row remains `OPEN` (or `RESOLVED`); only the calling operator's unacknowledged view is updated.
+5. The frontend updates local item state and dispatches `melon:alert-updated` event.
+6. The sidebar notification badge and TopAppBar dot decrement live counters immediately without full page reload.
 
-**Alternative flows:** Alert already acknowledged; show current state.
-**Error flows:** Admin lacks permission; alert belongs to unauthorised device.
-**Postconditions:** Alert is acknowledged, not deleted; sidebar badge count updates immediately.
-**Required permissions:** `alert.acknowledge`.
-**Relevant account statuses:** `ACTIVE`.
-**UI states:** Confirming, acknowledged, conflict.
-**Audit events:** `alert.acknowledged`.
+**Alternative flows:** Alert already acknowledged by this user; idempotent update.  
+**Error flows:** Admin lacks permission; alert belongs to unauthorised device.  
+**Postconditions:** Alert is acknowledged for calling operator, not deleted; other operators still see it as unread until they acknowledge it.  
+**Required permissions:** `alert.acknowledge`.  
+**Relevant account statuses:** `ACTIVE`.  
+**UI states:** Acknowledging (inline spinner), acknowledged, error.  
+**Audit events:** `alert.acknowledged` (`userScoped: true`).  
 **Scope rules:** System-wide for Owner; assigned devices for Admin per `RBAC.md`.
+
+---
+
+## Flow 37A — User Bulk-Acknowledges Alerts (DEC-ALRT-100 / TASK-0707)
+
+**Primary actor:** Owner or permitted Admin  
+**Preconditions:** One or more unacknowledged alerts exist in operator's scope.  
+**Trigger:** User selects checkboxes and clicks "Acknowledge Selected (N)" or clicks "Acknowledge All".
+
+**Main success flow:**
+
+1. The frontend gathers selected alert IDs (or `{ all: true }`).
+2. Client submits `POST /api/v1/alerts/bulk-acknowledge`.
+3. Server validates session, `alert.acknowledge` permission, and filters target alerts by operator device access scope.
+4. Server executes an atomic database transaction batching `AlertAcknowledgement` upserts for all authorized target alerts.
+5. Server records individual `alert.acknowledged` audit log entries with `{ userScoped: true, bulk: true }`.
+6. Client updates local alert states, unchecks selection bar, and dispatches `melon:alert-updated` custom event.
+7. Navigation badges and top navigation indicators update instantaneously.
+
+**Alternative flows:** Operator deselects items; selection bar hides.  
+**Error flows:** Partial failure aborts transaction; user is notified via error banner.  
+**Postconditions:** All target alerts are acknowledged for the operator; other operators' views remain unaffected.  
+**Required permissions:** `alert.acknowledge`.  
+**Relevant account statuses:** `ACTIVE`.  
+**UI states:** Multi-select bar, batch acknowledging spinner, bulk complete.  
+**Audit events:** `alert.acknowledged` per target alert.
+
+---
+
+## Flow 37B — Alert Email Notification Delivery (DEC-ALRT-099 / DEC-ALRT-100 / TASK-0706)
+
+**Primary actor:** System background worker / internal machine-to-machine dispatcher  
+**Preconditions:** An alert is created (e.g. command timeout, agronomic anomaly, offline device).  
+**Trigger:** Asynchronous trigger calls `POST /api/v1/internal/alerts/{alertId}/dispatch-emails` with `INTERNAL_SERVICE_TOKEN`.
+
+**Main success flow:**
+
+1. Server validates `INTERNAL_SERVICE_TOKEN` bearer authorization.
+2. Server queries target alert and resolves eligible recipients via `resolveAlertRecipients()`:
+   - `OWNER` users receive all alerts globally.
+   - `ADMIN` users receive alerts only for their assigned devices (`UserDeviceAccess`).
+   - Inactive, unverified, or suspended users are excluded.
+3. For each eligible recipient, server checks `user_preferences.email_alerts_enabled`:
+   - If disabled (`false`), server logs dispatch status `DISABLED_BY_PREFERENCE` in `alert_email_dispatches` and skips delivery.
+   - If enabled (`true`), server resolves localized email template dynamically from `messages/id.json` or `messages/en.json` based on the recipient's `preferred_locale`.
+4. Resend email service dispatches transactional alert email with embedded PNG logo (`cid:logo1`), localized severity badge, and deep link to `/notifications`.
+5. Server records successful dispatch with status `SENT` in `alert_email_dispatches` (`@@unique([alertId, userId])`).
+
+**Alternative flows:** In test/development mode (`NODE_ENV !== 'production'`), dispatch is simulated with status `SIMULATED` without calling external email APIs.  
+**Error flows:** Resend API failure triggers exponential backoff with jitter (up to 3 retries); terminal failures are logged with status `FAILED` and error details.  
+**Postconditions:** Authorized operators receive localized email notifications without duplicate dispatches or alert creation pipeline latency.
+
+---
+
+## Flow 37C — User Manages Notification Preferences (DEC-ALRT-099 / DEC-ALRT-100 / TASK-0706)
+
+**Primary actor:** Owner or Admin  
+**Preconditions:** Active authenticated session.  
+**Trigger:** User clicks "Notifications & Alerts" in `/settings`.
+
+**Main success flow:**
+
+1. Frontend opens `SettingsNotificationPreferences` modal, portaled directly to `document.body` with `z-[100]` to ensure full dark overlay coverage over the fixed `TopAppBar`.
+2. Frontend fetches user preferences via `GET /api/v1/me/preferences`.
+3. Modal displays toggle for "Email Alert Notifications" (and language-consistent description).
+4. User toggles setting and clicks "Save Changes" ("Simpan Perubahan").
+5. Frontend sends `PATCH /api/v1/me/preferences` with `{ emailAlertsEnabled: boolean }`.
+6. Server validates and updates `user_preferences` table.
+7. Frontend displays localized success toast ("Preferences saved successfully" / "Preferensi berhasil disimpan") and closes modal.
+
+**Alternative flows:** User cancels or clicks outside modal; changes discarded.  
+**Error flows:** Network or server error; displays localized error toast.  
+**Postconditions:** Future alert email dispatches respect the updated preference.  
+**Required permissions:** Active authenticated user.  
+**UI states:** Loading skeleton, toggle form, saving spinner, success toast.
 
 ---
 
@@ -1813,28 +1887,29 @@ No command is created until explicit modal confirmation.
 
 ---
 
-## Flow 47 — Faucet Command Times Out
+## Flow 47 — Faucet Command Times Out (DEC-CTRL-098 / TASK-0809)
 
-**Primary actor:** System and user
-**Preconditions:** Expected acknowledgement or completion is not received.
-**Trigger:** Configured timeout expires.
+**Primary actor:** System and user  
+**Preconditions:** Active command has been dispatched (`SENT`), but physical device ACK/event is not received within the 1-minute default timeout window (`FAUCET_COMMAND_DEFAULT_TIMEOUT_MS = 60 * 1000`).  
+**Trigger:** Background stale sweep `CommandPublisher.sweepStaleSentCommands()` detects `now >= expiresAt`.
 
 **Main success flow:**
 
-1. The system changes command status to `TIMEOUT`.
-2. The system records timeout timestamp and stage.
-3. The frontend displays that final physical state may be unknown unless the integration contract confirms otherwise.
-4. The system creates an alert where configured.
-5. A new command is not automatically issued unless retry policy explicitly allows it.
+1. The gateway sweep transitions the command status from `SENT` to `TIMEOUT` (`COMMAND_EXPIRED_TIMEOUT`).
+2. The device concurrency lock (`faucet_commands_one_active_per_device`) is immediately released.
+3. The gateway triggers warning alert creation via `AlertRepository.createCommandTimeoutAlert()`.
+4. User-facing alert template sanitizes technical internal command IDs, rendering localized notification: "The valve command for {deviceName} timed out without confirmation."
+5. The frontend (`FaucetStatusCard`) receives the `TIMEOUT` status via realtime SSE or polling and preserves the `lastConfirmedPhysicalState` (`OPEN` or `CLOSED`) instead of resetting to `UNKNOWN`.
+6. The frontend renders the relative confirmation timestamp (e.g. "Last confirmed: 1 minute ago") and a persistent warning banner ("Warning: Device not responding").
+7. No blind physical retry occurs.
 
-**Alternative flows:** Late acknowledgement arrives; reconciliation policy is applied.
-**Error flows:** Do not display timeout as confirmed faucet closure or completion.
-**Postconditions:** Command requires review or reconciliation.
-**Required permissions:** Relevant control-history read.
-**Relevant account statuses:** Command record persists.
-**UI states:** Timeout, uncertain state warning.
-**Audit events:** `faucet.command.timeout`.
-**Open decisions:** Timeout duration and late-acknowledgement policy.
+**Alternative flows:** Late acknowledgement arrives; command remains in terminal `TIMEOUT` state without regressions.  
+**Error flows:** Technical states such as `STALE` or raw `cmd-xxxxxxxx` strings are strictly prohibited from operator view.  
+**Postconditions:** Device concurrency lock is cleared; physical valve state is preserved with clear latency warnings.  
+**Required permissions:** Relevant control-history read.  
+**Relevant account statuses:** Active command transitioned to terminal `TIMEOUT`.  
+**UI states:** Timeout warning banner, retained physical valve state, relative timestamp.  
+**Audit events:** `faucet.command.timeout`, `alert.created`.
 
 ---
 

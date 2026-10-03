@@ -401,7 +401,7 @@ describe('DeviceRegistryPage Auth State Hydration & Permission Scoping', () => {
     // Water Tank Volume and Faucet Control
     expect(screen.getByText('Volume Tangki')).toBeInTheDocument();
     expect(screen.getByText('L')).toBeInTheDocument();
-    expect(screen.getByText('Kontrol Katup Irigasi')).toBeInTheDocument();
+    expect(screen.getByText('Kontrol Valve Irigasi')).toBeInTheDocument();
     expect(screen.getByText('Preset: 0.3L, 1L, 1.5L')).toBeInTheDocument();
   });
 
@@ -495,7 +495,7 @@ describe('DeviceRegistryPage Auth State Hydration & Permission Scoping', () => {
     expect(screen.getByText('TDS Air')).toBeInTheDocument();
 
     // Neither node shall display Faucet Control or Control Capabilities section
-    expect(screen.queryByText('Kontrol Katup Irigasi')).not.toBeInTheDocument();
+    expect(screen.queryByText('Kontrol Valve Irigasi')).not.toBeInTheDocument();
     expect(screen.queryByText('Irrigation Valve Control')).not.toBeInTheDocument();
     expect(screen.queryByText('Kemampuan Kontrol')).not.toBeInTheDocument();
     expect(screen.queryByText('Control Capabilities')).not.toBeInTheDocument();
@@ -566,7 +566,7 @@ describe('DeviceRegistryPage Auth State Hydration & Permission Scoping', () => {
     expect(screen.getByText('Volume Tangki')).toBeInTheDocument();
 
     // Does NOT show faucet control when capability is not present
-    expect(screen.queryByText('Kontrol Katup Irigasi')).not.toBeInTheDocument();
+    expect(screen.queryByText('Kontrol Valve Irigasi')).not.toBeInTheDocument();
     expect(screen.queryByText('Preset: 0.3L, 1L, 1.5L')).not.toBeInTheDocument();
   });
 

@@ -502,7 +502,7 @@
     "phaseTargetHeader": "Phase / Target",
     "actualVolumeHeader": "Actual Volume",
     "requestedAtHeader": "Requested At",
-    "actorHeader": "Actor",
+    "actorHeader": "Operator",
     "phaseBadge": "(Phase {phase})",
     "paginationHistory": "Page {page} of {totalPages} ({total} items)",
     "confirmPrompt": "Confirm dispensing {volume} mL from device {deviceName}.",
@@ -557,7 +557,10 @@
     "sendOpenCommand": "Send Open Command",
     "sendCloseCommand": "Send Close Command",
     "commandSentSuccessGeneric": "Command {action} sent successfully! Initial status: QUEUED.",
-    "invalidPlantCount": "Plant count must be an integer of at least 1."
+    "invalidPlantCount": "Plant count must be an integer of at least 1.",
+    "lastConfirmedLabel": "Last confirmed",
+    "deviceNotRespondingWarning": "Device not responding",
+    "warningLabel": "Warning"
   },
   "alerts": {
     "title": "Alert Notifications",
@@ -580,14 +583,20 @@
     "commandFailedTitle": "Valve Command Failed",
     "commandFailedMessage": "Valve command {commandId} for {deviceName} failed: {reason}",
     "commandTimeoutTitle": "Valve Command Timed Out",
-    "commandTimeoutMessage": "Valve command {commandId} for {deviceName} timed out without confirmation.",
+    "commandTimeoutMessage": "The valve command for {deviceName} timed out without confirmation.",
     "acknowledgeAction": "Acknowledge Alert",
     "acknowledgeConfirm": "Are you sure you want to acknowledge this alert?",
     "acknowledgedBy": "Acknowledged by",
     "operatorNote": "Operator Note",
     "notePlaceholder": "Enter note (optional)...",
     "acknowledgeSuccess": "Alert successfully acknowledged.",
-    "acknowledgeError": "Failed to acknowledge alert."
+    "acknowledgeError": "Failed to acknowledge alert.",
+    "selectAll": "Select All",
+    "selectedCount": "{count} alert(s) selected",
+    "acknowledgeSelected": "Acknowledge Selected ({count})",
+    "acknowledgeAll": "Acknowledge All",
+    "bulkAcknowledgeSuccess": "{count} alert(s) successfully acknowledged.",
+    "bulkAcknowledgeError": "Failed to bulk acknowledge alerts."
   },
   "users": {
     "title": "User Management",
@@ -798,7 +807,14 @@
     "helpTitle": "Help & Support",
     "helpSubtitle": "FAQ, tutorials, and contact",
     "helpAndSupportTitle": "Help & Support",
-    "helpAndSupportSubtitle": "FAQ, tutorials, and contact"
+    "helpAndSupportSubtitle": "FAQ, tutorials, and contact",
+    "emailAlertsLabel": "Email Alert Notifications",
+    "emailAlertsDesc": "Receive email alerts when devices encounter warnings or timeouts",
+    "emailAlertsEnabled": "Active",
+    "emailAlertsDisabled": "Disabled",
+    "savingPreferences": "Updating preferences...",
+    "savePreferencesFailed": "Failed to update notification preferences. Please try again.",
+    "preferencesSaved": "Preferences saved successfully"
   },
   "validation": {
     "required": "This field is required",

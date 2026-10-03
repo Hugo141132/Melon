@@ -2463,49 +2463,72 @@ INTERNAL_ERROR (500)
 
 # 19. Alert Endpoints (API-ALERT-001..API-ALERT-002)
 
-## 19.1 List Alerts
+## 19.1 List Alerts (DEC-ALRT-097 / TASK-0704 / TASK-0705)
 
 ```http
 GET /api/v1/alerts
 ```
 
-**Authentication:** Required
+**Authentication:** Required  
 **Permission:** `alert.read`
 
-The server shall return only alerts within the user's scope.
+The server returns alerts within the user's authorized scope (OWNER sees global alerts; ADMIN sees assigned devices and own user alerts).
 
-Query parameters:
+### User-Scoped Status and Acknowledgement Derivation
 
-```text
-page
-pageSize
-deviceId
-severity
-status
-alertType
-from
-to
-```
+The `status` field in the response is dynamically computed relative to the requesting session:
+- If the global alert has `status = RESOLVED`, the response returns `status = RESOLVED`.
+- Else, if the requesting user has acknowledged the alert, the response returns `status = ACKNOWLEDGED` and `isAcknowledged = true`.
+- Else, the response returns `status = OPEN` and `isAcknowledged = false`.
 
-Response item:
+### Query Parameters
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `page` | integer | No | Page number (default: `1`) |
+| `pageSize` | integer | No | Items per page (default: `20`, max: `100`) |
+| `deviceId` | UUID | No | Filter by target device |
+| `severity` | string | No | `INFO`, `WARNING`, `CRITICAL` |
+| `status` | string | No | `OPEN`, `ACKNOWLEDGED`, `RESOLVED` |
+| `alertType` | string | No | Alert type code (e.g. `COMMAND_TIMEOUT`) |
+| `from` | ISO date | No | Filter `openedAt >= from` |
+| `to` | ISO date | No | Filter `openedAt <= to` |
+| `sort` | string | No | Sort field and direction (default: `openedAt:desc`) |
+
+**Status Query Filtering Semantics:**
+- When `status=OPEN`: Filters alerts where global `status != RESOLVED` AND the requesting user has NOT acknowledged the alert (`acknowledgements: { none: { acknowledgedByUserId: session.id } }`). Used by navigation badge polling.
+- When `status=ACKNOWLEDGED`: Filters alerts where the requesting user has acknowledged the alert (`acknowledgements: { some: { acknowledgedByUserId: session.id } }`).
+- When `status=RESOLVED`: Filters alerts where global `status = RESOLVED`.
+- When omitted: Returns all alerts in scope with user-scoped `status` and `isAcknowledged` flags.
+
+Response item (`AlertDto`):
 
 ```json
 {
-  "id": "alert-001",
-  "deviceId": "water-node-001",
-  "alertType": "DEVICE_OFFLINE",
-  "severity": "CRITICAL",
+  "id": "11111111-1111-1111-1111-111111111111",
+  "deviceId": "22222222-2222-2222-2222-222222222222",
+  "userId": null,
+  "alertType": "COMMAND_TIMEOUT",
+  "severity": "WARNING",
   "status": "OPEN",
-  "titleKey": "alerts.deviceOffline.title",
-  "messageKey": "alerts.deviceOffline.message",
+  "isAcknowledged": false,
+  "acknowledgedAt": null,
+  "sourceType": "faucet_command",
+  "sourceId": "33333333-3333-3333-3333-333333333333",
+  "titleKey": "alerts.commandTimeoutTitle",
+  "messageKey": "alerts.commandTimeoutMessage",
   "messageParams": {
-    "deviceName": "Water Node 1"
+    "commandId": "cmd-01JXYZ123",
+    "deviceName": "Water Tank Node 1"
   },
-  "openedAt": "2026-07-27T14:00:00+07:00"
+  "openedAt": "2026-10-03T11:00:00.000Z",
+  "resolvedAt": null,
+  "createdAt": "2026-10-03T11:00:00.000Z",
+  "updatedAt": "2026-10-03T11:00:00.000Z"
 }
 ```
 
-The frontend shall translate `titleKey` and `messageKey`.
+The frontend translates `titleKey` and `messageKey`. Per `DEC-CTRL-098`, user-facing alert templates use friendly parameters (such as `{deviceName}`) without exposing internal `commandId` strings to operators. Raw `commandId` remains in `messageParams` and `sourceId` for diagnostic and audit referencing.
 
 ---
 
@@ -2515,19 +2538,23 @@ The frontend shall translate `titleKey` and `messageKey`.
 GET /api/v1/alerts/{alertId}
 ```
 
-**Authentication:** Required
+**Authentication:** Required  
 **Permission:** `alert.read`
+
+Returns single alert detail formatted as `AlertDto` with user-scoped `status` and `isAcknowledged` state for the calling user.
 
 ---
 
-## 19.3 Acknowledge Alert
+## 19.3 Acknowledge Alert (DEC-ALRT-097 / TASK-0704)
 
 ```http
 POST /api/v1/alerts/{alertId}/acknowledge
 ```
 
-**Authentication:** Required
+**Authentication:** Required  
 **Permission:** `alert.acknowledge`
+
+Acknowledges an alert specifically for the authenticated operator. The global alert lifecycle remains `OPEN` (or `RESOLVED`); only the calling operator's view and badge count are marked as acknowledged.
 
 Request:
 
@@ -2536,6 +2563,7 @@ Request:
   "note": "Checked by field operator"
 }
 ```
+*(Payload body is optional; empty JSON `{}` or omitted `note` is fully supported for 1-click direct UI acknowledgement).*
 
 Response:
 
@@ -2543,14 +2571,72 @@ Response:
 {
   "success": true,
   "data": {
-    "alertId": "alert-001",
+    "alertId": "11111111-1111-1111-1111-111111111111",
     "status": "ACKNOWLEDGED",
-    "acknowledgedAt": "2026-07-27T14:40:00+07:00"
+    "acknowledgedAt": "2026-10-03T11:45:00.000Z"
+  },
+  "meta": {
+    "requestId": "req-1727955900000"
   }
 }
 ```
 
-Admin acknowledgement permission is permitted for assigned devices in accordance with `RBAC.md`.
+Admin acknowledgement permission is permitted for assigned devices in accordance with `RBAC.md`. Synchronous audit log is created with event key `alert.acknowledged` and metadata `{ userScoped: true, note }`.
+
+---
+
+## 19.4 Bulk Acknowledge Alerts (DEC-ALRT-100 / TASK-0707)
+
+```http
+POST /api/v1/alerts/bulk-acknowledge
+```
+
+**Authentication:** Required  
+**Permission:** `alert.acknowledge`
+
+Acknowledges multiple alerts in a single atomic transaction for the authenticated operator. The global alert lifecycles remain `OPEN` (or `RESOLVED`); only the calling operator's view and badge count are marked as acknowledged.
+
+### Request Body
+
+Supports acknowledging specific alert IDs or all open unacknowledged alerts in the operator's authorized scope:
+
+**Option A: Acknowledge explicit alert IDs**
+```json
+{
+  "alertIds": [
+    "11111111-1111-1111-1111-111111111111",
+    "22222222-2222-2222-2222-222222222222"
+  ],
+  "note": "Bulk acknowledged by field operator"
+}
+```
+
+**Option B: Acknowledge all open alerts in scope**
+```json
+{
+  "all": true,
+  "note": "Acknowledged all pending alerts"
+}
+```
+
+*Note: For `ADMIN` users, only alerts for explicitly assigned devices (`UserDeviceAccess`) or user-scoped alerts are acknowledged. Any unassigned alerts in `alertIds` are safely skipped.*
+
+### Response 200 OK
+
+```json
+{
+  "success": true,
+  "data": {
+    "count": 2,
+    "acknowledgedAt": "2026-10-03T11:45:00.000Z"
+  },
+  "meta": {
+    "requestId": "req-1727955900000"
+  }
+}
+```
+
+Audit logs with event key `alert.acknowledged` and metadata `{ userScoped: true, bulk: true, note }` are written for each acknowledged alert. Dispatches client-side `melon:alert-updated` event to immediately sync navigation badges.
 
 ---
 
@@ -3688,4 +3774,85 @@ The following specifications govern server-side device access validation across 
 - **Concealment Invariants:** The error payload never reveals internal device registration secrets, canonical identifiers (`DEC-DEV-028`), or existence proofs for inaccessible devices.
 - **Frontend Page Integration:** Page routes (`/soil`, `/water`, `/controls`) capture the 403 status and render the dedicated `DeviceAccessForbidden` component displaying a human-readable device name instead of leaking database UUIDs.
 <!-- Device Access Revocation API Reconciled: 2026-09-22 -->
+
+---
+
+## User Preferences and Alert Email Notification APIs (Reconciled 2026-10-03 per DEC-ALRT-099)
+
+### 1. User Preferences Endpoints
+
+#### GET /api/v1/me/preferences
+- **Summary:** Retrieve the authenticated user's operational preferences.
+- **Authentication:** Required (Session Cookie, `accountStatus = ACTIVE`).
+- **Authorization:** `OWNER` or `ADMIN`.
+- **Response 200 OK:**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "preferredLocale": "id",
+      "timezone": "Asia/Jakarta",
+      "defaultDeviceId": null,
+      "emailAlertsEnabled": true
+    },
+    "meta": {
+      "requestId": "req-01JXYZ001"
+    }
+  }
+  ```
+
+#### PATCH /api/v1/me/preferences
+- **Summary:** Update the authenticated user's operational preferences.
+- **Authentication:** Required (Session Cookie, `accountStatus = ACTIVE`).
+- **Authorization:** `OWNER` or `ADMIN`.
+- **Request Body:**
+  ```json
+  {
+    "preferredLocale": "id",
+    "timezone": "Asia/Jakarta",
+    "defaultDeviceId": null,
+    "emailAlertsEnabled": false
+  }
+  ```
+- **Response 200 OK:**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "preferredLocale": "id",
+      "timezone": "Asia/Jakarta",
+      "defaultDeviceId": null,
+      "emailAlertsEnabled": false
+    },
+    "meta": {
+      "requestId": "req-01JXYZ002"
+    }
+  }
+  ```
+
+### 2. Internal Machine-to-Machine Alert Dispatch Endpoint
+
+#### POST /api/v1/internal/alerts/{alertId}/dispatch-emails
+- **Summary:** Trigger asynchronous email dispatch for a newly created alert.
+- **Authentication:** Bearer token matching `INTERNAL_SERVICE_TOKEN`.
+- **Authorization:** Internal background workers and services.
+- **Response 200 OK:**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "alertId": "alert-001",
+      "totalEligible": 2,
+      "sentCount": 1,
+      "skippedCount": 1,
+      "failedCount": 0
+    },
+    "meta": {
+      "requestId": "req-01JXYZ003"
+    }
+  }
+  ```
+- **Response 401 Unauthorized:** Missing or invalid `INTERNAL_SERVICE_TOKEN`.
+- **Response 404 Not Found:** Alert not found.
+
 

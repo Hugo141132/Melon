@@ -16,7 +16,9 @@ describe('AlertRepository Unit Tests', () => {
         update: vi.fn(),
       },
       alertAcknowledgement: {
+        findFirst: vi.fn(),
         create: vi.fn(),
+        update: vi.fn(),
       },
       auditLog: {
         create: vi.fn(),
@@ -133,10 +135,7 @@ describe('AlertRepository Unit Tests', () => {
       const userId = 'user-owner-uuid';
       const result = await alertRepo.acknowledgeAlert(mockAlertRecord.id, userId, 'Test note');
 
-      expect(mockPrisma.alert.update).toHaveBeenCalledWith({
-        where: { id: mockAlertRecord.id },
-        data: { status: AlertStatus.ACKNOWLEDGED },
-      });
+      expect(mockPrisma.alert.update).not.toHaveBeenCalled();
       expect(mockPrisma.alertAcknowledgement.create).toHaveBeenCalledWith({
         data: {
           alertId: mockAlertRecord.id,
@@ -154,7 +153,7 @@ describe('AlertRepository Unit Tests', () => {
           result: 'SUCCESS',
           previousValues: { status: mockAlertRecord.status },
           newValues: { status: AlertStatus.ACKNOWLEDGED },
-          metadata: { note: 'Test note' },
+          metadata: { note: 'Test note', userScoped: true },
         },
       });
       expect(result.status).toBe(AlertStatus.ACKNOWLEDGED);
@@ -189,16 +188,20 @@ describe('AlertRepository Unit Tests', () => {
         assignedDevices
       );
       expect(result.status).toBe(AlertStatus.ACKNOWLEDGED);
-      expect(mockPrisma.alert.update).toHaveBeenCalled();
+      expect(mockPrisma.alertAcknowledgement.create).toHaveBeenCalled();
     });
 
     it('handles duplicate acknowledgement idempotently without throwing', async () => {
       const alreadyAcknowledgedRecord = {
         ...mockAlertRecord,
-        status: AlertStatus.ACKNOWLEDGED,
+        status: AlertStatus.OPEN,
       };
       mockPrisma.alert.findUnique.mockResolvedValue(alreadyAcknowledgedRecord);
-      mockPrisma.alert.update.mockResolvedValue(alreadyAcknowledgedRecord);
+      mockPrisma.alertAcknowledgement.findFirst.mockResolvedValue({
+        id: 'existing-ack-id',
+        alertId: alreadyAcknowledgedRecord.id,
+        acknowledgedByUserId: 'owner-user-id',
+      });
 
       const result = await alertRepo.acknowledgeAlert(
         alreadyAcknowledgedRecord.id,
@@ -207,19 +210,20 @@ describe('AlertRepository Unit Tests', () => {
       );
 
       expect(result.status).toBe(AlertStatus.ACKNOWLEDGED);
-      expect(mockPrisma.alertAcknowledgement.create).toHaveBeenCalledWith({
+      expect(mockPrisma.alertAcknowledgement.update).toHaveBeenCalledWith({
+        where: { id: 'existing-ack-id' },
         data: {
-          alertId: alreadyAcknowledgedRecord.id,
-          acknowledgedByUserId: 'owner-user-id',
           note: 'Second acknowledgment note',
           acknowledgedAt: expect.any(Date),
         },
       });
+      expect(mockPrisma.alert.update).not.toHaveBeenCalled();
       expect(mockPrisma.auditLog.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           eventKey: 'alert.acknowledged',
-          previousValues: { status: AlertStatus.ACKNOWLEDGED },
+          previousValues: { status: AlertStatus.OPEN },
           newValues: { status: AlertStatus.ACKNOWLEDGED },
+          metadata: expect.objectContaining({ userScoped: true }),
         }),
       });
     });

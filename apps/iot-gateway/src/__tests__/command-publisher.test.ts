@@ -9,6 +9,7 @@ import {
   DeviceAccountStatus,
   UserRole,
   FaucetCommandAction,
+  AlertSeverity,
 } from '@kebun-melon/contracts';
 
 describe('TASK-0804: CommandPublisher (Gateway Command Publisher)', () => {
@@ -823,10 +824,15 @@ describe('TASK-0804: CommandPublisher (Gateway Command Publisher)', () => {
         }),
       } as any;
 
+      const mockAlertRepo = {
+        createCommandTimeoutAlert: vi.fn().mockResolvedValue({ id: 'alert-timeout-1' }),
+      } as any;
+
       const publisher = new CommandPublisher({
         env,
         mqttClient: { isConnected: () => true } as any,
         faucetCommandRepo: mockFaucetCommandRepo,
+        alertRepo: mockAlertRepo,
       });
 
       const res = await publisher.sweepStaleSentCommands();
@@ -837,6 +843,15 @@ describe('TASK-0804: CommandPublisher (Gateway Command Publisher)', () => {
         'cmd-db-uuid-sent-expired',
         FaucetCommandStatus.TIMEOUT,
         { reasonCode: 'COMMAND_EXPIRED_TIMEOUT' }
+      );
+      expect(mockAlertRepo.createCommandTimeoutAlert).toHaveBeenCalledTimes(1);
+      expect(mockAlertRepo.createCommandTimeoutAlert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          deviceId: 'water-tank-01',
+          commandId: 'cmd-sent-exp-1',
+          severity: AlertSeverity.WARNING,
+          reasonCode: 'COMMAND_EXPIRED_TIMEOUT',
+        })
       );
     });
 

@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
@@ -30,7 +30,7 @@ export interface SidebarProps {
 const SIDEBAR_NAV_ITEMS = [
   { href: '/', key: 'home', icon: Home },
   { href: '/sensor', key: 'sensor', icon: Radio },
-  { href: '/notifikasi', key: 'alerts', icon: Bell },
+  { href: '/notifications', key: 'alerts', icon: Bell },
   { href: '/devices', key: 'devices', icon: Cpu },
   { href: '/users', key: 'users', icon: Users, roleRequired: 'OWNER' },
   { href: '/approvals', key: 'approvals', icon: ShieldCheck, roleRequired: 'OWNER' },
@@ -42,7 +42,13 @@ export default function Sidebar({ isOpen, onClose, onMouseEnter, onMouseLeave }:
   const tNav = useTranslations('navigation');
   const tCommon = useTranslations('common');
   const { user, role } = useAuth();
-  const { count: criticalCount } = useAlertBadge();
+  const { count: alertCount, refetch: refetchAlertBadge } = useAlertBadge();
+
+  useEffect(() => {
+    if (isOpen) {
+      refetchAlertBadge();
+    }
+  }, [isOpen, refetchAlertBadge]);
 
   const userName = user?.fullName || user?.email || '';
   const displayName = userName ? userName.trim().replace(/^pak\s+/i, '') : '';
@@ -103,6 +109,7 @@ export default function Sidebar({ isOpen, onClose, onMouseEnter, onMouseLeave }:
               const isActive =
                 currentPath === item.href ||
                 (item.href !== '/' && currentPath.startsWith(item.href)) ||
+                (item.href === '/notifications' && currentPath.startsWith('/notifikasi')) ||
                 (item.href === '/sensor' &&
                   ['/sensor', '/soil', '/water', '/controls'].includes(currentPath));
 
@@ -131,9 +138,9 @@ export default function Sidebar({ isOpen, onClose, onMouseEnter, onMouseLeave }:
                             : 'text-app-on-surface-variant group-hover:text-app-primary'
                         )}
                       />
-                      {item.href === '/notifikasi' && criticalCount > 0 && (
+                      {item.href === '/notifications' && alertCount > 0 && (
                         <span className="absolute -top-1 -right-1.5 w-3.5 h-3.5 bg-app-error text-white text-[9px] font-bold rounded-full flex items-center justify-center border border-app-surface-container-lowest">
-                          {criticalCount}
+                          {alertCount}
                         </span>
                       )}
                     </div>

@@ -132,4 +132,33 @@ describe('Alert Contracts & Zod Validation', () => {
     expect(AlertDtoSchema.safeParse(timeoutAlert).success).toBe(true);
     expect(failedAlert.alertType).not.toBe(timeoutAlert.alertType);
   });
+
+  it('validates AlertDto with user-scoped isAcknowledged and acknowledgedAt fields', () => {
+    const alert = {
+      id: '11111111-1111-1111-1111-111111111111',
+      deviceId: '22222222-2222-2222-2222-222222222222',
+      userId: null,
+      alertType: 'COMMAND_TIMEOUT',
+      severity: AlertSeverity.WARNING,
+      status: AlertStatus.ACKNOWLEDGED,
+      isAcknowledged: true,
+      acknowledgedAt: '2026-10-03T11:45:00.000Z',
+      sourceType: 'faucet_command',
+      sourceId: null,
+      titleKey: 'alerts.commandTimeoutTitle',
+      messageKey: 'alerts.commandTimeoutMessage',
+      messageParams: null,
+      openedAt: new Date().toISOString(),
+      resolvedAt: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    const parsed = AlertDtoSchema.safeParse(alert);
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.isAcknowledged).toBe(true);
+      expect(parsed.data.acknowledgedAt).toBe('2026-10-03T11:45:00.000Z');
+    }
+  });
 });

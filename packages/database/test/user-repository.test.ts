@@ -253,6 +253,7 @@ describe('UserRepository Unit Tests', () => {
         preferredLocale: 'en',
         timezone: 'Asia/Jakarta',
         defaultDeviceId: null,
+        emailAlertsEnabled: true,
       },
     });
     expect(mockAuditLogCreate).toHaveBeenCalledWith(

@@ -281,6 +281,7 @@ export const UserPreferenceUpdateInputSchema = z
     preferredLocale: z.enum(['id', 'en']).optional(),
     timezone: z.string().max(100).optional(),
     defaultDeviceId: z.string().uuid().nullable().optional(),
+    emailAlertsEnabled: z.boolean().optional(),
   })
   .strict();
 

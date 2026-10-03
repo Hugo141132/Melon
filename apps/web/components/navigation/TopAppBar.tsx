@@ -9,6 +9,7 @@ import UserAvatar from '../auth/UserAvatar';
 import DeviceSelector from './DeviceSelector';
 import Sidebar from './Sidebar';
 import { useAuth } from '@/context/AuthContext';
+import { useAlertBadge } from '@/hooks/useAlertBadge';
 
 interface TopAppBarProps {
   showDeviceSelector?: boolean;
@@ -25,6 +26,7 @@ export default function TopAppBar({ showDeviceSelector = true }: TopAppBarProps)
   const shouldShowDeviceSelector = showDeviceSelector && isSelectorAllowedPage;
 
   const { user } = useAuth();
+  const { count: alertCount } = useAlertBadge();
   const userDisplayName = user?.fullName || user?.email || '';
 
   const clearHoverTimer = useCallback(() => {
@@ -101,18 +103,26 @@ export default function TopAppBar({ showDeviceSelector = true }: TopAppBarProps)
             onFocus={handleLogoFocus}
             aria-label={tAccessibility('openSidebar')}
             aria-expanded={sidebarOpen}
-            className="flex items-center gap-2 flex-shrink-0 cursor-pointer p-1.5 -ml-1.5 rounded-xl hover:bg-app-surface-container-low transition-colors group text-left z-10"
+            className="flex items-center gap-2 flex-shrink-0 cursor-pointer p-1.5 -ml-1.5 rounded-xl hover:bg-app-surface-container-low transition-colors group text-left z-10 relative"
             data-testid="top-logo-trigger"
           >
-            <Image
-              src="/logo2.webp"
-              alt="Melon"
-              width={35}
-              height={28}
-              className="h-7 sm:h-8 w-auto object-contain"
-              priority
-              unoptimized
-            />
+            <div className="relative">
+              <Image
+                src="/logo2.webp"
+                alt="Melon"
+                width={35}
+                height={28}
+                className="h-7 sm:h-8 w-auto object-contain"
+                priority
+                unoptimized
+              />
+              {alertCount > 0 && (
+                <span
+                  data-testid="top-logo-alert-dot"
+                  className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-app-error rounded-full ring-2 ring-app-surface"
+                />
+              )}
+            </div>
           </button>
         </div>
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
-import { publishRealtimeEvent } from '../events/webhook';
+import { publishRealtimeEvent, triggerAlertEmailDispatch } from '../events/webhook';
 import { logger } from '../observability/logger';
 import { GatewayEnv } from '../config/env';
 
@@ -61,5 +61,50 @@ describe('Realtime Webhook Publish', () => {
         }),
       })
     );
+  });
+
+  describe('triggerAlertEmailDispatch', () => {
+    it('should not dispatch if env is null', async () => {
+      await triggerAlertEmailDispatch(null, 'alert-123');
+      expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('GatewayEnv not bound'));
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('should not dispatch if WEB_APP_URL is missing', async () => {
+      const env = { INTERNAL_SERVICE_TOKEN: 'token' } as GatewayEnv;
+      await triggerAlertEmailDispatch(env, 'alert-123');
+      expect(logger.debug).toHaveBeenCalledWith(
+        expect.stringContaining('WEB_APP_URL not configured')
+      );
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('should trigger alert email dispatch successfully via internal endpoint', async () => {
+      (global.fetch as any).mockResolvedValue({
+        ok: true,
+      });
+
+      const env = {
+        WEB_APP_URL: 'http://localhost:3000',
+        INTERNAL_SERVICE_TOKEN: 'token-xyz',
+      } as GatewayEnv;
+
+      await triggerAlertEmailDispatch(env, 'alert-abc-456');
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        'http://localhost:3000/api/v1/internal/alerts/alert-abc-456/dispatch-emails',
+        expect.objectContaining({
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer token-xyz',
+          },
+        })
+      );
+      expect(logger.info).toHaveBeenCalledWith(
+        expect.stringContaining('Triggered alert email dispatch'),
+        expect.objectContaining({ alertId: 'alert-abc-456' })
+      );
+    });
   });
 });

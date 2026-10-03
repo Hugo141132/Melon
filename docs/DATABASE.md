@@ -1240,18 +1240,61 @@ Alert thresholds and generation ownership remain `TBD`.
 
 ---
 
-## 10.2 `alert_acknowledgements`
+## 10.2 `alert_acknowledgements` (DEC-ALRT-097 / TASK-0704)
 
 | Column | Type | Nullable | Notes |
 |---|---|---:|---|
 | `id` | UUID | No | Primary key |
-| `alert_id` | UUID | No | |
-| `acknowledged_by_user_id` | UUID | No | |
-| `note` | TEXT | Yes | User-entered |
-| `acknowledged_at` | TIMESTAMPTZ | No | |
-| `created_at` | TIMESTAMPTZ | No | |
+| `alert_id` | UUID | No | FK referencing `alerts.id` (onDelete: Cascade) |
+| `acknowledged_by_user_id` | UUID | No | FK referencing `users.id` (onDelete: Restrict) |
+| `note` | TEXT | Yes | User-entered note (optional) |
+| `acknowledged_at` | TIMESTAMPTZ | No | Timestamp of acknowledgement |
+| `created_at` | TIMESTAMPTZ | No | Record creation timestamp |
 
-Alert acknowledgement shall not delete the alert.
+### Constraints and Indexes
+
+```sql
+UNIQUE INDEX "alert_acknowledgements_alert_user_idx" ON "alert_acknowledgements"("alert_id", "acknowledged_by_user_id");
+INDEX "alert_acknowledgements_user_id_idx" ON "alert_acknowledgements"("acknowledged_by_user_id");
+INDEX "alert_acknowledgements_alert_id_idx" ON "alert_acknowledgements"("alert_id");
+```
+
+### User-Scoped Acknowledgement Invariants
+
+1. **Global Lifecycle Separation:** An alert's lifecycle status on the `alerts` table remains strictly `OPEN` or `RESOLVED`. An alert row is not mutated to `ACKNOWLEDGED` when acknowledged by an operator.
+2. **Individual User Scoping:** User acknowledgements are stored per operator in `alert_acknowledgements`. When User A acknowledges an alert, only User A's unread list and badge count reflect the acknowledgement; User B continues to see the alert as `OPEN` / unread until User B acknowledges it.
+3. **Idempotent Updates:** A composite unique index on `(alert_id, acknowledged_by_user_id)` ensures duplicate acknowledgements by the same operator safely update the existing row's `acknowledged_at` timestamp without generating duplicate records or failing.
+4. **Non-destructive:** Alert acknowledgement shall never delete the underlying alert.
+
+---
+
+## 10.3 `alert_email_dispatches` (DEC-ALRT-099 / TASK-0706)
+
+| Column | Type | Nullable | Notes |
+|---|---|---:|---|
+| `id` | UUID | No | Primary key (`gen_random_uuid()`) |
+| `alert_id` | UUID | No | FK referencing `alerts.id` (onDelete: Cascade) |
+| `user_id` | UUID | No | FK referencing `users.id` (onDelete: Cascade) |
+| `recipient_email` | VARCHAR(255) | No | Recipient email address at time of dispatch |
+| `status` | AlertEmailDispatchStatus | No | `SENT`, `FAILED`, `DISABLED_BY_PREFERENCE`, `SIMULATED` |
+| `error_message` | TEXT | Yes | Error detail if dispatch failed |
+| `dispatched_at` | TIMESTAMPTZ | Yes | Timestamp when email was successfully sent |
+| `created_at` | TIMESTAMPTZ | No | Record creation timestamp |
+| `updated_at` | TIMESTAMPTZ | No | Timestamp of latest state change |
+
+### Constraints and Indexes
+
+```sql
+UNIQUE INDEX "alert_email_dispatches_alert_user_idx" ON "alert_email_dispatches"("alert_id", "user_id");
+INDEX "alert_email_dispatches_status_idx" ON "alert_email_dispatches"("status");
+INDEX "alert_email_dispatches_user_id_idx" ON "alert_email_dispatches"("user_id");
+INDEX "alert_email_dispatches_alert_id_idx" ON "alert_email_dispatches"("alert_id");
+```
+
+### Invariants
+
+1. **Idempotent Delivery:** The composite unique index on `(alert_id, user_id)` guarantees that an alert cannot be dispatched twice via email to the same recipient.
+2. **Auditability:** Retains complete delivery history including failures (`FAILED`) and recipient opt-outs (`DISABLED_BY_PREFERENCE`).
 
 ---
 
@@ -1262,12 +1305,13 @@ Alert acknowledgement shall not delete the alert.
 | Column | Type | Nullable | Notes |
 |---|---|---:|---|
 | `id` | UUID | No | Primary key |
-| `user_id` | UUID | No | Unique FK |
-| `preferred_locale` | VARCHAR(10) | No | `en` or `id` |
+| `user_id` | UUID | No | Unique FK referencing `users.id` |
+| `preferred_locale` | VARCHAR(10) | No | `en` or `id` (default: `id`) |
 | `timezone` | VARCHAR(100) | Yes | Recommended `Asia/Jakarta` default |
-| `default_device_id` | UUID | Yes | Must be authorised |
-| `created_at` | TIMESTAMPTZ | No | |
-| `updated_at` | TIMESTAMPTZ | No | |
+| `default_device_id` | UUID | Yes | Must be authorised device |
+| `email_alerts_enabled` | BOOLEAN | No | Default: `true` (DEC-ALRT-099) |
+| `created_at` | TIMESTAMPTZ | No | Record creation timestamp |
+| `updated_at` | TIMESTAMPTZ | No | Timestamp of latest preference update |
 
 Constraints:
 

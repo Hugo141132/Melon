@@ -2366,7 +2366,27 @@ export class UserRepository {
   }
 
   /**
-   * Updates a user's preferences.
+   * Fetches user preferences for the given user, returning defaults if not yet created.
+   */
+  async getUserPreference(userId: string): Promise<{
+    preferredLocale: string;
+    timezone: string | null;
+    defaultDeviceId: string | null;
+    emailAlertsEnabled: boolean;
+  }> {
+    const pref = await this.prisma.userPreference.findUnique({
+      where: { userId },
+    });
+    return {
+      preferredLocale: pref?.preferredLocale || 'id',
+      timezone: pref?.timezone || 'Asia/Jakarta',
+      defaultDeviceId: pref?.defaultDeviceId || null,
+      emailAlertsEnabled: (pref as any)?.emailAlertsEnabled ?? true,
+    };
+  }
+
+  /**
+   * Updates or creates user preferences (preferred locale, timezone, default device, email alerts enabled).
    * Inserts an AuditLog entry with eventKey='profile.self.updated' (without secrets).
    */
   async updateUserPreference(input: {
@@ -2374,6 +2394,7 @@ export class UserRepository {
     preferredLocale?: string;
     timezone?: string;
     defaultDeviceId?: string | null;
+    emailAlertsEnabled?: boolean;
     requestId?: string;
     ipAddress?: string;
     userAgent?: string;
@@ -2385,6 +2406,7 @@ export class UserRepository {
       preferredLocale: string;
       timezone: string | null;
       defaultDeviceId: string | null;
+      emailAlertsEnabled: boolean;
     };
   }> {
     try {
@@ -2405,6 +2427,8 @@ export class UserRepository {
         if (input.preferredLocale !== undefined) updateData.preferredLocale = input.preferredLocale;
         if (input.timezone !== undefined) updateData.timezone = input.timezone;
         if (input.defaultDeviceId !== undefined) updateData.defaultDeviceId = input.defaultDeviceId;
+        if (input.emailAlertsEnabled !== undefined)
+          updateData.emailAlertsEnabled = input.emailAlertsEnabled;
 
         const updated = await tx.userPreference.upsert({
           where: { userId: input.userId },
@@ -2414,6 +2438,8 @@ export class UserRepository {
             preferredLocale: input.preferredLocale || 'id',
             timezone: input.timezone || 'Asia/Jakarta',
             defaultDeviceId: input.defaultDeviceId || null,
+            emailAlertsEnabled:
+              input.emailAlertsEnabled !== undefined ? input.emailAlertsEnabled : true,
           },
         });
 
@@ -2429,6 +2455,7 @@ export class UserRepository {
                   preferredLocale: existingPref.preferredLocale,
                   timezone: existingPref.timezone,
                   defaultDeviceId: existingPref.defaultDeviceId,
+                  emailAlertsEnabled: (existingPref as any).emailAlertsEnabled,
                 }
               : {},
             newValues: updateData,
@@ -2448,6 +2475,7 @@ export class UserRepository {
           preferredLocale: result.preferredLocale,
           timezone: result.timezone,
           defaultDeviceId: result.defaultDeviceId,
+          emailAlertsEnabled: (result as any).emailAlertsEnabled ?? true,
         },
       };
     } catch (error: any) {

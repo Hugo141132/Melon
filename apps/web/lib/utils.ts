@@ -127,3 +127,37 @@ export function getConnectionStatusDotColor(status?: string | null): string {
   }
   return 'bg-rose-500';
 }
+
+/**
+ * Formats a given date/timestamp into a human-readable relative time string
+ * (e.g. '1 minute ago' / '1 menit yang lalu').
+ */
+export function formatRelativeTime(
+  date: Date | string | number | null | undefined,
+  locale = 'id'
+): string {
+  if (!date) return '';
+  const d = typeof date === 'string' || typeof date === 'number' ? new Date(date) : date;
+  if (isNaN(d.getTime())) return '';
+
+  const now = Date.now();
+  const diffSec = Math.round((d.getTime() - now) / 1000);
+  const absDiff = Math.abs(diffSec);
+
+  const targetLocale = locale?.startsWith('en') ? 'en-US' : 'id-ID';
+  const rtf = new Intl.RelativeTimeFormat(targetLocale, { numeric: 'auto' });
+
+  if (absDiff < 45) {
+    return targetLocale.startsWith('en') ? 'just now' : 'baru saja';
+  }
+  const diffMin = Math.round(diffSec / 60);
+  if (Math.abs(diffMin) < 60) {
+    return rtf.format(diffMin, 'minute');
+  }
+  const diffHour = Math.round(diffMin / 60);
+  if (Math.abs(diffHour) < 24) {
+    return rtf.format(diffHour, 'hour');
+  }
+  const diffDay = Math.round(diffHour / 24);
+  return rtf.format(diffDay, 'day');
+}

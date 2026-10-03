@@ -70,6 +70,11 @@ const nextConfig = {
         destination: '/setting',
         permanent: true,
       },
+      {
+        source: '/notifikasi',
+        destination: '/notifications',
+        permanent: true,
+      },
     ];
   },
 };

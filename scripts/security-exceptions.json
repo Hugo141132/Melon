@@ -85,6 +85,51 @@
       "approvedBy": "Security Team",
       "approvedDate": "2026-10-01",
       "expiresDate": "2026-11-01"
+    },
+    {
+      "id": "EXC-DEP-009",
+      "packageName": "braces",
+      "advisoryId": "*",
+      "reason": "Transitive dev-dependency of Tailwind CSS (@next/eslint-plugin-next, fast-glob, micromatch, chokidar); stack-exhaustion DoS via deeply nested patterns (GHSA-vfj7-8cjw-p6xm) is restricted to build/lint time and does not affect runtime applications as no untrusted user input is parsed.",
+      "approvedBy": "Security Team",
+      "approvedDate": "2026-10-03",
+      "expiresDate": "2026-11-03"
+    },
+    {
+      "id": "EXC-DEP-010",
+      "packageName": "micromatch",
+      "advisoryId": "*",
+      "reason": "Transitive dev-dependency of Tailwind CSS and fast-glob flagged solely due to sub-dependency braces; used strictly at build/lint time with no runtime exposure.",
+      "approvedBy": "Security Team",
+      "approvedDate": "2026-10-03",
+      "expiresDate": "2026-11-03"
+    },
+    {
+      "id": "EXC-DEP-011",
+      "packageName": "chokidar",
+      "advisoryId": "*",
+      "reason": "Transitive dev-dependency of Tailwind CSS flagged solely due to sub-dependency braces; used strictly for local build file-watching with no runtime exposure.",
+      "approvedBy": "Security Team",
+      "approvedDate": "2026-10-03",
+      "expiresDate": "2026-11-03"
+    },
+    {
+      "id": "EXC-DEP-012",
+      "packageName": "fast-glob",
+      "advisoryId": "*",
+      "reason": "Transitive dev-dependency of ESLint and Tailwind CSS flagged solely due to sub-dependency micromatch/braces; used strictly at build/lint time with no runtime exposure.",
+      "approvedBy": "Security Team",
+      "approvedDate": "2026-10-03",
+      "expiresDate": "2026-11-03"
+    },
+    {
+      "id": "EXC-DEP-013",
+      "packageName": "@next/eslint-plugin-next",
+      "advisoryId": "*",
+      "reason": "Dev-dependency of eslint-config-next flagged solely due to transitive sub-dependency fast-glob/micromatch/braces; used strictly at build/lint time with no runtime exposure.",
+      "approvedBy": "Security Team",
+      "approvedDate": "2026-10-03",
+      "expiresDate": "2026-11-03"
     }
   ]
 }

@@ -1487,3 +1487,268 @@ export async function sendSessionRecoveryOtpEmail(
     };
   }
 }
+
+export interface SendAlertNotificationEmailInput {
+  toEmail: string;
+  recipientName?: string;
+  alertType: string;
+  severity: string;
+  title: string;
+  message: string;
+  deviceName?: string;
+  openedAt?: Date | string;
+  locale?: string;
+  requestId?: string;
+}
+
+export interface SendAlertNotificationEmailResult {
+  success: boolean;
+  emailSent: boolean;
+  simulated?: boolean;
+  id?: string;
+  error?: string;
+}
+
+export function getAlertNotificationEmailHtml(
+  name: string,
+  input: {
+    alertType: string;
+    severity: string;
+    title: string;
+    message: string;
+    deviceName?: string;
+    openedAt?: Date | string;
+  },
+  locale: string
+): { subject: string; html: string; text: string } {
+  const isId = locale.startsWith('id');
+  const severityUpper = input.severity.toUpperCase();
+
+  let severityLabel = severityUpper;
+  let severityBg = '#eff6ff';
+  let severityBorder = '#3b82f6';
+  let severityColor = '#1d4ed8';
+
+  if (severityUpper === 'CRITICAL') {
+    severityLabel = isId ? 'KRITIS' : 'CRITICAL';
+    severityBg = '#fef2f2';
+    severityBorder = '#dc2626';
+    severityColor = '#991b1b';
+  } else if (severityUpper === 'WARNING') {
+    severityLabel = isId ? 'PERINGATAN' : 'WARNING';
+    severityBg = '#fffbeb';
+    severityBorder = '#f59e0b';
+    severityColor = '#92400e';
+  } else {
+    severityLabel = isId ? 'INFORMASI' : 'INFO';
+    severityBg = '#eff6ff';
+    severityBorder = '#3b82f6';
+    severityColor = '#1d4ed8';
+  }
+
+  const subject = isId
+    ? `[${severityLabel}] Notifikasi Peringatan: ${input.title}`
+    : `[${severityLabel}] Alert Notification: ${input.title}`;
+
+  const greeting = isId ? `Halo, ${name || 'Pengguna'}` : `Hello, ${name || 'Operator'}`;
+
+  const intro = isId
+    ? `Sistem pemantauan telah mendeteksi peringatan baru yang memerlukan perhatian Anda.`
+    : `The monitoring system has detected a new alert requiring your attention.`;
+
+  const deviceLabel = isId ? 'Perangkat' : 'Device';
+  const timeLabel = isId ? 'Waktu Kejadian' : 'Event Time';
+  const typeLabel = isId ? 'Tipe Peringatan' : 'Alert Type';
+  const descLabel = isId ? 'Keterangan' : 'Details';
+  const viewActionText = isId ? 'Buka Daftar Notifikasi' : 'View in Notifications';
+  const footerNotice = isId
+    ? 'Anda menerima email ini karena notifikasi email diaktifkan pada akun Anda. Anda dapat mengubah preferensi ini di Pengaturan.'
+    : 'You received this email because email notifications are enabled for your account. You can update this in Settings.';
+
+  const formattedTime = input.openedAt
+    ? new Date(input.openedAt).toLocaleString(isId ? 'id-ID' : 'en-US', {
+        dateStyle: 'medium',
+        timeStyle: 'medium',
+      })
+    : new Date().toISOString();
+
+  const appBaseUrl =
+    process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'https://melonmadura.my.id';
+  const notificationsUrl = `${appBaseUrl.replace(/\/$/, '')}/notifications`;
+
+  const logoAttachment = getLogoAttachment();
+  const logoUrl = logoAttachment ? 'cid:logo1' : `${appBaseUrl.replace(/\/$/, '')}/logo1-email.png`;
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${subject}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f4f7f4; margin: 0; padding: 24px; color: #1e293b; }
+    .container { max-width: 560px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 32px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+    .header { text-align: center; margin-bottom: 24px; }
+    .header img { height: 40px; width: auto; max-width: 220px; display: inline-block; object-fit: contain; margin: 0 auto; }
+    .badge { display: inline-block; font-size: 13px; font-weight: 700; padding: 4px 12px; border-radius: 9999px; text-transform: uppercase; margin-bottom: 12px; }
+    .title { font-size: 20px; font-weight: 700; color: #0f172a; margin: 0 0 16px 0; }
+    .card { background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px; margin: 20px 0; }
+    .row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px; }
+    .label { color: #64748b; font-weight: 500; }
+    .value { color: #0f172a; font-weight: 600; }
+    .message-box { background-color: #ffffff; border-left: 4px solid ${severityBorder}; padding: 12px 16px; margin: 16px 0 0 0; border-radius: 4px; font-size: 14px; line-height: 1.5; color: #334155; }
+    .btn { display: inline-block; background-color: #059669; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; font-size: 14px; margin-top: 20px; text-align: center; }
+    .footer { margin-top: 32px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b; text-align: center; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <img src="${logoUrl}" alt="Melon Governance" width="220" height="44" style="height: 40px; width: auto; max-width: 220px; display: inline-block; object-fit: contain; margin: 0 auto;" />
+    </div>
+    <div style="text-align: center;">
+      <span class="badge" style="background-color: ${severityBg}; border: 1px solid ${severityBorder}; color: ${severityColor};">
+        ${severityLabel}
+      </span>
+      <h1 class="title">${input.title}</h1>
+    </div>
+    <p style="font-size: 15px; line-height: 1.6; margin-top: 16px;"><strong>${greeting}</strong>,</p>
+    <p style="font-size: 15px; line-height: 1.6;">${intro}</p>
+
+    <div class="card">
+      ${
+        input.deviceName
+          ? `
+      <div style="margin-bottom: 10px; font-size: 14px;">
+        <span class="label">${deviceLabel}:</span>
+        <span class="value" style="margin-left: 8px;">${input.deviceName}</span>
+      </div>`
+          : ''
+      }
+      <div style="margin-bottom: 10px; font-size: 14px;">
+        <span class="label">${typeLabel}:</span>
+        <span class="value" style="margin-left: 8px;">${input.alertType}</span>
+      </div>
+      <div style="margin-bottom: 10px; font-size: 14px;">
+        <span class="label">${timeLabel}:</span>
+        <span class="value" style="margin-left: 8px;">${formattedTime}</span>
+      </div>
+      <div class="message-box">
+        <strong style="display: block; margin-bottom: 4px; color: #0f172a;">${descLabel}:</strong>
+        ${input.message}
+      </div>
+    </div>
+
+    <div style="text-align: center; margin-top: 24px;">
+      <a href="${notificationsUrl}" class="btn" style="color: #ffffff;">${viewActionText}</a>
+    </div>
+
+    <div class="footer">
+      <p>${footerNotice}</p>
+      <p>© ${new Date().getFullYear()} Melon Governance Monitoring System. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>
+  `.trim();
+
+  const text = `
+Melon Governance - ${severityLabel}: ${input.title}
+=============================================================
+
+${greeting},
+
+${intro}
+
+${input.deviceName ? `${deviceLabel}: ${input.deviceName}\n` : ''}${typeLabel}: ${input.alertType}
+${timeLabel}: ${formattedTime}
+
+${descLabel}:
+${input.message}
+
+-------------------------------------------------------------
+${viewActionText}: ${notificationsUrl}
+
+${footerNotice}
+© ${new Date().getFullYear()} Melon Governance Monitoring System.
+  `.trim();
+
+  return { subject, html, text };
+}
+
+/**
+ * Sends an operational alert email notification via Resend with exponential backoff retry.
+ */
+export async function sendAlertNotificationEmail(
+  input: SendAlertNotificationEmailInput
+): Promise<SendAlertNotificationEmailResult> {
+  const reqLogger = logger.child({
+    requestId: input.requestId,
+    alertType: input.alertType,
+    severity: input.severity,
+  });
+
+  const env = validateServerEnv();
+  const locale = input.locale || env.DEFAULT_LOCALE || 'id';
+  const name = input.recipientName || '';
+
+  const { subject, html, text } = getAlertNotificationEmailHtml(name, input, locale);
+
+  const apiKey = env.RESEND_API_KEY || process.env.RESEND_API_KEY;
+  const fromEmail =
+    env.RESEND_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || DEFAULT_RESEND_FROM_EMAIL;
+
+  if (!apiKey || env.NODE_ENV === 'test' || process.env.NODE_ENV === 'test') {
+    reqLogger.info('Simulated alert notification email delivery to ' + input.toEmail);
+    return {
+      success: true,
+      emailSent: false,
+      simulated: true,
+    };
+  }
+
+  try {
+    const resend = new Resend(apiKey);
+    const result = await sendWithRetry(
+      resend,
+      {
+        from: fromEmail,
+        to: [input.toEmail],
+        subject,
+        html,
+        text,
+      },
+      reqLogger
+    );
+
+    if (!result.success) {
+      reqLogger.error(
+        'Resend delivery reported error for alert notification: ' +
+          (result.error || 'Unknown error')
+      );
+      return {
+        success: false,
+        emailSent: false,
+        error: result.error,
+      };
+    }
+
+    reqLogger.info('Alert notification email dispatched successfully via Resend');
+    return {
+      success: true,
+      emailSent: true,
+      id: result.id,
+    };
+  } catch (err: any) {
+    reqLogger.error(
+      'Unexpected exception during Resend alert notification email dispatch: ' +
+        (err?.message || String(err))
+    );
+    return {
+      success: false,
+      emailSent: false,
+      error: err?.message || 'Email delivery failed',
+    };
+  }
+}

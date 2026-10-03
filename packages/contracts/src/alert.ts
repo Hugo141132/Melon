@@ -21,6 +21,8 @@ export const AlertDtoSchema = z.object({
   messageParams: z.record(z.unknown()).nullable(),
   openedAt: z.union([z.date(), z.string()]),
   resolvedAt: z.union([z.date(), z.string()]).nullable(),
+  isAcknowledged: z.boolean().optional().default(false),
+  acknowledgedAt: z.union([z.date(), z.string()]).nullable().optional(),
   createdAt: z.union([z.date(), z.string()]),
   updatedAt: z.union([z.date(), z.string()]),
 });
@@ -82,3 +84,25 @@ export const AlertAcknowledgementDtoSchema = z.object({
 });
 
 export type AlertAcknowledgementDto = z.infer<typeof AlertAcknowledgementDtoSchema>;
+
+export const BulkAcknowledgeAlertsInputSchema = z
+  .object({
+    alertIds: z.array(z.string().uuid()).optional(),
+    all: z.boolean().optional(),
+    note: z.string().trim().max(500).optional().nullable(),
+  })
+  .refine(
+    (data) => data.all === true || (Array.isArray(data.alertIds) && data.alertIds.length > 0),
+    {
+      message: 'Either alertIds with at least one ID or all=true must be provided',
+    }
+  );
+
+export type BulkAcknowledgeAlertsInput = z.input<typeof BulkAcknowledgeAlertsInputSchema>;
+
+export const BulkAcknowledgeAlertsResultSchema = z.object({
+  acknowledgedCount: z.number().int().min(0),
+  alertIds: z.array(z.string().uuid()),
+});
+
+export type BulkAcknowledgeAlertsResult = z.infer<typeof BulkAcknowledgeAlertsResultSchema>;

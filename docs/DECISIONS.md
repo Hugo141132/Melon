@@ -1448,3 +1448,131 @@ The following facts are supported by the verified decisions governance of `TASK-
      - Enforced client idempotency keys, zero auto-retries, 5-minute stale command timeout sweeps, and immutable audit logs.
 <!-- DEC-CTRL-096 Reconciled: 2026-10-01 -->
 
+---
+
+## DEC-ALRT-097: User-Scoped Alert Acknowledgement, Canonical Route & Navigation Badge Reliability Architecture
+- **Status:** APPROVED & IMPLEMENTED (2026-10-03)
+- **Related Task IDs:** `TASK-0704`, `TASK-0705`, `TASK-0418`
+- **Context:**
+  Manual verification revealed three distinct functional and UX issues in alert and notification handling:
+  1. **Global vs User Acknowledgement Contamination:** When User A acknowledged an alert, the system mutated the global `alert.status` row to `ACKNOWLEDGED`. Consequently, User B also saw the alert as acknowledged, and User B's unread alert count was wiped out.
+  2. **Notification Badge Dormancy:** Navigation badges on `Sidebar` and `TopAppBar` only updated after the user explicitly navigated to the alerts page, leaving operators unaware of open hardware/command alerts upon login.
+  3. **Duplicate Warning UI in Manual Valve Control:** `FaucetPresetSelector` redundantly rendered "Last confirmed" and "Device not responding" warnings, which already exist in `Irrigation Command Status` (`FaucetStatusCard`).
+  4. **Unnecessary Acknowledgment Notes Modal:** Operator acknowledgement previously prompted for a comment with no clear storage or operational rationale.
+- **Decision & Implementation Directives:**
+  1. **User-Scoped Acknowledgement Data Model:**
+     - Global Alert Lifecycle: An alert's global lifecycle status remains strictly `OPEN` or `RESOLVED`. An alert row is not mutated to `ACKNOWLEDGED` when acknowledged by an operator.
+     - Individual Acknowledgement Persistence: User acknowledgements are stored in `alert_acknowledgements` with a composite unique index:
+       `@@unique([alertId, acknowledgedByUserId], map: "alert_acknowledgements_alert_user_idx")`.
+     - Idempotency & Non-destructive Updates: Subsequent acknowledgements by the same user update their existing record's `acknowledgedAt` timestamp.
+  2. **User-Scoped Query Filtering & Effective Status Derivation:**
+     - In `AlertRepository.getAlerts`:
+       - `status=OPEN`: Filters alerts where `status != 'RESOLVED'` and `acknowledgements: { none: { acknowledgedByUserId: session.id } }`.
+       - `status=ACKNOWLEDGED`: Filters alerts where `acknowledgements: { some: { acknowledgedByUserId: session.id } }`.
+       - All alerts: Returns alerts with dynamic user-scoped `status` (`ACKNOWLEDGED` if acknowledged by requesting user, else `OPEN` or `RESOLVED`) and `isAcknowledged: boolean`.
+  3. **One-Click Direct Acknowledgement:**
+     - Removed the comment modal from the `/notifications` page in favor of an instant 1-click acknowledgement button with inline spinner. The `note` field remains optional in contracts and backend API.
+  4. **Immediate Navigation Badge Hydration & Real-time Sync:**
+     - `useAlertBadge` hook queries `GET /api/v1/alerts?status=OPEN&pageSize=100` immediately upon authentication.
+     - Added a 15-second background polling timer, window `focus`, `visibilitychange`, and `melon:alert-updated` event dispatching (fired on login and direct alert acknowledgement).
+     - Added an alert dot indicator (`top-logo-alert-dot`) on `TopAppBar` when unacknowledged alerts exist for the user.
+  5. **Manual Valve Control UI Focus:**
+     - Cleaned up `FaucetPresetSelector` to focus strictly on `Physical Valve State: OPEN/CLOSED`, removing duplicate timestamps and timeout banners that are already handled by `FaucetStatusCard`.
+  6. **Canonical Route Standardization:**
+     - Standardized canonical notifications page route to `/notifications`, with `/notifikasi` maintained as a 307 redirect.
+<!-- DEC-ALRT-097 Reconciled: 2026-10-03 -->
+
+---
+
+## DEC-CTRL-098: Faucet Command 1-Minute Timeout, Physical Valve State Retention, and Sanitized Alert Messages
+- **Status:** APPROVED & IMPLEMENTED (2026-10-03)
+- **Related Task IDs:** `TASK-0809`, `TASK-0810`, `TASK-0703`, `TASK-0704`
+- **Context:**
+  When a faucet OPEN/CLOSE/DISPENSE command timed out (previously with a 5-minute expiry), the user interface erroneously reverted the authoritative `Physical Valve State` to `UNKNOWN`. In reality, a command timeout indicates that the command was not acknowledged or completed by the device within the expected window; it does NOT mean the physical hardware state changed or became unknown. Additionally, the 5-minute timeout window was excessively long for responsive manual irrigation operations, and user-facing alert messages exposed internal command IDs (`cmd-xxxxxxxx`), confusing operators.
+- **Decision & Implementation Directives:**
+  1. **1-Minute Default Timeout Duration:**
+     - Reduced default faucet command expiration from 5 minutes to 1 minute (`FAUCET_COMMAND_DEFAULT_TIMEOUT_MS = 60 * 1000`).
+     - Defined canonical constant `FAUCET_COMMAND_DEFAULT_TIMEOUT_MS` in `@kebun-melon/contracts` and enforced in `FaucetCommandRepository.createCommand()`.
+     - `CommandPublisher.sweepStaleSentCommands()` in `apps/iot-gateway` sweeps expired active commands after 1 minute, transitioning them to `TIMEOUT` and creating warning alerts (`createCommandTimeoutAlert()`).
+  2. **Physical Valve State Retention on Timeout:**
+     - In `FaucetStatusCard` and related UI, when a command status is `TIMEOUT`, the system preserves and renders the `lastConfirmedPhysicalState` (`OPEN` or `CLOSED`) instead of reverting to `UNKNOWN`.
+     - Displays relative confirmation timestamp (e.g. `Last confirmed: 1 minute ago` / `Terakhir dikonfirmasi: 1 menit yang lalu`) and warning banner (`Warning: Device not responding` / `Peringatan: Perangkat tidak merespons`).
+     - Technical internal states (e.g. `STALE`) are strictly forbidden from user-facing presentation.
+  3. **Sanitized User-Facing Alert Messages:**
+     - Removed raw internal command IDs (`cmd-xxxxxxxx`) from alert messages.
+     - English: `"The valve command for {deviceName} timed out without confirmation."`
+     - Indonesian: `"Perintah katup untuk {deviceName} kehabisan waktu tanpa konfirmasi."`
+     - Internal command IDs remain strictly in backend logs, audit logs, and database records (`alerts.sourceId` and audit log metadata).
+  4. **Manual Valve Control UI Focus:**
+     - Cleaned up `FaucetPresetSelector` to focus strictly on `Physical Valve State: OPEN/CLOSED`, removing duplicate timestamps and timeout banners that are already handled by `FaucetStatusCard`.
+<!-- DEC-CTRL-098 Reconciled: 2026-10-03 -->
+
+---
+
+## DEC-ALRT-099: Alert Email Notification System Architecture and Delivery Governance (Phase 1)
+- **Status:** APPROVED & IMPLEMENTED (2026-10-03)
+- **Related Task IDs:** `TASK-0706`, `TASK-0701`, `TASK-0704`, `TASK-0214`
+- **Context:**
+  Operational monitoring requires that high-priority anomalies (including faucet command timeouts, sensor telemetry thresholds, and hardware offline events) notify designated operators via email. Previously, email delivery was restricted to authentication transactional emails (verification codes, password reset). Alert emails must reach authorized users based strictly on established RBAC device ownership rules, respect user-configurable notification preferences, maintain idempotent delivery without spamming users, and operate asynchronously without blocking real-time alert creation pipelines.
+- **Decision & Implementation Directives:**
+  1. **Resend Transactional Email Infrastructure for Alerts:**
+     - Reuses existing Resend infrastructure (`apps/web/lib/email/resend.ts`) to dispatch formatted alert emails (`sendAlertNotificationEmail`).
+     - Supports all alert severities (`CRITICAL`, `WARNING`, `INFO`) with severity-coded visual badges, formatted timestamp, device metadata, localized titles/descriptions, and direct links to `/notifications`.
+     - In test/development mode (`NODE_ENV === 'test'`), email dispatch simulates delivery with structured logging without contacting external APIs.
+  2. **RBAC & Device-Scoped Recipient Resolution:**
+     - Enforced via `AlertNotificationRepository.resolveAlertRecipients(alertId)`:
+       - Active `OWNER` users with verified email addresses receive all alerts across all devices globally.
+       - Active `ADMIN` users with verified email addresses receive alerts strictly for devices actively assigned to them in `UserDeviceAccess` (`revokedAt IS NULL`).
+       - System alerts (`deviceId = null`) route strictly to active `OWNER` users.
+       - Unverified accounts (`emailVerifiedAt IS NULL`) and non-active accounts (`accountStatus != 'ACTIVE'`) are excluded.
+  3. **User Notification Preference Governance:**
+     - Added `emailAlertsEnabled` boolean column (default `true`) to `user_preferences`.
+     - Exposed via `GET /api/v1/me/preferences` and `PATCH /api/v1/me/preferences` with schema validation (`packages/contracts`).
+     - Added `SettingsNotificationPreferences` modal and toggle in `/settings` conforming to `Premium Minimal Ops`.
+  4. **Dispatch Tracking & Delivery Idempotency:**
+     - Created `alert_email_dispatches` table with composite unique index `@@unique([alertId, userId], map: "alert_email_dispatches_alert_user_idx")`.
+     - Tracks recipient delivery status (`SENT`, `FAILED`, `DISABLED_BY_PREFERENCE`, `SIMULATED`), provider message ID, error messages, and dispatch timestamps.
+     - Prevents duplicate email dispatches for the same alert to the same recipient.
+  5. **Decoupled Asynchronous Execution:**
+     - Alert ingestion in IoT Gateway and Web never blocks or fails on email delivery.
+     - Protected internal machine-to-machine dispatch endpoint: `POST /api/v1/internal/alerts/[alertId]/dispatch-emails` authenticated via Bearer `INTERNAL_SERVICE_TOKEN`.
+  6. **Phase 1 Exclusions:**
+     - Advanced severity filtering, rolling frequency rate limiting, and external Redis/BullMQ queue infrastructure are deferred to future phases.
+<!-- DEC-ALRT-099 Reconciled: 2026-10-03 -->
+
+---
+
+## DEC-ALRT-100: Alert Notification System UX, Localization Consistency, Terminology Standardization, and Bulk Acknowledgement Governance
+- **Status:** APPROVED & IMPLEMENTED (2026-10-03)
+- **Related Task IDs:** `TASK-0707`, `TASK-0706`, `TASK-0704`, `TASK-0705`
+- **Context:**
+  Following the successful implementation of alert email dispatch and single-alert acknowledgement, operators required UX, terminology, and localization refinements:
+  1. Notification email delivery previously relied on hardcoded fallback dictionaries, leading to language inconsistencies where templates failed to respect the recipient's preferred locale.
+  2. Indonesian user-facing text used "Katup", while English and engineering specifications use "Valve". Standardizing "Valve" provides clarity across hardware, controls, and alerts.
+  3. Acknowledging multiple alerts individually caused high operator overhead. A bulk acknowledgement flow was required while strictly preserving individual user-scoped acknowledgement tracking.
+  4. Audit log and notification UI headers referenced "Actor" / "Aktor", which felt overly technical; "Operator" provides intuitive clarity.
+- **Decision & Implementation Directives:**
+  1. **Dynamic Localization Consistency:**
+     - `AlertNotificationService.resolveLocalizedContent()` retrieves alert title, message, and fallback severity labels dynamically from `messages/id.json` and `messages/en.json` according to the user's `preferredLocale`.
+     - Hardcoded static translation maps are eliminated. All strings conform to standard next-intl dictionary structures.
+  2. **Standardized Technical Terminology ("Valve" over "Katup"):**
+     - "Valve" is standardized as the single technical term across all Indonesian translations (`messages/id.json`), English translations (`messages/en.json`), control panels, notification cards, and email templates.
+     - All 32 instances of "Katup" in Indonesian messages are updated to "Valve".
+  3. **User-Scoped Bulk Acknowledgement Flow:**
+     - User-scoped acknowledgement model (`AlertAcknowledgement` with `@@unique([alertId, acknowledgedByUserId])`) is strictly preserved without altering global alert lifecycle status (`OPEN` / `RESOLVED`).
+     - Added contract schemas `BulkAcknowledgeAlertsInputSchema` and `BulkAcknowledgeAlertsResultSchema` in `@kebun-melon/contracts`.
+     - Implemented `AlertRepository.acknowledgeAlertsBulk(userId, input, authorizedDeviceIds)` in `@kebun-melon/database` utilizing atomic transaction batching, scoped authorization, and audit log generation.
+     - Created `POST /api/v1/alerts/bulk-acknowledge` accepting `{ alertIds: string[] }` or `{ all: true }`.
+     - Implemented multi-select UI on `/notifications`:
+       - Checkbox for open, unacknowledged alerts.
+       - Master "Select All" toggle with count badge.
+       - "Acknowledge Selected (N)" button with loading spinner.
+       - "Acknowledge All" button for one-click clearing of all pending alerts for the operator.
+       - Dispatches `melon:alert-updated` event to instantly update navigation badges.
+  4. **User-Facing Role Label ("Operator" over "Actor"):**
+     - Updated UI translation keys (`audit.actorHeader` / `actorHeader`) to "Operator" in both English and Indonesian.
+<!-- DEC-ALRT-100 Reconciled: 2026-10-03 -->
+
+
+
+

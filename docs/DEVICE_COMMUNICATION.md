@@ -2492,10 +2492,13 @@ The following facts are supported by the verified implementation of `TASK-0804` 
 - **Payload Schema Conformance:**
   - `DISPENSE`: Transmits `schemaVersion: '1.0'`, `commandId`, `deviceId`, `siteId`, `action: 'DISPENSE'`, valid `phase`, `plantCount >= 1`, persisted integer `targetVolumeMl` (no publisher-side recalculation), `requestedAt`, and `expiresAt`.
   - `OPEN` / `CLOSE`: Transmits clean manual action payload omitting `phase`, `plantCount`, and `targetVolumeMl` (or `"ON"` / `"OFF"` strings on direct hardware topics).
-- **State Progression & Stale SENT Timeout Sweep (`DEC-CTRL-094`):**
+- **State Progression & Stale SENT Timeout Sweep (`DEC-CTRL-094`, `DEC-CTRL-098` / `TASK-0809`):**
   - Atomically transitions database status from `QUEUED` to `SENT` only after broker confirms publication. Expired commands are marked `EXPIRED` without transmission. Disconnected/failed broker states keep commands `QUEUED` with zero false `SENT` marks.
-  - Active `SENT` commands whose `expiresAt` has passed without receiving an ACK are automatically swept by `sweepStaleSentCommands()` every 2,000ms to terminal state `TIMEOUT` (`COMMAND_EXPIRED_TIMEOUT`), safely releasing the device concurrency lock (`faucet_commands_one_active_per_device`) and emitting realtime SSE updates.
-<!-- TASK-0804 Reconciled: 2026-09-23 -->
+  - The authoritative default command timeout is 1 minute (`FAUCET_COMMAND_DEFAULT_TIMEOUT_MS = 60 * 1000`).
+  - Active `SENT` commands whose `expiresAt` has passed without receiving an ACK are automatically swept by `sweepStaleSentCommands()` every 2,000ms to terminal state `TIMEOUT` (`COMMAND_EXPIRED_TIMEOUT`), safely releasing the device concurrency lock (`faucet_commands_one_active_per_device`), emitting realtime SSE updates, and creating a `COMMAND_TIMEOUT` warning alert.
+  - **Physical Valve State Retention:** Timeout indicates unconfirmed execution rather than physical valve actuation. The frontend preserves the `lastConfirmedPhysicalState` (`OPEN` or `CLOSED`) along with a relative confirmation timestamp and displays a warning banner ("Device not responding"). Reverting physical state to `UNKNOWN` upon timeout is forbidden.
+  - **Sanitized Alert Messaging:** User-facing timeout alert notifications omit internal raw command IDs (`cmd-xxxxxxxx`), rendering friendly device-centric notifications while keeping internal command IDs strictly in backend audit logs and diagnostic traces.
+<!-- TASK-0804 & TASK-0809 Reconciled: 2026-10-03 -->
 
 ---
 

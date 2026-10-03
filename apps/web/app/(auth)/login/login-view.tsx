@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useAuth } from '@/context/AuthContext';
+import { ALERT_UPDATED_EVENT } from '@/hooks/useAlertBadge';
 
 function LoginForm() {
   const router = useRouter();
@@ -110,6 +111,10 @@ function LoginForm() {
           accountStatus: json.data.user.accountStatus,
           activeRoles: json.data.user.activeRoles || [json.data.user.role],
         });
+      }
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent(ALERT_UPDATED_EVENT));
       }
 
       router.push(redirectPath);

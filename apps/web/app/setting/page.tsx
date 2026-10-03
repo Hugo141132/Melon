@@ -4,6 +4,7 @@ import Link from 'next/link';
 import UserAvatar from '@/components/auth/UserAvatar';
 import TopAppBar from '@/components/navigation/TopAppBar';
 import { SettingsLocaleSwitcher } from '@/components/settings/locale-switcher';
+import { SettingsNotificationPreferences } from '@/components/settings/notification-preferences';
 import { USER_PROFILE } from '@/lib/constants';
 import { User as UserIcon, ChevronRight, HelpCircle } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -74,6 +75,8 @@ export default function SettingPage() {
             subtitle={tSettings('profileSubtitle')}
             href="/profile"
           />
+
+          <SettingsNotificationPreferences />
 
           <SettingsLocaleSwitcher />
 

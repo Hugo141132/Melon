@@ -16,20 +16,47 @@ export class AlertNotFoundError extends Error {
   }
 }
 
+export interface AlertRepositoryOptions {
+  onAlertCreated?: (alert: AlertDto) => Promise<void> | void;
+}
+
 export class AlertRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly options?: AlertRepositoryOptions
+  ) {}
 
   /**
    * Formats raw Prisma Alert record into PublicSafe AlertDto.
+   * Derives user-specific acknowledgement and effective status when authorizedUserId is provided.
    */
-  private formatAlertDto(alert: any): AlertDto {
+  private formatAlertDto(alert: any, authorizedUserId?: string): AlertDto {
+    const userAck =
+      authorizedUserId && Array.isArray(alert.acknowledgements)
+        ? alert.acknowledgements.find((ack: any) => ack.acknowledgedByUserId === authorizedUserId)
+        : Array.isArray(alert.acknowledgements) && alert.acknowledgements.length > 0
+          ? alert.acknowledgements[0]
+          : null;
+
+    const isAcknowledged = Boolean(userAck);
+    const effectiveStatus: AlertStatus =
+      alert.status === AlertStatus.RESOLVED
+        ? AlertStatus.RESOLVED
+        : isAcknowledged
+          ? AlertStatus.ACKNOWLEDGED
+          : alert.status === AlertStatus.ACKNOWLEDGED && !authorizedUserId
+            ? AlertStatus.ACKNOWLEDGED
+            : AlertStatus.OPEN;
+
     return {
       id: alert.id,
       deviceId: alert.deviceId || null,
       userId: alert.userId || null,
       alertType: alert.alertType,
       severity: alert.severity as AlertSeverity,
-      status: alert.status as AlertStatus,
+      status: effectiveStatus,
+      isAcknowledged,
+      acknowledgedAt: userAck?.acknowledgedAt || null,
       sourceType: alert.sourceType,
       sourceId: alert.sourceId || null,
       titleKey: alert.titleKey || null,
@@ -100,7 +127,26 @@ export class AlertRepository {
     }
 
     if (query.status) {
-      where.status = query.status;
+      if (authorizedUserId) {
+        if (query.status === AlertStatus.OPEN) {
+          where.status = { not: AlertStatus.RESOLVED };
+          where.acknowledgements = {
+            none: {
+              acknowledgedByUserId: authorizedUserId,
+            },
+          };
+        } else if (query.status === AlertStatus.ACKNOWLEDGED) {
+          where.acknowledgements = {
+            some: {
+              acknowledgedByUserId: authorizedUserId,
+            },
+          };
+        } else if (query.status === AlertStatus.RESOLVED) {
+          where.status = AlertStatus.RESOLVED;
+        }
+      } else {
+        where.status = query.status;
+      }
     }
 
     if (query.alertType) {
@@ -130,11 +176,21 @@ export class AlertRepository {
         skip,
         take: pageSize,
         orderBy: { [sortField]: sortOrder },
+        include: {
+          acknowledgements: authorizedUserId
+            ? {
+                where: { acknowledgedByUserId: authorizedUserId },
+                select: { id: true, acknowledgedByUserId: true, acknowledgedAt: true },
+              }
+            : {
+                select: { id: true, acknowledgedByUserId: true, acknowledgedAt: true },
+              },
+        },
       }),
     ]);
 
     const totalPages = Math.ceil(totalItems / pageSize) || 1;
-    const items = rawAlerts.map((a) => this.formatAlertDto(a));
+    const items = rawAlerts.map((a) => this.formatAlertDto(a, authorizedUserId));
 
     return {
       items,
@@ -149,7 +205,7 @@ export class AlertRepository {
 
   /**
    * Fetches single Alert by UUID.
-   * Enforces OWNER/ADMIN scoping logic.
+   * Enforces OWNER/ADMIN scoping logic and derives user acknowledgement state.
    */
   async getAlertById(
     alertId: string,
@@ -158,6 +214,16 @@ export class AlertRepository {
   ): Promise<AlertDto | null> {
     const alert = await this.prisma.alert.findUnique({
       where: { id: alertId },
+      include: {
+        acknowledgements: authorizedUserId
+          ? {
+              where: { acknowledgedByUserId: authorizedUserId },
+              select: { id: true, acknowledgedByUserId: true, acknowledgedAt: true },
+            }
+          : {
+              select: { id: true, acknowledgedByUserId: true, acknowledgedAt: true },
+            },
+      },
     });
 
     if (!alert) {
@@ -177,7 +243,7 @@ export class AlertRepository {
       }
     }
 
-    return this.formatAlertDto(alert);
+    return this.formatAlertDto(alert, authorizedUserId);
   }
 
   /**
@@ -202,11 +268,16 @@ export class AlertRepository {
       },
     });
 
-    return this.formatAlertDto(created);
+    const formatted = this.formatAlertDto(created);
+    if (this.options?.onAlertCreated) {
+      Promise.resolve(this.options.onAlertCreated(formatted)).catch(() => {});
+    }
+    return formatted;
   }
 
   /**
-   * Acknowledges an Alert and records an alert.acknowledged AuditLog entry inside a database transaction.
+   * Acknowledges an Alert for a specific user and records an alert.acknowledged AuditLog entry inside a database transaction.
+   * The alert's global lifecycle remains OPEN / RESOLVED, while acknowledgement is individual per user.
    */
   async acknowledgeAlert(
     alertId: string,
@@ -231,21 +302,34 @@ export class AlertRepository {
     const now = new Date();
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.alert.update({
-        where: { id: alertId },
-        data: {
-          status: AlertStatus.ACKNOWLEDGED,
+      // NOTE: Do not mutate global alert.status to ACKNOWLEDGED.
+      // Alert lifecycle remains global (OPEN / RESOLVED), while user acknowledgement is individual.
+
+      const existingAck = await tx.alertAcknowledgement.findFirst({
+        where: {
+          alertId,
+          acknowledgedByUserId: userId,
         },
       });
 
-      await tx.alertAcknowledgement.create({
-        data: {
-          alertId,
-          acknowledgedByUserId: userId,
-          note: note ? note.trim() : null,
-          acknowledgedAt: now,
-        },
-      });
+      if (existingAck) {
+        await tx.alertAcknowledgement.update({
+          where: { id: existingAck.id },
+          data: {
+            note: note ? note.trim() : null,
+            acknowledgedAt: now,
+          },
+        });
+      } else {
+        await tx.alertAcknowledgement.create({
+          data: {
+            alertId,
+            acknowledgedByUserId: userId,
+            note: note ? note.trim() : null,
+            acknowledgedAt: now,
+          },
+        });
+      }
 
       await tx.auditLog.create({
         data: {
@@ -257,6 +341,7 @@ export class AlertRepository {
           previousValues: { status: alert.status },
           newValues: { status: AlertStatus.ACKNOWLEDGED },
           metadata: {
+            userScoped: true,
             note: note ? note.trim() : null,
           },
         },
@@ -267,6 +352,95 @@ export class AlertRepository {
       alertId,
       status: AlertStatus.ACKNOWLEDGED,
       acknowledgedAt: now,
+    };
+  }
+
+  /**
+   * Bulk acknowledges alerts for a specific user and records audit log entries.
+   * If alertIds is provided, acknowledges those specific alerts (filtering to accessible ones).
+   * If all=true, acknowledges all OPEN alerts accessible to the user that have not yet been acknowledged by the user.
+   */
+  async acknowledgeAlertsBulk(
+    userId: string,
+    options: {
+      alertIds?: string[];
+      all?: boolean;
+      note?: string;
+    },
+    authorizedDeviceIds?: string[]
+  ): Promise<{ acknowledgedCount: number; alertIds: string[] }> {
+    const note = options.note?.trim() || null;
+    const now = new Date();
+
+    const where: Prisma.AlertWhereInput = {
+      status: { not: AlertStatus.RESOLVED },
+      acknowledgements: {
+        none: {
+          acknowledgedByUserId: userId,
+        },
+      },
+    };
+
+    if (authorizedDeviceIds !== undefined) {
+      where.OR = [{ deviceId: { in: authorizedDeviceIds } }, { userId }];
+    }
+
+    if (options.alertIds && options.alertIds.length > 0) {
+      where.id = { in: options.alertIds };
+    }
+
+    const eligibleAlerts = await this.prisma.alert.findMany({
+      where,
+      select: { id: true, status: true },
+    });
+
+    if (eligibleAlerts.length === 0) {
+      return { acknowledgedCount: 0, alertIds: [] };
+    }
+
+    const targetAlertIds = eligibleAlerts.map((a) => a.id);
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const alertId of targetAlertIds) {
+        await tx.alertAcknowledgement.upsert({
+          where: {
+            alertId_acknowledgedByUserId: {
+              alertId,
+              acknowledgedByUserId: userId,
+            },
+          },
+          update: {
+            note,
+            acknowledgedAt: now,
+          },
+          create: {
+            alertId,
+            acknowledgedByUserId: userId,
+            note,
+            acknowledgedAt: now,
+          },
+        });
+      }
+
+      await tx.auditLog.create({
+        data: {
+          eventKey: 'alert.acknowledged.bulk',
+          actorUserId: userId,
+          targetType: 'Alert',
+          result: 'SUCCESS',
+          metadata: {
+            count: targetAlertIds.length,
+            alertIds: targetAlertIds,
+            userScoped: true,
+            note,
+          },
+        },
+      });
+    });
+
+    return {
+      acknowledgedCount: targetAlertIds.length,
+      alertIds: targetAlertIds,
     };
   }
 
@@ -350,7 +524,11 @@ export class AlertRepository {
       },
     });
 
-    return this.formatAlertDto(created);
+    const formatted = this.formatAlertDto(created);
+    if (this.options?.onAlertCreated) {
+      Promise.resolve(this.options.onAlertCreated(formatted)).catch(() => {});
+    }
+    return formatted;
   }
 
   /**
@@ -417,7 +595,7 @@ export class AlertRepository {
       data: {
         deviceId: deviceUuid,
         alertType: AlertType.COMMAND_TIMEOUT,
-        severity: input.severity || AlertSeverity.CRITICAL,
+        severity: input.severity || AlertSeverity.WARNING,
         status: AlertStatus.OPEN,
         sourceType: 'faucet_command',
         sourceId: commandUuid,
@@ -434,6 +612,10 @@ export class AlertRepository {
       },
     });
 
-    return this.formatAlertDto(created);
+    const formatted = this.formatAlertDto(created);
+    if (this.options?.onAlertCreated) {
+      Promise.resolve(this.options.onAlertCreated(formatted)).catch(() => {});
+    }
+    return formatted;
   }
 }

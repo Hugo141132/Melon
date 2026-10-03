@@ -18,7 +18,7 @@ import { GatewayEnv } from '../config/env';
 import { mqttTopicRouter } from '../mqtt/router';
 import { logger } from '../observability/logger';
 import { metricsCollector } from '../observability/metrics';
-import { publishRealtimeEvent } from './webhook';
+import { publishRealtimeEvent, triggerAlertEmailDispatch } from './webhook';
 
 export type AuthoritativePhysicalFaucetState = 'OPEN' | 'CLOSED' | 'UNKNOWN';
 
@@ -508,7 +508,7 @@ export class FaucetEventProcessor {
 
         if (this.alertRepo) {
           try {
-            await this.alertRepo.createCommandFailureAlert({
+            const failureAlert = await this.alertRepo.createCommandFailureAlert({
               deviceId: device.id,
               commandId: command.id,
               reasonCode,
@@ -521,6 +521,15 @@ export class FaucetEventProcessor {
                 action: command.action,
               },
             });
+
+            if (failureAlert?.id) {
+              triggerAlertEmailDispatch(this.env, failureAlert.id).catch((err) => {
+                logger.warn('Failed to trigger alert email dispatch on FAILED event', {
+                  alertId: failureAlert.id,
+                  error: err instanceof Error ? err.message : String(err),
+                });
+              });
+            }
           } catch (alertErr) {
             logger.error('Failed to create command failure alert on FAILED event', alertErr, {
               commandId: command.commandId,

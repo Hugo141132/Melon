@@ -100,6 +100,7 @@ All exceptions must be recorded in `scripts/security-exceptions.json` using the 
 - **TASK-0916 / Singapore Dev Cutover & E2E Isolation Audit (2026-09-08):** Confirmed zero secret exceptions and zero dependency exceptions introduced; internal service token rotation executed using 32-byte hex CSPRNG without credential printing; automated secret scanning passed (`npx tsx scripts/scan-secrets.ts`); dependency vulnerability scan passed (`npm run scan:deps`); fail-closed test database guards enforced in `playwright.config.ts`, `e2e/critical-flows.spec.ts`, and `packages/database/scripts/run-docker-integration-test.ts` preventing test runs against Singapore Dev; real `.env` files, `apps/*/.env`, `packages/*/.env`, and `backups/` verified 100% ignored in git with zero security exceptions.
 - **TASK-0916 / Singapore Staging Cutover & Baseline Fidelity Audit (2026-09-08):** Confirmed zero secret exceptions and zero dependency exceptions introduced; immutable staging baseline manifest verified (SHA-256 `BC03C209639942BEA678B1353D382C4E354C7A800082187E60807ADD8E43A9FB`); staging database connection string and credentials scoped exclusively via environment variables; automated secret scan passed (`npx tsx scripts/scan-secrets.ts`); container redeployment verified healthy without token leakage; `ENABLE_FAUCET_CONTROL=false` strictly preserved (`faucet_commands` = 0); zero security exceptions registered in `scripts/security-exceptions.json`.
 - **TASK-0410 / Dependency Vulnerability Exception Audit (2026-09-09):** Documented formal reviewed exceptions `EXC-DEP-002` (`js-yaml` / `GHSA-2883-xcg3-v3hh`), `EXC-DEP-003` (`next` / `GHSA-p293-qw3h-jr36`), `EXC-DEP-004` (`next` / `GHSA-2xp9-vwfh-vxw4`), and `EXC-DEP-005` (`sharp` / `GHSA-rgj7-g3m4-5g8c`) in `scripts/security-exceptions.json`. Verified all 4 advisories are fully mitigated by Linux container runtime architecture, disabled AVIF formats, and dev-only usage.
+- **Alert Notification & Dependency Security Audit (2026-10-03):** Confirmed zero secret exceptions introduced; registered approved exceptions `EXC-DEP-009` through `EXC-DEP-013` for build-time transitive dependency `braces` (`GHSA-vfj7-8cjw-p6xm`) and its dev-only dependents (`micromatch`, `chokidar`, `fast-glob`, `@next/eslint-plugin-next`) in `scripts/security-exceptions.json`. Verified all 5 packages are strictly build-time tools with zero runtime or client bundle exposure.
 
 ---
 
@@ -355,7 +356,14 @@ This section documents the investigation, compensating controls, and formal appr
 - **Affected Context:** `next/og` dynamic OpenGraph image generation.
 - **Compensating Controls:** `next/og` and `ImageResponse` are completely unused throughout the entire application codebase. The operational dashboard processes only structured numerical IoT telemetry, static SVG illustrations, and dynamic initials monograms, completely eliminating the attack surface.
 - **Approval & Expiry:** Approved by Security Team on 2026-10-01. Expires 2026-11-01 (31 days).
-<!-- Dependency Vulnerability Exceptions Reconciled: 2026-10-01 -->
+
+### 8. EXC-DEP-009 through EXC-DEP-013 (`braces`, `micromatch`, `chokidar`, `fast-glob`, `@next/eslint-plugin-next` / `GHSA-vfj7-8cjw-p6xm`, High)
+- **Vulnerability:** Stack-exhaustion denial of service through deeply nested patterns in `braces` (`GHSA-vfj7-8cjw-p6xm`), transitively flagged on its dependent dev-tooling packages (`micromatch`, `chokidar`, `fast-glob`, `@next/eslint-plugin-next`).
+- **Classification:** Mitigated Transitive Dev-Dependency.
+- **Affected Context:** Build-time and lint-time dependencies of Tailwind CSS (`tailwindcss@3.4.19`) and Next.js ESLint plugin (`eslint-config-next@15.1.0`).
+- **Compensating Controls:** None of the affected packages are bundled into browser client bundles or production server runtimes. The web application and IoT gateway process strictly structured numerical IoT telemetry and never evaluate or parse untrusted user-supplied glob expressions or regex patterns.
+- **Approval & Expiry:** Approved by Security Team on 2026-10-03. Expires 2026-11-03 (31 days).
+<!-- Dependency Vulnerability Exceptions Reconciled: 2026-10-03 -->
 
 ---
 

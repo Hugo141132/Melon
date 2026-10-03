@@ -78,6 +78,8 @@ export interface FaucetPresetSelectorProps {
     targetVolumeMl?: number | null;
   } | null;
   physicalState?: AuthoritativePhysicalState;
+  lastConfirmedAt?: Date | string | null;
+  isCommandTimedOut?: boolean;
   isValveStatusLoading?: boolean;
   isSubmitting?: boolean;
   submittingAction?: 'DISPENSE' | 'OPEN' | 'CLOSE' | string | null;
@@ -407,73 +409,75 @@ export default function FaucetPresetSelector({
             </p>
           </div>
 
-          {/* Authoritative Physical Faucet State Badge */}
-          <div
-            className={cn(
-              'px-3.5 py-1.5 rounded-xl border flex items-center gap-2 text-xs font-bold self-start sm:self-auto shadow-xs transition-colors duration-200 motion-reduce:transition-none',
-              isValveStatusLoading
-                ? 'bg-app-surface-container/60 text-app-on-surface-variant border-app-outline-variant/30'
-                : effectiveTransitionState === 'OPENING'
-                  ? 'bg-sky-50 text-sky-800 border-sky-300'
-                  : effectiveTransitionState === 'CLOSING'
-                    ? 'bg-indigo-50 text-indigo-800 border-indigo-300'
-                    : effectiveTransitionState === 'DISPENSING'
-                      ? 'bg-cyan-50 text-cyan-800 border-cyan-300'
-                      : effectiveTransitionState === 'WAITING_CONFIRMATION'
-                        ? 'bg-blue-50 text-blue-800 border-blue-300'
-                        : physicalState === 'OPEN'
-                          ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                          : physicalState === 'CLOSED'
-                            ? 'bg-slate-100 text-slate-800 border-slate-300'
-                            : 'bg-amber-50 text-amber-900 border-amber-300'
-            )}
-            data-testid="authoritative-physical-state"
-          >
-            <span
+          {/* Authoritative Physical Faucet State Badge & Warning */}
+          <div className="flex flex-col sm:items-end gap-1.5 self-start sm:self-auto">
+            <div
               className={cn(
-                'w-2 h-2 rounded-full transition-colors duration-200 motion-reduce:transition-none',
+                'px-3.5 py-1.5 rounded-xl border flex items-center gap-2 text-xs font-bold shadow-xs transition-colors duration-200 motion-reduce:transition-none',
                 isValveStatusLoading
-                  ? 'bg-app-outline-variant animate-pulse'
+                  ? 'bg-app-surface-container/60 text-app-on-surface-variant border-app-outline-variant/30'
                   : effectiveTransitionState === 'OPENING'
-                    ? 'bg-sky-500 animate-pulse motion-reduce:animate-none'
+                    ? 'bg-sky-50 text-sky-800 border-sky-300'
                     : effectiveTransitionState === 'CLOSING'
-                      ? 'bg-indigo-500 animate-pulse motion-reduce:animate-none'
+                      ? 'bg-indigo-50 text-indigo-800 border-indigo-300'
                       : effectiveTransitionState === 'DISPENSING'
-                        ? 'bg-cyan-500 animate-pulse motion-reduce:animate-none'
+                        ? 'bg-cyan-50 text-cyan-800 border-cyan-300'
                         : effectiveTransitionState === 'WAITING_CONFIRMATION'
-                          ? 'bg-blue-500 animate-pulse motion-reduce:animate-none'
+                          ? 'bg-blue-50 text-blue-800 border-blue-300'
                           : physicalState === 'OPEN'
-                            ? 'bg-emerald-500 animate-pulse'
+                            ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
                             : physicalState === 'CLOSED'
-                              ? 'bg-slate-500'
-                              : 'bg-amber-500'
+                              ? 'bg-slate-100 text-slate-800 border-slate-300'
+                              : 'bg-amber-50 text-amber-900 border-amber-300'
               )}
-            />
-            <span className="flex items-center gap-1.5">
-              <span>{tFaucet('physicalStateTitle')}:</span>
-              {isValveStatusLoading ? (
-                <span className="inline-flex items-center gap-1 font-medium text-app-on-surface-variant">
-                  <span className="inline-block h-3.5 w-16 bg-app-surface-container rounded animate-pulse align-middle" />
-                  <span className="sr-only">{tFaucet('physicalStateLoading')}</span>
-                </span>
-              ) : effectiveTransitionState === 'OPENING' ? (
-                <span>{tFaucet('physicalStateOpening')}</span>
-              ) : effectiveTransitionState === 'CLOSING' ? (
-                <span>{tFaucet('physicalStateClosing')}</span>
-              ) : effectiveTransitionState === 'DISPENSING' ? (
-                <span>{tFaucet('physicalStateDispensing')}</span>
-              ) : effectiveTransitionState === 'WAITING_CONFIRMATION' ? (
-                <span>{tFaucet('physicalStateWaitingConfirmation')}</span>
-              ) : (
-                <span>
-                  {physicalState === 'OPEN'
-                    ? tFaucet('physicalStateOpen')
-                    : physicalState === 'CLOSED'
-                      ? tFaucet('physicalStateClosed')
-                      : tFaucet('physicalStateUnknown')}
-                </span>
-              )}
-            </span>
+              data-testid="authoritative-physical-state"
+            >
+              <span
+                className={cn(
+                  'w-2 h-2 rounded-full transition-colors duration-200 motion-reduce:transition-none',
+                  isValveStatusLoading
+                    ? 'bg-app-outline-variant animate-pulse'
+                    : effectiveTransitionState === 'OPENING'
+                      ? 'bg-sky-500 animate-pulse motion-reduce:animate-none'
+                      : effectiveTransitionState === 'CLOSING'
+                        ? 'bg-indigo-500 animate-pulse motion-reduce:animate-none'
+                        : effectiveTransitionState === 'DISPENSING'
+                          ? 'bg-cyan-500 animate-pulse motion-reduce:animate-none'
+                          : effectiveTransitionState === 'WAITING_CONFIRMATION'
+                            ? 'bg-blue-500 animate-pulse motion-reduce:animate-none'
+                            : physicalState === 'OPEN'
+                              ? 'bg-emerald-500 animate-pulse'
+                              : physicalState === 'CLOSED'
+                                ? 'bg-slate-500'
+                                : 'bg-amber-500'
+                )}
+              />
+              <span className="flex items-center gap-1.5">
+                <span>{tFaucet('physicalStateTitle')}:</span>
+                {isValveStatusLoading ? (
+                  <span className="inline-flex items-center gap-1 font-medium text-app-on-surface-variant">
+                    <span className="inline-block h-3.5 w-16 bg-app-surface-container rounded animate-pulse align-middle" />
+                    <span className="sr-only">{tFaucet('physicalStateLoading')}</span>
+                  </span>
+                ) : effectiveTransitionState === 'OPENING' ? (
+                  <span>{tFaucet('physicalStateOpening')}</span>
+                ) : effectiveTransitionState === 'CLOSING' ? (
+                  <span>{tFaucet('physicalStateClosing')}</span>
+                ) : effectiveTransitionState === 'DISPENSING' ? (
+                  <span>{tFaucet('physicalStateDispensing')}</span>
+                ) : effectiveTransitionState === 'WAITING_CONFIRMATION' ? (
+                  <span>{tFaucet('physicalStateWaitingConfirmation')}</span>
+                ) : (
+                  <span>
+                    {physicalState === 'OPEN'
+                      ? tFaucet('physicalStateOpen')
+                      : physicalState === 'CLOSED'
+                        ? tFaucet('physicalStateClosed')
+                        : tFaucet('physicalStateUnknown')}
+                  </span>
+                )}
+              </span>
+            </div>
           </div>
         </div>
 

@@ -8,6 +8,42 @@ import {
   AuthorizationError,
 } from '../../../../../lib/auth/rbac';
 
+export async function GET(request: Request) {
+  const requestId = `req-${Date.now()}`;
+  try {
+    const session = await requireSession(request);
+    requireActiveAccount(session);
+
+    const userRepo = new UserRepository(prisma);
+    const preferences = await userRepo.getUserPreference(session.id);
+
+    return NextResponse.json({
+      success: true,
+      data: preferences,
+      meta: { requestId },
+    });
+  } catch (error: any) {
+    if (error instanceof AuthorizationError || error?.name === 'AuthorizationError') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: { code: error.code, message: error.message },
+          meta: { requestId },
+        },
+        { status: error.statusCode }
+      );
+    }
+    return NextResponse.json(
+      {
+        success: false,
+        error: { code: 'INTERNAL_ERROR', message: 'Failed to retrieve preferences.' },
+        meta: { requestId },
+      },
+      { status: 500 }
+    );
+  }
+}
+
 export async function PATCH(request: Request) {
   const requestId = `req-${Date.now()}`;
 
@@ -61,6 +97,7 @@ export async function PATCH(request: Request) {
       preferredLocale: parseResult.data.preferredLocale,
       timezone: parseResult.data.timezone,
       defaultDeviceId: parseResult.data.defaultDeviceId,
+      emailAlertsEnabled: parseResult.data.emailAlertsEnabled,
       requestId,
       ipAddress,
       userAgent,

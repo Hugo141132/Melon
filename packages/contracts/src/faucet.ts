@@ -13,6 +13,12 @@ export const FAUCET_PRESET_VOLUMES: Record<number, number> = {
   3: 1500,
 };
 
+/**
+ * Canonical default timeout duration for faucet commands in milliseconds.
+ * Reduced from 5 minutes to 1 minute (60,000 ms).
+ */
+export const FAUCET_COMMAND_DEFAULT_TIMEOUT_MS = 60 * 1000;
+
 export class InvalidFaucetPhaseError extends Error {
   constructor(phase: number) {
     super(

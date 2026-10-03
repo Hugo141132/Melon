@@ -15,10 +15,14 @@ import {
   PowerOff,
   Activity,
 } from 'lucide-react';
-import { useTranslations } from 'next-intl';
-import { cn } from '@/lib/utils';
+import { useTranslations, useLocale } from 'next-intl';
+import { cn, formatRelativeTime } from '@/lib/utils';
 import { formatLitersDisplay } from './FaucetPresetSelector';
-import { ValveTransitionState, deriveValveTransitionState } from './faucet-transition';
+import {
+  AuthoritativePhysicalState,
+  ValveTransitionState,
+  deriveValveTransitionState,
+} from './faucet-transition';
 
 export interface FaucetCommandEventDto {
   id: string;
@@ -64,6 +68,8 @@ export interface FaucetStatusCardProps {
   onCommandUpdated?: (updated: FaucetCommandDto) => void;
   className?: string;
   transitionState?: ValveTransitionState;
+  lastConfirmedPhysicalState?: AuthoritativePhysicalState;
+  lastConfirmedAt?: Date | string | null;
 }
 
 export const ACTIVE_COMMAND_STATUSES = ['QUEUED', 'SENT', 'ACKNOWLEDGED', 'IN_PROGRESS'];
@@ -107,9 +113,12 @@ export default function FaucetStatusCard({
   onCommandUpdated,
   className,
   transitionState: propTransitionState,
+  lastConfirmedPhysicalState = 'UNKNOWN',
+  lastConfirmedAt = null,
 }: FaucetStatusCardProps) {
   const tFaucet = useTranslations('faucet');
   const tCommon = useTranslations('common');
+  const locale = useLocale();
 
   const [currentCommand, setCurrentCommand] = useState<FaucetCommandDto>(command);
   const [isPolling, setIsPolling] = useState(false);
@@ -124,7 +133,15 @@ export default function FaucetStatusCard({
   const isActiveState = ACTIVE_COMMAND_STATUSES.includes(status);
   const action = currentCommand.action || 'DISPENSE';
   const isDispense = action === 'DISPENSE';
-  const physicalState = getAuthoritativePhysicalStateFromCommand(currentCommand);
+  const rawCommandPhysicalState = getAuthoritativePhysicalStateFromCommand(currentCommand);
+  const physicalState =
+    currentCommand.status === 'TIMEOUT' &&
+    lastConfirmedPhysicalState &&
+    lastConfirmedPhysicalState !== 'UNKNOWN'
+      ? lastConfirmedPhysicalState
+      : rawCommandPhysicalState !== 'UNKNOWN'
+        ? rawCommandPhysicalState
+        : lastConfirmedPhysicalState || 'UNKNOWN';
   const transitionState =
     propTransitionState !== undefined
       ? propTransitionState
@@ -476,6 +493,29 @@ export default function FaucetStatusCard({
                       : tFaucet('physicalStateUnknownDesc')}
         </span>
       </div>
+
+      {/* Timeout Warning & Last Confirmed Banner if TIMEOUT */}
+      {currentCommand.status === 'TIMEOUT' && (
+        <div
+          className="p-3.5 bg-amber-50/90 border border-amber-300 rounded-xl text-xs text-amber-900 flex flex-col sm:flex-row sm:items-center justify-between gap-2 animate-fade-in"
+          data-testid="status-card-timeout-warning"
+        >
+          <div className="flex items-center gap-2 font-bold text-amber-800">
+            <AlertTriangle size={16} className="text-amber-600 flex-shrink-0" />
+            <span>
+              {tFaucet('warningLabel')}: {tFaucet('deviceNotRespondingWarning')}
+            </span>
+          </div>
+          {lastConfirmedAt && (
+            <div className="text-[11px] text-amber-800 font-medium">
+              <span>{tFaucet('lastConfirmedLabel')}: </span>
+              <span className="font-bold text-app-on-surface">
+                {formatRelativeTime(lastConfirmedAt, locale)}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Reason / Failure Banner if FAILED */}
       {currentCommand.status === 'FAILED' &&
