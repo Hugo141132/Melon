@@ -111,18 +111,6 @@ export const CANONICAL_PERMISSIONS: SeedPermissionDef[] = [
     adminAccess: false,
   },
   {
-    code: 'device.deactivate',
-    description: 'Deactivate device',
-    ownerAccess: true,
-    adminAccess: false,
-  },
-  {
-    code: 'device.activate',
-    description: 'Reactivate device',
-    ownerAccess: true,
-    adminAccess: false,
-  },
-  {
     code: 'device.assign',
     description: 'Assign device to user',
     ownerAccess: true,
@@ -373,18 +361,21 @@ export async function seedCanonicalDevices(prisma: PrismaClient, siteId: string)
   const devices = [
     {
       deviceId: 'soil-node-001',
+      clientId: 'melon-esp32-tanah1',
       deviceType: DeviceType.SOIL_NODE,
       name: 'Soil Monitoring Node',
       capabilities: ['SOIL_TELEMETRY'],
     },
     {
       deviceId: 'water-quality-node-001',
+      clientId: 'melon-esp32-air1',
       deviceType: DeviceType.WATER_QUALITY_NODE,
       name: 'Water Quality Node',
       capabilities: ['WATER_TELEMETRY'],
     },
     {
       deviceId: 'water-tank-node-zi37gz',
+      clientId: 'NodeMCU_Irigasi_Fix',
       deviceType: DeviceType.WATER_TANK_NODE,
       name: 'Water Tank',
       capabilities: ['WATER_TANK_VOLUME', 'FAUCET_CONTROL'],
@@ -395,12 +386,14 @@ export async function seedCanonicalDevices(prisma: PrismaClient, siteId: string)
     const device = await prisma.device.upsert({
       where: { deviceId: d.deviceId },
       update: {
+        clientId: d.clientId,
         name: d.name,
         deviceType: d.deviceType,
         siteId: siteId,
       },
       create: {
         deviceId: d.deviceId,
+        clientId: d.clientId,
         name: d.name,
         deviceType: d.deviceType,
         siteId: siteId,

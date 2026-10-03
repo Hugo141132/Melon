@@ -6,7 +6,6 @@ import {
   Cpu,
   Search,
   Edit2,
-  PowerOff,
   Loader2,
   ChevronLeft,
   ChevronRight,
@@ -15,10 +14,10 @@ import {
   AlertTriangle,
   Clock,
   Radio,
-  RotateCcw,
 } from 'lucide-react';
 import { useTranslations, useLocale } from 'next-intl';
 import { useAuth } from '@/context/AuthContext';
+import { useOptionalDeviceContext } from '@/context/DeviceContext';
 
 interface PublicSafeDeviceDto {
   id: string;
@@ -54,6 +53,7 @@ export default function DeviceRegistryPage() {
   const locale = useLocale();
   const { role, setUser, invalidateSession } = useAuth();
   const isOwner = role === 'OWNER';
+  const deviceContext = useOptionalDeviceContext();
 
   // List state
   const [devices, setDevices] = useState<PublicSafeDeviceDto[]>([]);
@@ -78,16 +78,6 @@ export default function DeviceRegistryPage() {
   const [editDeviceId, setEditDeviceId] = useState('');
   const [editName, setEditName] = useState('');
   const [editSubmitting, setEditSubmitting] = useState(false);
-
-  // Deactivate Modal State
-  const [deactivateDevice, setDeactivateDevice] = useState<PublicSafeDeviceDto | null>(null);
-  const [deactivateModalOpen, setDeactivateModalOpen] = useState(false);
-  const [deactivateSubmitting, setDeactivateSubmitting] = useState(false);
-
-  // Activate Modal State
-  const [activateDevice, setActivateDevice] = useState<PublicSafeDeviceDto | null>(null);
-  const [activateModalOpen, setActivateModalOpen] = useState(false);
-  const [activateSubmitting, setActivateSubmitting] = useState(false);
 
   // Fetch devices (supports silent refetch to prevent skeleton flicker)
   const fetchDevices = useCallback(
@@ -163,6 +153,31 @@ export default function DeviceRegistryPage() {
           prev.map((d) => (d.id === editDevice.id ? { ...d, ...json.data } : d))
         );
         fetchDevices(pagination.page, true);
+
+        // Update global DeviceContext and sync URL state after rotation
+        if (deviceContext?.refetchDevices) {
+          await deviceContext.refetchDevices();
+          if (
+            deviceContext.selectedDeviceId === editDevice.id ||
+            deviceContext.selectedDeviceId === editDevice.deviceId
+          ) {
+            deviceContext.selectDevice(json.data.id || json.data.deviceId);
+          }
+        }
+
+        // Sync URL query param if present on the active page
+        if (typeof window !== 'undefined') {
+          try {
+            const url = new URL(window.location.href);
+            const currentParam = url.searchParams.get('deviceId');
+            if (currentParam === editDevice.id || currentParam === editDevice.deviceId) {
+              url.searchParams.set('deviceId', json.data.deviceId || json.data.id);
+              window.history.replaceState(window.history.state, '', url.toString());
+            }
+          } catch {
+            // Ignore URL update failure
+          }
+        }
       } else {
         setErrorMsg(json.error?.message || tDevices('updateFailed'));
       }
@@ -173,88 +188,11 @@ export default function DeviceRegistryPage() {
     }
   };
 
-  // Handle Deactivate Device
-  const handleDeactivate = async () => {
-    if (!deactivateDevice) return;
-
-    setDeactivateSubmitting(true);
-    setErrorMsg(null);
-
-    try {
-      const targetIdentifier = deactivateDevice.deviceId || deactivateDevice.id;
-      const res = await fetch(`/api/v1/devices/${targetIdentifier}/deactivate`, {
-        method: 'POST',
-      });
-
-      const json = await res.json();
-      if (json.success) {
-        setSuccessMsg(tDevices('deactivateSuccess', { name: deactivateDevice.name }));
-        setDeactivateModalOpen(false);
-        const targetId = deactivateDevice.id;
-        setDeactivateDevice(null);
-        setDevices((prev) =>
-          prev.map((d) =>
-            d.id === targetId
-              ? { ...d, accountStatus: 'DEACTIVATED', connectionStatus: 'INACTIVE' }
-              : d
-          )
-        );
-        fetchDevices(pagination.page, true);
-      } else {
-        setErrorMsg(json.error?.message || tDevices('deactivateFailed'));
-      }
-    } catch {
-      setErrorMsg(tDevices('networkErrorDeactivate'));
-    } finally {
-      setDeactivateSubmitting(false);
-    }
-  };
-
-  // Handle Activate Device
-  const handleActivate = async () => {
-    if (!activateDevice) return;
-
-    setActivateSubmitting(true);
-    setErrorMsg(null);
-
-    try {
-      const targetIdentifier = activateDevice.deviceId || activateDevice.id;
-      const res = await fetch(`/api/v1/devices/${targetIdentifier}/activate`, {
-        method: 'POST',
-      });
-
-      const json = await res.json();
-      if (json.success) {
-        setSuccessMsg(tDevices('activateSuccess', { name: activateDevice.name }));
-        setActivateModalOpen(false);
-        const targetId = activateDevice.id;
-        setActivateDevice(null);
-        setDevices((prev) =>
-          prev.map((d) =>
-            d.id === targetId ? { ...d, accountStatus: 'ACTIVE', connectionStatus: 'UNKNOWN' } : d
-          )
-        );
-        fetchDevices(pagination.page, true);
-      } else {
-        setErrorMsg(json.error?.message || tDevices('activateFailed'));
-      }
-    } catch {
-      setErrorMsg(tDevices('networkErrorActivate'));
-    } finally {
-      setActivateSubmitting(false);
-    }
-  };
-
-  // User-facing device status simplification: Connected, Disconnected, Inactive
+  // User-facing device status simplification: Connected and Disconnected
   const displayedDevices = devices.filter((device) => {
-    const isOnline = device.accountStatus !== 'DEACTIVATED' && device.connectionStatus === 'ONLINE';
-    const isInactive =
-      device.accountStatus === 'DEACTIVATED' || device.connectionStatus === 'INACTIVE';
-    const isDisconnected = !isOnline && !isInactive;
-
+    const isOnline = device.connectionStatus === 'ONLINE';
     if (statusFilter === 'CONNECTED') return isOnline;
-    if (statusFilter === 'DISCONNECTED') return isDisconnected;
-    if (statusFilter === 'INACTIVE') return isInactive;
+    if (statusFilter === 'DISCONNECTED') return !isOnline;
     return true;
   });
 
@@ -338,7 +276,6 @@ export default function DeviceRegistryPage() {
               <option value="ALL">{tDevices('allStatuses')}</option>
               <option value="CONNECTED">{tDevices('connected')}</option>
               <option value="DISCONNECTED">{tDevices('disconnected')}</option>
-              <option value="INACTIVE">{tDevices('inactive')}</option>
             </select>
           </div>
         </div>
@@ -380,8 +317,6 @@ export default function DeviceRegistryPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {displayedDevices.map((device) => {
-              const isDeactivated = device.accountStatus === 'DEACTIVATED';
-
               // Helper to resolve user-friendly parameter items with proper measurement names and units
               const resolveParameters = () => {
                 const rawCaps = device.capabilities || [];
@@ -497,15 +432,9 @@ export default function DeviceRegistryPage() {
                 }
               };
 
-              const isOnline =
-                device.accountStatus !== 'DEACTIVATED' && device.connectionStatus === 'ONLINE';
-              const isInactive =
-                device.accountStatus === 'DEACTIVATED' || device.connectionStatus === 'INACTIVE';
+              const isOnline = device.connectionStatus === 'ONLINE';
 
               const getConnectionStatusLabel = () => {
-                if (isInactive) {
-                  return tDevices('inactive');
-                }
                 if (isOnline) {
                   return tDevices('connected');
                 }
@@ -515,11 +444,7 @@ export default function DeviceRegistryPage() {
               return (
                 <div
                   key={device.id}
-                  className={`bg-app-surface-container-lowest p-4 sm:p-5 rounded-xl soft-elevation border transition-all duration-200 flex flex-col justify-between ${
-                    isDeactivated
-                      ? 'border-gray-200 opacity-60 bg-gray-50/80'
-                      : 'border-app-outline-variant/30 hover:border-app-primary/40 hover:-translate-y-0.5 hover:shadow-md'
-                  }`}
+                  className="bg-app-surface-container-lowest p-4 sm:p-5 rounded-xl soft-elevation border border-app-outline-variant/30 hover:border-app-primary/40 hover:-translate-y-0.5 hover:shadow-md transition-all duration-200 flex flex-col justify-between"
                 >
                   <div>
                     {/* Top Row: Connection Status & Domain Badge on left, Owner actions on right */}
@@ -529,9 +454,7 @@ export default function DeviceRegistryPage() {
                           className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1.5 ${
                             isOnline
                               ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
-                              : isInactive
-                                ? 'bg-gray-100 text-gray-700 border border-gray-200/60'
-                                : 'bg-rose-50 text-rose-700 border border-rose-200/60'
+                              : 'bg-rose-50 text-rose-700 border border-rose-200/60'
                           }`}
                         >
                           {isOnline && (
@@ -547,44 +470,18 @@ export default function DeviceRegistryPage() {
 
                       {isOwner && (
                         <div className="flex items-center gap-1 flex-shrink-0">
-                          {!isDeactivated && (
-                            <button
-                              onClick={() => {
-                                setEditDevice(device);
-                                setEditDeviceId(device.deviceId || '');
-                                setEditName(device.name);
-                                setEditModalOpen(true);
-                              }}
-                              className="p-1.5 rounded-lg hover:bg-app-surface-container text-app-on-surface-variant transition-colors active:scale-95"
-                              title={tCommon('edit')}
-                            >
-                              <Edit2 size={15} />
-                            </button>
-                          )}
-                          {!isDeactivated && (
-                            <button
-                              onClick={() => {
-                                setDeactivateDevice(device);
-                                setDeactivateModalOpen(true);
-                              }}
-                              className="p-1.5 rounded-lg hover:bg-amber-50 text-amber-700 transition-colors active:scale-95"
-                              title={tDevices('deactivateConfirmTitle')}
-                            >
-                              <PowerOff size={15} />
-                            </button>
-                          )}
-                          {isDeactivated && (
-                            <button
-                              onClick={() => {
-                                setActivateDevice(device);
-                                setActivateModalOpen(true);
-                              }}
-                              className="p-1.5 rounded-lg hover:bg-emerald-50 text-emerald-600 transition-colors active:scale-95"
-                              title={tDevices('activateConfirmTitle')}
-                            >
-                              <RotateCcw size={15} />
-                            </button>
-                          )}
+                          <button
+                            onClick={() => {
+                              setEditDevice(device);
+                              setEditDeviceId(device.deviceId || '');
+                              setEditName(device.name);
+                              setEditModalOpen(true);
+                            }}
+                            className="p-1.5 rounded-lg hover:bg-app-surface-container text-app-on-surface-variant transition-colors active:scale-95"
+                            title={tCommon('edit')}
+                          >
+                            <Edit2 size={15} />
+                          </button>
                         </div>
                       )}
                     </div>
@@ -781,84 +678,6 @@ export default function DeviceRegistryPage() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* Deactivate Device Confirm Modal */}
-      {deactivateModalOpen && deactivateDevice && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-app-surface-container-lowest rounded-2xl max-w-md w-full p-6 space-y-5 soft-elevation-lg animate-scale-up">
-            <div className="flex items-center gap-3 text-amber-600">
-              <AlertTriangle size={24} />
-              <h3 className="text-[18px] font-bold">{tDevices('deactivateConfirmTitle')}</h3>
-            </div>
-
-            <p className="text-[14px] text-app-on-surface-variant leading-relaxed">
-              {tDevices('deactivatePrompt', { name: deactivateDevice.name })}
-              <br />
-              <br />
-              <span className="text-amber-700 font-medium">{tDevices('deactivateWarning')}</span>
-            </p>
-
-            <div className="flex items-center justify-end gap-3 pt-3 border-t border-app-outline-variant/20">
-              <button
-                type="button"
-                onClick={() => setDeactivateModalOpen(false)}
-                className="px-4 py-2 text-[14px] font-semibold text-app-on-surface-variant hover:bg-app-surface-container rounded-xl"
-              >
-                {tCommon('cancel')}
-              </button>
-              <button
-                type="button"
-                onClick={handleDeactivate}
-                disabled={deactivateSubmitting}
-                className="inline-flex items-center gap-2 px-5 py-2 text-[14px] font-semibold bg-amber-600 text-white rounded-xl hover:bg-amber-700 disabled:opacity-50"
-              >
-                {deactivateSubmitting && <Loader2 size={16} className="animate-spin" />}
-                <span>{tDevices('deactivateConfirmBtn')}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Activate Confirm Modal */}
-      {activateModalOpen && activateDevice && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-app-surface-container-lowest rounded-2xl max-w-md w-full p-6 space-y-5 soft-elevation-lg animate-scale-up border border-emerald-200">
-            <div className="flex items-center gap-3 text-emerald-600">
-              <CheckCircle2 size={24} />
-              <h3 className="text-[18px] font-bold">{tDevices('activateConfirmTitle')}</h3>
-            </div>
-
-            <p className="text-[14px] text-app-on-surface-variant leading-relaxed">
-              {tDevices('activatePrompt', { name: activateDevice.name })}
-              <br />
-              <br />
-              <span className="text-emerald-700 font-medium block bg-emerald-50 p-3 rounded-xl border border-emerald-200">
-                {tDevices('activateWarning')}
-              </span>
-            </p>
-
-            <div className="flex items-center justify-end gap-3 pt-3 border-t border-app-outline-variant/20">
-              <button
-                type="button"
-                onClick={() => setActivateModalOpen(false)}
-                className="px-4 py-2 text-[14px] font-semibold text-app-on-surface-variant hover:bg-app-surface-container rounded-xl"
-              >
-                {tCommon('cancel')}
-              </button>
-              <button
-                type="button"
-                onClick={handleActivate}
-                disabled={activateSubmitting}
-                className="inline-flex items-center gap-2 px-5 py-2 text-[14px] font-semibold bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                {activateSubmitting && <Loader2 size={16} className="animate-spin" />}
-                <span>{tDevices('activateConfirmBtn')}</span>
-              </button>
-            </div>
           </div>
         </div>
       )}

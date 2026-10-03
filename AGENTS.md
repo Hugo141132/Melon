@@ -522,6 +522,32 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
   - 21st.dev MCP: `NOT REQUIRED`
   - Summary: Reconciled device connection status naming and filtering across the global header `DeviceSelector`, `/soil`, `/water`, `/controls` (`WaterTankMonitoringCard`, `FaucetPresetSelector`, `FaucetConfirmationModal`), and `DashboardView` per `DEC-DEV-034` and `DEC-UIUX-106`. Enforced two canonical user-facing connection states: Connected (`ONLINE`) and Disconnected (`OFFLINE`, `STALE`, `UNKNOWN`), completely eliminating the intermediate "Stale" label from user-facing badges, dots, and tabs. Added frontend normalization utilities (`normalizeConnectionStatus`, `getConnectionStatusLabel`, `getConnectionStatusDotColor`) in `apps/web/lib/utils.ts`. Standardized semantic dot indicators strictly to emerald (`bg-emerald-500`) for Connected and rose (`bg-rose-500`) for Disconnected. Updated selector quick status filter tabs to All / Connected / Disconnected (`Semua` / `Terhubung` / `Terputus`), with `Disconnected` capturing both offline and stale devices. Preserved internal backend telemetry freshness evaluation (`TELEMETRY_STALE_THRESHOLD_MS = 60000`) and MQTT ingestion logic intact. Verified 100% test pass rate across 82 test files (687/687 tests in `@kebun-melon/web`), 0 TypeScript typecheck errors across all 4 monorepo packages, and zero staging modifications.
 
+#### TASK-0302 Governance Record
+
+`TASK-0302` device identity security rotation & lifecycle cleanup record:
+- Status: `DONE` (Completed 2026-10-03)
+- Frontend impact: `MINOR`
+- Selected UI direction: `Premium Minimal Ops`
+- Existing color template: `UNCHANGED`
+- Selected motion effects: `None`
+- 21st.dev MCP: `NOT REQUIRED`
+- Summary: Reconciled Device Identity Security Rotation and removed device activation/deactivation lifecycle per `DEC-DEV-038` and `DEC-DEV-039`:
+  - **Three-Tier Identity Triad (`DEC-DEV-038`)**:
+    - Retained `devices.id` as immutable PostgreSQL UUID primary key and relational foreign key anchor.
+    - Standardized `devices.device_id` as an OWNER-rotatable security identifier (`PATCH /api/v1/devices/{deviceId}`). Rotating `device_id` invalidates the old identifier immediately (lookups for previous string return HTTP 404).
+    - Preserved `devices.client_id` as the physical hardware MQTT identity (`melon-esp32-tanah1`, `melon-esp32-air1`, `NodeMCU_Irigasi_Fix`). Microcontrollers transmit without firmware reflashing during security rotation.
+    - Updated IoT gateway telemetry ingestion to resolve hardware via `client_id` and persist telemetry directly using `devices.id` UUID.
+    - Added structured audit logging for `device.identifier_rotated` capturing previous and new identifiers, actor ID, and device UUID.
+    - Synchronized frontend `DeviceContext` and URL search parameters upon rotation via `refetchDevices` and `selectDevice`.
+  - **Device Deactivation Removal (`DEC-DEV-039`)**:
+    - Completely deleted API routes `POST /api/v1/devices/{deviceId}/deactivate` and `POST /api/v1/devices/{deviceId}/activate`.
+    - Removed repository methods `deactivateDevice` and `activateDevice` from `DeviceRepository`.
+    - Retired permissions `device.deactivate` and `device.activate` from `seed.ts` and RBAC catalog.
+    - Cleaned up `/devices` UI: removed Deactivate (`PowerOff`) and Activate (`RotateCcw`) action buttons and modals; retained strictly the Owner Edit (`Edit2`) button.
+    - Cleaned up connection status filter: removed "Inactive" option, standardizing strictly on 2 operational states: Connected (`ONLINE`) and Disconnected (`OFFLINE`, `STALE`, `UNKNOWN`).
+    - Preserved PostgreSQL schema (`devices.account_status` and `devices.deactivated_at`) to eliminate migration overhead and prevent schema drift.
+  - **Verification**: 55/55 targeted unit tests passed, 133/133 full test files (1,380/1,380 tests) passed across monorepo packages, and 0 TypeScript typecheck errors across all 4 workspaces.
+
 #### TASK-0304 / TASK-0305 Governance Record
 
 `TASK-0304` / `TASK-0305` device access revocation enforcement & human-readable 403 forbidden state record:

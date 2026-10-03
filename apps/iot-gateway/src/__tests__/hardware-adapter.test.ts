@@ -647,4 +647,27 @@ describe('HardwareMqttAdapter (TASK-0411 / Hardware Compatibility Layer)', () =>
       );
     });
   });
+
+  describe('Dynamic Target Device Resolution & Identity Rotation', () => {
+    it('resolves WATER_TANK_NODE by client_id = NodeMCU_Irigasi_Fix from database registry', async () => {
+      const mockDbDevice = {
+        id: 'tank-uuid-999',
+        deviceId: 'water-tank-rotated-001',
+        siteId: 'site-alpha',
+        accountStatus: 'ACTIVE',
+      };
+      const mockRepo = {
+        getDeviceByClientId: vi.fn().mockResolvedValue(mockDbDevice),
+      };
+
+      const customAdapter = new HardwareMqttAdapter({
+        env: { ...mockEnv, WATER_TANK_DEVICE_ID: 'static-fallback-id' },
+        deviceRepo: mockRepo as any,
+      });
+
+      const resolved = await customAdapter.resolveTargetDeviceId();
+      expect(mockRepo.getDeviceByClientId).toHaveBeenCalledWith('NodeMCU_Irigasi_Fix');
+      expect(resolved).toBe('water-tank-rotated-001');
+    });
+  });
 });

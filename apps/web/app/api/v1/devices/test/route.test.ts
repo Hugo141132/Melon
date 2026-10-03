@@ -1,8 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { GET } from '../route';
 import { GET as GET_DETAIL, PATCH } from '../[deviceId]/route';
-import { POST as DEACTIVATE } from '../[deviceId]/deactivate/route';
-import { POST as ACTIVATE } from '../[deviceId]/activate/route';
 import { AccountStatus, UserRole, DeviceType } from '@kebun-melon/contracts';
 import * as dbModule from '@kebun-melon/database';
 
@@ -19,8 +17,6 @@ vi.mock('next/headers', () => ({
 const mockGetDevices = vi.fn();
 const mockGetDeviceByCanonicalId = vi.fn();
 const mockUpdateDevice = vi.fn();
-const mockDeactivateDevice = vi.fn();
-const mockActivateDevice = vi.fn();
 const mockFindManyUserDeviceAccess = vi.fn().mockResolvedValue([]);
 const mockFindFirstUserDeviceAccess = vi.fn().mockResolvedValue(null);
 
@@ -46,12 +42,6 @@ vi.mock('@kebun-melon/database', async (importOriginal) => {
       }
       updateDevice(...args: any[]) {
         return mockUpdateDevice(...args);
-      }
-      deactivateDevice(...args: any[]) {
-        return mockDeactivateDevice(...args);
-      }
-      activateDevice(...args: any[]) {
-        return mockActivateDevice(...args);
       }
     },
   };
@@ -549,88 +539,6 @@ describe('Device Registry API Endpoints (TASK-0302 & TASK-0305)', () => {
 
       expect(res.status).toBe(422);
       expect(json.error.code).toBe('VALIDATION_ERROR');
-    });
-  });
-
-  describe('POST /api/v1/devices/[deviceId]/deactivate', () => {
-    it('deactivates device when called by Owner', async () => {
-      mockOwnerSession();
-
-      mockDeactivateDevice.mockResolvedValueOnce({
-        id: 'dev-1',
-        deviceId: 'water-node-001',
-        accountStatus: 'DEACTIVATED',
-        connectionStatus: 'INACTIVE',
-      });
-
-      const req = new Request('http://localhost/api/v1/devices/water-node-001/deactivate', {
-        method: 'POST',
-      });
-
-      const res = await DEACTIVATE(req, {
-        params: Promise.resolve({ deviceId: 'water-node-001' }),
-      });
-      const json = await res.json();
-
-      expect(res.status).toBe(200);
-      expect(json.data.accountStatus).toBe('DEACTIVATED');
-      expect(json.data.connectionStatus).toBe('INACTIVE');
-    });
-  });
-
-  describe('POST /api/v1/devices/[deviceId]/activate', () => {
-    it('activates device when called by Owner', async () => {
-      mockOwnerSession();
-
-      mockActivateDevice.mockResolvedValueOnce({
-        id: 'dev-1',
-        deviceId: 'water-node-001',
-        accountStatus: 'ACTIVE',
-        connectionStatus: 'UNKNOWN',
-      });
-
-      const req = new Request('http://localhost/api/v1/devices/water-node-001/activate', {
-        method: 'POST',
-      });
-
-      const res = await ACTIVATE(req, { params: Promise.resolve({ deviceId: 'water-node-001' }) });
-      const json = await res.json();
-
-      expect(res.status).toBe(200);
-      expect(json.data.accountStatus).toBe('ACTIVE');
-      expect(json.data.connectionStatus).toBe('UNKNOWN');
-    });
-
-    it('rejects activate request by Admin with 403 INSUFFICIENT_PERMISSION', async () => {
-      mockAdminSession();
-
-      const req = new Request('http://localhost/api/v1/devices/water-node-001/activate', {
-        method: 'POST',
-      });
-
-      const res = await ACTIVATE(req, { params: Promise.resolve({ deviceId: 'water-node-001' }) });
-      const json = await res.json();
-
-      expect(res.status).toBe(403);
-      expect(json.error.code).toBe('INSUFFICIENT_PERMISSION');
-    });
-
-    it('returns 404 DEVICE_NOT_FOUND when device does not exist', async () => {
-      mockOwnerSession();
-
-      mockActivateDevice.mockRejectedValueOnce(
-        new dbModule.DeviceNotFoundError("Device 'non-existent' not found.")
-      );
-
-      const req = new Request('http://localhost/api/v1/devices/non-existent/activate', {
-        method: 'POST',
-      });
-
-      const res = await ACTIVATE(req, { params: Promise.resolve({ deviceId: 'non-existent' }) });
-      const json = await res.json();
-
-      expect(res.status).toBe(404);
-      expect(json.error.code).toBe('DEVICE_NOT_FOUND');
     });
   });
 });

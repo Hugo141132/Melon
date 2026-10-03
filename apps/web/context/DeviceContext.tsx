@@ -473,6 +473,10 @@ export function DeviceProvider({
   );
 }
 
+export function useOptionalDeviceContext(): DeviceContextType | null {
+  return useContext(DeviceContext) || null;
+}
+
 export function useDeviceContext(): DeviceContextType {
   const context = useContext(DeviceContext);
   if (!context) {

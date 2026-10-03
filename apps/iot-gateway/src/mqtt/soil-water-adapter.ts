@@ -130,15 +130,12 @@ export class SoilWaterMqttAdapter {
   }
 
   /**
-   * Dynamically resolves database deviceId for SOIL_NODE using MQTT client identity.
-   * Priority:
-   * 1. Check in-memory resolution cache (TTL 30s)
-   * 2. Query devices by client_id = targetClientId (primary identity source)
-   * 3. Query devices by canonical deviceId / UUID (if incoming identifier was specified)
-   * Returns canonical deviceId if active SOIL_NODE, or null if unknown/unauthorized.
-   * DOES NOT fall back to arbitrary active device.
+   * Dynamically resolves database device entity for SOIL_NODE using MQTT client identity.
+   * Returns { deviceId, id } where id is the immutable database UUID.
    */
-  public async resolveSoilDeviceId(incomingClientId?: string): Promise<string | null> {
+  public async resolveSoilDevice(
+    incomingClientId?: string
+  ): Promise<{ deviceId: string; id: string } | null> {
     if (!incomingClientId || !incomingClientId.trim()) {
       return null;
     }
@@ -146,7 +143,7 @@ export class SoilWaterMqttAdapter {
 
     const cached = this.deviceCache.get(targetClientId);
     if (cached && Date.now() - cached.cachedAt < this.CACHE_TTL_MS) {
-      return cached.deviceId;
+      return { deviceId: cached.deviceId, id: cached.id };
     }
 
     if (this.deviceRepo) {
@@ -166,7 +163,7 @@ export class SoilWaterMqttAdapter {
               id: deviceByClient.id,
               cachedAt: Date.now(),
             });
-            return deviceByClient.deviceId;
+            return { deviceId: deviceByClient.deviceId, id: deviceByClient.id };
           }
           logger.warn(
             'Device with clientId found but incompatible or inactive for soil telemetry',
@@ -191,7 +188,7 @@ export class SoilWaterMqttAdapter {
               id: deviceByCanonical.id,
               cachedAt: Date.now(),
             });
-            return deviceByCanonical.deviceId;
+            return { deviceId: deviceByCanonical.deviceId, id: deviceByCanonical.id };
           }
           logger.warn(
             'Device with canonical ID found but incompatible or inactive for soil telemetry',
@@ -215,15 +212,26 @@ export class SoilWaterMqttAdapter {
   }
 
   /**
-   * Dynamically resolves database deviceId for WATER_QUALITY_NODE using MQTT client identity.
+   * Dynamically resolves database deviceId for SOIL_NODE using MQTT client identity.
    * Priority:
    * 1. Check in-memory resolution cache (TTL 30s)
    * 2. Query devices by client_id = targetClientId (primary identity source)
    * 3. Query devices by canonical deviceId / UUID (if incoming identifier was specified)
-   * Returns canonical deviceId if active WATER_QUALITY_NODE, or null if unknown/unauthorized.
+   * Returns canonical deviceId if active SOIL_NODE, or null if unknown/unauthorized.
    * DOES NOT fall back to arbitrary active device.
    */
-  public async resolveWaterDeviceId(incomingClientId?: string): Promise<string | null> {
+  public async resolveSoilDeviceId(incomingClientId?: string): Promise<string | null> {
+    const dev = await this.resolveSoilDevice(incomingClientId);
+    return dev ? dev.deviceId : null;
+  }
+
+  /**
+   * Dynamically resolves database device entity for WATER_QUALITY_NODE using MQTT client identity.
+   * Returns { deviceId, id } where id is the immutable database UUID.
+   */
+  public async resolveWaterDevice(
+    incomingClientId?: string
+  ): Promise<{ deviceId: string; id: string } | null> {
     if (!incomingClientId || !incomingClientId.trim()) {
       return null;
     }
@@ -231,7 +239,7 @@ export class SoilWaterMqttAdapter {
 
     const cached = this.deviceCache.get(targetClientId);
     if (cached && Date.now() - cached.cachedAt < this.CACHE_TTL_MS) {
-      return cached.deviceId;
+      return { deviceId: cached.deviceId, id: cached.id };
     }
 
     if (this.deviceRepo) {
@@ -252,7 +260,7 @@ export class SoilWaterMqttAdapter {
               id: deviceByClient.id,
               cachedAt: Date.now(),
             });
-            return deviceByClient.deviceId;
+            return { deviceId: deviceByClient.deviceId, id: deviceByClient.id };
           }
           logger.warn(
             'Device with clientId found but incompatible or inactive for water quality telemetry',
@@ -277,7 +285,7 @@ export class SoilWaterMqttAdapter {
               id: deviceByCanonical.id,
               cachedAt: Date.now(),
             });
-            return deviceByCanonical.deviceId;
+            return { deviceId: deviceByCanonical.deviceId, id: deviceByCanonical.id };
           }
           logger.warn(
             'Device with canonical ID found but incompatible or inactive for water quality telemetry',
@@ -298,6 +306,20 @@ export class SoilWaterMqttAdapter {
 
     // Explicit rejection: unknown or unmapped device
     return null;
+  }
+
+  /**
+   * Dynamically resolves database deviceId for WATER_QUALITY_NODE using MQTT client identity.
+   * Priority:
+   * 1. Check in-memory resolution cache (TTL 30s)
+   * 2. Query devices by client_id = targetClientId (primary identity source)
+   * 3. Query devices by canonical deviceId / UUID (if incoming identifier was specified)
+   * Returns canonical deviceId if active WATER_QUALITY_NODE, or null if unknown/unauthorized.
+   * DOES NOT fall back to arbitrary active device.
+   */
+  public async resolveWaterDeviceId(incomingClientId?: string): Promise<string | null> {
+    const dev = await this.resolveWaterDevice(incomingClientId);
+    return dev ? dev.deviceId : null;
   }
 
   public isConfigured(): boolean {
@@ -498,14 +520,16 @@ export class SoilWaterMqttAdapter {
       return { success: false, reason: 'MISSING_CLIENT_ID' };
     }
 
-    const targetDeviceId = await this.resolveSoilDeviceId(incomingIdentifier);
-    if (!targetDeviceId) {
+    const targetDevice = await this.resolveSoilDevice(incomingIdentifier);
+    if (!targetDevice) {
       metricsCollector.incrementUnknownDeviceAttempts();
       logger.warn('Soil telemetry message rejected: unknown or unauthorized device clientId', {
         clientId: incomingIdentifier,
       });
       return { success: false, reason: 'UNKNOWN_DEVICE_CLIENT_ID' };
     }
+    const targetDeviceId = targetDevice.deviceId;
+    const targetDeviceUuid = targetDevice.id;
 
     if (!this.telemetryRepo) {
       logger.warn('TelemetryRepository not available for soil telemetry ingestion');
@@ -514,7 +538,7 @@ export class SoilWaterMqttAdapter {
 
     try {
       const result = await this.telemetryRepo.ingestSoilReading({
-        deviceId: targetDeviceId,
+        deviceId: targetDeviceUuid,
         messageId: normalized.messageId!,
         schemaVersion: '1.0',
         sequenceNumber: normalized.sequence,
@@ -746,8 +770,8 @@ export class SoilWaterMqttAdapter {
       return { success: false, reason: 'MISSING_CLIENT_ID' };
     }
 
-    const targetDeviceId = await this.resolveWaterDeviceId(incomingIdentifier);
-    if (!targetDeviceId) {
+    const targetDevice = await this.resolveWaterDevice(incomingIdentifier);
+    if (!targetDevice) {
       metricsCollector.incrementUnknownDeviceAttempts();
       logger.warn(
         'Water quality telemetry message rejected: unknown or unauthorized device clientId',
@@ -757,6 +781,8 @@ export class SoilWaterMqttAdapter {
       );
       return { success: false, reason: 'UNKNOWN_DEVICE_CLIENT_ID' };
     }
+    const targetDeviceId = targetDevice.deviceId;
+    const targetDeviceUuid = targetDevice.id;
 
     if (!this.telemetryRepo) {
       logger.warn('TelemetryRepository not available for water telemetry ingestion');
@@ -765,7 +791,7 @@ export class SoilWaterMqttAdapter {
 
     try {
       const result = await this.telemetryRepo.ingestWaterReading({
-        deviceId: targetDeviceId,
+        deviceId: targetDeviceUuid,
         messageId: normalized.messageId!,
         schemaVersion: '1.0',
         sequenceNumber: normalized.sequence,

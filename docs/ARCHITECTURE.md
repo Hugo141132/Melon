@@ -85,7 +85,13 @@ Every device-specific operation shall be scoped by a canonical `deviceId`. Servi
 
 Authorised device endpoints (`GET /api/v1/devices`, `GET /api/v1/devices/{deviceId}`) enforce role-based projection and scoping (`DEC-DEV-028` / `TASK-0305`): Owner receives global visibility with canonical `deviceId`, while Admin visibility is strictly limited to active assignments (`revokedAt IS NULL`) with canonical `deviceId` strictly concealed. Safe internal database UUID `id` is retained.
 
-**Device Lifecycle & Zero Hard Deletion (`DEC-DEV-030`)**: Devices are pre-provisioned via database seeds (including canonical devices `soil-node-001`, `water-quality-node-001`, and `water-tank-node-zi37gz`) and visible to Owner by default. In-app device creation and hard deletion are eliminated to safeguard historical telemetry and audit trails. Device state transitions between `ACTIVE` and `DEACTIVATED` via dedicated `POST /activate` and `POST /deactivate` endpoints guarded by Owner RBAC permissions.
+**Device Identity Security Rotation & Zero Hard Deletion (`DEC-DEV-030`, `DEC-DEV-038`, `DEC-DEV-039`)**: Devices are pre-provisioned via database seeds (including canonical devices `soil-node-001`, `water-quality-node-001`, and `water-tank-node-zi37gz`) and visible to Owner by default. In-app device creation and hard deletion are eliminated to safeguard historical telemetry and audit trails.
+- **Identity Triad (`DEC-DEV-038`)**:
+  - `devices.id` (UUID): Immutable database primary key. Serves as the authoritative relational foreign key for all child records (telemetry, commands, alerts, assignments).
+  - `devices.device_id`: Mutable security identifier rotatable by `OWNER` from UI/API (`PATCH /api/v1/devices/{deviceId}`). Invalidation of the previous identifier is immediate.
+  - `devices.client_id`: Hardware MQTT client identifier matching microcontroller firmware (`melon-esp32-tanah1`, `melon-esp32-air1`, `NodeMCU_Irigasi_Fix`). Microcontrollers transmit without firmware reflashing during rotation.
+  - **Internal Telemetry Routing**: Telemetry ingestion resolves hardware via `client_id` and persists records using the immutable `devices.id` UUID.
+- **Deactivation Removal (`DEC-DEV-039`)**: Administrative activation and deactivation endpoints and `device.activate`/`device.deactivate` permissions are removed. Operational monitoring evaluates strictly two states: **Connected** (`ONLINE`) and **Disconnected** (`OFFLINE`, `STALE`, `UNKNOWN`).
 
 No service shall assume that only one device exists. Domain routes use canonical `/soil` and `/water` paths; legacy `/tanah` and `/air` paths return 404 Not Found.
 
@@ -1967,7 +1973,7 @@ The following architecture facts are supported by the verified implementation of
    - Eliminates redundant client-side `useEffect` call and `fetch('/api/v1/auth/session')` request on mount.
    - Completely removes the blocking `"Checking user session..."` screen (`tAuth('checkingSession')`), enabling immediate invocation of `fetchDevices(1)` upon mount.
 3. **Preserved Security & Authorization Boundaries:**
-   - Server-side route authorization (`requireSession` in `/api/v1/devices`), RBAC scoping (`device.read`, `device.activate`, `device.deactivate`), and Admin canonical `deviceId` concealment (`DEC-DEV-028`) remain strictly enforced on the server.
+   - Server-side route authorization (`requireSession` in `/api/v1/devices`), RBAC scoping (`device.read`, `device.update`), and Admin canonical `deviceId` concealment (`DEC-DEV-028`) remain strictly enforced on the server.
 <!-- Devices Loading & Auth Optimization Architecture Reconciled: 2026-09-04 -->
 
 ---
@@ -2347,9 +2353,38 @@ Next.js API Handler: GET /api/v1/devices/[deviceId]/predictions/latest
 ### 3. Hardware Telemetry Ingress Normalization & Security Invariants (`DEC-DEV-036`)
 - **Adapter Ingress Handling:** `SoilWaterMqttAdapter` in `apps/iot-gateway` handles live telemetry packets arriving on `melon/sensor-tanah/data-2424600050` and `melon/sensor-air/data-2424600050`.
 - **Envelope Normalization:** Supports both top-level and nested telemetry wrappers (extracting `"device"`, `"device_code"`, and nested `"soil"` or `"water"` blocks) to accommodate field ESP32 firmware variations.
-- **Strict Device Identity Validation:** Ingress normalization strictly extracts candidate identifiers and verifies them against registered PostgreSQL `devices`. Telemetry from unrecognized or deactivated devices is rejected and logged, preserving the zero-trust device perimeter.
+- **Strict Device Identity Validation:** Ingress normalization strictly extracts candidate identifiers and verifies them against registered PostgreSQL `devices`. Telemetry from unrecognized or unregistered devices is rejected and logged, preserving the zero-trust device perimeter.
 - **Actuator & Topic Isolation:** The reservoir water tank monitoring and faucet control pipeline (`irigasi/melon/...`) remains on a completely dedicated, isolated pipeline and is never modified by sensor telemetry adapter changes.
 <!-- External ML & Ingress Normalization Architecture Reconciled: 2026-09-23 -->
+
+---
+
+## Device Identity Security Rotation & Lifecycle Cleanup Architecture (Reconciled 2026-10-03)
+
+The following architecture facts are supported by the verified implementation of Device Identity Security Rotation (`DEC-DEV-038`) and Device Lifecycle Cleanup (`DEC-DEV-039`):
+
+### 1. Three-Tier Identity Triad (`DEC-DEV-038`)
+- **Database Identity (`devices.id`)**: Authoritative immutable PostgreSQL UUID primary key. All dependent child tables (`soil_readings`, `water_readings`, `reservoir_water_readings`, `faucet_commands`, `user_device_access`, `alerts`, `device_external_mappings`, `device_capabilities`, `device_status_events`) reference `devices.id` via foreign keys.
+- **Security Identifier (`devices.device_id`)**: Rotatable canonical string identifier editable exclusively by `OWNER` from the UI/API (`PATCH /api/v1/devices/{deviceId}`).
+  - **Instant Invalidation**: Rotating `device_id` invalidates the old identifier immediately. Lookups targeting the previous string return HTTP 404 (`DEVICE_NOT_FOUND`).
+  - **Relational Integrity**: Because child tables reference `devices.id` UUID, rotating `device_id` preserves 100% of telemetry history, audit trails, and user device assignments without data migration or foreign key cascades.
+  - **Audit Trail**: Every rotation writes structured audit event `device.identifier_rotated` with the previous identifier, new identifier, actor user ID, and device UUID.
+- **Hardware MQTT Identity (`devices.client_id`)**: Immutable physical client identifier configured in microcontroller firmware (`melon-esp32-tanah1`, `melon-esp32-air1`, `NodeMCU_Irigasi_Fix`).
+  - **Zero Firmware Reflashing**: Physical microcontrollers continue transmitting under their provisioned `client_id`. Field hardware does not need firmware reconfiguration or broker credential updates when the Owner rotates `device_id`.
+  - **Ingress Gateway Binding**: The IoT Gateway resolves incoming telemetry dynamically via `devices.client_id` and forwards the immutable database UUID (`devices.id`) to persistence repositories.
+
+### 2. Device Deactivation Removal & Monitoring State Normalization (`DEC-DEV-039`)
+- **Lifecycle Endpoints & Permissions Retired**:
+  - `POST /api/v1/devices/{deviceId}/deactivate` and `POST /api/v1/devices/{deviceId}/activate` are completely deleted.
+  - RBAC permissions `device.deactivate` and `device.activate` are permanently retired from seed data and authorization matrices.
+- **Frontend Action & Filter Cleanup**:
+  - Deactivate (`PowerOff`) and Activate (`RotateCcw`) action buttons and confirmation dialogs are completely removed from `/devices`.
+  - The "Inactive" option is removed from connection status filters.
+- **Two Operational Monitoring States**:
+  - Device monitoring standardizes strictly on two states: **Connected** (`ONLINE`, telemetry $\le 60\text{s}$) and **Disconnected** (`OFFLINE`, `STALE`, `UNKNOWN`, telemetry $> 60\text{s}$ or uninitialized).
+- **PostgreSQL Schema Stability**:
+  - Columns `devices.account_status` (default `'ACTIVE'`) and `devices.deactivated_at` (nullable `NULL`) remain in PostgreSQL to prevent schema drift, breaking migrations, or downtime.
+<!-- Device Identity Security Rotation & Lifecycle Cleanup Architecture Reconciled: 2026-10-03 -->
 
 
 

@@ -219,8 +219,8 @@ The Owner shall be able to:
 - Reactivate suspended Admin accounts (`POST /api/v1/users/{userId}/activate`).
 - Permanently delete eligible Admin accounts individually or in bulk via checkbox multi-selection (`POST /api/v1/users/bulk-delete`).
 - Assign or remove device access for Admin users.
-- Activate or deactivate devices (`device.activate`, `device.deactivate`). Hard delete is eliminated per `DEC-DEV-030`.
-- Edit external canonical `deviceId` and device `name` (`DEC-DEV-028`). Note: in-app device creation is removed per `DEC-DEV-027`.
+- Rotate device security identifiers (`deviceId`) and edit device names (`device.update` per `DEC-DEV-038`). Hard delete and administrative deactivation are eliminated per `DEC-DEV-030` and `DEC-DEV-039`.
+- Edit external canonical `deviceId` and device `name` (`DEC-DEV-028`, `DEC-DEV-038`). Note: in-app device creation is removed per `DEC-DEV-027`.
 - View account and control audit records.
 - Manage access-related settings permitted by the final system policy.
 - Access faucet-control functionality only where the final control policy allows it.
@@ -407,9 +407,9 @@ profilee.password.reset.other
 ```text
 device.read (Owner: global with canonical deviceId; Admin: active assignments with deviceId strictly concealed per DEC-DEV-028 / TASK-0305)
 device.create (REMOVED per DEC-DEV-027)
-device.update (Owner-only: can edit canonical deviceId & name per DEC-DEV-028)
-device.deactivate (Owner-only)
-device.activate (Owner-only per DEC-DEV-030)
+device.update (Owner-only: can rotate canonical deviceId & edit name per DEC-DEV-028 / DEC-DEV-038)
+device.deactivate (REMOVED per DEC-DEV-039)
+device.activate (REMOVED per DEC-DEV-039)
 device.assign (Owner-only)
 device.unassign (Owner-only)
 ```
@@ -487,9 +487,9 @@ Legend:
 | `profilee.password.reset.other` | Allow | Deny |
 | `device.read` | Allow within scope (includes canonical `deviceId`) | Allow for assigned devices (canonical `deviceId` strictly concealed per `DEC-DEV-028`) |
 | `device.create` | Removed per `DEC-DEV-027` | Deny / Removed |
-| `device.update` | Allow (can edit canonical `deviceId` & `name` per `DEC-DEV-028`) | Deny |
-| `device.deactivate` | Allow | Deny |
-| `device.activate` | Allow | Deny |
+| `device.update` | Allow (can rotate canonical `deviceId` & edit `name` per `DEC-DEV-028`, `DEC-DEV-038`) | Deny |
+| `device.deactivate` | Removed per `DEC-DEV-039` | Deny / Removed |
+| `device.activate` | Removed per `DEC-DEV-039` | Deny / Removed |
 | `device.assign` | Allow | Deny |
 | `device.unassign` | Allow | Deny |
 | `monitoring.current.read` | Allow within scope | Allow for assigned devices |

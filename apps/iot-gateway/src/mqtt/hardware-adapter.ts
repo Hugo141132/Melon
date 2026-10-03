@@ -115,15 +115,23 @@ export class HardwareMqttAdapter {
       return this.targetDeviceId;
     }
 
-    // 1. Explicit WATER_TANK_DEVICE_ID environment variable check
-    if (this.env?.WATER_TANK_DEVICE_ID && this.env.WATER_TANK_DEVICE_ID.trim().length > 0) {
-      this.targetDeviceId = this.env.WATER_TANK_DEVICE_ID.trim();
-      return this.targetDeviceId;
-    }
-
-    // 2. Database lookup fallback if deviceRepo is available
+    // 1. Primary: Lookup by hardware client_id = 'NodeMCU_Irigasi_Fix' in database registry
     if (this.deviceRepo) {
       try {
+        const hardwareClientId =
+          (this.env as any)?.HARDWARE_DEVICE_MQTT_CLIENT_ID?.trim() || 'NodeMCU_Irigasi_Fix';
+        if (typeof this.deviceRepo.getDeviceByClientId === 'function') {
+          const deviceByClient = await this.deviceRepo.getDeviceByClientId(hardwareClientId);
+          if (deviceByClient && deviceByClient.accountStatus === 'ACTIVE') {
+            this.targetDeviceId = deviceByClient.deviceId;
+            if (deviceByClient.siteId) {
+              this.targetSiteId = deviceByClient.siteId;
+            }
+            return this.targetDeviceId;
+          }
+        }
+
+        // 2. Active WATER_TANK_NODE lookup fallback
         const paginated = await this.deviceRepo.getDevices({
           deviceType: DeviceType.WATER_TANK_NODE,
           page: 1,
@@ -150,7 +158,12 @@ export class HardwareMqttAdapter {
       }
     }
 
-    // 3. Fallback to HARDWARE_TARGET_DEVICE_ID env config if set, or default
+    // 3. Fallback to explicit environment variable check if database is unavailable or unresolved
+    if (this.env?.WATER_TANK_DEVICE_ID && this.env.WATER_TANK_DEVICE_ID.trim().length > 0) {
+      this.targetDeviceId = this.env.WATER_TANK_DEVICE_ID.trim();
+      return this.targetDeviceId;
+    }
+
     if (
       this.env?.HARDWARE_TARGET_DEVICE_ID &&
       this.env.HARDWARE_TARGET_DEVICE_ID.trim().length > 0

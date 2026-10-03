@@ -345,7 +345,6 @@ INVALID_PHASE
 
 ```text
 DEVICE_NOT_FOUND
-DEVICE_INACTIVE
 DEVICE_OFFLINE
 DEVICE_STATUS_UNKNOWN
 NO_MONITORING_DATA
@@ -1806,62 +1805,21 @@ Request body:
 Rules:
 - The internal database primary key UUID (`devices.id`) is immutable and never updated.
 - The Owner may update the canonical `deviceId` string and user-facing `name`.
-- Renaming `deviceId` preserves all relational foreign keys (`devices.id` references).
-- Physical ESP32/NodeMCU firmware reconfiguration and EMQX broker credential/ACL synchronization following a `deviceId` rename are operational workflows marked as **TBD / BLOCKING** automation (`DEC-DEV-028`).
+- **Security Identifier Rotation (`DEC-DEV-038`)**: Rotating `deviceId` immediately invalidates the previous identifier (API lookups targeting the old identifier return HTTP 404).
+- **Relational Integrity**: Rotating `deviceId` preserves all relational child records (`devices.id` foreign key references) including telemetry, faucet commands, alerts, and user access records.
+- **Hardware Decoupling**: Physical microcontroller firmware uses `devices.client_id` (`melon-esp32-tanah1`, `melon-esp32-air1`, `NodeMCU_Irigasi_Fix`) and does NOT require firmware reflashing when the Owner rotates the external `deviceId`.
+- **Audit Logging**: The system writes a structured audit log event (`device.identifier_rotated`) capturing the previous identifier, new identifier, actor user ID, and device UUID.
 
 ---
 
-## 14.5 Deactivate Device
+## 14.5 Device Deactivation & Activation Lifecycle (REMOVED)
 
-```http
-POST /api/v1/devices/{deviceId}/deactivate
-```
-
-**Authentication:** Required
-**Permission:** `device.deactivate` (Owner only)
-**Description:** Deactivates an active device, setting `accountStatus = 'DEACTIVATED'`, `connectionStatus = 'INACTIVE'`, populating `deactivatedAt = NOW()`, and preventing faucet commands.
-
-Response:
-
-```json
-{
-  "success": true,
-  "data": {
-    "id": "11111111-1111-1111-1111-111111111111",
-    "deviceId": "water-node-001",
-    "accountStatus": "DEACTIVATED",
-    "connectionStatus": "INACTIVE"
-  },
-  "meta": { "requestId": "req-1724400000000" }
-}
-```
-
----
-
-## 14.6 Activate Device
-
-```http
-POST /api/v1/devices/{deviceId}/activate
-```
-
-**Authentication:** Required
-**Permission:** `device.activate` (Owner only; `DEC-DEV-030`)
-**Description:** Reactivates a deactivated device, restoring `accountStatus = 'ACTIVE'`, resetting `connectionStatus = 'UNKNOWN'`, and clearing `deactivatedAt = NULL`.
-
-Response:
-
-```json
-{
-  "success": true,
-  "data": {
-    "id": "11111111-1111-1111-1111-111111111111",
-    "deviceId": "water-node-001",
-    "accountStatus": "ACTIVE",
-    "connectionStatus": "UNKNOWN"
-  },
-  "meta": { "requestId": "req-1724400000000" }
-}
-```
+> [!NOTE]
+> Endpoints `POST /api/v1/devices/{deviceId}/deactivate` and `POST /api/v1/devices/{deviceId}/activate` have been permanently removed per `DEC-DEV-039`.
+>
+> Device lifecycle deactivation is no longer a supported product feature. All pre-provisioned devices remain active in PostgreSQL, and operational monitoring evaluates strictly live connection states (`Connected` / `ONLINE` vs `Disconnected` / `OFFLINE`, `STALE`, `UNKNOWN`).
+>
+> Associated permissions `device.deactivate` and `device.activate` have been retired from the system RBAC catalog.
 
 ---
 

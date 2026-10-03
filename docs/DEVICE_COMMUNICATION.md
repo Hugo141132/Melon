@@ -380,8 +380,14 @@ Rules:
 - A device shall not publish as another device.
 - Device credentials shall be bound to the permitted `deviceId` or `clientId`.
 - Topic authorisation shall prevent cross-device access.
-- Deactivated devices (`accountStatus = 'DEACTIVATED'`) transition `connectionStatus` to `INACTIVE` and are rejected from executing new faucet commands. Reactivation resets `connectionStatus` to `UNKNOWN` until new communication is established (`DEC-DEV-030`).
-- Operational and hardware procedures for reconciling physical ESP32/NodeMCU firmware configurations and EMQX broker credentials/ACLs following a `deviceId` rename are **TBD / BLOCKING** automation (`DEC-DEV-028`).
+- **Device Identity Security Rotation (`DEC-DEV-036` / `TASK-0418`):**
+  - `devices.device_id` is a mutable security identifier rotatable by OWNER from the UI/API.
+  - Old `device_id` is invalidated immediately upon rotation (API requests referencing the old string receive HTTP 404).
+  - Telemetry ingestion in the IoT Gateway resolves hardware via immutable `devices.client_id` (`melon-esp32-tanah1`, `melon-esp32-air1`, `NodeMCU_Irigasi_Fix`) and passes the immutable database UUID (`devices.id`) to persistence repositories.
+  - Firmware continues streaming telemetry without firmware reflashing or broker ACL changes.
+  - Relational integrity, historical telemetry (`soil_readings`, `water_readings`, `reservoir_water_readings`), RBAC assignments, faucet commands, and audit logs remain 100% intact across rotations.
+  - Frontend `DeviceContext` and URL search parameters dynamically synchronize after OWNER updates `device_id`.
+  - Reconciles and unblocks `DEC-DEV-028` Item 4.
 
 
 ---
@@ -452,22 +458,21 @@ To prevent operational confusion and ensure hardware safety:
 
 ### 7.3 Device Status Presentation & UI Mapping
 
-To provide clear operational visibility without overwhelming operators with technical heartbeat nuances, the user-facing interface simplifies device status presentation to strictly three operational states:
+To provide clear operational visibility without overwhelming operators with technical heartbeat nuances, the user-facing interface simplifies device status presentation strictly to two operational states (`DEC-DEV-034`, `DEC-DEV-039`):
 
 | Canonical Internal Status | User-Facing English | User-Facing Bahasa Indonesia | UI Badge Presentation | Operational Meaning |
 |---|---|---|---|---|
 | `ONLINE` | **Connected** | **Terhubung** | Emerald pill (`border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400`), pulsing dot | Device is actively communicating within the freshness threshold ($\le 60\text{s}$). |
-| `OFFLINE` | **Disconnected** | **Terputus** | Muted zinc/amber pill (`border-zinc-500/20 bg-zinc-500/10 text-zinc-500 dark:text-zinc-400`), static dot | Device has stopped communicating or missed heartbeat windows. |
-| `STALE` | **Disconnected** | **Terputus** | Muted zinc/amber pill (`border-zinc-500/20 bg-zinc-500/10 text-zinc-500 dark:text-zinc-400`), static dot | Telemetry timestamp exceeds freshness window ($> 60\text{s}$). |
-| `UNKNOWN` | **Disconnected** | **Terputus** | Muted zinc/amber pill (`border-zinc-500/20 bg-zinc-500/10 text-zinc-500 dark:text-zinc-400`), static dot | Device initial state upon reactivation or before first telemetry. |
-| `INACTIVE` (or `accountStatus = 'DEACTIVATED'`) | **Inactive** | **Tidak Aktif** | Neutral gray pill (`border-zinc-500/20 bg-zinc-500/10 text-zinc-400`), static dot | Device has been administratively deactivated by the Owner. |
+| `OFFLINE` | **Disconnected** | **Terputus** | Muted zinc/rose pill (`border-rose-500/20 bg-rose-500/10 text-rose-500 dark:text-rose-400`), static dot | Device has stopped communicating or missed heartbeat windows. |
+| `STALE` | **Disconnected** | **Terputus** | Muted zinc/rose pill (`border-rose-500/20 bg-rose-500/10 text-rose-500 dark:text-rose-400`), static dot | Telemetry timestamp exceeds freshness window ($> 60\text{s}$). |
+| `UNKNOWN` | **Disconnected** | **Terputus** | Muted zinc/rose pill (`border-rose-500/20 bg-rose-500/10 text-rose-500 dark:text-rose-400`), static dot | Device initial state upon startup or before first telemetry. |
 
 **Invariants:**
-- Database schema and REST API contracts retain the canonical `DeviceConnectionStatus` enum: `ONLINE`, `OFFLINE`, `STALE`, `UNKNOWN`, `INACTIVE`.
+- Database schema and REST API contracts retain the canonical `DeviceConnectionStatus` enum (`ONLINE`, `OFFLINE`, `STALE`, `UNKNOWN`).
 - Client-side filtering maps:
   - `CONNECTED` $\to$ `device.connectionStatus === 'ONLINE'`
-  - `DISCONNECTED` $\to$ `['OFFLINE', 'STALE', 'UNKNOWN'].includes(device.connectionStatus)`
-  - `INACTIVE` $\to$ `device.connectionStatus === 'INACTIVE' || device.accountStatus === 'DEACTIVATED'`
+  - `DISCONNECTED` $\to$ `device.connectionStatus !== 'ONLINE'` (captures `OFFLINE`, `STALE`, and `UNKNOWN`)
+- Device deactivation and the `INACTIVE` filter state are completely removed (`DEC-DEV-039`). All registered devices remain continuously monitored.
 - API query contracts remain strictly untouched (no custom non-canonical query enum strings passed to backend, preventing HTTP 422 `VALIDATION_ERROR`).
 
 ---
@@ -2095,18 +2100,22 @@ Admin users shall not provision devices unless explicitly allowed by `RBAC.md`.
 
 ---
 
-## 33. Device Deactivation
+## 33. Device Deactivation Removal & Identity Security Rotation
 
-When a device is deactivated:
+### 33.1 Device Deactivation Removal (`DEC-DEV-039`)
+The device activation/deactivation feature has been permanently removed from the product:
+- No administrative deactivation/reactivation endpoints exist (`POST /deactivate` and `POST /activate` are deleted).
+- Pre-provisioned devices remain active in PostgreSQL (`devices.account_status = 'ACTIVE'`).
+- The frontend does not offer deactivation actions or an `INACTIVE` filter state.
+- Operational status monitoring relies strictly on `Connected` (`ONLINE`) and `Disconnected` (`OFFLINE`, `STALE`, `UNKNOWN`).
 
-- New telemetry may be rejected or quarantined.
-- New faucet commands shall not be sent.
-- Existing credentials should be revoked or disabled.
-- Historical data shall remain available according to access policy.
-- The action shall be audited.
-- The frontend shall show `INACTIVE`.
-
-The exact credential-revocation automation is `TBD`.
+### 33.2 Device Identity Security Rotation Architecture (`DEC-DEV-038`)
+To allow security rotation of external device identifiers without causing operational or telemetry disruption:
+1. **Relational Identity (`devices.id`)**: Immutable PostgreSQL UUID primary key. Telemetry readings, faucet commands, alerts, and user access records are bound to `devices.id`.
+2. **Security Identifier (`devices.device_id`)**: Rotatable canonical identifier editable by `OWNER` from the UI/API. Rotating this identifier immediately invalidates the previous identifier (API lookups for the old identifier return HTTP 404).
+3. **Hardware MQTT Identity (`devices.client_id`)**: Immutable physical MQTT client identifier configured in microcontroller firmware (`melon-esp32-tanah1`, `melon-esp32-air1`, `NodeMCU_Irigasi_Fix`).
+4. **Internal Ingestion Binding**: The IoT Gateway resolves incoming telemetry via `devices.client_id` and forwards the immutable database UUID (`devices.id`) to persistence repositories. Microcontrollers never need firmware reflashing when the Owner rotates the external `deviceId`.
+5. **Audit Logging**: Rotating `deviceId` writes structured audit event `device.identifier_rotated` with the previous identifier, new identifier, actor user ID, and device UUID.
 
 ---
 

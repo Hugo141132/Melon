@@ -355,8 +355,6 @@ profilee.other.read
 profilee.other.update
 device.read
 device.update
-device.deactivate
-device.activate
 device.assign
 device.unassign
 monitoring.current.read
@@ -643,12 +641,13 @@ Stores registered ESP32/NodeMCU devices. Devices are provisioned out-of-band / v
 
 | Column | Type | Nullable | Notes |
 |---|---|---:|---|
-| `id` | UUID | No | Internal immutable primary key (`DEC-DEV-028`) |
-| `device_id` | VARCHAR(150) | No | Unique canonical hardware identity (Owner-editable; concealed from Admin per `DEC-DEV-028`) |
+| `id` | UUID | No | Internal immutable primary key (`DEC-DEV-028`, `DEC-DEV-038`) |
+| `device_id` | VARCHAR(150) | No | Rotatable security identifier (Owner-editable; concealed from Admin per `DEC-DEV-028`, `DEC-DEV-038`) |
+| `client_id` | VARCHAR(150) | Yes | Hardware MQTT client identifier (`melon-esp32-tanah1`, `melon-esp32-air1`, `NodeMCU_Irigasi_Fix`) |
 | `site_id` | UUID | Yes | Foreign key to `sites.id` (associated to `site-01` by default via `seedCanonicalDevices` per `TASK-0109`) |
 | `name` | VARCHAR(200) | No | User-facing device name |
 | `device_type` | VARCHAR(60) | No | Canonical type |
-| `account_status` | VARCHAR(30) | No | Device lifecycle state |
+| `account_status` | VARCHAR(30) | No | Device lifecycle state (defaults to `ACTIVE`) |
 | `connection_status` | VARCHAR(30) | No | Latest connection state |
 | `firmware_version` | VARCHAR(100) | Yes | |
 | `hardware_revision` | VARCHAR(100) | Yes | |
@@ -659,7 +658,7 @@ Stores registered ESP32/NodeMCU devices. Devices are provisioned out-of-band / v
 | `longitude` | NUMERIC(9,6) | Yes | Latest known coordinate |
 | `created_at` | TIMESTAMPTZ | No | |
 | `updated_at` | TIMESTAMPTZ | No | |
-| `deactivated_at` | TIMESTAMPTZ | Yes | |
+| `deactivated_at` | TIMESTAMPTZ | Yes | Preserved for schema compatibility |
 
 Recommended `device_type` values:
 
@@ -669,14 +668,6 @@ WATER_QUALITY_NODE
 WATER_TANK_NODE
 ```
 
-Recommended device lifecycle values:
-
-```text
-ACTIVE
-INACTIVE
-DEACTIVATED
-```
-
 Recommended connection values:
 
 ```text
@@ -684,27 +675,29 @@ ONLINE
 OFFLINE
 STALE
 UNKNOWN
-INACTIVE
 ```
 
 ### Constraints and Identity Governance
 
-- `id` (UUID) is strictly immutable and serves as the relational foreign key target for all dependent tables (`user_device_access`, `soil_readings`, `water_readings`, `telemetry_reservoir`, `faucet_commands`, `alerts`, `device_status_events`).
-- `device_id` shall be unique across active and inactive records.
+- **Device Identity Triad (`DEC-DEV-038`)**:
+  - `id` (UUID): Immutable primary key and authoritative relational foreign key for all child tables (`soil_readings`, `water_readings`, `reservoir_water_readings`, `faucet_commands`, `user_device_access`, `alerts`, `device_external_mappings`, `device_capabilities`, `device_status_events`).
+  - `device_id` (VARCHAR(150)): Rotatable security identifier editable by `OWNER` from UI/API. Rotating `device_id` immediately invalidates the previous string (old string returns HTTP 404).
+  - `client_id` (VARCHAR(150)): Hardware MQTT identity matching microcontroller firmware. Ingestion resolves physical devices via `client_id` and forwards immutable `devices.id` UUID to repositories. Microcontrollers never require firmware reflashing when `device_id` rotates.
+- `device_id` shall be unique across all device records.
 - `device_id` is editable only by Owner users. Admin users cannot view or edit canonical `device_id` (`DEC-DEV-028`).
-- In-app device creation is removed; new device records are provisioned via administrative seeds (`DEC-DEV-027`).
-- **Connection States**:
+- In-app device creation is removed; device records are pre-provisioned via administrative seeds (`DEC-DEV-027`).
+- **Connection States (`DEC-DEV-034`, `DEC-DEV-039`)**:
   - Derived from `devices.last_message_at` relative to current time.
   - Heartbeat failure thresholds strictly defined in `DEC-DEV-022`.
+  - User-facing UI evaluates strictly two states: **Connected** (`ONLINE`) and **Disconnected** (`OFFLINE`, `STALE`, `UNKNOWN`).
 - **Retention**:
   - High-frequency telemetry records (soil, water quality, reservoir) older than 90 days are periodically purged using the `purge_expired_telemetry_records` stored procedure to cap database size.
   - `audit_logs`, `faucet_commands`, and `faucet_command_events` have long-term immutable retention (minimum 1 year) and are excluded from routine telemetry cleanup.
-- **No Hard Delete for Devices (`DEC-DEV-030`)**: Devices are never deleted from the database. Deleting devices would destroy foreign-key relationships and erase telemetry, alert, command, and audit histories. Device lifecycle is controlled strictly via deactivation and reactivation:
-  - **Deactivation**: `account_status = 'DEACTIVATED'`, `connection_status = 'INACTIVE'`, and `deactivated_at = NOW()`. Faucet control is blocked.
-  - **Reactivation**: `account_status = 'ACTIVE'`, `connection_status = 'UNKNOWN'`, and `deactivated_at = NULL`. Full operational monitoring is resumed.
+- **Zero Hard Delete & Deactivation Removal (`DEC-DEV-030`, `DEC-DEV-039`)**:
+  - Devices are never deleted from the database. Deleting devices would destroy foreign-key relationships and erase telemetry, alert, command, and audit histories.
+  - Administrative activation and deactivation endpoints (`POST /deactivate`, `POST /activate`) and permissions have been permanently removed per `DEC-DEV-039`. Pre-provisioned devices remain active in PostgreSQL.
 - Previously/last-accessed device history is not stored or persisted (`DEC-DEV-029`). All historical telemetry, command, assignment/revocation, status, and audit data are fully preserved.
 - Device coordinates shall remain within valid latitude and longitude ranges.
-- A deactivated device shall not receive new faucet commands.
 - Device credentials shall not be stored in plain text in this table.
 
 ### Indexes
@@ -1503,7 +1496,7 @@ Recommended policies:
 | Alert to acknowledgement | Cascade only if alerts are retention-managed |
 | User to audit logs | Preserve logs; actor may be nullable only for system cases |
 
-Users and devices should normally be deactivated rather than deleted.
+User accounts support administrative suspension or lifecycle management, whereas pre-provisioned devices are permanently preserved in PostgreSQL and never deleted or deactivated (`DEC-DEV-030`, `DEC-DEV-039`).
 
 ---
 

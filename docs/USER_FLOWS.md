@@ -1115,60 +1115,46 @@ flowchart TD
 
 ---
 
-## Flow 22A — Owner Deactivates a Device
+---
+
+## Flow 22 — Owner Rotates Device Security Identifier (`deviceId`)
 
 **Primary actor:** Owner
-**Preconditions:** Owner is `ACTIVE`; target device is currently `ACTIVE`.
-**Trigger:** Owner clicks "Deactivate Device" and confirms in modal on `/devices`.
+**Preconditions:** Owner is `ACTIVE`; target device exists in PostgreSQL.
+**Trigger:** Owner clicks "Edit" (`Edit2` icon) on a device card on `/devices`.
 
 **Main success flow:**
 
 1. The Owner views the device list on `/devices` (canonical pre-provisioned devices `soil-node-001`, `water-quality-node-001`, and `water-tank-node-zi37gz` visible by default).
-2. The Owner selects an active device and clicks "Deactivate".
-3. The system presents a confirmation modal detailing the deactivation impact.
-4. The Owner confirms deactivation.
-5. The frontend calls `POST /api/v1/devices/{deviceId}/deactivate`.
-6. The server validates the Owner session and verifies `device.deactivate` permission.
-7. The database updates `accountStatus = DEACTIVATED`, `connectionStatus = INACTIVE`, and records `deactivatedAt = NOW()`.
-8. Any active or pending faucet control capability on the device is immediately blocked.
-9. A `device.deactivated` audit log event is recorded with actor ID and timestamp.
-10. The UI updates device status badge to `Inactive` (*"Tidak Aktif"*) and presents a "Reactivate" action. All historical telemetry, readings, and logs remain completely preserved.
+2. The Owner clicks the "Edit" button on a device card header.
+3. The system presents an edit modal displaying the current device name and canonical `deviceId`.
+4. The Owner modifies the `deviceId` (security identifier rotation) and/or device display name.
+5. The frontend calls `PATCH /api/v1/devices/{deviceId}` with the updated payload.
+6. The server validates the Owner session and verifies `device.update` permission.
+7. The database updates `devices.device_id`, strictly preserving the immutable database primary key `devices.id` UUID.
+8. The previous `deviceId` is invalidated immediately (subsequent API queries targeting the old string return HTTP 404 `DEVICE_NOT_FOUND`).
+9. Microcontrollers in the field continue transmitting telemetry without interruption or firmware reflashing because the IoT Gateway binds ingestion via `devices.client_id` and forwards `devices.id` internally.
+10. A structured audit log event `device.identifier_rotated` (or `device.updated`) is written with previous and new identifiers, actor ID, and device UUID.
+11. The frontend `DeviceContext` refreshes device state and updates URL search parameters if the rotated device was actively selected.
 
-**Alternative flows:** Device is already deactivated; system returns current status.
-**Error flows:** Unauthenticated request (401), non-Owner request (403), device not found (404).
-**Postconditions:** Device is deactivated and prevented from taking commands. Historical data is preserved.
-**Required permissions:** `device.deactivate` (Owner only).
-**Audit events:** `device.deactivated`.
-
----
-
-## Flow 22B — Owner Reactivates a Device
-
-**Primary actor:** Owner
-**Preconditions:** Owner is `ACTIVE`; target device is currently `DEACTIVATED`.
-**Trigger:** Owner clicks "Reactivate" and confirms in modal on `/devices`.
-
-**Main success flow:**
-
-1. The Owner views deactivated devices on `/devices`.
-2. The Owner clicks "Reactivate" on a deactivated device card.
-3. The system presents an activation confirmation modal.
-4. The Owner confirms reactivation.
-5. The frontend calls `POST /api/v1/devices/{deviceId}/activate`.
-6. The server validates the Owner session and verifies `device.activate` permission (`DEC-DEV-030`).
-7. The database updates `accountStatus = ACTIVE`, resets `connectionStatus = UNKNOWN`, and clears `deactivatedAt = NULL`.
-8. A `device.activated` audit log event is recorded with actor ID and timestamp.
-9. The UI updates the device status badge to `Disconnected` (*"Terputus"*, awaiting initial telemetry) and restores standard operational views.
-
-**Alternative flows:** Device is already active; system returns current status.
-**Error flows:** Unauthenticated request (401), non-Owner request (403), device not found (404).
-**Postconditions:** Device account status is restored to `ACTIVE`.
-**Required permissions:** `device.activate` (Owner only).
-**Audit events:** `device.activated`.
+**Alternative flows:** Owner only updates display name; audit log `device.updated` is written without identifier invalidation.
+**Error flows:** Duplicate `deviceId` conflict (HTTP 409 `DUPLICATE_DEVICE_ID`), unauthenticated request (401), non-Owner request (403), device not found (404).
+**Postconditions:** Device security identifier is rotated; relational telemetry and audit history remain 100% intact.
+**Required permissions:** `device.update` (Owner only).
+**Audit events:** `device.identifier_rotated`, `device.updated`.
 
 ---
 
-## Flow 22C — User Views and Filters Devices on Device Management Console (TASK-0302 / TASK-0303 Refinement)
+## Note on Device Activation & Deactivation Removal (`DEC-DEV-039`)
+
+> [!NOTE]
+> Device deactivation and reactivation workflows (formerly Flow 22A and Flow 22B) have been permanently removed from the application per `DEC-DEV-039`.
+>
+> All pre-provisioned devices remain active in PostgreSQL. Operational fleet monitoring relies strictly on live connection states (`Connected` / `ONLINE` vs `Disconnected` / `OFFLINE`, `STALE`, `UNKNOWN`).
+
+---
+
+## Flow 23 — User Views and Filters Devices on Device Management Console (TASK-0302 / TASK-0303 Refinement)
 
 **Primary actor:** Owner or Admin
 **Preconditions:** Active authenticated session (`requireActiveAccount`).
@@ -1181,21 +1167,21 @@ flowchart TD
 3. The user interacts with responsive search and filter controls:
    - Search bar filters devices by name, firmware version, or canonical `deviceId` (Owner only). Fluid flex layout prevents text or placeholder truncation on mobile ($390\text{px}$).
    - Domain filter dropdown filters by domain: All Domains, Soil Monitoring (`SOIL_NODE`), Water Quality (`WATER_QUALITY_NODE`), or Water Tank (`WATER_TANK_NODE`).
-   - Connection status dropdown filter provides 4 simplified operational views:
+   - Connection status dropdown filter provides strictly 2 operational filter choices (`DEC-DEV-034`, `DEC-DEV-039`):
      - **All Connection Statuses** (*"Semua Status Koneksi"*)
      - **Connected** (*"Terhubung"*): maps to canonical `ONLINE`.
      - **Disconnected** (*"Terputus"*): maps to canonical `['OFFLINE', 'STALE', 'UNKNOWN']`.
-     - **Inactive** (*"Tidak Aktif"*): maps to canonical `INACTIVE` or `accountStatus = 'DEACTIVATED'`.
    - Filtering runs client-side to ensure full compatibility with backend API contracts without generating HTTP 422 `VALIDATION_ERROR` responses.
 4. The device grid renders cards with refined visual hierarchy:
-   - Device name and side-by-side domain and simplified status badges with indicator dots (emerald for Connected, muted zinc for Disconnected, neutral gray for Inactive).
+   - Device name and side-by-side domain and simplified status badges with indicator dots (emerald for Connected, rose for Disconnected).
    - Technical metadata: canonical `deviceId` monospace pill (Owner only) and firmware version pill.
    - Monitoring parameters pill chips showing readable labels and standardized measurement units:
      - **Soil Node:** Nitrogen (`mg/kg`), Phosphorus (`mg/kg`), Potassium (`mg/kg`), Soil Temperature (`°C`), Soil Moisture (`%`), Soil pH (`pH`), Soil EC (`µS/cm`).
      - **Water Quality Node:** Water pH (`pH`), Water TDS (`ppm`), Water EC (`µS/cm`).
      - **Water Tank Node:** Tank Volume (`L`).
    - Control capabilities: "Irrigation Valve Control" (`FAUCET_CONTROL`) appears **strictly and exclusively** on controller/reservoir devices (`WATER_TANK_NODE`). Passive monitoring devices (`SOIL_NODE`, `WATER_QUALITY_NODE`) strictly omit irrigation control capabilities.
-   - Footer: Last seen timestamp with relative time formatting and Owner-only lifecycle action buttons (Deactivate / Reactivate).
+   - Header actions: Owner-only Edit button (`Edit2`) triggers the security identifier and name edit modal. Deactivate and Activate buttons are permanently removed (`DEC-DEV-039`).
+   - Footer: Last seen timestamp with relative time formatting.
 5. All UI labels, placeholders, tooltips, dialogs, and units support full bilingual localization in English and Bahasa Indonesia.
 
 **Alternative flows:** No devices found matching filter criteria; empty state card is displayed.

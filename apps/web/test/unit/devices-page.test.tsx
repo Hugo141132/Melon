@@ -120,7 +120,7 @@ describe('DeviceRegistryPage Auth State Hydration & Permission Scoping', () => {
     });
   });
 
-  it('2. displays canonical deviceId and Owner action buttons (Edit & Deactivate) when user is OWNER', async () => {
+  it('2. displays canonical deviceId and Owner action button (Edit) when user is OWNER', async () => {
     mockAuthContext = {
       user: {
         id: 'usr-1',
@@ -142,12 +142,12 @@ describe('DeviceRegistryPage Auth State Hydration & Permission Scoping', () => {
     // DEC-DEV-028: Canonical deviceId is visible to OWNER
     expect(screen.getByText('soil-node-001')).toBeInTheDocument();
 
-    // Edit and Deactivate action buttons are visible for OWNER
+    // Edit action button is visible for OWNER (Deactivate button removed)
     expect(screen.getByTitle('Ubah')).toBeInTheDocument();
-    expect(screen.getByTitle('Nonaktifkan Perangkat?')).toBeInTheDocument();
+    expect(screen.queryByTitle('Nonaktifkan Perangkat?')).not.toBeInTheDocument();
   });
 
-  it('3. conceals Owner action buttons (Edit & Deactivate) when user is ADMIN', async () => {
+  it('3. conceals Owner action button (Edit) when user is ADMIN', async () => {
     mockAuthContext = {
       user: {
         id: 'usr-2',
@@ -166,7 +166,7 @@ describe('DeviceRegistryPage Auth State Hydration & Permission Scoping', () => {
       expect(screen.getByText('Soil Node Greenhouse A')).toBeInTheDocument();
     });
 
-    // Edit and Deactivate action buttons must NOT be visible to ADMIN
+    // Edit action button must NOT be visible to ADMIN
     expect(screen.queryByTitle('Ubah')).not.toBeInTheDocument();
     expect(screen.queryByTitle('Nonaktifkan Perangkat?')).not.toBeInTheDocument();
   });
@@ -203,11 +203,11 @@ describe('DeviceRegistryPage Auth State Hydration & Permission Scoping', () => {
     expect(screen.getByRole('option', { name: 'Kualitas Air' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'Tangki Air' })).toBeInTheDocument();
 
-    // Localized connection status options (simplified to Connected, Disconnected, Inactive)
+    // Localized connection status options (simplified to Connected and Disconnected)
     expect(screen.getByRole('option', { name: 'Semua Status Koneksi' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'Terhubung' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'Terputus' })).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: 'Tidak Aktif' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Tidak Aktif' })).not.toBeInTheDocument();
     expect(screen.queryByRole('option', { name: 'Data Tidak Mutakhir' })).not.toBeInTheDocument();
     expect(screen.queryByRole('option', { name: 'Tidak Diketahui' })).not.toBeInTheDocument();
 
@@ -606,7 +606,7 @@ describe('DeviceRegistryPage Auth State Hydration & Permission Scoping', () => {
     expect(screen.getByRole('option', { name: 'All Connection Statuses' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'Connected' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'Disconnected' })).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: 'Inactive' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Inactive' })).not.toBeInTheDocument();
     expect(screen.queryByRole('option', { name: 'Data Stale' })).not.toBeInTheDocument();
     expect(screen.queryByRole('option', { name: 'Unknown' })).not.toBeInTheDocument();
 
@@ -616,119 +616,7 @@ describe('DeviceRegistryPage Auth State Hydration & Permission Scoping', () => {
     expect(screen.getAllByText('Connected')).toHaveLength(2);
   });
 
-  it('11. manages device deactivation and reactivation lifecycle with optimistic in-place state transition and localized prompts', async () => {
-    let currentDevice = { ...mockDevices[0] };
-
-    global.fetch = vi.fn().mockImplementation((url: string, options?: any) => {
-      if (
-        url.includes('/api/v1/devices') &&
-        (!options || options.method === 'GET' || !options.method)
-      ) {
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          json: () =>
-            Promise.resolve({
-              success: true,
-              data: [currentDevice],
-              meta: {
-                pagination: { page: 1, pageSize: 10, totalItems: 1, totalPages: 1 },
-              },
-            }),
-        });
-      }
-      if (url.includes('/deactivate') && options?.method === 'POST') {
-        currentDevice = {
-          ...currentDevice,
-          accountStatus: 'DEACTIVATED',
-          connectionStatus: 'INACTIVE',
-        };
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          json: () => Promise.resolve({ success: true, message: 'Device deactivated' }),
-        });
-      }
-      if (url.includes('/activate') && options?.method === 'POST') {
-        currentDevice = { ...currentDevice, accountStatus: 'ACTIVE', connectionStatus: 'OFFLINE' };
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          json: () => Promise.resolve({ success: true, message: 'Device reactivated' }),
-        });
-      }
-      return Promise.reject(new Error(`Unhandled fetch: ${url}`));
-    });
-
-    mockAuthContext = {
-      user: {
-        id: 'usr-1',
-        fullName: 'Owner Kebun',
-        email: 'owner@kebunmelon.id',
-        accountStatus: 'ACTIVE',
-        activeRoles: [UserRole.OWNER],
-      },
-      role: UserRole.OWNER,
-      isAuthenticated: true,
-    };
-
-    renderComponent();
-
-    await waitFor(() => {
-      expect(screen.getByText('Soil Node Greenhouse A')).toBeInTheDocument();
-    });
-
-    // 1. Initial active state has "Terhubung" badge and deactivation action button
-    expect(screen.getAllByText('Terhubung')).toHaveLength(2);
-    const deactivateBtn = screen.getByTitle('Nonaktifkan Perangkat?');
-    expect(deactivateBtn).toBeInTheDocument();
-
-    // 2. Click deactivate button -> opens modal with localized prompt
-    fireEvent.click(deactivateBtn);
-    expect(screen.getByRole('heading', { name: 'Nonaktifkan Perangkat?' })).toBeInTheDocument();
-    expect(
-      screen.getByText('Apakah Anda yakin ingin menonaktifkan perangkat Soil Node Greenhouse A?')
-    ).toBeInTheDocument();
-
-    // 3. Confirm deactivation
-    const confirmDeactivateBtn = screen.getByRole('button', { name: 'Ya, Nonaktifkan' });
-    fireEvent.click(confirmDeactivateBtn);
-
-    // 4. Modal closes and card optimistically updates in-place without page reloading
-    await waitFor(() => {
-      expect(
-        screen.queryByRole('heading', { name: 'Nonaktifkan Perangkat?' })
-      ).not.toBeInTheDocument();
-      expect(screen.getAllByText('Tidak Aktif')).toHaveLength(2);
-    });
-
-    // Action button switches to activate button
-    const activateBtn = screen.getByTitle('Aktifkan Perangkat');
-    expect(activateBtn).toBeInTheDocument();
-    expect(screen.queryByTitle('Nonaktifkan Perangkat?')).not.toBeInTheDocument();
-
-    // 5. Click activate button -> opens modal with localized prompt
-    fireEvent.click(activateBtn);
-    expect(screen.getByRole('heading', { name: 'Aktifkan Perangkat' })).toBeInTheDocument();
-    expect(
-      screen.getByText('Aktifkan kembali perangkat Soil Node Greenhouse A?')
-    ).toBeInTheDocument();
-
-    // 6. Confirm activation
-    const confirmActivateBtn = screen.getByRole('button', { name: 'Ya, Aktifkan' });
-    fireEvent.click(confirmActivateBtn);
-
-    // 7. Modal closes and card optimistically updates in-place back to active/offline
-    await waitFor(() => {
-      expect(screen.queryByRole('heading', { name: 'Aktifkan Perangkat' })).not.toBeInTheDocument();
-      expect(screen.getAllByText('Terputus')).toHaveLength(2);
-    });
-
-    // Action button switches back to deactivation button
-    expect(screen.getByTitle('Nonaktifkan Perangkat?')).toBeInTheDocument();
-  });
-
-  it('12. maps canonical statuses to simplified presentation (ONLINE -> Connected, OFFLINE/STALE/UNKNOWN -> Disconnected, INACTIVE -> Inactive) and supports client filtering', async () => {
+  it('11. maps canonical statuses to simplified presentation (ONLINE -> Connected, OFFLINE/STALE/UNKNOWN -> Disconnected) and supports client filtering', async () => {
     const devicesWithVariousStatuses = [
       {
         ...mockDevices[0],
@@ -762,14 +650,6 @@ describe('DeviceRegistryPage Auth State Hydration & Permission Scoping', () => {
         connectionStatus: 'UNKNOWN',
         accountStatus: 'ACTIVE',
       },
-      {
-        ...mockDevices[0],
-        id: 'dev-inactive',
-        deviceId: 'dev-inactive-05',
-        name: 'Device Inactive Node',
-        connectionStatus: 'INACTIVE',
-        accountStatus: 'DEACTIVATED',
-      },
     ];
 
     global.fetch = vi.fn().mockImplementation((url: string) => {
@@ -782,7 +662,7 @@ describe('DeviceRegistryPage Auth State Hydration & Permission Scoping', () => {
               success: true,
               data: devicesWithVariousStatuses,
               meta: {
-                pagination: { page: 1, pageSize: 10, totalItems: 5, totalPages: 1 },
+                pagination: { page: 1, pageSize: 10, totalItems: 4, totalPages: 1 },
               },
             }),
         });
@@ -809,7 +689,6 @@ describe('DeviceRegistryPage Auth State Hydration & Permission Scoping', () => {
       expect(screen.getByText('Device Offline Node')).toBeInTheDocument();
       expect(screen.getByText('Device Stale Node')).toBeInTheDocument();
       expect(screen.getByText('Device Unknown Node')).toBeInTheDocument();
-      expect(screen.getByText('Device Inactive Node')).toBeInTheDocument();
     });
 
     // Verify status mapping in Indonesian:
@@ -819,8 +698,8 @@ describe('DeviceRegistryPage Auth State Hydration & Permission Scoping', () => {
     // 3 Disconnected (OFFLINE, STALE, UNKNOWN) -> 3 badges + 1 dropdown option = 4 "Terputus"
     expect(screen.getAllByText('Terputus')).toHaveLength(4);
 
-    // 1 Inactive -> 1 badge + 1 dropdown option = 2 "Tidak Aktif"
-    expect(screen.getAllByText('Tidak Aktif')).toHaveLength(2);
+    // Inactive status is completely retired
+    expect(screen.queryByText('Tidak Aktif')).not.toBeInTheDocument();
 
     // Deprecated/raw individual statuses must NEVER be presented in user UI
     expect(screen.queryByText('Data Tidak Mutakhir')).not.toBeInTheDocument();
@@ -836,7 +715,6 @@ describe('DeviceRegistryPage Auth State Hydration & Permission Scoping', () => {
     expect(screen.queryByText('Device Offline Node')).not.toBeInTheDocument();
     expect(screen.queryByText('Device Stale Node')).not.toBeInTheDocument();
     expect(screen.queryByText('Device Unknown Node')).not.toBeInTheDocument();
-    expect(screen.queryByText('Device Inactive Node')).not.toBeInTheDocument();
 
     // Filter by Disconnected:
     fireEvent.change(statusFilterSelect, { target: { value: 'DISCONNECTED' } });
@@ -844,15 +722,6 @@ describe('DeviceRegistryPage Auth State Hydration & Permission Scoping', () => {
     expect(screen.getByText('Device Offline Node')).toBeInTheDocument();
     expect(screen.getByText('Device Stale Node')).toBeInTheDocument();
     expect(screen.getByText('Device Unknown Node')).toBeInTheDocument();
-    expect(screen.queryByText('Device Inactive Node')).not.toBeInTheDocument();
-
-    // Filter by Inactive:
-    fireEvent.change(statusFilterSelect, { target: { value: 'INACTIVE' } });
-    expect(screen.queryByText('Device Online Node')).not.toBeInTheDocument();
-    expect(screen.queryByText('Device Offline Node')).not.toBeInTheDocument();
-    expect(screen.queryByText('Device Stale Node')).not.toBeInTheDocument();
-    expect(screen.queryByText('Device Unknown Node')).not.toBeInTheDocument();
-    expect(screen.getByText('Device Inactive Node')).toBeInTheDocument();
 
     // Filter by All:
     fireEvent.change(statusFilterSelect, { target: { value: 'ALL' } });
@@ -860,6 +729,5 @@ describe('DeviceRegistryPage Auth State Hydration & Permission Scoping', () => {
     expect(screen.getByText('Device Offline Node')).toBeInTheDocument();
     expect(screen.getByText('Device Stale Node')).toBeInTheDocument();
     expect(screen.getByText('Device Unknown Node')).toBeInTheDocument();
-    expect(screen.getByText('Device Inactive Node')).toBeInTheDocument();
   });
 });

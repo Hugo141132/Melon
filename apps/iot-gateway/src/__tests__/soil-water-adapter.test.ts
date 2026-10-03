@@ -189,7 +189,7 @@ describe('SoilWaterMqttAdapter (TASK-0412 / Soil & Water MQTT Ingestion)', () =>
       expect(result.readingId).toBe('soil-reading-uuid-123');
       expect(mockTelemetryRepo.ingestSoilReading).toHaveBeenCalledWith(
         expect.objectContaining({
-          deviceId: 'melon-esp32-tanah1',
+          deviceId: 'soil-uuid-001',
           nitrogen: 45,
           phosphorus: 30,
           potassium: 120,
@@ -238,7 +238,7 @@ describe('SoilWaterMqttAdapter (TASK-0412 / Soil & Water MQTT Ingestion)', () =>
       expect(result.success).toBe(true);
       expect(mockTelemetryRepo.ingestSoilReading).toHaveBeenCalledWith(
         expect.objectContaining({
-          deviceId: 'melon-esp32-tanah1',
+          deviceId: 'soil-uuid-001',
           nitrogen: 50,
           phosphorus: 25,
           potassium: 110,
@@ -268,7 +268,7 @@ describe('SoilWaterMqttAdapter (TASK-0412 / Soil & Water MQTT Ingestion)', () =>
       expect(result.success).toBe(true);
       expect(mockTelemetryRepo.ingestSoilReading).toHaveBeenCalledWith(
         expect.objectContaining({
-          deviceId: 'melon-esp32-tanah1',
+          deviceId: 'soil-uuid-001',
           nitrogen: 9,
           phosphorus: 13,
           potassium: 31,
@@ -297,7 +297,7 @@ describe('SoilWaterMqttAdapter (TASK-0412 / Soil & Water MQTT Ingestion)', () =>
       expect(result.success).toBe(true);
       expect(mockTelemetryRepo.ingestSoilReading).toHaveBeenCalledWith(
         expect.objectContaining({
-          deviceId: 'melon-esp32-tanah1',
+          deviceId: 'soil-uuid-001',
         })
       );
     });
@@ -439,7 +439,7 @@ describe('SoilWaterMqttAdapter (TASK-0412 / Soil & Water MQTT Ingestion)', () =>
       expect(result.readingId).toBe('water-reading-uuid-456');
       expect(mockTelemetryRepo.ingestWaterReading).toHaveBeenCalledWith(
         expect.objectContaining({
-          deviceId: 'melon-esp32-air1',
+          deviceId: 'water-uuid-001',
           ph: 7.2,
           tds: 450,
           ec: 0.9,
@@ -480,7 +480,7 @@ describe('SoilWaterMqttAdapter (TASK-0412 / Soil & Water MQTT Ingestion)', () =>
       expect(result.success).toBe(true);
       expect(mockTelemetryRepo.ingestWaterReading).toHaveBeenCalledWith(
         expect.objectContaining({
-          deviceId: 'melon-esp32-air1',
+          deviceId: 'water-uuid-001',
           ph: 6.9,
           tds: 520,
           ec: 1.1,
@@ -510,7 +510,7 @@ describe('SoilWaterMqttAdapter (TASK-0412 / Soil & Water MQTT Ingestion)', () =>
       expect(result.success).toBe(true);
       expect(mockTelemetryRepo.ingestWaterReading).toHaveBeenCalledWith(
         expect.objectContaining({
-          deviceId: 'melon-esp32-air1',
+          deviceId: 'water-uuid-001',
           ph: 14.08,
           tds: 76,
           ec: 82,
@@ -737,6 +737,61 @@ describe('SoilWaterMqttAdapter (TASK-0412 / Soil & Water MQTT Ingestion)', () =>
       expect(second).toBe('melon-esp32-tanah1');
       // Should only query database once due to cache
       expect(mockDeviceRepo.getDeviceByClientId).toHaveBeenCalledTimes(1);
+    });
+
+    it('supports device_id security rotation: hardware continues streaming via client_id and ingestion persists to immutable UUID', async () => {
+      // Simulate OWNER rotating deviceId from soil-node-001 to rotated-soil-sec-999
+      const rotatedDevice = {
+        ...mockSoilDevice,
+        id: 'soil-uuid-001',
+        deviceId: 'rotated-soil-sec-999',
+        clientId: 'melon-esp32-tanah1',
+      };
+      (mockDeviceRepo.getDeviceByClientId as any).mockResolvedValue(rotatedDevice);
+      adapter.clearDeviceCache();
+
+      mockTelemetryRepo.ingestSoilReading.mockResolvedValueOnce({
+        readingId: 'soil-reading-uuid-123',
+        deviceId: 'soil-uuid-001',
+        canonicalDeviceId: 'rotated-soil-sec-999',
+        messageId: 'msg-soil-001',
+        recordedAt: new Date('2026-09-15T10:00:00.000Z'),
+        receivedAt: new Date('2026-09-15T10:00:01.000Z'),
+        isDuplicate: false,
+        validationStatus: 'VALID',
+      });
+
+      // Hardware continues sending telemetry with unchanged firmware client_id
+      const payload = {
+        clientId: 'melon-esp32-tanah1',
+        n: 40,
+        p: 20,
+        k: 100,
+        temp: 27.5,
+        hum: 60.0,
+        ph: 6.8,
+        ec: 1.2,
+        status: 'NORMAL',
+      };
+
+      const result = await adapter.handleInboundSoilData(Buffer.from(JSON.stringify(payload)));
+
+      expect(result.success).toBe(true);
+      // Ingestion must target immutable database UUID, maintaining relational integrity
+      expect(mockTelemetryRepo.ingestSoilReading).toHaveBeenCalledWith(
+        expect.objectContaining({
+          deviceId: 'soil-uuid-001',
+        })
+      );
+      // Realtime events and downstream AI use the newly rotated canonical deviceId
+      expect(publishRealtimeEvent).toHaveBeenCalledWith(
+        mockEnv,
+        'telemetry.soil.updated',
+        expect.objectContaining({
+          canonicalDeviceId: 'rotated-soil-sec-999',
+        }),
+        'rotated-soil-sec-999'
+      );
     });
   });
 

@@ -19,8 +19,10 @@ import {
  */
 const DEFAULT_ML_DEVICE_ALIASES: Record<string, string> = {
   'melon-esp32-tanah1': 'melon002',
+  'soil-node-001': 'melon002',
   'soil-node-jvbkdbv': 'melon002',
   'melon-esp32-air1': 'water001',
+  'water-quality-node-001': 'water001',
   'water-quality-node-quiua': 'water001',
 };
 

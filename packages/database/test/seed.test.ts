@@ -122,7 +122,7 @@ describe('Permanent RBAC Database Seed & Idempotency Test', () => {
       (p) => p.code
     );
 
-    expect(ownerOnlyPerms.length).toBe(19);
+    expect(ownerOnlyPerms.length).toBe(17);
 
     for (const code of ownerOnlyPerms) {
       expect(adminPermCodes).not.toContain(code);

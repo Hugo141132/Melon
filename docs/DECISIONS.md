@@ -38,7 +38,7 @@
 |---|---|---|---|
 | **Authentication** | `DEC-AUTH-001` to `DEC-AUTH-012`, `DEC-AUTH-102` to `DEC-AUTH-111` | **APPROVED** | HTTP-only secure cookies (`HttpOnly`, `Secure`, `SameSite=Strict`), PostgreSQL session table, 30m idle / 8h absolute maximum lifetime, CLI Owner seed, no public Owner creation, mandatory 6-digit email verification, 1m unified expiry & cooldown, verified self-email change, single active session enforcement, cross-client email PNG logo & 'Melon Governance' branding, and Owner User Management email verification isolation with ADMINISTRATOR role presentation. |
 | **RBAC** | `DEC-RBAC-013` to `DEC-RBAC-019` | **APPROVED** | Owner has global device visibility. Admins have mandatory per-device assignments; device assignment automatically grants both monitoring and faucet control. Owners manage assignments. No separate per-user-device `canControl` permission in v1. |
-| **Devices** | `DEC-DEV-020` to `DEC-DEV-037` | **APPROVED** | Unified EMQX Cloud broker architecture (`DEC-DEV-035` superseding `DEC-DEV-033`): all soil, water quality, and reservoir water tank telemetry consolidated onto EMQX Cloud with HiveMQ fallback permanently retired. Direct 2-tier gateway for single water tank node (`DEC-DEV-032`). Resilient hardware payload normalization in `SoilWaterMqttAdapter` supporting real ESP32 envelopes (`device`, nested `water`, `device_code`) while strictly preserving database device identity validation (`DEC-DEV-036`). External ML prediction resolution decoupled from immutable `devices.deviceId` via `device_external_mappings.external_device_id = 'soil001'`, and EMQX broker ACL policy granting scoped bidirectional `Publish & Subscribe` for `petanimelon` (`DEC-DEV-037`). User-facing connection status normalized strictly to Connected vs Disconnected (`DEC-DEV-034`). In-app device creation removed (`DEC-DEV-027`). External `deviceId` editable by OWNER only (`DEC-DEV-028`). Zero hard deletion in favor of `DEACTIVATED` / `ACTIVE` (`DEC-DEV-030`). |
+| **Devices** | `DEC-DEV-020` to `DEC-DEV-039` | **APPROVED** | Unified EMQX Cloud broker architecture (`DEC-DEV-035` superseding `DEC-DEV-033`): all soil, water quality, and reservoir water tank telemetry consolidated onto EMQX Cloud with HiveMQ fallback permanently retired. Direct 2-tier gateway for single water tank node (`DEC-DEV-032`). Resilient hardware payload normalization in `SoilWaterMqttAdapter` supporting real ESP32 envelopes (`device`, nested `water`, `device_code`) while strictly preserving database device identity validation (`DEC-DEV-036`). External ML prediction resolution decoupled from immutable `devices.deviceId` via `device_external_mappings.external_device_id = 'soil001'`, and EMQX broker ACL policy granting scoped bidirectional `Publish & Subscribe` for `petanimelon` (`DEC-DEV-037`). Device identity security rotation architecture (`DEC-DEV-038`): relational identity `devices.id` UUID is immutable, `devices.device_id` is an OWNER-rotatable security identifier, and `devices.client_id` is hardware MQTT identity. Complete removal of device activation/deactivation lifecycle in favor of pre-provisioned devices monitored strictly by Connected vs Disconnected statuses (`DEC-DEV-039` superseding `DEC-DEV-030`). In-app device creation removed (`DEC-DEV-027`). Zero hard deletion preserved. |
 | **Monitoring** | `DEC-MON-036` to `DEC-MON-050`, `DEC-MON-085` to `DEC-MON-091` | **APPROVED** | Three distinct monitoring domains: 1) Soil monitoring (NPK, Temp, Moisture, pH, EC in `µS/cm`, status), 2) Water Quality monitoring (pH, TDS in ppm, EC in `µS/cm`, status), 3) Water Tank monitoring (Tank Vol in `L`, 0 L–2200 L scale per `DEC-MON-089`, status; Flow rate deleted per `DEC-MON-089`). Canonical EC unit standardized directly in `µS/cm` without multiplier conversions across storage, API, UI, simulator, and ML inference (`DEC-MON-091`). Soil & Water Quality ML classification is ingested from an external ML team's Supabase project over read-only PostgREST HTTPS (`ExternalPredictionClient`), mapped dynamically via `device_external_mappings`, and hybrid MQTT recommendations are published asynchronously via `apps/iot-gateway` without local ML compute (`DEC-MON-090`). Raw telemetry remains immutable. 90-day retention TTL with chunked batch maintenance (`DEC-MON-048` / `TASK-0913`). |
 | **Faucet Control** | `DEC-CTRL-051` to `DEC-CTRL-067`, `DEC-CTRL-090`, `DEC-CTRL-094`, `DEC-CTRL-095`, `DEC-CTRL-096` | **APPROVED** | Max 1 active command/device, no auto retries, `ENABLE_FAUCET_CONTROL=true` permanently enabled across all environments (`DEC-CTRL-096`). Duplicate command IDs never re-dispense. Automated timeout sweep for stale SENT commands (`DEC-CTRL-094`). Hardware valve feedback bridging and STATUS query contract (`DEC-CTRL-095`). Staging validation executed with `ENABLE_FAUCET_CONTROL=true` (`DEC-CTRL-096`). Timeout ≠ completion. Cancellation/stop support: **TBD**. |
 | **I18N** | `DEC-I18N-068` to `DEC-I18N-074` | **APPROVED** | Default `id` (Bahasa Indonesia), `en` fallback, mandatory centered language-selection gate for unauthenticated visitors without valid locale (`English` -> `en`, `Bahasa Indonesia` -> `id`), cookie-based non-prefixed routing (no URL path pollution), subsequent language changes strictly in Settings (`/settings`), UTC storage with `Asia/Jakarta` (WIB) presentation. |
@@ -310,13 +310,14 @@
 #### DEC-DEV-030: Removal of Device Hard Deletion and Transition to Activation / Deactivation Lifecycle
 * **Related Task IDs**: `TASK-0302`, `TASK-0303`
 * **Related Documentation**: `docs/PRD.md` §8.1, `docs/RBAC.md` §6.1, §9.3, §10, `docs/USER_FLOWS.md` §8 (Flow 22A, 22B), `docs/API.md` §14.5, §14.6, §14.8, `docs/DATABASE.md` §3.5, §7.2, `docs/SECURITY.md` §10.5, `docs/UI_UX.md` §6, §7.1
-* **Status**: **APPROVED BY USER (2026-08-23)**
-* **Implementation Status**: **IMPLEMENTED & VERIFIED (2026-08-23 / TASK-0302)**
-* **Approved Decision**:
+* **Status**: **SUPERSEDED (2026-10-03 by DEC-DEV-039; previously APPROVED BY USER 2026-08-23)**
+* **Implementation Status**: **SUPERSEDED / RETIRED (2026-10-03)**
+* **Approved Decision (Historical)**:
+  > [!NOTE]
+  > Device activation and deactivation lifecycle was formally retired per `DEC-DEV-039`. Pre-provisioned devices remain permanently in PostgreSQL, and operational monitoring relies strictly on live connection states (`Connected` vs `Disconnected`). Hard deletion remains permanently eliminated.
+
   1. **Zero Hard Delete for Devices**: Hard deletion of devices (`DELETE /api/v1/devices/{deviceId}`) is permanently removed from the application UI and REST API. Deleting devices causes catastrophic data loss across telemetry, audit logs, commands, and access histories.
-  2. **Device Activation & Deactivation Lifecycle**: Device lifecycle is managed strictly via `DEACTIVATED` and `ACTIVE` states:
-     - **Deactivation**: Owners can deactivate devices (`POST /api/v1/devices/{deviceId}/deactivate`, `device.deactivate` permission). Sets `accountStatus = 'DEACTIVATED'`, `connectionStatus = 'INACTIVE'`, populates `deactivatedAt = NOW()`, immediately revokes faucet control capabilities, and logs `device.deactivated` in audit logs.
-     - **Reactivation**: Owners can reactivate deactivated devices (`POST /api/v1/devices/{deviceId}/activate`, `device.activate` permission). Sets `accountStatus = 'ACTIVE'`, resets `connectionStatus = 'UNKNOWN'`, clears `deactivatedAt = NULL`, and logs `device.activated` in audit logs.
+  2. **Device Activation & Deactivation Lifecycle (RETIRED per DEC-DEV-039)**: Device lifecycle was previously managed via `DEACTIVATED` and `ACTIVE` states (`POST /deactivate` and `POST /activate`). This feature has been completely removed from UI, API, and permissions.
   3. **Pre-Provisioned Default Devices**: Standard canonical devices (`soil-node-001`, `water-quality-node-001`, and `water-tank-node-zi37gz`) are seeded and immediately visible to the Owner upon system initialization.
 * **Implementation Evidence**:
   - Removed `DELETE /api/v1/devices/[deviceId]` route handler and created `POST /api/v1/devices/[deviceId]/activate`.
@@ -567,7 +568,39 @@
   1. **Intentional Pre-Validation Disablement**: Faucet control was intentionally disabled (`ENABLE_FAUCET_CONTROL=false`) across staging configurations prior to staging validation to maintain baseline safety locks, prevent accidental hardware actuation, and verify baseline container health and telemetry ingestion isolation.
   2. **Staging Validation Flag Activation**: Full staging validation of end-to-end critical flows (`TASK-1004` Flows 8, 9, 10) and hardware-in-the-loop valve control (`TASK-0811`, `TASK-0812`) required explicitly enabling the feature flag (`ENABLE_FAUCET_CONTROL=true`) in the staging runtime environment.
   3. **Zero Application Code Changes Required**: The feature flag toggle required zero application code modifications. All backend validation, RBAC checks, IoT Gateway command publishing, database repository transactions, contracts, and frontend UI control panels were already fully implemented, tested, and guarded by the feature flag.
-  4. **Production Invariant Unchanged**: Production environment configuration strictly retains mandatory `ENABLE_FAUCET_CONTROL=false` by default, requiring dual written sign-off from both Project Owner and Hardware Lead before any production activation per `DEC-CTRL-051` and `DEC-CTRL-067`.
+#### DEC-DEV-038: Device Identity Security Rotation Architecture
+* **Related Task IDs**: `TASK-0418` (superseding and unblocking `DEC-DEV-028` Item 4)
+* **Related Documentation**: `docs/DEVICE_COMMUNICATION.md` §3.1, §4.3; `docs/SECURITY.md` §18; `docs/DATABASE.md` §3.2
+* **Status**: **APPROVED BY USER (2026-10-03)**
+* **Approved Decision**:
+  1. **Three-Tier Identity Triad**:
+     - **Database Identity (`devices.id`)**: Immutable UUID primary key. Authoritative relational foreign key for all child tables (`soil_readings`, `water_readings`, `reservoir_water_readings`, `faucet_commands`, `user_device_access`, `alerts`, `device_external_mappings`, `device_capabilities`, `device_status_events`). Never changes.
+     - **Security Identifier (`devices.device_id`)**: Mutable canonical identifier rotatable by `OWNER` from the UI/API (`PATCH /api/v1/devices/{deviceId}`). Old identifier becomes invalid immediately upon rotation (API returns 404 for lookups targeting old string).
+     - **Hardware MQTT Identity (`devices.client_id`)**: Immutable physical MQTT client identifier (`melon-esp32-tanah1`, `melon-esp32-air1`, `NodeMCU_Irigasi_Fix`). Microcontroller firmware transmits using this ID without requiring firmware reflashing when security rotation occurs.
+  2. **Ingestion & Persistence Binding**:
+     - Gateway telemetry ingestion dynamically resolves hardware identity via `devices.client_id` from database registry.
+     - Telemetry ingestion (`ingestSoilReading`, `ingestWaterReading`, `ingestReservoirReading`) passes the immutable database UUID (`device.id`) to persistence repositories, guaranteeing that all historical telemetry, RBAC permissions, audit trails, and faucet commands remain 100% intact across rotations.
+  3. **Frontend & URL Synchronization**:
+     - Frontend `DeviceContext` and URL search parameters dynamically synchronize upon `device_id` rotation via `refetchDevices` and `selectDevice`.
+  4. **Audit Logging**:
+     - Records `device.identifier_rotated` with previous and new `deviceId`, actor ID, and device database UUID.
+  5. **Zero Database DDL Migration**:
+     - Relational schema already defines `devices.client_id VARCHAR(150) UNIQUE` and `devices.id UUID PRIMARY KEY`. No database migration or data mutation is required.
+
+---
+
+#### DEC-DEV-039: Complete Removal of Device Activation/Deactivation Lifecycle & Standardization on Connected/Disconnected Monitoring
+* **Related Task IDs**: `TASK-0302`, `TASK-0303` (superseding `DEC-DEV-030`)
+* **Related Documentation**: `docs/DEVICE_COMMUNICATION.md` §7, §33; `docs/API.md` §14; `docs/RBAC.md` §6.1, §9.3; `docs/USER_FLOWS.md` §8; `docs/DATABASE.md` §3.5
+* **Status**: **APPROVED BY USER (2026-10-03 - Supersedes DEC-DEV-030)**
+* **Approved Decision**:
+  1. **Lifecycle Removal**: The administrative device deactivation and reactivation feature (`POST /api/v1/devices/{deviceId}/deactivate` and `POST /api/v1/devices/{deviceId}/activate`) is permanently removed from the product requirements.
+  2. **RBAC Permission Cleanup**: Permissions `device.deactivate` and `device.activate` are retired and removed from seed data and authorization matrices.
+  3. **Frontend Action & Filter Cleanup**: Deactivate (`PowerOff`) and Activate (`RotateCcw`) action buttons and modals are completely removed from the `/devices` UI. The "Inactive" option is removed from connection status filters.
+  4. **Monitoring State Normalization**: Device monitoring standardizes strictly on two operational states:
+     - **Connected**: `ONLINE` (transmitting valid telemetry within 60s).
+     - **Disconnected**: `OFFLINE`, `STALE`, or `UNKNOWN` (inactive, delayed, or uninitialized communication).
+  5. **Database Schema Preservation**: Existing database columns (`devices.account_status` defaulting to `'ACTIVE'`, and `devices.deactivated_at` nullable) are retained in PostgreSQL to prevent schema drift, breaking migrations, or downtime.
 
 ---
 

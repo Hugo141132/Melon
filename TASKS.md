@@ -1313,15 +1313,28 @@ Implement sites if required for version 1.
   - **Device Capability Restriction Rules:** Restricted "Irrigation Valve Control" (`FAUCET_CONTROL`) strictly to supported controller/reservoir devices (`WATER_TANK_NODE`). Soil (`SOIL_NODE`) and Water Quality (`WATER_QUALITY_NODE`) monitoring devices strictly do not display irrigation control capability.
   - **Simplified Status Display & Client Filtering:** Mapped raw connection statuses to 3 user-facing presentation statuses (`ONLINE` $\to$ Connected, `OFFLINE`/`STALE`/`UNKNOWN` $\to$ Disconnected, `INACTIVE`/deactivated $\to$ Inactive) with custom badge colors and indicator dots. Provided 4-option dropdown filter operating client-side without violating backend API query schemas.
   - **Bilingual Localization:** Maintained 100% key parity across `messages/id.json` and `messages/en.json` under `devices.*` namespace with zero hardcoded UI strings or Unicode emojis.
-  - **Verification:** 12/12 unit tests passed in `apps/web/test/unit/devices-page.test.tsx`, TypeScript typecheck passed with 0 errors across 4 workspaces, and Playwright MCP visual verification confirmed responsive layout and status filtering across mobile and desktop.
+  - Reconciled Device Identity Security Rotation & Removed Device Deactivation Lifecycle on 2026-10-03 (`TASK-0302` / `TASK-0418` / `DEC-DEV-038`, `DEC-DEV-039`):
+  - **Device Identity Security Rotation (`DEC-DEV-038`)**:
+    - Retained `devices.id` as the immutable PostgreSQL UUID primary key and relational foreign key anchor.
+    - Standardized `devices.device_id` as an OWNER-rotatable security identifier. Rotating `device_id` from UI/API (`PATCH /api/v1/devices/{deviceId}`) immediately invalidates the old identifier (lookups for the previous string return HTTP 404).
+    - Preserved `devices.client_id` as the physical hardware MQTT identity (`melon-esp32-tanah1`, `melon-esp32-air1`, `NodeMCU_Irigasi_Fix`). Microcontrollers transmit without firmware reflashing during security rotation.
+    - Updated IoT gateway telemetry ingestion to resolve hardware via `client_id` and persist telemetry directly using `devices.id` UUID.
+    - Added structured audit logging for `device.identifier_rotated`.
+  - **Device Deactivation Removal (`DEC-DEV-039`)**:
+    - Completely deleted API routes `POST /api/v1/devices/{deviceId}/deactivate` and `POST /api/v1/devices/{deviceId}/activate`.
+    - Removed repository methods `deactivateDevice` and `activateDevice` from `DeviceRepository`.
+    - Retired permissions `device.deactivate` and `device.activate` from `seed.ts` and RBAC catalog.
+    - Cleaned up `/devices` UI: removed Deactivate (`PowerOff`) and Activate (`RotateCcw`) action buttons and modals; retained strictly the Owner Edit (`Edit2`) button.
+    - Cleaned up connection status filter: removed "Inactive" option, standardizing strictly on 2 operational states: Connected (`ONLINE`) and Disconnected (`OFFLINE`, `STALE`, `UNKNOWN`).
+    - Preserved PostgreSQL schema (`devices.account_status` and `devices.deactivated_at`) to eliminate migration overhead and prevent schema drift.
+  - **Verification**: 55/55 targeted unit tests passed, 133/133 full test files (1,380/1,380 tests) passed across monorepo packages, and 0 TypeScript typecheck errors across all 4 workspaces.
 
 ### Work
 
 Implement:
 
-- Device identity (immutable DB UUID `id`, Owner-editable external `deviceId`).
+- Device identity (immutable DB UUID `id`, Owner-rotatable external `deviceId`, hardware MQTT `client_id`).
 - Device type.
-- Lifecycle status.
 - Connection status.
 - Capabilities.
 - Firmware metadata.
@@ -1333,9 +1346,10 @@ Implement:
 - `deviceId` is unique.
 - Device IDs are canonical and untranslated.
 - Device credentials are not exposed.
-- Inactive devices cannot receive commands.
+- Rotated `deviceId` immediately invalidates previous identifier; hardware continues working via `client_id` (`DEC-DEV-038`).
 - In-app device creation is removed (`DEC-DEV-027`).
 - Canonical `deviceId` is editable by Owner and concealed from Admin (`DEC-DEV-028`).
+- Device deactivation is permanently removed; fleet monitoring standardizes on Connected vs Disconnected states (`DEC-DEV-039`).
 
 ---
 
@@ -2391,6 +2405,49 @@ The external ML inference pipeline classifies soil and irrigation water telemetr
 - [x] Establish invariant that `devices.deviceId` remains immutable in favor of `device_external_mappings`.
 - [x] Verify EMQX Cloud broker ACL policy for `petanimelon` (`Publish & Subscribe` on 4 scoped topics).
 - [x] Update documentation (`TASKS.md`, `AGENTS.md`, `docs/DEVICE_COMMUNICATION.md`, `docs/DECISIONS.md`, `docs/ARCHITECTURE.md`, `docs/TRACEABILITY.md`).
+
+---
+
+## TASK-0418 — Implement Approved Device Identity Security Rotation Architecture
+
+**Priority:** `P1`
+**Status:** `DONE` (Completed 2026-10-03 per DEC-DEV-036, unblocking DEC-DEV-028 Item 4)
+**Dependencies:** `TASK-0412`, `TASK-0417`, `DEC-DEV-036`
+
+### Context & Implementation
+1. **Three-Tier Identity Triad Implementation (`DEC-DEV-036`):**
+   - **Database Identity (`devices.id`)**: Immutable UUID primary key. Authoritative relational foreign key for all child tables (`soil_readings`, `water_readings`, `reservoir_water_readings`, `faucet_commands`, `user_device_access`, `alerts`, `device_external_mappings`, `device_capabilities`, `device_status_events`).
+   - **Security Identifier (`devices.device_id`)**: Mutable canonical identifier rotatable by `OWNER` from the UI/API (`PATCH /api/v1/devices/{targetIdentifier}`). Rotating it immediately invalidates the old identifier (404 on API lookups with old string).
+   - **Hardware MQTT Identity (`devices.client_id`)**: Immutable physical MQTT client identifier (`melon-esp32-tanah1`, `melon-esp32-air1`, `NodeMCU_Irigasi_Fix`). Microcontroller firmware transmits using this ID without requiring firmware reflashing or broker credential changes when security rotation occurs.
+2. **Gateway Ingestion & Persistence Binding:**
+   - In `apps/iot-gateway/src/mqtt/soil-water-adapter.ts`:
+     - Added `resolveSoilDevice` and `resolveWaterDevice` returning `{ deviceId, id }` (where `id` is the immutable database UUID).
+     - Updated `handleInboundSoilData` and `handleInboundWaterData` to pass `targetDevice.id` (UUID) to `telemetryRepo.ingestSoilReading` and `telemetryRepo.ingestWaterReading`, while retaining `targetDevice.deviceId` for realtime SSE dispatch and downstream AI recommendation topics.
+   - In `apps/iot-gateway/src/mqtt/hardware-adapter.ts`:
+     - Updated `resolveTargetDeviceId` to dynamically query database registry for `client_id = 'NodeMCU_Irigasi_Fix'` first, eliminating static environment variable dependency.
+3. **Frontend Context & URL State Synchronization:**
+   - In `apps/web/context/DeviceContext.tsx`: Exported safe non-throwing `useOptionalDeviceContext()`.
+   - In `apps/web/app/devices/page.tsx`: Updated `handleUpdateDevice` to call `deviceContext?.refetchDevices()`, re-select active device via `selectDevice`, and synchronize URL query params (`deviceId=...`) upon successful rotation.
+4. **Seed & Fallback Configuration:**
+   - In `packages/database/prisma/seed.ts`: Added `clientId: 'melon-esp32-tanah1'`, `'melon-esp32-air1'`, and `'NodeMCU_Irigasi_Fix'` to `seedCanonicalDevices`.
+   - In `packages/database/src/external-prediction-client.ts`: Added canonical seed aliases to `DEFAULT_ML_DEVICE_ALIASES`.
+   - Rebuilt `@kebun-melon/database` (`dist/`).
+5. **Quality Verification & Invariants:**
+   - Unit tests: Added dedicated rotation test in `apps/iot-gateway/src/__tests__/soil-water-adapter.test.ts` and `apps/iot-gateway/src/__tests__/hardware-adapter.test.ts`. Full monorepo vitest suite passed with 100% pass rate (133 test files, 1,389 tests passed).
+   - Typecheck: Full workspace `tsc --noEmit` passed with 0 errors across all 4 packages.
+   - Zero Database DDL Migration: Confirmed zero migration files required (schema already supports `id`, `device_id`, `client_id`).
+   - Staging Update Status: Staging requires no database migration or schema modification; only standard container rebuild/restart (`kebun-melon-staging-web`, `kebun-melon-staging-gateway`) upon deployment.
+
+### Acceptance Criteria
+- [x] OWNER can change `device_id` from the web UI.
+- [x] Old `device_id` becomes invalid immediately after rotation.
+- [x] Existing telemetry history, RBAC permissions, faucet commands, and audit records remain 100% intact.
+- [x] MQTT devices continue streaming without firmware changes.
+- [x] Gateway telemetry ingestion relies on immutable `devices.id` UUID.
+- [x] Static `device_id` dependency removed from MQTT gateway fallback logic.
+- [x] Frontend `DeviceContext` and URL state update after OWNER changes `device_id`.
+- [x] Audit logging preserved for `device.updated`.
+- [x] 100% test pass rate on unit tests without credentials.
 
 ---
 
