@@ -3397,3 +3397,57 @@ Automated testing for `TASK-0813` covers coordinated dashboard loading, intermed
   - Database migration required: **NO** (foreign key relation and `full_name` column already exist in PostgreSQL).
 <!-- TASK-0813 Testing Evidence Reconciled: 2026-10-01 -->
 
+---
+
+## 49. Alert Notification System & User Acknowledgement Scoping Testing Evidence (TASK-0703 – TASK-0707 / Reconciled 2026-10-03)
+
+### 1. Test Suite Coverage & Verification Scope
+Automated testing for the Alert Notification System covers user-scoped alert acknowledgement, atomic bulk acknowledgement, asynchronous email dispatch, user notification preferences, and dynamic localization:
+
+- **Notifications Bulk Acknowledgement UI (`apps/web/test/unit/notifications-bulk-acknowledge-ui.test.tsx`):**
+  - Result: **2/2 passed** (100%, exit code 0).
+  - Verifies multi-select checkbox controls, "Select All" toggle, selection counter badge, and batch acknowledgement triggering.
+  - Verifies `melon:alert-updated` DOM event emission to update navigation badges.
+- **Notifications User-Scoped Acknowledgement UI (`apps/web/test/unit/notifications-user-scope.test.tsx`):**
+  - Result: **2/2 passed** (100%, exit code 0).
+  - Verifies 1-click direct acknowledgement without mandatory comment dialogs.
+  - Verifies operator-scoped visibility: acknowledged alerts hide from the active user's unread list while remaining unacknowledged for other users.
+- **Alert Repository Database Tests (`packages/database/test/alert-repository.test.ts`):**
+  - Result: **7/7 passed** (100%, exit code 0).
+  - Verifies `AlertRepository.acknowledgeAlert` and `acknowledgeAlertsBulk` writing to `alert_acknowledgements` with composite unique constraint `@@unique([alertId, acknowledgedByUserId])`.
+  - Verifies user-scoped `status=OPEN` filtering using SQL outer join / `NOT EXISTS` conditions.
+  - Verifies global alert status preservation (`OPEN` / `RESOLVED`).
+- **Bulk Acknowledge API Route (`apps/web/app/api/v1/alerts/bulk-acknowledge/test/route.test.ts`):**
+  - Result: **5/5 passed** (100%, exit code 0).
+  - Verifies RBAC enforcement (`alert.acknowledge`), input schema validation (`BulkAcknowledgeAlertsInputSchema`), device scoping for Admin users, and audit logging (`alert.acknowledged`).
+- **Alert Notification Service Unit Tests (`apps/web/test/unit/alert-notification-service.test.ts`):**
+  - Result: **5/5 passed** (100%, exit code 0).
+  - Verifies dynamic locale resolution (`id` / `en`) from message catalogs, recipient resolution based on RBAC and `user_device_access`, and suppression when `emailAlertsEnabled === false`.
+- **Resend Alert Email Delivery Tests (`apps/web/test/unit/resend-alert-email.test.ts`):**
+  - Result: **3/3 passed** (100%, exit code 0).
+  - Verifies multipart HTML/plain-text construction, inline brand logo (`cid:logo1`), severity badges, deep link formatting, and simulation mode in test environments.
+- **Internal Alert Dispatch Route Tests (`apps/web/test/unit/internal-alert-dispatch-route.test.ts`):**
+  - Result: **2/2 passed** (100%, exit code 0).
+  - Verifies machine-to-machine authentication via Bearer `INTERNAL_SERVICE_TOKEN` and decoupled dispatch execution.
+- **Notification Preferences Settings UI (`apps/web/test/unit/settings-notification-preferences.test.tsx`):**
+  - Result: **2/2 passed** (100%, exit code 0).
+  - Verifies modal toggle rendering, `/api/v1/me/preferences` REST integration, and modal overlay stacking context (`z-[100]` portaled to `document.body`).
+- **Sidebar & Top Navigation Badge (`apps/web/test/unit/sidebar-navigation.test.tsx`):**
+  - Result: **12/12 passed** (100%, exit code 0).
+  - Verifies unread alert count hydration on login session establishment, unread indicator dot on `TopAppBar`, and real-time synchronization.
+- **Faucet Command Timeout & Valve Terminology (`apps/web/test/unit/faucet-control-ui.test.tsx`, `controls-loading-transition.test.tsx`):**
+  - Result: **32/32 passed** and **19/19 passed** (100%, exit code 0).
+  - Verifies "Valve" standardization replacing "Katup", "Operator" replacing "Actor", and physical valve state retention (`lastConfirmedPhysicalState`) on command timeout with sanitized alert messages.
+- **Translation Completeness & Parity (`npm run i18n:check`):**
+  - Result: **100% key and ICU placeholder parity** across all namespaces.
+- **Monorepo Typecheck (`npm run typecheck`):**
+  - Result: **0 errors** across all 4 packages.
+
+### 2. Staging Deployment Verification Evidence
+- **Target Environment:** Containerized Staging on AWS Singapore (`ihgoxqdncepbcrqkchxu`), PostgreSQL 17 via transaction pooler.
+- **Migrations Applied:** Migrations 17 (`20261003120000`) and 18 (`20261003140000`) verified in `_prisma_migrations`.
+- **Live Email Delivery:** Verified end-to-end delivery through Resend with external dispatch ID `01a10130-c8b3-7de2-bd52-541bbff6851e`.
+- **Privacy Sanitization:** Verified zero leakage of technical command IDs (`cmd-xxxxxxxx`) or database UUIDs in operator-facing alerts or emails.
+<!-- Alert Notification System Testing Evidence Reconciled: 2026-10-03 -->
+
+

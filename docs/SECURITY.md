@@ -1628,7 +1628,7 @@ The security implementation is accepted when:
 5. Device authentication may use passwords or certificates; the final production approach is not selected.
 6. Hardware fail-safe behaviour requires confirmation from the hardware team.
 7. Audit, backup, and personal-data retention periods are not defined.
-8. ~~The production hosting environment is still under discussion.~~ **RESOLVED** — Dedicated Linux VPS with Docker Compose, hardened OS, UFW firewall, SSH key-only access, non-root containers, and automated HTTPS reverse proxy (`TASK-1011`); staging is containerized (`TASK-1012`), decoupled from Railway (`DEC-INF-088`).
+8. ~~The production hosting environment is still under discussion.~~ **RESOLVED** — JagoanHosting Nebula General Purpose VPS (`38.103.171.46`, Ubuntu 26.04.1 LTS, Docker Compose v5.6.0) with hardened OS, UFW firewall (TCP 22/80/443), dedicated non-root user `deploy` with SSH key-only access (root login and password auth disabled), and Caddy automated HTTPS reverse proxy (`TASK-1011`, `DEC-INF-088`); staging containerized at `/opt/kebun-melon` (`TASK-1012 Tier 2`), decoupled from Railway.
 9. MFA is recommended for Owner accounts but not yet approved.
 10. Security testing must be completed before production physical control is enabled.
 

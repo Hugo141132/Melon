@@ -812,4 +812,75 @@ The following facts are verified in the traceability matrix regarding `TASK-0813
   - Database migration required: **NO** (Prisma relation and `full_name` column already exist in PostgreSQL).
 <!-- TASK-0813 Traceability Reconciled: 2026-10-01 -->
 
+---
+
+## Alert Notification System Staging Deployment & Verification Traceability Note (DEC-ALRT-097 / DEC-ALRT-099 / DEC-ALRT-100 / DEC-CTRL-098 / Reconciled 2026-10-03)
+
+The following facts are verified in the traceability matrix regarding the Alert Notification System release (`TASK-0703`, `TASK-0704`, `TASK-0705`, `TASK-0706`, `TASK-0707`):
+- **Traceability Baseline:** Governed by `PRD-FR-035`, `PRD-FR-036`, `PRD-FR-037`, `PRD-FR-040`, `DEC-ALRT-097`, `DEC-ALRT-099`, `DEC-ALRT-100`, `DEC-CTRL-098`, `docs/ARCHITECTURE.md` §18, `docs/API.md` §19, `docs/DATABASE.md` §10, `docs/UI_UX.md`, and `docs/TESTING.md`.
+- **Implementation Status:** `DONE` (Implemented, verified with 100% test pass rate across 139 test files, and validated in containerized staging).
+- **Decoupled User Acknowledgement Model (`DEC-ALRT-097`):**
+  - Alert global lifecycle remains `OPEN` or `RESOLVED` on the `alerts` table.
+  - Operator acknowledgements are stored per operator in `alert_acknowledgements` with composite unique index `@@unique([alertId, acknowledgedByUserId])`.
+  - Operator A acknowledgement updates only Operator A's unread badge count without mutating state for Operator B.
+  - Direct 1-click acknowledgement and atomic bulk acknowledgement (`POST /api/v1/alerts/bulk-acknowledge`) implemented and audited.
+- **Asynchronous Decoupled Email Delivery (`DEC-ALRT-099`):**
+  - Core telemetry ingestion and gateway command processing never block on external email delivery.
+  - Internal M2M trigger routes through `POST /api/v1/internal/alerts/:id/dispatch-emails` authenticated via Bearer `INTERNAL_SERVICE_TOKEN`.
+  - Recipient resolution enforces RBAC: `OWNER` users receive all alerts; `ADMIN` users receive alerts only for assigned devices (`user_device_access`); inactive/unverified accounts excluded.
+  - Dispatch idempotency guaranteed via `alert_email_dispatches` table (`@@unique([alertId, userId])`).
+  - Operator preferences honored via `emailAlertsEnabled` in `user_preferences` (status: `DISABLED_BY_PREFERENCE` when disabled).
+- **Dynamic Localization & Technical Terminology Standardization (`DEC-ALRT-100`):**
+  - Subjects, bodies, badges, and CTAs dynamically looked up from localized catalogs (`messages/id.json` and `messages/en.json`) based on recipient's `preferredLocale`, eliminating hardcoded fallback dictionaries.
+  - Standardized "Valve" replacing "Katup" across all Indonesian and English UI and notification emails.
+  - Standardized "Operator" replacing "Actor" / "Aktor" in table headers.
+  - Modal overlay stacking context for notification preferences isolated with `z-[100]` portaled directly to `document.body`, covering `TopAppBar`.
+- **Faucet Command Timeout & Privacy Sanitization (`DEC-CTRL-098`):**
+  - Background sweep transitions timed-out commands to `TIMEOUT`, releases device locks, and generates `COMMAND_TIMEOUT` alerts.
+  - UI preserves `lastConfirmedPhysicalState` (`OPEN` / `CLOSED`) with a non-responding banner, forbidding regression to `UNKNOWN`.
+  - User-facing alert messages and emails strictly strip technical command IDs (`cmd-xxxxxxxx`) and database UUIDs.
+- **Staging Verification Evidence:**
+  - Singapore Supabase target (`ihgoxqdncepbcrqkchxu`) running PostgreSQL 17 with 18 migrations applied (`20261003120000` and `20261003140000`).
+  - Containers `kebun-melon-staging-web` and `kebun-melon-staging-gateway` healthy and operational.
+  - Full smoke test passed: login, preferences toggle, alert queries, user-scoped ack, bulk ack, internal dispatch, and live Resend delivery (Dispatch ID: `01a10130-c8b3-7de2-bd52-541bbff6851e`).
+<!-- Alert Notification System Staging Deployment & Verification Traceability Reconciled: 2026-10-03 -->
+
+---
+
+## Initial VPS Deployment & Nebula Host Verification Traceability Note (TASK-1011 / TASK-1012 Tier 2 / Reconciled 2026-10-03)
+
+The following facts are verified in the traceability matrix regarding the Initial VPS Deployment and Staging Verification on Nebula General Purpose VPS:
+- **Traceability Baseline:** Governed by `DEC-INF-088`, `docs/SECURITY.md` §32–33, `docs/ARCHITECTURE.md`, `TASKS.md` (`TASK-1011`, `TASK-1012 Tier 2`), and `docs/VPS_DEPLOYMENT_RUNBOOK.md`.
+- **Hosting Decision:** JagoanHosting Nebula General Purpose is **FIXED** for both initial deployment and final production release.
+- **Host Baseline & OS Hardening Facts:**
+  - Host reinstalled from Rocky Linux to Ubuntu 26.04 LTS (observed after system updates: Ubuntu 26.04.1 LTS, kernel `7.0.0-38-generic`, `x86_64`, ~1909 MiB RAM; swapfile not yet created / 0 swap at last check).
+  - Provisioned user `deploy` with sudo privileges; SSH key login verified after disabling root login, password authentication, and keyboard-interactive authentication.
+  - Active UFW firewall permitting strictly TCP ports 22, 80, and 443.
+  - Docker Engine `29.8.2` and Docker Compose `v5.6.0` installed and running.
+  - Dedicated deployment directory `/opt/kebun-melon` with `deploy:deploy` ownership.
+- **Packaging & Container Ingress Facts:**
+  - Container images built off-VPS on Windows workstation for `--platform linux/amd64` (`kebun-melon-web:0.1.0-init`, `kebun-melon-gateway:0.1.0-init`) with static asset bundling verified (`apps/web/public/`).
+  - Transferred via `docker save -o` / `scp` / `docker load -i` without shell stream corruption.
+  - Multi-service Docker Compose (`docker-compose.prod.yml`) enforces required `.env.production` (`required: true`) without unintended local `.env` fallback.
+  - Reverse proxy (`caddy:2.9-alpine`, `docker/caddy/Caddyfile`) receives only `DOMAIN` and `ACME_EMAIL`, enforces HTTPS with automated Let's Encrypt TLS, applies security headers, blocks `/api/v1/internal/*` (HTTP 403), and handles unbuffered SSE (`flush_interval -1`).
+  - Network `melon-internal-network` configured with bridge driver without `internal: true`, preserving required outbound internet access for ACME TLS, external Supabase PostgreSQL, and external EMQX Cloud.
+- **Initial Deployment Target & Configuration Invariants:**
+  - Deployed targeting **Singapore Staging** (`ihgoxqdncepbcrqkchxu`), `APP_ENV=staging`, `NODE_ENV=production`, `RETENTION_ENABLED=false` (protecting staging telemetry from 10-second boot purge), 1-minute authentication token expiry (`AUTH_RESET_TOKEN_EXPIRY_MINUTES=1`, `AUTH_VERIFY_TOKEN_EXPIRY_MINUTES=1`), and approved `ENABLE_FAUCET_CONTROL=true` policy.
+- **Verification Evidence (Operator-Reported):**
+  - Operator reports successful container-status (healthy), public website delivery over HTTPS, `/health`, and `/ready` checks. (Labeled explicitly as operator-reported evidence; independent measurements, physical valve tests, and local 5 pre-commit CI gates remain unverified for this step).
+- **Procedures & Operational Governance:**
+  - Created `docs/VPS_DEPLOYMENT_RUNBOOK.md` containing prerequisite host checks, gateway single-consumer handover protocol, post-startup smoke tests, and an 8-step routine website update procedure with rollback routines.
+- **Database & Migration Assessment:**
+  - Staging database schema changes: **NONE** (no new migrations required for initial deployment).
+  - Physical valve actuation test: **NOT REPORTED**.
+  - Mumbai retirement: Permanently retired with zero active fallback (cloud-project deletion remains unverified).
+- **Pending Final Production Release Gates:**
+  - Live cutover to dedicated Supabase Production project.
+  - 2 GB swapfile configuration on VPS.
+  - Physical valve actuation test in production.
+  - Automated encrypted offsite backup cron to R2/S3 (`TASK-0909`).
+  - Sentry and Grafana Cloud observability integration.
+  - Five pre-commit CI gates and remote push CI verification.
+<!-- TASK-1011 & TASK-1012 Tier 2 Traceability Reconciled: 2026-10-03 -->
+
 

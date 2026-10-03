@@ -39,7 +39,7 @@ The database shall be the durable system of record for application state.
 
 ### 2.1 TASK-0914 Environment & Schema Reconciliation
 `TASK-0914` required zero database schema migrations or data alterations:
-- **Environment Isolation:** Local development connects to its configured local database (`DATABASE_URL`), while staging connects to the dedicated Supabase PostgreSQL database (`scqrbtfilmttqrutynyo`) (formerly hosted on Railway, transitioning to containerized staging per `TASK-1012`). Staging database records and canonical identities remain intact and unmodified.
+- **Environment Isolation:** Local development connects to its configured local database (`DATABASE_URL`), while staging connects to the dedicated Supabase PostgreSQL database in Singapore (`ihgoxqdncepbcrqkchxu`, formerly Mumbai `scqrbtfilmttqrutynyo` transitioned per `TASK-0916` / `DEC-INF-095`). Staging database records and canonical identities remain intact and unmodified.
 - **Dynamic Device Identity:** Canonical device strings (`devices.device_id`) are managed as environment data and resolved dynamically at runtime by simulation tools via CLI/environment variables, with no hardcoded device ID assumptions in source code.
 
 ### 2.2 TASK-0916 Migration Preparation, Singapore Dev & Staging Cutover Reconciliation
@@ -70,6 +70,14 @@ Under `TASK-0218` and `DEC-AUTH-110`:
 - **New Model & Migration:** Added `session_recovery_challenges` table via migration `20260925150000_add_session_recovery_challenges` to support out-of-band 6-digit OTP verification for clearing orphaned sessions when cookies are deleted.
 - **Applied & Verified on Singapore Dev:** Successfully deployed migration to PostgreSQL 17 Singapore Dev (`unbyxlkrzqlafolxcypi`). Verified 8 columns, foreign key cascade to `users(id)`, and indexes on `user_id` and `expires_at`.
 - **Prisma Dual-Connection Configuration:** Configured `directUrl = env("DIRECT_URL")` in `packages/database/prisma/schema.prisma`. Application runtime maintains high-concurrency connection through Supabase Transaction Pooler (`DATABASE_URL` on port `6543`), while Prisma CLI migration operations route via `DIRECT_URL` (port `5432` Session Mode Pooler / direct) which supports PostgreSQL session-level advisory locks (`pg_advisory_lock`). Staging deployment follows identical dual-connection runbook.
+
+### 2.5 Initial VPS Deployment Database Status: Zero New Migrations Required
+
+Under `TASK-1011` / `TASK-1012 Tier 2`:
+- Initial staging deployment to JagoanHosting Nebula General Purpose VPS (`monitoring.melonmadura.my.id`) relies directly on the existing PostgreSQL 17 Singapore Staging schema (`ihgoxqdncepbcrqkchxu`).
+- No new schema modifications or Prisma migrations were required.
+- Application runtime connects via Transaction Pooler (`DATABASE_URL`, port `6543`) with `DIRECT_URL` configured for Prisma CLI operations.
+- Staging operates with `RETENTION_ENABLED=false` until data retention background jobs are formally scheduled.
 
 ---
 

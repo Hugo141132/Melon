@@ -1,0 +1,94 @@
+services:
+  reverse-proxy:
+    image: caddy:2.9-alpine
+    container_name: kebun-melon-proxy
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp'
+    environment:
+      - DOMAIN=${DOMAIN:-monitoring.melonmadura.my.id}
+      - ACME_EMAIL=${ACME_EMAIL:-noreply@melonmadura.my.id}
+    volumes:
+      - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - melon-internal-network
+    depends_on:
+      web:
+        condition: service_healthy
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '10m'
+        max-file: '3'
+    mem_limit: 128m
+
+  web:
+    image: ${WEB_IMAGE:-kebun-melon-web:0.1.0-init}
+    container_name: kebun-melon-web
+    restart: unless-stopped
+    env_file:
+      - path: .env.production
+        required: true
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - HOSTNAME=0.0.0.0
+      - INTERNAL_GATEWAY_URL=http://iot-gateway:3001
+      - ENABLE_FAUCET_CONTROL=true
+    networks:
+      - melon-internal-network
+    depends_on:
+      iot-gateway:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -f http://localhost:3000/health || exit 1']
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '10m'
+        max-file: '3'
+    mem_limit: 512m
+
+  iot-gateway:
+    image: ${GATEWAY_IMAGE:-kebun-melon-gateway:0.1.0-init}
+    container_name: kebun-melon-gateway
+    restart: unless-stopped
+    env_file:
+      - path: .env.production
+        required: true
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - HOST=0.0.0.0
+      - WEB_APP_URL=http://web:3000
+      - ENABLE_FAUCET_CONTROL=true
+    networks:
+      - melon-internal-network
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -f http://localhost:3001/health || exit 1']
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '10m'
+        max-file: '3'
+    mem_limit: 384m
+
+networks:
+  melon-internal-network:
+    driver: bridge
+
+volumes:
+  caddy-data:
+  caddy-config:

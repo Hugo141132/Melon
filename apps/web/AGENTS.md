@@ -91,7 +91,7 @@ This document specifies operational guidelines and system boundaries for coding 
   - 21st.dev MCP: `NOT REQUIRED`
   - Scope: Reconciled water-tank volume scale to authoritative 0 L–2200 L capacity (`WATER_TANK_MAX_CAPACITY = 2200`), progress clamping (0%–100%), visual scale labels (`0 L`, `2200 L`), single full-width column responsive grid (`grid-cols-1 gap-4`), and explicit zero/null/unknown/loading state preservation following Flow Rate removal (`DEC-MON-089`).
 - **TASK-1004 Staging Infrastructure**:
-  - Web Hosting: Railway PaaS (`melon-monitor.up.railway.app`)
-  - Database: Supabase PostgreSQL (`aws-0-ap-south-1.pooler.supabase.com:6543`)
+  - Web Hosting: Containerized Docker Staging (`TASK-1012`; formerly Railway PaaS `melon-monitor.up.railway.app`, now decommissioned)
+  - Database: Supabase PostgreSQL (`aws-0-ap-southeast-1.pooler.supabase.com:6543`, `ihgoxqdncepbcrqkchxu`)
   - MQTT Broker: EMQX Cloud Serverless (`wss://` TLS)
   - Safety Enforced: `ENABLE_FAUCET_CONTROL=true` (permanently enabled across all environments per `DEC-CTRL-096`)

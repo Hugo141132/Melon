@@ -1,0 +1,38 @@
+{
+	email {$ACME_EMAIL:noreply@melonmadura.my.id}
+}
+
+{$DOMAIN:monitoring.melonmadura.my.id} {
+	# Security Headers (docs/SECURITY.md §16.8)
+	header {
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	# Block public access to internal machine-to-machine endpoints
+	@internal path /api/v1/internal/*
+	respond @internal "Access denied" 403
+
+	# Server-Sent Events (SSE) Route Handling without proxy buffering
+	@sse path /api/v1/realtime/stream*
+	handle @sse {
+		reverse_proxy web:3000 {
+			flush_interval -1
+		}
+	}
+
+	# General Web Application Routing
+	handle {
+		reverse_proxy web:3000
+	}
+
+	# Bounded Logging
+	log {
+		output stdout
+		format console
+		level INFO
+	}
+}

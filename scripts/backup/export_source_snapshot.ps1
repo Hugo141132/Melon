@@ -21,21 +21,21 @@ param (
 
 $ErrorActionPreference = 'Stop'
 
-# Project connection mapping (Session Pooler Port 5432)
+# Project connection mapping (Session Pooler Port 5432 - Singapore ap-southeast-1)
 $projectConfig = @{
     'dev' = @{
-        'Host' = 'aws-1-ap-south-1.pooler.supabase.com'
+        'Host' = 'aws-0-ap-southeast-1.pooler.supabase.com'
         'Port' = 5432
-        'User' = 'postgres.xjsencdgfcbkzdzqcnqx'
+        'User' = 'postgres.unbyxlkrzqlafolxcypi'
         'Database' = 'postgres'
-        'Ref' = 'xjsencdgfcbkzdzqcnqx'
+        'Ref' = 'unbyxlkrzqlafolxcypi'
     }
     'staging' = @{
-        'Host' = 'aws-0-ap-south-1.pooler.supabase.com'
+        'Host' = 'aws-0-ap-southeast-1.pooler.supabase.com'
         'Port' = 5432
-        'User' = 'postgres.scqrbtfilmttqrutynyo'
+        'User' = 'postgres.ihgoxqdncepbcrqkchxu'
         'Database' = 'postgres'
-        'Ref' = 'scqrbtfilmttqrutynyo'
+        'Ref' = 'ihgoxqdncepbcrqkchxu'
     }
 }
 
@@ -79,7 +79,7 @@ if (-not $hasNativeGpg) {
 }
 
 # 3. Prompt for Database Password & Encryption Passphrase
-$secPass = Read-Host -Prompt "Enter password for Mumbai $($Environment.ToUpper()) ($($cfg.User))" -AsSecureString
+$secPass = Read-Host -Prompt "Enter password for Singapore $($Environment.ToUpper()) ($($cfg.User))" -AsSecureString
 if ($null -eq $secPass -or $secPass.Length -eq 0) {
     Write-Error "Database password cannot be empty."
     exit 1

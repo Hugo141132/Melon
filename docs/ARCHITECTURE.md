@@ -2390,36 +2390,92 @@ The following architecture facts are supported by the verified implementation of
 
 ## Alert Architecture, User Acknowledgement Scoping, and Asynchronous Email Notification Subsystem (Reconciled 2026-10-03 per DEC-ALRT-097, DEC-ALRT-099, DEC-ALRT-100, DEC-CTRL-098)
 
-### 1. Alert Lifecycle & User-Scoped Acknowledgement Decoupling
-- **Global Lifecycle Separation:** An alert's lifecycle status on the `alerts` table remains strictly `OPEN` or `RESOLVED`. An alert row is not mutated to `ACKNOWLEDGED` when acknowledged by an operator.
-- **User Scoping:** User acknowledgements are stored per operator in `alert_acknowledgements` with a composite unique index `@@unique([alertId, acknowledgedByUserId], map: "alert_acknowledgements_alert_user_idx")`.
-- When Operator A acknowledges an alert, only Operator A's unread list and navigation badge reflect the acknowledgement; Operator B continues to see the alert as `OPEN` / unread until Operator B acknowledges it.
-- **Bulk Acknowledgement Flow:** `POST /api/v1/alerts/bulk-acknowledge` accepts `{ alertIds: string[] }` or `{ all: true }`, processing all authorized targets within an atomic database transaction and emitting individual `alert.acknowledged` audit logs. Dispatches client-side `melon:alert-updated` event to immediately update navigation badges.
+### 1. Alert Lifecycle Architecture
+The alert subsystem decouples alert generation, resolution, and operator interaction across the system:
+- **Global Lifecycle Separation:** An alert's fundamental lifecycle state on the `alerts` table is governed strictly by the `AlertStatus` enum: `OPEN` or `RESOLVED`. An alert row is **never** mutated to `ACKNOWLEDGED` when acknowledged by an operator; its status remains `OPEN` until the underlying condition resolves.
+- **Alert Generation Triggers:**
+  - **Sensor Telemetry Breaches:** Created by ingestion pipelines when calibrated physical measurements exceed critical or warning thresholds.
+  - **Command Execution Failures (`COMMAND_FAILED`):** Created by the IoT Gateway `AcknowledgementProcessor` (rejected ACKs) or `FaucetEventProcessor` (`FAILED` execution events) when a valve actuation command fails on physical hardware.
+  - **Command Timeouts (`COMMAND_TIMEOUT`):** Created by the IoT Gateway `CommandPublisher.sweepStaleSentCommands()` background task when an in-flight command in state `SENT` exceeds `expiresAt` (default: 60 seconds) without hardware ACK/completion.
+- **Alert Resolution Mechanics:**
+  - Alerts are resolved automatically when telemetry returns within normal operating envelopes or manually by authorized operators.
+  - Resolving an alert transitions `status` to `RESOLVED` and sets `resolvedAt = NOW()`.
+- **Durable Persistence Model:**
+  - Stored in the `alerts` table with schema attributes: `id` (UUID), `deviceId` (UUID, nullable for system alerts), `sourceType` (e.g., `'faucet_command'`, `'sensor_reading'`), `sourceId` (UUID string), `severity` (`CRITICAL`, `WARNING`, `INFO`), `type` (`COMMAND_FAILED`, `COMMAND_TIMEOUT`, `SENSOR_ANOMALY`, etc.), `translationKey` (ICU key in message catalog), `metadata` (JSONB), and timestamps.
 
-### 2. Decoupled Asynchronous Email Notification Subsystem
-- **Non-Blocking Telemetry and Gateway Ingestion:** Alert generation in IoT Gateway and Web applications must never block on external email delivery or synchronous third-party APIs.
-- **Machine-to-Machine Internal Dispatch:** Alert creation pathways trigger an asynchronous HTTP POST call to `POST /api/v1/internal/alerts/[alertId]/dispatch-emails` authenticated via Bearer `INTERNAL_SERVICE_TOKEN`.
-- **Recipient Resolution & RBAC Scoping:**
-  - `OWNER` users receive all alerts globally.
-  - `ADMIN` users receive alerts only for their explicitly assigned devices (`UserDeviceAccess`).
-  - System-wide alerts route strictly to active `OWNER` users.
-  - Inactive, unverified, or suspended accounts are strictly excluded.
-- **Idempotency & Delivery Tracking:** Dispatches are logged in `alert_email_dispatches` with composite unique index `@@unique([alertId, userId])` and statuses `SENT`, `FAILED`, `DISABLED_BY_PREFERENCE`, and `SIMULATED`. An alert is guaranteed never to be dispatched twice via email to the same recipient.
-- **User Preferences:** Email alert delivery honors the user's `emailAlertsEnabled` boolean preference in `user_preferences` (default: `true`), configurable via `/settings`.
+### 2. User Acknowledgement Model & Multi-Operator Isolation
+To support multi-operator shift management without cross-operator interference, alert acknowledgement is decoupled from the alert's global lifecycle:
+- **Relational User Scoping:**
+  - User acknowledgements are stored in the dedicated join table `alert_acknowledgements`.
+  - Enforced by a composite unique index: `@@unique([alertId, acknowledgedByUserId], map: "alert_acknowledgements_alert_user_idx")`.
+- **Multi-Operator Isolation Invariant:**
+  - When Operator A acknowledges an alert, an acknowledgement record is inserted for Operator A.
+  - Operator A's unread list and navigation badges immediately update to show the alert as acknowledged.
+  - Operator B (and other active operators) continue to see the alert as unread (`OPEN`) until they independently acknowledge it.
+- **Badge & Unread State Derivation:**
+  - Active alert queries (`GET /api/v1/alerts?status=OPEN`) dynamically evaluate acknowledgement state via SQL `NOT EXISTS` / relational outer join against `alert_acknowledgements` for the requesting `userId`.
+  - The client hook `useAlertBadge` monitors unacknowledged count via 15-second background interval polling, window focus, visibility change, and real-time custom DOM event `melon:alert-updated`.
+- **Acknowledgement Interaction:**
+  - **Direct 1-Click Action:** Operators can acknowledge individual alerts directly with a single click, eliminating mandatory comment dialogs.
+  - **Atomic Bulk Acknowledgement:** `POST /api/v1/alerts/bulk-acknowledge` accepts `{ alertIds: string[] }` or `{ all: true }`, processing all authorized target alerts in a single PostgreSQL transaction (`AlertRepository.acknowledgeAlertsBulk`), emitting structured audit logs (`alert.acknowledged`), and updating UI state.
 
-### 3. Dynamic Locale Resolution & Zero-Hardcoded Template Delivery
-- `AlertNotificationService` dynamically resolves the email subject, body, severity badge, and CTA action links from `messages/id.json` or `messages/en.json` according to the recipient's persisted `preferredLocale` (`id` or `en`).
-- Hardcoded fallback translation dictionaries are completely eliminated.
-- Transactional alert emails embed an email-safe PNG logo (`cid:logo1`), severity badge, device context, and deep link to `/notifications`.
+### 3. Email Notification Flow & Asynchronous Decoupling
+To protect telemetry ingestion throughput and hardware communication reliability, email notifications are strictly decoupled from core execution paths:
+- **Non-Blocking Telemetry & Gateway Ingestion:**
+  - Alert creation pathways in the IoT Gateway and Web applications write the alert record to PostgreSQL synchronously, then immediately proceed without blocking on external network delivery.
+- **Machine-to-Machine Internal Dispatch Endpoint:**
+  - Background alert triggers make an asynchronous internal HTTP request to `POST /api/v1/internal/alerts/[alertId]/dispatch-emails`.
+  - Protected via Bearer token authentication against `INTERNAL_SERVICE_TOKEN`.
+- **Transactional Delivery Engine:**
+  - Implemented via `apps/web/lib/email/resend.ts` (`sendAlertNotificationEmail`) using the unified Resend service.
+  - Formats rich HTML and plain-text multipart emails featuring severity badges, device identification, human-readable action context, inline brand logo (`cid:logo1`), and deep links to `/notifications`.
+  - Non-production environments support simulated dispatch with structured terminal logging to prevent sandbox quota exhaustion.
+- **Idempotency & Audit Tracking:**
+  - Every dispatch attempt is recorded in `alert_email_dispatches` with composite unique constraint `@@unique([alertId, userId])`.
+  - Tracks delivery status via `AlertEmailDispatchStatus`: `SENT`, `FAILED`, `DISABLED_BY_PREFERENCE`, and `SIMULATED`.
+  - Guarantees an alert is never dispatched twice via email to the same recipient, even across server restarts or retries.
 
-### 4. Faucet Command Timeout & Physical Valve State Retention
-- Default command timeout duration is 1 minute (`FAUCET_COMMAND_DEFAULT_TIMEOUT_MS = 60 * 1000`).
-- Background stale sweep `CommandPublisher.sweepStaleSentCommands()` periodically transitions unacknowledged active `SENT` commands past `expiresAt` to terminal state `TIMEOUT`, releases device concurrency locks, and triggers `AlertRepository.createCommandTimeoutAlert()`.
-- **Physical Valve State Retention:** Timeout indicates unconfirmed command delivery rather than physical valve actuation. The UI (`FaucetStatusCard`) preserves the `lastConfirmedPhysicalState` (`OPEN` or `CLOSED`) along with a relative confirmation timestamp and displays a warning banner ("Device not responding"). Reverting physical state to `UNKNOWN` on timeout is forbidden.
-- **Sanitized Operator Alerts:** Technical internal command IDs (`cmd-xxxxxxxx`) are removed from user-facing alert notifications, keeping internal IDs strictly in backend database records, audit logs, and diagnostic traces.
+### 4. Recipient Resolution & Role-Based Access Control
+The notification engine applies strict RBAC and device access boundaries before dispatching any notification:
+- **Role-Based Scoping Rules:**
+  - **`OWNER` (PIC):** Global visibility. Owner users receive notifications for all alerts across all devices and system events.
+  - **`ADMIN` (Operator):** Device-scoped visibility. Admin users receive notifications only for alerts associated with devices explicitly assigned to them via `user_device_access`.
+  - **System Alerts:** Alerts without an associated `deviceId` route exclusively to active `OWNER` users.
+- **Account State Verification:**
+  - Inactive, suspended, deactivated, or unverified accounts (`emailVerifiedAt === null` or `accountStatus !== ACTIVE`) are unconditionally excluded from recipient candidate lists.
 
-### 5. Modal Overlay Stacking Context Architecture
-- To prevent z-index clipping and stacking context bleed caused by fixed navigation headers (`TopAppBar`), high-priority modals (such as `SettingsNotificationPreferences`) portal directly to `document.body` with `z-[100]`, providing seamless viewport darkening and focus trapping.
+### 5. User Notification Preference Handling
+Operator notification fatigue is prevented through explicit, user-configurable preference controls:
+- **Persistence Model:**
+  - Configured via the `emailAlertsEnabled` boolean attribute in `user_preferences` (default: `true`).
+  - Added via additive database migration with zero downtime.
+- **API Interfaces:**
+  - `GET /api/v1/me/preferences`: Returns authenticated operator preferences including `emailAlertsEnabled`.
+  - `PATCH /api/v1/me/preferences`: Validates input via `UserPreferenceUpdateSchema` in `@kebun-melon/contracts` and updates operator preferences.
+- **Dispatch Enforcement:**
+  - During recipient resolution, if an authorized recipient has `emailAlertsEnabled === false`, the dispatcher skips external email transmission and logs the dispatch row with status `DISABLED_BY_PREFERENCE`.
+- **User Interface & Modal Stacking Context:**
+  - Exposed via `SettingsNotificationPreferences` in `/settings`.
+  - Portaled directly to `document.body` with `z-[100]` to avoid clipping and backdrop layering issues under fixed navigation headers (`TopAppBar`).
+
+### 6. Localization Behavior & Information Sanitization
+The notification system enforces end-to-end multilingual parity and operational data privacy:
+- **Dynamic Recipient-Aware Translation:**
+  - The notification service queries each recipient's persisted `preferredLocale` (`id` or `en`).
+  - Alert subjects, severity badges, and body content are dynamically looked up from localized catalogs (`messages/id.json` and `messages/en.json`).
+  - Hardcoded translation fallbacks are completely eliminated.
+- **Standardized Technical Terminology:**
+  - **"Valve":** Standardized as the singular technical term across both Indonesian and English UI, replacing "Katup" (e.g., "Valve Error", "Valve Status", "Perintah valve").
+  - **"Operator":** Standardized as the user-facing role label in UI and table headers, replacing "Actor" / "Aktor".
+- **Internal Identifier Sanitization:**
+  - Technical internal database identifiers (UUIDs, internal command IDs such as `cmd-xxxxxxxx`) are strictly stripped from all user-facing notification content, email subjects, and email bodies.
+  - Operator messages reference recognizable human labels (e.g., "Main Irrigation Valve", device names, timestamps).
+  - Internal IDs remain preserved exclusively in backend database records, structured audit logs, and diagnostic traces.
+
+### 7. Physical Valve State Retention on Command Timeout
+- When a command times out (`FAUCET_COMMAND_DEFAULT_TIMEOUT_MS = 60000`), the timeout signifies unconfirmed communication over MQTT, not physical valve actuation failure.
+- The UI (`FaucetStatusCard`) preserves the `lastConfirmedPhysicalState` (`OPEN` or `CLOSED`) along with a relative confirmation timestamp and displays a warning banner ("Device not responding").
+- Reverting physical state to `UNKNOWN` on timeout is strictly forbidden, preventing misleading UI state flips during transient network drops.
 <!-- Alert Architecture & Asynchronous Email Notification Subsystem Reconciled: 2026-10-03 -->
 
 

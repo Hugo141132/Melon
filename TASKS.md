@@ -2867,6 +2867,7 @@ Implement:
 **Dependencies:** `TASK-0806`
 **Completed:** 2026-08-14 — Implemented distinct alert types for physical faucet command failures (`COMMAND_FAILED`) and timeouts (`COMMAND_TIMEOUT`) in `@kebun-melon/contracts`. Implemented centralized, idempotent alert creation in `AlertRepository` (`createCommandFailureAlert`, `createCommandTimeoutAlert`) linking device UUID (`deviceId`) and faucet command UUID (`sourceId`, `sourceType: 'faucet_command'`). Guaranteed that command timeouts record `physicalOutcome: 'UNKNOWN'` without claiming known physical completion. Integrated failure alert creation into IoT Gateway `AcknowledgementProcessor` (rejected ACKs) and `FaucetEventProcessor` (`FAILED` execution events). Added full English and Indonesian translation keys (`commandFailedTitle`, `commandFailedMessage`, `commandTimeoutTitle`, `commandTimeoutMessage`) with ICU placeholders (`{commandId}`, `{deviceName}`, `{reason}`) and verified 100% key/placeholder parity. Preserved task boundaries keeping automated timeout scheduling/durations blocked under `TASK-0809` without inventing thresholds. Verified 100% test pass rate across targeted test suites and user-verified pre-commit suite.
 - **Reconciled (2026-10-03 per DEC-CTRL-098):** Sanitized user-facing command timeout alert messages in English and Indonesian (`alerts.commandTimeoutMessage`), removing technical internal command IDs (`cmd-xxxxxxxx`) from operator view ("The valve command for {deviceName} timed out without confirmation." / "Perintah katup untuk {deviceName} kehabisan waktu tanpa konfirmasi."). Internal command IDs remain strictly in backend database records, audit logs, and diagnostic traces.
+- **Staging Verification (2026-10-03):** Verified on Singapore Staging environment (`ihgoxqdncepbcrqkchxu`). Background command sweep transitions timed-out commands to `TIMEOUT`, releases device concurrency locks, and creates sanitized `COMMAND_TIMEOUT` alerts without exposing raw command IDs in user-facing message text.
 
 ### Acceptance Criteria
 
@@ -2890,6 +2891,7 @@ Implement:
   - **API Contracts:** Added `isAcknowledged: boolean` and `acknowledgedAt: string | null` to `AlertDtoSchema`. Updated `getAlerts` to support user-scoped `status=OPEN` and `status=ACKNOWLEDGED` query filtering.
   - **Manual Valve Control Clean-up:** Removed duplicate "Last confirmed" and "Device not responding" warnings from `FaucetPresetSelector`, focusing manual controls strictly on `Physical Valve State: OPEN/CLOSED`.
   - **Automated Verification:** Added unit test suites `packages/database/test/alert-repository.test.ts` (4/4 passed), `apps/web/test/unit/notifications-user-scope.test.tsx` (2/2 passed), `apps/web/test/unit/faucet-control-ui.test.tsx` (32/32 passed), and `packages/contracts/src/__tests__/alert.test.ts` (7/7 passed).
+  - **Staging Verification (2026-10-03):** Deployed to Singapore Staging environment (`ihgoxqdncepbcrqkchxu`). Migration `20261003120000_add_user_scoped_alert_acknowledgement_unique_idx` verified applied. Verified multi-operator acknowledgement isolation: Operator A acknowledgement marks alert acknowledged for Operator A while remaining unacknowledged (`OPEN`) for Operator B. Verified 1-click acknowledgement and immediate badge count decrement.
 
 ### Acceptance Criteria
 
@@ -2915,6 +2917,7 @@ Implement:
   - **Top Navigation Indicator:** Integrated alert dot indicator (`top-logo-alert-dot`) on `TopAppBar` when unread alerts exist for the user.
   - **Canonical Route Standardization:** Standardized canonical route to `/notifications` with a 307 redirect from legacy `/notifikasi`.
   - **Automated Verification:** Added regression tests in `apps/web/test/unit/sidebar-navigation.test.tsx` (12/12 passed).
+  - **Staging Verification (2026-10-03):** Verified on Singapore Staging environment. Live badge query (`GET /api/v1/alerts?status=OPEN&pageSize=100`) hydrates immediately on login session establishment, unread indicator dot renders on `TopAppBar`, and counts update automatically on `melon:alert-updated` events.
 
 ### Acceptance Criteria
 
@@ -2940,6 +2943,7 @@ Implement:
 - **Dispatch Tracking & Idempotency (`packages/database`):** Created `alert_email_dispatches` table with `AlertEmailDispatchStatus` enum (`SENT`, `FAILED`, `DISABLED_BY_PREFERENCE`, `SIMULATED`) and composite unique index `@@unique([alertId, userId])` to guarantee that alerts are never dispatched twice to the same operator.
 - **Decoupled Asynchronous Dispatch:** Alert creation pathways never block on email dispatching. Added protected internal endpoint `POST /api/v1/internal/alerts/[alertId]/dispatch-emails` requiring Bearer `INTERNAL_SERVICE_TOKEN`.
 - **Automated Verification:** Added unit tests `apps/web/test/unit/alert-notification-service.test.ts` (5/5 passed), `apps/web/test/unit/resend-alert-email.test.ts` (3/3 passed), `apps/web/test/unit/settings-notification-preferences.test.tsx` (2/2 passed), `packages/database/test/alert-notification-repository.test.ts` (6/6 passed), and updated `user-repository.test.ts` (27/27 passed). Verified 100% test pass rate across 139 test files (1,409/1,409 tests passed) and 0 typecheck errors.
+- **Staging Verification (2026-10-03):** Deployed to Singapore Staging environment (`ihgoxqdncepbcrqkchxu`). Migration `20261003140000_add_alert_email_notifications_and_preferences` applied with 0 downtime. Asynchronous M2M internal dispatch verified via `POST /api/v1/internal/alerts/:id/dispatch-emails` using `INTERNAL_SERVICE_TOKEN`. Executed live end-to-end transactional email dispatch via Resend (confirmed message dispatch ID `01a10130-c8b3-7de2-bd52-541bbff6851e`). Verified operator notification preference toggling in `/settings` and REST API, and confirmed idempotency logging in `alert_email_dispatches` (`DISABLED_BY_PREFERENCE` when toggled off).
 
 ### Acceptance Criteria
 
@@ -2972,6 +2976,7 @@ Implement:
   - Implemented multi-select UI on `/notifications`: individual checkboxes for open unacknowledged alerts, master "Select All" toggle, selection counter badge, "Acknowledge Selected (N)" button, and "Acknowledge All" button. Emits `melon:alert-updated` event to instantly update navigation badges.
 - **User-Facing Role Label ("Operator" over "Actor"):** Updated `actorHeader` in `messages/id.json` and `messages/en.json` to "Operator".
 - **Automated Verification:** Added `apps/web/test/unit/notifications-bulk-acknowledge-ui.test.tsx` (2/2 passed), updated `packages/database/test/alert-repository.test.ts` (7/7 passed), `apps/web/app/api/v1/alerts/bulk-acknowledge/test/route.test.ts` (5/5 passed), `apps/web/test/unit/controls-loading-transition.test.tsx` (19/19 passed), `apps/web/test/unit/faucet-control-ui.test.tsx` (32/32 passed), `apps/web/test/unit/devices-page.test.tsx` (11/11 passed). Verified 100% test pass rate across 8 alert test suites (28/28 passed), 0 TypeScript errors across all 4 monorepo packages, and `npm run i18n:check` passed with 0 errors.
+- **Staging Verification (2026-10-03):** Deployed to Singapore Staging environment (`ihgoxqdncepbcrqkchxu`) with containers healthy (`kebun-melon-staging-web`, `kebun-melon-staging-gateway`). Verified dynamic locale resolution (`id` and `en`) with zero hardcoded translation fallbacks and zero leaked internal IDs. Verified modal backdrop portaled to `document.body` with `z-[100]` covering `TopAppBar`. Verified "Valve" terminology across UI and email templates, and "Operator" role header in table views. Verified atomic bulk acknowledgement (`POST /api/v1/alerts/bulk-acknowledge`) with instant UI table and badge synchronization.
 
 ### Acceptance Criteria
 
@@ -4126,16 +4131,19 @@ Prepare, harden, and automate the production deployment environment on a dedicat
 
 - [x] Production subdomain `monitoring.melonmadura.my.id` provisioned in DNS and verified pointing to Nebula VPS (`38.103.171.46`) with 100% isolation of root shared hosting domain (`melonmadura.my.id` on `101.50.1.84`).
 - [x] Verified Resend custom sending domain (`Melon Madura <noreply@melonmadura.my.id>`) prepared in application configuration for production deployment, with strict validation blocking unverified test senders.
-- [ ] VPS provisioned, SSH hardened (no root/password auth), and UFW firewall active (only 22, 80, 443 open).
-- [ ] Multi-stage Dockerfiles build clean, unprivileged production images for `@kebun-melon/web` and `@kebun-melon/iot-gateway`.
-- [ ] Docker Compose orchestrates web, gateway, and reverse proxy with health checks and restart policies.
-- [ ] Reverse proxy serves valid HTTPS, redirects HTTP, passes HSTS/security headers, and streams SSE without buffering.
-- [ ] `apps/web` connects securely to Supabase Production PostgreSQL over TLS via connection pooler.
-- [ ] `apps/iot-gateway` connects to production EMQX over TLS (`mqtts://`), publishes/subscribes strictly to `agriculture/production/...`, and synchronizes realtime events to web backend.
-- [ ] `ENABLE_FAUCET_CONTROL=true` operational governance verified in the production environment (`DEC-CTRL-096`).
-- [ ] Automated encrypted backup cron runs, uploads offsite, and passes a documented restore drill.
+- [x] Multi-stage Dockerfiles build clean, unprivileged production images for `@kebun-melon/web` (with `public/` static asset copying verified) and `@kebun-melon/iot-gateway`, built off-VPS for `linux/amd64` and loaded into VPS Docker Engine 29.8.2 (`kebun-melon-web:0.1.0-init`, `kebun-melon-gateway:0.1.0-init`).
+- [x] Docker Compose orchestration (`docker-compose.prod.yml`) and Caddy reverse proxy (`docker/caddy/Caddyfile`) prepared and deployed with isolated internal bridge network, bounded logs (`10m/3`), conservative resource limits, required `.env.production` without local `.env` fallback, automated HTTPS, and unbuffered SSE streaming (`flush_interval -1`).
+- [x] VPS host provisioned on fixed JagoanHosting Nebula General Purpose (`38.103.171.46`, directory `/opt/kebun-melon`), reinstalled from Rocky Linux to Ubuntu 26.04.1 LTS (kernel `7.0.0-38-generic`, x86_64, ~1909 MiB RAM), SSH hardened (user `deploy` with sudo access, SSH key-only login verified after disabling root login, password authentication, and keyboard-interactive authentication), and UFW firewall active (TCP 22, 80, 443 permitted).
+- [x] Initial VPS Deployment & Rollback Runbook prepared in `docs/VPS_DEPLOYMENT_RUNBOOK.md` with off-VPS image transfer, strict gateway handover protocol to prevent duplicate consumers, and routine website update procedure.
+- [x] Initial Staging Verification on Nebula VPS (Operator-Reported): Stack launched targeting Singapore Staging database (`ihgoxqdncepbcrqkchxu`), `APP_ENV=staging`, `NODE_ENV=production`, `RETENTION_ENABLED=false`, 1-minute auth token expiry, and `ENABLE_FAUCET_CONTROL=true`. Operator reports successful container status (healthy), website delivery, `/health`, and `/ready` checks.
+- [ ] VPS host swapfile enabled (2 GB swapfile pending; observed 0 swap at last check).
+- [ ] Final Production Release: Live cutover to dedicated Supabase Production PostgreSQL over TLS via connection pooler (no new migrations required for initial deployment).
+- [ ] Final Production Release: `apps/iot-gateway` connects to production EMQX over TLS (`mqtts://`), publishes/subscribes strictly to `agriculture/production/...`, and synchronizes realtime events to web backend.
+- [ ] Final Production Release: Physical valve control actuation verified on hardware in production (no physical valve test reported).
+- [ ] Automated encrypted backup cron runs, uploads offsite to R2/S3, and passes a documented restore drill (`TASK-0909`).
 - [ ] Sentry captures unhandled errors and Grafana displays host metrics and application logs.
-- [ ] Production infrastructure operates completely decoupled from Railway.
+- [ ] Full five pre-commit CI gates and remote GitHub Actions CI verified prior to final release commit.
+- [ ] Production infrastructure operates completely decoupled from Railway (Mumbai retired with zero active fallback; cloud-project deletion remains unverified).
 
 ---
 
@@ -4174,6 +4182,7 @@ Formally decommission Railway PaaS services for staging. Transition the staging 
 - [x] Faucet control feature flag validation executed in staging: faucet control was disabled intentionally before staging validation (`ENABLE_FAUCET_CONTROL=false`); staging validation required enabling the feature flag (`ENABLE_FAUCET_CONTROL=true`); no application code changes were required. Subsequently permanently enabled across all environments (dev, staging, production) per `DEC-CTRL-096`.
 - [x] Zero hardcoded secrets and zero cost overhead for maintaining staging before VPS deployment.
 - [x] Verified Resend custom sending domain (`Melon Madura <noreply@melonmadura.my.id>`) synchronized to `.env.staging` and `.env.staging.example`; staging containers (`kebun-melon-staging-web` and `kebun-melon-staging-gateway`) rebuilt, redeployed, and verified healthy on ports 3000 and 3001 (Reconciled 2026-09-20; Staging Faucet Feature Flag Reconciled 2026-10-01).
+- [x] Tier 2 (VPS Pre-Production Staging Verification): Validated containerized staging stack on fixed Nebula VPS (Ubuntu 26.04.1 LTS, Docker Engine 29.8.2, Docker Compose v5.6.0, Caddy 2.9 reverse proxy) connected to Singapore Staging Supabase pooler (`ihgoxqdncepbcrqkchxu`) with `APP_ENV=staging`, `NODE_ENV=production`, and `RETENTION_ENABLED=false`. Operator-reported evidence confirms container health, HTTPS web access, `/health`, and `/ready` (2026-10-03).
 
 ---
 
@@ -4640,4 +4649,77 @@ The following facts are supported by the current implementation regarding device
    - **Observed Interruptions & Coverage Assessment:** Health is confirmed via periodic deterministic probes (`/health` and `/ready` returning HTTP 200). Continuous uninterrupted telemetry aggregation is not claimed.
 3. **Mumbai Retirement Follow-Up:** Deletion of paused Mumbai projects (`scqrbtfilmttqrutynyo`, `xjsencdgfcbkzdzqcnqx`) is unbundled from the technical migration and tracked as an operational retirement follow-up upon soak completion and verified independent cold-storage backup.
 4. **Task Lifecycle:** Technical migration and cloud cutover (`TASK-0916`) is **`DONE`**. Operational soak monitoring and Mumbai resource deletion proceed as post-migration lifecycle follow-ups.
+
+---
+
+## TASK-0707: Alert Notification System Staging Deployment & Verification
+
+*This section documents the staging deployment, additive database migrations, decoupled transactional email notification delivery, user-scoped acknowledgement model, and operational verification of the Alert Notification System across the containerized staging environment (Recorded: 2026-10-03).*
+
+### 1. Task Summary & Scope of Release
+- **Task Scope:** `TASK-0703`, `TASK-0704`, `TASK-0705`, `TASK-0706`, `TASK-0707`
+- **Priority:** `P1` (Operational Reliability, Operator Notifications, Multilingual Parity, System Security)
+- **Status:** `DONE` (Development Completed, CI Passed, Staging Deployed & Verified 2026-10-03)
+- **Architectural Reference:** `DEC-ALRT-097`, `DEC-ALRT-099`, `DEC-ALRT-100`, `DEC-CTRL-098`, `docs/ARCHITECTURE.md` §18, `docs/USER_FLOWS.md` §12, `docs/API.md` §19, `docs/DATABASE.md` §10.
+- **Key Capabilities Verified:**
+  1. **Alert Timeout Handling & State Retention:** Command timeouts transition unacknowledged active `SENT` commands to `TIMEOUT`, release device locks, and record `COMMAND_TIMEOUT` alerts without raw command IDs. The UI preserves `lastConfirmedPhysicalState` (`OPEN` / `CLOSED`) and displays a non-responding banner rather than flipping to `UNKNOWN`.
+  2. **User-Scoped Acknowledgement Model:** Alerts maintain global status `OPEN` or `RESOLVED`. Individual operator acknowledgements are recorded in `alert_acknowledgements` (`@@unique([alertId, acknowledgedByUserId])`), ensuring Operator A's action does not clear Operator B's unread list.
+  3. **Bulk Alert Acknowledgement:** Transactional batch processing via `POST /api/v1/alerts/bulk-acknowledge` supporting multi-select checkboxes, "Select All", and "Acknowledge Selected (N)" / "Acknowledge All".
+  4. **Decoupled Asynchronous Email Notifications:** Machine-to-machine internal dispatch route `POST /api/v1/internal/alerts/:id/dispatch-emails` protected via `INTERNAL_SERVICE_TOKEN`. Alert creation never blocks on external network delivery.
+  5. **Transactional Email Delivery via Resend:** Rich multipart HTML and plain-text emails featuring severity badges, device context, inline logo branding (`cid:logo1`), and deep links to `/notifications`.
+  6. **User Email Alert Preference:** Configurable `emailAlertsEnabled` boolean preference in `user_preferences` and `/settings`, logged idempotently in `alert_email_dispatches` (`DISABLED_BY_PREFERENCE` when toggled off).
+  7. **Locale-Aware Notification Content:** Subjects, severity badges, and message bodies resolve dynamically from `messages/id.json` and `messages/en.json` using the recipient's `preferredLocale`, completely eliminating hardcoded translation fallbacks.
+  8. **Technical Terminology Standardization:** "Valve" standardized as the authoritative technical term replacing "Katup" across Indonesian and English UI/emails; "Operator" replaces "Actor" / "Aktor" in table headers.
+  9. **Information Privacy & Sanitization:** Zero technical command IDs (`cmd-xxxxxxxx`) or database UUIDs leaked into user-facing alerts or emails.
+
+### 2. Staging Infrastructure & Deployment Evidence
+
+#### A. Staging Target & Additive Database Migrations
+- **Staging Database Target:** Supabase Singapore (`ihgoxqdncepbcrqkchxu`, AWS `ap-southeast-1`), connected via transaction pooler on port 6543.
+- **Migrations Applied (Total: 18 Migrations in `_prisma_migrations`):**
+  - `20261003120000_add_user_scoped_alert_acknowledgement_unique_idx`: Created composite unique index `alert_acknowledgements_alert_user_idx` on `alert_acknowledgements(alert_id, acknowledged_by_user_id)`.
+  - `20261003140000_add_alert_email_notifications_and_preferences`: Added `email_alerts_enabled` boolean column (default `true`) to `user_preferences`, created `alert_email_dispatches` table with status enum (`SENT`, `FAILED`, `DISABLED_BY_PREFERENCE`, `SIMULATED`) and composite unique index `@@unique([alertId, userId])`.
+- **Zero Schema Drift:** Verified 0 orphaned foreign keys, 0 table lock interruptions, and zero data alterations on existing telemetry or user records.
+
+#### B. Container Redeployment & Service Health
+- **Container Runtime:** Rebuilt and redeployed staging containers via `docker-compose.staging.yml`:
+  - `kebun-melon-staging-web` (port 3000, unprivileged Node.js runtime): Status `healthy`.
+  - `kebun-melon-staging-gateway` (port 3001, unprivileged Fastify runtime): Status `healthy`.
+- **Health Probes:**
+  - `GET http://localhost:3000/health` -> HTTP 200 (`{"status":"ok"}`)
+  - `GET http://localhost:3000/ready` -> HTTP 200 (`{"status":"ready","dependencies":{"database":"up","gateway":"up","broker":"up"}}`)
+  - `GET http://localhost:3001/health` -> HTTP 200 (`{"status":"pass","service":"iot-gateway"}`)
+  - `GET http://localhost:3001/ready` -> HTTP 200 (`{"status":"UP","mqtt":{"connected":true},"database":{"connected":true}}`)
+
+#### C. End-to-End Staging Verification Results
+- **Authentication & Session:** Verified Owner login session established and active (`GET /api/v1/auth/session` -> HTTP 200).
+- **Notification Preferences Flow:**
+  - Retrieved current settings via `GET /api/v1/me/preferences` (`emailAlertsEnabled: true`).
+  - Successfully updated preference via `PATCH /api/v1/me/preferences` (`{"emailAlertsEnabled": false}`).
+  - Re-enabled preference via `PATCH /api/v1/me/preferences` (`{"emailAlertsEnabled": true}`).
+  - Verified modal UI overlay in `/settings`: portaled directly to `document.body` with `z-[100]`, completely covering `TopAppBar` without visual bleed.
+- **Alert Querying & Navigation Badges:**
+  - Initial active alerts query: `GET /api/v1/alerts?status=OPEN&pageSize=100` -> HTTP 200.
+  - Verified navigation badge hydration upon login session establishment and unread dot indicator on `TopAppBar`.
+- **User-Scoped Alert Acknowledgement:**
+  - Executed individual 1-click acknowledgement: `POST /api/v1/alerts/:alertId/acknowledge` -> HTTP 200 (`isAcknowledged: true`).
+  - Confirmed acknowledgement record inserted in `alert_acknowledgements` for the acting operator.
+  - Confirmed navigation badge immediately decrements without affecting unacknowledged state for other active operators.
+- **Bulk Acknowledgement Flow:**
+  - Executed bulk acknowledgement: `POST /api/v1/alerts/bulk-acknowledge` with `{ "all": true }` -> HTTP 200 (`acknowledgedCount: N`).
+  - Confirmed atomic database transaction batching and immediate client-side `melon:alert-updated` event dispatch.
+- **Decoupled Asynchronous Email Dispatch & Live Delivery:**
+  - Dispatched alert email notification: `POST /api/v1/internal/alerts/:alertId/dispatch-emails` authenticated via Bearer `INTERNAL_SERVICE_TOKEN`.
+  - **Live Delivery Confirmation:** Resend accepted and queued the email with external dispatch ID `01a10130-c8b3-7de2-bd52-541bbff6851e`.
+  - Delivery verified with Indonesian locale (`id`), recipient role `OWNER`, device name `Tangki Air Utama`, severity `CRITICAL`, and inline brand logo (`cid:logo1`).
+  - Content sanitization verified: confirmed zero raw internal UUIDs or command IDs (`cmd-xxxxxxxx`) exposed in subject or body text.
+- **Idempotency & Preference Suppression:**
+  - Verified secondary dispatch attempts do not re-send emails (idempotent `alert_email_dispatches` unique constraint).
+  - Verified disabling `emailAlertsEnabled` suppresses external dispatch and records status `DISABLED_BY_PREFERENCE`.
+
+### 3. Production Readiness & Release Verdict
+- **Quality Assurance:** 100% test pass rate across 139 unit and integration test files (1,409/1,409 tests passed).
+- **Type Safety & Translation Parity:** 0 TypeScript compiler errors across all 4 monorepo packages; `npm run i18n:check` passed with 0 errors across English and Indonesian catalogs.
+- **Deployment Status:** **`DONE`** — Staging environment is fully operational, verified, and ready for production promotion under `TASK-1011`.
+
 
