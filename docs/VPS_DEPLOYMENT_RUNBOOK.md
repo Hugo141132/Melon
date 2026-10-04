@@ -173,6 +173,17 @@ nano /opt/kebun-melon/.env.production
   - Both Web and IoT Gateway connect to `DATABASE_URL` (port 6543 Transaction Pooler, `?pgbouncer=true`).
   - `DIRECT_URL` (port 5432 Session Pooler) is used exclusively for migrations executed from the workstation or bastion, not by container runtime.
   - `ENABLE_FAUCET_CONTROL=true` operational policy is preserved.
+* **External ML Supabase Configuration (TASK-0413 / DEC-MON-090):**
+  - Web container requires `EXTERNAL_ML_SUPABASE_URL` and at least ONE valid key (`EXTERNAL_ML_SUPABASE_SECRET_KEY` or `EXTERNAL_ML_SUPABASE_PUBLISHABLE_KEY`) in `.env.production` to retrieve AI predictions and recommendations for soil and water quality monitoring. Both keys are not simultaneously mandatory.
+  - If absent, `ExternalPredictionClient.isConfigured()` evaluates to `false`, causing `/api/v1/devices/[deviceId]/predictions/latest` to return `null` / `UNAVAILABLE`.
+  - To avoid secret disclosure in shell history, prompt for keys interactively using `read -s`:
+    ```bash
+    read -r -s -p "Enter EXTERNAL_ML_SUPABASE_KEY (Publishable or Secret): " ML_KEY; echo ""
+    if [ -z "$ML_KEY" ]; then echo "ERROR: ML key cannot be empty. Aborting." >&2; exit 1; fi
+    update_or_add_env .env.production EXTERNAL_ML_SUPABASE_URL "https://styjuynxuykvujnnqxos.supabase.co" || exit 1
+    update_or_add_env .env.production EXTERNAL_ML_SUPABASE_PUBLISHABLE_KEY "$ML_KEY" || exit 1
+    unset ML_KEY
+    ```
 
 ### 4.2 Reliable Image Tag Configuration in .env.production (Update-or-Add Procedure)
 > **CRITICAL RULE:** **NEVER overwrite live `/opt/kebun-melon/.env.production` with `.env.production.example`.**  
@@ -192,8 +203,8 @@ update_or_add_env() {
   local key="$2"
   local val="$3"
 
-  if [ ! -f "$file" ]; then
-    echo "ERROR: Target file '$file' does not exist." >&2
+  if [ ! -f "$file" ] || [ ! -r "$file" ]; then
+    echo "ERROR: Target file '$file' does not exist or is unreadable." >&2
     return 1
   fi
 
@@ -214,12 +225,17 @@ update_or_add_env() {
     return 1
   }
 
-  # Perform update or append
+  # Perform update or append with key deduplication
   if grep -q "^${key}=" "$file"; then
-    # Update existing key in-place using awk
+    # Update existing key in-place using awk, removing any duplicate occurrences
     if ! awk -v k="$key" -v v="$val" '
-      $0 ~ "^" k "=" { print k "=" v; next }
+      BEGIN { found = 0 }
+      $0 ~ "^" k "=" {
+        if (!found) { print k "=" v; found = 1 }
+        next
+      }
       { print }
+      END { if (!found) print k "=" v }
     ' "$file" > "$tmp_file"; then
       echo "ERROR: awk failed while updating key '$key'." >&2
       rm -f "$tmp_file"
@@ -259,17 +275,28 @@ update_or_add_env() {
   return 0
 }
 
-# Apply TASK-0917 release tags to .env.production
-update_or_add_env .env.production WEB_IMAGE "kebun-melon-web:0.2.0-retention"
-update_or_add_env .env.production GATEWAY_IMAGE "kebun-melon-gateway:0.2.0-retention"
+# Capture previous web image tag to durable state file before update (persists across SSH sessions)
+PREV_WEB_IMAGE=$(grep '^WEB_IMAGE=' .env.production 2>/dev/null | cut -d'=' -f2-)
+if [ -n "$PREV_WEB_IMAGE" ]; then
+  echo "$PREV_WEB_IMAGE" > /opt/kebun-melon/.prev_web_image
+  chmod 600 /opt/kebun-melon/.prev_web_image
+fi
+
+# Apply release tags to .env.production (aborting on any update failure)
+update_or_add_env .env.production WEB_IMAGE "kebun-melon-web:${RELEASE_TAG}" || { echo "ERROR: Failed to update WEB_IMAGE"; exit 1; }
 
 # Step A: Verify keys in file without exposing secrets:
 echo "--- Verified image keys in .env.production ---"
 grep -E '^(WEB_IMAGE|GATEWAY_IMAGE)=' .env.production
 
-# Step B: Verify resolved Compose image references:
+# Step B: Verify resolved Compose image references and validate matching web image:
 echo "--- Verified Compose resolved image references ---"
-docker compose --env-file .env.production -f docker-compose.prod.yml config --images
+RESOLVED_IMAGES=$(docker compose --env-file .env.production -f docker-compose.prod.yml config --images) || { echo "ERROR: docker compose config failed"; exit 1; }
+echo "$RESOLVED_IMAGES"
+if ! echo "$RESOLVED_IMAGES" | grep -q "kebun-melon-web:${RELEASE_TAG}"; then
+  echo "ERROR: Compose resolved image does not match target kebun-melon-web:${RELEASE_TAG}!" >&2
+  exit 1
+fi
 ```
 
 ### 4.3 Database Migration Assessment & Pending TASK-0917 Migration Status
@@ -519,11 +546,18 @@ curl.exe -s http://localhost:3001/health
 If the new web release displays runtime errors or fails health checks:
 ```bash
 # On VPS (/opt/kebun-melon):
-# Immediately roll back to the previous known-good tag (e.g. 0.1.0-init)
-WEB_IMAGE=kebun-melon-web:0.1.0-init docker compose --env-file .env.production -f docker-compose.prod.yml up -d --no-deps web
+# Read previously captured web image from durable state file:
+ROLLBACK_IMAGE=$(cat /opt/kebun-melon/.prev_web_image 2>/dev/null)
+if [ -z "$ROLLBACK_IMAGE" ]; then
+  ROLLBACK_IMAGE="kebun-melon-web:0.2.0-retention"
+fi
+echo "Executing rollback to: ${ROLLBACK_IMAGE}"
+update_or_add_env .env.production WEB_IMAGE "${ROLLBACK_IMAGE}" || exit 1
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d --no-deps web
 
 # Verify rollback container is healthy
-docker compose -f docker-compose.prod.yml ps web
+docker compose --env-file .env.production -f docker-compose.prod.yml ps web
+docker inspect --format '{{json .State.Health.Status}}' kebun-melon-web
 ```
 > **DOWNTIME & ROLLBACK NOTE:** Recreating containers causes a brief (~2–5 second) sub-second container swap. True zero-downtime rolling deploys require multi-replica blue/green routing not present on a single-node small VPS. Image rollback rolls back application code only; it does **not** roll back database schema changes.
 

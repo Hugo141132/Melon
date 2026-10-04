@@ -3447,7 +3447,55 @@ Automated testing for the Alert Notification System covers user-scoped alert ack
 - **Target Environment:** Containerized Staging on AWS Singapore (`ihgoxqdncepbcrqkchxu`), PostgreSQL 17 via transaction pooler.
 - **Migrations Applied:** Migrations 17 (`20261003120000`) and 18 (`20261003140000`) verified in `_prisma_migrations`.
 - **Live Email Delivery:** Verified end-to-end delivery through Resend with external dispatch ID `01a10130-c8b3-7de2-bd52-541bbff6851e`.
-- **Privacy Sanitization:** Verified zero leakage of technical command IDs (`cmd-xxxxxxxx`) or database UUIDs in operator-facing alerts or emails.
 <!-- Alert Notification System Testing Evidence Reconciled: 2026-10-03 -->
+
+---
+
+## 50. BUG-1011-01: Deployment Parity Follow-Up — VPS AI Recommendations Configuration & Alert Timezone Parity Testing Evidence
+
+### 1. Test Suite Coverage & Verification Scope
+Automated unit testing and credential-free checks for BUG-1011-01 cover the canonical alert timestamp formatter, recipient preference timezone resolution, UTC date rollover, and strict 100% email/UI timestamp presentation parity:
+
+- **Canonical Alert Timestamp Formatter (`apps/web/test/unit/format-alert-timestamp.test.ts`):**
+  - Result: **6/6 passed** (100%, exit code 0).
+  - Verifies required default `Asia/Jakarta` (WIB, UTC+7) when timezone is omitted or null.
+  - Verifies custom recipient preference timezones (`UTC`, `America/New_York`, `Asia/Tokyo`).
+  - Verifies graceful fallback to `Asia/Jakarta` on invalid or corrupt IANA timezone strings.
+  - Verifies UTC midnight date rollover into the next calendar day without manual 7-hour arithmetic.
+  - Verifies 100% string parity between UI formatted timestamp and Resend email HTML/text templates.
+  - Verifies defensive handling of null, undefined, or invalid date inputs.
+- **Alert Notification Email Templates (`apps/web/test/unit/resend-alert-email.test.ts`):**
+  - Result: **7/7 passed** (100%, exit code 0).
+  - Verifies default `Asia/Jakarta` formatting, UTC date rollover, custom preference timezone respect, and graceful fallback.
+- **Alert Notification Service (`apps/web/test/unit/alert-notification-service.test.ts`):**
+  - Result: **5/5 passed** (100%, exit code 0).
+  - Verifies propagation of recipient `timezone` from database preferences into `sendAlertNotificationEmail` call options.
+- **Alert Notification Repository Database Tests (`packages/database/test/alert-notification-repository.test.ts`):**
+  - Result: **6/6 passed** (100%, exit code 0).
+  - Verifies `AlertNotificationRepository.getEligibleAlertRecipients` resolving `timezone` from `user_preferences` (defaulting to `'Asia/Jakarta'`).
+- **Notifications Bulk & User-Scoped UI (`apps/web/test/unit/notifications-bulk-acknowledge-ui.test.tsx`, `notifications-user-scope.test.tsx`):**
+  - Result: **4/4 passed** (100%, exit code 0).
+  - Verifies rendering of alert cards with localized timestamps and instant 1-click / bulk acknowledgement.
+- **Monorepo Type Safety & Quality Gates:**
+  - `npm run typecheck`: **0 errors** across all 4 monorepo packages (`@kebun-melon/iot-gateway`, `@kebun-melon/web`, `@kebun-melon/contracts`, `@kebun-melon/database`).
+  - `npm run lint`: **0 warnings/errors**.
+  - `npm run format:check`: **100% Prettier code style compliant**.
+  - `npm run i18n:check`: Complete translation key and placeholder parity across Indonesian and English catalogs.
+  - `npm run scan:secrets`: **0 hardcoded secrets detected**.
+  - `npm run scan:deps`: **0 unapproved advisories**.
+
+### 2. Outstanding Deferred CI Gates (Checkpoint Status)
+The following full CI gates were intentionally deferred for this checkpoint and must be re-run prior to final release promotion:
+- [ ] `npm run test:coverage` (Full coverage suite across monorepo)
+- [ ] `npm run test:integration` (Database integration test suite against PostgreSQL instance)
+- [ ] `npm run check:quality` (Full composite gate including production build output)
+- [ ] `npm test` (Complete test execution across all workspaces)
+- [ ] `npm run test:e2e` (Playwright browser end-to-end smoke test suite)
+
+### 3. Pending Live Verification Items (Operator Execution)
+- [ ] VPS runtime environment variables (`EXTERNAL_ML_SUPABASE_URL`, `EXTERNAL_ML_SUPABASE_PUBLISHABLE_KEY`) injected into `/opt/kebun-melon/.env.production`.
+- [ ] Live prediction endpoint retrieval and UI display on VPS domain (`https://melonmadura.my.id`).
+- [ ] Live test alert email delivery via Resend verified with `WIB` timestamp matching `/notifications` UI.
+<!-- BUG-1011-01 Testing Evidence Checkpointed: 2026-10-04 -->
 
 

@@ -1609,3 +1609,28 @@ The following facts are supported by the verified decisions governance of `TASK-
       - **Distinction from Pre-existing Hardware Adapter Behavior:** The hardware volume adapter (`HardwareMqttAdapter.handleInboundHardwareVolume` in `apps/iot-gateway`) assigns a fresh random `hw-vol-${crypto.randomUUID()}` to every incoming hardware message. Multiple deliveries of the same hardware measurement therefore receive different message IDs and were never deduplicated by the database unique constraint—both before and after pruning.
       - **Owner Acceptance:** The Owner has formally reviewed and accepted latest-5 retention per device with bounded-window message-ID deduplication limited to retained records. No fallback, archive, or tombstone tables shall be introduced.
 <!-- DEC-MON-092 Reconciled: 2026-10-04 -->
+
+---
+
+## DEC-ALRT-101: Alert Timezone Parity & External ML Runtime Deployment Configuration
+- **Status:** APPROVED & IMPLEMENTED (2026-10-04)
+- **Related Task IDs:** `BUG-1011-01`, `TASK-0413`, `TASK-0706`, `TASK-0707`, `TASK-1011`, `TASK-1012`
+- **Context:**
+  Following production VPS deployment rehearsals under `TASK-1011`, two runtime operational parity discrepancies were identified:
+  1. **VPS AI Recommendations Empty (`TASK-0413`, `TASK-1011`):** `ExternalPredictionClient` evaluates `isConfigured()` by requiring `EXTERNAL_ML_SUPABASE_URL` and at least one valid key (`EXTERNAL_ML_SUPABASE_SECRET_KEY` or `EXTERNAL_ML_SUPABASE_PUBLISHABLE_KEY`). These keys were missing from `.env.production.example` and the deployment runbook (`docs/VPS_DEPLOYMENT_RUNBOOK.md`). Without them, `/api/v1/devices/[deviceId]/predictions/latest` fails closed and returns `null` (`UNAVAILABLE`).
+  2. **Alert Timestamp Presentation Discrepancy (`TASK-0706`, `TASK-0707`):** Alert opened timestamps are stored in UTC (`TIMESTAMPTZ`). Previously, email formatting lacked an explicit `timeZone` in `toLocaleString` (defaulting to container UTC time), while `/notifications` lacked recipient user preference timezone integration.
+- **Approved Decision & Implementation Directives:**
+  1. **Unified Canonical Alert Timestamp Formatter:**
+     - Created `formatAlertTimestamp` in `apps/web/lib/notifications/format-alert-timestamp.ts`.
+     - Required Default: `Asia/Jakarta` (WIB, UTC+7).
+     - User Preference: Honors `userPreference.timezone` when configured.
+     - Fault Tolerance: Safely falls back to `Asia/Jakarta` on invalid or corrupted IANA timezone strings.
+     - Deterministic Rollover: Accurately computes UTC midnight date rollovers into the next local calendar day without manual 7-hour arithmetic.
+  2. **100% Presentation Parity Across Outbound Email & Web UI:**
+     - Both `apps/web/lib/email/resend.ts` and `apps/web/app/notifications/page.tsx` consume `formatAlertTimestamp` directly as the single source of truth.
+     - Database repository `AlertNotificationRepository` resolves recipient `timezone` from `user_preferences`.
+  3. **External ML Supabase Deployment Configuration Parity:**
+     - Added `EXTERNAL_ML_SUPABASE_URL`, `EXTERNAL_ML_SUPABASE_PUBLISHABLE_KEY`, and `EXTERNAL_ML_SUPABASE_SECRET_KEY` to `.env.production.example`.
+     - Documented the interactive `read -s` update-or-add procedure in `docs/VPS_DEPLOYMENT_RUNBOOK.md` §4.1 to inject keys into `/opt/kebun-melon/.env.production` without shell history exposure.
+     - Rebuilding and restarting `kebun-melon-web` is required; IoT Gateway and database schemas remain unaffected (0 schema drift).
+<!-- DEC-ALRT-101 Reconciled: 2026-10-04 -->

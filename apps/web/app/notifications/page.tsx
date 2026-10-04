@@ -5,8 +5,9 @@ import TopAppBar from '@/components/navigation/TopAppBar';
 import { AlertDto, AlertSeverity, AlertStatus } from '@kebun-melon/contracts';
 import { LucideIcon, AlertTriangle, AlertCircle, Info, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import { ALERT_UPDATED_EVENT } from '@/hooks/useAlertBadge';
+import { formatAlertTimestamp } from '@/lib/notifications/format-alert-timestamp';
 
 const severityConfig: Record<
   AlertSeverity,
@@ -62,12 +63,14 @@ function getSeverityConfig(severity: string) {
 
 function AlertCard({
   alert,
+  userTimezone,
   onAcknowledge,
   isAcknowledging,
   isSelected,
   onToggleSelect,
 }: {
   alert: AlertDto;
+  userTimezone?: string;
   onAcknowledge: (alertId: string) => void;
   isAcknowledging: boolean;
   isSelected?: boolean;
@@ -75,6 +78,7 @@ function AlertCard({
 }) {
   const tAlerts = useTranslations('alerts');
   const tCommon = useTranslations('common');
+  const locale = useLocale();
 
   const cfg = getSeverityConfig(alert.severity);
   const Icon = cfg.icon;
@@ -178,7 +182,7 @@ function AlertCard({
           {message && <p className="text-[12px] text-app-on-surface-variant mb-2">{message}</p>}
 
           <div className="text-[11px] text-app-on-surface-variant">
-            {new Date(alert.openedAt).toLocaleString()}
+            {formatAlertTimestamp(alert.openedAt, locale, userTimezone)}
           </div>
         </div>
       </div>
@@ -205,6 +209,7 @@ export default function NotificationsPage() {
   const tCommon = useTranslations('common');
   const [alerts, setAlerts] = useState<AlertDto[]>([]);
   const [loading, setLoading] = useState(true);
+  const [userTimezone, setUserTimezone] = useState<string>('Asia/Jakarta');
   const [acknowledgingId, setAcknowledgingId] = useState<string | null>(null);
   const [selectedAlertIds, setSelectedAlertIds] = useState<Set<string>>(new Set());
   const [isBulkAcknowledging, setIsBulkAcknowledging] = useState(false);
@@ -212,7 +217,20 @@ export default function NotificationsPage() {
 
   useEffect(() => {
     fetchAlerts();
+    fetchUserPreferences();
   }, []);
+
+  const fetchUserPreferences = async () => {
+    try {
+      const res = await fetch('/api/v1/me/preferences');
+      const json = await res.json();
+      if (json.success && json.data?.timezone) {
+        setUserTimezone(json.data.timezone);
+      }
+    } catch {
+      // Gracefully defaults to Asia/Jakarta
+    }
+  };
 
   const fetchAlerts = async () => {
     try {
@@ -521,6 +539,7 @@ export default function NotificationsPage() {
                 <AlertCard
                   key={alert.id}
                   alert={alert}
+                  userTimezone={userTimezone}
                   onAcknowledge={handleDirectAcknowledge}
                   isAcknowledging={acknowledgingId === alert.id}
                   isSelected={selectedAlertIds.has(alert.id)}

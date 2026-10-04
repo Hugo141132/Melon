@@ -3051,3 +3051,43 @@ The following facts are supported by the current implementation regarding device
     - Verified 100% test pass rate across focused unit test suites: `packages/database/test/telemetry-repository.test.ts` (17/17 passed), `packages/database/test/retention-service.test.ts` (9/9 passed), gateway scheduler & processor (13/13 passed), web monitoring (33/33 passed).
     - Full monorepo typecheck passed cleanly with 0 errors across all 4 packages (`tsc --noEmit`).
 <!-- TASK-0917 Reconciled: 2026-10-03 -->
+
+---
+
+## BUG-1011-01 Governance & Deployment Parity Follow-Up Record
+
+`BUG-1011-01` deployment parity follow-up for VPS AI recommendations configuration & alert timezone parity record:
+- **Status:** `PENDING_DEPLOYMENT_VERIFICATION` (Implementation complete; verification and deployment pending)
+- **Priority:** `P1`
+- **Dependencies:** `TASK-0413`, `TASK-0706`, `TASK-0707`, `TASK-1011`, `TASK-1012`
+- **Frontend impact:** `MINOR`
+- **Selected UI direction:** `Premium Minimal Ops`
+- **Existing color template:** `UNCHANGED`
+- **Selected motion effects:** `None`
+- **21st.dev MCP:** `NOT REQUIRED`
+- **Summary:** Checkpointed deployment configuration parity follow-up for VPS AI recommendations and unified UTC/WIB presentation discrepancy across alert email notifications and `/notifications` UI:
+  - **VPS AI Recommendations Deployment Configuration (`TASK-0413`, `TASK-1011`, `TASK-1012`):**
+    - Inspected `ExternalPredictionClient` (`packages/database/src/external-prediction-client.ts`), which evaluates `isConfigured()` requiring `EXTERNAL_ML_SUPABASE_URL` and at least one valid key (`EXTERNAL_ML_SUPABASE_SECRET_KEY` or `EXTERNAL_ML_SUPABASE_PUBLISHABLE_KEY`).
+    - Added external ML environment variables to `.env.production.example` and documented the interactive `read -s` update-or-add procedure in `docs/VPS_DEPLOYMENT_RUNBOOK.md` §4.1 to prevent secret disclosure in shell history.
+    - Preserved read-only external Supabase ML integration, RBAC, and database-driven device mapping.
+  - **Canonical Alert Timestamp Formatter & Email/UI Timezone Parity (`TASK-0706`, `TASK-0707`):**
+    - Implemented unified canonical formatter `formatAlertTimestamp` in `apps/web/lib/notifications/format-alert-timestamp.ts`:
+      - Enforces `Asia/Jakarta` (WIB, UTC+7) as the required system default timezone.
+      - Honors `userPreference.timezone` when configured by the recipient or active user.
+      - Gracefully falls back to `Asia/Jakarta` on invalid or corrupt IANA timezone strings.
+      - Accurately handles UTC midnight date rollovers into the next local calendar day without manual 7-hour arithmetic.
+    - Wired both `apps/web/lib/email/resend.ts` and `apps/web/app/notifications/page.tsx` directly to `formatAlertTimestamp`, guaranteeing 100% presentation parity between outbound emails and web UI.
+    - Updated `AlertNotificationRepository` in `packages/database` to resolve recipient `timezone` from `user_preferences`.
+  - **Automated Verification:**
+    - Dedicated test suite `apps/web/test/unit/format-alert-timestamp.test.ts` (6/6 tests passed).
+    - Email notification suite `apps/web/test/unit/resend-alert-email.test.ts` (7/7 tests passed).
+    - Service and repository suites: `apps/web/test/unit/alert-notification-service.test.ts` (5/5 passed), `packages/database/test/alert-notification-repository.test.ts` (6/6 passed), `notifications-bulk-acknowledge-ui.test.tsx` (2/2 passed), `notifications-user-scope.test.tsx` (2/2 passed). Total: 28/28 tests passed.
+    - Full monorepo typecheck passed cleanly with 0 errors across all 4 packages (`npm run typecheck`).
+    - ESLint passed with 0 warnings/errors; Prettier format check passed; i18n check passed; secret scan and dependency audit passed with 0 findings.
+  - **Deferred CI Gates & Unverified Runtime Items:**
+    - Full CI gates deferred for checkpoint: `test:coverage`, `test:integration`, `check:quality` (full composite including build), `test`, and `test:e2e`.
+    - Unverified live VPS items: VPS runtime environment `EXTERNAL_ML_SUPABASE_*` configuration, live prediction endpoint retrieval on VPS, and live email/UI timestamp presentation parity across UTC midnight rollovers.
+  - **Staging / VPS Rollout & Rollback Reference:**
+    - Requires rebuilding and restarting `kebun-melon-web` only; zero database migration or schema drift.
+    - Rollback image tag is preserved in `/opt/kebun-melon/.prev_web_image` (fallback to `kebun-melon-web:0.2.0-retention`) per `docs/VPS_DEPLOYMENT_RUNBOOK.md` §7.1.
+<!-- BUG-1011-01 Checkpointed: 2026-10-04 -->

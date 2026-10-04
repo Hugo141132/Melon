@@ -169,6 +169,7 @@ export async function dispatchAlertEmails(
         deviceName: alert.deviceName,
         openedAt: alert.openedAt,
         locale: recipient.preferredLocale,
+        timezone: recipient.timezone,
         requestId: options?.requestId,
       });
 

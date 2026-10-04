@@ -100,6 +100,7 @@ describe('Alert Notification Service', () => {
             email: 'active@example.com',
             fullName: 'Active User',
             preferredLocale: 'id',
+            timezone: 'Asia/Jakarta',
             emailAlertsEnabled: true,
           },
           {
@@ -107,6 +108,7 @@ describe('Alert Notification Service', () => {
             email: 'optout@example.com',
             fullName: 'Opt-out User',
             preferredLocale: 'en',
+            timezone: 'UTC',
             emailAlertsEnabled: false,
           },
         ],
@@ -121,6 +123,14 @@ describe('Alert Notification Service', () => {
       expect(result.sent).toBe(1);
       expect(result.skipped).toBe(1);
       expect(result.failed).toBe(0);
+
+      const emailModule = await import('@/lib/email/resend');
+      expect((emailModule as any).sendAlertNotificationEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          toEmail: 'active@example.com',
+          timezone: 'Asia/Jakarta',
+        })
+      );
 
       // Verify opt-out was recorded as DISABLED_BY_PREFERENCE
       expect(__mockRecordDispatch).toHaveBeenCalledWith(

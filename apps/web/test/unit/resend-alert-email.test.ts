@@ -46,6 +46,112 @@ describe('Alert Notification Email Templates', () => {
     expect(html).toContain('View in Notifications');
   });
 
+  it('formats openedAt timestamp using Asia/Jakarta (WIB) by default and maintains HTML/text parity', () => {
+    const openedAt = new Date('2026-10-03T10:00:00Z'); // 10:00 UTC = 17:00 WIB
+    const expectedTimeId = openedAt.toLocaleString('id-ID', {
+      dateStyle: 'medium',
+      timeStyle: 'medium',
+      timeZone: 'Asia/Jakarta',
+    });
+
+    const { html, text } = getAlertNotificationEmailHtml(
+      'Budi',
+      {
+        alertType: 'DEVICE_OFFLINE',
+        severity: 'CRITICAL',
+        title: 'Node Offline',
+        message: 'ESP32 device stopped responding.',
+        openedAt,
+      },
+      'id'
+    );
+
+    // Verify both HTML and plain-text contain the identical Asia/Jakarta formatted timestamp
+    expect(html).toContain(expectedTimeId);
+    expect(text).toContain(expectedTimeId);
+    // Confirm 17:00 (WIB) appears, not 10:00 (UTC)
+    expect(expectedTimeId).toMatch(/17[:.]00/);
+  });
+
+  it('handles UTC date rollover correctly into Asia/Jakarta (WIB) next day without manual arithmetic', () => {
+    // 2026-10-03 at 20:30:00 UTC corresponds to 2026-10-04 at 03:30:00 WIB (+7 hours)
+    const openedAt = new Date('2026-10-03T20:30:00Z');
+    const expectedRolloverTime = openedAt.toLocaleString('en-US', {
+      dateStyle: 'medium',
+      timeStyle: 'medium',
+      timeZone: 'Asia/Jakarta',
+    });
+
+    const { html, text } = getAlertNotificationEmailHtml(
+      'Operator',
+      {
+        alertType: 'LOW_RESERVOIR_LEVEL',
+        severity: 'WARNING',
+        title: 'Reservoir Level Low',
+        message: 'Water level below safety threshold.',
+        openedAt,
+      },
+      'en'
+    );
+
+    expect(html).toContain(expectedRolloverTime);
+    expect(text).toContain(expectedRolloverTime);
+    // Confirm date rolled over to Oct 4 and time is 3:30 AM
+    expect(expectedRolloverTime).toContain('Oct 4, 2026');
+    expect(expectedRolloverTime).toMatch(/3:30/);
+  });
+
+  it('respects recipient custom timezone when specified in preferences', () => {
+    const openedAt = new Date('2026-10-03T10:00:00Z');
+    const expectedUtcTime = openedAt.toLocaleString('en-US', {
+      dateStyle: 'medium',
+      timeStyle: 'medium',
+      timeZone: 'UTC',
+    });
+
+    const { html, text } = getAlertNotificationEmailHtml(
+      'Remote Admin',
+      {
+        alertType: 'DEVICE_OFFLINE',
+        severity: 'INFO',
+        title: 'Device Reconnected',
+        message: 'Node reconnected.',
+        openedAt,
+        timezone: 'UTC',
+      },
+      'en'
+    );
+
+    expect(html).toContain(expectedUtcTime);
+    expect(text).toContain(expectedUtcTime);
+    expect(expectedUtcTime).toMatch(/10:00/);
+  });
+
+  it('safely falls back to Asia/Jakarta if an invalid timezone string is provided', () => {
+    const openedAt = new Date('2026-10-03T10:00:00Z');
+    const expectedFallbackTime = openedAt.toLocaleString('id-ID', {
+      dateStyle: 'medium',
+      timeStyle: 'medium',
+      timeZone: 'Asia/Jakarta',
+    });
+
+    const { html, text } = getAlertNotificationEmailHtml(
+      'Operator',
+      {
+        alertType: 'COMMAND_TIMEOUT',
+        severity: 'WARNING',
+        title: 'Timeout',
+        message: 'Timeout occured',
+        openedAt,
+        timezone: 'Invalid/Non_Existent_Timezone',
+      },
+      'id'
+    );
+
+    expect(html).toContain(expectedFallbackTime);
+    expect(text).toContain(expectedFallbackTime);
+  });
+
   it('simulates delivery in test environment without throwing', async () => {
     const result = await sendAlertNotificationEmail({
       toEmail: 'test@example.com',

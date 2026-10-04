@@ -7,6 +7,7 @@ export interface AlertRecipient {
   email: string;
   fullName: string;
   preferredLocale: string;
+  timezone?: string;
   emailAlertsEnabled: boolean;
 }
 
@@ -125,6 +126,7 @@ export class AlertNotificationRepository {
         email: u.email,
         fullName: u.fullName,
         preferredLocale: pref?.preferredLocale || 'id',
+        timezone: pref?.timezone || 'Asia/Jakarta',
         emailAlertsEnabled: pref?.emailAlertsEnabled !== undefined ? pref.emailAlertsEnabled : true,
       };
     });

@@ -63,6 +63,7 @@ describe('AlertNotificationRepository', () => {
               emailVerifiedAt: new Date(),
               userPreference: {
                 preferredLocale: 'en',
+                timezone: 'America/New_York',
                 emailAlertsEnabled: true,
               },
             },
@@ -96,12 +97,14 @@ describe('AlertNotificationRepository', () => {
       expect(owner).toBeDefined();
       expect(owner?.email).toBe('owner@example.com');
       expect(owner?.preferredLocale).toBe('en');
+      expect(owner?.timezone).toBe('America/New_York');
       expect(owner?.emailAlertsEnabled).toBe(true);
 
       const admin = result.recipients.find((r) => r.userId === 'admin-001');
       expect(admin).toBeDefined();
       expect(admin?.email).toBe('admin@example.com');
       expect(admin?.preferredLocale).toBe('id');
+      expect(admin?.timezone).toBe('Asia/Jakarta');
       expect(admin?.emailAlertsEnabled).toBe(false);
     });
 

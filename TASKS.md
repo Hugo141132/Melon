@@ -4757,4 +4757,67 @@ The following facts are supported by the current implementation regarding device
 - **Type Safety & Translation Parity:** 0 TypeScript compiler errors across all 4 monorepo packages; `npm run i18n:check` passed with 0 errors across English and Indonesian catalogs.
 - **Deployment Status:** **`DONE`** — Staging environment is fully operational, verified, and ready for production promotion under `TASK-1011`.
 
+---
+
+## BUG-1011-01: Deployment Parity Follow-Up — VPS AI Recommendations Configuration & Alert Timezone Parity
+
+**Priority:** `P1` (Operational Parity, Agronomic Decision Support & Operator Notification Precision)
+**Status:** `PENDING_DEPLOYMENT_VERIFICATION` (Implementation complete; verification and deployment pending)
+**Dependencies:** `TASK-0413`, `TASK-0706`, `TASK-0707`, `TASK-1011`, `TASK-1012`
+**Recorded:** 2026-10-04 — Checkpointed deployment configuration parity follow-up for VPS AI recommendations and unified UTC/WIB presentation discrepancy across alert email notifications and `/notifications` UI:
+
+### 1. Implemented Changes & Tests Actually Passed
+- **Root Cause & Resolution 1 — VPS AI Recommendations Empty (`TASK-0413`, `TASK-1011`, `TASK-1012`):**
+  - *Analysis:* `ExternalPredictionClient` (`packages/database/src/external-prediction-client.ts`) evaluates `isConfigured()` by requiring `EXTERNAL_ML_SUPABASE_URL` and *either* `EXTERNAL_ML_SUPABASE_SECRET_KEY` or `EXTERNAL_ML_SUPABASE_PUBLISHABLE_KEY`. The keys were missing in `.env.production.example` and `docs/VPS_DEPLOYMENT_RUNBOOK.md`, causing `/api/v1/devices/[deviceId]/predictions/latest` to fail closed and return `null` (`UNAVAILABLE`) on the live VPS container.
+  - *Resolution:* Added `EXTERNAL_ML_SUPABASE_*` configuration to `.env.production.example` and documented the non-secret update-or-add procedure in `docs/VPS_DEPLOYMENT_RUNBOOK.md` §4.1. Preserved read-only external Supabase ML integration, RBAC, and database-driven device mapping.
+- **Root Cause & Resolution 2 — Unified Timezone Policy & Email/UI Parity (`TASK-0706`, `TASK-0707`):**
+  - *Analysis:* Alert timestamps are stored in UTC (`TIMESTAMPTZ`). Previously, email formatting defaulted to container UTC time, while `/notifications` lacked user preference timezone integration.
+  - *Resolution:* Implemented unified canonical formatter `formatAlertTimestamp` in `apps/web/lib/notifications/format-alert-timestamp.ts` adhering to the documented policy: `Asia/Jakarta` (WIB, UTC+7) default, honoring `userPreference.timezone`, safe fallback on invalid IANA timezones, and handling UTC date rollovers accurately without manual 7-hour arithmetic. Wired both `apps/web/lib/email/resend.ts` and `apps/web/app/notifications/page.tsx` to this single source of truth.
+- **Tests & Quality Checks Actually Passed Locally:**
+  - `apps/web/test/unit/format-alert-timestamp.test.ts` (6/6 tests passed)
+  - `apps/web/test/unit/resend-alert-email.test.ts` (7/7 tests passed)
+  - `apps/web/test/unit/alert-notification-service.test.ts` (5/5 tests passed)
+  - `packages/database/test/alert-notification-repository.test.ts` (6/6 tests passed)
+  - `apps/web/test/unit/notifications-bulk-acknowledge-ui.test.tsx` (2/2 tests passed)
+  - `apps/web/test/unit/notifications-user-scope.test.tsx` (2/2 tests passed)
+  - Total focused tests: 28/28 passed.
+  - `npm run typecheck`: 0 errors across all 4 monorepo packages.
+  - `npm run lint`: 0 warnings/errors across all 4 monorepo packages.
+  - `npm run format:check`: 100% matched Prettier formatting.
+  - `npm run i18n:check`: catalog completeness verified.
+  - `npm run scan:secrets`: 0 hardcoded secrets detected.
+  - `npm run scan:deps`: 0 unapproved dependency advisories.
+
+### 2. Outstanding Deferred CI Gates (Pre-Release Rerun Required)
+The following full CI gates were deferred for this checkpoint and must be verified prior to marking the bug resolved or promoting to production:
+- [ ] **`npm run test:coverage`**: Monorepo-wide unit test suite with V8 code coverage threshold enforcement.
+- [ ] **`npm run test:integration`**: Database integration test suite (`npm run db:test:integration`) against PostgreSQL instance.
+- [ ] **`npm run check:quality`**: Full composite gate (`typecheck && lint && format:check && i18n:check && scan:secrets && scan:deps && build`), specifically verifying production build output.
+- [ ] **`npm test`**: Complete test execution across all workspaces.
+- [ ] **`npm run test:e2e`**: Playwright browser end-to-end smoke test suite against staging environment.
+
+### 3. Unverified VPS Runtime Configuration & Live Items
+- [ ] **VPS ML Runtime Environment:** `EXTERNAL_ML_SUPABASE_URL` and `EXTERNAL_ML_SUPABASE_PUBLISHABLE_KEY` (or `EXTERNAL_ML_SUPABASE_SECRET_KEY`) injection into `/opt/kebun-melon/.env.production` via interactive `read -s` on VPS.
+- [ ] **Live Prediction Retrieval:** Authenticated API response verification on `GET /api/v1/devices/[deviceId]/predictions/latest` and UI cards rendering AI recommendations for soil and water quality monitoring.
+- [ ] **Live Email / UI Timezone Parity:** Live test alert trigger verification via Resend ensuring email timestamp displays WIB (`Asia/Jakarta`) and matches the `/notifications` UI view across UTC midnight date rollovers.
+
+### 4. Staging / VPS Update Requirements & Rollback Reference
+- **Environment Updates:** Inject external ML Supabase keys into `/opt/kebun-melon/.env.production` (see `docs/VPS_DEPLOYMENT_RUNBOOK.md` §4.1).
+- **Container Rollout:** Rebuild and restart `kebun-melon-web` container (`docker compose --env-file .env.production -f docker-compose.prod.yml up -d --no-deps --build web`). IoT Gateway container does not require rebuild.
+- **Database Schema Drift:** 0 migrations required; schema unchanged.
+- **Reverse Proxy:** Zero configuration modifications required on Nginx/Caddy.
+- **Rollback Reference:** Follow `docs/VPS_DEPLOYMENT_RUNBOOK.md` §7.1. Previous image tag is preserved in `/opt/kebun-melon/.prev_web_image` (fallback to `kebun-melon-web:0.2.0-retention`).
+- **Release Verification Steps:** Execute health checks (`/health`, `/ready`), inspect container logs, verify authenticated prediction payload, and trigger test alert notification.
+
+### 5. Checkpoint Acceptance Criteria
+- [x] External ML Supabase environment variables documented in `.env.production.example` and `docs/VPS_DEPLOYMENT_RUNBOOK.md`.
+- [x] Read-only ML client requirements inspected (`URL` + at least one valid key).
+- [x] Canonical `formatAlertTimestamp` created and shared between email and `/notifications`.
+- [x] Default timezone `Asia/Jakarta` (WIB, UTC+7) enforced with user preference support.
+- [x] Date rollover across midnight UTC handled accurately without manual 7-hour arithmetic.
+- [x] 100% HTML, plain-text, and UI timestamp presentation parity guaranteed.
+- [x] Focused automated unit tests and credential-free checks passing (28/28 tests, typecheck, lint, format, security scans).
+- [ ] Outstanding deferred CI gates (`test:coverage`, `test:integration`, `check:quality`, `test`, `test:e2e`) executed and verified.
+- [ ] VPS runtime deployment, live prediction retrieval, and live alert email/UI verification executed by operator.
+
 

@@ -8,6 +8,7 @@ import {
   DEFAULT_DELETION_REASON,
   DEFAULT_REACTIVATION_REASON,
 } from '@kebun-melon/contracts';
+import { formatAlertTimestamp } from '@/lib/notifications/format-alert-timestamp';
 
 const logger = new Logger({ serviceName: 'web:email' });
 
@@ -1498,6 +1499,7 @@ export interface SendAlertNotificationEmailInput {
   deviceName?: string;
   openedAt?: Date | string;
   locale?: string;
+  timezone?: string;
   requestId?: string;
 }
 
@@ -1518,6 +1520,7 @@ export function getAlertNotificationEmailHtml(
     message: string;
     deviceName?: string;
     openedAt?: Date | string;
+    timezone?: string;
   },
   locale: string
 ): { subject: string; html: string; text: string } {
@@ -1565,12 +1568,7 @@ export function getAlertNotificationEmailHtml(
     ? 'Anda menerima email ini karena notifikasi email diaktifkan pada akun Anda. Anda dapat mengubah preferensi ini di Pengaturan.'
     : 'You received this email because email notifications are enabled for your account. You can update this in Settings.';
 
-  const formattedTime = input.openedAt
-    ? new Date(input.openedAt).toLocaleString(isId ? 'id-ID' : 'en-US', {
-        dateStyle: 'medium',
-        timeStyle: 'medium',
-      })
-    : new Date().toISOString();
+  const formattedTime = formatAlertTimestamp(input.openedAt || new Date(), locale, input.timezone);
 
   const appBaseUrl =
     process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'https://melonmadura.my.id';
