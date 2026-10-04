@@ -227,7 +227,9 @@ describe('RetentionService Unit Tests', () => {
     });
 
     it('prunes reservoir_water_readings using window function when $queryRaw is available (DEC-MON-092)', async () => {
-      mockPrisma.$queryRaw = vi.fn().mockResolvedValueOnce([{ id: 'excess-r1' }, { id: 'excess-r2' }]);
+      mockPrisma.$queryRaw = vi
+        .fn()
+        .mockResolvedValueOnce([{ id: 'excess-r1' }, { id: 'excess-r2' }]);
       mockPrisma.reservoirWaterReading.deleteMany.mockResolvedValueOnce({ count: 2 });
 
       const summary = await retentionService.pruneExpiredTelemetry({
