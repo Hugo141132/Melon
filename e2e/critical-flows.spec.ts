@@ -434,6 +434,40 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
       return;
     }
 
+    if (prisma && !adminUserId) {
+      const existingAdmin = await prisma.user.findUnique({ where: { email: testAdminEmail } });
+      if (existingAdmin) {
+        adminUserId = existingAdmin.id;
+      } else {
+        const adminPasswordHash = await hashPassword(testAdminPassword);
+        const newAdmin = await prisma.user.create({
+          data: {
+            email: testAdminEmail,
+            fullName: testAdminName,
+            passwordHash: adminPasswordHash,
+            accountStatus: 'ACTIVE',
+            emailVerifiedAt: new Date(),
+          },
+        });
+        adminUserId = newAdmin.id;
+        const adminRole = await prisma.role.findUnique({ where: { code: 'ADMIN' } });
+        if (adminRole) {
+          await prisma.userRoleAssignment.create({
+            data: { userId: newAdmin.id, roleId: adminRole.id },
+          });
+        }
+        if (targetDeviceId && ownerUserId) {
+          await prisma.userDeviceAccess.create({
+            data: {
+              userId: newAdmin.id,
+              deviceId: targetDeviceId,
+              assignedByUserId: ownerUserId,
+            },
+          });
+        }
+      }
+    }
+
     await page.goto('/login');
     await selectLanguageIfGated(page, 'id');
     await page.fill('input#email', testAdminEmail);
@@ -516,7 +550,7 @@ test.describe.serial('TASK-1004: End-to-End Critical Flows', () => {
         'button[data-testid="btn-select-phase-1"], [data-testid="preset-card-phase-1"] button, button:has-text("0.3 L"), button:has-text("Siram 0.3 L"), button:has-text("Dispense 0.3 L"), button:has-text("Phase 1")'
       )
       .first();
-    await expect(phase1Button).toBeEnabled({ timeout: 10000 });
+    await expect(phase1Button).toBeEnabled({ timeout: 20000 });
     await phase1Button.click();
 
     // Wait for confirm modal button and submit

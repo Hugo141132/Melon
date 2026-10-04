@@ -8,6 +8,6 @@ export const metadata = {
   description: 'Sistem pemantauan tanah, kualitas air, dan kontrol irigasi tandon melon',
 };
 
-export default function DashboardPage() {
+export default function DashboardDirectRoutePage() {
   return <DashboardView />;
 }

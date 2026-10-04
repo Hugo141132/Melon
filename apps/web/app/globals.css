@@ -258,6 +258,14 @@
     }
   }
 
+  @media (prefers-reduced-motion: reduce) {
+    .animate-fade-in,
+    .animate-slide-up {
+      animation: none !important;
+      transform: none !important;
+    }
+  }
+
   /* ─── Reusable Ambient Organic Background Layer System ────── */
   .min-h-dvh.bg-app-surface,
   .min-h-dvh.bg-surface,

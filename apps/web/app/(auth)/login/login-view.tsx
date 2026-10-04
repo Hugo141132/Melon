@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import {
   Mail,
   Lock,
@@ -39,9 +39,11 @@ function LoginForm() {
   const [errorMessage, setErrorMessage] = useState('');
   const [canRecover, setCanRecover] = useState(false);
   const messageParam = searchParams.get('message');
+  const reasonParam = searchParams.get('reason');
   const [successMessage] = useState(
     messageParam === 'PASSWORD_CHANGED' ? tAuth('passwordChangedSuccess') : ''
   );
+  const outageNotice = reasonParam === 'outage' ? tAuth('outageNotice') : '';
 
   // Session Recovery Modal State
   const [showRecoveryModal, setShowRecoveryModal] = useState(false);
@@ -63,6 +65,24 @@ function LoginForm() {
     return () => clearInterval(interval);
   }, [recoveryCountdown]);
 
+  // Track client-side outage logout promise to prevent race condition with fast login submission
+  const outageLogoutPromiseRef = useRef<Promise<void> | null>(null);
+
+  // Execute client-side logout mutation when landing on outage recovery to revoke
+  // any old session and clear HttpOnly cookie without violating Server Component GET constraints
+  useEffect(() => {
+    if (reasonParam === 'outage') {
+      outageLogoutPromiseRef.current = fetch('/api/v1/auth/logout', {
+        method: 'POST',
+        credentials: 'same-origin',
+      })
+        .then(() => {})
+        .catch(() => {
+          // Expected if backend is still unreachable during total outage
+        });
+    }
+  }, [reasonParam]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
@@ -75,6 +95,14 @@ function LoginForm() {
 
     try {
       setLoading(true);
+
+      // Guarantee any in-flight outage recovery logout finishes before creating a new session
+      if (reasonParam === 'outage' && outageLogoutPromiseRef.current) {
+        try {
+          await outageLogoutPromiseRef.current;
+        } catch {}
+      }
+
       const res = await fetch('/api/v1/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -210,6 +238,13 @@ function LoginForm() {
   return (
     <>
       <form className="space-y-5" onSubmit={handleSubmit}>
+        {outageNotice && (
+          <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-700 dark:text-amber-300 text-[14px] leading-[20px] flex items-start gap-2.5">
+            <AlertCircle size={18} className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
+            <span>{outageNotice}</span>
+          </div>
+        )}
+
         {successMessage && (
           <div className="p-3.5 bg-primary/10 border border-primary/30 rounded-xl text-primary text-[14px] leading-[20px] flex items-start gap-2.5">
             <CheckCircle size={18} className="mt-0.5 shrink-0" />
@@ -517,7 +552,7 @@ export default function LoginView() {
 
   return (
     <div className="bg-surface text-on-surface min-h-dvh flex flex-col justify-center items-center p-[24px]">
-      <main className="w-full max-w-md bg-surface-container-lowest bento-shape p-[32px] md:p-[36px] shadow-sm border border-outline-variant/60 rounded-3xl">
+      <main className="w-full max-w-md bg-surface-container-lowest bento-shape p-[32px] md:p-[36px] shadow-sm border border-outline-variant/60 rounded-3xl animate-fade-in">
         {/* Header */}
         <header className="mb-[28px] text-center">
           <div className="flex justify-center mb-4">

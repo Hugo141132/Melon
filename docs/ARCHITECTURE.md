@@ -2478,6 +2478,50 @@ The notification system enforces end-to-end multilingual parity and operational 
 - Reverting physical state to `UNKNOWN` on timeout is strictly forbidden, preventing misleading UI state flips during transient network drops.
 <!-- Alert Architecture & Asynchronous Email Notification Subsystem Reconciled: 2026-10-03 -->
 
+## Connection Outage Detection, Protected-State Handling & Recovery Architecture (DEC-ARCH-036 / TASK-0507 / Reconciled 2026-10-04)
+
+### 1. Bounded Confirmation Outage Probing
+To prevent erratic UI state flips caused by transient Wi-Fi drops or momentary cellular packet loss in farm environments, connection outage detection relies on bounded confirmation probing:
+- **Probing Cadence & Threshold:** The client connectivity monitor executes lightweight heartbeat probes at 2-second intervals. An outage is confirmed only after 3 consecutive failed probes.
+- **Empirical Detection Window:** Total detection latency is bounded between 4 and 7 seconds (accounting for network request timeouts and retry spacing). Instantaneous outage detection is physically impossible over HTTP/TLS and is not claimed.
+- **Probe Endpoint:** Probing utilizes lightweight HTTP HEAD/GET against `/api/v1/health` or `/api/v1/auth/session`, verifying end-to-end connectivity to the Next.js runtime and PostgreSQL backend.
+
+### 2. Protected Operational State & Inline Outage View
+When an unrecoverable outage is confirmed, protected application views safeguard farm operations:
+- **Immediate Inline Surface Replacement:** Protected operational views (`/dashboard`, `/soil`, `/water`, `/controls`, `/devices`, `/users`, `/setting`) replace interactive control inputs and live telemetry with an inline Outage View.
+- **Actuation Protection:** Actuation buttons (faucet presets, valve controls) are disabled and hidden to prevent operators from queueing blind commands during communication severance.
+- **Layout Shell Preservation:** The top navigation bar (`TopAppBar`) and sidebar navigation (`Sidebar`) remain mounted to provide system status feedback without triggering full-page layout destruction.
+
+### 3. Server Component Purity & Session Lifecycle on Recovery
+Architectural purity in Next.js App Router server components is strictly enforced during recovery:
+- **Server Component GET Purity:** Next.js Server Components rendering GET pages (specifically `apps/web/app/(auth)/login/page.tsx` and route guards) MUST NEVER mutate cookies, revoke tokens, or trigger database write operations during SSR rendering.
+- **Client-Side Recovery Mutation:** When an operator initiates recovery from an outage or session conflict, logout and session cleanup are executed strictly on the client side in `apps/web/app/(auth)/login/login-view.tsx` via an explicit `POST /api/v1/auth/logout` API mutation.
+- **Submission Race Protection (`outageLogoutPromiseRef`):** The client view guards logout invocations with `outageLogoutPromiseRef`. Rapid multi-clicks or concurrent retry timers share the in-flight logout promise, preventing redundant network requests and race conditions.
+- **Cookie Revocation Timing:** Client session cookies and tokens are revoked ONLY after a successful server-side logout response (HTTP 200/204). Cookies are never cleared prematurely before the server confirms session invalidation.
+
+### 4. Epoch Fencing (`activeEpochRef`)
+To eliminate race conditions where delayed asynchronous responses from an earlier connection attempt resolve after reconnection:
+- **State Monotonicity:** `AuthContext` and telemetry hooks maintain a monotonically increasing `activeEpochRef`.
+- **Invalidation on Disconnect/Reconnect:** The epoch counter increments upon confirmed connection loss and upon successful reconnection.
+- **Stale Payload Discard:** Any in-flight telemetry frames, device updates, or session validations tagged with an older epoch are immediately discarded, preventing stale or out-of-order data from corrupting the active user interface.
+
+## Metadata Icon & Adaptive Favicon Architecture (DEC-UIUX-109 / TASK-0507 / Reconciled 2026-10-04)
+
+### 1. Dual Media-Query Root Icon Strategy
+The root layout metadata (`apps/web/app/layout.tsx`) implements dual media-query icons under Next.js App Router metadata conventions:
+- **Dark Mode Descriptor:** `{ rel: 'icon', url: '/favicon-dark.png', media: '(prefers-color-scheme: dark)' }` pointing to the uniform white logo asset.
+- **Light Mode Descriptor:** `{ rel: 'icon', url: '/favicon-light.png', media: '(prefers-color-scheme: light)' }` pointing to the uniform black logo asset.
+- **Shortcut Icon:** Dedicated legacy fallback pointing to `/favicon-light.png`.
+
+### 2. Static Asset Authority & Distribution
+- **Next.js Static Asset Root:** Favicons are served exclusively from `apps/web/public/` (`/favicon-dark.png` and `/favicon-light.png`). Standalone Next.js Docker builds and Caddy reverse proxy mount and serve assets directly from this path.
+- **Deduplication Audit:** Redundant root-level duplicates (`public/favicon-*.png`) were removed to prevent directory drift and cache confusion. Master source brand asset `docs/assets/logo2.webp` (`apps/web/public/logo2.webp`) remains intact and unmodified.
+
+### 3. Browser Tab Lifecycle & Media Query Throttling
+- In Chromium-based browsers, background tabs (`visibilityState === 'hidden'`) throttle or defer `matchMedia` event callbacks until the tab is brought into focus (`visibilityState === 'visible'`).
+- Updating upon tab activation is standard Chromium tab behavior. BAMABAA formally accepted tab-activation updates on 2026-10-04, closing background update investigations.
+<!-- Outage Detection & Adaptive Favicon Architecture Reconciled: 2026-10-04 -->
+
 
 
 

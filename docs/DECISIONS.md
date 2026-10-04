@@ -44,7 +44,8 @@
 | **I18N** | `DEC-I18N-068` to `DEC-I18N-074` | **APPROVED** | Default `id` (Bahasa Indonesia), `en` fallback, mandatory centered language-selection gate for unauthenticated visitors without valid locale (`English` -> `en`, `Bahasa Indonesia` -> `id`), cookie-based non-prefixed routing (no URL path pollution), subsequent language changes strictly in Settings (`/settings`), UTC storage with `Asia/Jakarta` (WIB) presentation. |
 | **Infrastructure** | `DEC-INF-075` to `DEC-INF-088` | **APPROVED** | npm monorepo, PostgreSQL with Prisma ORM, internal health probes, dedicated Linux VPS production with Docker Compose (`TASK-1011`), and containerized staging decoupled from Railway (`TASK-1012`). Backup schedule and retention: daily automated encrypted pg_dump with offsite object storage. |
 | **Testing** | `DEC-TST-089` to `DEC-TST-100` | **APPROVED** | Modern Evergreen browsers. Mobile viewport primary (360-430px). Accessibility standard: **TBD**. API performance targets (p95): **TBD**. Physical test run count per faucet phase: **TBD**. |
-| **UI/UX & Frontend** | `DEC-UIUX-101` to `DEC-UIUX-106` | **APPROVED** | 6 primary UI directions (1 per task), authoritative Kebun Melon color palette (UNCHANGED), controlled 12-motion library, performant motion quality, mandatory task-level frontend declaration, 21st.dev MCP required ONLY for material redesigns, removal of Linked Devices from profile, Account/Session Security management, simplified faucet confirmation modal, and device connection status presentation normalization (`Connected` vs `Disconnected` per `DEC-UIUX-106`). |
+| **UI/UX & Frontend** | `DEC-UIUX-101` to `DEC-UIUX-109` | **APPROVED** | 6 primary UI directions (1 per task), authoritative Kebun Melon color palette (UNCHANGED), controlled 12-motion library, performant motion quality, mandatory task-level frontend declaration, 21st.dev MCP required ONLY for material redesigns, removal of Linked Devices from profile, Account/Session Security management, simplified faucet confirmation modal, device connection status presentation normalization (`Connected` vs `Disconnected` per `DEC-UIUX-106`), shared page transitions (`animate-fade-in`), dashboard animated KPI counting (`AnimatedNumber.tsx`), and whole-logo adaptive favicon branding with "Melon Governance" title (`DEC-UIUX-109`). |
+| **Resilience & Architecture** | `DEC-ARCH-036` | **APPROVED** | Bounded confirmation outage probing (3 failed probes at 2s = 4–7s detection window), immediate inline Outage View for protected states, Server Component GET purity in Next.js App Router (zero session revocation during GET SSR), client-side recovery logout mutation with submission race prevention (`outageLogoutPromiseRef`), and epoch fencing (`activeEpochRef`) to drop stale in-flight telemetry frames. |
 
 ---
 
@@ -1634,3 +1635,55 @@ The following facts are supported by the verified decisions governance of `TASK-
      - Documented the interactive `read -s` update-or-add procedure in `docs/VPS_DEPLOYMENT_RUNBOOK.md` §4.1 to inject keys into `/opt/kebun-melon/.env.production` without shell history exposure.
      - Rebuilding and restarting `kebun-melon-web` is required; IoT Gateway and database schemas remain unaffected (0 schema drift).
 <!-- DEC-ALRT-101 Reconciled: 2026-10-04 -->
+
+---
+
+## DEC-ARCH-036: Connection Outage Detection, Protected-State Handling & Recovery Architecture
+- **Status:** APPROVED & IMPLEMENTED (2026-10-04)
+- **Related Task IDs:** `TASK-0507`, `TASK-0204`, `TASK-0215`, `TASK-0217`, `TASK-0218`
+- **Context:**
+  In field operations, intermittent Wi-Fi and unstable cellular connections are common. Misinterpreting a single dropped network packet as an unrecoverable outage causes jarring UI flashing and false alarms. Conversely, failing to detect a true communication loss allows operators to attempt valve actuations or make agronomic decisions on frozen sensor data. Furthermore, session recovery flows must avoid Server Component SSR side effects and submission races.
+- **Approved Decision & Implementation Directives:**
+  1. **Bounded Confirmation Outage Probing:**
+     - Connectivity monitoring enforces a bounded confirmation strategy: 3 consecutive failed probes at 2-second intervals before declaring an unrecoverable outage.
+     - Total detection latency is bounded between 4 and 7 seconds (accounting for network round-trips and timeouts). Instantaneous detection is physically impossible over HTTP/TLS and is not claimed.
+  2. **Protected-State Handling via Inline Outage View:**
+     - Upon confirmed outage, protected operational routes (`/dashboard`, `/soil`, `/water`, `/controls`, `/devices`, `/users`, `/setting`) replace interactive control and telemetry surfaces with an inline Outage View.
+     - Actuation buttons are disabled and concealed to prevent queueing blind commands.
+     - Layout shell (`TopAppBar`, `Sidebar`) remains mounted to maintain visual context and display connectivity status.
+  3. **Server Component GET Purity:**
+     - Next.js App Router Server Components rendering GET pages (specifically `/login/page.tsx`) must never mutate cookies or revoke sessions during SSR.
+     - Session revocation on recovery is handled client-side in `login-view.tsx` via `POST /api/v1/auth/logout`.
+     - `outageLogoutPromiseRef` prevents race conditions from concurrent clicks or retries.
+     - Cookies and sessions are revoked ONLY upon successful server-side logout response (HTTP 200/204).
+  4. **Epoch Fencing (`activeEpochRef`):**
+     - Both `AuthContext` and telemetry hooks maintain an `activeEpochRef` counter incremented on connection transitions.
+     - Any in-flight telemetry frames or session validations bearing a stale epoch are immediately discarded, preventing race-condition corruption of client state.
+<!-- DEC-ARCH-036 Reconciled: 2026-10-04 -->
+
+---
+
+## DEC-UIUX-109: Shared Page Transitions, Dashboard Animated Counting & Whole-Logo Adaptive Favicon Branding
+- **Status:** APPROVED & IMPLEMENTED (2026-10-04)
+- **Related Task IDs:** `TASK-0507`, `DEC-UIUX-101`, `DEC-UIUX-107`, `DEC-UIUX-108`
+- **Context:**
+  Following the standardization of the "Melon Governance" title, operational monitoring required cohesive, lightweight visual Polish without heavy animation overhead. In addition, the application favicon required clear visibility against both dark and light browser tab strips, while preserving original master brand assets.
+- **Approved Decision & Implementation Directives:**
+  1. **Shared Page Enter Transitions:**
+     - Standardized single `animate-fade-in` (~400ms duration) CSS animation on `<main>` across App Router pages.
+     - Redundant inner card animations eliminated.
+     - Strict `@media (prefers-reduced-motion: reduce)` compliance: instantly bypasses fade/transform animations.
+     - CPU usage bounded by executing only during the 400ms route transition window.
+  2. **Dashboard KPI Animated Counting (`AnimatedNumber.tsx`):**
+     - Numerical metrics interpolate over 400ms using `requestAnimationFrame`.
+     - Automatically checks `prefers-reduced-motion: reduce` and renders target numbers statically without RAF.
+     - Smooth retargeting and automatic RAF cancellation on component unmount.
+  3. **Whole-Logo Adaptive Favicon:**
+     - Uniform whole-logo recolor derived from master `logo2.webp`:
+       - Dark mode (`prefers-color-scheme: dark`): Entire emblem, crown, and typography render in uniform white (`/favicon-dark.png`, 48,621 bytes, 32×32 RGBA).
+       - Light mode (`prefers-color-scheme: light`): Entire emblem, crown, and typography render in uniform solid black (`/favicon-light.png`, 48,834 bytes, 32×32 RGBA).
+       - Master source asset `docs/assets/logo2.webp` (`apps/web/public/logo2.webp`) remains intact and unmodified.
+     - Dual media-query link declarations in Next.js `layout.tsx` metadata icons (`media: '(prefers-color-scheme: dark)'` and `media: '(prefers-color-scheme: light)'`).
+     - Assets reside strictly in `apps/web/public/`. Duplicate root `public/favicon-*.png` removed.
+     - Chromium tab activation lifecycle: In Chromium browsers, background tabs throttle `matchMedia` change event dispatching until tab activation (`visibilityState === 'visible'`). BAMABAA formally accepted tab-activation updates on 2026-10-04, closing background update investigations.
+<!-- DEC-UIUX-109 Reconciled: 2026-10-04 -->

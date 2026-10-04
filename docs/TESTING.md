@@ -3498,4 +3498,57 @@ The following full CI gates were intentionally deferred for this checkpoint and 
 - [ ] Live test alert email delivery via Resend verified with `WIB` timestamp matching `/notifications` UI.
 <!-- BUG-1011-01 Testing Evidence Checkpointed: 2026-10-04 -->
 
+---
+
+## 51. TASK-0507: Frontend Outage Resiliency, Unified Page Transitions, Controlled Animated Counting & Adaptive Favicon Branding Testing Evidence
+
+### 1. Test Suite Coverage & Verification Scope
+Automated testing for TASK-0507 covers auth session purity during RSC rendering, client-initiated logout mutation on outage recovery, rapid confirmation probing, epoch-based state isolation, unmounting of protected routes during backend unavailability, full RAF animation lifecycle, and dynamic favicon theming:
+
+- **Auth Outage Detection & State Suppression (`apps/web/test/unit/outage-detection.test.tsx`):**
+  - Result: **3/3 passed** (100%, exit code 0).
+  - Verifies unmounting of protected content (`queryByTestId('auth-status') === null`) and immediate inline fallback rendering ("Koneksi Server Terputus") when server is unreachable.
+  - Verifies `clearState` invocation upon 3 consecutive probe failures and session nullification.
+  - Verifies 401 unauthorized responses clear session without setting `isOutage = true`.
+- **Animated Number Lifecycle & Motion Preferences (`apps/web/test/unit/animated-number.test.tsx`):**
+  - Result: **9/9 passed** (100%, exit code 0).
+  - Verifies controlled RAF ticks (initial mount interpolation at 50% and 100%).
+  - Verifies cancellation of in-flight RAF when target value changes rapidly.
+  - Verifies cancellation of in-flight RAF on component unmount.
+  - Verifies instantaneous formatted rendering without RAF when `prefers-reduced-motion` is active.
+  - Verifies stability when value remains unchanged (zero redundant RAF schedules).
+  - Verifies locale-aware decimal formatting and precision (`12.34`).
+  - Verifies correct handling of numeric zero (`'0'`).
+  - Verifies fallback rendering on null/undefined (`'--'`).
+- **Layout Metadata & Adaptive Favicon Icons (`apps/web/test/unit/metadata-icons.test.ts`):**
+  - Verifies exact document title `"Melon Governance"`.
+  - Verifies unified declarative metadata icons array with `(prefers-color-scheme: light)` pointing to `/favicon-light.png` and `(prefers-color-scheme: dark)` pointing to `/favicon-dark.png`.
+- **Monorepo Quality & CI Gates Status:**
+  - `npm run check:quality`: Pending manual execution by BAMABAA.
+  - `npm test`: Pending manual execution by BAMABAA.
+  - `npm run test:coverage`: Pending manual execution by BAMABAA.
+  - `npm run test:integration`: Pending manual execution by BAMABAA.
+  - `npm run test:e2e`: Pending manual execution by BAMABAA (isolated web server port 3005 and disposable test DB environment prepared).
+
+### 2. Manual Operator Verification Status
+- [x] **Real-Tab Favicon Visual Verification:** Whole logo (crown emblem, "KING" typography, and subtitle) renders uniform crisp white in dark mode and solid black in light mode, preserving transparency and master `logo2.webp`. Formally reviewed and accepted by BAMABAA on 2026-10-04 (updates upon tab activation accepted; background update investigation permanently closed).
+- [ ] **Real Server Shutdown & Inline Outage View:** Verify inline Outage View replaces protected content within 4–7 seconds on active session (Pending manual test by BAMABAA).
+- [ ] **Outage Recovery Navigation:** Verify navigation to `/login?reason=outage`, ensuring cookie revocation on server-side logout and guest guard blocking silent redirect (Pending manual test by BAMABAA).
+- [ ] **Dashboard Runtime Profiling:** Focused dashboard runtime heap and FPS profiling under authenticated session (Pending manual test by BAMABAA).
+
+### 3. Pre-Commit CI Test Gates Protocol (Executed Exclusively by BAMABAA)
+The following five verification commands must be executed **exclusively by operator BAMABAA** following manual website acceptance. Coding agents are strictly forbidden from running these commands.
+
+| Command | Working Directory | Prerequisites | Repository Actions | CI Workflow Mapping |
+|---|---|---|---|---|
+| `npm run check:quality` | Monorepo Root (`C:\Users\Puroh\Documents\Melon`) | Node.js 20+, `npm install` completed | Runs ESLint, Prettier check, and TypeScript typechecking across all 4 monorepo packages (`apps/web`, `apps/iot-gateway`, `packages/database`, `packages/contracts`). | `.github/workflows/ci.yml` (`quality` job) |
+| `npm run test` | Monorepo Root | Node.js 20+, dependencies installed | Runs all Jest unit and mock suites across all workspaces with zero database dependency. | `.github/workflows/ci.yml` (`unit-tests` job) |
+| `npm run test:coverage` | Monorepo Root | Node.js 20+, dependencies installed | Executes full test suite with coverage collection, generating coverage reports. | `.github/workflows/ci.yml` (`coverage` step) |
+| `npm run test:integration` | Monorepo Root | Dedicated PostgreSQL test database with applied Prisma migrations (`DATABASE_URL` pointing to test DB). **Never run against development or staging databases.** | Executes relational database integration tests, transaction rollbacks, and repository integrity checks. | `.github/workflows/ci.yml` (`integration-tests` job with PostgreSQL service container) |
+| `npm run test:e2e` | Monorepo Root | Playwright browser binaries installed (Microsoft Edge / Chromium), dedicated isolated PostgreSQL test database, Web app built or running on dedicated port 3005 (`reuseExistingServer: false`). | Executes Playwright end-to-end critical flow tests covering authentication, dashboard telemetry, controls, and alerts. | `.github/workflows/ci.yml` (`e2e-tests` job) |
+
+<!-- TASK-0507 Testing Evidence Recorded: 2026-10-04 -->
+
+
+
 

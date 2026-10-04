@@ -183,6 +183,32 @@ export function DeviceProvider({
     selectedDeviceRef.current = selectedDevice;
   }, [selectedDevice]);
 
+  // Monotonic epoch to invalidate and drop in-flight device fetches across outage/unauthenticated events
+  const activeEpochRef = React.useRef<number>(0);
+
+  // Cleanly clear sensitive device state and cache on unauthenticated or backend outage
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleClearState = () => {
+      activeEpochRef.current += 1;
+      setDevices([]);
+      setSelectedDevice(null);
+      selectedDeviceRef.current = null;
+      try {
+        sessionStorage.removeItem(DEVICE_CACHE_KEY);
+      } catch {}
+    };
+
+    window.addEventListener('melon:unauthenticated', handleClearState);
+    window.addEventListener('melon:backend-outage', handleClearState);
+
+    return () => {
+      window.removeEventListener('melon:unauthenticated', handleClearState);
+      window.removeEventListener('melon:backend-outage', handleClearState);
+    };
+  }, []);
+
   // Sync selection with URL without triggering page reload
   const syncSelection = useCallback((device: AuthorisedDevice | null) => {
     if (typeof window === 'undefined') return;
@@ -282,9 +308,11 @@ export function DeviceProvider({
   const refetchDevices = useCallback(async () => {
     setIsLoading(true);
     setError(null);
+    const epoch = activeEpochRef.current;
 
     try {
       const response = await fetch('/api/v1/devices');
+      if (epoch !== activeEpochRef.current) return;
       if (!response.ok) {
         if (response.status === 401) {
           setError('Sesi berakhir. Silakan login kembali.');
@@ -296,15 +324,19 @@ export function DeviceProvider({
       }
 
       const json = await response.json();
+      if (epoch !== activeEpochRef.current) return;
       if (json.success && Array.isArray(json.data)) {
         processDeviceList(json.data);
       } else {
         setError(json.error?.message || 'Format data perangkat tidak valid.');
       }
     } catch (err: any) {
+      if (epoch !== activeEpochRef.current) return;
       setError(err?.message || 'Gagal terhubung ke server.');
     } finally {
-      setIsLoading(false);
+      if (epoch === activeEpochRef.current) {
+        setIsLoading(false);
+      }
     }
   }, [processDeviceList]);
 

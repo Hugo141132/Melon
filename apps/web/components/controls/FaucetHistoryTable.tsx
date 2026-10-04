@@ -183,6 +183,7 @@ export default function FaucetHistoryTable({
   useRealtimeMonitoring({
     channels: ['commands'],
     deviceId: deviceId || undefined,
+    enabled: Boolean(deviceId),
     onEvent: handleRealtimeEvent,
   });
 

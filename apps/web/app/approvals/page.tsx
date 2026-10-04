@@ -175,7 +175,7 @@ export default function PendingApprovalsPage() {
       <TopAppBar />
 
       <main className="pt-20 px-[1rem] max-w-4xl mx-auto w-full space-y-5">
-        <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-app-surface-container-lowest p-5 rounded-xl soft-elevation-lg border border-app-outline-variant/30">
+        <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-app-surface-container-lowest p-5 rounded-xl soft-elevation-lg border border-app-outline-variant/30 animate-fade-in">
           <div>
             <h1 className="text-[24px] leading-8 font-bold text-app-primary flex items-center gap-2">
               <User size={24} /> {tApprovals('title')}
@@ -192,7 +192,7 @@ export default function PendingApprovalsPage() {
         </header>
 
         {/* Search Bar */}
-        <div className="flex gap-2">
+        <div className="flex gap-2 animate-fade-in">
           <div className="relative flex-1">
             <Search
               size={18}
@@ -254,7 +254,7 @@ export default function PendingApprovalsPage() {
 
         {/* List & Detail Grid */}
         {!loading && !error && items.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in">
             <div className="space-y-3">
               {items.map((item) => (
                 <div

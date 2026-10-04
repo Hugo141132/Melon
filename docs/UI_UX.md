@@ -236,6 +236,37 @@ The 2026-09-25 authentication UX enhancement streamlines the `ACTIVE_SESSION_EXI
    - **Real-Time 60-Second Countdown:** Displays live decrementing timer (`01:00` down to `00:00`) indicating OTP expiration. When expired, the input is disabled and a resend action becomes available after cooldown.
    - **Accessible Action Controls:** Primary confirmation button (*"Verify & Terminate Other Session"* / *"Verifikasi & Akhiri Sesi Lain"*) and subtle Cancel button (*"Batal"* / *"Cancel"*). Canceling safely dismisses the modal without modifying or revoking the active session on the other device.
 
+### 1.11 Shared Page Transitions, Dashboard Animated Counting & Adaptive Favicon Branding Governance (TASK-0507 / DEC-UIUX-109)
+The 2026-10-04 refinement introduces lightweight shared page transitions, smooth KPI counting on the dashboard, and a whole-logo adaptive favicon aligned with the standardized "Melon Governance" brand title (`TASK-0507`, `DEC-UIUX-109`):
+- **Frontend impact:** `MINOR`
+- **Selected UI direction:** `Premium Minimal Ops`
+- **Existing color template:** `UNCHANGED`
+- **Selected motion effects:** `Page enter`, `KPI refresh`
+- **21st.dev MCP:** `NOT REQUIRED` (Minor refinement adhering strictly to existing layouts and design tokens)
+
+#### Presentation, Motion, and Branding Rules
+1. **Shared Page Enter Transitions (`Page enter`):**
+   - Implemented via a lightweight CSS animation (`animate-fade-in`, ~400ms duration with subtle opacity easing) applied to the `<main>` container across App Router pages.
+   - Redundant, conflicting inner card transitions were eliminated to prevent visual stutter and cumulative layout shift.
+   - **Accessibility & Motion Safety:** Enforces strict adherence to `@media (prefers-reduced-motion: reduce)`. When reduced motion is preferred by the operating system or browser, all fade and transform transitions are bypassed instantly (`animation: none; opacity: 1`).
+   - **Resource Management:** Does not claim zero resource usage; bounds CPU usage by executing CSS transitions purely during the 400ms route transition window without continuous background animation loops.
+2. **Dashboard KPI Animated Counting (`AnimatedNumber.tsx` / `KPI refresh`):**
+   - Implemented for numerical metrics on dashboard overview cards using `requestAnimationFrame` (RAF) linear interpolation over a bounded 400ms duration.
+   - **Reduced Motion Safety:** Automatically checks `window.matchMedia('(prefers-reduced-motion: reduce)')`. If reduced motion is active, animated interpolation is bypassed entirely and the target number is rendered statically without delay.
+   - **Retargeting & Lifecycle Cleanup:** Cancels active animation frames on component unmount to prevent memory leaks and handles rapid telemetry retargeting smoothly without numerical flicker.
+3. **Whole-Logo Adaptive Favicon & Browser Tab Title (`DEC-UIUX-109`):**
+   - **Brand Title:** Root App Router metadata (`apps/web/app/layout.tsx`) standardizes `title.default` and `title.template` to `"Melon Governance"`.
+   - **Uniform Whole-Logo Recolor:**
+     - Dark mode preference (`prefers-color-scheme: dark`): The entire emblem, crown, "KING" typography, and subtitle render in crisp, uniform white (`/favicon-dark.png`, 48,621 bytes, 32×32 RGBA).
+     - Light mode preference (`prefers-color-scheme: light`): The entire emblem and typography render in crisp, uniform solid black (`/favicon-light.png`, 48,834 bytes, 32×32 RGBA).
+     - Master source asset `logo2.webp` is preserved 100% untouched.
+   - **Dual Media-Query Metadata Icons:** Declared in Next.js root metadata:
+     - `{ rel: 'icon', url: '/favicon-dark.png', media: '(prefers-color-scheme: dark)' }`
+     - `{ rel: 'icon', url: '/favicon-light.png', media: '(prefers-color-scheme: light)' }`
+     - Dedicated shortcut icon references `/favicon-light.png` for legacy user agents.
+   - **Asset Location Authority:** Assets reside strictly in `apps/web/public/` (the Next.js public root directory). Redundant root-level duplicates (`public/favicon-*.png`) were removed following build audit.
+   - **Browser Lifecycle & Acceptance:** In Chromium-based browsers, background tabs (`visibilityState === 'hidden'`) throttle or defer `matchMedia` event callbacks until the tab is activated. BAMABAA formally accepted tab-activation updates on 2026-10-04; background update investigation is closed.
+
 ---
 
 ## 2. Source-of-Truth Hierarchy

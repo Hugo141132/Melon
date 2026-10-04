@@ -2,6 +2,7 @@
 
 import React from 'react';
 import TopAppBar from '@/components/navigation/TopAppBar';
+import AnimatedNumber from '@/components/dashboard/AnimatedNumber';
 import WeatherCard from '@/components/dashboard/WeatherCard';
 import { useAuth } from '@/context/AuthContext';
 import { useDeviceContext } from '@/context/DeviceContext';
@@ -11,7 +12,7 @@ import { normalizeConnectionStatus } from '@/lib/utils';
 
 export default function DashboardView() {
   const tDash = useTranslations('dashboard');
-  const locale = useLocale();
+  const locale = typeof useLocale === 'function' ? useLocale() : 'id';
 
   const { user } = useAuth();
   const { devices } = useDeviceContext();
@@ -38,7 +39,7 @@ export default function DashboardView() {
 
       <main className="pt-20 sm:pt-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full space-y-6">
         {/* ── Top Section: Hero / System Overview Card with Operational Device Metrics ─── */}
-        <section className="bg-app-surface-container-lowest rounded-2xl p-6 sm:p-8 lg:p-9 soft-elevation-lg border border-app-outline-variant/60">
+        <section className="bg-app-surface-container-lowest rounded-2xl p-6 sm:p-8 lg:p-9 soft-elevation-lg border border-app-outline-variant/60 animate-fade-in">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             {/* Clean Greeting without Emojis */}
             <h1 className="text-[24px] sm:text-[28px] lg:text-[32px] font-extrabold text-app-on-surface tracking-tight">
@@ -51,7 +52,7 @@ export default function DashboardView() {
           </div>
 
           {/* Operational Node Summary Bar */}
-          <div className="mt-6 pt-6 border-t border-app-outline-variant/30 grid grid-cols-1 sm:grid-cols-3 gap-3.5 sm:gap-4">
+          <div className="mt-6 pt-6 border-t border-app-outline-variant/30 grid grid-cols-1 sm:grid-cols-3 gap-3.5 sm:gap-4 animate-fade-in">
             {/* Total Registered Nodes */}
             <div className="bg-app-surface-container-low rounded-xl p-4 border border-app-outline-variant/40 flex items-center justify-between">
               <div>
@@ -59,7 +60,7 @@ export default function DashboardView() {
                   {tDash('totalDevices')}
                 </span>
                 <span className="text-[22px] sm:text-[26px] font-extrabold text-app-on-surface">
-                  {devices.length}
+                  <AnimatedNumber value={devices.length} dataTestId="total-devices-count" />
                 </span>
               </div>
               <div className="w-10 h-10 rounded-xl bg-app-surface-container-high text-app-on-surface-variant flex items-center justify-center flex-shrink-0">
@@ -74,7 +75,7 @@ export default function DashboardView() {
                   {tDash('onlineDevices')}
                 </span>
                 <span className="text-[22px] sm:text-[26px] font-extrabold text-white">
-                  {onlineDevicesCount}
+                  <AnimatedNumber value={onlineDevicesCount} dataTestId="online-devices-count" />
                 </span>
               </div>
               <div className="w-10 h-10 rounded-xl bg-app-primary-fixed text-app-on-primary-fixed flex items-center justify-center flex-shrink-0">
@@ -89,7 +90,7 @@ export default function DashboardView() {
                   {tDash('offlineDevices')}
                 </span>
                 <span className="text-[22px] sm:text-[26px] font-extrabold text-app-on-surface-variant">
-                  {offlineDevicesCount}
+                  <AnimatedNumber value={offlineDevicesCount} dataTestId="offline-devices-count" />
                 </span>
               </div>
               <div className="w-10 h-10 rounded-xl bg-app-surface-container-high flex items-center justify-center flex-shrink-0">
@@ -100,7 +101,7 @@ export default function DashboardView() {
         </section>
 
         {/* ── Below Section: Full-Width Environmental Weather Card ─── */}
-        <section>
+        <section className="animate-fade-in">
           <WeatherCard />
         </section>
       </main>

@@ -108,6 +108,7 @@
     "suspendedTitle": "Akses Akun Ditangguhkan",
     "deactivatedTitle": "Akun Nonaktif",
     "expiredTitle": "Sesi Selesai / Kadaluwarsa",
+    "outageNotice": "Koneksi ke server backend terputus. Sesi lokal telah diamankan. Silakan masuk kembali setelah server pulih.",
     "loginFailed": "Gagal masuk. Periksa email dan kata sandi Anda.",
     "checkingSession": "Memeriksa sesi pengguna...",
     "ownerExistsError": "Akun Pemilik sudah terdaftar di sistem.",

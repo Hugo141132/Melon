@@ -91,7 +91,17 @@ export function useRealtimeMonitoring({
       es.addEventListener(evtName, handleMessage(evtName) as EventListener);
     });
 
+    const handleTerminate = () => {
+      setStatus('CLOSED');
+      es.close();
+    };
+
+    window.addEventListener('melon:unauthenticated', handleTerminate);
+    window.addEventListener('melon:backend-outage', handleTerminate);
+
     return () => {
+      window.removeEventListener('melon:unauthenticated', handleTerminate);
+      window.removeEventListener('melon:backend-outage', handleTerminate);
       es.close();
       eventSourceRef.current = null;
     };

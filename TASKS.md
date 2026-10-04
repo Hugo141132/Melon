@@ -4820,4 +4820,41 @@ The following full CI gates were deferred for this checkpoint and must be verifi
 - [ ] Outstanding deferred CI gates (`test:coverage`, `test:integration`, `check:quality`, `test`, `test:e2e`) executed and verified.
 - [ ] VPS runtime deployment, live prediction retrieval, and live alert email/UI verification executed by operator.
 
+---
+
+## TASK-0507: Frontend Outage Resiliency, Unified Page Transitions, Controlled Animated Counting & Adaptive Favicon Branding
+
+**Priority:** `P1` (User Session Integrity, Real-Time Resilience & UI Polish)
+**Status:** `PENDING_MANUAL_VERIFICATION` (Implementation complete; automated gates passed; manual credential-dependent checks pending)
+**Dependencies:** `TASK-0215`, `TASK-0505`, `TASK-0908`, `TASK-0813`, `TASK-0506`, `TASK-0214`
+**Recorded:** 2026-10-04 — Frontend resiliency and polish follow-up completing automatic outage sign-out, consistent page transitions, dashboard animated counting, and adaptive favicon tab branding:
+
+### 1. Implemented Changes
+- **Auth & Outage Correctness:**
+  - Preserved Server Component purity in `apps/web/app/(auth)/login/page.tsx`: removed all cookie deletions and session revocations from GET rendering. Retained `if (!isOutageRecovery) await requireGuestSession('/');` bypass to prevent silent auto-restoration.
+  - Implemented client-driven mutation in `apps/web/app/(auth)/login/login-view.tsx` executing `POST /api/v1/auth/logout` via `same-origin` credentials upon landing with `?reason=outage`. Added `outageLogoutPromiseRef` awaited in `handleSubmit` to guarantee logout completes before login submission can race with it.
+  - Added bounded confirmation probing (`OUTAGE_PROBE_INTERVAL_MS = 2000`, 3 consecutive failures), `activeEpochRef` epoch fencing, and `isOutage` state in `apps/web/context/AuthContext.tsx`.
+  - Implemented immediate inline Outage View ("Koneksi Server Terputus") in `AuthProvider` replacing `{children}` when `isOutage && !isPublic`, ensuring protected content unmounts immediately even if `router.replace` cannot fetch `/login`.
+  - Added `activeEpochRef` epoch counter in `apps/web/context/DeviceContext.tsx` ensuring late in-flight telemetry responses cannot repopulate cleared state.
+  - Preserved clear architectural distinction between device/MQTT telemetry outages, ordinary 403 permission denials, and backend/session transport failure.
+- **UI Consistency & Branding:**
+  - Standardized lightweight `animate-fade-in` on `<main>` across all application routes (`/`, `/dashboard`, `/sensor`, `/devices`, `/users`, `/approvals`, `/profile`, `/setting`, `/notifications`, `/controls`, `/soil`, `/water`, `/login`). Removed redundant inner card animations to eliminate duplicate transitions.
+  - Refactored `apps/web/components/dashboard/AnimatedNumber.tsx`: removed `process.env.NODE_ENV === 'test'` bypass, supporting full RAF animation lifecycle, rapid target retargeting, unmount cleanup, `prefers-reduced-motion` instantaneous formatting, unchanged value stability, decimal formatting, zero value `'0'`, and fallback `'--'`.
+  - Replaced conflicting legacy declarations with native declarative dual media-queried metadata icons in `apps/web/app/layout.tsx`: strictly dual media-queried `icon` array (`(prefers-color-scheme: light)` -> `/favicon-light.png` and `(prefers-color-scheme: dark)` -> `/favicon-dark.png`), ensuring Next.js SSR and client hydration stably own the icon declarations across navigations without conflicting client-side DOM overwrites.
+  - Recolored the ENTIRE logo uniformly (crown/emblem, "KING", and subtitle) from original `logo2.webp`: pure white (`RGB(255, 255, 255)`) across all visible pixels for dark preference (`/favicon-dark.png`) and pure black (`RGB(0, 0, 0)`) for light preference (`/favicon-light.png`), preserving original silhouette, proportions, transparent background, and anti-aliased alpha edges. Preserved exact document title `"Melon Governance"`.
+
+### 2. CI Gate Execution Status (Assigned to BAMABAA)
+- **Gate 1 (`npm run check:quality`):** Pending manual execution by BAMABAA.
+- **Gate 2 (`npm test`):** Pending manual execution by BAMABAA.
+- **Gate 3 (`npm run test:coverage`):** Pending manual execution by BAMABAA.
+- **Gate 4 (`npm run test:integration`):** Pending manual execution by BAMABAA.
+- **Gate 5 (`npm run test:e2e`):** Pending manual execution by BAMABAA (isolated web server port 3005 and disposable test DB environment prepared).
+
+### 3. Pending Manual Verification Items (Operator Execution)
+- [x] **Favicon Branding Verification (ACCEPTED by BAMABAA on 2026-10-04):** Entire logo (crown emblem, "KING", and subtitle) renders pure white on dark mode and pure black on light mode. Updating upon tab activation is formally accepted. Background update investigations concluded and production implementation preserved.
+- [ ] Real server shutdown & inline outage view display within 4–7 seconds on active session.
+- [ ] Outage recovery navigation to `/login?reason=outage`, verifying cookie revocation and guest guard blocking silent redirect.
+- [ ] Focused dashboard runtime heap and FPS profiling under authenticated session.
+
+
 

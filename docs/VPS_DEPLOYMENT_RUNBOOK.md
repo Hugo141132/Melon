@@ -537,12 +537,19 @@ curl.exe -s http://localhost:3001/health
   - **Web UI updates only:** **NO ACTION NEEDED.** Caddy automatically proxies traffic to `web:3000`. No reload, recreation, or restart required.
   - **Caddyfile or domain changes:** Validate first (`docker run --rm -v /opt/kebun-melon/docker/caddy/Caddyfile:/etc/caddy/Caddyfile caddy:2.9-alpine caddy validate --config /etc/caddy/Caddyfile`), then reload gracefully:
     `docker compose -f docker-compose.prod.yml exec reverse-proxy caddy reload --config /etc/caddy/Caddyfile`
+* **When is a Cache Purge Required?**
+  - **Caddy Reverse Proxy:** Operates as a pure reverse proxy without internal response caching. Static asset requests (`/favicon-*.png`, `/logo*.webp`) pass directly to the Next.js container.
+  - **Conditional Purge Directive:** Purging caches is strictly conditional on evidence. Only execute a cache purge if an external edge CDN (e.g. Cloudflare) or intermediate proxy is confirmed active and serving stale cached responses (`cf-cache-status: HIT`). Never perform blind cache purges.
+* **Why are On-VPS Builds Forbidden? (Off-VPS Image Build Rule)**
+  - Building images directly on the Nebula VPS (`docker compose build` or `docker build`) is strictly prohibited. The host possesses ~1.9 GB of RAM. The Next.js production build (`next build` / Turbopack / Webpack compilation) requires significant memory and CPU, routinely triggering Linux OOM (Out-Of-Memory) killer terminations that take down active gateway and web services.
+  - All container images MUST be compiled off-VPS on workstation or CI runners with `--platform linux/amd64`, packaged via `docker save -o`, transferred via SCP, and loaded with `docker load -i`.
 * **When does Staging need updating?**
   - Staging (`docker-compose.staging.yml`) should be updated and tested whenever significant frontend or gateway changes require verification before releasing to the VPS.
 * **When is a Database Migration actually necessary?**
   - Only when Prisma schema models, tables, columns, indexes, or data-pruning SQL migrations are deployed. Pure documentation or frontend visual/text changes do **not** require migrations.
 
 ### 8.8 Step 8: Safe Web Rollback Routine
+
 If the new web release displays runtime errors or fails health checks:
 ```bash
 # On VPS (/opt/kebun-melon):

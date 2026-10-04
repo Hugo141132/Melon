@@ -407,6 +407,22 @@ All motion must be lightweight, subtle, performant, appropriate for an operation
 
 
 
+#### TASK-0507 Governance Record
+
+`TASK-0507` Frontend Outage Resiliency, Unified Page Transitions, Controlled Animated Counting & Adaptive Favicon Branding record:
+- Status: `PENDING_OPERATOR_VERIFICATION` (Implemented & Verified 2026-10-04; Favicon accepted; operator live checks and CI gates pending)
+- Priority: `P1` (User Session Integrity, Real-Time Resilience & UI Polish)
+- Frontend impact: `MINOR`
+- Selected UI direction: `Premium Minimal Ops`
+- Existing color template: `UNCHANGED`
+- Selected motion effects: `Page enter`, `KPI refresh`
+- 21st.dev MCP: `NOT REQUIRED`
+- Summary: Implemented frontend outage resiliency, unified page transitions, dashboard animated counting, and adaptive whole-logo favicon branding under `DEC-UIUX-109` and `DEC-ARCH-036`:
+  - Adaptive Whole-Logo Favicon Branding (`DEC-UIUX-109`): Standardized root browser tab title to "Melon Governance". Restored native declarative dual media-queried metadata icons in `apps/web/app/layout.tsx` (`(prefers-color-scheme: light)` -> `/favicon-light.png`, `(prefers-color-scheme: dark)` -> `/favicon-dark.png`) without unconditional `shortcut`/`apple` overrides. Uniformly recolored the entire logo (crown emblem, "KING", and subtitle "Agro wisata") from master `logo2.webp`: pure white (`RGB(255, 255, 255)`) for dark mode (`/favicon-dark.png`) and pure black (`RGB(0, 0, 0)`) for light mode (`/favicon-light.png`). Removed unused duplicate root `public/favicon-*.png` files; Next.js and Dockerfile strictly consume `apps/web/public/`. Updating upon tab activation formally accepted by BAMABAA on 2026-10-04.
+  - Shared Page Transitions: Unified lightweight `animate-fade-in` (200ms opacity transition) on `<main>` across all application pages; removed redundant inner card transitions to prevent visual flickering.
+  - Dashboard Animated Counting (`AnimatedNumber.tsx`): Lightweight linear interpolation with standard `requestAnimationFrame` over 400ms duration. Strict `prefers-reduced-motion: reduce` instantaneous formatting, retargeting stability, unmount RAF cancellation, and support for decimals, null fallback (`'--'`), and clean `'0'`. Bounds CPU consumption by running only during active transition.
+  - Outage Resiliency & Server Component Purity (`DEC-ARCH-036`): `AuthProvider` inline Outage View ("Koneksi Server Terputus") renders immediately upon 3 consecutive probe failures (`OUTAGE_PROBE_INTERVAL_MS = 2000`, 4–7s total), replacing protected content even if client chunk fetching fails during server outage. Preserved Server Component purity in `/login/page.tsx` (GET rendering never revokes cookies/sessions). Replaced with client-driven logout mutation in `login-view.tsx` with `outageLogoutPromiseRef` to prevent submission race conditions. Added `activeEpochRef` in `AuthContext` and `DeviceContext` to drop out-of-order in-flight telemetry.
+
 #### TASK-0109 Governance Record
 
 `TASK-0109` canonical default site seeding and device environment parity record:
@@ -2048,6 +2064,8 @@ A defect fix should include a regression test.
 
 Do not remove failing tests merely to make CI pass.
 
+Coding agents may author or adjust tests and run isolated static syntax/type checks, but MUST NEVER execute or trigger the 5 comprehensive CI gates (`npm run check:quality`, `npm test`, `npm run test:coverage`, `npm run test:integration`, `npm run test:e2e`). Those 5 gates are reserved strictly for manual operator execution by BAMABAA after manual website acceptance.
+
 ---
 
 ## 21. Required Negative Tests
@@ -2576,6 +2594,9 @@ Agents shall never:
 - Commit secrets.
 - Remove audit history to simplify development.
 - Use frontend visibility as the only security control.
+- Execute or trigger the 5 CI gates (`test:coverage`, `test:integration`, `check:quality`, `test`, `test:e2e`), which are reserved strictly for manual operator execution by BAMABAA after website acceptance.
+- Execute `docker compose build` or compile images on the Nebula VPS host; all container image builds must occur off-VPS.
+- Mutate cookies, revoke sessions, or perform state-altering mutations during Server Component GET rendering (Server Component purity).
 
 ---
 

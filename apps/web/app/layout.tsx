@@ -42,6 +42,20 @@ export const metadata: Metadata = {
   description:
     'Kelola lahan melon Anda dengan lebih mudah. Monitor NPK, air, dan kesehatan tanaman secara real-time.',
   keywords: ['kebun melon', 'smart farming', 'pertanian pintar', 'NPK sensor'],
+  icons: {
+    icon: [
+      {
+        url: '/favicon-light.png',
+        media: '(prefers-color-scheme: light)',
+        type: 'image/png',
+      },
+      {
+        url: '/favicon-dark.png',
+        media: '(prefers-color-scheme: dark)',
+        type: 'image/png',
+      },
+    ],
+  },
 };
 
 export const viewport: Viewport = {

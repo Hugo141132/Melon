@@ -202,7 +202,7 @@ export default function DeviceRegistryPage() {
 
       <main className="pt-20 px-[1rem] max-w-4xl mx-auto w-full space-y-5">
         {/* Header */}
-        <section className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-app-surface-container-lowest p-5 rounded-xl soft-elevation-lg border border-app-outline-variant/30">
+        <section className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-app-surface-container-lowest p-5 rounded-xl soft-elevation-lg border border-app-outline-variant/30 animate-fade-in">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-xl bg-app-primary/10 flex items-center justify-center text-app-primary">
               <Cpu size={26} />
@@ -241,7 +241,7 @@ export default function DeviceRegistryPage() {
         )}
 
         {/* Controls & Filters */}
-        <div className="bg-app-surface-container-lowest p-4 rounded-xl soft-elevation border border-app-outline-variant/20 flex flex-col sm:flex-row gap-3">
+        <div className="bg-app-surface-container-lowest p-4 rounded-xl soft-elevation border border-app-outline-variant/20 flex flex-col sm:flex-row gap-3 animate-fade-in">
           <div className="relative flex-1 min-w-0">
             <Search
               size={18}
@@ -315,7 +315,7 @@ export default function DeviceRegistryPage() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in">
             {displayedDevices.map((device) => {
               // Helper to resolve user-friendly parameter items with proper measurement names and units
               const resolveParameters = () => {

@@ -883,4 +883,31 @@ The following facts are verified in the traceability matrix regarding the Initia
   - Five pre-commit CI gates and remote push CI verification.
 <!-- TASK-1011 & TASK-1012 Tier 2 Traceability Reconciled: 2026-10-03 -->
 
+---
+
+## Frontend Outage Resiliency, Page Transitions, Animated Counting & Adaptive Favicon Traceability Note (TASK-0507 / DEC-UIUX-109 / DEC-ARCH-036 / Reconciled 2026-10-04)
+
+The following facts are verified in the traceability matrix regarding `TASK-0507`:
+- **Traceability Baseline:**
+  - Tasks: `TASK-0507` in `TASKS.md`.
+  - Architecture: `docs/ARCHITECTURE.md` (Outage Detection, Recovery Flow, and Metadata Icon Strategy).
+  - Decisions: `DEC-ARCH-036` (Outage resilience) and `DEC-UIUX-109` (Adaptive favicon & page transitions) in `docs/DECISIONS.md`.
+  - User Flows: `FLOW-SYS-055` (Connection Outage Detection, Protected State Handling, and Session Recovery) in `docs/USER_FLOWS.md`.
+  - UI/UX & Frontend Audit: `docs/UI_UX.md` §1.11 and `docs/FRONTEND_AUDIT.md`.
+  - Testing: `docs/TESTING.md` §51.
+  - Security: `docs/SECURITY.md` (Server Component GET Purity & Outage Session Recovery).
+  - Governance: `AGENTS.md` §4.1 (`TASK-0507 Governance Record`).
+- **Implementation Status:**
+  - **Connection Outage Resilience:** Implemented bounded confirmation probing (3 probes at 2s = 4–7s detection window), inline Outage View replacing protected operational content, Server Component GET purity in Next.js App Router, client-side logout mutation with `outageLogoutPromiseRef` mutex protection, and `activeEpochRef` epoch fencing to discard stale telemetry.
+  - **Shared Page Transitions:** Implemented `animate-fade-in` (~400ms duration) on root `<main>` container across App Router pages, removing redundant inner card transitions. Fully disabled under `@media (prefers-reduced-motion: reduce)`.
+  - **Dashboard Animated Counting:** Implemented `AnimatedNumber.tsx` with RAF interpolation over 400ms, automatic reduced-motion bypass, retargeting stability, and unmount cancellation.
+  - **Adaptive Favicon & Brand Title:** Configured root App Router metadata title to `"Melon Governance"`. Created uniform white logo variant for dark mode (`/favicon-dark.png`, 48,621 bytes) and uniform black logo variant for light mode (`/favicon-light.png`, 48,834 bytes), preserving master `logo2.webp`. Configured dual media-query icons in root metadata. Removed unused root-level duplicate assets.
+- **Verification & Acceptance Status:**
+  - Automated Unit Tests: 100% pass across targeted unit test suites (`outage-detection.test.tsx`, `animated-number.test.tsx`, `metadata-icons.test.ts`).
+  - Manual Favicon Acceptance: Whole-logo adaptive favicon branding formally reviewed and accepted by BAMABAA on 2026-10-04 (updates upon tab activation accepted; background update investigation closed).
+  - Remaining Manual Operator Tests: Real server shutdown outage test, outage recovery navigation test, and heap/FPS profiling remain pending execution by BAMABAA.
+  - Pre-Commit CI Gates: Five pre-commit commands (`check:quality`, `test`, `test:coverage`, `test:integration`, `test:e2e`) are reserved exclusively for execution by operator BAMABAA.
+<!-- TASK-0507 Traceability Reconciled: 2026-10-04 -->
+
+
 

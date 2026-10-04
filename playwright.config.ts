@@ -35,15 +35,22 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npm run dev',
+    command: `npm run dev --workspace=apps/web -- -p ${testPort}`,
     url: `http://127.0.0.1:${testPort}`,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
     timeout: 120000,
     env: {
       ...process.env,
       PORT: testPort,
       ENABLE_FAUCET_CONTROL: 'true',
-      ...(validatedDbUrl ? { DATABASE_URL: validatedDbUrl } : {}),
+      ...(validatedDbUrl
+        ? {
+            DATABASE_URL: validatedDbUrl,
+            DIRECT_URL: validatedDbUrl,
+            TEST_DATABASE_URL: validatedDbUrl,
+            E2E_DATABASE_URL: validatedDbUrl,
+          }
+        : {}),
     },
   },
 });

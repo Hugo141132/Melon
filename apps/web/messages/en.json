@@ -108,6 +108,7 @@
     "suspendedTitle": "Account Access Suspended",
     "deactivatedTitle": "Account Deactivated",
     "expiredTitle": "Session Expired",
+    "outageNotice": "Connection to the backend server was lost. Local session state has been secured. Please sign in again once the server is restored.",
     "loginFailed": "Login failed. Please check your email and password.",
     "checkingSession": "Checking user session...",
     "ownerExistsError": "An Owner account is already registered in the system.",

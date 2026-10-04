@@ -262,7 +262,7 @@ export default function ProfilePage() {
         )}
 
         {/* Section 1: Personal Info */}
-        <section className="space-y-[1rem]">
+        <section className="space-y-[1rem] animate-fade-in">
           {/* Avatar */}
           <div className="flex flex-col items-center gap-4 mb-8">
             <UserAvatar name={fullName || user?.fullName || USER_PROFILE.name} size="lg" />
@@ -330,7 +330,7 @@ export default function ProfilePage() {
         </section>
 
         {/* Section 2: Account & Session Security */}
-        <section className="space-y-[1rem]">
+        <section className="space-y-[1rem] animate-fade-in">
           <h2 className="text-[20px] font-semibold text-app-on-surface px-1">
             {tProfile('securityTitle')}
           </h2>

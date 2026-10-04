@@ -133,6 +133,28 @@ export async function GET(request: Request) {
 
   const stream = new ReadableStream({
     async start(controller) {
+      const cleanup = () => {
+        if (heartbeatTimer) {
+          clearInterval(heartbeatTimer);
+          heartbeatTimer = null;
+        }
+        if (unsubscribeEventHub) {
+          unsubscribeEventHub();
+          unsubscribeEventHub = null;
+        }
+        try {
+          controller.close();
+        } catch {
+          // Controller might already be closed
+        }
+      };
+
+      if (request.signal?.aborted) {
+        cleanup();
+        return;
+      }
+      request.signal?.addEventListener('abort', cleanup);
+
       // 1. Send initial connected event
       const connectedPayload = {
         event: 'connected',
@@ -181,6 +203,7 @@ export async function GET(request: Request) {
           );
         } catch {
           // Stream controller closed
+          cleanup();
         }
       });
 
@@ -194,18 +217,16 @@ export async function GET(request: Request) {
           // Recheck session active status
           const isSessionActive = await verifyStreamSessionActive(prisma, token);
           if (!isSessionActive) {
-            controller.enqueue(
-              encoder.encode(
-                `event: session.expired\ndata: ${JSON.stringify({
-                  reason: 'SESSION_EXPIRED_OR_REVOKED',
-                })}\n\n`
-              )
-            );
-            if (heartbeatTimer) clearInterval(heartbeatTimer);
-            if (unsubscribeEventHub) unsubscribeEventHub();
             try {
-              controller.close();
+              controller.enqueue(
+                encoder.encode(
+                  `event: session.expired\ndata: ${JSON.stringify({
+                    reason: 'SESSION_EXPIRED_OR_REVOKED',
+                  })}\n\n`
+                )
+              );
             } catch {}
+            cleanup();
             return;
           }
 
@@ -216,19 +237,17 @@ export async function GET(request: Request) {
                 isDeviceAssignedToUser,
               });
             } catch {
-              controller.enqueue(
-                encoder.encode(
-                  `event: access.revoked\ndata: ${JSON.stringify({
-                    reason: 'DEVICE_ACCESS_REVOKED',
-                    deviceId: targetDeviceId,
-                  })}\n\n`
-                )
-              );
-              if (heartbeatTimer) clearInterval(heartbeatTimer);
-              if (unsubscribeEventHub) unsubscribeEventHub();
               try {
-                controller.close();
+                controller.enqueue(
+                  encoder.encode(
+                    `event: access.revoked\ndata: ${JSON.stringify({
+                      reason: 'DEVICE_ACCESS_REVOKED',
+                      deviceId: targetDeviceId,
+                    })}\n\n`
+                  )
+                );
               } catch {}
+              cleanup();
               return;
             }
           }
@@ -242,14 +261,21 @@ export async function GET(request: Request) {
             )
           );
         } catch {
-          // Suppress tick errors
+          // Connection broken or closed by client
+          cleanup();
         }
       }, intervalMs);
     },
 
     cancel() {
-      if (heartbeatTimer) clearInterval(heartbeatTimer);
-      if (unsubscribeEventHub) unsubscribeEventHub();
+      if (heartbeatTimer) {
+        clearInterval(heartbeatTimer);
+        heartbeatTimer = null;
+      }
+      if (unsubscribeEventHub) {
+        unsubscribeEventHub();
+        unsubscribeEventHub = null;
+      }
     },
   });
 

@@ -501,7 +501,7 @@ export default function UserManagementPage() {
 
       <main className="pt-20 px-4 max-w-5xl mx-auto w-full space-y-5">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-app-surface-container-lowest p-5 rounded-2xl border border-app-outline-variant/30 soft-elevation">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-app-surface-container-lowest p-5 rounded-2xl border border-app-outline-variant/30 soft-elevation animate-fade-in">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center text-blue-700 flex-shrink-0">
               <UsersIcon size={24} />
@@ -550,7 +550,7 @@ export default function UserManagementPage() {
         )}
 
         {/* Search & Filter Bar */}
-        <div className="bg-app-surface-container-lowest p-4 rounded-2xl border border-app-outline-variant/30 space-y-3">
+        <div className="bg-app-surface-container-lowest p-4 rounded-2xl border border-app-outline-variant/30 space-y-3 animate-fade-in">
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
               <Search
@@ -629,7 +629,7 @@ export default function UserManagementPage() {
         )}
 
         {/* User List Table / Cards */}
-        <div className="bg-app-surface-container-lowest rounded-2xl border border-app-outline-variant/30 overflow-hidden soft-elevation">
+        <div className="bg-app-surface-container-lowest rounded-2xl border border-app-outline-variant/30 overflow-hidden soft-elevation animate-fade-in">
           {/* Table Sub-header with Select All (when eligible users exist on page) */}
           {!loading && users.length > 0 && eligibleUsersOnPage.length > 0 && (
             <div className="px-4 sm:px-5 py-2.5 bg-app-surface-container-low border-b border-app-outline-variant/20 flex items-center justify-between">

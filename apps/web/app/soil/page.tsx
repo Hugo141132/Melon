@@ -301,9 +301,9 @@ export default function SoilPage() {
     <div className="bg-app-surface text-app-on-surface min-h-dvh pb-24">
       <TopAppBar showDeviceSelector={true} />
 
-      <main className="pt-20 px-[1rem] max-w-4xl mx-auto space-y-5">
+      <main className="pt-20 px-[1rem] max-w-4xl mx-auto space-y-5 animate-fade-in">
         {!isSoilNode && selectedDevice && (
-          <section className="bg-app-surface-container-lowest rounded-xl p-5 soft-elevation-lg border border-app-outline-variant/30 flex flex-col items-center text-center animate-fade-in space-y-3">
+          <section className="bg-app-surface-container-lowest rounded-xl p-5 soft-elevation-lg border border-app-outline-variant/30 flex flex-col items-center text-center space-y-3">
             <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-600">
               <Cpu size={24} />
             </div>
@@ -324,7 +324,7 @@ export default function SoilPage() {
         {isSoilNode && (
           <>
             {/* Status Overview & Real-Time Header */}
-            <section className="bg-app-surface-container-lowest rounded-xl p-5 soft-elevation-lg border border-app-outline-variant/30 animate-fade-in">
+            <section className="bg-app-surface-container-lowest rounded-xl p-5 soft-elevation-lg border border-app-outline-variant/30">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <div

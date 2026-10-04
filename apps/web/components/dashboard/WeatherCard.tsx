@@ -16,6 +16,8 @@ import {
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 
+import AnimatedNumber from '@/components/dashboard/AnimatedNumber';
+
 // Fixed location coordinates for King Agrowisata
 export const FIXED_WEATHER_LOCATION = {
   latitude: -7.172934,
@@ -194,12 +196,29 @@ export default function WeatherCard() {
             <div>
               <div className="flex items-baseline gap-2.5">
                 <span className="text-[38px] sm:text-[44px] font-extrabold leading-none tracking-tight text-app-on-surface">
-                  {data?.temperature}°C
+                  <AnimatedNumber
+                    value={data?.temperature}
+                    decimals={1}
+                    suffix="°C"
+                    dataTestId="weather-temperature"
+                  />
                 </span>
                 <span className="text-[12px] sm:text-[14px] font-medium text-app-on-surface-variant">
-                  {tDash('feelsLike', {
-                    temp: data?.apparentTemperature ?? data?.temperature ?? 0,
-                  })}
+                  <AnimatedNumber
+                    value={data?.apparentTemperature ?? data?.temperature}
+                    decimals={1}
+                    prefix={
+                      tDash('feelsLike', { temp: '__TEMP__' }).includes('__TEMP__')
+                        ? tDash('feelsLike', { temp: '__TEMP__' }).split('__TEMP__')[0]
+                        : ''
+                    }
+                    suffix={
+                      tDash('feelsLike', { temp: '__TEMP__' }).includes('__TEMP__')
+                        ? tDash('feelsLike', { temp: '__TEMP__' }).split('__TEMP__')[1]
+                        : '°C'
+                    }
+                    dataTestId="weather-feels-like"
+                  />
                 </span>
               </div>
               <p className="inline-block mt-2 px-2.5 py-0.5 rounded-md bg-app-primary/10 text-app-primary border border-app-primary/25 text-[12px] sm:text-[13px] font-bold">
@@ -224,7 +243,12 @@ export default function WeatherCard() {
                   <span className="text-[12px] font-bold">{tDash('humidity')}</span>
                 </div>
                 <span className="text-[20px] sm:text-[22px] font-extrabold text-app-on-surface">
-                  {data?.humidity}%
+                  <AnimatedNumber
+                    value={data?.humidity}
+                    decimals={0}
+                    suffix="%"
+                    dataTestId="weather-humidity"
+                  />
                   <span className="text-[11px] font-bold text-app-primary ml-1">RH</span>
                 </span>
               </div>
@@ -240,7 +264,11 @@ export default function WeatherCard() {
                   <span className="text-[12px] font-medium">{tDash('windSpeed')}</span>
                 </div>
                 <span className="text-[20px] sm:text-[22px] font-bold text-app-on-surface">
-                  {data?.windSpeed}{' '}
+                  <AnimatedNumber
+                    value={data?.windSpeed}
+                    decimals={1}
+                    dataTestId="weather-wind-speed"
+                  />{' '}
                   <span className="text-[11px] font-normal text-app-on-surface-variant">km/h</span>
                 </span>
               </div>
@@ -256,7 +284,11 @@ export default function WeatherCard() {
                   <span className="text-[12px] font-medium">{tDash('uvIndex')}</span>
                 </div>
                 <span className="text-[20px] sm:text-[22px] font-bold text-app-on-surface">
-                  {data?.uvIndex}
+                  <AnimatedNumber
+                    value={data?.uvIndex}
+                    decimals={0}
+                    dataTestId="weather-uv-index"
+                  />
                 </span>
               </div>
             </div>

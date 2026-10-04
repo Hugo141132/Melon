@@ -90,6 +90,7 @@ export function ensureTestDatabase(): string | undefined {
     try {
       initializeTestDatabase(existing);
       process.env.DATABASE_URL = existing;
+      process.env.DIRECT_URL = existing;
       process.env.E2E_DATABASE_URL = existing;
       process.env.TEST_DATABASE_URL = existing;
       return existing;
@@ -156,6 +157,7 @@ export function ensureTestDatabase(): string | undefined {
     initializeTestDatabase(testDbUrl);
 
     process.env.DATABASE_URL = testDbUrl;
+    process.env.DIRECT_URL = testDbUrl;
     process.env.E2E_DATABASE_URL = testDbUrl;
     process.env.TEST_DATABASE_URL = testDbUrl;
     return testDbUrl;

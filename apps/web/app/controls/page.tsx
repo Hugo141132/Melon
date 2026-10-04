@@ -24,7 +24,7 @@ export default function ControlsPage() {
     <div className="bg-app-surface text-app-on-surface min-h-dvh pb-10">
       <TopAppBar showDeviceSelector={true} />
 
-      <main className="pt-20 px-[1rem] max-w-4xl mx-auto w-full space-y-6">
+      <main className="pt-20 px-[1rem] max-w-4xl mx-auto w-full space-y-6 animate-fade-in">
         {/* Tank Monitoring Card */}
         <WaterTankMonitoringCard />
 

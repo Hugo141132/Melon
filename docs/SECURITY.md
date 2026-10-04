@@ -1883,4 +1883,17 @@ The following security controls and architecture govern the permanent enablement
   6. **Automated Timeout Sweeps:** Commands unacknowledged or uncompleted after 5 minutes are transitioned to `TIMEOUT` by scheduled workers.
 <!-- Faucet Control Security Reconciled: 2026-10-01 -->
 
+---
+
+## Server Component GET Purity & Outage Recovery Session Security Controls Note (DEC-ARCH-036 / TASK-0507 / Reconciled 2026-10-04)
+
+The following security controls govern session lifecycle, Server Component SSR boundaries, and recovery handling:
+- **Server Component GET Purity Invariant:** Next.js App Router Server Components rendering GET pages (specifically `apps/web/app/(auth)/login/page.tsx` and route guards) MUST NEVER mutate cookies, revoke tokens, or execute database write operations during SSR rendering. Doing so violates App Router architectural constraints, causes hydration mismatches, and can lead to unintended session invalidations during harmless browser pre-fetches.
+- **Client-Side Recovery Mutation Boundary:** Session revocation on recovery is strictly isolated to explicit client-side mutations (`POST /api/v1/auth/logout`) initiated from `apps/web/app/(auth)/login/login-view.tsx`.
+- **Submission Race Protection (`outageLogoutPromiseRef`):** The client view enforces mutex protection over in-flight logout operations using `outageLogoutPromiseRef`. Rapid multi-clicks or concurrent retry timeouts share the single active promise, eliminating redundant network calls and race conditions.
+- **Cookie & Session Invalidation Timing:** Cookies and session tokens are revoked on the client ONLY after a successful server-side logout response (HTTP 200/204). Cookies are never cleared prematurely before the server confirms session invalidation.
+- **Epoch-Based State Isolation (`activeEpochRef`):** Both `AuthContext` and telemetry hooks track an `activeEpochRef` counter. In-flight telemetry or session validation responses initiated prior to an outage or reconnection event are unconditionally dropped if their epoch does not match the active epoch, preventing race-condition corruption of client-side operational state.
+<!-- Server Component Purity & Outage Recovery Security Reconciled: 2026-10-04 -->
+
+
 

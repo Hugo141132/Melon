@@ -27,7 +27,7 @@ export default function SensorPage() {
 
       <main className="pt-20 px-[1rem] max-w-4xl mx-auto w-full space-y-5">
         {/* Intro Header */}
-        <section className="bg-app-surface-container-lowest rounded-2xl p-5 border border-app-outline-variant/30 soft-elevation-lg space-y-2">
+        <section className="bg-app-surface-container-lowest rounded-2xl p-5 border border-app-outline-variant/30 soft-elevation-lg space-y-2 animate-fade-in">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-app-primary/10 flex items-center justify-center text-app-primary">
               <Sprout size={22} />
@@ -44,7 +44,7 @@ export default function SensorPage() {
         </section>
 
         {/* Category Navigation Cards */}
-        <div className="space-y-3">
+        <div className="space-y-3 animate-fade-in">
           <h2 className="text-[15px] font-bold text-app-on-surface px-1">
             {tDevices('sensorCategoriesTitle')}
           </h2>

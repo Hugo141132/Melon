@@ -591,4 +591,34 @@ The following frontend components were audited, refactored, and verified for `TA
   - Playwright visual tests confirmed full-width cards on desktop ($1280\times 800$) and zero horizontal overflow on mobile ($390\times 844$).
 <!-- Water Tank UI Frontend Audit Reconciled: 2026-09-09 -->
 
+---
+
+## Shared Page Transitions, Dashboard Animated Counting & Adaptive Favicon Branding Frontend Audit Note (TASK-0507 / DEC-UIUX-109 / Reconciled 2026-10-04)
+
+The following frontend components, assets, and styling tokens were audited, implemented, and verified under `TASK-0507`:
+- **`apps/web/components/common/AnimatedNumber.tsx` [NEW]:**
+  - Smooth KPI number interpolation using `requestAnimationFrame` over a bounded 400ms duration.
+  - Automatically queries `window.matchMedia('(prefers-reduced-motion: reduce)')`. If reduced motion is active, the animation loop is bypassed entirely and the target number is rendered statically without delay.
+  - Retargeting safety: updates in-flight target values smoothly without numerical flashing or jumps.
+  - Unmount cleanup: safely invokes `cancelAnimationFrame` in `useEffect` cleanup to guarantee zero memory leaks or stray state updates.
+  - Resource usage: bounds CPU utilization strictly to the active 400ms interpolation window; does not consume idle CPU or run continuous timers.
+- **`apps/web/app/layout.tsx` [AUDITED & RECONCILED]:**
+  - Standardized root App Router metadata `title.default` and `title.template` to `"Melon Governance"`.
+  - Configured dual media-query icons in `metadata.icons`:
+    - `{ rel: 'icon', url: '/favicon-dark.png', media: '(prefers-color-scheme: dark)' }`
+    - `{ rel: 'icon', url: '/favicon-light.png', media: '(prefers-color-scheme: light)' }`
+    - `{ rel: 'shortcut icon', url: '/favicon-light.png' }`
+- **Branding Assets & Static Delivery [AUDITED & RECONCILED]:**
+  - `apps/web/public/favicon-dark.png`: 48,621 bytes, 32×32 RGBA. Uniform white recolor of master `logo2.webp` for dark browser tab strips.
+  - `apps/web/public/favicon-light.png`: 48,834 bytes, 32×32 RGBA. Uniform black recolor of master `logo2.webp` for light browser tab strips.
+  - `docs/assets/logo2.webp` (`apps/web/public/logo2.webp`): Master circular brand emblem preserved 100% untouched.
+  - Root directory audit: duplicate root files `public/favicon-*.png` were confirmed unused by the Next.js runtime and removed.
+  - Browser tab activation lifecycle: In Chromium-based browsers, background tabs (`visibilityState === 'hidden'`) throttle `matchMedia` event delivery. BAMABAA formally accepted tab-activation updates on 2026-10-04, closing background update investigations.
+- **Shared Page Transitions (`animate-fade-in`) [AUDITED & RECONCILED]:**
+  - Sourced from root Tailwind animation tokens (`animate-fade-in`, ~400ms duration with subtle opacity easing).
+  - Applied uniformly to the `<main>` container across operational views, eliminating conflicting card-level entrance transitions.
+  - Fully disabled under `@media (prefers-reduced-motion: reduce)` (`animation: none; opacity: 1`).
+<!-- Frontend Audit TASK-0507 Reconciled: 2026-10-04 -->
+
+
 

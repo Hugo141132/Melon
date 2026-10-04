@@ -2490,3 +2490,38 @@ The following facts are verified in the user flow architecture regarding device 
 - **Human-Readable Device Presentation:** Raw database UUIDs are never exposed to the user in the forbidden UI state; friendly cached names or localized domain titles (`Node Sensor Tanah`, etc.) are rendered.
 - **Client Cache Eviction:** `markDeviceRevoked` executes on mount, setting `selectedDevice = null`, deleting cached device entries in `sessionStorage`, and terminating background polling.
 <!-- Device Access Revocation User Flows Reconciled: 2026-09-22 -->
+
+---
+
+## Flow 55 — Connection Outage Detection, Protected State Handling, and Session Recovery (FLOW-SYS-055 / TASK-0507 / DEC-ARCH-036)
+
+### 1. Preconditions
+- User is authenticated with an active session (`OWNER` or `ADMIN`).
+- User is actively viewing a protected operational view (`/dashboard`, `/soil`, `/water`, `/controls`, `/devices`, `/users`, `/setting`).
+- Local network connection drops, or backend service becomes temporarily unreachable.
+
+### 2. Main Success Scenario (Outage Detection & Protected State)
+1. **Transient Dropped Request Handling:**
+   - A single telemetry poll or API fetch fails due to momentary network packet loss.
+   - The UI does **not** flash an outage banner or interrupt the operator immediately.
+2. **Bounded Confirmation Probing:**
+   - The background connectivity monitor initiates confirmation probing at 2-second intervals.
+   - If 3 consecutive probes fail (total elapsed detection time: 4–7 seconds), an unrecoverable connection outage is confirmed.
+3. **Protected Inline Outage View Transition:**
+   - The operational content area transitions to an inline Outage View (`DisconnectedView`) explaining the connection severance in localized copy.
+   - All physical actuation controls (faucet volume presets, manual open/close valve controls) are immediately disabled and hidden.
+   - The global layout shell (`TopAppBar`, `Sidebar`) remains mounted, displaying an offline indicator dot without causing layout destruction.
+   - The client incrementation of `activeEpochRef` ensures any delayed in-flight telemetry responses arriving late over the network are unconditionally discarded.
+4. **Network Reconnection & Health Confirmation:**
+   - The connectivity monitor continues non-blocking background probes.
+   - Once 2 consecutive probes return HTTP 200/OK, connectivity is confirmed restored.
+   - The Outage View displays an active "Reconnect / Muat Ulang" button.
+5. **Session Recovery & Data Resumption:**
+   - The user clicks "Reconnect" or triggers a soft refresh.
+   - If the session remained valid on the server, the protected operational view re-hydrates live telemetry under a fresh epoch.
+   - If the session expired during the outage, the user is redirected to `/login`.
+   - **Server Component Purity:** Server-side SSR rendering of `/login` strictly performs zero cookie mutation and zero session revocation.
+   - **Client-Side Recovery Logout:** When recovery or account switching is initiated, client-side `login-view.tsx` dispatches `POST /api/v1/auth/logout`. Submission races are guarded by `outageLogoutPromiseRef`.
+   - Client cookies are revoked ONLY upon receiving a successful server response confirming termination.
+<!-- Connection Outage User Flows Reconciled: 2026-10-04 -->
+
