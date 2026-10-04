@@ -98,13 +98,50 @@ scp docker/caddy/Caddyfile deploy@38.103.171.46:/opt/kebun-melon/docker/caddy/
 scp .env.production.example deploy@38.103.171.46:/opt/kebun-melon/
 ```
 
-### 3.3 Load Images on VPS Host
+### 3.3 Load Images on VPS Host (Exact Archive Path & Verification)
 On VPS host (`/opt/kebun-melon`):
+
+> **SAFETY INVARIANTS (ARCHIVE INTEGRITY & REMOVAL):**
+> 1. **No Wildcard Operations:** Never use wildcard commands like `docker load -i *.tar` or `rm -f *.tar`. Wildcards can expand unpredictably, load unintended stale archives, or delete untracked archives.
+> 2. **Explicit Release Tag & Archive Path:** Always define the explicit VPS release tag before referencing the archive path. For the TASK-0917 upgrade, use `0.2.0-retention` consistently across all steps.
+> 3. **Explicit Abort on Load Failure:** Check that `docker load` completes with exit code 0. If `docker load` fails, abort immediately and preserve the archive—even if expected image tags already exist from prior attempts.
+> 4. **Verified Image Inspection:** Verify both expected image tags exist in Docker Engine before any optional removal of that specific archive.
+
 ```bash
 cd /opt/kebun-melon
-docker load -i melon-images-0.1.0-init.tar
-rm melon-images-0.1.0-init.tar
-docker images | grep kebun-melon
+
+# 1. Define target VPS release tag and exact archive path (TASK-0917 upgrade tag)
+RELEASE_TAG="0.2.0-retention"
+ARCHIVE_PATH="/opt/kebun-melon/melon-images-${RELEASE_TAG}.tar"
+
+# 2. Check archive exists before proceeding
+if [ ! -f "${ARCHIVE_PATH}" ]; then
+  echo "ERROR: Release archive not found at ${ARCHIVE_PATH}" >&2
+  exit 1
+fi
+
+# 3. Load image archive into Docker Engine and EXPLICITLY ABORT on failure
+# Must abort immediately before checking existing images or removing archive
+if ! docker load -i "${ARCHIVE_PATH}"; then
+  echo "ERROR: 'docker load -i ${ARCHIVE_PATH}' failed with non-zero exit status!" >&2
+  echo "PRESERVING archive ${ARCHIVE_PATH} for diagnostics. Aborting immediately." >&2
+  exit 1
+fi
+
+# 4. Verify both expected image tags exist before any optional archive removal
+EXPECTED_WEB="kebun-melon-web:${RELEASE_TAG}"
+EXPECTED_GATEWAY="kebun-melon-gateway:${RELEASE_TAG}"
+
+if ! docker image inspect "${EXPECTED_WEB}" >/dev/null 2>&1 || \
+   ! docker image inspect "${EXPECTED_GATEWAY}" >/dev/null 2>&1; then
+  echo "ERROR: Required images (${EXPECTED_WEB} or ${EXPECTED_GATEWAY}) not found in Docker daemon!" >&2
+  echo "PRESERVING archive ${ARCHIVE_PATH} for diagnostics. Aborting immediately." >&2
+  exit 1
+fi
+
+echo "Verification PASSED: Both ${EXPECTED_WEB} and ${EXPECTED_GATEWAY} are present."
+# Optional: safely remove only this specific verified archive (never wildcard rm *.tar)
+rm -f "${ARCHIVE_PATH}"
 ```
 
 ---
@@ -114,7 +151,7 @@ docker images | grep kebun-melon
 On the VPS host (`/opt/kebun-melon`):
 
 ```bash
-# 1. Create .env.production from template
+# 1. Create .env.production from template (initial setup only)
 cp /opt/kebun-melon/.env.production.example /opt/kebun-melon/.env.production
 chmod 600 /opt/kebun-melon/.env.production
 
@@ -137,12 +174,114 @@ nano /opt/kebun-melon/.env.production
   - `DIRECT_URL` (port 5432 Session Pooler) is used exclusively for migrations executed from the workstation or bastion, not by container runtime.
   - `ENABLE_FAUCET_CONTROL=true` operational policy is preserved.
 
-### 4.2 Apply Pending Database Migrations (Run from Local Workstation or Bastion)
-Before starting web containers, deploy migrations via `DIRECT_URL` (Port 5432):
-```powershell
-# From local workstation with target database credentials set in DIRECT_URL:
-npx prisma migrate deploy --schema=packages/database/prisma/schema.prisma
+### 4.2 Reliable Image Tag Configuration in .env.production (Update-or-Add Procedure)
+> **CRITICAL RULE:** **NEVER overwrite live `/opt/kebun-melon/.env.production` with `.env.production.example`.**  
+> The live `.env.production` contains secret database passwords, auth tokens, and session keys that must be preserved.
+>
+> **SAFETY INVARIANTS (UPDATE-OR-ADD PROCEDURE):**
+> 1. **Avoid `sed ... || echo ...`:** In standard POSIX/bash, `sed -i` exits with code 0 even if no lines match. Consequently, `|| echo ...` never executes when a key is absent, leaving the key silently missing!
+> 2. **Secure Temporary File from Start:** Create a uniquely named temporary file (`mktemp`) in the target directory, restrict its permissions immediately to `600`, clean it up on failure, and propagate non-zero exit codes. A final successful `chmod` must not mask a failed write or rename.
+> 3. **Key Exists vs Missing:** If the key exists, update it in-place using awk (avoiding regex delimiter collisions). If absent, append it cleanly to the end of the file with a newline.
+> 4. **Preserve Unrelated Settings:** Secrets (`DATABASE_URL`, `AUTH_SECRET`), operational toggles (`RETENTION_ENABLED=false`, `ENABLE_FAUCET_CONTROL=true`), and comments remain untouched.
+> 5. **Avoid Exposing Secrets:** Do not print or cat the full file. Verify only the non-secret keys and resolved Compose image references.
+
+```bash
+# Define reliable update-or-add shell helper
+update_or_add_env() {
+  local file="${1:-.env.production}"
+  local key="$2"
+  local val="$3"
+
+  if [ ! -f "$file" ]; then
+    echo "ERROR: Target file '$file' does not exist." >&2
+    return 1
+  fi
+
+  local dir
+  dir="$(dirname "$file")"
+
+  # Create a uniquely named, secure temporary file in the same directory (same filesystem for atomic mv)
+  local tmp_file
+  tmp_file="$(mktemp "${dir}/.env.tmp.XXXXXXXXXX")" || {
+    echo "ERROR: Failed to create temporary file in '$dir'." >&2
+    return 1
+  }
+
+  # Enforce restrictive permissions on the temporary file immediately
+  chmod 600 "$tmp_file" || {
+    echo "ERROR: Failed to set restrictive permissions on temporary file." >&2
+    rm -f "$tmp_file"
+    return 1
+  }
+
+  # Perform update or append
+  if grep -q "^${key}=" "$file"; then
+    # Update existing key in-place using awk
+    if ! awk -v k="$key" -v v="$val" '
+      $0 ~ "^" k "=" { print k "=" v; next }
+      { print }
+    ' "$file" > "$tmp_file"; then
+      echo "ERROR: awk failed while updating key '$key'." >&2
+      rm -f "$tmp_file"
+      return 1
+    fi
+  else
+    # Copy existing content and append missing key
+    if ! cp -p "$file" "$tmp_file"; then
+      echo "ERROR: Failed to duplicate '$file' to temporary file." >&2
+      rm -f "$tmp_file"
+      return 1
+    fi
+    chmod 600 "$tmp_file" || { rm -f "$tmp_file"; return 1; }
+    if [ -s "$tmp_file" ] && [ -n "$(tail -c1 "$tmp_file" 2>/dev/null)" ]; then
+      echo "" >> "$tmp_file" || { rm -f "$tmp_file"; return 1; }
+    fi
+    echo "${key}=${val}" >> "$tmp_file" || {
+      echo "ERROR: Failed to append key '$key' to temporary file." >&2
+      rm -f "$tmp_file"
+      return 1
+    }
+  fi
+
+  # Atomically replace target file
+  if ! mv -f "$tmp_file" "$file"; then
+    echo "ERROR: Failed to atomically replace '$file' with '$tmp_file'." >&2
+    rm -f "$tmp_file"
+    return 1
+  fi
+
+  # Final permission enforcement on the replaced file
+  if ! chmod 600 "$file"; then
+    echo "ERROR: Failed to enforce 600 permissions on '$file'." >&2
+    return 1
+  fi
+
+  return 0
+}
+
+# Apply TASK-0917 release tags to .env.production
+update_or_add_env .env.production WEB_IMAGE "kebun-melon-web:0.2.0-retention"
+update_or_add_env .env.production GATEWAY_IMAGE "kebun-melon-gateway:0.2.0-retention"
+
+# Step A: Verify keys in file without exposing secrets:
+echo "--- Verified image keys in .env.production ---"
+grep -E '^(WEB_IMAGE|GATEWAY_IMAGE)=' .env.production
+
+# Step B: Verify resolved Compose image references:
+echo "--- Verified Compose resolved image references ---"
+docker compose --env-file .env.production -f docker-compose.prod.yml config --images
 ```
+
+### 4.3 Database Migration Assessment & Pending TASK-0917 Migration Status
+> **CRITICAL DISTINCTION (DOCUMENTATION CHANGE VS FULL TASK-0917 RELEASE):**
+> - **Documentation-Only Changes:** Updates to documentation, checklists, runbooks, or `.gitignore` require **ZERO database migrations and ZERO container updates**.
+> - **Full TASK-0917 Release:** Although `packages/database/prisma/schema.prisma` has no DDL schema alterations, a reviewable data pruning migration (`20261003230000_reservoir_water_readings_latest_5_retention`) exists in `packages/database/prisma/migrations/` to trim historical excess reservoir readings beyond the latest 5 per device.
+> - **Deployment Status:** The migration deployment status on Singapore Staging (`ihgoxqdncepbcrqkchxu`) and active VPS database remains **PENDING / UNKNOWN** until explicitly verified by the operator using database credentials. No live migration is executed automatically.
+> - **Execution:** When the operator executes the full TASK-0917 release, deploy pending migrations from the local workstation or bastion via `DIRECT_URL` (Port 5432):
+>   ```powershell
+>   # From local workstation with target database credentials set in DIRECT_URL:
+>   npx prisma migrate deploy --schema=packages/database/prisma/schema.prisma
+>   ```
 
 ---
 
@@ -273,7 +412,7 @@ docker save -o web-update-0.1.1-ui.tar kebun-melon-web:0.1.1-ui
 scp web-update-0.1.1-ui.tar deploy@38.103.171.46:/opt/kebun-melon/
 ```
 
-### 8.3 Step 3: Load New Image on VPS Host
+### 8.3 Step 3: Load New Image on VPS Host (Exact Archive Path & Verification)
 Connect to VPS and load the container image:
 ```bash
 # Connect via SSH
@@ -282,12 +421,33 @@ ssh deploy@38.103.171.46
 # Navigate to deploy directory
 cd /opt/kebun-melon
 
-# Load image into Docker Engine
-docker load -i web-update-0.1.1-ui.tar
-rm web-update-0.1.1-ui.tar
+# 1. Define explicit release tag and exact archive path (no wildcards!)
+RELEASE_TAG="0.1.1-ui"
+ARCHIVE_PATH="/opt/kebun-melon/web-update-${RELEASE_TAG}.tar"
 
-# Verify image is loaded with proper tag
-docker images | grep kebun-melon-web
+# 2. Check archive exists before loading
+if [ ! -f "${ARCHIVE_PATH}" ]; then
+  echo "ERROR: Release archive not found at ${ARCHIVE_PATH}" >&2
+  exit 1
+fi
+
+# 3. Load image into Docker Engine and EXPLICITLY ABORT on failure
+if ! docker load -i "${ARCHIVE_PATH}"; then
+  echo "ERROR: 'docker load -i ${ARCHIVE_PATH}' failed with non-zero exit status!" >&2
+  echo "PRESERVING archive ${ARCHIVE_PATH} for diagnostics. Aborting immediately." >&2
+  exit 1
+fi
+
+# 4. Verify expected image tag exists before removing archive
+EXPECTED_WEB="kebun-melon-web:${RELEASE_TAG}"
+if ! docker image inspect "${EXPECTED_WEB}" >/dev/null 2>&1; then
+  echo "ERROR: Image ${EXPECTED_WEB} missing from Docker daemon! Preserving ${ARCHIVE_PATH} for diagnostics." >&2
+  exit 1
+fi
+
+echo "Verification PASSED: ${EXPECTED_WEB} is present in Docker Engine."
+# Optional: safely remove only this specific verified archive
+rm -f "${ARCHIVE_PATH}"
 ```
 
 ### 8.4 Step 4: Environment & Secrets Preservation Invariant
@@ -295,8 +455,21 @@ docker images | grep kebun-melon-web
 The live `.env.production` contains secret database passwords, auth tokens, and session keys that must be preserved.
 
 To update the image tag used by Compose:
-* **Option A (Shell Variable Override - Recommended):** Set `WEB_IMAGE` inline when running Compose.
-* **Option B (File Edit):** Update `WEB_IMAGE=kebun-melon-web:0.1.1-ui` inside `.env.production` without touching secret values.
+* **Option A (Shell Variable Override - Recommended for one-off commands):** Set `WEB_IMAGE` inline when running Compose:
+  ```bash
+  WEB_IMAGE=kebun-melon-web:0.1.1-ui docker compose --env-file .env.production -f docker-compose.prod.yml up -d --no-deps web
+  ```
+* **Option B (Reliable File Edit via Update-or-Add Procedure):** Update `WEB_IMAGE` inside `.env.production` without touching secret values or file permissions:
+  ```bash
+  # Use tested update_or_add_env function (handles missing/existing keys, preserves 600 perms)
+  update_or_add_env .env.production WEB_IMAGE "kebun-melon-web:0.1.1-ui"
+
+  # Verify key without exposing secrets
+  grep -E '^WEB_IMAGE=' .env.production
+
+  # Verify resolved Compose image reference
+  docker compose --env-file .env.production -f docker-compose.prod.yml config --images
+  ```
 
 ### 8.5 Step 5: Web-Only In-Place Recreate (Zero Gateway Interruption)
 For a web-only update, recreate **only the web service** using `--no-deps`. This preserves the running `iot-gateway` container and its active EMQX MQTT connection without interruption:
@@ -340,7 +513,7 @@ curl.exe -s http://localhost:3001/health
 * **When does Staging need updating?**
   - Staging (`docker-compose.staging.yml`) should be updated and tested whenever significant frontend or gateway changes require verification before releasing to the VPS.
 * **When is a Database Migration actually necessary?**
-  - Only when Prisma schema models, tables, columns, indexes, or enums are added or changed. Pure frontend visual, text, component, or algorithm changes do **not** require migrations.
+  - Only when Prisma schema models, tables, columns, indexes, or data-pruning SQL migrations are deployed. Pure documentation or frontend visual/text changes do **not** require migrations.
 
 ### 8.8 Step 8: Safe Web Rollback Routine
 If the new web release displays runtime errors or fails health checks:
@@ -353,4 +526,72 @@ WEB_IMAGE=kebun-melon-web:0.1.0-init docker compose --env-file .env.production -
 docker compose -f docker-compose.prod.yml ps web
 ```
 > **DOWNTIME & ROLLBACK NOTE:** Recreating containers causes a brief (~2–5 second) sub-second container swap. True zero-downtime rolling deploys require multi-replica blue/green routing not present on a single-node small VPS. Image rollback rolls back application code only; it does **not** roll back database schema changes.
+
+---
+
+## 9. Comprehensive Deployment Checklist (Pre-Flight & Execution)
+
+Use this checklist as the final operational gate before and during any VPS deployment.
+
+### 9.1 Release Scope Distinction & Pre-Flight Gate Checklist
+- [ ] **Release Scope Classification:**
+  - **Documentation / Checklist Updates Only:** Requires **zero** database migrations and **zero** Docker container updates.
+  - **Full TASK-0917 Release:** Transitions reservoir water retention to latest-5 per device across database, gateway, and web. Uses release tag `0.2.0-retention` consistently for archive, images, and Compose environment. Physical valve hardware actuation is **out of scope** and removed from TASK-0917 (strictly telemetry retention).
+- [ ] **Database Migration Status (TASK-0917 Migration):**
+  - Migration `20261003230000_reservoir_water_readings_latest_5_retention` exists in `packages/database/prisma/migrations/`.
+  - Its deployment status on Singapore Staging (`ihgoxqdncepbcrqkchxu`) and active VPS database is **PENDING / UNKNOWN** until explicitly verified via credentialed query by the operator.
+  - An unchanged `schema.prisma` does not eliminate this migration. Do NOT run live migrations during documentation review.
+- [ ] **Branch Invariant:** You are strictly on the `main` branch (no feature branches or detached HEADs deployed to production).
+- [ ] **Five Mandatory Quality Gates:** All 5 reserved pre-commit gates executed and passed on local workstation:
+  - `npm run test:coverage`
+  - `npm run test:integration`
+  - `npm run check:quality`
+  - `npm run test`
+  - `npm run test:e2e`
+- [ ] **Manual Git Operations:** Manually staged, committed, and pushed to `main`.
+- [ ] **GitHub Actions CI Status:** Verified all remote CI workflows passed green on GitHub before initiating VPS deployment.
+- [ ] **Caddy Reverse Proxy Requirement:**
+  - Web UI or gateway application updates: **NO Caddy reload or recreation needed.** Caddy proxies automatically to internal container ports.
+  - Only reload Caddy if `Caddyfile` or domain definitions were explicitly modified.
+- [ ] **Retention Configuration Invariant:** Confirm `RETENTION_ENABLED=false` remains set in `.env.production` during pre-production verification to safeguard existing telemetry.
+- [ ] **Single-Gateway Ownership Invariant:** Confirm that only ONE IoT gateway will run globally. Any conflicting local or staging gateway must be stopped before starting the VPS gateway.
+
+### 9.2 Container Packaging & Transfer Checklist (Workstation — Full Release Only)
+- [ ] **Platform Flag:** Build strictly with `--platform linux/amd64` using the TASK-0917 semantic release tag:
+  ```powershell
+  docker build --platform linux/amd64 -t kebun-melon-web:0.2.0-retention -f apps/web/Dockerfile .
+  docker build --platform linux/amd64 -t kebun-melon-gateway:0.2.0-retention -f apps/iot-gateway/Dockerfile .
+  ```
+- [ ] **Deterministic Archive:** Save container images directly to named archive:
+  ```powershell
+  docker save -o melon-images-0.2.0-retention.tar kebun-melon-web:0.2.0-retention kebun-melon-gateway:0.2.0-retention
+  ```
+- [ ] **Transfer:** Secure copy (`scp`) the archive directly to `/opt/kebun-melon/` on the VPS host:
+  ```powershell
+  scp melon-images-0.2.0-retention.tar deploy@38.103.171.46:/opt/kebun-melon/
+  ```
+
+### 9.3 VPS Execution Checklist (Host `/opt/kebun-melon` — Full Release Only)
+- [ ] **Define Release Tag First:** Set `RELEASE_TAG="0.2.0-retention"` and `ARCHIVE_PATH="/opt/kebun-melon/melon-images-${RELEASE_TAG}.tar"` explicitly before invoking Docker commands.
+- [ ] **No Wildcards:** Never use `docker load -i *.tar` or `rm -f *.tar`.
+- [ ] **Archive Existence Check:** Check `[ -f "${ARCHIVE_PATH}" ]` before running load.
+- [ ] **Docker Load Success (Explicit Abort):** Check that `docker load -i "${ARCHIVE_PATH}"` exits with code 0. If it fails, abort immediately and preserve the archive—even if image tags exist from prior attempts.
+- [ ] **Image Tag Inspection:** Inspect and verify both `kebun-melon-web:${RELEASE_TAG}` and `kebun-melon-gateway:${RELEASE_TAG}` exist in `docker image inspect` BEFORE removing the archive file.
+- [ ] **Safe Archive Removal:** Only remove the specific archive (`rm -f "${ARCHIVE_PATH}"`) after tag inspection succeeds.
+- [ ] **Environment Tag Update (Avoid `sed ... || echo ...`):**
+  - Use `update_or_add_env` to update `WEB_IMAGE` and `GATEWAY_IMAGE` in `.env.production`.
+  - Secure temporary file created via `mktemp "${dir}/.env.tmp.XXXXXXXXXX"` with `600` permissions set immediately.
+  - Cleaned up on error; error propagates.
+  - Verify existing unrelated keys (`DATABASE_URL`, `AUTH_SECRET`, `RETENTION_ENABLED`) remain unchanged.
+  - Verify file permissions remain strictly `chmod 600`.
+- [ ] **Secrets Non-Exposure:** Verify keys via `grep -E '^(WEB_IMAGE|GATEWAY_IMAGE)=' .env.production` without dumping or logging file secrets.
+- [ ] **Compose Config Resolution:** Verify Compose resolves the updated image tags via `docker compose --env-file .env.production -f docker-compose.prod.yml config --images`.
+- [ ] **Service Recreate:** Recreate services in-place (`docker compose --env-file .env.production -f docker-compose.prod.yml up -d --no-deps web iot-gateway`).
+- [ ] **Layered Health Verification:**
+  - Verify container status: `docker compose -f docker-compose.prod.yml ps`.
+  - Verify public health: `curl -I https://monitoring.melonmadura.my.id/health` (HTTP 200).
+  - Verify readiness: `curl https://monitoring.melonmadura.my.id/ready` (HTTP 200).
+  - Verify gateway health: `curl http://localhost:3001/health` (HTTP 200).
+  - Verify live SSE telemetry stream in operator browser session.
+
 

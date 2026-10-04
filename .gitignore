@@ -37,6 +37,8 @@ build/
 .vite/
 *.tsbuildinfo
 .eslintcache
+*.tar
+*.tar.gz
 
 # Logs & Temporary Caches
 *.log
