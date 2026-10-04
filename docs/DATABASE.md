@@ -174,18 +174,19 @@ Security-sensitive and historical records (audit logs, telemetry history) shall 
 - Owner-initiated Admin Account Deletion (`DELETE /api/v1/users/{userId}` and `POST /api/v1/users/bulk-delete`): Permanently hard-deletes the target Admin user row(s) and account-owned dependent records (`sessions`, `user_roles`, `user_preferences`, `user_device_access`, `account_approvals`, `faucet_commands`, `alert_acknowledgements`) inside a single database transaction. All active sessions are immediately revoked. References to the deleted user as an actor in historical `audit_logs` are anonymized (`actorUserId = NULL`) to preserve audit continuity without foreign key errors. A dedicated `account.deleted` audit event is recorded capturing actor ID, deleted user ID, timestamp, and resolved reason (custom reason or default `"Account permanently deleted by OWNER / PIC."`). Owner accounts and accounts in `PENDING_APPROVAL` status are strictly protected from deletion.
 - Devices and Device assignments: Soft deletion or deactivation is used where historical telemetry reconstruction matters (`DEC-DEV-030`). Hard device deletion is permanently disabled.
 
-#### Telemetry Data Retention and Automated Maintenance Policy (TASK-0913)
+#### Telemetry Data Retention and Automated Maintenance Policy (TASK-0913 / TASK-0917)
 
 Telemetry and operational time-series data follow an automated lifecycle maintenance policy to prevent unbounded Supabase storage growth while ensuring compliance with the maximum 31-day historical query window (`DEC-MON-087`):
 
-1. **Raw Telemetry Retention TTL:** High-frequency raw sensor telemetry records and ephemeral operational errors older than **90 days** (`DEC-MON-048`) are automatically purged by scheduled maintenance routines.
-2. **Approved Telemetry & Operational Tables:**
-   - `soil_readings`
-   - `water_readings`
-   - `reservoir_water_readings`
+1. **Raw Telemetry Retention TTL:** High-frequency raw sensor telemetry records (`soil_readings`, `water_readings`) and ephemeral operational errors older than **90 days** (`DEC-MON-048`) are automatically purged by scheduled maintenance routines.
+2. **Reservoir Water Telemetry Retention (`DEC-MON-092` / `TASK-0917`):** Unlike general time-series analytics, `reservoir_water_readings` retains strictly the **latest 5 records per device** (`deviceId`). Trimming executes atomically inside the ingestion transaction and is pruned in scheduled maintenance using a deterministic tie-breaker (`received_at DESC, id DESC`).
+3. **Approved Telemetry & Operational Tables:**
+   - `soil_readings` (90-day retention)
+   - `water_readings` (90-day retention)
+   - `reservoir_water_readings` (Latest 5 records per device)
    - `sensor_battery_readings` (legacy schema coverage)
-   - `device_status_events`
-   - `integration_errors`
+   - `device_status_events` (90-day retention; valve events capped at latest 5 per device per `DEC-CTRL-095`)
+   - `integration_errors` (90-day retention)
 3. **Protected & Exempt Data (Zero-Purge Guarantee):**
    The following critical compliance, security, and operational audit tables are strictly **exempt** from telemetry retention cleanup (`SEC-DATA-004`) and are enforced as immutable / non-purgeable by `RetentionService`:
    - `audit_logs` (Security and compliance audit history, retained indefinitely)
@@ -963,6 +964,17 @@ Stores reservoir-water volume and status telemetry independently from general wa
 | `status` | VARCHAR(30) | Yes | Canonical status |
 | `validation_status` | VARCHAR(30) | No | |
 | `created_at` | TIMESTAMPTZ | No | |
+
+### 8.4.1 Per-Device Latest-5 Retention Policy (DEC-MON-092 / TASK-0917)
+
+Under `DEC-MON-092` and `TASK-0917`, `reservoir_water_readings` enforces a strict **latest-5 records per device** retention policy:
+
+- **Per-Device Partitioning:** Retention is partitioned strictly by `device_id`. Ingesting readings for one reservoir tank never evicts readings belonging to another device.
+- **Deterministic Stable Tie-Breaker:** Record recency and pruning order are governed deterministically by `received_at DESC, id DESC`.
+- **Atomic Concurrency Guarantee:** Trimming occurs within the same atomic database transaction (`this.prisma.$transaction`) as the reading insertion in `TelemetryRepository.ingestReservoirReading`.
+- **Fewer Than 5 Handling:** When a device has fewer than 5 records (e.g. 1, 2, 3, or 4 records), all records are preserved without premature deletion.
+- **Deduplication Boundary:** `UNIQUE (device_id, message_id)` is enforced only against actively retained records. Because the table maintains strictly the latest 5 records per device, `message_id` uniqueness holds within the rolling 5-record window, not across the device lifetime. If an older reading whose `message_id` has already been pruned is redelivered over the network, it is accepted as a new record and assigned a fresh `received_at` timestamp, becoming the newest reading in `[received_at DESC, id DESC]` order and altering the latest displayed tank volume. In contrast, inbound raw hardware messages via `HardwareMqttAdapter` are assigned a new random `hw-vol-<uuid>` upon every delivery, meaning the raw hardware path was never deduplicated by `message_id`. Formally approved by Owner under `DEC-MON-092`.
+- **Scheduled Maintenance & Existing Excess Cleanup:** `RetentionService` executes an atomic window-function query (`ROW_NUMBER() OVER (PARTITION BY device_id ORDER BY received_at DESC, id DESC)`) to prune excess rows beyond the top 5 per device, maintaining parity across background runs without deleting dormant device state.
 
 ---
 

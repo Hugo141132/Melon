@@ -225,5 +225,21 @@ describe('RetentionService Unit Tests', () => {
       expect(mockPrisma.accountApproval.findMany).not.toHaveBeenCalled();
       expect(mockPrisma.accountApproval.deleteMany).not.toHaveBeenCalled();
     });
+
+    it('prunes reservoir_water_readings using window function when $queryRaw is available (DEC-MON-092)', async () => {
+      mockPrisma.$queryRaw = vi.fn().mockResolvedValueOnce([{ id: 'excess-r1' }, { id: 'excess-r2' }]);
+      mockPrisma.reservoirWaterReading.deleteMany.mockResolvedValueOnce({ count: 2 });
+
+      const summary = await retentionService.pruneExpiredTelemetry({
+        tables: ['reservoir_water_readings'],
+        yieldMs: 0,
+      });
+
+      expect(mockPrisma.$queryRaw).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.reservoirWaterReading.deleteMany).toHaveBeenCalledWith({
+        where: { id: { in: ['excess-r1', 'excess-r2'] } },
+      });
+      expect(summary.tables.reservoir_water_readings.deletedCount).toBe(2);
+    });
   });
 });

@@ -37,7 +37,7 @@ The system monitors:
 
 ### Reservoir-Water Monitoring (MQTT 5.0 over TLS via Primary EMQX Cloud Broker, DEC-DEV-032 / DEC-DEV-033 / DEC-DEV-035)
 
-- Reservoir water volume, Reservoir status (Flow rate deleted per `DEC-MON-089`). Preserved on dedicated EMQX Cloud broker (`irigasi/melon/...`).
+- Reservoir water volume, Reservoir status (Flow rate deleted per `DEC-MON-089`). Preserved on dedicated EMQX Cloud broker (`irigasi/melon/...`). Strict per-device latest-5 records retention (`DEC-MON-092` / `TASK-0917`).
 
 ### Sensor Battery (`BAT`)
 
@@ -3021,6 +3021,33 @@ The following facts are supported by the current implementation regarding device
   - **Verification:** Environment test suites (`apps/web/test/unit/server-env.test.ts`, `apps/iot-gateway/src/__tests__/gateway.test.ts`, `scripts/test-env.ts`) pass with 100% pass rate, and TypeScript compilation passes cleanly (`tsc --noEmit` 0 errors across monorepo).
 <!-- Permanent Faucet Control Enablement Reconciled: 2026-10-01 -->
 
+---
 
+## TASK-0917 Governance & Reservoir Water Readings Retention Record
 
-
+`TASK-0917` reservoir water readings retention to latest 5 records per device record:
+- **Status:** `DONE` (Implemented & Verified 2026-10-03)
+- **Priority:** `P1`
+- **Dependencies:** `TASK-0913`, `TASK-0812`, `TASK-0410`
+- **Frontend impact:** `NONE`
+- **Selected UI direction:** `N/A`
+- **Existing color template:** `UNCHANGED`
+- **Selected motion effects:** `None`
+- **21st.dev MCP:** `NOT REQUIRED`
+- **Summary:** Transitioned `reservoir_water_readings` retention policy from 90-day time-based TTL to strictly the latest 5 records per device (`DEC-MON-092`):
+  - **Deterministic Recency & Stable Tie-Breaker (`packages/database`):**
+    - Enforced recency ordering using `[received_at DESC, id DESC]`, pairing the authoritative non-null arrival timestamp with the unique UUID primary key as an immutable tie-breaker.
+    - Updated `TelemetryRepository.getLatestWaterTankReading` to consume `orderBy: [{ receivedAt: 'desc' }, { id: 'desc' }]`, guaranteeing 100% parity between querying and pruning.
+  - **Atomic Concurrency Guarantee (`TelemetryRepository.ingestReservoirReading`):**
+    - Enforced retention trimming atomically inside `this.prisma.$transaction` immediately following reading creation and device state updating.
+    - Preserved device isolation: trimming is scoped strictly to `deviceId: device.id` (`id: { notIn: keepIds }`), ensuring writes on one tank never evict records from another tank.
+    - Retained fewer than 5 records when fewer exist without premature deletion.
+  - **Maintenance & Existing Excess Cleanup (`RetentionService`):**
+    - Updated `RetentionService` to prune excess records beyond 5 per device using an atomic PostgreSQL window function query (`ROW_NUMBER() OVER (PARTITION BY device_id ORDER BY received_at DESC, id DESC)`).
+    - Preserved dormant device state: devices with $\le 5$ records are never deleted by 90-day time cutoffs.
+    - Added helper `pruneExcessReservoirReadings` in `TelemetryRepository`.
+    - Created reviewable database migration (`packages/database/prisma/migrations/20261003230000_reservoir_water_readings_latest_5_retention/migration.sql`) to clean up historical excess records in existing databases.
+  - **Verification:**
+    - Verified 100% test pass rate across focused unit test suites: `packages/database/test/telemetry-repository.test.ts` (17/17 passed), `packages/database/test/retention-service.test.ts` (9/9 passed), gateway scheduler & processor (13/13 passed), web monitoring (33/33 passed).
+    - Full monorepo typecheck passed cleanly with 0 errors across all 4 packages (`tsc --noEmit`).
+<!-- TASK-0917 Reconciled: 2026-10-03 -->

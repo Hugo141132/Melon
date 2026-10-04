@@ -234,6 +234,22 @@ export class RetentionService {
         return rows.map((r) => r.id);
       }
       case 'reservoir_water_readings': {
+        // Enforce deterministic latest-5 per device retention (DEC-MON-092 / TASK-0917)
+        if (typeof (this.prisma as any).$queryRaw === 'function') {
+          const rows = await (this.prisma as any).$queryRaw<{ id: string }[]>`
+            SELECT id FROM (
+              SELECT id,
+                     ROW_NUMBER() OVER (
+                       PARTITION BY device_id
+                       ORDER BY received_at DESC, id DESC
+                     ) as rn
+              FROM "reservoir_water_readings"
+            ) sub
+            WHERE sub.rn > 5
+            LIMIT ${batchSize}
+          `;
+          return rows.map((r: { id: string }) => r.id);
+        }
         const rows = await this.prisma.reservoirWaterReading.findMany({
           where: { receivedAt: { lt: cutoffDate } },
           select: { id: true },

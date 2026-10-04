@@ -41,9 +41,11 @@ describe('TelemetryRepository Unit Tests (TASK-0405)', () => {
         findUnique: vi.fn(),
         findFirst: vi.fn(),
         count: vi.fn(),
-        findMany: vi.fn(),
+        findMany: vi.fn().mockResolvedValue([]),
+        deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
       },
       $transaction: vi.fn(async (cb: any) => cb(mockPrisma)),
+      $executeRaw: vi.fn().mockResolvedValue(0),
     };
 
     repo = new TelemetryRepository(mockPrisma as any);
@@ -405,10 +407,119 @@ describe('TelemetryRepository Unit Tests (TASK-0405)', () => {
         DeviceConnectionStatus.ONLINE
       );
     });
+
+    it('retains all records and does not delete when fewer than 5 records exist', async () => {
+      const mockDevice = {
+        id: 'reservoir-dev-uuid-1',
+        deviceId: 'water-tank-001',
+        accountStatus: 'ACTIVE',
+      };
+      mockPrisma.device.findFirst.mockResolvedValue(mockDevice);
+      mockPrisma.reservoirWaterReading.create.mockResolvedValue({
+        id: 'res-new',
+        deviceId: mockDevice.id,
+        receivedAt: new Date(),
+        validationStatus: TelemetryValidationStatus.VALID,
+      });
+      // 3 existing records (< 5)
+      mockPrisma.reservoirWaterReading.findMany.mockResolvedValueOnce([
+        { id: 'res-new' },
+        { id: 'res-2' },
+        { id: 'res-1' },
+      ]);
+
+      await repo.ingestReservoirReading({
+        deviceId: 'water-tank-001',
+        messageId: 'msg-res-002',
+        tankVolume: 12.5,
+      });
+
+      expect(mockPrisma.reservoirWaterReading.findMany).toHaveBeenCalledWith({
+        where: { deviceId: mockDevice.id },
+        orderBy: [{ receivedAt: 'desc' }, { id: 'desc' }],
+        take: 5,
+        select: { id: true },
+      });
+      // No deleteMany because length < 5
+      expect(mockPrisma.reservoirWaterReading.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it('atomically trims older excess records when 5 or more records exist, keeping latest 5', async () => {
+      const mockDevice = {
+        id: 'reservoir-dev-uuid-1',
+        deviceId: 'water-tank-001',
+        accountStatus: 'ACTIVE',
+      };
+      mockPrisma.device.findFirst.mockResolvedValue(mockDevice);
+      mockPrisma.reservoirWaterReading.create.mockResolvedValue({
+        id: 'res-6',
+        deviceId: mockDevice.id,
+        receivedAt: new Date(),
+        validationStatus: TelemetryValidationStatus.VALID,
+      });
+      // Top 5 records returned by findMany (descending order)
+      const top5 = [
+        { id: 'res-6' },
+        { id: 'res-5' },
+        { id: 'res-4' },
+        { id: 'res-3' },
+        { id: 'res-2' },
+      ];
+      mockPrisma.reservoirWaterReading.findMany.mockResolvedValueOnce(top5);
+
+      await repo.ingestReservoirReading({
+        deviceId: 'water-tank-001',
+        messageId: 'msg-res-006',
+        tankVolume: 15.0,
+      });
+
+      expect(mockPrisma.reservoirWaterReading.deleteMany).toHaveBeenCalledWith({
+        where: {
+          deviceId: mockDevice.id,
+          id: { notIn: ['res-6', 'res-5', 'res-4', 'res-3', 'res-2'] },
+        },
+      });
+    });
+
+    it('enforces device isolation: only trims records for the specific ingested device', async () => {
+      const mockDeviceA = {
+        id: 'device-uuid-a',
+        deviceId: 'water-tank-a',
+        accountStatus: 'ACTIVE',
+      };
+      mockPrisma.device.findFirst.mockResolvedValue(mockDeviceA);
+      mockPrisma.reservoirWaterReading.create.mockResolvedValue({
+        id: 'res-a-new',
+        deviceId: mockDeviceA.id,
+        receivedAt: new Date(),
+        validationStatus: TelemetryValidationStatus.VALID,
+      });
+      mockPrisma.reservoirWaterReading.findMany.mockResolvedValueOnce([
+        { id: 'res-a-5' },
+        { id: 'res-a-4' },
+        { id: 'res-a-3' },
+        { id: 'res-a-2' },
+        { id: 'res-a-1' },
+      ]);
+
+      await repo.ingestReservoirReading({
+        deviceId: 'water-tank-a',
+        messageId: 'msg-a',
+        tankVolume: 20.0,
+      });
+
+      // Verify the delete filter strictly scopes to device-uuid-a
+      expect(mockPrisma.reservoirWaterReading.deleteMany).toHaveBeenCalledWith({
+        where: {
+          deviceId: 'device-uuid-a',
+          id: { notIn: ['res-a-5', 'res-a-4', 'res-a-3', 'res-a-2', 'res-a-1'] },
+        },
+      });
+    });
   });
 
   describe('getLatestWaterTankReading', () => {
-    it('queries using relation filter when non-UUID canonical deviceId is passed', async () => {
+    it('queries using relation filter when non-UUID canonical deviceId is passed with stable tie-breaker', async () => {
       mockPrisma.reservoirWaterReading.findFirst.mockResolvedValue({
         id: 'reading-tank-1',
         deviceId: '33333333-3333-3333-3333-333333333333',
@@ -427,9 +538,20 @@ describe('TelemetryRepository Unit Tests (TASK-0405)', () => {
             ],
           },
         },
-        orderBy: { receivedAt: 'desc' },
+        orderBy: [{ receivedAt: 'desc' }, { id: 'desc' }],
       });
       expect(res?.id).toBe('reading-tank-1');
+    });
+  });
+
+  describe('pruneExcessReservoirReadings (DEC-MON-092 / TASK-0917)', () => {
+    it('executes window-function raw deletion when $executeRaw is available', async () => {
+      mockPrisma.$executeRaw.mockResolvedValueOnce(12);
+
+      const count = await repo.pruneExcessReservoirReadings(5);
+
+      expect(count).toBe(12);
+      expect(mockPrisma.$executeRaw).toHaveBeenCalledTimes(1);
     });
   });
 

@@ -3820,6 +3820,41 @@ Apply to:
 
 ---
 
+## TASK-0917 — Transition Reservoir Water Readings Retention to Latest 5 Records Per Device
+
+**Priority:** `P1`
+**Status:** `DONE`
+**Dependencies:** `TASK-0913`, `TASK-0812`, `TASK-0410`
+**Related Decisions:** `DEC-MON-092`
+**Verification addendum (2026-10-04):** Local implementation and credential-free automated tests are complete; no live migration or deployment has been executed. Real-PostgreSQL concurrency and overlapping ingestion + maintenance tests (`test-real-postgres-concurrency.ts` and `test-real-postgres-overlap.ts`) verified against PostgreSQL 17.11 with zero transaction errors, zero deadlocks, and exact top-5 retention per device. Owner formally approved latest-5 retention and bounded-window deduplication (`DEC-MON-092`, item 7); no tombstone/archive tables or compatibility fallbacks shall be added. Live verification (migration status, retained counts, API/UI, service health) remains pending manual operator execution.
+**Completed:** 2026-10-03 — Transitioned `reservoir_water_readings` retention policy from 90-day time-based TTL to strictly the latest 5 records per device (`DEC-MON-092`). Enforced deterministic recency and stable tie-breaker via `[received_at DESC, id DESC]` across all read, write, and cleanup paths (correcting unsupported "monotonic" terminology). In `TelemetryRepository.ingestReservoirReading`, acquired device-level row lock on `devices.id` first to serialize concurrent same-device writes, then executed atomic post-insertion retention trimming inside `this.prisma.$transaction`, retaining fewer than 5 records when fewer exist and pruning older excess records for the specific target device to preserve device isolation. Added stable tie-breaker `[receivedAt DESC, id DESC]` to `TelemetryRepository.getLatestWaterTankReading` and added `pruneExcessReservoirReadings` helper method. Updated `RetentionService` in `@kebun-melon/database` to prune excess records beyond 5 per device using an atomic PostgreSQL window function (`ROW_NUMBER() OVER (PARTITION BY device_id ORDER BY received_at DESC, id DESC)`). Created reviewable destructive data pruning migration `20261003230000_reservoir_water_readings_latest_5_retention` to clean up existing historical excess rows. Updated `DATABASE.md` and `DECISIONS.md`. Verified via isolated real-PostgreSQL container tests covering 10-write concurrency, fewer-than-5 preservation, 2-device isolation, deterministic tie-breaking, and pruned duplicate replay; confirmed 0 TypeScript errors across all 4 monorepo packages.
+
+### Work
+
+- Transition retention policy for `reservoir_water_readings` from 90 days (`DEC-MON-048`) to latest 5 records per device (`DEC-MON-092`).
+- Enforce deterministic ordering using `receivedAt DESC, id DESC` (with UUID primary key `id` as stable tie-breaker).
+- Enforce per-device latest-5 retention cap atomically inside ingestion transaction (`TelemetryRepository.ingestReservoirReading`).
+- Retain fewer than 5 records when fewer exist without premature deletion.
+- Preserve strict device isolation: ingestion on one device never evicts records of another device.
+- Align `getLatestWaterTankReading` ordering with the exact same deterministic tie-breaker (`receivedAt DESC, id DESC`).
+- Update `RetentionService` and scheduled maintenance to prune excess records beyond 5 per device, preserving dormant device state indefinitely.
+- Create reviewable database migration (`20261003230000_reservoir_water_readings_latest_5_retention`) for excess rows cleanup.
+- Add focused unit tests covering retention capping, fewer-than-5 retention, device isolation, and stable tie-breaking.
+
+### Acceptance Criteria
+
+- [x] `reservoir_water_readings` retention is capped at strictly the latest 5 records per device.
+- [x] Ingestion pruning executes atomically within the insertion transaction.
+- [x] Devices with fewer than 5 records retain all existing records.
+- [x] Device isolation is strictly preserved: device A never evicts device B's records.
+- [x] Recency and pruning order are governed deterministically by `receivedAt DESC, id DESC`.
+- [x] `getLatestWaterTankReading` utilizes the identical deterministic tie-breaker.
+- [x] `RetentionService` maintains parity by pruning rows where rank > 5 per device.
+- [x] Reviewable SQL migration is prepared with clearly defined deletion scope.
+- [x] Unit and regression tests pass with 100% success rate.
+
+---
+
 # 18. Phase 10 — Verification and Release
 
 ## TASK-1001 — Complete Unit Test Suite

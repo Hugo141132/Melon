@@ -216,6 +216,17 @@ export class TelemetryRepository {
 
     try {
       const result = await this.prisma.$transaction(async (tx) => {
+        // 1. Acquire device-level row lock first to serialize concurrent writes for the same device
+        await tx.device.update({
+          where: { id: device.id },
+          data: {
+            lastSeenAt: serverReceivedAt,
+            lastMessageAt: serverReceivedAt,
+            connectionStatus: DeviceConnectionStatus.ONLINE,
+          },
+        });
+
+        // 2. Insert new reservoir reading
         const reading = await tx.reservoirWaterReading.create({
           data: {
             deviceId: device.id,
@@ -230,14 +241,25 @@ export class TelemetryRepository {
           },
         });
 
-        await tx.device.update({
-          where: { id: device.id },
-          data: {
-            lastSeenAt: serverReceivedAt,
-            lastMessageAt: serverReceivedAt,
-            connectionStatus: DeviceConnectionStatus.ONLINE,
-          },
+        // 3. Enforce deterministic latest-5 retention per device (DEC-MON-092)
+        const recordsToKeep = await tx.reservoirWaterReading.findMany({
+          where: { deviceId: device.id },
+          orderBy: [{ receivedAt: 'desc' }, { id: 'desc' }],
+          take: 5,
+          select: { id: true },
         });
+
+        if (recordsToKeep && recordsToKeep.length >= 5) {
+          const keepIds = recordsToKeep.map((r: { id: string }) => r.id);
+          if (typeof tx.reservoirWaterReading.deleteMany === 'function') {
+            await tx.reservoirWaterReading.deleteMany({
+              where: {
+                deviceId: device.id,
+                id: { notIn: keepIds },
+              },
+            });
+          }
+        }
 
         return reading;
       });
@@ -470,8 +492,33 @@ export class TelemetryRepository {
               OR: [{ deviceId: cleanId }, { deviceId: { equals: cleanId, mode: 'insensitive' } }],
             },
           },
-      orderBy: { receivedAt: 'desc' },
+      orderBy: [{ receivedAt: 'desc' }, { id: 'desc' }],
     });
+  }
+
+  /**
+   * Prunes existing excess reservoir readings across all devices, retaining strictly
+   * the latest N records per device (default: 5) ordered deterministically by receivedAt desc, id desc.
+   * (DEC-MON-092 / TASK-0917)
+   */
+  async pruneExcessReservoirReadings(keepCount: number = 5): Promise<number> {
+    if (typeof (this.prisma as any).$executeRaw === 'function') {
+      return (this.prisma as any).$executeRaw`
+        DELETE FROM "reservoir_water_readings"
+        WHERE id IN (
+          SELECT id FROM (
+            SELECT id,
+                   ROW_NUMBER() OVER (
+                     PARTITION BY device_id
+                     ORDER BY received_at DESC, id DESC
+                   ) as rn
+            FROM "reservoir_water_readings"
+          ) sub
+          WHERE sub.rn > ${keepCount}
+        )
+      `;
+    }
+    return 0;
   }
 
   /**
