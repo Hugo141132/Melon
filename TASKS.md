@@ -4880,29 +4880,32 @@ The following full CI gates were deferred for this checkpoint and must be verifi
   - Implemented stream reconnection reconciliation: detects when the SSE connection transitions from `CLOSED`/`CONNECTING`/`POLLING` to `OPEN` and automatically reconciles the history table.
   - Maintained dedicated physical/active command monitoring on `FaucetStatusCard` without polluting the terminal history table.
 - **3-Month Terminal Retention Policy & Anti-Replay Tombstones (`packages/database/src/retention-service.ts` & `faucet-command-repository.ts`):**
-  - Defined automatic 3-calendar-month retention cutoff using strict UTC month calculation (`calculateThreeMonthUtcCutoff(refDate)`).
+  - Defined automatic 3-calendar-month retention cutoff using strict UTC month calculation with month-end day clamping (`calculateThreeMonthUtcCutoff(refDate)`).
+  - Enforced 3-calendar-month UTC cutoff for `faucet_commands` inside `RetentionService` itself, regardless of `retentionDays` or whether selected tables are command-only or mixed.
   - Terminal commands (`COMPLETED`, `FAILED`, `CANCELLED`, `TIMEOUT`, `EXPIRED`) older than 3 calendar months based on terminal timestamps (`completedAt`, `failedAt`, `cancelledAt`, `expiresAt`, `updatedAt`) are targeted for pruning.
   - Active/in-flight commands (`QUEUED`, `SENT`, `ACKNOWLEDGED`, `IN_PROGRESS`) are strictly protected and never purged.
   - Implemented transactional deletion with anti-replay protection: creates immutable tombstone records in `faucet_command_idempotency_tombstones` (`idempotency_key`, `command_id`, `device_id`, `original_status`, `requested_at`, `purged_at`) before cascading deletion of `faucet_command_events` and `faucet_commands`.
   - Enforced anti-replay rejection in `createCommand`: rejects incoming requests using previously purged idempotency keys with `FaucetCommandConflictError`.
+  - Added validated optional `RETENTION_TABLES` configuration in `GatewayEnv` (`apps/iot-gateway/src/config/env.ts`) and passed it through `RetentionScheduler`, allowing only approved table names and rejecting invalid or explicitly empty input without falling back to deleting all tables.
   - Prepared database DDL migration `20261005193000_add_faucet_command_idempotency_tombstones/migration.sql` without running destructive or unverified migrations on live database.
 
 ### 2. Verification
 - `packages/database/src/__tests__/faucet-command-repository.test.ts`: 27/27 tests passed (100%).
-- `packages/database/test/retention-service.test.ts`: 12/12 tests passed (100%, including UTC month-end clamping).
+- `packages/database/test/retention-service.test.ts`: 16/16 tests passed (100%, including 3-calendar-month UTC cutoff enforcement, month-end day clamping, mixed-table handling, empty-table rejection, and active command protection).
+- `apps/iot-gateway/src/__tests__/retention-scheduler.test.ts`: 12/12 tests passed (100%, including `RETENTION_TABLES` pass-through, omitted fallback, and Zod schema validation).
 - `apps/web/test/unit/faucet-history-realtime.test.tsx`: 4/4 tests passed (100%).
 
 ### 3. Acceptance & Deployment Tracking
-- **Code & Test Implementation:** `COMPLETE` (100% verified across contracts, repositories, UI handlers, and unit tests).
+- **Code & Test Implementation:** `COMPLETE` (100% verified across contracts, repositories, UI handlers, scheduler, and unit tests).
 - **Database Migration Status:**
-  - Dev Database: `APPLIED IN DEV` (Migration `20261005193000_add_faucet_command_idempotency_tombstones` applied per operator output).
-  - Reservoir Retention Migration (`20261003230000_reservoir_water_readings_latest_5_retention`): Remains separate and `PENDING` (destructive DML not executed).
-  - Staging & Production: `PENDING` (Deferred to operator deployment pass).
+  - Staging Database (`ihgoxqdncepbcrqkchxu`): `UP TO DATE` ("Database schema is up to date!" confirmed by operator after tombstone application via `prisma migrate resolve --applied 20261005193000_add_faucet_command_idempotency_tombstones`; zero pending migrations in staging).
+  - Dev Database: Tombstone applied; reservoir migration `20261003230000` remains separate and pending in dev.
 - **Live Website Acceptance:** `USER-CONFIRMED COMPLETE on 2026-10-05` (Interactive verification completed by operator `wnf2fn2nc0n`).
+- **VPS Deployment & Container Health:** `DEPLOYED on 2026-10-06` (Release `ada891e` deployed to Nebula VPS `38.103.171.46`; containers `kebun-melon-web:ada891e` and `kebun-melon-gateway:ada891e` healthy; Caddy restarted after shutdown and HTTPS restored; all post-deployment smoke tests passed).
 - **Deferred Runtime Items:**
+  - Retention activation (`RETENTION_ENABLED=false` currently maintained in `.env.production`) remains pending separate authorization and scheduler configuration isolation (`RETENTION_TABLES=faucet_commands`).
   - Unobserved 3-month physical deletion scenarios in the field remain pending future schedule triggers.
   - Actual memory/latency performance profiling remains separate and pending (unsupported claims such as `<=50 KB RAM` or guaranteed zero latency overhead are qualified).
-- **Staging / Production Deployment:** `PENDING` (Deferred to operator deployment via IDE Remote SSH).
 
 ---
 
@@ -4943,7 +4946,7 @@ The following full CI gates were deferred for this checkpoint and must be verifi
 - **Code & Test Implementation:** `COMPLETE` (100% verified across contracts, repositories, routes, and UI pagination).
 - **Live Database Migration:** `NOT REQUIRED` (Reuses existing database indexes and pagination parameters).
 - **Live Website Acceptance:** `USER-CONFIRMED COMPLETE on 2026-10-05` (Manual verification completed by operator `wnf2fn2nc0n`).
-- **Staging / Production Deployment:** `PENDING` (Deferred to operator deployment via IDE Remote SSH).
+- **VPS Deployment & Container Health:** `DEPLOYED on 2026-10-06` (Release `ada891e` deployed to Nebula VPS `38.103.171.46`; web container healthy; Caddy restarted after shutdown and HTTPS restored; table pagination 10 rows/page and terminal status filter preservation verified via post-deployment smoke test).
 
 ---
 
@@ -4989,5 +4992,5 @@ The following full CI gates were deferred for this checkpoint and must be verifi
 - **Code & Test Implementation:** `COMPLETE` (100% verified across email service, routes, SSE authorizations, and UI components).
 - **Live Database Migration:** `NOT REQUIRED` (Reuses existing `User`, `UserPreference`, and `AccountApproval` tables).
 - **Live Website Acceptance:** `USER-CONFIRMED COMPLETE on 2026-10-05` (Interactive verification completed by operator `wnf2fn2nc0n`).
-- **Deferred Verification Items:** Real inbox physical receipt remains unobserved (provider acceptance logged); final CI checks and Staging/Production Deployment remain separate and pending.
-- **Staging / Production Deployment:** `PENDING` (Deferred to operator deployment via IDE Remote SSH).
+- **VPS Deployment & Container Health:** `DEPLOYED on 2026-10-06` (Release `ada891e` deployed to Nebula VPS `38.103.171.46`; web container healthy; Caddy restarted after shutdown and HTTPS restored; real-time toast, dynamic badge, and Resend email dispatch verified via post-deployment smoke test).
+- **Deferred Verification Items:** Real inbox physical receipt remains unobserved (provider acceptance logged); final CI checks remain deferred.

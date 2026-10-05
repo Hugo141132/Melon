@@ -207,5 +207,79 @@ describe('RetentionScheduler Unit Tests', () => {
 
       await expect(scheduler.runRetentionJob()).rejects.toThrow('Database connection failed');
     });
+
+    it('passes configured RETENTION_TABLES to pruneExpiredTelemetry', async () => {
+      mockEnv.RETENTION_TABLES = ['faucet_commands'];
+      const scheduler = new RetentionScheduler({
+        env: mockEnv,
+        retentionService: mockRetentionService,
+      });
+
+      await scheduler.runRetentionJob();
+
+      expect(mockRetentionService.pruneExpiredTelemetry).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tables: ['faucet_commands'],
+          retentionDays: 90,
+          batchSize: 1000,
+        })
+      );
+    });
+
+    it('passes undefined tables when RETENTION_TABLES is omitted (defaults to all tables)', async () => {
+      delete mockEnv.RETENTION_TABLES;
+      const scheduler = new RetentionScheduler({
+        env: mockEnv,
+        retentionService: mockRetentionService,
+      });
+
+      await scheduler.runRetentionJob();
+
+      expect(mockRetentionService.pruneExpiredTelemetry).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tables: undefined,
+        })
+      );
+    });
+  });
+
+  describe('RETENTION_TABLES Env Schema Validation', () => {
+    it('parses valid single table string to array', async () => {
+      const { gatewayEnvSchema } = await import('../config/env');
+      const parsed = gatewayEnvSchema.parse({
+        ...mockEnv,
+        RETENTION_TABLES: 'faucet_commands',
+      });
+      expect(parsed.RETENTION_TABLES).toEqual(['faucet_commands']);
+    });
+
+    it('parses comma-separated table string to array', async () => {
+      const { gatewayEnvSchema } = await import('../config/env');
+      const parsed = gatewayEnvSchema.parse({
+        ...mockEnv,
+        RETENTION_TABLES: 'soil_readings,faucet_commands',
+      });
+      expect(parsed.RETENTION_TABLES).toEqual(['soil_readings', 'faucet_commands']);
+    });
+
+    it('rejects explicitly empty RETENTION_TABLES string', async () => {
+      const { gatewayEnvSchema } = await import('../config/env');
+      expect(() =>
+        gatewayEnvSchema.parse({
+          ...mockEnv,
+          RETENTION_TABLES: '   ',
+        })
+      ).toThrow('RETENTION_TABLES cannot be explicitly empty');
+    });
+
+    it('rejects unapproved table names in RETENTION_TABLES', async () => {
+      const { gatewayEnvSchema } = await import('../config/env');
+      expect(() =>
+        gatewayEnvSchema.parse({
+          ...mockEnv,
+          RETENTION_TABLES: 'audit_logs',
+        })
+      ).toThrow('Invalid table in RETENTION_TABLES: "audit_logs"');
+    });
   });
 });

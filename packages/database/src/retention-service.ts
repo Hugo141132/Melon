@@ -110,6 +110,7 @@ export interface TableRetentionResult {
 
 export interface RetentionSummary {
   cutoffDate: Date;
+  commandCutoffDate?: Date;
   retentionDays: number;
   totalDeleted: number;
   tables: Record<ApprovedRetentionTable, TableRetentionResult>;
@@ -135,10 +136,15 @@ export class RetentionService {
     const yieldMs = Math.max(0, options.yieldMs ?? 20);
     const referenceNow = options.now ?? startedAt;
 
+    if (options.tables !== undefined && options.tables.length === 0) {
+      throw new Error(
+        'options.tables cannot be explicitly empty. Omit to target all approved tables or specify valid tables.'
+      );
+    }
+
     const defaultCutoffDate = new Date(
       referenceNow.getTime() - retentionDays * 24 * 60 * 60 * 1000
     );
-    const cutoffDate = defaultCutoffDate;
     const threeMonthCutoffDate = calculateThreeMonthUtcCutoff(referenceNow);
     const targetTables = options.tables ?? APPROVED_RETENTION_TABLES;
 
@@ -153,8 +159,10 @@ export class RetentionService {
     let totalDeleted = 0;
 
     for (const table of targetTables) {
+      // Enforce 3 calendar months with UTC month-end clamping for faucet_commands
+      // regardless of retentionDays or whether selected tables are command-only or mixed.
       const tableCutoffDate =
-        table === 'faucet_commands' && options.retentionDays === undefined
+        table === 'faucet_commands'
           ? threeMonthCutoffDate
           : options.retentionDays !== undefined
             ? new Date(referenceNow.getTime() - options.retentionDays * 24 * 60 * 60 * 1000)
@@ -192,9 +200,13 @@ export class RetentionService {
 
     const completedAt = new Date();
     const totalDurationMs = completedAt.getTime() - startedAt.getTime();
+    const isCommandOnly =
+      targetTables.length === 1 && targetTables[0] === 'faucet_commands';
+    const cutoffDate = isCommandOnly ? threeMonthCutoffDate : defaultCutoffDate;
 
     return {
       cutoffDate,
+      commandCutoffDate: threeMonthCutoffDate,
       retentionDays,
       totalDeleted,
       tables: tableResults as Record<ApprovedRetentionTable, TableRetentionResult>,

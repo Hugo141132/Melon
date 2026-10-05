@@ -336,5 +336,112 @@ describe('RetentionService Unit Tests', () => {
       });
       expect(summary.tables.reservoir_water_readings.deletedCount).toBe(2);
     });
+
+    it('enforces 3-calendar-month UTC cutoff for faucet_commands even when retentionDays is passed (e.g. 30 days)', async () => {
+      const fixedNow = new Date('2026-10-05T12:00:00.000Z');
+      const expected3MonthCutoff = new Date('2026-07-05T12:00:00.000Z');
+
+      mockPrisma.faucetCommand.findMany.mockResolvedValueOnce([]);
+
+      const summary = await retentionService.pruneExpiredTelemetry({
+        tables: ['faucet_commands'],
+        retentionDays: 30,
+        now: fixedNow,
+        yieldMs: 0,
+      });
+
+      // Verify faucet_commands query used 3-month cutoff, NOT 30-day cutoff
+      expect(mockPrisma.faucetCommand.findMany).toHaveBeenCalledWith({
+        where: expect.objectContaining({
+          status: {
+            in: ['COMPLETED', 'FAILED', 'CANCELLED', 'TIMEOUT', 'EXPIRED'],
+          },
+          OR: expect.arrayContaining([
+            { completedAt: { not: null, lt: expected3MonthCutoff } },
+            { failedAt: { not: null, lt: expected3MonthCutoff } },
+            { cancelledAt: { not: null, lt: expected3MonthCutoff } },
+            { status: { in: ['TIMEOUT', 'EXPIRED'] }, expiresAt: { lt: expected3MonthCutoff } },
+            {
+              completedAt: null,
+              failedAt: null,
+              cancelledAt: null,
+              updatedAt: { lt: expected3MonthCutoff },
+            },
+          ]),
+        }),
+        select: { id: true },
+        take: 1000,
+      });
+
+      expect(summary.cutoffDate).toEqual(expected3MonthCutoff);
+      expect(summary.commandCutoffDate).toEqual(expected3MonthCutoff);
+    });
+
+    it('handles mixed-table cutoffs: telemetry uses retentionDays while faucet_commands strictly uses 3 calendar months', async () => {
+      const fixedNow = new Date('2026-10-05T12:00:00.000Z');
+      const expected30DayCutoff = new Date(fixedNow.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const expected3MonthCutoff = new Date('2026-07-05T12:00:00.000Z');
+
+      mockPrisma.soilReading.findMany.mockResolvedValueOnce([]);
+      mockPrisma.faucetCommand.findMany.mockResolvedValueOnce([]);
+
+      const summary = await retentionService.pruneExpiredTelemetry({
+        tables: ['soil_readings', 'faucet_commands'],
+        retentionDays: 30,
+        now: fixedNow,
+        yieldMs: 0,
+      });
+
+      // Soil readings must use the 30-day cutoff
+      expect(mockPrisma.soilReading.findMany).toHaveBeenCalledWith({
+        where: { receivedAt: { lt: expected30DayCutoff } },
+        select: { id: true },
+        take: 1000,
+      });
+
+      // Faucet commands must strictly use the 3-month cutoff despite retentionDays=30
+      expect(mockPrisma.faucetCommand.findMany).toHaveBeenCalledWith({
+        where: expect.objectContaining({
+          OR: expect.arrayContaining([
+            { completedAt: { not: null, lt: expected3MonthCutoff } },
+          ]),
+        }),
+        select: { id: true },
+        take: 1000,
+      });
+
+      expect(summary.commandCutoffDate).toEqual(expected3MonthCutoff);
+    });
+
+    it('rejects explicitly empty tables array with error and does not delete anything', async () => {
+      await expect(
+        retentionService.pruneExpiredTelemetry({
+          tables: [],
+        })
+      ).rejects.toThrow('options.tables cannot be explicitly empty');
+
+      expect(mockPrisma.soilReading.findMany).not.toHaveBeenCalled();
+      expect(mockPrisma.faucetCommand.findMany).not.toHaveBeenCalled();
+    });
+
+    it('protects active commands: non-terminal statuses are never targeted for pruning', async () => {
+      const fixedNow = new Date('2026-10-05T12:00:00.000Z');
+      mockPrisma.faucetCommand.findMany.mockResolvedValueOnce([]);
+
+      await retentionService.pruneExpiredTelemetry({
+        tables: ['faucet_commands'],
+        now: fixedNow,
+        yieldMs: 0,
+      });
+
+      // Verify status array contains ONLY terminal statuses, strictly excluding QUEUED, SENT, ACKNOWLEDGED, IN_PROGRESS
+      const callArgs = mockPrisma.faucetCommand.findMany.mock.calls[0][0];
+      const targetedStatuses = callArgs.where.status.in;
+      expect(targetedStatuses).toEqual(['COMPLETED', 'FAILED', 'CANCELLED', 'TIMEOUT', 'EXPIRED']);
+      expect(targetedStatuses).not.toContain('QUEUED');
+      expect(targetedStatuses).not.toContain('SENT');
+      expect(targetedStatuses).not.toContain('ACKNOWLEDGED');
+      expect(targetedStatuses).not.toContain('IN_PROGRESS');
+    });
   });
 });

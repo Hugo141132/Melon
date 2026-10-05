@@ -49,6 +49,7 @@ export class RetentionScheduler {
       retentionDays: this.env.RETENTION_RAW_DAYS ?? 90,
       batchSize: this.env.RETENTION_BATCH_SIZE ?? 1000,
       intervalMs,
+      targetTables: this.env.RETENTION_TABLES ?? 'ALL_APPROVED_TABLES',
     });
 
     // Schedule periodic retention runs
@@ -98,12 +99,14 @@ export class RetentionScheduler {
         retentionDays: overrideOptions?.retentionDays ?? this.env.RETENTION_RAW_DAYS ?? 90,
         batchSize: overrideOptions?.batchSize ?? this.env.RETENTION_BATCH_SIZE ?? 1000,
         yieldMs: overrideOptions?.yieldMs ?? 20,
+        tables: overrideOptions?.tables ?? (this.env.RETENTION_TABLES as any),
         ...overrideOptions,
       };
 
       logger.info('Executing telemetry data retention cleanup...', {
         retentionDays: options.retentionDays,
         batchSize: options.batchSize,
+        targetTables: options.tables ?? 'ALL_APPROVED_TABLES',
       });
 
       const summary = await this.getService().pruneExpiredTelemetry(options);
