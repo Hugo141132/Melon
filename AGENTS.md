@@ -39,6 +39,17 @@ The system monitors:
 
 - Reservoir water volume, Reservoir status (Flow rate deleted per `DEC-MON-089`). Preserved on dedicated EMQX Cloud broker (`irigasi/melon/...`). Strict per-device latest-5 records retention (`DEC-MON-092` / `TASK-0917`).
 
+### Faucet Command History & Retention Invariants (DEC-CTRL-097, DEC-CTRL-098)
+
+- **Event-Driven History & Pagination**: Faucet command history updates on terminal transitions (`COMPLETED`, `TIMEOUT`, `EXPIRED`) and SSE events without repeated background polling while active commands execute. Enforces server-side pagination (10 rows/page), strict terminal-only status filters (`All Status`, `COMPLETED`, `TIMEOUT`, `EXPIRED`), and stale-response protection.
+- **Three-Calendar-Month Retention & Anti-Replay Tombstones**: Terminal commands older than 3 calendar months are pruned by `RetentionService` with UTC month-end clamping. Active commands are strictly protected. Purged keys are recorded in `faucet_command_idempotency_tombstones` to reject replayed commands with HTTP 409 Conflict. This policy is completely separate from the reservoir water latest-5 records policy.
+
+### Admin Approval & Owner Notification Invariants (DEC-AUTH-112)
+
+- **Owner-Exclusive Notifications**: Admin email verification triggers multi-channel notification exclusively for active Owners: bilingual transactional email via Resend (`sendAdminApprovalRequestEmail`), top-screen real-time toast (`AdminApprovalToastNotifier`), and sidebar menu badge counter.
+- **Database Query Invariant**: Active Owner selection MUST query strictly by enum code: `userRoles: { some: { role: { code: UserRole.OWNER } } }`. Querying by display string `name` is forbidden.
+- **Domain Decoupling**: Admin approval events are strictly decoupled from agronomic sensor alerts (`alerts` table) and `/notifications`.
+
 ### Sensor Battery (`BAT`)
 
 - Battery (`BAT`) parameter is completely removed from soil and water quality monitoring domains (`DEC-MON-086`, superseding `DEC-MON-085`).

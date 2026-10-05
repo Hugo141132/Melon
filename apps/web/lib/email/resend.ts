@@ -1750,3 +1750,231 @@ export async function sendAlertNotificationEmail(
     };
   }
 }
+
+export interface SendAdminApprovalRequestEmailInput {
+  toEmail: string;
+  recipientName: string;
+  applicantName: string;
+  applicantEmail: string;
+  registeredAt?: Date | string;
+  locale?: string;
+  requestId?: string;
+}
+
+export interface SendAdminApprovalRequestEmailResult {
+  success: boolean;
+  emailSent: boolean;
+  simulated?: boolean;
+  id?: string;
+  error?: string;
+}
+
+export function getAdminApprovalRequestEmailHtml(
+  input: SendAdminApprovalRequestEmailInput,
+  locale: string
+): { subject: string; html: string; text: string } {
+  const isId = locale.startsWith('id');
+  const logoUrl = getEmailLogoUrl();
+
+  const env = validateServerEnv();
+  const rawBaseUrl =
+    env.APP_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.APP_URL ||
+    'http://localhost:3000';
+  const baseUrl = rawBaseUrl.replace(/\/+$/, '');
+  const approvalsUrl = `${baseUrl}/approvals`;
+
+  const subject = isId
+    ? 'Permintaan Persetujuan Administrator Baru — Melon Governance'
+    : 'New Administrator Approval Request — Melon Governance';
+
+  const greeting = isId
+    ? `Halo ${input.recipientName || 'OWNER / PIC'},`
+    : `Hello ${input.recipientName || 'OWNER / PIC'},`;
+
+  const intro = isId
+    ? 'Seorang calon administrator baru telah menyelesaikan verifikasi email dan menunggu persetujuan Anda untuk mendapatkan akses ke Melon Governance Monitoring System:'
+    : 'A new administrator applicant has completed email verification and is awaiting your approval to access the Melon Governance Monitoring System:';
+
+  const applicantCardLabel = isId ? 'Rincian Pemohon' : 'Applicant Details';
+  const nameLabel = isId ? 'Nama Lengkap:' : 'Full Name:';
+  const emailLabel = isId ? 'Alamat Email:' : 'Email Address:';
+  const roleLabel = isId ? 'Peran Diminta:' : 'Requested Role:';
+  const requestedRoleValue = 'ADMINISTRATOR';
+  const timeLabel = isId ? 'Waktu Pendaftaran:' : 'Registration Time:';
+  const formattedTime = input.registeredAt
+    ? new Date(input.registeredAt).toLocaleString(isId ? 'id-ID' : 'en-US', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      })
+    : new Date().toLocaleString(isId ? 'id-ID' : 'en-US', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      });
+
+  const buttonText = isId ? 'Tinjau Persetujuan' : 'Review Approvals';
+  const footerNotice = isId
+    ? 'Anda menerima email ini karena terdaftar sebagai OWNER / PIC aktif di sistem Melon Governance.'
+    : 'You received this email because you are registered as an active OWNER / PIC on the Melon Governance system.';
+
+  const html = `
+<!DOCTYPE html>
+<html lang="${isId ? 'id' : 'en'}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${subject}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f4f7f4; margin: 0; padding: 24px; color: #1e293b; }
+    .container { max-width: 560px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 32px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+    .header { text-align: center; margin-bottom: 24px; }
+    .header img { height: 40px; width: auto; max-width: 220px; display: inline-block; object-fit: contain; margin: 0 auto; }
+    .content { font-size: 16px; line-height: 1.6; }
+    .card { background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 24px 0; }
+    .card-title { font-weight: 700; font-size: 14px; color: #334155; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .row { margin-bottom: 8px; font-size: 14px; }
+    .row:last-child { margin-bottom: 0; }
+    .label { color: #64748b; font-weight: 500; display: inline-block; width: 140px; }
+    .value { color: #0f172a; font-weight: 600; }
+    .badge { display: inline-block; background-color: #e0e7ff; color: #3730a3; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 700; }
+    .btn-container { text-align: center; margin: 28px 0; }
+    .btn { display: inline-block; background-color: #16a34a; color: #ffffff !important; padding: 14px 28px; font-size: 16px; font-weight: 600; text-decoration: none; border-radius: 8px; }
+    .footer { margin-top: 32px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-size: 13px; color: #64748b; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <img src="${logoUrl}" alt="Melon Governance" width="220" height="44" style="height: 40px; width: auto; max-width: 220px; display: inline-block; object-fit: contain; margin: 0 auto;" />
+    </div>
+    <div class="content">
+      <p><strong>${greeting}</strong></p>
+      <p>${intro}</p>
+
+      <div class="card">
+        <div class="card-title">${applicantCardLabel}</div>
+        <div class="row">
+          <span class="label">${nameLabel}</span>
+          <span class="value">${input.applicantName}</span>
+        </div>
+        <div class="row">
+          <span class="label">${emailLabel}</span>
+          <span class="value">${input.applicantEmail}</span>
+        </div>
+        <div class="row">
+          <span class="label">${roleLabel}</span>
+          <span class="badge">${requestedRoleValue}</span>
+        </div>
+        <div class="row">
+          <span class="label">${timeLabel}</span>
+          <span class="value">${formattedTime}</span>
+        </div>
+      </div>
+
+      <div class="btn-container">
+        <a href="${approvalsUrl}" class="btn" target="_blank" rel="noopener noreferrer">${buttonText}</a>
+      </div>
+    </div>
+    <div class="footer">
+      <p>${footerNotice}</p>
+      <p>© ${new Date().getFullYear()} Melon Governance Monitoring System. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>
+  `.trim();
+
+  const text = `
+Melon Governance
+==============================
+
+${greeting}
+
+${intro}
+
+${applicantCardLabel}:
+- ${nameLabel} ${input.applicantName}
+- ${emailLabel} ${input.applicantEmail}
+- ${roleLabel} ${requestedRoleValue}
+- ${timeLabel} ${formattedTime}
+
+${buttonText}: ${approvalsUrl}
+
+${footerNotice}
+© ${new Date().getFullYear()} Melon Governance Monitoring System.
+  `.trim();
+
+  return { subject, html, text };
+}
+
+export async function sendAdminApprovalRequestEmail(
+  input: SendAdminApprovalRequestEmailInput
+): Promise<SendAdminApprovalRequestEmailResult> {
+  const reqLogger = logger.child({
+    requestId: input.requestId,
+    applicantEmail: input.applicantEmail,
+  });
+
+  const env = validateServerEnv();
+  const locale = input.locale || env.DEFAULT_LOCALE || 'id';
+
+  const { subject, html, text } = getAdminApprovalRequestEmailHtml(input, locale);
+
+  const apiKey = env.RESEND_API_KEY || process.env.RESEND_API_KEY;
+  const fromEmail =
+    env.RESEND_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || DEFAULT_RESEND_FROM_EMAIL;
+
+  if (!apiKey || env.NODE_ENV === 'test' || process.env.NODE_ENV === 'test') {
+    reqLogger.info('Simulated admin approval request email delivery to ' + input.toEmail);
+    return {
+      success: true,
+      emailSent: false,
+      simulated: true,
+    };
+  }
+
+  try {
+    const resend = new Resend(apiKey);
+    const result = await sendWithRetry(
+      resend,
+      {
+        from: fromEmail,
+        to: [input.toEmail],
+        subject,
+        html,
+        text,
+      },
+      reqLogger
+    );
+
+    if (!result.success) {
+      reqLogger.error(
+        'Resend delivery reported error for admin approval request: ' +
+          (result.error || 'Unknown error')
+      );
+      return {
+        success: false,
+        emailSent: false,
+        error: result.error,
+      };
+    }
+
+    reqLogger.info('Admin approval request email dispatched successfully via Resend');
+    return {
+      success: true,
+      emailSent: true,
+      id: result.id,
+    };
+  } catch (err: any) {
+    reqLogger.error(
+      'Unexpected exception during Resend admin approval request email dispatch: ' +
+        (err?.message || String(err))
+    );
+    return {
+      success: false,
+      emailSent: false,
+      error: err?.message || 'Email delivery failed',
+    };
+  }
+}

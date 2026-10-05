@@ -4762,7 +4762,7 @@ The following facts are supported by the current implementation regarding device
 ## BUG-1011-01: Deployment Parity Follow-Up — VPS AI Recommendations Configuration & Alert Timezone Parity
 
 **Priority:** `P1` (Operational Parity, Agronomic Decision Support & Operator Notification Precision)
-**Status:** `PENDING_DEPLOYMENT_VERIFICATION` (Implementation complete; verification and deployment pending)
+**Status:** `IN_PROGRESS (WEB_DEPLOYED_AND_ML_VERIFIED)` (Web container release and External ML environment verified on VPS Nebula; alert timezone parity under UTC midnight rollover and deferred CI gates pending)
 **Dependencies:** `TASK-0413`, `TASK-0706`, `TASK-0707`, `TASK-1011`, `TASK-1012`
 **Recorded:** 2026-10-04 — Checkpointed deployment configuration parity follow-up for VPS AI recommendations and unified UTC/WIB presentation discrepancy across alert email notifications and `/notifications` UI:
 
@@ -4796,18 +4796,20 @@ The following full CI gates were deferred for this checkpoint and must be verifi
 - [ ] **`npm test`**: Complete test execution across all workspaces.
 - [ ] **`npm run test:e2e`**: Playwright browser end-to-end smoke test suite against staging environment.
 
-### 3. Unverified VPS Runtime Configuration & Live Items
-- [ ] **VPS ML Runtime Environment:** `EXTERNAL_ML_SUPABASE_URL` and `EXTERNAL_ML_SUPABASE_PUBLISHABLE_KEY` (or `EXTERNAL_ML_SUPABASE_SECRET_KEY`) injection into `/opt/kebun-melon/.env.production` via interactive `read -s` on VPS.
-- [ ] **Live Prediction Retrieval:** Authenticated API response verification on `GET /api/v1/devices/[deviceId]/predictions/latest` and UI cards rendering AI recommendations for soil and water quality monitoring.
-- [ ] **Live Email / UI Timezone Parity:** Live test alert trigger verification via Resend ensuring email timestamp displays WIB (`Asia/Jakarta`) and matches the `/notifications` UI view across UTC midnight date rollovers.
+### 3. VPS Runtime Verification Results & Status (2026-10-05)
+- [x] **Web Container Deployment (`kebun-melon-web:e7dee58`):** Recreated and verified healthy on VPS Nebula (`38.103.171.46`). Built off-VPS from commit `e7dee58e44fb5e5f143d9edfacf32cf7ae650194`, matching Image ID `sha256:4ae123fdc8f1b8178786248fc0efab6d220849885096ef6e4e0c4537ea5557e5`.
+- [x] **Rollback Baseline Image Preserved:** Tagged `kebun-melon-web:rollback-baseline` (Image ID `sha256:707d2588a3ccd769eba914813d1919e9f39531c76f3a82a128a0e10c5580e211`) preserved in local Docker daemon.
+- [x] **Ancillary Container Preservation:** `kebun-melon-gateway:t0917-e98fb37` (Image ID `sha256:510cfa3fae056444886e11c8ea1d1b21c8143d9518dd331ddea5a0da5aca04d9`, healthy) and `caddy:2.9-alpine` (Image ID `sha256:b4e3952384eb9524a887633ce65c752dd7c71314d2c2acf98cd5c715aaa534f0`, running) kept running without recreation.
+- [x] **VPS ML Runtime Environment:** `EXTERNAL_ML_SUPABASE_URL` and `EXTERNAL_ML_SUPABASE_PUBLISHABLE_KEY` (pointing to project `styjuynxuykvujnnqxos`) injected into `/opt/kebun-melon/.env.production` (permissions `600`) without exposing secret values.
+- [x] **Live Prediction Retrieval:** Authenticated API response verification on `GET /api/v1/devices/[deviceId]/predictions/latest` and UI cards rendering AI recommendations for soil and water quality monitoring verified working on `monitoring.melonmadura.my.id`.
+- [x] **Public & Local HTTPS Health:** `curl -I https://monitoring.melonmadura.my.id/health` returns HTTP 200 with valid TLS certificate.
+- [ ] **Live Email / UI Timezone Parity:** Live test alert trigger verification via Resend ensuring email timestamp displays WIB (`Asia/Jakarta`) and matches the `/notifications` UI view across UTC midnight date rollovers (Pending live verification).
 
-### 4. Staging / VPS Update Requirements & Rollback Reference
-- **Environment Updates:** Inject external ML Supabase keys into `/opt/kebun-melon/.env.production` (see `docs/VPS_DEPLOYMENT_RUNBOOK.md` §4.1).
-- **Container Rollout:** Rebuild and restart `kebun-melon-web` container (`docker compose --env-file .env.production -f docker-compose.prod.yml up -d --no-deps --build web`). IoT Gateway container does not require rebuild.
-- **Database Schema Drift:** 0 migrations required; schema unchanged.
-- **Reverse Proxy:** Zero configuration modifications required on Nginx/Caddy.
-- **Rollback Reference:** Follow `docs/VPS_DEPLOYMENT_RUNBOOK.md` §7.1. Previous image tag is preserved in `/opt/kebun-melon/.prev_web_image` (fallback to `kebun-melon-web:0.2.0-retention`).
-- **Release Verification Steps:** Execute health checks (`/health`, `/ready`), inspect container logs, verify authenticated prediction payload, and trigger test alert notification.
+### 4. Remaining Separate & Unverified Deployment Items
+- **Staging Status:** Must be verified independently (`docker-compose.staging.yml` was not part of this VPS web rollout).
+- **Database Retention Migration:** Migration `20261003230000_reservoir_water_readings_latest_5_retention` remains strictly separate, unexecuted, and unverified (destructive DML not executed).
+- **Hardware Prerequisites:** Valve hardware actuation prerequisites (`TASK-0414`) remain blocked on physical hardware.
+- **Rollback Reference:** Follow `docs/VPS_DEPLOYMENT_RUNBOOK.md` §8.8. Rollback image tag `kebun-melon-web:rollback-baseline` (`sha256:707d2588a3...`) is verified present on the host.
 
 ### 5. Checkpoint Acceptance Criteria
 - [x] External ML Supabase environment variables documented in `.env.production.example` and `docs/VPS_DEPLOYMENT_RUNBOOK.md`.
@@ -4817,8 +4819,9 @@ The following full CI gates were deferred for this checkpoint and must be verifi
 - [x] Date rollover across midnight UTC handled accurately without manual 7-hour arithmetic.
 - [x] 100% HTML, plain-text, and UI timestamp presentation parity guaranteed.
 - [x] Focused automated unit tests and credential-free checks passing (28/28 tests, typecheck, lint, format, security scans).
+- [x] VPS runtime deployment and live prediction retrieval executed by operator (Web container `e7dee58` healthy, External ML Supabase connected).
 - [ ] Outstanding deferred CI gates (`test:coverage`, `test:integration`, `check:quality`, `test`, `test:e2e`) executed and verified.
-- [ ] VPS runtime deployment, live prediction retrieval, and live alert email/UI verification executed by operator.
+- [ ] Live alert email / UI timezone parity under midnight UTC rollover verified.
 
 ---
 
@@ -4856,5 +4859,135 @@ The following full CI gates were deferred for this checkpoint and must be verifi
 - [ ] Outage recovery navigation to `/login?reason=outage`, verifying cookie revocation and guest guard blocking silent redirect.
 - [ ] Focused dashboard runtime heap and FPS profiling under authenticated session.
 
+---
 
+## TASK-0814: Valve Command History Real-Time Optimization & 3-Month Retention Policy
 
+**Priority:** `P1` (Operational Observability, Real-Time Resilience & Data Retention Governance)
+**Status:** `DONE`
+**Dependencies:** `TASK-0813`, `TASK-0414`, `TASK-0915`, `DEC-DEV-036`
+**Frontend Impact:** `MINOR`
+**Selected UI Direction:** `Premium Minimal Ops`
+**Existing Color Template:** `UNCHANGED`
+**Selected Motion Effects:** `Button hover`
+**21st.dev MCP:** `NOT REQUIRED`
+
+### 1. Implemented Changes
+- **Valve Command History Real-Time Optimization (`apps/web/components/controls/FaucetHistoryTable.tsx`):**
+  - Eliminated continuous 2.5-second polling refreshes while commands are active in `FaucetHistoryTable`.
+  - Refactored realtime SSE handling: listens to `faucet.command.updated` and refreshes history strictly ONCE when a command transitions to a terminal state (`COMPLETED`, `TIMEOUT`, or `EXPIRED`).
+  - Implemented terminal event deduplication via `processedTerminalTransitionsRef` (`Set<string>` of `${commandId}:${status}`) preventing repeated refreshes or duplicate fetches.
+  - Implemented stream reconnection reconciliation: detects when the SSE connection transitions from `CLOSED`/`CONNECTING`/`POLLING` to `OPEN` and automatically reconciles the history table.
+  - Maintained dedicated physical/active command monitoring on `FaucetStatusCard` without polluting the terminal history table.
+- **3-Month Terminal Retention Policy & Anti-Replay Tombstones (`packages/database/src/retention-service.ts` & `faucet-command-repository.ts`):**
+  - Defined automatic 3-calendar-month retention cutoff using strict UTC month calculation (`calculateThreeMonthUtcCutoff(refDate)`).
+  - Terminal commands (`COMPLETED`, `FAILED`, `CANCELLED`, `TIMEOUT`, `EXPIRED`) older than 3 calendar months based on terminal timestamps (`completedAt`, `failedAt`, `cancelledAt`, `expiresAt`, `updatedAt`) are targeted for pruning.
+  - Active/in-flight commands (`QUEUED`, `SENT`, `ACKNOWLEDGED`, `IN_PROGRESS`) are strictly protected and never purged.
+  - Implemented transactional deletion with anti-replay protection: creates immutable tombstone records in `faucet_command_idempotency_tombstones` (`idempotency_key`, `command_id`, `device_id`, `original_status`, `requested_at`, `purged_at`) before cascading deletion of `faucet_command_events` and `faucet_commands`.
+  - Enforced anti-replay rejection in `createCommand`: rejects incoming requests using previously purged idempotency keys with `FaucetCommandConflictError`.
+  - Prepared database DDL migration `20261005193000_add_faucet_command_idempotency_tombstones/migration.sql` without running destructive or unverified migrations on live database.
+
+### 2. Verification
+- `packages/database/src/__tests__/faucet-command-repository.test.ts`: 27/27 tests passed (100%).
+- `packages/database/test/retention-service.test.ts`: 12/12 tests passed (100%, including UTC month-end clamping).
+- `apps/web/test/unit/faucet-history-realtime.test.tsx`: 4/4 tests passed (100%).
+
+### 3. Acceptance & Deployment Tracking
+- **Code & Test Implementation:** `COMPLETE` (100% verified across contracts, repositories, UI handlers, and unit tests).
+- **Database Migration Status:**
+  - Dev Database: `APPLIED IN DEV` (Migration `20261005193000_add_faucet_command_idempotency_tombstones` applied per operator output).
+  - Reservoir Retention Migration (`20261003230000_reservoir_water_readings_latest_5_retention`): Remains separate and `PENDING` (destructive DML not executed).
+  - Staging & Production: `PENDING` (Deferred to operator deployment pass).
+- **Live Website Acceptance:** `USER-CONFIRMED COMPLETE on 2026-10-05` (Interactive verification completed by operator `wnf2fn2nc0n`).
+- **Deferred Runtime Items:**
+  - Unobserved 3-month physical deletion scenarios in the field remain pending future schedule triggers.
+  - Actual memory/latency performance profiling remains separate and pending (unsupported claims such as `<=50 KB RAM` or guaranteed zero latency overhead are qualified).
+- **Staging / Production Deployment:** `PENDING` (Deferred to operator deployment via IDE Remote SSH).
+
+---
+
+## TASK-0918: Server-Side Command History Pagination, Deterministic Ordering & Filter Invariants
+
+**Priority:** `P1` (API Contract Strictness, Deterministic Pagination & Data Integrity)
+**Status:** `DONE`
+**Dependencies:** `TASK-0913`, `TASK-0915`, `TASK-0814`
+**Frontend Impact:** `MINOR`
+**Selected UI Direction:** `Premium Minimal Ops`
+**Existing Color Template:** `UNCHANGED`
+**Selected Motion Effects:** `Button hover`
+**21st.dev MCP:** `NOT REQUIRED`
+
+### 1. Implemented Changes
+- **Strict Terminal Status Filter Invariant:**
+  - Restricted `FaucetHistoryTable` status dropdown to exactly 4 options: `All Status`, `COMPLETED`, `TIMEOUT`, `EXPIRED`. Non-terminal statuses (`QUEUED`, `SENT`, `IN_PROGRESS`, `ACKNOWLEDGED`) are strictly excluded from the dropdown.
+  - When `All Status` is selected, frontend query sends `statuses=COMPLETED,TIMEOUT,EXPIRED` to the API.
+  - In `packages/contracts/src/faucet.ts`: added `statuses: z.array(z.nativeEnum(FaucetCommandStatus)).optional()` to `FaucetCommandQueryInputSchema`.
+  - In `apps/web/app/api/v1/devices/[deviceId]/faucet-commands/route.ts`: parsed `statuses` comma-separated query parameter.
+  - In `packages/database/src/faucet-command-repository.ts`: filtered terminal statuses at the SQL level before executing `count`, `skip`, and `take` (`where.status = { in: query.statuses }`).
+- **Deterministic Ordering & Auto-Recovery Pagination:**
+  - Enforced absolute deterministic ordering in database query: `orderBy: [{ [sortField]: sortOrder }, { id: sortOrder }]`, guaranteeing stable pagination across identical timestamps.
+  - Guaranteed page reset to 1 upon changing `deviceId` or `statusFilter`.
+  - Implemented auto-recovery from empty pages: when data has been pruned or purged and `history.length === 0 && pagination.totalItems > 0 && pagination.page > pagination.totalPages`, automatically navigates back to `pagination.totalPages`.
+- **Independent Child Table State & Stale Response Protection:**
+  - Refactored `FaucetHistoryTable` to own its state (`currentPage`, `selectedStatus`, `items`, `pagination`), removing parent overrides on background re-render.
+  - Standardized API pagination parsing across nested formats (`json.data?.pagination || json.data?.meta?.pagination || json.meta?.pagination`).
+  - Added request sequence guard (`fetchSeqRef`) discarding stale or out-of-order network responses.
+  - Fixed server-side pagination to 10 rows per page with active page and filter preservation.
+
+### 2. Verification
+- Contract and database tests passing with 100% success rate.
+- Verified deterministic sort order in unit tests.
+- `apps/web/test/unit/faucet-history-realtime.test.tsx`: 4/4 tests passed (100%).
+
+### 3. Acceptance & Deployment Tracking
+- **Code & Test Implementation:** `COMPLETE` (100% verified across contracts, repositories, routes, and UI pagination).
+- **Live Database Migration:** `NOT REQUIRED` (Reuses existing database indexes and pagination parameters).
+- **Live Website Acceptance:** `USER-CONFIRMED COMPLETE on 2026-10-05` (Manual verification completed by operator `wnf2fn2nc0n`).
+- **Staging / Production Deployment:** `PENDING` (Deferred to operator deployment via IDE Remote SSH).
+
+---
+
+## TASK-0219: Admin Approval Notification, Top Toast & Badge Synchronization
+
+**Priority:** `P1` (Owner Governance, Real-Time Alerts & Multi-Device State Synchronization)
+**Status:** `DONE`
+**Dependencies:** `TASK-0206`, `TASK-0207`, `TASK-0214`, `TASK-0215`
+**Frontend Impact:** `MINOR`
+**Selected UI Direction:** `Premium Minimal Ops`
+**Existing Color Template:** `UNCHANGED`
+**Selected Motion Effects:** `Modal`, `Button hover`
+**21st.dev MCP:** `NOT REQUIRED`
+
+### 1. Implemented Changes
+- **Admin Eligibility Notification Trigger (`apps/web/app/api/v1/auth/verify-email/route.ts`):**
+  - When an applicant with role `ADMIN` and status `PENDING_APPROVAL` successfully verifies their email via `verifyEmailWithToken`:
+    - Queries all active OWNER accounts using the role enum code `userRoles.some.role.code = UserRole.OWNER` (fixing previous role name matching bug).
+    - Dispatches bilingual transactional email via Resend (`sendAdminApprovalRequestEmail`) tailored to each Owner's `preferredLocale` with applicant details and direct review link to `${baseUrl}/approvals`. Calls are wrapped in `Promise.allSettled` to prevent provider rejections from causing applicant verification failure (awaited dispatch may affect verification endpoint response latency).
+    - Structured logging records email dispatch progression across 4 observable states (*Send not attempted*, *Provider rejected*, *Accepted*, *Delivered*) with recipient metadata safely redacted.
+    - Broadcasts real-time SSE event `admin.approval.requested` to connected clients.
+    - Strictly preserves boundary: never writes to the sensor `Alert` table or `/notifications` route.
+- **Server-Side SSE Stream Authorization (`apps/web/app/api/v1/realtime/stream/route.ts`):**
+  - Added strict server-side RBAC authorization: `admin.approval.*` events (`admin.approval.requested`, `admin.approval.decided`) are strictly filtered and transmitted ONLY to active sessions holding the `OWNER` role (`session.activeRoles.includes(UserRole.OWNER)`). Non-Owner sessions never receive approval payloads.
+  - Registered `approvals` channel in stream filtering.
+- **Real-Time Top Toast Notifier (`apps/web/components/notifications/AdminApprovalToastNotifier.tsx`):**
+  - Implemented top toast notifier in RootLayout (`apps/web/app/layout.tsx`) active exclusively for `OWNER`.
+  - Renders non-intrusive `Premium Minimal Ops` toast at the top center of the screen with applicant details, an interactive review button leading to `/approvals` using key `common.view` (`"Lihat"` in `id.json` / `"View"` in `en.json`, resolving `MISSING_MESSAGE`), and a dismiss button.
+  - Deduplicates events via unique request keys, auto-dismisses after 8 seconds, and automatically clears when a decision event (`admin.approval.decided`) is received.
+- **Dynamic Sidebar Badge Synchronization (`apps/web/hooks/useAdminApprovalBadge.ts` & `Sidebar.tsx`):**
+  - Created `useAdminApprovalBadge` hook querying `/api/v1/approvals/pending?pageSize=1` and listening to `melon:approvals-updated`.
+  - Added bright red badge counter on the `/approvals` menu item in `Sidebar.tsx` for `OWNER`.
+  - In `apps/web/app/api/v1/approvals/[userId]/approve/route.ts` and `reject/route.ts`: publishes `admin.approval.decided` and dispatches `melon:approvals-updated` in `apps/web/app/approvals/page.tsx` on action completion.
+
+### 2. Verification
+- `apps/web/test/unit/admin-approval-toast-and-badge.test.tsx`: 4/4 tests passed (100%).
+- `apps/web/test/unit/resend-email.test.ts`: 15/15 tests passed (100%).
+- `apps/web/test/unit/verify-email-routes.test.ts`: 10/10 tests passed (100%).
+- `apps/web/test/unit/sidebar-navigation.test.tsx`: 12/12 tests passed (100%).
+- `npm run typecheck`: 0 errors across all 4 monorepo packages.
+
+### 3. Acceptance & Deployment Tracking
+- **Code & Test Implementation:** `COMPLETE` (100% verified across email service, routes, SSE authorizations, and UI components).
+- **Live Database Migration:** `NOT REQUIRED` (Reuses existing `User`, `UserPreference`, and `AccountApproval` tables).
+- **Live Website Acceptance:** `USER-CONFIRMED COMPLETE on 2026-10-05` (Interactive verification completed by operator `wnf2fn2nc0n`).
+- **Deferred Verification Items:** Real inbox physical receipt remains unobserved (provider acceptance logged); final CI checks and Staging/Production Deployment remain separate and pending.
+- **Staging / Production Deployment:** `PENDING` (Deferred to operator deployment via IDE Remote SSH).

@@ -59,6 +59,9 @@ export default function PendingApprovalsPage() {
       } else {
         setApproveSuccess(true);
         setDecisionNote('');
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('melon:approvals-updated'));
+        }
         setTimeout(() => {
           setSelectedUserId(null);
           setDetailItem(null);
@@ -89,6 +92,9 @@ export default function PendingApprovalsPage() {
       } else {
         setRejectSuccess(true);
         setDecisionNote('');
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('melon:approvals-updated'));
+        }
         setTimeout(() => {
           setSelectedUserId(null);
           setDetailItem(null);

@@ -83,6 +83,8 @@ export function useRealtimeMonitoring({
       'alert.created',
       'alert.updated',
       'faucet.command.updated',
+      'admin.approval.requested',
+      'admin.approval.decided',
       'access.revoked',
       'session.expired',
     ];

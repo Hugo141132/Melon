@@ -538,9 +538,19 @@ The actuator control interface is structured into modular, single-responsibility
 ```
 
 **Architecture Contracts:**
-1. **Idempotency**: Client generates `cmd-<uuid>` and transmits it exclusively via HTTP header `Idempotency-Key`.
+1. **Idempotency & Anti-Replay Tombstones (`DEC-CTRL-098`)**: Client generates `cmd-<uuid>` and transmits it exclusively via HTTP header `Idempotency-Key`. The backend checks both active commands and `faucet_command_idempotency_tombstones`. If a command was pruned after 3 calendar months, its tombstone record permanently blocks replay submissions with HTTP 409 `DUPLICATE_COMMAND`.
 2. **Polling Lifecycle**: `FaucetStatusCard` polls `GET /api/v1/devices/{deviceId}/faucet-commands/{commandId}` every 2,500ms strictly while status is `QUEUED`, `SENT`, `ACKNOWLEDGED`, or `IN_PROGRESS`. Polling immediately terminates upon reaching any terminal state (`COMPLETED`, `FAILED`, `CANCELLED`, `TIMEOUT`, `EXPIRED`) or upon component unmount.
 3. **Physical State Derivation**: Authoritative physical valve state (`OPEN`, `CLOSED`, `UNKNOWN`) is derived strictly from verified terminal command outcomes (`COMPLETED OPEN` $\rightarrow$ `OPEN`, `COMPLETED CLOSE` $\rightarrow$ `CLOSED`; active commands, failures, and `DISPENSE` completions strictly present `UNKNOWN`).
+4. **Independent History Table State & Event-Driven Refresh (`DEC-CTRL-097`)**:
+   - `FaucetHistoryTable` encapsulates its own pagination and filter state (`currentPage`, `selectedStatus`, `items`, `pagination`). Parent components do NOT push external `initialItems` or `initialPagination` overrides on background re-renders.
+   - When active commands monitored in `FaucetStatusCard` transition to a terminal state (`COMPLETED`, `TIMEOUT`, `EXPIRED`), an event triggers exactly one child table refresh, keeping in-flight polling and historical viewing decoupled.
+   - Out-of-order network responses are discarded using a monotonically increasing sequence reference (`fetchSeqRef`), preventing stale responses from overwriting current page data.
+   - Server-side pagination is fixed at 10 items per page with compound deterministic sorting (`createdAt DESC, id DESC`). Filtering is restricted strictly to terminal statuses (`ALL`, `COMPLETED`, `TIMEOUT`, `EXPIRED`).
+5. **Three-Calendar-Month Data Retention with Anti-Replay Tombstones (`DEC-CTRL-098`)**:
+   - Terminal records older than 3 calendar months (UTC month-end clamped via `calculateThreeMonthUtcCutoff(refDate)`) are purged.
+   - Active commands (`QUEUED`, `SENT`, `ACKNOWLEDGED`, `IN_PROGRESS`) are strictly protected from deletion.
+   - Idempotency keys of deleted commands are archived in `faucet_command_idempotency_tombstones`.
+   - Distinct and independent from the separate reservoir water latest-5 records policy (`DEC-MON-092`), whose migration remains pending in dev.
 
 ### 8.6 Historical Monitoring UI Subsystem (`/soil`, `/water` / TASK-0504, DEC-UIUX-104)
 
@@ -577,19 +587,33 @@ The authentication layer shall verify:
 - Permission changes.
 - Suspension or deactivation.
 
-### 9.2 Account Approval
+### 9.2 Account Approval & Multi-Channel Owner Notification (`DEC-AUTH-112`)
 
-Registration flow:
+Registration & Approval Flow:
 
 ```text
 Public registration
 → ADMIN role
-→ PENDING_APPROVAL
-→ Owner decision
-→ APPROVED or ACTIVE
+→ emailVerifiedAt IS NULL (Verification token generated)
+→ Applicant completes email verification (/verify-email)
+→ emailVerifiedAt set to NOW()
+→ accountStatus remains PENDING_APPROVAL
+→ Server queries active Owners (userRoles.some.role.code = UserRole.OWNER)
+→ Multi-Channel Notification:
+   ├─ Bilingual transactional email via Resend (Promise.allSettled)
+   ├─ Server-Sent Event (admin.approval.requested)
+   │   ├─ Top toast notification (AdminApprovalToastNotifier with common.view CTA)
+   │   └─ Dynamic sidebar/topbar badge counters
+   └─ Strictly isolated from agronomic alerts (/notifications intact)
+→ Owner reviews pending applicants on /approvals
+→ APPROVED or ACTIVE (or REJECTED)
 ```
 
-The distinction between `APPROVED` and `ACTIVE` remains `TBD`.
+**Architectural Contracts:**
+1. **Recipient Query Invariant:** Recipient resolution queries active Owners strictly via the role code enum (`role: { code: UserRole.OWNER }`), avoiding string matching bugs.
+2. **Resend Delivery Fault Tolerance & Latency Impact:** Email delivery calls are awaited via `Promise.allSettled`. A provider outage or rejection does NOT fail the applicant's HTTP 200 verification response, but the awaited external call can affect verification endpoint response latency.
+3. **Observability Without Secret Leakage:** Email delivery status transitions through four structured observable states (*Send not attempted*, *Provider rejected*, *Accepted*, *Delivered*) with recipient metadata safely redacted.
+4. **Domain Alert Isolation:** The administrative approval workflow is architecturally distinct from agronomic telemetry alerts. Approval events are never inserted into the `alerts` table and never appear on `/notifications`.
 
 ### 9.3 Session Strategy
 

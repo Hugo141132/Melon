@@ -115,6 +115,7 @@ export const FaucetCommandQueryInputSchema = z.object({
   pageSize: z.number().int().min(1).max(100).default(20),
   deviceId: z.string().uuid().optional(),
   status: z.nativeEnum(FaucetCommandStatus).optional(),
+  statuses: z.array(z.nativeEnum(FaucetCommandStatus)).optional(),
   initiatedByUserId: z.string().uuid().optional(),
   from: z.string().datetime().optional(),
   to: z.string().datetime().optional(),

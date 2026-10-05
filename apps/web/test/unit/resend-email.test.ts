@@ -434,4 +434,40 @@ describe('TASK-0213 Resend Email Service Unit Tests', () => {
       })
     );
   });
+
+  it('dispatches admin approval request email to OWNER with applicant details and review link', async () => {
+    process.env.RESEND_API_KEY = 're_test_key_12345';
+    process.env.RESEND_FROM_EMAIL = 'Melon Governance <noreply@melonmadura.my.id>';
+    (process.env as Record<string, string | undefined>).NODE_ENV = 'development';
+
+    const sendMock = vi.fn().mockResolvedValue({
+      data: { id: 'email_approval_req_789' },
+      error: null,
+    });
+
+    (Resend as unknown as any).mockImplementation(function (this: any) {
+      this.emails = { send: sendMock };
+    });
+
+    const { sendAdminApprovalRequestEmail } = await import('../../lib/email/resend');
+    const result = await sendAdminApprovalRequestEmail({
+      toEmail: 'owner@kebunmelon.com',
+      recipientName: 'Budi Santoso',
+      applicantName: 'Siti Aminah',
+      applicantEmail: 'siti@example.com',
+      locale: 'id',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.emailSent).toBe(true);
+    expect(result.id).toBe('email_approval_req_789');
+    expect(sendMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        from: 'Melon Governance <noreply@melonmadura.my.id>',
+        to: ['owner@kebunmelon.com'],
+        subject: 'Permintaan Persetujuan Administrator Baru — Melon Governance',
+        text: expect.stringContaining('Siti Aminah'),
+      })
+    );
+  });
 });

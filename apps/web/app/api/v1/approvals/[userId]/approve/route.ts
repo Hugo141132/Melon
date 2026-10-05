@@ -9,6 +9,7 @@ import {
   applyRateLimitToResponse,
 } from '../../../../../../lib/rate-limit';
 import { validateServerEnv } from '../../../../../../lib/env/server';
+import { realtimeEventHub } from '../../../../../../lib/realtime/event-hub';
 
 export async function POST(request: Request, props: { params: Promise<{ userId: string }> }) {
   const params = await props.params;
@@ -132,6 +133,17 @@ export async function POST(request: Request, props: { params: Promise<{ userId: 
         { status: 500 }
       );
     }
+
+    // Broadcast decision to update badges and real-time streams
+    realtimeEventHub.publish({
+      name: 'admin.approval.decided',
+      data: {
+        userId,
+        decision: 'APPROVED',
+        decidedByUserId: session.id,
+        timestamp: new Date().toISOString(),
+      },
+    });
 
     const response = NextResponse.json(
       {

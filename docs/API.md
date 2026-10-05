@@ -765,6 +765,13 @@ Server rules:
 - Handles Prisma `P2034` transaction write conflicts with bounded retries (3 attempts), returning `CONCURRENCY_CONFLICT` (HTTP 409) upon exhaustion.
 - Returns `TOKEN_ALREADY_USED` (HTTP 400) if code was already used (`P2025` or user already verified).
 - Emits structured audit log `account.email.verified`.
+- **Owner Approval Notification Trigger (`DEC-AUTH-112` / `TASK-0219`):**
+  - If verified user has `accountStatus === 'PENDING_APPROVAL'`, selects active Owner accounts strictly via enum code: `userRoles: { some: { role: { code: UserRole.OWNER }, revokedAt: null } }`, `accountStatus = 'ACTIVE'`, and `emailVerifiedAt != null`. Querying by display name `Role.name` is forbidden.
+  - Broadcasts Server-Sent Event `admin.approval.requested` on `/api/v1/realtime/stream` (authorized exclusively to active Owner sessions).
+  - Dispatches bilingual transactional email via Resend (`sendAdminApprovalRequestEmail`) to each active Owner in parallel via `Promise.allSettled`, formatted in the Owner's `userPreference.preferredLocale` (`id` or `en`) with applicant details and deep links to `/approvals`.
+  - Delivery outcomes are recorded in structured server logs without credentials (*send not attempted*, *provider rejected*, *accepted*, *delivered*).
+  - External provider rejections or network failures do NOT fail the applicant's HTTP 200 email verification response.
+  - Awaited email delivery calls can affect HTTP response latency on verification.
 
 Frontend rules:
 - Employs in-flight Promise map deduplication with immediate cache eviction on settlement (`finally`) to ensure exactly 1 network POST in React Strict Mode / remounts while delivering navigation triggers to the active mount.
@@ -772,7 +779,7 @@ Frontend rules:
 - Enforces server-side guest guard (`DEC-AUTH-103`), redirecting authenticated sessions on `/verify-email` to `/`.
 
 Testing status:
-- *Delivery & Testing Status*: Verification has been manually exercised using Resend test mode/test recipients and 6-digit code dispatch. We have not yet tested delivery to arbitrary real email recipients using a verified custom sending domain, because no such domain is currently configured. Real-mailbox deliverability is treated as pending deployment/infrastructure acceptance, not an application logic failure.
+- *Delivery & Acceptance Status*: Website manual acceptance confirmed complete by user on 2026-10-05. External inbox delivery verification and final CI checks remain pending.
 
 Possible errors:
 - `400 Bad Request`: `VALIDATION_ERROR`, `INVALID_TOKEN`, `TOKEN_EXPIRED`, `TOKEN_ALREADY_USED`
@@ -2286,7 +2293,7 @@ DEVICE_OFFLINE
 DEVICE_NOT_CONTROLLABLE
 ACTIVE_COMMAND_EXISTS
 INVALID_PHASE
-DUPLICATE_COMMAND
+DUPLICATE_COMMAND (matches active or purged tombstone key per DEC-CTRL-098)
 GATEWAY_UNAVAILABLE
 ```
 
@@ -2303,14 +2310,32 @@ GET /api/v1/devices/{deviceId}/faucet-commands
 
 Query parameters:
 
-```text
-page
-pageSize
-status
-from
-to
-initiatedBy
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `page` | integer | No | 1-based page number (default: `1`) |
+| `pageSize` | integer | No | Items per page (default: `20`, UI default: `10`, range: `1`..`100`) |
+| `status` | string | No | Single canonical status filter |
+| `statuses` | string | No | Comma-separated canonical statuses (e.g. `COMPLETED,TIMEOUT,EXPIRED`) for multi-status filtering before pagination |
+| `from` | ISO date | No | Filter `requestedAt >= from` |
+| `to` | ISO date | No | Filter `requestedAt <= to` |
+| `initiatedBy` | UUID | No | Filter by initiating user ID |
+| `sortField` | string | No | Sort field (`requestedAt`, `completedAt`, etc., default: `requestedAt`) |
+| `sortOrder` | string | No | `asc` or `desc` (default: `desc`) |
+
+**Deterministic Ordering Guarantee:**
+The backend repository executes deterministic pagination with tie-breaker sorting:
+```typescript
+orderBy: [{ [sortField]: sortOrder }, { id: sortOrder }]
 ```
+
+**Real-Time Optimization & Refresh Policy (`TASK-0814` / `TASK-0918` / `DEC-CTRL-097`):**
+- Periodic 2.5-second polling of `FaucetHistoryTable` during active commands has been permanently eliminated. Active in-flight command monitoring and polling remain strictly encapsulated in `FaucetStatusCard`.
+- `FaucetHistoryTable` loads upon mount or filter change and triggers a single, deduplicated refresh strictly when an active command transitions to a terminal state (`COMPLETED`, `TIMEOUT`, `EXPIRED`) via the Server-Sent Event `faucet.command.updated` or local state completion.
+- When the history filter dropdown is set to `All Status`, the frontend transmits `statuses=COMPLETED,TIMEOUT,EXPIRED`, ensuring in-flight commands do not pollute historical logs.
+- The UI paginates server-side with 10 rows per page, parsing pagination metadata robustly from `json.data?.pagination`, `json.data?.meta?.pagination`, or `json.meta?.pagination`.
+- Independent table state: `FaucetControlPanel` does not overwrite the table's state with parent `initialItems` on re-renders, preventing race conditions.
+- Stale-response protection: monotonic `fetchSeqRef` ensures delayed or out-of-order network responses are safely ignored.
+- If the current page becomes empty due to background retention purging, the UI automatically recovers by fetching the last valid page (`totalPages`).
 
 ---
 
@@ -2764,13 +2789,13 @@ Optional query parameters:
 
 ```text
 deviceId
-channels
+channels (e.g. telemetry, status, alerts, commands, approvals)
 ```
 
 Example:
 
 ```http
-GET /api/v1/realtime/stream?deviceId=water-node-001&channels=telemetry,status,alerts,commands
+GET /api/v1/realtime/stream?deviceId=water-node-001&channels=telemetry,status,alerts,commands,approvals
 ```
 
 Supported event names:
@@ -2782,6 +2807,8 @@ device.status.updated
 alert.created
 alert.updated
 faucet.command.updated
+admin.approval.requested
+admin.approval.decided
 access.revoked
 session.expired
 ```
@@ -2793,11 +2820,17 @@ event: faucet.command.updated
 data: {"commandId":"cmd-01JXYZ123","deviceId":"water-node-001","status":"IN_PROGRESS"}
 ```
 
+```text
+event: admin.approval.requested
+data: {"userId":"usr-01JXYZ789","fullName":"Budi Santoso","email":"budi@example.com","requestedAt":"2026-10-05T19:30:00.000Z"}
+```
+
 Security rules:
 
 - Validate session before connection.
 - Verify device access.
 - Filter every outgoing event.
+- **Admin Approval Event Authorization (`TASK-0219` / `DEC-DEV-036`):** Events `admin.approval.requested` and `admin.approval.decided` and the `approvals` channel are strictly restricted to authenticated sessions with the `OWNER` role (`session.activeRoles.includes('OWNER')`). Non-Owner clients will never receive registration approval events.
 - Terminate stream after session expiry.
 - Stop events after access revocation.
 - Do not expose MQTT topics or credentials.

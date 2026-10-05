@@ -648,6 +648,34 @@ Each faucet command shall record at least:
 - Failure reason, if available.
 - Manual Open/Close details, if available.
 
+### 11.6 Valve Command History & Terminal-State Optimization (PRD-FR-040 / TASK-0814 / TASK-0918 / DEC-CTRL-097 / DEC-CTRL-098)
+
+The Valve Command History component (`FaucetHistoryTable`) on `/controls` shall follow strict real-time, filtering, pagination, and data-lifecycle invariants:
+
+1. **Decoupled Real-Time Refresh Architecture:**
+   - The redundant 2.5-second polling interval of `FaucetHistoryTable` while commands are active is permanently eliminated. Active in-flight command monitoring and polling remain strictly encapsulated in `FaucetStatusCard`.
+   - `FaucetHistoryTable` refreshes exactly **once** upon command transition to any terminal status (`COMPLETED`, `TIMEOUT`, `EXPIRED`) triggered via Server-Sent Event `faucet.command.updated` or local state completion.
+   - Terminal transitions are deduplicated (`processedTerminalTransitionsRef`) to prevent redundant renders from concurrent SSE broadcasts.
+   - Reconnection reconciliation is enforced: when the SSE connection recovers from interrupted states (`CLOSED`, `CONNECTING`, `POLLING` $\rightarrow$ `OPEN`), the table performs a single reconciliation fetch.
+2. **Strict History Filter Invariant:**
+   - The status dropdown filter exclusively provides 4 selectable options: `All Status`, `COMPLETED`, `TIMEOUT`, and `EXPIRED`.
+   - The `All Status` option transmits `statuses=COMPLETED,TIMEOUT,EXPIRED` to filter exclusively terminal records at the database level before pagination (`count` and `skip/take`), ensuring in-flight active commands never pollute historical records.
+3. **Deterministic Pagination, Independent State & Stale-Response Protection:**
+   - Server-side pagination is bounded to `pageSize = 10` per page on the UI (with backend contract accepting 1 to 100). Next and Previous pagination controls allow navigation across all pages without dropping earlier commands from view.
+   - Ordering is strictly deterministic using compound sorting: `orderBy: [{ [sortField]: sortOrder }, { id: sortOrder }]`.
+   - The table independently parses pagination envelopes across `json.data?.pagination`, `json.data?.meta?.pagination`, or `json.meta?.pagination`.
+   - `FaucetControlPanel` does not overwrite the table's active state with parent `initialItems` on re-renders, preventing race conditions that push older records out of view.
+   - A monotonic `fetchSeqRef` ignores stale network responses arriving out of order.
+   - Active page resets to `1` whenever target device or status filter changes.
+   - If historical records on the current page are purged leaving the view empty, the table automatically recovers by fetching the last valid page (`totalPages`).
+4. **Terminal History 3-Month Retention & Anti-Replay Tombstones:**
+   - Terminal command records older than 3 calendar months calculated via exact UTC month math (`calculateThreeMonthUtcCutoff(refDate)`) with month-end clamping (e.g. May 31 $\rightarrow$ Feb 28 on non-leap years) are automatically cleaned up by `RetentionService`. Active commands (`QUEUED`, `SENT`, `ACKNOWLEDGED`, `IN_PROGRESS`) are strictly exempt.
+   - Replay attacks are permanently mitigated: purged idempotency keys are transactionally archived into `faucet_command_idempotency_tombstones`. Future command creation requests matching a tombstone key are deterministically rejected with HTTP 409 Conflict.
+   - **Independence from Reservoir Retention**: This faucet command retention mechanism is completely distinct from the separate reservoir water latest-5 records retention policy (`DEC-MON-092`). The tombstone migration (`20261005193000_add_faucet_command_idempotency_tombstones`) has been applied on the development database per operator execution, whereas the reservoir migration remains pending.
+5. **Acceptance Status**:
+   - Website manual verification confirmed complete by user on 2026-10-05.
+   - Production/staging migration deployment, actual performance profiling, live 3-month pruning observation, and the final 5 CI checks remain separate and pending.
+
 ---
 
 ## 12. Alerts and Notifications (PRD-FR-034)
@@ -673,9 +701,30 @@ Exact thresholds and notification channels are TBD.
 
 The system shall not invent soil or water alert thresholds.
 
-The Owner shall be able to view pending approval alerts.
-
 An Admin shall only view alerts within the Admin's authorised scope.
+
+### 12.1 Real-Time Admin Registration & Approval Workflow (PRD-FR-041 / TASK-0219 / DEC-AUTH-112)
+
+When an applicant registers for an `ADMIN` role with status `PENDING_APPROVAL` and completes email ownership verification (`verifyEmailWithToken`):
+
+1. **Bilingual Transactional Email Notification:**
+   - The system queries active `OWNER` accounts strictly via enum code: `userRoles: { some: { role: { code: UserRole.OWNER }, revokedAt: null } }`, with `accountStatus = 'ACTIVE'` and `emailVerifiedAt != null`. Querying by display name string (`name: 'OWNER'`) is strictly avoided.
+   - Transactional notification emails are dispatched via Resend (`sendAdminApprovalRequestEmail`) in parallel using `Promise.allSettled`, rendered in each Owner's `preferredLocale` (`id` or `en`) with high-contrast Melon Governance branding, inline logo attachment (`cid:logo1`), applicant details (name, email, verification timestamp), and a direct CTA link to `${baseUrl}/approvals`.
+   - Email dispatch results are observable in server logs without leaking credentials (*Send not attempted*, *Provider rejected*, *Accepted*, *Delivered*). Provider rejection does not fail the applicant's HTTP 200 verification response.
+2. **Real-Time Top Screen Toast Notification (`AdminApprovalToastNotifier`):**
+   - The server broadcasts the Server-Sent Event `admin.approval.requested` on `/api/v1/realtime/stream` (strictly authorized to active Owner sessions).
+   - Online Owners immediately receive an interactive toast notification at the top-center of their screen with an alert bell icon, applicant metadata, and a direct button linking to `/approvals`.
+   - The review action button consumes canonical localization key `common.view` (`"view": "Lihat"` in `id.json` and `"view": "View"` in `en.json`), preventing `MISSING_MESSAGE` errors.
+   - Incoming SSE events are deduplicated via `Set` tracking to prevent duplicate toast banners during reconnects or multi-window sessions.
+3. **Interactive Sidebar Approval Badge:**
+   - The sidebar navigation menu item for `/approvals` renders a dynamic red pill badge indicating the total count of pending Admin approval requests (`approvalCount > 0`).
+   - The count hydrates immediately on login/mount via `GET /api/v1/approvals/pending?pageSize=1` and dynamically updates upon receiving window events (`melon:approvals-updated`) or realtime SSE events (`admin.approval.requested` / `admin.approval.decided`).
+   - Approving or rejecting an applicant instantly invalidates and refreshes the badge count.
+4. **Decoupled System Architecture:**
+   - Admin approval notifications are strictly decoupled from physical agronomic sensor alerts. Approval events are never inserted into the `alerts` database table and do not appear on `/notifications`, preserving clean domain separation between infrastructure/user lifecycle and agronomy monitoring.
+5. **Acceptance Status**:
+   - Website manual acceptance confirmed complete by user on 2026-10-05.
+   - External inbox delivery verification and final CI checks remain pending.
 
 ---
 

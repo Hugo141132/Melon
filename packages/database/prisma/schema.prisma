@@ -483,6 +483,19 @@ model FaucetCommandEvent {
   @@map("faucet_command_events")
 }
 
+model FaucetCommandIdempotencyTombstone {
+  id             String    @id @default(uuid()) @db.Uuid
+  idempotencyKey String    @unique @map("idempotency_key") @db.VarChar(150)
+  commandId      String    @map("command_id") @db.VarChar(150)
+  deviceId       String    @map("device_id") @db.Uuid
+  originalStatus String    @map("original_status") @db.VarChar(40)
+  requestedAt    DateTime  @map("requested_at") @db.Timestamptz
+  purgedAt       DateTime  @default(now()) @map("purged_at") @db.Timestamptz
+
+  @@index([deviceId], map: "faucet_command_tombstones_device_id_idx")
+  @@map("faucet_command_idempotency_tombstones")
+}
+
 // -----------------------------------------------------------------------------
 // 5. Alert Tables
 // -----------------------------------------------------------------------------

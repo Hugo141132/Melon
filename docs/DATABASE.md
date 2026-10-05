@@ -79,6 +79,14 @@ Under `TASK-1011` / `TASK-1012 Tier 2`:
 - Application runtime connects via Transaction Pooler (`DATABASE_URL`, port `6543`) with `DIRECT_URL` configured for Prisma CLI operations.
 - Staging operates with `RETENTION_ENABLED=false` until data retention background jobs are formally scheduled.
 
+### 2.6 TASK-0814 / TASK-0918 / DEC-DEV-036 Database Model & Retention Reconciliation: faucet_command_idempotency_tombstones & 3-Month UTC Retention
+
+Under `TASK-0814`, `TASK-0918`, and `DEC-DEV-036`:
+- **New Tombstone Model & Migration:** Added `faucet_command_idempotency_tombstones` table via migration `20261005193000_add_faucet_command_idempotency_tombstones` to permanently retain idempotency keys and command metadata of purged terminal faucet commands (`COMPLETED`, `TIMEOUT`, `EXPIRED`).
+- **3-Month Calendar UTC Retention Policy:** Terminal faucet commands older than 3 calendar months calculated via exact UTC month math (`calculateThreeMonthUtcCutoff(refDate)`) are purged by `RetentionService`. Active in-flight commands (`QUEUED`, `SENT`, `ACKNOWLEDGED`, `IN_PROGRESS`) are strictly exempt from deletion.
+- **Anti-Replay Security Guarantee:** Purging executes inside an interactive database transaction: tombstone records are created first, followed by deletion of dependent `faucet_command_events`, and finally deletion of the target `faucet_commands`. Subsequent command submissions presenting purged idempotency keys are deterministically rejected with `FaucetCommandConflictError` (HTTP 409 Conflict).
+- **Migration & Live Database Invariant:** Migration file is committed to the repository codebase (`prisma/migrations/20261005193000_add_faucet_command_idempotency_tombstones/migration.sql`), while execution against live databases (Dev/Staging) is strictly deferred to scheduled deployment windows.
+
 ---
 
 
@@ -174,26 +182,30 @@ Security-sensitive and historical records (audit logs, telemetry history) shall 
 - Owner-initiated Admin Account Deletion (`DELETE /api/v1/users/{userId}` and `POST /api/v1/users/bulk-delete`): Permanently hard-deletes the target Admin user row(s) and account-owned dependent records (`sessions`, `user_roles`, `user_preferences`, `user_device_access`, `account_approvals`, `faucet_commands`, `alert_acknowledgements`) inside a single database transaction. All active sessions are immediately revoked. References to the deleted user as an actor in historical `audit_logs` are anonymized (`actorUserId = NULL`) to preserve audit continuity without foreign key errors. A dedicated `account.deleted` audit event is recorded capturing actor ID, deleted user ID, timestamp, and resolved reason (custom reason or default `"Account permanently deleted by OWNER / PIC."`). Owner accounts and accounts in `PENDING_APPROVAL` status are strictly protected from deletion.
 - Devices and Device assignments: Soft deletion or deactivation is used where historical telemetry reconstruction matters (`DEC-DEV-030`). Hard device deletion is permanently disabled.
 
-#### Telemetry Data Retention and Automated Maintenance Policy (TASK-0913 / TASK-0917)
+#### Telemetry and Command Data Retention and Automated Maintenance Policy (TASK-0913 / TASK-0917 / TASK-0814 / TASK-0918 / DEC-DEV-036)
 
-Telemetry and operational time-series data follow an automated lifecycle maintenance policy to prevent unbounded Supabase storage growth while ensuring compliance with the maximum 31-day historical query window (`DEC-MON-087`):
+Telemetry, operational time-series data, and terminal actuator records follow an automated lifecycle maintenance policy to prevent unbounded Supabase storage growth while ensuring compliance with analytical and audit requirements:
 
 1. **Raw Telemetry Retention TTL:** High-frequency raw sensor telemetry records (`soil_readings`, `water_readings`) and ephemeral operational errors older than **90 days** (`DEC-MON-048`) are automatically purged by scheduled maintenance routines.
 2. **Reservoir Water Telemetry Retention (`DEC-MON-092` / `TASK-0917`):** Unlike general time-series analytics, `reservoir_water_readings` retains strictly the **latest 5 records per device** (`deviceId`). Trimming executes atomically inside the ingestion transaction and is pruned in scheduled maintenance using a deterministic tie-breaker (`received_at DESC, id DESC`).
-3. **Approved Telemetry & Operational Tables:**
+3. **Terminal Faucet Command 3-Month Retention (`TASK-0814` / `TASK-0918` / `DEC-DEV-036`):**
+   - Terminal faucet commands (`status IN ('COMPLETED', 'TIMEOUT', 'EXPIRED')`) older than **3 calendar months** calculated using exact UTC month math (`calculateThreeMonthUtcCutoff(refDate)`) are automatically pruned.
+   - **Active Command Protection:** In-flight / active commands (`QUEUED`, `SENT`, `ACKNOWLEDGED`, `IN_PROGRESS`) are strictly protected from deletion regardless of age.
+   - **Tombstone Anti-Replay Guarantee:** Prior to deleting command and event rows, `RetentionService` transactionally inserts tombstone records into `faucet_command_idempotency_tombstones`. Future command submissions using purged idempotency keys are deterministically rejected with `FaucetCommandConflictError` (HTTP 409 Conflict).
+4. **Approved Retention Tables:**
    - `soil_readings` (90-day retention)
    - `water_readings` (90-day retention)
    - `reservoir_water_readings` (Latest 5 records per device)
    - `sensor_battery_readings` (legacy schema coverage)
    - `device_status_events` (90-day retention; valve events capped at latest 5 per device per `DEC-CTRL-095`)
    - `integration_errors` (90-day retention)
-3. **Protected & Exempt Data (Zero-Purge Guarantee):**
-   The following critical compliance, security, and operational audit tables are strictly **exempt** from telemetry retention cleanup (`SEC-DATA-004`) and are enforced as immutable / non-purgeable by `RetentionService`:
+   - `faucet_commands` (Terminal status only: `COMPLETED`, `TIMEOUT`, `EXPIRED`, older than 3 calendar months UTC)
+5. **Protected & Exempt Data (Zero-Purge Guarantee):**
+   The following critical compliance, security, and operational audit tables are strictly **exempt** from retention cleanup (`SEC-DATA-004`) and are enforced as immutable / non-purgeable:
    - `audit_logs` (Security and compliance audit history, retained indefinitely)
-   - `faucet_commands` (Actuator command audit trail and lifecycle records)
-   - `faucet_command_events` (Deterministic state transition log for faucet commands)
    - `account_approvals` (Historical Owner approval and rejection decision trail)
-4. **Chunked Batch Deletion Strategy:**
+   - Active `faucet_commands` (`QUEUED`, `SENT`, `ACKNOWLEDGED`, `IN_PROGRESS`)
+6. **Chunked Batch Deletion Strategy:**
    To eliminate table locks, prevent transaction timeouts, and avoid impacting real-time telemetry ingestion, deletions are executed iteratively in batches (`RETENTION_BATCH_SIZE`, default `1000`) using indexed primary key ID ranges (`DELETE FROM <table> WHERE id IN (...)`) with an asynchronous event loop pause (`yieldMs: 20`) between batches.
 5. **Execution Architecture:**
    - **Database Layer:** [`RetentionService`](file:///c:/Users/Puroh/Documents/Melon/packages/database/src/retention-service.ts) in `@kebun-melon/database`.
@@ -1215,6 +1227,45 @@ WHERE status IN ('QUEUED', 'SENT', 'ACKNOWLEDGED', 'IN_PROGRESS')
 Whether concurrent commands are prohibited is `TBD`.
 
 Do not add this index until the concurrency policy is approved.
+
+---
+
+## 9.4 `faucet_command_idempotency_tombstones` (DB-CMD-003 / TASK-0814 / DEC-DEV-036)
+
+Stores idempotency keys and command metadata of purged terminal faucet commands (`COMPLETED`, `TIMEOUT`, `EXPIRED`) after the 3-month retention cutoff. Prevents replay attacks when client applications resubmit old command idempotency keys.
+
+| Column | Type | Nullable | Notes |
+|---|---|---:|---|
+| `id` | UUID | No | Primary key (`gen_random_uuid()`) |
+| `idempotency_key` | VARCHAR(150) | No | Unique idempotency key from original command |
+| `command_id` | VARCHAR(150) | No | External command identifier |
+| `device_id` | VARCHAR(100) | No | Target device identifier |
+| `original_status` | VARCHAR(40) | No | Final terminal status before purge |
+| `requested_at` | TIMESTAMPTZ | No | Original command creation timestamp |
+| `purged_at` | TIMESTAMPTZ | No | Retention purge execution timestamp (`NOW()`) |
+
+### Rules
+
+- Tombstone rows are created atomically inside the retention cleanup transaction before associated `faucet_command_events` and `faucet_commands` rows are deleted.
+- **Three-Calendar-Month Retention & UTC Month-End Clamping**: `RetentionService.pruneOldFaucetCommands()` prunes terminal commands (`COMPLETED`, `TIMEOUT`, `EXPIRED`) older than 3 calendar months. Cutoff timestamps use exact UTC month subtraction (`calculateThreeMonthUtcCutoff(refDate)`) with month-end day clamping (e.g. May 31 $\rightarrow$ Feb 28 on non-leap years) to prevent date rollover bugs.
+- **Protected Active Commands**: Commands in active states (`QUEUED`, `SENT`, `ACKNOWLEDGED`, `IN_PROGRESS`) are strictly protected and never purged regardless of age.
+- During command creation (`createCommand`), the repository checks `faucetCommandIdempotencyTombstone.findUnique({ where: { idempotencyKey } })`. If found, creation fails immediately with `FaucetCommandConflictError` (HTTP 409 Conflict).
+- Tombstone records are retained indefinitely to guarantee zero replay vulnerabilities.
+- **Strict Separation from Reservoir Telemetry Retention**: This faucet command retention policy is completely distinct from the reservoir water latest-5 records retention policy (`DEC-MON-092` / `TASK-0917`).
+- **Migration & Verification Status**: Migration `20261005193000_add_faucet_command_idempotency_tombstones` has been recorded as applied on the verified dev database per operator output; the reservoir migration (`20261003230000_reservoir_water_readings_latest_5_retention`) remains pending. Live staging/production migrations and field observation of 3-month purges remain pending.
+
+### Indexes
+
+```text
+UNIQUE INDEX faucet_command_idempotency_tombstones_key_unique
+ON faucet_command_idempotency_tombstones (idempotency_key)
+
+INDEX faucet_command_idempotency_tombstones_device_idx
+ON faucet_command_idempotency_tombstones (device_id)
+
+INDEX faucet_command_idempotency_tombstones_command_idx
+ON faucet_command_idempotency_tombstones (command_id)
+```
 
 ---
 

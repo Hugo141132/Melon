@@ -7,6 +7,7 @@ import {
   AuthorizationError,
 } from '@/lib/auth/rbac';
 import { prisma, verifyStreamSessionActive } from '@kebun-melon/database';
+import { UserRole } from '@kebun-melon/contracts';
 import { realtimeEventHub, RealtimeMonitoringEvent } from '@/lib/realtime/event-hub';
 
 export const dynamic = 'force-dynamic';
@@ -172,6 +173,16 @@ export async function GET(request: Request) {
 
       // 2. Subscribe to Realtime Event Hub
       unsubscribeEventHub = realtimeEventHub.subscribe((event: RealtimeMonitoringEvent) => {
+        const eventName = event.name.toLowerCase();
+
+        // Server-side RBAC authorization for admin approval events: strictly restricted to OWNER
+        if (eventName.startsWith('admin.approval.')) {
+          const isOwner = session.activeRoles?.includes(UserRole.OWNER);
+          if (!isOwner) {
+            return;
+          }
+        }
+
         // Filter by deviceId if specified (matching against both UUID and canonical ID)
         if (targetDeviceId && event.deviceId) {
           if (!resolvedDeviceIds.includes(event.deviceId)) {
@@ -181,12 +192,12 @@ export async function GET(request: Request) {
 
         // Filter by channel if specified
         if (channelsFilter && channelsFilter.length > 0) {
-          const eventName = event.name.toLowerCase();
           const matchesChannel = channelsFilter.some((ch) => {
             if (ch === 'telemetry' && eventName.startsWith('telemetry.')) return true;
             if (ch === 'status' && eventName.startsWith('device.status.')) return true;
             if (ch === 'alerts' && eventName.startsWith('alert.')) return true;
             if (ch === 'commands' && eventName.startsWith('faucet.command.')) return true;
+            if (ch === 'approvals' && eventName.startsWith('admin.approval.')) return true;
             return eventName.includes(ch);
           });
 

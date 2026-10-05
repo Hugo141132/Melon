@@ -331,11 +331,20 @@ export async function GET(request: Request, props: { params: Promise<{ deviceId:
     });
 
     const url = new URL(request.url, 'http://localhost');
+    const rawStatuses = url.searchParams.get('statuses');
+    const statusesList = rawStatuses
+      ? rawStatuses
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : undefined;
+
     const rawQuery = {
       page: url.searchParams.get('page') ? Number(url.searchParams.get('page')) : 1,
       pageSize: url.searchParams.get('pageSize') ? Number(url.searchParams.get('pageSize')) : 20,
       deviceId: device.id,
       status: url.searchParams.get('status') || undefined,
+      statuses: statusesList,
       initiatedByUserId: url.searchParams.get('initiatedByUserId') || undefined,
       from: url.searchParams.get('from') || undefined,
       to: url.searchParams.get('to') || undefined,

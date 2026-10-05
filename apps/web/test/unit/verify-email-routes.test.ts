@@ -240,6 +240,179 @@ describe('TASK-0214 Email Verification Routes Unit Tests', () => {
       expect(res.headers.get('set-cookie')).toBeNull();
     });
 
+    it('notifies active OWNERs via email and SSE when a PENDING_APPROVAL user verifies email', async () => {
+      vi.spyOn(UserRepository.prototype, 'verifyEmailWithToken').mockResolvedValue({
+        success: true,
+        user: {
+          id: 'admin-applicant-uuid-999',
+          fullName: 'Calon Admin Baru',
+          email: 'calon.admin@example.com',
+          username: null,
+          accountStatus: 'PENDING_APPROVAL' as any,
+          emailVerifiedAt: new Date(),
+          lastLoginAt: null,
+          suspendedAt: null,
+          deactivatedAt: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          activeRoles: ['ADMIN' as any],
+        },
+      });
+
+      const findManyOwnersSpy = vi.spyOn(prisma.user, 'findMany').mockResolvedValue([
+        {
+          id: 'owner-uuid-1',
+          email: 'owner@kebunmelon.com',
+          fullName: 'Budi Santoso',
+          userPreference: {
+            preferredLocale: 'id',
+          },
+        } as any,
+      ]);
+
+      const sendApprovalEmailSpy = vi
+        .spyOn(resendModule, 'sendAdminApprovalRequestEmail')
+        .mockResolvedValue({ success: true, emailSent: true, id: 'email-id-999' });
+
+      const req = new Request('http://localhost/api/v1/auth/verify-email', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-forwarded-for': '198.51.100.25',
+        },
+        body: JSON.stringify({ token: 'valid-admin-token' }),
+      });
+
+      const res = await verifyEmailPost(req);
+      expect(res.status).toBe(200);
+
+      const json = await res.json();
+      expect(json.success).toBe(true);
+      expect(json.data.user.accountStatus).toBe('PENDING_APPROVAL');
+
+      expect(findManyOwnersSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            userRoles: {
+              some: {
+                role: { code: 'OWNER' },
+                revokedAt: null,
+              },
+            },
+            accountStatus: 'ACTIVE',
+            emailVerifiedAt: { not: null },
+          }),
+        })
+      );
+      expect(sendApprovalEmailSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          toEmail: 'owner@kebunmelon.com',
+          applicantEmail: 'calon.admin@example.com',
+          applicantName: 'Calon Admin Baru',
+        })
+      );
+    });
+
+    it('keeps verification successful when Resend provider rejects approval email', async () => {
+      vi.spyOn(UserRepository.prototype, 'verifyEmailWithToken').mockResolvedValue({
+        success: true,
+        user: {
+          id: 'admin-applicant-uuid-999',
+          fullName: 'Calon Admin Baru',
+          email: 'calon.admin@example.com',
+          username: null,
+          accountStatus: 'PENDING_APPROVAL' as any,
+          emailVerifiedAt: new Date(),
+          lastLoginAt: null,
+          suspendedAt: null,
+          deactivatedAt: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          activeRoles: ['ADMIN' as any],
+        },
+      });
+
+      vi.spyOn(prisma.user, 'findMany').mockResolvedValue([
+        {
+          id: 'owner-uuid-1',
+          email: 'owner@kebunmelon.com',
+          fullName: 'Budi Santoso',
+          userPreference: {
+            preferredLocale: 'en',
+          },
+        } as any,
+      ]);
+
+      const sendApprovalEmailSpy = vi
+        .spyOn(resendModule, 'sendAdminApprovalRequestEmail')
+        .mockResolvedValue({
+          success: false,
+          emailSent: false,
+          error: 'Domain verification failed',
+        });
+
+      const req = new Request('http://localhost/api/v1/auth/verify-email', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-forwarded-for': '198.51.100.26',
+        },
+        body: JSON.stringify({ token: 'valid-admin-token-rejected-send' }),
+      });
+
+      const res = await verifyEmailPost(req);
+      expect(res.status).toBe(200);
+
+      const json = await res.json();
+      expect(json.success).toBe(true);
+      expect(json.data.user.accountStatus).toBe('PENDING_APPROVAL');
+      expect(sendApprovalEmailSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          toEmail: 'owner@kebunmelon.com',
+          locale: 'en',
+        })
+      );
+    });
+
+    it('handles zero active owners gracefully (send not attempted) without erroring', async () => {
+      vi.spyOn(UserRepository.prototype, 'verifyEmailWithToken').mockResolvedValue({
+        success: true,
+        user: {
+          id: 'admin-applicant-uuid-999',
+          fullName: 'Calon Admin Baru',
+          email: 'calon.admin@example.com',
+          username: null,
+          accountStatus: 'PENDING_APPROVAL' as any,
+          emailVerifiedAt: new Date(),
+          lastLoginAt: null,
+          suspendedAt: null,
+          deactivatedAt: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          activeRoles: ['ADMIN' as any],
+        },
+      });
+
+      vi.spyOn(prisma.user, 'findMany').mockResolvedValue([]);
+      const sendApprovalEmailSpy = vi.spyOn(resendModule, 'sendAdminApprovalRequestEmail');
+
+      const req = new Request('http://localhost/api/v1/auth/verify-email', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-forwarded-for': '198.51.100.27',
+        },
+        body: JSON.stringify({ token: 'valid-admin-token-no-owners' }),
+      });
+
+      const res = await verifyEmailPost(req);
+      expect(res.status).toBe(200);
+
+      const json = await res.json();
+      expect(json.success).toBe(true);
+      expect(sendApprovalEmailSpy).not.toHaveBeenCalled();
+    });
+
     it('returns 400 when token is invalid or expired', async () => {
       vi.spyOn(UserRepository.prototype, 'verifyEmailWithToken').mockResolvedValue({
         success: false,

@@ -36,11 +36,11 @@
 
 | Subsystem | Decision IDs | Status | Approved Policy |
 |---|---|---|---|
-| **Authentication** | `DEC-AUTH-001` to `DEC-AUTH-012`, `DEC-AUTH-102` to `DEC-AUTH-111` | **APPROVED** | HTTP-only secure cookies (`HttpOnly`, `Secure`, `SameSite=Strict`), PostgreSQL session table, 30m idle / 8h absolute maximum lifetime, CLI Owner seed, no public Owner creation, mandatory 6-digit email verification, 1m unified expiry & cooldown, verified self-email change, single active session enforcement, cross-client email PNG logo & 'Melon Governance' branding, and Owner User Management email verification isolation with ADMINISTRATOR role presentation. |
+| **Authentication** | `DEC-AUTH-001` to `DEC-AUTH-012`, `DEC-AUTH-102` to `DEC-AUTH-112` | **APPROVED** | HTTP-only secure cookies (`HttpOnly`, `Secure`, `SameSite=Strict`), PostgreSQL session table, 30m idle / 8h absolute maximum lifetime, CLI Owner seed, no public Owner creation, mandatory 6-digit email verification, 1m unified expiry & cooldown, verified self-email change, single active session enforcement, cross-client email PNG logo & 'Melon Governance' branding, Owner User Management email verification isolation with ADMINISTRATOR role presentation, and Owner real-time approval notifications with role.code database queries (`DEC-AUTH-112`). |
 | **RBAC** | `DEC-RBAC-013` to `DEC-RBAC-019` | **APPROVED** | Owner has global device visibility. Admins have mandatory per-device assignments; device assignment automatically grants both monitoring and faucet control. Owners manage assignments. No separate per-user-device `canControl` permission in v1. |
 | **Devices** | `DEC-DEV-020` to `DEC-DEV-039` | **APPROVED** | Unified EMQX Cloud broker architecture (`DEC-DEV-035` superseding `DEC-DEV-033`): all soil, water quality, and reservoir water tank telemetry consolidated onto EMQX Cloud with HiveMQ fallback permanently retired. Direct 2-tier gateway for single water tank node (`DEC-DEV-032`). Resilient hardware payload normalization in `SoilWaterMqttAdapter` supporting real ESP32 envelopes (`device`, nested `water`, `device_code`) while strictly preserving database device identity validation (`DEC-DEV-036`). External ML prediction resolution decoupled from immutable `devices.deviceId` via `device_external_mappings.external_device_id = 'soil001'`, and EMQX broker ACL policy granting scoped bidirectional `Publish & Subscribe` for `petanimelon` (`DEC-DEV-037`). Device identity security rotation architecture (`DEC-DEV-038`): relational identity `devices.id` UUID is immutable, `devices.device_id` is an OWNER-rotatable security identifier, and `devices.client_id` is hardware MQTT identity. Complete removal of device activation/deactivation lifecycle in favor of pre-provisioned devices monitored strictly by Connected vs Disconnected statuses (`DEC-DEV-039` superseding `DEC-DEV-030`). In-app device creation removed (`DEC-DEV-027`). Zero hard deletion preserved. |
 | **Monitoring** | `DEC-MON-036` to `DEC-MON-050`, `DEC-MON-085` to `DEC-MON-092` | **APPROVED** | Three distinct monitoring domains: 1) Soil monitoring (NPK, Temp, Moisture, pH, EC in `µS/cm`, status), 2) Water Quality monitoring (pH, TDS in ppm, EC in `µS/cm`, status), 3) Water Tank monitoring (Tank Vol in `L`, 0 L–2200 L scale per `DEC-MON-089`, status; Flow rate deleted per `DEC-MON-089`). Canonical EC unit standardized directly in `µS/cm` without multiplier conversions across storage, API, UI, simulator, and ML inference (`DEC-MON-091`). Soil & Water Quality ML classification is ingested from an external ML team's Supabase project over read-only PostgREST HTTPS (`ExternalPredictionClient`), mapped dynamically via `device_external_mappings`, and hybrid MQTT recommendations are published asynchronously via `apps/iot-gateway` without local ML compute (`DEC-MON-090`). Raw telemetry remains immutable. 90-day retention TTL with chunked batch maintenance for Soil and Water Quality (`DEC-MON-048` / `TASK-0913`); strict per-device latest-5 records retention for reservoir water tank readings (`DEC-MON-092` / `TASK-0917`). |
-| **Faucet Control** | `DEC-CTRL-051` to `DEC-CTRL-067`, `DEC-CTRL-090`, `DEC-CTRL-094`, `DEC-CTRL-095`, `DEC-CTRL-096` | **APPROVED** | Max 1 active command/device, no auto retries, `ENABLE_FAUCET_CONTROL=true` permanently enabled across all environments (`DEC-CTRL-096`). Duplicate command IDs never re-dispense. Automated timeout sweep for stale SENT commands (`DEC-CTRL-094`). Hardware valve feedback bridging and STATUS query contract (`DEC-CTRL-095`). Staging validation executed with `ENABLE_FAUCET_CONTROL=true` (`DEC-CTRL-096`). Timeout ≠ completion. Cancellation/stop support: **TBD**. |
+| **Faucet Control** | `DEC-CTRL-051` to `DEC-CTRL-067`, `DEC-CTRL-090`, `DEC-CTRL-094`, `DEC-CTRL-095`, `DEC-CTRL-096`, `DEC-CTRL-097`, `DEC-CTRL-098` | **APPROVED** | Max 1 active command/device, no auto retries, `ENABLE_FAUCET_CONTROL=true` permanently enabled across all environments (`DEC-CTRL-096`). Duplicate command IDs never re-dispense. Automated timeout sweep for stale SENT commands (`DEC-CTRL-094`). Hardware valve feedback bridging and STATUS query contract (`DEC-CTRL-095`). Staging validation executed with `ENABLE_FAUCET_CONTROL=true` (`DEC-CTRL-096`). Event-driven history refresh, terminal status filtering & server-side pagination (`DEC-CTRL-097`). 3-calendar-month command retention with anti-replay tombstones (`DEC-CTRL-098`). Timeout ≠ completion. Cancellation/stop support: **TBD**. |
 | **I18N** | `DEC-I18N-068` to `DEC-I18N-074` | **APPROVED** | Default `id` (Bahasa Indonesia), `en` fallback, mandatory centered language-selection gate for unauthenticated visitors without valid locale (`English` -> `en`, `Bahasa Indonesia` -> `id`), cookie-based non-prefixed routing (no URL path pollution), subsequent language changes strictly in Settings (`/settings`), UTC storage with `Asia/Jakarta` (WIB) presentation. |
 | **Infrastructure** | `DEC-INF-075` to `DEC-INF-088` | **APPROVED** | npm monorepo, PostgreSQL with Prisma ORM, internal health probes, dedicated Linux VPS production with Docker Compose (`TASK-1011`), and containerized staging decoupled from Railway (`TASK-1012`). Backup schedule and retention: daily automated encrypted pg_dump with offsite object storage. |
 | **Testing** | `DEC-TST-089` to `DEC-TST-100` | **APPROVED** | Modern Evergreen browsers. Mobile viewport primary (360-430px). Accessibility standard: **TBD**. API performance targets (p95): **TBD**. Physical test run count per faucet phase: **TBD**. |
@@ -199,6 +199,29 @@
   3. **Environment Variable Configuration**: Server environment variables `AUTH_RESET_TOKEN_EXPIRY_MINUTES` and `AUTH_VERIFY_TOKEN_EXPIRY_MINUTES` default to `1` (minimum 1), allowing operational overrides without hardcoding.
   4. **Email Template & Localization Synchronization**: All transactional email copy and bilingual user notices (`codeExpiryNotice` in `id.json` and `en.json`) are updated to specify 1 minute validity.
   5. **Security Defenses Maintained**: High-entropy CSPRNG tokens, user/target scoped SHA-256 hashing, transactional invalidation of prior codes, single-use deletion, and strict IP rate limiting (3 req/min request, 5 req/min verify) remain fully active.
+
+---
+
+#### DEC-AUTH-112: Owner Real-Time Admin Approval Notification, Bilingual Email Dispatch & Role Code Query Invariant
+* **Related Task IDs**: `TASK-0219`
+* **Related Documentation**: `docs/PRD.md` §11.1, `docs/SECURITY.md` §11.4, `docs/API.md` §10.7, `docs/USER_FLOWS.md` §Flow 1.1, `TASKS.md`
+* **Status**: **APPROVED BY USER (Website Acceptance Confirmed 2026-10-05)**
+* **Context**:
+  - Following Admin registration and successful email verification, accounts remain in `PENDING_APPROVAL` status until an Owner takes action on `/approvals`.
+  - Previously, Owners received no proactive alert, requiring manual polling of `/approvals`.
+  - During implementation, manual verification revealed an issue where active Owner accounts were queried via `role: { name: 'OWNER' }`. Because `Role.name` in the database seed was populated in Title Case (`'Owner'`) while `Role.code` stored enum `UserRole.OWNER` (`'OWNER'`), the query returned zero rows in case-sensitive PostgreSQL, causing email dispatch to be bypassed (*send not attempted*).
+  - Additionally, Resend SDK rejections were not previously surfaced in structured server logs.
+* **Approved Decision**:
+  1. **Canonical Role Code Query Invariant**: Active Owner selection during approval event handling queries strictly by enum code: `userRoles: { some: { role: { code: UserRole.OWNER }, revokedAt: null } }`, with `accountStatus = 'ACTIVE'` and `emailVerifiedAt != null`. Querying by display string `name` is strictly prohibited.
+  2. **Decoupled Multi-Channel Notification Flow**:
+     - **Bilingual Transactional Email**: Dispatched in parallel via `Promise.allSettled` using Resend (`sendAdminApprovalRequestEmail`) to each active Owner, rendered in their individual `preferredLocale` (`id` or `en`) with applicant details and deep links to `/approvals`.
+     - **Real-Time Top-Screen Toast (`AdminApprovalToastNotifier`)**: Emitted via SSE stream `admin.approval.requested` on `/api/v1/realtime/stream`, restricted on the server exclusively to active Owner sessions.
+     - **Sidebar Counter Badge (`useAdminApprovalBadge`)**: Hydrated on login/mount and real-time synchronized to pending approval counts on the `/approvals` menu item in `Sidebar.tsx`.
+  3. **Strict Domain Isolation**: Admin approval events are completely decoupled from physical agronomic sensor alerts. They MUST NEVER be inserted into the `alerts` table or exposed on `/notifications`.
+  4. **Observable Failure Handling (No Secrets)**:
+     - Delivery status is strictly classified: *send not attempted* (0 active verified owners), *provider rejected* (`success: false`), *accepted* (`sendRes.id`), and *delivered* (physical inbox receipt, confirmed only by recipient).
+     - Individual provider rejection or network error is logged with sanitized IDs without exposing secrets and does NOT fail the applicant's HTTP 200 email verification response.
+     - Operator acknowledges that awaited external provider calls can affect HTTP response latency on verification.
 
 ---
 
@@ -569,6 +592,45 @@
   1. **Intentional Pre-Validation Disablement**: Faucet control was intentionally disabled (`ENABLE_FAUCET_CONTROL=false`) across staging configurations prior to staging validation to maintain baseline safety locks, prevent accidental hardware actuation, and verify baseline container health and telemetry ingestion isolation.
   2. **Staging Validation Flag Activation**: Full staging validation of end-to-end critical flows (`TASK-1004` Flows 8, 9, 10) and hardware-in-the-loop valve control (`TASK-0811`, `TASK-0812`) required explicitly enabling the feature flag (`ENABLE_FAUCET_CONTROL=true`) in the staging runtime environment.
   3. **Zero Application Code Changes Required**: The feature flag toggle required zero application code modifications. All backend validation, RBAC checks, IoT Gateway command publishing, database repository transactions, contracts, and frontend UI control panels were already fully implemented, tested, and guarded by the feature flag.
+
+---
+
+#### DEC-CTRL-097: Faucet Command History Event-Driven Refresh, Strict Terminal Status Filtering & Server-Side Pagination
+* **Related Task IDs**: `TASK-0814`, `TASK-0918`
+* **Related Documentation**: `docs/PRD.md` §11, `docs/API.md` §18, `docs/UI_UX.md` §12, `TASKS.md`
+* **Status**: **APPROVED BY USER (Website Acceptance Confirmed 2026-10-05)**
+* **Context**:
+  - Previously, `FaucetHistoryTable` executed a background interval re-fetch every 2,500ms while commands were in-flight, competing with active command polling in `FaucetStatusCard`.
+  - The history table was restricted to 10 rows without usable pagination, causing newly completed commands to push earlier records out of view.
+  - The status filter included non-terminal statuses in the dropdown, and API pagination metadata was not parsed across alternate envelope shapes.
+* **Approved Decision**:
+  1. **Event-Driven Transition Refresh**: The redundant 2.5s polling loop on command history is permanently eliminated. The history table refreshes once when an active command reaches a terminal state (`COMPLETED`, `TIMEOUT`, `EXPIRED`) via `activeCommandTerminalRef` tracking and SSE events.
+  2. **Strict Terminal-Only Status Dropdown**: The dropdown filter in `FaucetHistoryTable` offers strictly 4 options: `All Status`, `COMPLETED`, `TIMEOUT`, and `EXPIRED`. Non-terminal states are omitted. When `All Status` is selected, the query sends `statuses=COMPLETED,TIMEOUT,EXPIRED` to the server.
+  3. **Server-Side Pagination (10 Rows/Page)**: History table paginates server-side with a strict page size of 10. Next and Previous buttons allow navigating all pages.
+  4. **Robust API Pagination Parsing**: The table parses pagination metadata from any of `json.data?.pagination`, `json.data?.meta?.pagination`, or `json.meta?.pagination`.
+  5. **Independent Table State & Stale-Response Protection**: `FaucetControlPanel` does not overwrite the table's state with `initialItems` on parent re-renders. A monotonically increasing `fetchSeqRef` ignores stale network responses arriving out of order. Changing devices or filters resets page to 1 while preserving current filters.
+  6. **Preserved In-Flight Monitoring**: Active command status polling in `FaucetStatusCard` (2,500ms while active) remains fully operational and untouched.
+
+---
+
+#### DEC-CTRL-098: Three-Calendar-Month Faucet Command Retention with Anti-Replay Tombstones
+* **Related Task IDs**: `TASK-0918`, `TASK-0814`
+* **Related Documentation**: `docs/DATABASE.md` §3.6, §8.5; `docs/SECURITY.md` §13.7.1; `docs/API.md` §18; `TASKS.md`
+* **Status**: **APPROVED BY USER (Website Acceptance Confirmed 2026-10-05)**
+* **Context**:
+  - Faucet command records require lifecycle retention to keep the active database lean while preventing arbitrary command replaying after records are pruned.
+  - This policy is completely separate from the reservoir water latest-5 records retention (`DEC-MON-092`).
+* **Approved Decision**:
+  1. **Three-Calendar-Month Retention Window**: Terminal commands (`COMPLETED`, `TIMEOUT`, `EXPIRED`) older than 3 calendar months are pruned by `RetentionService.pruneOldFaucetCommands()`.
+  2. **UTC Month-End Clamping**: Date calculation clamps month-end days (e.g. May 31 $\rightarrow$ Feb 28 on non-leap years) in UTC to prevent date rollover bugs.
+  3. **Protected Active Commands**: Commands in active states (`QUEUED`, `SENT`, `ACKNOWLEDGED`, `IN_PROGRESS`) are strictly protected and never pruned regardless of age.
+  4. **Transactional Anti-Replay Tombstones**: Before cascading deletion from `faucet_command_events` and `faucet_commands`, each command's idempotency key and metadata are copied into `faucet_command_idempotency_tombstones`.
+  5. **Fail-Closed Replay Prevention**: Incoming commands with previously purged idempotency keys are rejected in `createCommand` with `FaucetCommandConflictError` (HTTP 409).
+  6. **Separation from Reservoir Policy**: This retention mechanism is independent of the reservoir water latest-5-record retention policy (`20261003230000_reservoir_water_readings_latest_5_retention`), whose live database migration remains pending.
+  7. **Migration Tracking**: Tombstone migration `20261005193000_add_faucet_command_idempotency_tombstones` is recorded as applied on the dev database per operator confirmation. Live execution on staging/production is deferred to scheduled deployment.
+
+---
+
 #### DEC-DEV-038: Device Identity Security Rotation Architecture
 * **Related Task IDs**: `TASK-0418` (superseding and unblocking `DEC-DEV-028` Item 4)
 * **Related Documentation**: `docs/DEVICE_COMMUNICATION.md` §3.1, §4.3; `docs/SECURITY.md` §18; `docs/DATABASE.md` §3.2
@@ -1687,3 +1749,36 @@ The following facts are supported by the verified decisions governance of `TASK-
      - Assets reside strictly in `apps/web/public/`. Duplicate root `public/favicon-*.png` removed.
      - Chromium tab activation lifecycle: In Chromium browsers, background tabs throttle `matchMedia` change event dispatching until tab activation (`visibilityState === 'visible'`). BAMABAA formally accepted tab-activation updates on 2026-10-04, closing background update investigations.
 <!-- DEC-UIUX-109 Reconciled: 2026-10-04 -->
+
+---
+
+## DEC-DEV-036: Valve Command History Real-Time Optimization, 3-Month Retention with Idempotency Tombstones & Admin Approval Notifications
+- **Status:** APPROVED & IMPLEMENTED (2026-10-05)
+- **Related Task IDs:** `TASK-0814`, `TASK-0918`, `TASK-0219`, `DEC-MON-048`, `TASK-0206`, `TASK-0207`, `TASK-0214`, `TASK-0813`, `TASK-0915`
+- **Context:**
+  Operational monitoring and governance improvements required addressing three distinct workflows:
+  1. **Valve Command History UI Optimization:** Continuous 2.5-second polling refreshes while commands are in progress created unnecessary client re-renders and network traffic. Riwayat katup must reflect only terminal outcomes (`COMPLETED`, `TIMEOUT`, `EXPIRED`) with single-shot refresh on transition.
+  2. **Data Retention & Anti-Replay Idempotency:** Terminal faucet commands and events must be pruned after 3 calendar months to avoid table bloat, while active commands remain protected. However, completely purging records removes unique `idempotency_key` constraints, introducing replay vulnerabilities. An immutable tombstone mechanism is required.
+  3. **Admin Registration Approval Notification:** When an applicant with role `ADMIN` finishes email verification, active `OWNER` users must be promptly notified across multiple channels (bilingual email, top toast via SSE, dynamic badge in sidebar) without mixing administrative governance events into agronomic sensor alerts.
+- **Approved Decision & Implementation Directives:**
+  1. **Valve Command History Real-Time Optimization (`TASK-0814`, `TASK-0918`):**
+     - Status Filter Invariant: Dropdown filter in `FaucetHistoryTable` strictly offers exactly 4 options: `All Status`, `COMPLETED`, `TIMEOUT`, `EXPIRED`.
+     - When `All Status` is selected, frontend sends `statuses=COMPLETED,TIMEOUT,EXPIRED` to filter terminal commands at the SQL level before pagination (`count`/`skip`/`take`).
+     - Terminal Transition SSE Refresh: Listen to `faucet.command.updated`. History refreshes ONCE when status transitions to `COMPLETED`, `TIMEOUT`, or `EXPIRED`.
+     - Deduplication: Uses `processedTerminalTransitionsRef` (`Set<string>` of `${commandId}:${status}`) to prevent repeated fetches.
+     - Stream Reconnect Reconciliation: Automatically triggers history fetch when SSE stream transitions to `OPEN` after disconnect.
+     - Auto-Recovery Pagination: When records are pruned and `history.length === 0 && pagination.page > pagination.totalPages`, automatically re-fetches `pagination.totalPages`.
+  2. **3-Month Retention Cutoff & Anti-Replay Tombstones (`TASK-0814`):**
+     - Canonical 3-Month UTC Cutoff: Uses `calculateThreeMonthUtcCutoff(refDate)` (`setUTCMonth(getUTCMonth() - 3)`).
+     - Pruning Scope: Terminal commands (`COMPLETED`, `FAILED`, `CANCELLED`, `TIMEOUT`, `EXPIRED`) older than 3 months based on terminal timestamps (`completedAt`, `failedAt`, `cancelledAt`, `expiresAt`, `updatedAt`). Active commands (`QUEUED`, `SENT`, `ACKNOWLEDGED`, `IN_PROGRESS`) are strictly exempt.
+     - Idempotency Tombstones: Before cascade deletion of `faucet_command_events` and `faucet_commands`, atomic insertion into `faucet_command_idempotency_tombstones` (`idempotency_key`, `command_id`, `device_id`, `original_status`, `requested_at`, `purged_at`) is performed.
+     - Replay Protection: `createCommand` checks `faucetCommandIdempotencyTombstone.findUnique({ where: { idempotencyKey } })` and rejects previously purged keys with `FaucetCommandConflictError`.
+     - Non-Destructive Code & Migration Delivery: DDL migration `20261005193000_add_faucet_command_idempotency_tombstones/migration.sql` is provided without executing live migrations or cleanup.
+  3. **Admin Approval Notification, Top Toast & Badge Synchronization (`TASK-0219`):**
+     - Email Verification Trigger: Upon successful verification of a `PENDING_APPROVAL` admin applicant in `POST /api/v1/auth/verify-email`, active `OWNER` users are retrieved and notified.
+     - Bilingual Resend Email: Dispatches `sendAdminApprovalRequestEmail` matching Owner's `preferredLocale` with applicant details and review button linking to `${baseUrl}/approvals`.
+     - Strict Server-Side SSE RBAC: Event stream `GET /api/v1/realtime/stream` restricts `admin.approval.requested` and `admin.approval.decided` exclusively to sessions holding the `OWNER` role (`session.activeRoles.includes(UserRole.OWNER)`). Non-Owner sessions never receive approval payloads.
+     - Top Toast Notifier: `AdminApprovalToastNotifier` renders a `Premium Minimal Ops` top center toast for online Owners with applicant details, a review button, and auto-dismiss after 8 seconds.
+     - Sidebar Badge: `Sidebar.tsx` integrates `useAdminApprovalBadge` to render a red badge counter on `/approvals` for `OWNER`, updating dynamically on SSE events and manual decisions.
+     - Isolation: Approval events are strictly isolated from the sensor `Alert` table and `/notifications` route.
+<!-- DEC-DEV-036 Reconciled: 2026-10-05 -->

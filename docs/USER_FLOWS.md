@@ -322,9 +322,18 @@ flowchart TD
 6. The server looks up the token by SHA-256 hash `sha256(userId:code)` in `email_verification_tokens`.
 7. The server validates code expiration (1 minute) and single-use status.
 8. The server updates `emailVerifiedAt = NOW()`, transactionally deletes the code, handles any Prisma `P2034` write conflicts with bounded retries, and logs `account.email.verified`.
-9. The server returns HTTP 200 OK with `{ user }` without creating an authenticated session.
-10. Upon promise settlement, the key is evicted from the in-flight cache map (`finally`).
-11. The active mounted view receives the response:
+9. **Owner Multi-Channel Notification Dispatch (`DEC-AUTH-112` / `TASK-0219`):**
+   - If the newly verified user is an Admin (`accountStatus === 'PENDING_APPROVAL'`), the server queries all active Owner recipients using explicit role enum matching (`userRoles.some.role.code = UserRole.OWNER`).
+   - The server triggers bilingual email dispatch via Resend wrapped in `Promise.allSettled` to prevent delivery rejections from failing the applicant's verification HTTP 200 response (note: the awaited dispatch may affect verification endpoint response latency).
+   - Delivery progress is logged with redacted metadata into 4 observable states (*Send not attempted*, *Provider rejected*, *Accepted*, *Delivered*).
+   - The server emits an SSE event `admin.approval.requested` with payload `{ applicantId, applicantName, applicantEmail, requestedAt }`.
+   - Connected Owner sessions receive the SSE event:
+     - `AdminApprovalToastNotifier` renders a high-priority top toast with localized text and a direct action button (`common.view`: `"Lihat"` / `"View"`) routing to `/approvals`.
+     - The Owner's navigation sidebar and TopAppBar increment their unapproved registration badge counters.
+     - Crucially, this notification is **strictly isolated** from agronomic monitoring alerts and does NOT write to the `alerts` table or appear on `/notifications`.
+10. The server returns HTTP 200 OK with `{ user }` without creating an authenticated session.
+11. Upon promise settlement, the key is evicted from the in-flight cache map (`finally`).
+12. The active mounted view receives the response:
     - If `accountStatus === 'PENDING_APPROVAL'` (Admin), the frontend automatically redirects to `/status?status=PENDING_APPROVAL`.
     - If `accountStatus === 'ACTIVE'` (Owner), the frontend displays the verified success view with a button directing to `/login`.
 
@@ -1995,20 +2004,58 @@ No command is created until explicit modal confirmation.
 
 **Main success flow:**
 
-1. The server checks the idempotency or command identifier.
-2. The server identifies an existing command.
-3. The server does not create a second physical command.
-4. The system returns the existing command state.
-5. The frontend displays the current command.
+1. The server checks the idempotency header (`Idempotency-Key`).
+2. The server queries active commands and the anti-replay tombstone table `faucet_command_idempotency_tombstones` (`DEC-CTRL-098`).
+3. If the key matches an active or historical record, the server returns HTTP 409 Conflict (`DUPLICATE_COMMAND`) or returns the existing command state without submitting duplicate physical valve actuation.
+4. If the key matches an anti-replay tombstone (indicating the original command reached a terminal state and was purged under 3-month retention), the server strictly rejects the request with HTTP 409 `DUPLICATE_COMMAND` to prevent historical re-execution attacks.
+5. The frontend displays the existing command or clear duplicate warning.
 
-**Alternative flows:** A genuinely new request uses a new identifier after user confirmation.
-**Error flows:** Ambiguous duplicate context returns conflict.
-**Postconditions:** One logical command maps to at most one execution request.
+**Alternative flows:** A genuinely new request uses a newly generated UUID idempotency key upon explicit modal submission.
+**Error flows:** Replay attack or concurrent submission returns HTTP 409 Conflict.
+**Postconditions:** Exactly one physical command is dispatched per idempotency key across the command lifecycle and retention period.
 **Required permissions:** `device.control.dispense`.
 **Relevant account statuses:** `ACTIVE`.
-**UI states:** Existing command, conflict.
-**Audit events:** Duplicate request detection.
-**Open decisions:** Idempotency-key generation and retention.
+**UI states:** Existing command, conflict modal.
+**Audit events:** Duplicate command submission rejected.
+
+---
+
+## Flow 52b — User Views, Filters, and Paginates Faucet Command History (TASK-0814 / DEC-CTRL-097 / DEC-CTRL-098)
+
+**Primary actor:** Authorised control user (Owner or Admin with device access)
+**Preconditions:** Active session; user is viewing `/controls` for an authorised reservoir device.
+**Trigger:** Page loads, user selects a status filter, clicks pagination controls, or a terminal command SSE transition occurs.
+
+**Main success flow:**
+
+1. The client mounts `FaucetHistoryTable` with self-managed independent state (`currentPage`, `selectedStatus`, `items`, `pagination`). Parent components do NOT override child table state on background re-renders.
+2. The table dispatches `GET /api/v1/devices/{deviceId}/faucet-commands?page=1&limit=10&statuses=...`.
+3. The server queries `faucet_commands`, enforcing:
+   - Device assignment/authorization.
+   - Compound deterministic ordering (`createdAt DESC, id DESC`).
+   - Server-side pagination fixed at 10 records per page.
+   - Filter restriction to canonical terminal statuses (`COMPLETED`, `TIMEOUT`, `EXPIRED`) or all statuses (`ALL`). Active in-flight statuses (`QUEUED`, `SENT`, `IN_PROGRESS`) are managed by the status card and omitted from table filter selection.
+4. The client increments an internal request sequence reference (`fetchSeqRef`). If a delayed or out-of-order network response arrives after a newer request, it is discarded, protecting against stale-response overwrites.
+5. The client parses pagination metadata supporting standard and nested envelope formats (`json.data?.pagination || json.data?.meta?.pagination || json.meta?.pagination`).
+6. The user browses historical commands:
+   - Clicks "Berikutnya" (Next) or "Sebelumnya" (Previous) to navigate across pages.
+   - Page and filter selections are preserved without unwanted resets.
+7. **Event-Driven History Refresh:**
+   - Active in-flight command monitoring continues in `FaucetStatusCard`.
+   - When an active command transitions to a terminal state (`COMPLETED`, `TIMEOUT`, `EXPIRED`), an event triggers exactly one history table reload without resetting the user's active page or filter.
+8. **Three-Calendar-Month Data Retention (`DEC-CTRL-098`):**
+   - Commands older than 3 calendar months (calculated via UTC month-end clamping `calculateThreeMonthUtcCutoff(refDate)`) that have reached terminal states (`COMPLETED`, `TIMEOUT`, `EXPIRED`) are eligible for deletion.
+   - In-flight active commands (`QUEUED`, `SENT`, `ACKNOWLEDGED`, `IN_PROGRESS`) are strictly protected from deletion regardless of age.
+   - Upon deletion, idempotency keys are transactionally archived into `faucet_command_idempotency_tombstones` to enforce permanent replay protection.
+   - *Note:* This policy is completely separate from the reservoir water latest-5 records retention (`DEC-MON-092`), whose migration remains pending in dev.
+
+**Alternative flows:** Zero historical commands found; table displays localized empty state card.
+**Error flows:** Device not assigned (403), network failure displays error banner with manual retry button.
+**Postconditions:** User inspects historical actuator operations with deterministic ordering and stable pagination.
+**Required permissions:** `device.control.dispense` or `device.read`.
+**Relevant account statuses:** `ACTIVE`.
+**UI states:** History skeleton, table rows, pagination controls (Previous/Next/Page X of Y), empty state.
+**Audit events:** Read/pagination operations produce no audit events.
 
 ---
 

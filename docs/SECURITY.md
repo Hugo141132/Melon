@@ -668,6 +668,17 @@ Notification failure shall not roll back a valid approval decision.
 
 The notification failure shall be logged separately.
 
+### 11.4 Real-Time Notification & SSE Stream Security (TASK-0219 / DEC-AUTH-112)
+
+When an Admin applicant with `PENDING_APPROVAL` status successfully completes email verification (`verifyEmailWithToken`):
+
+- **Server-Side SSE Stream Authorization:** Events `admin.approval.requested` and `admin.approval.decided` on `/api/v1/realtime/stream` are strictly authorized at the server layer. Connections belonging to non-OWNER users (e.g. regular Admins or anonymous clients) are prevented from subscribing to the `approvals` channel and will never receive approval broadcast events.
+- **Database Query Invariant (Zero Mismatch):** Active Owners are strictly selected via enum code: `userRoles: { some: { role: { code: UserRole.OWNER }, revokedAt: null } }`, with `accountStatus = 'ACTIVE'` and `emailVerifiedAt != null`. Querying by display name `Role.name` is forbidden to prevent zero-match bugs.
+- **Data Minimization & Identity Privacy:** SSE payloads transmit only necessary operational identifiers (`userId`, `fullName`, `email`, `requestedAt`) to online Owners. Sensitive security fields (password hashes, tokens, auth salts) are strictly excluded from event payloads.
+- **Bilingual Transactional Email Notification:** Active Owners receive transactional notification emails dispatched via Resend in parallel via `Promise.allSettled`, formatted in their preferred language (`userPreference.preferredLocale`), with direct deep links to the protected `/approvals` management console.
+- **Observable & Secret-Safe Logging:** Email dispatch outcomes are strictly classified (*send not attempted*, *provider rejected*, *accepted*, *delivered*) and logged without leaking credentials or secrets. Provider rejections are non-blocking and do not roll back the user's verification response.
+- **Decoupled Notification Architecture:** Admin registration and approval events are strictly decoupled from agronomic sensor alerts (`alerts` table) and the `/notifications` route. They are surfaced exclusively through owner-authorized channels: transactional email, top-screen live toast notifier (`AdminApprovalToastNotifier`), and sidebar interactive badge count.
+
 ---
 
 ## 12. Device Access Security (SEC-RBAC-002)
@@ -793,6 +804,18 @@ Controls shall include:
 - TLS for MQTT and REST.
 - Per-device topic authorization ACLs.
 - Non-retained MQTT command messages (`retain = false`, QoS 1).
+- Permanent idempotency key tracking across retained and purged records.
+
+#### 13.7.1 Tombstone-Protected Anti-Replay for Purged Commands (TASK-0814 / TASK-0918 / DEC-CTRL-098)
+
+When terminal faucet commands (`COMPLETED`, `TIMEOUT`, `EXPIRED`) older than 3 calendar months are pruned by `RetentionService` per `DEC-CTRL-098`:
+
+- **Atomic Tombstone Insertion:** Before deleting records from `faucet_command_events` and `faucet_commands`, the system copies each command's `idempotency_key`, `command_id`, `device_id`, `original_status`, and `requested_at` into `faucet_command_idempotency_tombstones`.
+- **Pre-Creation Conflict Verification:** During `createCommand`, the repository executes a dual check:
+  1. Checks active `faucet_commands` for an existing idempotency key.
+  2. Checks `faucet_command_idempotency_tombstones` for a previously purged key.
+- **Fail-Closed Replay Rejection:** If the supplied `Idempotency-Key` matches an entry in the tombstone table, `createCommand` aborts with `FaucetCommandConflictError`, returning HTTP 409 Conflict. This prevents attackers or buggy clients from replaying historical physical actuator commands after retention pruning.
+- **Independence from Reservoir Policy & Migration Gating:** This anti-replay retention mechanism is completely separate from the reservoir water latest-5 records retention policy (`DEC-MON-092`). Dev tombstone migration `20261005193000_add_faucet_command_idempotency_tombstones` has been recorded as applied on the dev database per operator output; the reservoir migration remains pending. Skenario penghapusan 3 bulan riil di lapangan tetap terpisah dan pending.
 
 ### 13.8 Completion & Physical State Integrity (TASK-0807)
 

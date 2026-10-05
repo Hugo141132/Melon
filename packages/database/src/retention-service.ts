@@ -6,7 +6,8 @@ export type ApprovedRetentionTable =
   | 'reservoir_water_readings'
   | 'sensor_battery_readings'
   | 'device_status_events'
-  | 'integration_errors';
+  | 'integration_errors'
+  | 'faucet_commands';
 
 export const APPROVED_RETENTION_TABLES: readonly ApprovedRetentionTable[] = [
   'soil_readings',
@@ -15,12 +16,11 @@ export const APPROVED_RETENTION_TABLES: readonly ApprovedRetentionTable[] = [
   'sensor_battery_readings',
   'device_status_events',
   'integration_errors',
+  'faucet_commands',
 ] as const;
 
 export const PROTECTED_EXEMPT_TABLES: readonly string[] = [
   'audit_logs',
-  'faucet_commands',
-  'faucet_command_events',
   'account_approvals',
   'users',
   'roles',
@@ -38,6 +38,26 @@ export const PROTECTED_EXEMPT_TABLES: readonly string[] = [
   'password_reset_tokens',
   'email_verification_tokens',
 ] as const;
+
+/**
+ * Calculates 3-calendar-month UTC cutoff date with month-end day clamping.
+ * Prevents JavaScript Date month overflow (e.g. May 31 -> Feb 28/29 instead of March 3).
+ */
+export function calculateThreeMonthUtcCutoff(referenceDate: Date = new Date()): Date {
+  const year = referenceDate.getUTCFullYear();
+  const month = referenceDate.getUTCMonth();
+  const day = referenceDate.getUTCDate();
+  const hours = referenceDate.getUTCHours();
+  const minutes = referenceDate.getUTCMinutes();
+  const seconds = referenceDate.getUTCSeconds();
+  const ms = referenceDate.getUTCMilliseconds();
+
+  const targetMonth = month - 3;
+  const maxDaysInTargetMonth = new Date(Date.UTC(year, targetMonth + 1, 0)).getUTCDate();
+  const clampedDay = Math.min(day, maxDaysInTargetMonth);
+
+  return new Date(Date.UTC(year, targetMonth, clampedDay, hours, minutes, seconds, ms));
+}
 
 export class UnapprovedRetentionTableError extends Error {
   constructor(public readonly tableName: string) {
@@ -115,7 +135,11 @@ export class RetentionService {
     const yieldMs = Math.max(0, options.yieldMs ?? 20);
     const referenceNow = options.now ?? startedAt;
 
-    const cutoffDate = new Date(referenceNow.getTime() - retentionDays * 24 * 60 * 60 * 1000);
+    const defaultCutoffDate = new Date(
+      referenceNow.getTime() - retentionDays * 24 * 60 * 60 * 1000
+    );
+    const cutoffDate = defaultCutoffDate;
+    const threeMonthCutoffDate = calculateThreeMonthUtcCutoff(referenceNow);
     const targetTables = options.tables ?? APPROVED_RETENTION_TABLES;
 
     // Validate that all target tables are strictly approved
@@ -129,10 +153,17 @@ export class RetentionService {
     let totalDeleted = 0;
 
     for (const table of targetTables) {
+      const tableCutoffDate =
+        table === 'faucet_commands' && options.retentionDays === undefined
+          ? threeMonthCutoffDate
+          : options.retentionDays !== undefined
+            ? new Date(referenceNow.getTime() - options.retentionDays * 24 * 60 * 60 * 1000)
+            : defaultCutoffDate;
+
       const tableStart = Date.now();
       const { deletedCount, batchesExecuted } = await this.pruneTableInBatches(
         table,
-        cutoffDate,
+        tableCutoffDate,
         batchSize,
         yieldMs
       );
@@ -281,6 +312,33 @@ export class RetentionService {
         });
         return rows.map((r) => r.id);
       }
+      case 'faucet_commands': {
+        const rows = await this.prisma.faucetCommand.findMany({
+          where: {
+            status: {
+              in: ['COMPLETED', 'FAILED', 'CANCELLED', 'TIMEOUT', 'EXPIRED'],
+            },
+            OR: [
+              { completedAt: { not: null, lt: cutoffDate } },
+              { failedAt: { not: null, lt: cutoffDate } },
+              { cancelledAt: { not: null, lt: cutoffDate } },
+              {
+                status: { in: ['TIMEOUT', 'EXPIRED'] },
+                expiresAt: { lt: cutoffDate },
+              },
+              {
+                completedAt: null,
+                failedAt: null,
+                cancelledAt: null,
+                updatedAt: { lt: cutoffDate },
+              },
+            ],
+          },
+          select: { id: true },
+          take: batchSize,
+        });
+        return rows.map((r) => r.id);
+      }
       default:
         throw new UnapprovedRetentionTableError(table);
     }
@@ -325,6 +383,49 @@ export class RetentionService {
           where: { id: { in: ids } },
         });
         return res.count;
+      }
+      case 'faucet_commands': {
+        return await this.prisma.$transaction(async (tx) => {
+          const cmds = await tx.faucetCommand.findMany({
+            where: { id: { in: ids } },
+            select: {
+              id: true,
+              commandId: true,
+              deviceId: true,
+              idempotencyKey: true,
+              status: true,
+              requestedAt: true,
+            },
+          });
+
+          if (cmds.length === 0) return 0;
+
+          const tombstoneData = cmds.map((c) => ({
+            idempotencyKey: c.idempotencyKey,
+            commandId: c.commandId,
+            deviceId: c.deviceId,
+            originalStatus: c.status,
+            requestedAt: c.requestedAt,
+            purgedAt: new Date(),
+          }));
+
+          if ((tx as any).faucetCommandIdempotencyTombstone?.createMany) {
+            await (tx as any).faucetCommandIdempotencyTombstone.createMany({
+              data: tombstoneData,
+              skipDuplicates: true,
+            });
+          }
+
+          await tx.faucetCommandEvent.deleteMany({
+            where: { faucetCommandId: { in: ids } },
+          });
+
+          const res = await tx.faucetCommand.deleteMany({
+            where: { id: { in: ids } },
+          });
+
+          return res.count;
+        });
       }
       default:
         throw new UnapprovedRetentionTableError(table);

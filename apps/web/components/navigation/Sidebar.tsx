@@ -19,6 +19,7 @@ import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 import { useAlertBadge } from '@/hooks/useAlertBadge';
+import { useAdminApprovalBadge } from '@/hooks/useAdminApprovalBadge';
 
 export interface SidebarProps {
   isOpen: boolean;
@@ -43,12 +44,14 @@ export default function Sidebar({ isOpen, onClose, onMouseEnter, onMouseLeave }:
   const tCommon = useTranslations('common');
   const { user, role } = useAuth();
   const { count: alertCount, refetch: refetchAlertBadge } = useAlertBadge();
+  const { count: approvalCount, refetch: refetchApprovalBadge } = useAdminApprovalBadge();
 
   useEffect(() => {
     if (isOpen) {
       refetchAlertBadge();
+      refetchApprovalBadge();
     }
-  }, [isOpen, refetchAlertBadge]);
+  }, [isOpen, refetchAlertBadge, refetchApprovalBadge]);
 
   const userName = user?.fullName || user?.email || '';
   const displayName = userName ? userName.trim().replace(/^pak\s+/i, '') : '';
@@ -141,6 +144,14 @@ export default function Sidebar({ isOpen, onClose, onMouseEnter, onMouseLeave }:
                       {item.href === '/notifications' && alertCount > 0 && (
                         <span className="absolute -top-1 -right-1.5 w-3.5 h-3.5 bg-app-error text-white text-[9px] font-bold rounded-full flex items-center justify-center border border-app-surface-container-lowest">
                           {alertCount}
+                        </span>
+                      )}
+                      {item.href === '/approvals' && approvalCount > 0 && (
+                        <span
+                          className="absolute -top-1 -right-1.5 min-w-3.5 h-3.5 px-0.5 bg-rose-600 text-white text-[9px] font-bold rounded-full flex items-center justify-center border border-app-surface-container-lowest"
+                          data-testid="sidebar-approvals-badge"
+                        >
+                          {approvalCount > 99 ? '99+' : approvalCount}
                         </span>
                       )}
                     </div>

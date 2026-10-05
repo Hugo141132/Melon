@@ -167,6 +167,16 @@ export class FaucetCommandRepository {
     try {
       const created = await this.prisma.$transaction(async (tx) => {
         // 1. Idempotency check inside transaction
+        const existingTombstone = await (tx as any).faucetCommandIdempotencyTombstone?.findUnique({
+          where: { idempotencyKey: input.idempotencyKey },
+        });
+
+        if (existingTombstone) {
+          throw new FaucetCommandConflictError(
+            `Idempotency key '${input.idempotencyKey}' has already been used for a previously purged command (commandId: ${existingTombstone.commandId}).`
+          );
+        }
+
         const existingKey = await tx.faucetCommand.findUnique({
           where: { idempotencyKey: input.idempotencyKey },
           include: {
@@ -382,7 +392,9 @@ export class FaucetCommandRepository {
       where.deviceId = query.deviceId;
     }
 
-    if (query.status) {
+    if (query.statuses && query.statuses.length > 0) {
+      where.status = { in: query.statuses };
+    } else if (query.status) {
       where.status = query.status;
     }
 
@@ -408,7 +420,7 @@ export class FaucetCommandRepository {
         where,
         skip,
         take: pageSize,
-        orderBy: { [sortField]: sortOrder },
+        orderBy: [{ [sortField]: sortOrder }, { id: sortOrder }],
         include: {
           events: { orderBy: { receivedAt: 'asc' } },
           initiatedBy: { select: { fullName: true } },

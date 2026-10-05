@@ -14,6 +14,7 @@ import idMessages from '@/messages/id.json';
 import enMessages from '@/messages/en.json';
 import { getSessionOrNull } from '@/lib/auth/rbac';
 import AppBackground from '@/components/layout/AppBackground';
+import AdminApprovalToastNotifier from '@/components/notifications/AdminApprovalToastNotifier';
 
 // Re-evaluated layout message bundle
 const MESSAGES = {
@@ -74,7 +75,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <AppBackground />
         <NextIntlClientProvider locale={locale} messages={messages}>
           <AuthProvider initialSession={session}>
-            <DeviceProvider>{children}</DeviceProvider>
+            <DeviceProvider>
+              <AdminApprovalToastNotifier />
+              {children}
+            </DeviceProvider>
           </AuthProvider>
         </NextIntlClientProvider>
       </body>

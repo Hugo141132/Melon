@@ -25,6 +25,9 @@ describe('FaucetCommandRepository Unit & Integration Tests', () => {
         findFirst: vi.fn(),
         create: vi.fn(),
       },
+      faucetCommandIdempotencyTombstone: {
+        findUnique: vi.fn(),
+      },
       auditLog: {
         create: vi.fn(),
       },
@@ -610,6 +613,95 @@ describe('FaucetCommandRepository Unit & Integration Tests', () => {
       });
       expect(result?.id).toBe(validUuid);
       expect(result?.initiatedByFullName).toBe('Hugo Boss');
+    });
+  });
+
+  describe('idempotency tombstones and getCommands', () => {
+    it('throws FaucetCommandConflictError when idempotencyKey was previously recorded in tombstone table', async () => {
+      mockPrisma.faucetCommandIdempotencyTombstone.findUnique.mockResolvedValueOnce({
+        id: 'tomb-001',
+        idempotencyKey: 'idem-purged-001',
+        commandId: 'cmd-old-purged',
+        deviceId: mockDeviceId,
+        originalStatus: 'COMPLETED',
+        requestedAt: new Date('2026-05-01T00:00:00Z'),
+        purgedAt: new Date('2026-09-01T00:00:00Z'),
+      });
+
+      await expect(
+        repository.createCommand(
+          {
+            deviceId: mockDeviceId,
+            action: FaucetCommandAction.DISPENSE,
+            phase: 1,
+            plantCount: 1,
+            idempotencyKey: 'idem-purged-001',
+          },
+          mockUserId,
+          UserRole.ADMIN
+        )
+      ).rejects.toThrow(FaucetCommandConflictError);
+
+      expect(mockPrisma.faucetCommand.create).not.toHaveBeenCalled();
+    });
+
+    it('filters commands by statuses array in SQL before pagination and applies deterministic ordering', async () => {
+      mockPrisma.faucetCommand.count.mockResolvedValueOnce(2);
+      mockPrisma.faucetCommand.findMany.mockResolvedValueOnce([
+        mockCommandRecord,
+        mockOpenCommandRecord,
+      ]);
+
+      const result = await repository.getCommands(
+        {
+          page: 1,
+          pageSize: 20,
+          deviceId: mockDeviceId,
+          statuses: [
+            FaucetCommandStatus.COMPLETED,
+            FaucetCommandStatus.TIMEOUT,
+            FaucetCommandStatus.EXPIRED,
+          ],
+          sort: 'requestedAt:desc',
+        },
+        [mockDeviceId]
+      );
+
+      expect(mockPrisma.faucetCommand.count).toHaveBeenCalledWith({
+        where: expect.objectContaining({
+          deviceId: mockDeviceId,
+          status: {
+            in: [
+              FaucetCommandStatus.COMPLETED,
+              FaucetCommandStatus.TIMEOUT,
+              FaucetCommandStatus.EXPIRED,
+            ],
+          },
+        }),
+      });
+
+      expect(mockPrisma.faucetCommand.findMany).toHaveBeenCalledWith({
+        where: expect.objectContaining({
+          deviceId: mockDeviceId,
+          status: {
+            in: [
+              FaucetCommandStatus.COMPLETED,
+              FaucetCommandStatus.TIMEOUT,
+              FaucetCommandStatus.EXPIRED,
+            ],
+          },
+        }),
+        skip: 0,
+        take: 20,
+        orderBy: [{ requestedAt: 'desc' }, { id: 'desc' }],
+        include: {
+          events: { orderBy: { receivedAt: 'asc' } },
+          initiatedBy: { select: { fullName: true } },
+        },
+      });
+
+      expect(result.items.length).toBe(2);
+      expect(result.pagination.totalItems).toBe(2);
     });
   });
 });

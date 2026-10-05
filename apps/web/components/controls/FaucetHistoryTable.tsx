@@ -77,29 +77,35 @@ export default function FaucetHistoryTable({
     tFaucetRef.current = tFaucet;
   }, [tFaucet]);
 
-  // Synchronize history if initialItems updates from parent when at default filter & page
-  useEffect(() => {
-    if (initialItems && statusFilter === 'ALL' && pagination.page === 1) {
-      setHistory(initialItems);
-      if (initialPagination) {
-        setPagination(initialPagination);
-      }
-    }
-  }, [initialItems, initialPagination, statusFilter, pagination.page]);
+  const TERMINAL_STATUSES = React.useMemo(() => ['COMPLETED', 'TIMEOUT', 'EXPIRED'], []);
+  const processedTerminalTransitionsRef = React.useRef<Set<string>>(new Set());
+  const prevRealtimeStatusRef = React.useRef<'CONNECTING' | 'OPEN' | 'CLOSED' | 'POLLING'>(
+    'CLOSED'
+  );
+  const isFirstMountRef = React.useRef<boolean>(true);
+  const paginationRef = React.useRef(pagination);
+  React.useEffect(() => {
+    paginationRef.current = pagination;
+  }, [pagination]);
 
+  const fetchSeqRef = React.useRef<number>(0);
   const lastDeviceIdRef = React.useRef<string | null | undefined>(null);
-  const initialFetchSkippedRef = React.useRef<boolean>(false);
+  const lastFilterRef = React.useRef<string>('ALL');
 
   const fetchHistory = useCallback(
     async (pageToFetch = 1) => {
       if (!deviceId) return;
+      const fetchSeq = ++fetchSeqRef.current;
       setLoading(true);
       setErrorMsg(null);
       try {
         const queryParams = new URLSearchParams();
         queryParams.set('page', pageToFetch.toString());
         queryParams.set('pageSize', '10');
-        if (statusFilter !== 'ALL') {
+        if (statusFilter === 'ALL') {
+          // Strictly filter the three terminal statuses at SQL level before pagination
+          queryParams.set('statuses', 'COMPLETED,TIMEOUT,EXPIRED');
+        } else {
           queryParams.set('status', statusFilter);
         }
 
@@ -108,47 +114,78 @@ export default function FaucetHistoryTable({
         );
         const json = await res.json();
 
+        // Discard stale in-flight response
+        if (fetchSeq !== fetchSeqRef.current) {
+          return;
+        }
+
         if (json.success) {
-          setHistory(json.data.items || []);
-          if (json.data.meta?.pagination) {
-            setPagination(json.data.meta.pagination);
+          const items: FaucetHistoryItem[] = json.data?.items || [];
+          setHistory(items);
+          const pageMeta =
+            json.data?.pagination || json.data?.meta?.pagination || json.meta?.pagination;
+          if (pageMeta) {
+            setPagination({
+              page: Number(pageMeta.page) || pageToFetch,
+              pageSize: Number(pageMeta.pageSize) || 10,
+              totalItems: Number(pageMeta.totalItems) || 0,
+              totalPages: Number(pageMeta.totalPages) || 1,
+            });
           }
         } else {
           setErrorMsg(json.error?.message || tFaucetRef.current('historySubtitle'));
         }
       } catch {
-        setErrorMsg(tFaucetRef.current('networkErrorDispense'));
+        if (fetchSeq === fetchSeqRef.current) {
+          setErrorMsg(tFaucetRef.current('networkErrorDispense'));
+        }
       } finally {
-        setLoading(false);
+        if (fetchSeq === fetchSeqRef.current) {
+          setLoading(false);
+        }
       }
     },
     [deviceId, statusFilter]
   );
 
+  // Reset to page 1 on device change or filter change
   useEffect(() => {
-    if (deviceId !== lastDeviceIdRef.current) {
-      lastDeviceIdRef.current = deviceId;
-      initialFetchSkippedRef.current = false;
-    }
-
     if (!deviceId) {
       setHistory([]);
+      setPagination({ page: 1, pageSize: 10, totalItems: 0, totalPages: 1 });
       return;
     }
 
-    // Skip redundant initial fetch if parent already supplied coordinated initialItems
+    const deviceChanged = deviceId !== lastDeviceIdRef.current;
+    const filterChanged = statusFilter !== lastFilterRef.current;
+
+    lastDeviceIdRef.current = deviceId;
+    lastFilterRef.current = statusFilter;
+
+    if (deviceChanged || filterChanged || isFirstMountRef.current) {
+      fetchHistory(1);
+    }
+  }, [deviceId, statusFilter, fetchHistory]);
+
+  // Auto-recovery from empty page if data was purged/deleted and page > totalPages
+  useEffect(() => {
     if (
-      initialItems &&
-      initialItems.length >= 0 &&
-      statusFilter === 'ALL' &&
-      !initialFetchSkippedRef.current
+      !loading &&
+      history.length === 0 &&
+      pagination.totalItems > 0 &&
+      pagination.totalPages > 0 &&
+      pagination.page > pagination.totalPages
     ) {
-      initialFetchSkippedRef.current = true;
-      return;
+      fetchHistory(pagination.totalPages);
     }
-
-    fetchHistory(1);
-  }, [deviceId, statusFilter, fetchHistory, initialItems]);
+  }, [
+    loading,
+    history.length,
+    pagination.totalItems,
+    pagination.totalPages,
+    pagination.page,
+    fetchHistory,
+  ]);
 
   const handleRealtimeEvent = useCallback(
     (name: string, data: any) => {
@@ -156,36 +193,58 @@ export default function FaucetHistoryTable({
 
       const eventData = data as any;
       const commandId = eventData.commandId;
-      if (!commandId) return;
+      const status = eventData.status;
+      if (!commandId || !status) return;
 
-      setHistory((prev) => {
-        const idx = prev.findIndex((item) => item.commandId === commandId);
-        if (idx !== -1) {
-          // Update existing command
-          const newHistory = [...prev];
-          newHistory[idx] = {
-            ...newHistory[idx],
-            ...eventData,
-          };
-          return newHistory;
-        } else {
-          // Prepend new command (if matching filter)
-          if (statusFilter !== 'ALL' && eventData.status !== statusFilter) {
-            return prev;
-          }
-          return [eventData, ...prev].slice(0, pagination.pageSize);
-        }
-      });
+      // Only handle terminal transitions for the history table
+      if (!TERMINAL_STATUSES.includes(status)) {
+        return;
+      }
+
+      // Deduplicate terminal transitions to prevent repeated refreshes (bounded memory)
+      const dedupeKey = `${commandId}:${status}`;
+      if (processedTerminalTransitionsRef.current.has(dedupeKey)) {
+        return;
+      }
+      if (processedTerminalTransitionsRef.current.size >= 1000) {
+        const entries = Array.from(processedTerminalTransitionsRef.current);
+        processedTerminalTransitionsRef.current = new Set(entries.slice(500));
+      }
+      processedTerminalTransitionsRef.current.add(dedupeKey);
+
+      // Refresh once when command transitions to terminal status, preserving current page
+      fetchHistory(paginationRef.current.page);
     },
-    [statusFilter, pagination.pageSize]
+    [TERMINAL_STATUSES, fetchHistory]
   );
 
-  useRealtimeMonitoring({
+  const { status: realtimeStatus } = useRealtimeMonitoring({
     channels: ['commands'],
     deviceId: deviceId || undefined,
     enabled: Boolean(deviceId),
     onEvent: handleRealtimeEvent,
   });
+
+  // Reconcile history table upon stream reconnection
+  useEffect(() => {
+    if (isFirstMountRef.current) {
+      isFirstMountRef.current = false;
+      prevRealtimeStatusRef.current = realtimeStatus;
+      return;
+    }
+
+    if (
+      (prevRealtimeStatusRef.current === 'CLOSED' ||
+        prevRealtimeStatusRef.current === 'CONNECTING' ||
+        prevRealtimeStatusRef.current === 'POLLING') &&
+      realtimeStatus === 'OPEN'
+    ) {
+      // Stream reconnected, reconcile history
+      fetchHistory(paginationRef.current.page);
+    }
+
+    prevRealtimeStatusRef.current = realtimeStatus;
+  }, [realtimeStatus, fetchHistory]);
 
   const getStatusBadgeStyle = (status: string) => {
     switch (status) {
@@ -203,6 +262,8 @@ export default function FaucetHistoryTable({
         return 'bg-blue-50 text-blue-700 border-blue-200';
       case 'TIMEOUT':
         return 'bg-amber-100 text-amber-800 border-amber-300';
+      case 'EXPIRED':
+        return 'bg-zinc-100 text-zinc-700 border-zinc-300';
       default:
         return 'bg-gray-100 text-gray-700 border-gray-200';
     }
@@ -237,12 +298,8 @@ export default function FaucetHistoryTable({
               {tCommon('all')} {tCommon('status')}
             </option>
             <option value="COMPLETED">COMPLETED</option>
-            <option value="IN_PROGRESS">IN_PROGRESS</option>
-            <option value="FAILED">FAILED</option>
             <option value="TIMEOUT">TIMEOUT</option>
-            <option value="QUEUED">QUEUED</option>
-            <option value="SENT">SENT</option>
-            <option value="ACKNOWLEDGED">ACKNOWLEDGED</option>
+            <option value="EXPIRED">EXPIRED</option>
           </select>
 
           <button
@@ -400,16 +457,22 @@ export default function FaucetHistoryTable({
           </span>
           <div className="flex items-center gap-2">
             <button
+              type="button"
               disabled={pagination.page <= 1 || loading}
               onClick={() => fetchHistory(pagination.page - 1)}
-              className="p-1.5 rounded-lg border border-app-outline-variant/30 hover:bg-app-surface-container disabled:opacity-40"
+              className="p-1.5 rounded-lg border border-app-outline-variant/30 hover:bg-app-surface-container disabled:opacity-40 transition-colors"
+              aria-label="Previous page"
+              data-testid="btn-history-prev-page"
             >
               <ChevronLeft size={16} />
             </button>
             <button
+              type="button"
               disabled={pagination.page >= pagination.totalPages || loading}
               onClick={() => fetchHistory(pagination.page + 1)}
-              className="p-1.5 rounded-lg border border-app-outline-variant/30 hover:bg-app-surface-container disabled:opacity-40"
+              className="p-1.5 rounded-lg border border-app-outline-variant/30 hover:bg-app-surface-container disabled:opacity-40 transition-colors"
+              aria-label="Next page"
+              data-testid="btn-history-next-page"
             >
               <ChevronRight size={16} />
             </button>

@@ -24,9 +24,26 @@
 3. **Gateway Ownership Handover (Strict Single-Consumer Rule):**
    - Because all gateways subscribe to the same hardware topics (`melon/sensor-tanah/...`, `melon/sensor-air/...`, `irigasi/melon/...`), **only ONE active gateway may run at any time**.
    - Any local development or staging gateway (`kebun-melon-staging-gateway`) **must be stopped** immediately before launching the VPS gateway.
-4. **Current Status & Operator Evidence (Initial Deployment):**
-   - Container images `kebun-melon-web:0.1.0-init` and `kebun-melon-gateway:0.1.0-init` loaded into VPS Docker.
-   - Operator reports successful container-status (healthy), website delivery, `/health`, and `/ready` checks. (Labeled as operator-reported evidence; independent measurements, physical valve tests, and local 5 pre-commit CI gates remain unverified for this step).
+4. **Current Status & Verified Host Baseline (Web Release & External ML Parity — Commit `e7dee58`):**
+   - **Active Web Container:** Recreated and healthy with `kebun-melon-web:e7dee58` (built off-VPS from commit `e7dee58e44fb5e5f143d9edfacf32cf7ae650194`), Image ID `sha256:4ae123fdc8f1b8178786248fc0efab6d220849885096ef6e4e0c4537ea5557e5`.
+   - **Preserved Rollback Baseline:** Tagged `kebun-melon-web:rollback-baseline` (Image ID `sha256:707d2588a3ccd769eba914813d1919e9f39531c76f3a82a128a0e10c5580e211`) preserved in local Docker daemon.
+   - **Preserved Ancillary Containers:** Existing IoT Gateway `kebun-melon-gateway:t0917-e98fb37` (Image ID `sha256:510cfa3fae056444886e11c8ea1d1b21c8143d9518dd331ddea5a0da5aca04d9`, healthy) and Reverse Proxy `caddy:2.9-alpine` (Image ID `sha256:b4e3952384eb9524a887633ce65c752dd7c71314d2c2acf98cd5c715aaa534f0`, running) kept intact and running without rebuild.
+   - **External ML Configuration:** `EXTERNAL_ML_SUPABASE_URL` and `EXTERNAL_ML_SUPABASE_PUBLISHABLE_KEY` (pointing to project `styjuynxuykvujnnqxos`) configured in `/opt/kebun-melon/.env.production` (permissions `600`) without exposing secret values.
+   - **Verified Acceptance Evidence:**
+     - Local/public HTTPS probe to `https://monitoring.melonmadura.my.id/health` returns HTTP 200 with valid TLS certificate.
+     - Web container status: `healthy`.
+     - External ML live prediction retrieval: Authenticated API response and UI cards rendering AI recommendations for soil and water quality monitoring verified working.
+   - **Remaining Unverified / Separate Deployment Items:**
+     - Staging status (`docker-compose.staging.yml`) must be verified independently.
+     - **Database Migrations Separation & Status:**
+        - `20261005193000_add_faucet_command_idempotency_tombstones`: Applied in Singapore Dev by operator output. Status for Staging (`ihgoxqdncepbcrqkchxu`) and Production remains **PENDING**; must be targeted and executed explicitly during the next deployment pass before releasing the updated web container.
+        - `20261003230000_reservoir_water_readings_latest_5_retention`: Remains completely separate and **PENDING** across Dev, Staging, and Production (destructive DML not executed). Do NOT blindly run `prisma migrate deploy` as it applies all pending migrations without isolation.
+      - **Container & Infrastructure Update Scope:**
+        - This documentation update pass introduces zero runtime container or configuration drift.
+        - However, the underlying feature enhancements (Command history pagination, event-driven refresh, Owner approval toast and email dispatch) will require rebuilding and redeploying the `kebun-melon-web` container image off-VPS when staging/production releases are scheduled. Reverse proxy (`caddy:2.9-alpine`) and environment variables remain unchanged.
+     - Physical valve hardware actuation prerequisites remain blocked on physical hardware (`TASK-0414`).
+     - Alert email / UI timezone parity under UTC midnight rollover remains pending live verification.
+     - Local 5 pre-commit CI gates remain deferred.
 
 ---
 

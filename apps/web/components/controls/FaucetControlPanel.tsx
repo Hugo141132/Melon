@@ -110,7 +110,6 @@ export default function FaucetControlPanel() {
   // Active command & API state
   const [activeCommand, setActiveCommand] = useState<FaucetCommandDto | null>(null);
   const [recentCommands, setRecentCommands] = useState<FaucetCommandDto[]>([]);
-  const [commandsPagination, setCommandsPagination] = useState<any>(null);
   const [initialValveState, setInitialValveState] = useState<AuthoritativePhysicalState>('UNKNOWN');
   const [initialLastConfirmedAt, setInitialLastConfirmedAt] = useState<Date | string | null>(null);
   const [isValveStatusLoading, setIsValveStatusLoading] = useState<boolean>(false);
@@ -130,7 +129,6 @@ export default function FaucetControlPanel() {
     if (!targetDeviceId) {
       setActiveCommand(null);
       setRecentCommands([]);
-      setCommandsPagination(null);
       setIsCommandsLoading(false);
       return;
     }
@@ -144,9 +142,6 @@ export default function FaucetControlPanel() {
       if (json.success && json.data?.items) {
         const items: FaucetCommandDto[] = json.data.items;
         setRecentCommands(items);
-        if (json.data.meta?.pagination) {
-          setCommandsPagination(json.data.meta.pagination);
-        }
 
         const active = items.find((c) => ACTIVE_COMMAND_STATUSES.includes(c.status));
         if (active) {
@@ -204,7 +199,6 @@ export default function FaucetControlPanel() {
     } else {
       setActiveCommand(null);
       setRecentCommands([]);
-      setCommandsPagination(null);
       setInitialValveState('UNKNOWN');
       setInitialLastConfirmedAt(null);
       setLoadedDeviceId(null);
@@ -278,17 +272,21 @@ export default function FaucetControlPanel() {
   const handleCommandUpdated = useCallback(
     (updated: FaucetCommandDto) => {
       setActiveCommand(updated);
-      setRecentCommands((prev) => {
-        const index = prev.findIndex(
-          (c) => c.commandId === updated.commandId || c.id === updated.id
-        );
-        if (index >= 0) {
-          const updatedList = [...prev];
-          updatedList[index] = updated;
-          return updatedList;
-        }
-        return [updated, ...prev];
-      });
+
+      // Only update recentCommands list when command reaches terminal state to prevent repeated 2.5s table re-renders
+      if (['COMPLETED', 'TIMEOUT', 'EXPIRED'].includes(updated.status)) {
+        setRecentCommands((prev) => {
+          const index = prev.findIndex(
+            (c) => c.commandId === updated.commandId || c.id === updated.id
+          );
+          if (index >= 0) {
+            const updatedList = [...prev];
+            updatedList[index] = updated;
+            return updatedList;
+          }
+          return [updated, ...prev];
+        });
+      }
 
       // Update feedback notification to reflect latest status
       const notif = getCommandStatusMessage(updated);
@@ -478,8 +476,6 @@ export default function FaucetControlPanel() {
         <section>
           <FaucetHistoryTable
             deviceId={selectedDevice.deviceId || selectedDevice.id}
-            initialItems={recentCommands}
-            initialPagination={commandsPagination}
             isLoading={effectiveCommandsLoading}
           />
         </section>
