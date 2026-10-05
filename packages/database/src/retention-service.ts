@@ -200,8 +200,7 @@ export class RetentionService {
 
     const completedAt = new Date();
     const totalDurationMs = completedAt.getTime() - startedAt.getTime();
-    const isCommandOnly =
-      targetTables.length === 1 && targetTables[0] === 'faucet_commands';
+    const isCommandOnly = targetTables.length === 1 && targetTables[0] === 'faucet_commands';
     const cutoffDate = isCommandOnly ? threeMonthCutoffDate : defaultCutoffDate;
 
     return {

@@ -105,60 +105,67 @@ export const gatewayEnvSchema = z.object({
     .preprocess((val) => (val ? parseInt(String(val), 10) : 86400000), z.number().int().min(1000))
     .default(86400000),
   RETENTION_TABLES: z
-    .preprocess((val) => {
-      if (val === undefined || val === null) return undefined;
-      const approvedTables = [
-        'soil_readings',
-        'water_readings',
-        'reservoir_water_readings',
-        'sensor_battery_readings',
-        'device_status_events',
-        'integration_errors',
-        'faucet_commands',
-      ] as const;
+    .preprocess(
+      (val) => {
+        if (val === undefined || val === null) return undefined;
+        const approvedTables = [
+          'soil_readings',
+          'water_readings',
+          'reservoir_water_readings',
+          'sensor_battery_readings',
+          'device_status_events',
+          'integration_errors',
+          'faucet_commands',
+        ] as const;
 
-      if (typeof val === 'string') {
-        const trimmed = val.trim();
-        if (trimmed === '') {
-          throw new Error(
-            'RETENTION_TABLES cannot be explicitly empty. Omit the variable to target all tables or specify valid comma-separated tables (e.g. RETENTION_TABLES=faucet_commands).'
-          );
-        }
-        const parts = trimmed.split(',').map((p) => p.trim());
-        for (const part of parts) {
-          if (!part || !approvedTables.includes(part as any)) {
+        if (typeof val === 'string') {
+          const trimmed = val.trim();
+          if (trimmed === '') {
             throw new Error(
-              `Invalid table in RETENTION_TABLES: "${part}". Allowed tables: ${approvedTables.join(', ')}`
+              'RETENTION_TABLES cannot be explicitly empty. Omit the variable to target all tables or specify valid comma-separated tables (e.g. RETENTION_TABLES=faucet_commands).'
             );
           }
+          const parts = trimmed.split(',').map((p) => p.trim());
+          for (const part of parts) {
+            if (!part || !approvedTables.includes(part as any)) {
+              throw new Error(
+                `Invalid table in RETENTION_TABLES: "${part}". Allowed tables: ${approvedTables.join(', ')}`
+              );
+            }
+          }
+          return parts;
         }
-        return parts;
-      }
-      if (Array.isArray(val)) {
-        if (val.length === 0) {
-          throw new Error(
-            'RETENTION_TABLES cannot be explicitly empty. Omit the variable to target all tables or specify valid tables.'
-          );
-        }
-        for (const item of val) {
-          if (!approvedTables.includes(item)) {
+        if (Array.isArray(val)) {
+          if (val.length === 0) {
             throw new Error(
-              `Invalid table in RETENTION_TABLES: "${item}". Allowed tables: ${approvedTables.join(', ')}`
+              'RETENTION_TABLES cannot be explicitly empty. Omit the variable to target all tables or specify valid tables.'
             );
           }
+          for (const item of val) {
+            if (!approvedTables.includes(item)) {
+              throw new Error(
+                `Invalid table in RETENTION_TABLES: "${item}". Allowed tables: ${approvedTables.join(', ')}`
+              );
+            }
+          }
+          return val;
         }
         return val;
-      }
-      return val;
-    }, z.array(z.enum([
-      'soil_readings',
-      'water_readings',
-      'reservoir_water_readings',
-      'sensor_battery_readings',
-      'device_status_events',
-      'integration_errors',
-      'faucet_commands',
-    ])).optional())
+      },
+      z
+        .array(
+          z.enum([
+            'soil_readings',
+            'water_readings',
+            'reservoir_water_readings',
+            'sensor_battery_readings',
+            'device_status_events',
+            'integration_errors',
+            'faucet_commands',
+          ])
+        )
+        .optional()
+    )
     .optional(),
   EXTERNAL_ML_SUPABASE_URL: z.string().url().optional(),
   EXTERNAL_ML_SUPABASE_PUBLISHABLE_KEY: z.string().optional(),

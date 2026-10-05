@@ -402,9 +402,7 @@ describe('RetentionService Unit Tests', () => {
       // Faucet commands must strictly use the 3-month cutoff despite retentionDays=30
       expect(mockPrisma.faucetCommand.findMany).toHaveBeenCalledWith({
         where: expect.objectContaining({
-          OR: expect.arrayContaining([
-            { completedAt: { not: null, lt: expected3MonthCutoff } },
-          ]),
+          OR: expect.arrayContaining([{ completedAt: { not: null, lt: expected3MonthCutoff } }]),
         }),
         select: { id: true },
         take: 1000,
