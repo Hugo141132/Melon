@@ -24,9 +24,11 @@
 3. **Gateway Ownership Handover (Strict Single-Consumer Rule):**
    - Because all gateways subscribe to the same hardware topics (`melon/sensor-tanah/...`, `melon/sensor-air/...`, `irigasi/melon/...`), **only ONE active gateway may run at any time**.
    - Any local development or staging gateway (`kebun-melon-staging-gateway`) **must be stopped** immediately before launching the VPS gateway.
-4. **Current Status & Verified Host Baseline (Release `ada891e` Deployment & Smoke Test Acceptance — 2026-10-06):**
+4. **Current Status & Verified Host Baseline (Gateway `875f91b`, Web `ada891e`; operator-confirmed closeout — 2026-10-06):**
    - **Active Web Container:** Recreated and healthy with `kebun-melon-web:ada891e`, verified responding to internal health probe (`http://localhost:3000/health`).
-   - **Active Gateway Container:** Recreated and healthy with `kebun-melon-gateway:ada891e` bundling updated `@kebun-melon/database` (Prisma client with tombstone model and `RetentionService`), verified responding to internal health probe (`http://localhost:3001/health`).
+   - **Active Gateway Container:** Operator confirms `kebun-melon-gateway:875f91b` running and healthy. Commit `875f91b` was pushed to `main` and GitHub CI passed; web remains `kebun-melon-web:ada891e`.
+   - **Retention Runtime (operator-confirmed):** `RETENTION_ENABLED=true`, `RETENTION_TABLES=faucet_commands`. First scheduled cleanup completed at `2026-10-05T18:38:46.472Z` (`2026-10-06 01:38:46 WIB`); cutoff `2026-07-05T18:38:45.685Z`, `totalDeleted=0`, duration `787 ms`, interval `86400000 ms` (24 hours). Read-only preview found no eligible commands.
+   - **Evidence Scope:** This confirms the live VPS application, not a separate staging application deployment. The staging database migration status below does not establish the state of `docker-compose.staging.yml`.
    - **Preserved Rollback Baseline:** Tagged `kebun-melon-web:rollback-baseline` and `kebun-melon-gateway:rollback-baseline` preserved in local Docker daemon.
    - **Reverse Proxy & HTTPS Restoration:** Container `kebun-melon-proxy` (`caddy:2.9-alpine`) was restarted after an unexpected shutdown (shutdown cause unknown; investigation pending if recurrence observed); HTTPS restored with valid TLS certificate.
    - **Database Migration Status:**
@@ -39,11 +41,11 @@
      - Event-driven command history refresh via SSE verified functional without continuous polling.
      - Owner approval workflow (top toast notifier, dynamic sidebar badge, bilingual Resend email dispatch) verified functional.
    - **Remaining Unverified / Separate Deployment Items:**
-     - Retention activation (`RETENTION_ENABLED=false` currently maintained in `.env.production`) remains pending separate authorization and scheduler configuration isolation.
+     - Actual deletion and tombstone insertion with aged real data remain unverified; the successful zero-row scheduled run does not exercise those paths.
      - Physical valve hardware actuation prerequisites remain blocked on physical hardware (`TASK-0414`).
-     - Actual physical memory/latency performance profiling under production load remains separate and unmeasured.
-     - Staging status (`docker-compose.staging.yml`) must be verified independently.
-     - Local 5 pre-commit CI gates remain deferred.
+     - Memory/latency profiling under production load remains unmeasured; a single `787 ms` zero-row run establishes no performance guarantee.
+     - Staging application status (`docker-compose.staging.yml`) must be verified independently.
+     - GitHub CI for `875f91b` passed per operator confirmation. None of the five reserved CI commands is necessary for this documentation-only closeout; lightweight documentation checks suffice. No staging/VPS, Docker, database, or reverse-proxy update is required.
 
 ---
 

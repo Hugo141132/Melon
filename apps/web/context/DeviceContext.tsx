@@ -306,7 +306,7 @@ export function DeviceProvider({
   );
 
   const refetchDevices = useCallback(async () => {
-    setIsLoading(true);
+    setIsLoading((prev) => (devices.length === 0 ? true : prev));
     setError(null);
     const epoch = activeEpochRef.current;
 
@@ -316,6 +316,9 @@ export function DeviceProvider({
       if (!response.ok) {
         if (response.status === 401) {
           setError('Sesi berakhir. Silakan login kembali.');
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('melon:unauthenticated'));
+          }
         } else {
           setError(`Gagal memuat perangkat (${response.status})`);
         }
@@ -338,7 +341,7 @@ export function DeviceProvider({
         setIsLoading(false);
       }
     }
-  }, [processDeviceList]);
+  }, [devices.length, processDeviceList]);
 
   useEffect(() => {
     if (initialDevices) {
@@ -362,6 +365,13 @@ export function DeviceProvider({
       refetchDevices();
     }
   }, [pathname, initialDevices, processDeviceList, refetchDevices, hasFetched]);
+
+  // Synchronize candidate selection immediately on route transitions using already-loaded devices
+  useEffect(() => {
+    if (devices.length > 0) {
+      processDeviceList(devices);
+    }
+  }, [pathname, devices, processDeviceList]);
 
   // Listen for browser history navigation (popstate) to synchronize route context
   useEffect(() => {

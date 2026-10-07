@@ -26,6 +26,7 @@ describe('TASK-0901 — Web Security Headers Configuration Tests', () => {
     expect(headersMap.get('Content-Security-Policy')).toContain("frame-ancestors 'none'");
     expect(headersMap.get('Content-Security-Policy')).toContain('https://fonts.googleapis.com');
     expect(headersMap.get('Content-Security-Policy')).toContain('https://fonts.gstatic.com');
+    expect(headersMap.get('Content-Security-Policy')).toContain('https://api.open-meteo.com');
     expect(headersMap.get('Strict-Transport-Security')).toBeUndefined();
   });
 });

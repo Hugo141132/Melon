@@ -4901,11 +4901,12 @@ The following full CI gates were deferred for this checkpoint and must be verifi
   - Staging Database (`ihgoxqdncepbcrqkchxu`): `UP TO DATE` ("Database schema is up to date!" confirmed by operator after tombstone application via `prisma migrate resolve --applied 20261005193000_add_faucet_command_idempotency_tombstones`; zero pending migrations in staging).
   - Dev Database: Tombstone applied; reservoir migration `20261003230000` remains separate and pending in dev.
 - **Live Website Acceptance:** `USER-CONFIRMED COMPLETE on 2026-10-05` (Interactive verification completed by operator `wnf2fn2nc0n`).
-- **VPS Deployment & Container Health:** `DEPLOYED on 2026-10-06` (Release `ada891e` deployed to Nebula VPS `38.103.171.46`; containers `kebun-melon-web:ada891e` and `kebun-melon-gateway:ada891e` healthy; Caddy restarted after shutdown and HTTPS restored; all post-deployment smoke tests passed).
+- **VPS Deployment & Container Health:** Operator confirmed commit `875f91b` pushed to `main` and GitHub CI passed. Live VPS gateway `kebun-melon-gateway:875f91b` is running and healthy; web remains `kebun-melon-web:ada891e`.
+- **Retention Runtime Closeout (operator-confirmed, 2026-10-06):** `RETENTION_ENABLED=true`, `RETENTION_TABLES=faucet_commands`. First scheduled cleanup completed at `2026-10-05T18:38:46.472Z` (`2026-10-06 01:38:46 WIB`), with cutoff `2026-07-05T18:38:45.685Z`, `totalDeleted=0`, duration `787 ms`, and interval `86400000 ms` (24 hours). Read-only preview found no eligible commands.
+- **Environment Scope:** The staging database status above is separate from this live VPS application confirmation; this evidence does not establish deployment or scheduler activation for `docker-compose.staging.yml`.
 - **Deferred Runtime Items:**
-  - Retention activation (`RETENTION_ENABLED=false` currently maintained in `.env.production`) remains pending separate authorization and scheduler configuration isolation (`RETENTION_TABLES=faucet_commands`).
-  - Unobserved 3-month physical deletion scenarios in the field remain pending future schedule triggers.
-  - Actual memory/latency performance profiling remains separate and pending (unsupported claims such as `<=50 KB RAM` or guaranteed zero latency overhead are qualified).
+  - Actual deletion and tombstone insertion with aged real data remain unverified; the successful zero-row scheduled run does not exercise those paths.
+  - Memory/latency profiling under production load remains unmeasured. A single `787 ms` zero-row run establishes no performance guarantee.
 
 ---
 
@@ -4994,3 +4995,69 @@ The following full CI gates were deferred for this checkpoint and must be verifi
 - **Live Website Acceptance:** `USER-CONFIRMED COMPLETE on 2026-10-05` (Interactive verification completed by operator `wnf2fn2nc0n`).
 - **VPS Deployment & Container Health:** `DEPLOYED on 2026-10-06` (Release `ada891e` deployed to Nebula VPS `38.103.171.46`; web container healthy; Caddy restarted after shutdown and HTTPS restored; real-time toast, dynamic badge, and Resend email dispatch verified via post-deployment smoke test).
 - **Deferred Verification Items:** Real inbox physical receipt remains unobserved (provider acceptance logged); final CI checks remain deferred.
+
+---
+
+## TASK-RELIABILITY-01: Application Reliability & Consistency Refinement
+
+**Priority:** `P1` (System Reliability, UX Consistency, Rate-Limit Prevention & Security Guardrails)  
+**Status:** `READY FOR RELEASE TESTING`  
+**Dependencies:** `TASK-0212`, `TASK-0219`, `TASK-0707`, `TASK-0814`  
+**Frontend Impact:** `MINOR`  
+**Selected UI Direction:** `Premium Minimal Ops`  
+**Existing Color Template:** `UNCHANGED`  
+**Selected Motion Effects:** `Button hover`, `Modal`  
+**21st.dev MCP:** `NOT REQUIRED`  
+
+### 1. Implemented Changes
+
+- **User Management Operational Scope Refinement (`apps/web/app/users/page.tsx`, `packages/contracts/src/user.ts`, `packages/database/src/user-repository.ts`):**
+  - Excluded `PENDING_APPROVAL` and `REJECTED` accounts from `/users` query results. Operational User Management strictly manages active and suspended accounts (`ACTIVE`, `SUSPENDED`).
+  - Account approval history and applicant review are maintained separately in the Dedicated Approval Workflow (`/approvals`).
+  - Aligned User Management status filter options in contracts, database repository queries, and UI dropdown to `All Status`, `ACTIVE`, and `SUSPENDED`.
+- **Open-Meteo Weather Panel CSP Whitelisting (`apps/web/next.config.mjs`):**
+  - Updated Content Security Policy `connect-src` to explicitly include `https://api.open-meteo.com` alongside `'self'`.
+  - Resolves client-side console CSP blocking errors on `/` and `/dashboard` while preventing wildcard connections and preserving zero-weakening security guarantees.
+- **Valve Command History Pagination UI Refinement (`apps/web/components/controls/FaucetHistoryTable.tsx`):**
+  - Replaced basic chevron pagination controls with an accessible, responsive pagination UI (`flex-col sm:flex-row`).
+  - Added numbered page buttons with adaptive ellipsis windowing, `ArrowLeft`/`ArrowRight` buttons, and explicit `aria-current="page"`.
+  - Preserved strict server-side pagination (10 rows/page), compound sorting (`createdAt DESC, id DESC`), and stale-response sequence protection (`fetchSeqRef`).
+- **Notification Acknowledgement Refinement (`apps/web/app/api/v1/alerts/bulk-acknowledge/route.ts`, `packages/contracts/src/alert.ts`, `packages/database/src/alert-repository.ts`, `apps/web/app/notifications/page.tsx`):**
+  - Completely removed "Acknowledge All" functionality from backend contracts, database queries, and frontend UI.
+  - "Acknowledge Selected (N)" is the sole bulk-acknowledgement interaction (`alertIds` required, min 1), preventing inadvertent mass-dismissal of open alerts.
+- **Session Focus/Visibility Revalidation & Outage Resilience (`apps/web/context/AuthContext.tsx`):**
+  - Configured window focus and document visibility listeners to revalidate session in silent mode (`validateSession(true)`), preventing disruptive auth drops and layout shifts.
+  - Handled transient network blips and backend unauthenticated responses gracefully.
+- **Device State Synchronization (`apps/web/context/DeviceContext.tsx`):**
+  - Reused already-loaded device state across route transitions, eliminating redundant device fetching spinners during internal page navigation.
+  - Synchronizes candidate selection immediately on route transitions.
+  - Listens for unauthenticated events (`melon:unauthenticated`) on HTTP 401 responses.
+- **Alert Request Storm & HTTP 429 Prevention (`apps/web/hooks/useAlertBadge.ts`, `apps/web/app/notifications/page.tsx`):**
+  - Identified root cause of HTTP 429 on `/notifications`: duplicate consumers (`TopAppBar`, `Sidebar`), separate polling loops, rapid route re-mounts, and missing in-flight deduplication.
+  - Implemented module-level shared badge singleton (`sharedCount`, `sharedIsLoading`, `subscribers`) in `useAlertBadge.ts`.
+  - Added in-flight promise deduplication and a 10-second TTL cache for alert count queries.
+  - Suppressed badge polling and fetches while the user actively views `/notifications`.
+  - Added HTTP 429 rate-limit backoff respecting `Retry-After` header (minimum 30-second cooldown).
+  - Wired direct event synchronization: `/notifications` dispatches `melon:alert-updated` with `{ detail: { count: openCount } }` on alert fetch or acknowledge, instantly updating navigation badges without additional API calls.
+  - Exported `setSharedAlertCount` and `resetAlertBadgeState` for testing and deterministic state reset.
+
+### 2. Verification
+
+- **Manual Website Verification:** `USER-CONFIRMED COMPLETE` (Operator verified in browser: User Management accounts, weather card display, valve history pagination, notification acknowledgement, and alert badge behaviour).
+- **Automated Focused Validation:**
+  - `npm run typecheck:web`: 0 errors across `apps/web`.
+  - `use-alert-badge.test.tsx`: 4/4 tests passed (100%).
+  - `notifications-bulk-acknowledge-ui.test.tsx`: 2/2 tests passed (100%).
+  - `notifications-user-scope.test.tsx`: 2/2 tests passed (100%).
+  - `sidebar-navigation.test.tsx`: 12/12 tests passed (100%).
+  - `users-page.test.tsx`: 2/2 tests passed (100%).
+  - `security-headers.test.ts`: passed (includes Open-Meteo CSP verification).
+  - `alert-repository.test.ts`: 15/15 tests passed (100%).
+  - `user-repository.test.ts`: passed (includes active/suspended query filtering).
+- **Final Release Testing Status:** The five full validation test commands (`npm run test:coverage`, `npm run test:integration`, `npm run check:quality`, `npm run test`, `npm run test:e2e`) remain deferred and pending manual execution by the developer prior to git commit and push.
+
+### 3. Acceptance & Deployment Tracking
+- **Code & Test Implementation:** `COMPLETE` (All source and test files verified).
+- **Live Database Migration:** `NOT REQUIRED` (Database schema untouched; queries use existing tables and enums).
+- **Staging / VPS Deployment Requirement:** Requires building and restarting `kebun-melon-web` container image to deploy updated frontend bundle, Next.js CSP header configuration, and updated API route handlers. No gateway or reverse proxy changes required.
+

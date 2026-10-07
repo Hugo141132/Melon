@@ -87,16 +87,10 @@ export type AlertAcknowledgementDto = z.infer<typeof AlertAcknowledgementDtoSche
 
 export const BulkAcknowledgeAlertsInputSchema = z
   .object({
-    alertIds: z.array(z.string().uuid()).optional(),
-    all: z.boolean().optional(),
+    alertIds: z.array(z.string().uuid()).min(1, 'At least one alert ID must be provided'),
     note: z.string().trim().max(500).optional().nullable(),
   })
-  .refine(
-    (data) => data.all === true || (Array.isArray(data.alertIds) && data.alertIds.length > 0),
-    {
-      message: 'Either alertIds with at least one ID or all=true must be provided',
-    }
-  );
+  .strict();
 
 export type BulkAcknowledgeAlertsInput = z.input<typeof BulkAcknowledgeAlertsInputSchema>;
 

@@ -101,6 +101,7 @@ All exceptions must be recorded in `scripts/security-exceptions.json` using the 
 - **TASK-0916 / Singapore Staging Cutover & Baseline Fidelity Audit (2026-09-08):** Confirmed zero secret exceptions and zero dependency exceptions introduced; immutable staging baseline manifest verified (SHA-256 `BC03C209639942BEA678B1353D382C4E354C7A800082187E60807ADD8E43A9FB`); staging database connection string and credentials scoped exclusively via environment variables; automated secret scan passed (`npx tsx scripts/scan-secrets.ts`); container redeployment verified healthy without token leakage; `ENABLE_FAUCET_CONTROL=false` strictly preserved (`faucet_commands` = 0); zero security exceptions registered in `scripts/security-exceptions.json`.
 - **TASK-0410 / Dependency Vulnerability Exception Audit (2026-09-09):** Documented formal reviewed exceptions `EXC-DEP-002` (`js-yaml` / `GHSA-2883-xcg3-v3hh`), `EXC-DEP-003` (`next` / `GHSA-p293-qw3h-jr36`), `EXC-DEP-004` (`next` / `GHSA-2xp9-vwfh-vxw4`), and `EXC-DEP-005` (`sharp` / `GHSA-rgj7-g3m4-5g8c`) in `scripts/security-exceptions.json`. Verified all 4 advisories are fully mitigated by Linux container runtime architecture, disabled AVIF formats, and dev-only usage.
 - **Alert Notification & Dependency Security Audit (2026-10-03):** Confirmed zero secret exceptions introduced; registered approved exceptions `EXC-DEP-009` through `EXC-DEP-013` for build-time transitive dependency `braces` (`GHSA-vfj7-8cjw-p6xm`) and its dev-only dependents (`micromatch`, `chokidar`, `fast-glob`, `@next/eslint-plugin-next`) in `scripts/security-exceptions.json`. Verified all 5 packages are strictly build-time tools with zero runtime or client bundle exposure.
+- **Dependency Security Audit & Recertification (2026-10-07):** Confirmed zero secret exceptions introduced; registered approved exceptions `EXC-DEP-014` (`sharp` / `GHSA-wq5f-xc86-pv6w`), `EXC-DEP-015` (`source-map-js` / `GHSA-68fv-2mgg-jv7q`), and `EXC-DEP-016` (`postcss-nested` / `*`) in `scripts/security-exceptions.json`. Verified all 3 findings are mitigated by build-time containment and zero untrusted SVG/media or source map parsing at runtime. Recertified September baseline exceptions `EXC-DEP-002` through `EXC-DEP-005` for a renewed 30-day review cycle.
 
 ---
 
@@ -363,7 +364,28 @@ This section documents the investigation, compensating controls, and formal appr
 - **Affected Context:** Build-time and lint-time dependencies of Tailwind CSS (`tailwindcss@3.4.19`) and Next.js ESLint plugin (`eslint-config-next@15.1.0`).
 - **Compensating Controls:** None of the affected packages are bundled into browser client bundles or production server runtimes. The web application and IoT gateway process strictly structured numerical IoT telemetry and never evaluate or parse untrusted user-supplied glob expressions or regex patterns.
 - **Approval & Expiry:** Approved by Security Team on 2026-10-03. Expires 2026-11-03 (31 days).
-<!-- Dependency Vulnerability Exceptions Reconciled: 2026-10-03 -->
+
+### 9. EXC-DEP-014 (`sharp` / `GHSA-wq5f-xc86-pv6w`, High)
+- **Vulnerability:** Vulnerability in librsvg dependency (CVE-2026-96889) bundled in sharp sub-dependency.
+- **Classification:** Mitigated Unused Sub-dependency / Feature.
+- **Affected Context:** Transitive SVG rendering in Next.js image optimization.
+- **Compensating Controls:** The application processes only structured numerical IoT telemetry over MQTT and REST. Untrusted user SVG or image uploads are not supported. All SVG assets in the repository are static, vector-audited local files bundled at build time.
+- **Approval & Expiry:** Approved by Security Team on 2026-10-07. Expires 2026-11-07 (31 days).
+
+### 10. EXC-DEP-015 (`source-map-js` / `GHSA-68fv-2mgg-jv7q`, High)
+- **Vulnerability:** Event-loop denial of service through indexed source-map section offsets in `source-map-js`.
+- **Classification:** Mitigated Transitive Dev-Dependency.
+- **Affected Context:** PostCSS and Tailwind CSS CSS-processing toolchain used during build/compilation time.
+- **Compensating Controls:** `source-map-js` is not bundled into client browser bundles or production runtime server containers. The application does not parse, consume, or process untrusted source maps at runtime.
+- **Approval & Expiry:** Approved by Security Team on 2026-10-07. Expires 2026-11-07 (31 days).
+
+### 11. EXC-DEP-016 (`postcss-nested` / `*`, High)
+- **Vulnerability:** Transitive dependency of Tailwind CSS flagged due to sub-dependency `postcss-selector-parser`. Upstream suggested fix requires breaking upgrade to Tailwind CSS v4.
+- **Classification:** Mitigated Transitive Dev-Dependency.
+- **Affected Context:** Build-time CSS nesting compilation for Tailwind CSS v3 (`tailwindcss@3.4.19`).
+- **Compensating Controls:** `postcss-nested` runs strictly during static asset generation at build time and is never included in runtime server or client bundles. No untrusted user CSS or selectors are evaluated or parsed. Upgrading to Tailwind CSS v4 would break repository styling and visual design governance rules.
+- **Approval & Expiry:** Approved by Security Team on 2026-10-07. Expires 2026-11-07 (31 days).
+<!-- Dependency Vulnerability Exceptions Reconciled: 2026-10-07 -->
 
 ---
 

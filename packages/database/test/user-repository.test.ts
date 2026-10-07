@@ -1242,32 +1242,20 @@ describe('UserRepository Unit Tests', () => {
       expect(mockFindMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            accountStatus: { not: AccountStatus.DEACTIVATED },
-            NOT: [
-              {
-                accountStatus: AccountStatus.PENDING_APPROVAL,
-                emailVerifiedAt: null,
-              },
-            ],
+            accountStatus: { in: [AccountStatus.ACTIVE, AccountStatus.SUSPENDED] },
           }),
         })
       );
       expect(mockCount).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            accountStatus: { not: AccountStatus.DEACTIVATED },
-            NOT: [
-              {
-                accountStatus: AccountStatus.PENDING_APPROVAL,
-                emailVerifiedAt: null,
-              },
-            ],
+            accountStatus: { in: [AccountStatus.ACTIVE, AccountStatus.SUSPENDED] },
           }),
         })
       );
     });
 
-    it('getUsers with accountStatus=PENDING_APPROVAL enforces emailVerifiedAt not null', async () => {
+    it('getUsers excludes non-active/non-suspended accounts such as PENDING_APPROVAL', async () => {
       const mockFindMany = vi.fn().mockResolvedValue([]);
       const mockCount = vi.fn().mockResolvedValue(0);
 
@@ -1279,36 +1267,34 @@ describe('UserRepository Unit Tests', () => {
       };
 
       const repo = new UserRepository(mockPrisma);
-      await repo.getUsers({ accountStatus: AccountStatus.PENDING_APPROVAL });
+      await repo.getUsers({ accountStatus: AccountStatus.PENDING_APPROVAL as any });
 
       expect(mockFindMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            accountStatus: AccountStatus.PENDING_APPROVAL,
-            emailVerifiedAt: { not: null },
+            accountStatus: { in: [] },
           }),
         })
       );
       expect(mockCount).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            accountStatus: AccountStatus.PENDING_APPROVAL,
-            emailVerifiedAt: { not: null },
+            accountStatus: { in: [] },
           }),
         })
       );
     });
 
-    it('getUserManagementById returns null for unverified PENDING_APPROVAL accounts', async () => {
+    it('getUserManagementById returns null for PENDING_APPROVAL and non-active accounts', async () => {
       const mockPrisma: any = {
         user: {
           findUnique: vi.fn().mockResolvedValue({
-            id: 'usr-unverified',
-            fullName: 'Unverified Admin',
-            email: 'unverified@example.com',
-            username: 'unverified',
+            id: 'usr-pending',
+            fullName: 'Pending Admin',
+            email: 'pending@example.com',
+            username: 'pending_user',
             accountStatus: AccountStatus.PENDING_APPROVAL,
-            emailVerifiedAt: null,
+            emailVerifiedAt: new Date(),
             lastLoginAt: null,
             suspendedAt: null,
             deactivatedAt: null,
@@ -1320,21 +1306,21 @@ describe('UserRepository Unit Tests', () => {
       };
 
       const repo = new UserRepository(mockPrisma);
-      const result = await repo.getUserManagementById('usr-unverified');
+      const result = await repo.getUserManagementById('usr-pending');
 
       expect(result).toBeNull();
     });
 
-    it('getUserManagementById returns safe DTO for verified PENDING_APPROVAL accounts', async () => {
+    it('getUserManagementById returns safe DTO for ACTIVE and SUSPENDED accounts', async () => {
       const validAdminId = 'a0000000-0000-0000-0000-000000000001';
       const mockPrisma: any = {
         user: {
           findUnique: vi.fn().mockResolvedValue({
             id: validAdminId,
-            fullName: 'Verified Pending Admin',
-            email: 'verified@example.com',
-            username: 'verified_pending',
-            accountStatus: AccountStatus.PENDING_APPROVAL,
+            fullName: 'Active Admin',
+            email: 'active@example.com',
+            username: 'active_admin',
+            accountStatus: AccountStatus.ACTIVE,
             emailVerifiedAt: new Date('2026-09-21T03:00:00Z'),
             lastLoginAt: null,
             suspendedAt: null,
@@ -1351,7 +1337,7 @@ describe('UserRepository Unit Tests', () => {
 
       expect(result).not.toBeNull();
       expect(result?.id).toBe(validAdminId);
-      expect(result?.accountStatus).toBe(AccountStatus.PENDING_APPROVAL);
+      expect(result?.accountStatus).toBe(AccountStatus.ACTIVE);
       expect(result?.emailVerifiedAt).toBeDefined();
     });
   });

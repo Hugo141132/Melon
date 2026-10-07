@@ -162,7 +162,7 @@ flowchart TD
 ```mermaid
 flowchart TD
     A[Owner opens User Management] --> B[Server verifies OWNER]
-    B --> C[Load permitted users: emailVerifiedAt IS NOT NULL]
+    B --> C[Load operational users: ACTIVE or SUSPENDED (emailVerifiedAt IS NOT NULL)]
     C --> D[Owner selects user or multiple accounts]
     D --> E[Review profile and status]
     E --> F{Owner action}
@@ -179,6 +179,12 @@ flowchart TD
     K --> L
     M --> L
 ```
+
+*Invariants:*
+- **Operational Accounts Only**: `PENDING_APPROVAL` and `REJECTED` accounts are strictly excluded from `/users`. User Management handles only active or suspended operational accounts (`ACTIVE`, `SUSPENDED`).
+- **Separated Approval Lifecycle**: Account approval history is managed exclusively in the Dedicated Approval Workflow (`/approvals`) and never commingled with active user directory records.
+- **Status Filter Options**: Status filtering in the User Management UI is restricted to operational states: `All Status`, `ACTIVE`, and `SUSPENDED`.
+
 
 ## 5.5 Faucet Command Flow
 
@@ -1604,17 +1610,17 @@ The application does NOT provide a "Delete Device" flow. Device removal from the
 
 **Primary actor:** Owner or permitted Admin  
 **Preconditions:** One or more unacknowledged alerts exist in operator's scope.  
-**Trigger:** User selects checkboxes and clicks "Acknowledge Selected (N)" or clicks "Acknowledge All".
+**Trigger:** User selects checkboxes and clicks "Acknowledge Selected (N)". ("Acknowledge All" was retired to prevent inadvertent mass-dismissal.)
 
 **Main success flow:**
 
-1. The frontend gathers selected alert IDs (or `{ all: true }`).
+1. The frontend gathers selected alert IDs (`alertIds: string[]`, minimum 1 item).
 2. Client submits `POST /api/v1/alerts/bulk-acknowledge`.
 3. Server validates session, `alert.acknowledge` permission, and filters target alerts by operator device access scope.
 4. Server executes an atomic database transaction batching `AlertAcknowledgement` upserts for all authorized target alerts.
 5. Server records individual `alert.acknowledged` audit log entries with `{ userScoped: true, bulk: true }`.
-6. Client updates local alert states, unchecks selection bar, and dispatches `melon:alert-updated` custom event.
-7. Navigation badges and top navigation indicators update instantaneously.
+6. Client updates local alert states, unchecks selection bar, and dispatches `melon:alert-updated` CustomEvent with `{ detail: { count: openCount } }`.
+7. Navigation badges and top navigation indicators update instantaneously without redundant network polling.
 
 **Alternative flows:** Operator deselects items; selection bar hides.  
 **Error flows:** Partial failure aborts transaction; user is notified via error banner.  
@@ -1623,6 +1629,7 @@ The application does NOT provide a "Delete Device" flow. Device removal from the
 **Relevant account statuses:** `ACTIVE`.  
 **UI states:** Multi-select bar, batch acknowledging spinner, bulk complete.  
 **Audit events:** `alert.acknowledged` per target alert.
+
 
 ---
 

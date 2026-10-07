@@ -136,7 +136,7 @@ describe('POST /api/v1/alerts/bulk-acknowledge', () => {
     expect(json.data.alertIds).toEqual(targetIds);
   });
 
-  it('returns 200 with result on acknowledge all open alerts', async () => {
+  it('returns 422 VALIDATION_ERROR when { all: true } is sent without alertIds', async () => {
     vi.mocked(rbacModule.requireSession).mockResolvedValue({
       id: 'owner-001',
       fullName: 'Owner One',
@@ -146,31 +146,15 @@ describe('POST /api/v1/alerts/bulk-acknowledge', () => {
     });
     vi.mocked(rbacModule.requirePermission).mockReturnValue({} as any);
 
-    const mockBulkAck = vi.fn().mockResolvedValue({
-      acknowledgedCount: 5,
-      alertIds: [
-        '00000000-0000-0000-0000-000000000001',
-        '00000000-0000-0000-0000-000000000002',
-        '00000000-0000-0000-0000-000000000003',
-        '00000000-0000-0000-0000-000000000004',
-        '00000000-0000-0000-0000-000000000005',
-      ],
-    });
-    vi.mocked(AlertRepository).mockImplementation(function () {
-      return {
-        acknowledgeAlertsBulk: mockBulkAck,
-      } as any;
-    });
-
     const req = new NextRequest('http://localhost/api/v1/alerts/bulk-acknowledge', {
       method: 'POST',
       body: JSON.stringify({ all: true }),
     });
 
     const res = await POST(req);
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(422);
     const json = await res.json();
-    expect(json.success).toBe(true);
-    expect(json.data.acknowledgedCount).toBe(5);
+    expect(json.success).toBe(false);
+    expect(json.error.code).toBe('VALIDATION_ERROR');
   });
 });

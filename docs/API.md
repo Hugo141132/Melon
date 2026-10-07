@@ -2623,9 +2623,8 @@ Acknowledges multiple alerts in a single atomic transaction for the authenticate
 
 ### Request Body
 
-Supports acknowledging specific alert IDs or all open unacknowledged alerts in the operator's authorized scope:
+Requires explicit `alertIds` (array of UUIDs, minimum 1 item) to acknowledge for the operator's authorized scope:
 
-**Option A: Acknowledge explicit alert IDs**
 ```json
 {
   "alertIds": [
@@ -2636,15 +2635,7 @@ Supports acknowledging specific alert IDs or all open unacknowledged alerts in t
 }
 ```
 
-**Option B: Acknowledge all open alerts in scope**
-```json
-{
-  "all": true,
-  "note": "Acknowledged all pending alerts"
-}
-```
-
-*Note: For `ADMIN` users, only alerts for explicitly assigned devices (`UserDeviceAccess`) or user-scoped alerts are acknowledged. Any unassigned alerts in `alertIds` are safely skipped.*
+*Note: For `ADMIN` users, only alerts for explicitly assigned devices (`UserDeviceAccess`) or user-scoped alerts are acknowledged. Any unassigned alerts in `alertIds` are safely skipped. The previous `all: true` parameter was removed to prevent accidental mass-acknowledgement; explicit selection is enforced.*
 
 ### Response 200 OK
 
@@ -2661,7 +2652,7 @@ Supports acknowledging specific alert IDs or all open unacknowledged alerts in t
 }
 ```
 
-Audit logs with event key `alert.acknowledged` and metadata `{ userScoped: true, bulk: true, note }` are written for each acknowledged alert. Dispatches client-side `melon:alert-updated` event to immediately sync navigation badges.
+Audit logs with event key `alert.acknowledged` and metadata `{ userScoped: true, bulk: true, note }` are written for each acknowledged alert. Dispatches client-side `melon:alert-updated` CustomEvent with `{ detail: { count: openCount } }` to immediately synchronize navigation badges without triggering duplicate network roundtrips.
 
 ---
 

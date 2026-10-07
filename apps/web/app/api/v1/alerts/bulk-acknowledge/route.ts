@@ -35,7 +35,6 @@ export async function POST(request: NextRequest) {
       session.id,
       {
         alertIds: parsedBody.alertIds,
-        all: parsedBody.all,
         note: parsedBody.note || undefined,
       },
       authorizedDeviceIds

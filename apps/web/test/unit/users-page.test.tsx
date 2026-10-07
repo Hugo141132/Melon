@@ -166,7 +166,7 @@ describe('UserManagementPage Auth State Hydration & RBAC Scoping', () => {
     expect(adminLabels.some((el) => el.tagName === 'SPAN')).toBe(true);
   });
 
-  it('4. excludes unverified PENDING_APPROVAL accounts defensively if present in API payload', async () => {
+  it('4. excludes PENDING_APPROVAL and REJECTED accounts defensively if present in API payload', async () => {
     mockAuthContext = {
       user: {
         id: 'usr-owner-1',
@@ -195,6 +195,20 @@ describe('UserManagementPage Auth State Hydration & RBAC Scoping', () => {
         updatedAt: '2026-09-20T00:00:00.000Z',
         activeRoles: ['ADMIN'],
       },
+      {
+        id: 'usr-rejected-admin',
+        fullName: 'Rejected Applicant',
+        email: 'rejected@example.com',
+        username: 'rejected_guy',
+        accountStatus: 'REJECTED',
+        emailVerifiedAt: '2026-09-21T00:00:00.000Z',
+        lastLoginAt: null,
+        suspendedAt: null,
+        deactivatedAt: null,
+        createdAt: '2026-09-20T00:00:00.000Z',
+        updatedAt: '2026-09-20T00:00:00.000Z',
+        activeRoles: ['ADMIN'],
+      },
     ];
 
     global.fetch = vi.fn().mockImplementation((url: string) => {
@@ -210,7 +224,7 @@ describe('UserManagementPage Auth State Hydration & RBAC Scoping', () => {
                 pagination: {
                   page: 1,
                   pageSize: 10,
-                  totalItems: 2,
+                  totalItems: 3,
                   totalPages: 1,
                 },
               },
@@ -226,7 +240,12 @@ describe('UserManagementPage Auth State Hydration & RBAC Scoping', () => {
       expect(screen.getByText('Budi Santoso')).toBeInTheDocument();
     });
 
-    // Verification: Unverified applicant is filtered out and never rendered
+    // Verification: Pending and rejected applicants are filtered out and never rendered
     expect(screen.queryByText('Unverified Applicant')).not.toBeInTheDocument();
+    expect(screen.queryByText('Rejected Applicant')).not.toBeInTheDocument();
+
+    // Verification: Status dropdown does not contain PENDING_APPROVAL or REJECTED options
+    expect(screen.queryByRole('option', { name: /menunggu persetujuan/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: /ditolak/i })).not.toBeInTheDocument();
   });
 });

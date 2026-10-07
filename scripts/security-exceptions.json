@@ -29,8 +29,8 @@
       "advisoryId": "GHSA-2883-xcg3-v3hh",
       "reason": "Transitive dev-dependency of ESLint config (@eslint/eslintrc); maxTotalMergeKeys CPU consumption on empty merge sources does not affect runtime applications as no untrusted YAML is parsed.",
       "approvedBy": "Security Team",
-      "approvedDate": "2026-09-09",
-      "expiresDate": "2026-10-09"
+      "approvedDate": "2026-10-07",
+      "expiresDate": "2026-11-07"
     },
     {
       "id": "EXC-DEP-003",
@@ -38,8 +38,8 @@
       "advisoryId": "GHSA-p293-qw3h-jr36",
       "reason": "Platform-specific RCE restricted to Windows-hosted servers; staging and production runtime environments strictly run on containerized Linux (node:20-alpine / Railway PaaS), rendering Windows path traversal unexploitable.",
       "approvedBy": "Security Team",
-      "approvedDate": "2026-09-09",
-      "expiresDate": "2026-10-09"
+      "approvedDate": "2026-10-07",
+      "expiresDate": "2026-11-07"
     },
     {
       "id": "EXC-DEP-004",
@@ -47,8 +47,8 @@
       "advisoryId": "GHSA-2xp9-vwfh-vxw4",
       "reason": "Next.js Image Optimization API RCE triggered by AVIF files; application does not configure AVIF image formats, uses zero external image uploads, and relies strictly on static SVGs and remote avatars from approved Google/Pinterest origins.",
       "approvedBy": "Security Team",
-      "approvedDate": "2026-09-09",
-      "expiresDate": "2026-10-09"
+      "approvedDate": "2026-10-07",
+      "expiresDate": "2026-11-07"
     },
     {
       "id": "EXC-DEP-005",
@@ -56,8 +56,8 @@
       "advisoryId": "GHSA-rgj7-g3m4-5g8c",
       "reason": "Vulnerabilities in libheif decoder bundled in sharp sub-dependency; application processes only numerical IoT telemetry and does not ingest or decode HEIF/HEIC image assets.",
       "approvedBy": "Security Team",
-      "approvedDate": "2026-09-09",
-      "expiresDate": "2026-10-09"
+      "approvedDate": "2026-10-07",
+      "expiresDate": "2026-11-07"
     },
     {
       "id": "EXC-DEP-006",
@@ -130,6 +130,33 @@
       "approvedBy": "Security Team",
       "approvedDate": "2026-10-03",
       "expiresDate": "2026-11-03"
+    },
+    {
+      "id": "EXC-DEP-014",
+      "packageName": "sharp",
+      "advisoryId": "GHSA-wq5f-xc86-pv6w",
+      "reason": "Vulnerability in librsvg dependency (CVE-2026-96889) bundled in sharp sub-dependency; application processes only structured numerical IoT telemetry and static bundled assets, and does not ingest or rasterize untrusted user SVG assets.",
+      "approvedBy": "Security Team",
+      "approvedDate": "2026-10-07",
+      "expiresDate": "2026-11-07"
+    },
+    {
+      "id": "EXC-DEP-015",
+      "packageName": "source-map-js",
+      "advisoryId": "GHSA-68fv-2mgg-jv7q",
+      "reason": "Event-loop denial of service via indexed source-map section offsets (GHSA-68fv-2mgg-jv7q); source-map-js is a dev-only and build-time transitive dependency of PostCSS/Tailwind CSS with zero production runtime exposure or parsing of untrusted source maps.",
+      "approvedBy": "Security Team",
+      "approvedDate": "2026-10-07",
+      "expiresDate": "2026-11-07"
+    },
+    {
+      "id": "EXC-DEP-016",
+      "packageName": "postcss-nested",
+      "advisoryId": "*",
+      "reason": "Transitive dev-dependency of Tailwind CSS flagged due to sub-dependency postcss-selector-parser; used strictly at build time for CSS compilation with no client or server production runtime exposure.",
+      "approvedBy": "Security Team",
+      "approvedDate": "2026-10-07",
+      "expiresDate": "2026-11-07"
     }
   ]
 }

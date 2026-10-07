@@ -213,7 +213,6 @@ export default function NotificationsPage() {
   const [acknowledgingId, setAcknowledgingId] = useState<string | null>(null);
   const [selectedAlertIds, setSelectedAlertIds] = useState<Set<string>>(new Set());
   const [isBulkAcknowledging, setIsBulkAcknowledging] = useState(false);
-  const [isBulkAcknowledgingAll, setIsBulkAcknowledgingAll] = useState(false);
 
   useEffect(() => {
     fetchAlerts();
@@ -244,6 +243,17 @@ export default function NotificationsPage() {
             : [];
         setAlerts(rawItems);
         setSelectedAlertIds(new Set());
+
+        // Synchronize badge count directly with open unacknowledged alerts count
+        const openCount = rawItems.filter(
+          (a: AlertDto) =>
+            a.status?.toUpperCase() === AlertStatus.OPEN && !(a.isAcknowledged ?? false)
+        ).length;
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent(ALERT_UPDATED_EVENT, { detail: { count: openCount } })
+          );
+        }
       }
     } catch (e) {
       console.error(e);
@@ -264,8 +274,9 @@ export default function NotificationsPage() {
       const json = await res.json();
 
       if (json.success) {
-        setAlerts((prev) =>
-          prev.map((a) =>
+        let remainingOpen = 0;
+        setAlerts((prev) => {
+          const updated = prev.map((a) =>
             a.id === alertId
               ? {
                   ...a,
@@ -274,15 +285,21 @@ export default function NotificationsPage() {
                   acknowledgedAt: json.data?.acknowledgedAt || new Date().toISOString(),
                 }
               : a
-          )
-        );
+          );
+          remainingOpen = updated.filter(
+            (a) => a.status?.toUpperCase() === AlertStatus.OPEN && !(a.isAcknowledged ?? false)
+          ).length;
+          return updated;
+        });
         setSelectedAlertIds((prev) => {
           const next = new Set(prev);
           next.delete(alertId);
           return next;
         });
         if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent(ALERT_UPDATED_EVENT));
+          window.dispatchEvent(
+            new CustomEvent(ALERT_UPDATED_EVENT, { detail: { count: remainingOpen } })
+          );
         }
       }
     } catch (e) {
@@ -334,8 +351,9 @@ export default function NotificationsPage() {
 
       if (json.success) {
         const ackedSet = new Set(json.data.alertIds || ids);
-        setAlerts((prev) =>
-          prev.map((a) =>
+        let remainingOpen = 0;
+        setAlerts((prev) => {
+          const updated = prev.map((a) =>
             ackedSet.has(a.id)
               ? {
                   ...a,
@@ -344,55 +362,23 @@ export default function NotificationsPage() {
                   acknowledgedAt: new Date().toISOString(),
                 }
               : a
-          )
-        );
+          );
+          remainingOpen = updated.filter(
+            (a) => a.status?.toUpperCase() === AlertStatus.OPEN && !(a.isAcknowledged ?? false)
+          ).length;
+          return updated;
+        });
         setSelectedAlertIds(new Set());
         if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent(ALERT_UPDATED_EVENT));
+          window.dispatchEvent(
+            new CustomEvent(ALERT_UPDATED_EVENT, { detail: { count: remainingOpen } })
+          );
         }
       }
     } catch (e) {
       console.error(e);
     } finally {
       setIsBulkAcknowledging(false);
-    }
-  };
-
-  const handleAcknowledgeAll = async () => {
-    setIsBulkAcknowledgingAll(true);
-
-    try {
-      const res = await fetch('/api/v1/alerts/bulk-acknowledge', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ all: true }),
-      });
-      const json = await res.json();
-
-      if (json.success) {
-        const ackedSet = new Set(json.data.alertIds || []);
-        setAlerts((prev) =>
-          prev.map((a) =>
-            ackedSet.has(a.id) ||
-            (a.status?.toUpperCase() === AlertStatus.OPEN && !a.isAcknowledged)
-              ? {
-                  ...a,
-                  status: AlertStatus.ACKNOWLEDGED,
-                  isAcknowledged: true,
-                  acknowledgedAt: new Date().toISOString(),
-                }
-              : a
-          )
-        );
-        setSelectedAlertIds(new Set());
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent(ALERT_UPDATED_EVENT));
-        }
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setIsBulkAcknowledgingAll(false);
     }
   };
 
@@ -481,7 +467,7 @@ export default function NotificationsPage() {
               {selectedAlertIds.size > 0 && (
                 <button
                   onClick={handleAcknowledgeSelected}
-                  disabled={isBulkAcknowledging || isBulkAcknowledgingAll}
+                  disabled={isBulkAcknowledging}
                   data-testid="btn-acknowledge-selected"
                   className="px-3 py-1.5 rounded-lg text-[12px] font-semibold bg-app-primary text-white hover:bg-app-primary/90 disabled:opacity-50 transition-colors flex items-center gap-1.5 cursor-pointer"
                 >
@@ -489,16 +475,6 @@ export default function NotificationsPage() {
                   <span>{tAlerts('acknowledgeSelected', { count: selectedAlertIds.size })}</span>
                 </button>
               )}
-
-              <button
-                onClick={handleAcknowledgeAll}
-                disabled={isBulkAcknowledging || isBulkAcknowledgingAll}
-                data-testid="btn-acknowledge-all"
-                className="px-3 py-1.5 rounded-lg text-[12px] font-semibold border border-app-outline-variant/60 text-app-on-surface hover:bg-app-surface-container/50 disabled:opacity-50 transition-colors flex items-center gap-1.5 cursor-pointer"
-              >
-                {isBulkAcknowledgingAll && <Loader2 size={13} className="animate-spin" />}
-                <span>{tAlerts('acknowledgeAll')}</span>
-              </button>
             </div>
           </div>
         )}

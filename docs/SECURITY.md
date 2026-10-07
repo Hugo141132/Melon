@@ -1038,16 +1038,29 @@ Wildcard production origins shall not be used with credentials.
 
 ### 16.8 Security Headers
 
-Recommended headers include:
+Enforced production headers (configured in `apps/web/next.config.mjs`) include:
 
 ```text
 Content-Security-Policy
-Strict-Transport-Security
-X-Content-Type-Options
-Referrer-Policy
-Permissions-Policy
-frame-ancestors via CSP
+Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+X-Content-Type-Options: nosniff
+Referrer-Policy: strict-origin-when-cross-origin
+Permissions-Policy: camera=(), microphone=(), geolocation=()
+X-Frame-Options: DENY
 ```
+
+#### Content-Security-Policy Directive Baseline
+- `default-src 'self'`
+- `script-src 'self' 'unsafe-inline' 'unsafe-eval'`
+- `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`
+- `img-src 'self' data: blob: https://lh3.googleusercontent.com https://i.pinimg.com`
+- `font-src 'self' data: https://fonts.gstatic.com`
+- `connect-src 'self' https://api.open-meteo.com` (Explicitly permits client-side weather API queries; wildcard origins are forbidden and no policy weakening is introduced)
+- `frame-ancestors 'none'`
+- `object-src 'none'`
+- `base-uri 'self'`
+- `form-action 'self'`
+
 
 ### 16.9 Error Handling
 
@@ -1824,7 +1837,7 @@ The following security controls are active and verified regarding `TASK-0216` (V
 
 The following security and privacy controls are verified for `TASK-0506` (`/` and `/dashboard`):
 - **Fixed Coordinates & Zero Geolocation Tracking:** Environmental weather in `WeatherCard.tsx` uses hardcoded static farm coordinates (Latitude `-7.172934`, Longitude `113.2257627`). Browser geolocation APIs (`navigator.geolocation`) are completely omitted, preventing client location tracking or PII leakage.
-- **Public Weather API Boundary:** Weather data is retrieved client-side from the public Open-Meteo REST API without storing, transmitting, or embedding third-party API keys or credentials.
+- **Public Weather API Boundary & CSP Whitelisting:** Weather data is retrieved client-side from the public Open-Meteo REST API without storing, transmitting, or embedding third-party API keys or credentials. The Content Security Policy (`connect-src`) explicitly whitelists `https://api.open-meteo.com` alongside `'self'`, strictly preventing unauthorized outbound requests without degrading security guarantees.
 - **Canonical Identifier Concealment:** The dashboard summary cards expose only aggregated node counts (`Total`, `Online`, `Offline/Stale`). Canonical device IDs (`deviceId`) remain concealed from Admin users (`DEC-DEV-028`).
 - **Zero Ingestion of Synthetic Claims:** The synthetic 92/100 health score is permanently deleted, eliminating fabricated system health representations.
 <!-- TASK-0506 Security Reconciled: 2026-09-02 -->

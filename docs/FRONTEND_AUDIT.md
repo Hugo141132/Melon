@@ -620,5 +620,37 @@ The following frontend components, assets, and styling tokens were audited, impl
   - Fully disabled under `@media (prefers-reduced-motion: reduce)` (`animation: none; opacity: 1`).
 <!-- Frontend Audit TASK-0507 Reconciled: 2026-10-04 -->
 
+---
+
+## Reliability & Consistency Refinement Frontend Audit Note (Reconciled 2026-10-07)
+
+The following frontend components, hooks, and contexts were audited, refined, and verified under the Reliability Refinement initiative:
+
+- **`apps/web/components/controls/FaucetHistoryTable.tsx` [AUDITED & RECONCILED]:**
+  - Refined pagination controls: responsive layout (`flex-col sm:flex-row`), numbered page buttons with adaptive ellipsis windowing, accessible `ArrowLeft`/`ArrowRight` buttons, and explicit `aria-current="page"`.
+  - Preserved strict server-side pagination (10 rows/page) and stale-response protection sequence references (`fetchSeqRef`).
+- **`apps/web/app/notifications/page.tsx` [AUDITED & RECONCILED]:**
+  - "Acknowledge All" workflow removed: "Acknowledge Selected (N)" is the sole bulk-acknowledgement interaction, preventing accidental mass-dismissal of open agronomic alerts.
+  - Event-driven state synchronization: dispatches `melon:alert-updated` with `{ detail: { count: openCount } }` upon alert fetching or acknowledgement, synchronizing badge counters across the app without duplicate network queries.
+  - Eliminated alert storm loops by decoupling local alert list state from external badge pollers.
+- **`apps/web/hooks/useAlertBadge.ts` [AUDITED & RECONCILED]:**
+  - Module-level shared badge singleton (`sharedCount`, `sharedIsLoading`, `subscribers`), eliminating duplicate requests across multiple concurrent consumers (`TopAppBar`, `Sidebar`).
+  - In-flight request deduplication via shared promise.
+  - 10-second TTL cache to prevent rapid refetch bursts.
+  - Route-aware suppression: polling and fetch triggers are paused while the user is actively on `/notifications`.
+  - HTTP 429 rate-limit backoff: inspects `Retry-After` header with a 30-second fallback cooldown window.
+  - Tab visibility and focus revalidation with a 15-second debounce cooldown.
+  - Exports `setSharedAlertCount()` and `resetAlertBadgeState()` for clean synchronization and deterministic test isolation.
+- **`apps/web/context/AuthContext.tsx` [AUDITED & RECONCILED]:**
+  - Tab focus and visibility revalidation: calls `validateSession(true)` in silent mode, avoiding disruptive UI flashing or unwarranted auth drops during temporary connection blips.
+- **`apps/web/context/DeviceContext.tsx` [AUDITED & RECONCILED]:**
+  - Device state reuse: retains already-loaded device state during route navigation (`setIsLoading(prev => devices.length === 0 ? true : prev)`), eliminating duplicate device loading spinners and redundant API roundtrips.
+  - Synchronizes candidate selection immediately on route transitions.
+  - Dispatches `melon:unauthenticated` event on HTTP 401 responses.
+- **`apps/web/app/users/page.tsx` [AUDITED & RECONCILED]:**
+  - Aligned status filter dropdown options to `All Status`, `ACTIVE`, and `SUSPENDED`, strictly excluding pending-approval and rejected accounts from operational user management.
+
+<!-- Reliability Refinement Frontend Audit Reconciled: 2026-10-07 -->
+
 
 

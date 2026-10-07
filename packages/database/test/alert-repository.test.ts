@@ -277,21 +277,14 @@ describe('AlertRepository - User-Scoped Acknowledgement & Visibility', () => {
       });
     });
 
-    it('acknowledges all open alerts when all: true is passed', async () => {
+    it('returns acknowledgedCount: 0 when empty alertIds is passed', async () => {
       const userA = 'user-uuid-a';
 
-      mockPrisma.alertAcknowledgement.upsert = vi.fn().mockResolvedValue({});
-      mockPrisma.alert.findMany.mockResolvedValueOnce([
-        { id: 'alert-1', status: AlertStatus.OPEN },
-        { id: 'alert-2', status: AlertStatus.OPEN },
-        { id: 'alert-3', status: AlertStatus.OPEN },
-      ]);
+      const result = await repo.acknowledgeAlertsBulk(userA, { alertIds: [] });
 
-      const result = await repo.acknowledgeAlertsBulk(userA, { all: true });
-
-      expect(result.acknowledgedCount).toBe(3);
-      expect(result.alertIds).toEqual(['alert-1', 'alert-2', 'alert-3']);
-      expect(mockPrisma.alertAcknowledgement.upsert).toHaveBeenCalledTimes(3);
+      expect(result.acknowledgedCount).toBe(0);
+      expect(result.alertIds).toEqual([]);
+      expect(mockPrisma.alert.findMany).not.toHaveBeenCalled();
     });
 
     it('returns acknowledgedCount: 0 when no eligible alerts match', async () => {

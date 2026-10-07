@@ -276,7 +276,7 @@ export default function UserManagementPage() {
 
         if (json.success) {
           const safeUsers = (json.data || []).filter(
-            (u: UserDto) => !(u.accountStatus === 'PENDING_APPROVAL' && !u.emailVerifiedAt)
+            (u: UserDto) => u.accountStatus === 'ACTIVE' || u.accountStatus === 'SUSPENDED'
           );
           setUsers(safeUsers);
           if (json.meta?.pagination) {
@@ -572,10 +572,8 @@ export default function UserManagementPage() {
                 className="w-full sm:w-auto px-3 py-2.5 bg-app-surface-container-low border border-app-outline-variant/40 rounded-xl text-[13px] font-medium text-app-on-surface focus:outline-none truncate"
               >
                 <option value="ALL">{tUsers('allStatuses')}</option>
-                <option value="PENDING_APPROVAL">{tAuth('pendingApprovalBadge')}</option>
                 <option value="ACTIVE">{tAuth('active')}</option>
                 <option value="SUSPENDED">{tAuth('suspendedBadge')}</option>
-                <option value="REJECTED">{tAuth('rejectedBadge')}</option>
               </select>
 
               <select

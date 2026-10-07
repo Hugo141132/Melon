@@ -184,7 +184,7 @@ describe('Notifications UI - Bulk Acknowledgement Interactions', () => {
     });
   });
 
-  it('acknowledges all open alerts with Acknowledge All button', async () => {
+  it('does not render Acknowledge All button and acknowledges individual selected alerts', async () => {
     let bulkPayload: any = null;
 
     global.fetch = vi.fn().mockImplementation((url: string, opts?: any) => {
@@ -202,8 +202,8 @@ describe('Notifications UI - Bulk Acknowledgement Interactions', () => {
             Promise.resolve({
               success: true,
               data: {
-                count: 2,
-                acknowledgedAlertIds: ['alert-1', 'alert-2'],
+                count: 1,
+                acknowledgedAlertIds: ['alert-1'],
               },
             }),
         });
@@ -213,14 +213,23 @@ describe('Notifications UI - Bulk Acknowledgement Interactions', () => {
 
     render(<NotificationsPage />);
 
-    const bulkAllBtn = await screen.findByTestId('btn-acknowledge-all');
-    expect(bulkAllBtn).toBeInTheDocument();
+    expect(await screen.findByText('1 Critical')).toBeInTheDocument();
 
-    fireEvent.click(bulkAllBtn);
+    // Verify Acknowledge All button is NEVER rendered
+    expect(screen.queryByTestId('btn-acknowledge-all')).not.toBeInTheDocument();
+
+    // Select single open alert
+    const alert1Checkbox = await screen.findByTestId('checkbox-select-alert-1');
+    fireEvent.click(alert1Checkbox);
+
+    const bulkSelectedBtn = screen.getByTestId('btn-acknowledge-selected');
+    expect(bulkSelectedBtn).toBeInTheDocument();
+    expect(bulkSelectedBtn).toHaveTextContent('Acknowledge Selected (1)');
+
+    fireEvent.click(bulkSelectedBtn);
 
     await waitFor(() => {
-      expect(bulkPayload).toEqual({ all: true });
-      expect(screen.getByText('0 Critical')).toBeInTheDocument();
+      expect(bulkPayload).toEqual({ alertIds: ['alert-1'] });
       expect(screen.getByText('0 Warning')).toBeInTheDocument();
     });
   });

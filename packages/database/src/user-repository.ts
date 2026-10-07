@@ -1503,18 +1503,16 @@ export class UserRepository {
     const where: any = {};
 
     if (options?.accountStatus) {
-      where.accountStatus = options.accountStatus;
-      if (options.accountStatus === AccountStatus.PENDING_APPROVAL) {
-        where.emailVerifiedAt = { not: null };
+      if (
+        options.accountStatus === AccountStatus.ACTIVE ||
+        options.accountStatus === AccountStatus.SUSPENDED
+      ) {
+        where.accountStatus = options.accountStatus;
+      } else {
+        where.accountStatus = { in: [] };
       }
     } else {
-      where.accountStatus = { not: AccountStatus.DEACTIVATED };
-      where.NOT = [
-        {
-          accountStatus: AccountStatus.PENDING_APPROVAL,
-          emailVerifiedAt: null,
-        },
-      ];
+      where.accountStatus = { in: [AccountStatus.ACTIVE, AccountStatus.SUSPENDED] };
     }
 
     if (options?.role) {
@@ -1626,7 +1624,10 @@ export class UserRepository {
 
     if (!user) return null;
 
-    if (user.accountStatus === AccountStatus.PENDING_APPROVAL && !user.emailVerifiedAt) {
+    if (
+      user.accountStatus !== AccountStatus.ACTIVE &&
+      user.accountStatus !== AccountStatus.SUSPENDED
+    ) {
       return null;
     }
 

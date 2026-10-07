@@ -357,14 +357,12 @@ export class AlertRepository {
 
   /**
    * Bulk acknowledges alerts for a specific user and records audit log entries.
-   * If alertIds is provided, acknowledges those specific alerts (filtering to accessible ones).
-   * If all=true, acknowledges all OPEN alerts accessible to the user that have not yet been acknowledged by the user.
+   * Acknowledges specified alerts (filtering to accessible ones).
    */
   async acknowledgeAlertsBulk(
     userId: string,
     options: {
-      alertIds?: string[];
-      all?: boolean;
+      alertIds: string[];
       note?: string;
     },
     authorizedDeviceIds?: string[]
@@ -372,8 +370,13 @@ export class AlertRepository {
     const note = options.note?.trim() || null;
     const now = new Date();
 
+    if (!options.alertIds || options.alertIds.length === 0) {
+      return { acknowledgedCount: 0, alertIds: [] };
+    }
+
     const where: Prisma.AlertWhereInput = {
       status: { not: AlertStatus.RESOLVED },
+      id: { in: options.alertIds },
       acknowledgements: {
         none: {
           acknowledgedByUserId: userId,
@@ -383,10 +386,6 @@ export class AlertRepository {
 
     if (authorizedDeviceIds !== undefined) {
       where.OR = [{ deviceId: { in: authorizedDeviceIds } }, { userId }];
-    }
-
-    if (options.alertIds && options.alertIds.length > 0) {
-      where.id = { in: options.alertIds };
     }
 
     const eligibleAlerts = await this.prisma.alert.findMany({
