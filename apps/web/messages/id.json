@@ -586,6 +586,7 @@
     "commandFailedMessage": "Perintah valve {commandId} untuk {deviceName} gagal: {reason}",
     "commandTimeoutTitle": "Perintah Valve Kehabisan Waktu",
     "commandTimeoutMessage": "Perintah valve untuk {deviceName} kehabisan waktu tanpa konfirmasi.",
+    "commandTimeoutDesc": "Perintah valve untuk {deviceName} kehabisan waktu tanpa konfirmasi.",
     "acknowledgeAction": "Acknowledge Peringatan",
     "acknowledgeConfirm": "Apakah Anda yakin ingin melakukan acknowledge pada peringatan ini?",
     "acknowledgedBy": "Di-acknowledge oleh",

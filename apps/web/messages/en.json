@@ -586,6 +586,7 @@
     "commandFailedMessage": "Valve command {commandId} for {deviceName} failed: {reason}",
     "commandTimeoutTitle": "Valve Command Timed Out",
     "commandTimeoutMessage": "The valve command for {deviceName} timed out without confirmation.",
+    "commandTimeoutDesc": "The valve command for {deviceName} timed out without confirmation.",
     "acknowledgeAction": "Acknowledge Alert",
     "acknowledgeConfirm": "Are you sure you want to acknowledge this alert?",
     "acknowledgedBy": "Acknowledged by",
