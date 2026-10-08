@@ -50,6 +50,15 @@ The system monitors:
 - **Database Query Invariant**: Active Owner selection MUST query strictly by enum code: `userRoles: { some: { role: { code: UserRole.OWNER } } }`. Querying by display string `name` is forbidden.
 - **Domain Decoupling**: Admin approval events are strictly decoupled from agronomic sensor alerts (`alerts` table) and `/notifications`.
 
+### Soil & Water Telemetry History & Location Annotations (DEC-MON-093, TASK-0503, TASK-0504)
+
+- **Single-Chart UI & Zero Parallel Fallbacks**: Exactly one primary chart component per monitoring domain (`NPKChart` for soil, `WaterNutrientChart` for water) integrated into the core dashboard flow. Obsolete secondary components such as `LocationChart` are permanently deleted; parallel fallback branches are strictly prohibited.
+- **Location Isolation & Named-Only Charts**: Soil and water-quality devices are portable without firmware location IDs. Charts plot strictly location-annotated readings for the explicitly selected location, preventing distinct physical spots from connecting into one misleading line trend. Historical charts query `/chart` independently of history table pagination.
+- **Server-Side History Pagination**: History tables enforce a server-side page size of exactly 5 readings (`HISTORY_PAGE_SIZE = 5`) ordered deterministically by `[{ receivedAt: 'asc' }, { id: 'asc' }]`. Unnamed readings remain retained and visible in history. New incoming readings append at the dataset tail and never shift older pages. Background polling is prohibited while browsing historical pages.
+- **Reading-Bound Location Annotations & Normalization**: Location annotations bind directly to immutable individual reading IDs (never device-level defaults). Location identity is strictly normalized (`locationKey`: trimmed, whitespace-collapsed, lower-cased). Actor identity (`locationNamedById`) is derived strictly from the authenticated server session, with changes auditable in `audit_logs`.
+- **Bounded Windows & Keyset Batched Retrieval**: Date ranges remain strictly bounded (max 31 days per DEC-MON-087). The 1,000-point total restriction is removed in favor of bounded keyset cursor pagination (`[receivedAt, id]`, 1,000 points/batch) retrieving 100% of retained readings without memory explosion, query timeouts, or unbounded single queries. `CHART_POINTS_EXCEEDED` rejection is eliminated. The client hook sequentially retrieves all batches with stale request cancellation, plotting complete datasets while preserving actual sensor timestamps (`recordedAt`), zero/null values, and honest error handling. X-axis prevents first/last-label clipping and tick collisions via responsive horizontal padding and proportional tick distribution.
+- **Detailed Verification Evidence**: Empirical test records, DEV fixture inventories, and measurement details reside in `docs/TESTING.md` and `docs/DATABASE.md`.
+
 ### Sensor Battery (`BAT`)
 
 - Battery (`BAT`) parameter is completely removed from soil and water quality monitoring domains (`DEC-MON-086`, superseding `DEC-MON-085`).
@@ -1401,15 +1410,29 @@ Reliability, consistency, and rate-limit mitigation audit record:
     - Contract Tests: 6/6 passed in `packages/contracts/src/__tests__/faucet.test.ts`.
     - Translation Parity: 100% key parity via `npm run i18n:check`.
     - Monorepo Typecheck: 0 errors across all 4 packages (`contracts`, `database`, `iot-gateway`, `web`).
-  - **Deployment & Migration Assessment:**
-    - Staging update required: **YES** (rebuild/deploy of containerized web service required).
-    - Database migration required: **NO** (relational foreign key and `full_name` column already exist).
+#### TASK-0503 & TASK-0504 Governance Record
+
+`TASK-0503` & `TASK-0504` soil and water quality history chart completeness, single-chart UI, keyset pagination, and X-axis refinement record:
+- Status: `READY FOR RELEASE TESTING` (Implemented & Verified 2026-10-08; operator manual website verification passed; cleanup of 1,023 DEV synthetic fixtures completed; 5 pre-commit CI gates reserved for operator manual execution)
+- Priority: `P1` (Data Integrity, Visual Legibility, Mobile Parity & Operational Monitoring)
+- Frontend impact: `MATERIAL REDESIGN`
+- Selected UI direction: `Premium Minimal Ops`
+- Existing color template: `UNCHANGED`
+- Selected motion effects: `Skeleton loading`, `Dropdown`, `New event`
+- 21st.dev MCP: `NOT REQUIRED` (Reuses existing design tokens and component patterns; no new visual system)
+- Summary: Unified monitoring telemetry history into a single-chart architecture, eliminated total 1,000-point chart rejection via forward keyset cursor pagination, and refined X-axis responsiveness:
+  - **Single-Chart UI & Elimination of LocationChart:** Exactly one unified chart component per domain (`NPKChart` on `/soil`, `WaterNutrientChart` on `/water`). Permanently deleted obsolete `LocationChart` component. Zero parallel fallback branches: all trends render strictly within the primary chart surface.
+  - **Named-Only Location Isolation:** Soil and water-quality sensors are portable without firmware location hardware; charts require explicit location selection and plot only readings annotated with that specific normalized location (`locationKey`), preventing distinct physical spots from connecting into one misleading line trend. Historical charts query `/chart` independently of history table pagination.
+  - **Server-Side History Pagination:** History tables enforce a server-side page size of exactly 5 readings (`HISTORY_PAGE_SIZE = 5`) ordered deterministically by `[{ receivedAt: 'asc' }, { id: 'asc' }]`. Unnamed readings remain retained and visible in history. New incoming readings append at the dataset tail and never shift older pages. Background polling is prohibited while browsing historical pages.
+  - **Reading-Bound Location Annotations & Normalization:** Location annotations bind directly to immutable individual reading IDs (never device-level defaults). Location identity is strictly normalized (`locationKey`: trimmed, whitespace-collapsed, lower-cased). Actor identity (`locationNamedById`) derived strictly from authenticated server session, with changes auditable in `audit_logs` (`telemetry.location_annotated`).
+  - **Keyset Cursor Pagination & Elimination of 1,000-Point Rejection:** Date ranges remain bounded to max 31 days (`DEC-MON-087`). 1,000-point total restriction removed in favor of bounded forward keyset cursor pagination (`[receivedAt, id]`, 1,000 points/batch, max 2,000) retrieving 100% of retained readings. Cursor format strictly validated (`${receivedAtIso}_${id}`) with malformed cursors rejected with HTTP 400 `VALIDATION_ERROR` / `INVALID_CURSOR`. Client hook sequentially retrieves all batches with wire-level request cancellation via `AbortController`, non-advancing cursor detection (loop protection), stale request cancellation, plotting complete datasets while preserving actual sensor timestamps (`recordedAt`), zero/null values (`connectNulls={false}`), and honest error handling (discards partial batches on failure).
+  - **X-Axis Responsiveness & Anti-Clipping:** Algorithmic responsive tick distribution (4–6 ticks) anchoring first and last data points (`data[0]` and `data[N-1]`), with horizontal padding (`padding={{ left: 16, right: 16 }}`) and adjusted chart margin (`left: -14, right: 14`) preventing first/last-label clipping and tick collisions across mobile (390px) and desktop in bilingual locales (`id`/`en`). Line dots hidden (`dot={false}`) to prevent clutter on dense datasets, while preserving exact values and sensor timestamps in interactive tooltips.
+  - **Accurate Consistency Limits:** Locking `from`/`to` ISO boundaries client-side maintains a consistent SQL filter window across sequential batches but does not constitute an ACID transactional snapshot; client HTTP fetch abort terminates network transfer on wire but does not prove backend PostgreSQL query execution cancellation.
+  - **Operator Website Verification:** Manual website verification confirmed by operator JEMBOT as **OPERATOR-REPORTED PASS** on desktop and 390px mobile viewports across bilingual locales (`id`/`en`).
+  - **DEV Fixture Cleanup:** All 1,023 task-generated synthetic fixtures safely purged via interactive transaction targeting `where: { messageId: { startsWith: 'dev-fixture-' } }`. Post-cleanup verification confirmed 0 fixtures remaining, 0 cascade violations, and all non-task records (7 users, 3 devices, 1,837 audit logs) preserved intact. Remaining items: 0 dummy fixtures.
+  - **Verification & 5 Pre-Commit Gates:** 65/65 unit tests passed across 7 suites (100%), typecheck passed with 0 errors across 4 workspaces. The 5 pre-commit CI gates (`npm run check:quality`, `npm test`, `npm run test:integration`, `npm run test:coverage`, `npm run test:e2e`) are reserved for manual execution by operator JEMBOT and remain **PENDING**. Git commit, push, remote CI, and deployment remain **PENDING** until evidenced.
 
 ---
-
-
-
-
 
 ## 5. Task Selection Rules
 

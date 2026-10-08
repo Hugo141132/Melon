@@ -1,7 +1,11 @@
 'use client';
 
 import React from 'react';
-import { DateRangePreset, DomainType } from '@/hooks/useHistoricalMonitoring';
+import {
+  DateRangePreset,
+  DomainType,
+  ReadingLocationOption,
+} from '@/hooks/useHistoricalMonitoring';
 import { useTranslations } from 'next-intl';
 
 export interface MetricOption {
@@ -21,6 +25,9 @@ export interface HistoricalChartControlsProps {
   customTo: string;
   onCustomToChange: (val: string) => void;
   dateRangeError?: string | null;
+  locations?: ReadingLocationOption[];
+  selectedLocationKey?: string;
+  onSelectLocationKey?: (key: string) => void;
 }
 
 export default function HistoricalChartControls({
@@ -34,6 +41,9 @@ export default function HistoricalChartControls({
   customTo,
   onCustomToChange,
   dateRangeError,
+  locations,
+  selectedLocationKey,
+  onSelectLocationKey,
 }: HistoricalChartControlsProps) {
   const tHistory = useTranslations('history');
   const tCommon = useTranslations('common');
@@ -63,6 +73,40 @@ export default function HistoricalChartControls({
 
   return (
     <div className="space-y-3 mb-4">
+      {/* Location Selector row (when locations prop is provided) */}
+      {locations !== undefined && (
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-app-outline-variant/30 pb-3">
+          <div className="flex items-center gap-2">
+            <span className="text-[13px] font-semibold text-app-on-surface">
+              {locations.find((l) => l.locationKey === selectedLocationKey)?.locationName ??
+                tHistory('chartSelectLocation')}
+            </span>
+            {selectedLocationKey && (
+              <span className="text-[11px] text-app-on-surface-variant">
+                ({locations.find((l) => l.locationKey === selectedLocationKey)?.readingCount ?? 0}{' '}
+                data)
+              </span>
+            )}
+          </div>
+          <label className="flex items-center gap-2 text-xs text-app-on-surface-variant font-medium">
+            {tHistory('chartLocationLabel')}:
+            <select
+              value={selectedLocationKey ?? ''}
+              onChange={(e) => onSelectLocationKey?.(e.target.value)}
+              aria-label={tHistory('chartLocationLabel')}
+              className="rounded-lg border border-app-outline-variant/60 bg-app-surface-container-lowest px-2.5 py-1 text-xs text-app-on-surface outline-none focus:border-app-primary"
+            >
+              <option value="">{tHistory('chartSelectLocation')}</option>
+              {locations.map((loc) => (
+                <option key={loc.locationKey} value={loc.locationKey}>
+                  {loc.locationName} ({loc.readingCount})
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
+
       {/* Metrics & Date Presets row */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         {/* Metric Selector Pills */}

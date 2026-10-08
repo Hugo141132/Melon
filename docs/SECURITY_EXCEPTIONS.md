@@ -102,6 +102,7 @@ All exceptions must be recorded in `scripts/security-exceptions.json` using the 
 - **TASK-0410 / Dependency Vulnerability Exception Audit (2026-09-09):** Documented formal reviewed exceptions `EXC-DEP-002` (`js-yaml` / `GHSA-2883-xcg3-v3hh`), `EXC-DEP-003` (`next` / `GHSA-p293-qw3h-jr36`), `EXC-DEP-004` (`next` / `GHSA-2xp9-vwfh-vxw4`), and `EXC-DEP-005` (`sharp` / `GHSA-rgj7-g3m4-5g8c`) in `scripts/security-exceptions.json`. Verified all 4 advisories are fully mitigated by Linux container runtime architecture, disabled AVIF formats, and dev-only usage.
 - **Alert Notification & Dependency Security Audit (2026-10-03):** Confirmed zero secret exceptions introduced; registered approved exceptions `EXC-DEP-009` through `EXC-DEP-013` for build-time transitive dependency `braces` (`GHSA-vfj7-8cjw-p6xm`) and its dev-only dependents (`micromatch`, `chokidar`, `fast-glob`, `@next/eslint-plugin-next`) in `scripts/security-exceptions.json`. Verified all 5 packages are strictly build-time tools with zero runtime or client bundle exposure.
 - **Dependency Security Audit & Recertification (2026-10-07):** Confirmed zero secret exceptions introduced; registered approved exceptions `EXC-DEP-014` (`sharp` / `GHSA-wq5f-xc86-pv6w`), `EXC-DEP-015` (`source-map-js` / `GHSA-68fv-2mgg-jv7q`), and `EXC-DEP-016` (`postcss-nested` / `*`) in `scripts/security-exceptions.json`. Verified all 3 findings are mitigated by build-time containment and zero untrusted SVG/media or source map parsing at runtime. Recertified September baseline exceptions `EXC-DEP-002` through `EXC-DEP-005` for a renewed 30-day review cycle.
+- **Next.js Image Optimization SSRF Security Audit (2026-10-08):** Confirmed zero secret exceptions introduced; registered approved exception `EXC-DEP-017` (`next` / `GHSA-cjq9-62q9-8jv4`) in `scripts/security-exceptions.json`. Verified that Server-Side Request Forgery in Next.js Image Optimization is fully mitigated by strict `images.remotePatterns` origin scoping (Google and Pinterest avatars only), zero external image uploads, and containerized Linux runtime behind Caddy reverse proxy.
 
 ---
 
@@ -385,7 +386,14 @@ This section documents the investigation, compensating controls, and formal appr
 - **Affected Context:** Build-time CSS nesting compilation for Tailwind CSS v3 (`tailwindcss@3.4.19`).
 - **Compensating Controls:** `postcss-nested` runs strictly during static asset generation at build time and is never included in runtime server or client bundles. No untrusted user CSS or selectors are evaluated or parsed. Upgrading to Tailwind CSS v4 would break repository styling and visual design governance rules.
 - **Approval & Expiry:** Approved by Security Team on 2026-10-07. Expires 2026-11-07 (31 days).
-<!-- Dependency Vulnerability Exceptions Reconciled: 2026-10-07 -->
+
+### 12. EXC-DEP-017 (`next` / `GHSA-cjq9-62q9-8jv4`, High)
+- **Vulnerability:** Server-Side Request Forgery (SSRF) in Next.js Image Optimization API (`GHSA-cjq9-62q9-8jv4`).
+- **Classification:** Mitigated Feature-Specific Vulnerability.
+- **Affected Context:** Next.js built-in Image Optimization route (`/_next/image`).
+- **Compensating Controls:** The application processes numerical IoT telemetry over MQTT/REST and static SVG assets; it does not accept arbitrary external user image URLs or user image uploads. Remote image optimization patterns in `apps/web/next.config.mjs` are strictly scoped to approved Google (`lh3.googleusercontent.com`) and Pinterest (`i.pinimg.com`) avatar hostnames. Staging and production run containerized behind Caddy reverse proxy with CSP restricting image origins.
+- **Approval & Expiry:** Approved by Security Team on 2026-10-08. Expires 2026-11-08 (31 days).
+<!-- Dependency Vulnerability Exceptions Reconciled: 2026-10-08 -->
 
 ---
 

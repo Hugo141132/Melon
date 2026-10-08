@@ -1,5 +1,6 @@
 'use client';
 
+import React, { useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import TopAppBar from '@/components/navigation/TopAppBar';
 import HistoricalChartControls from '@/components/charts/HistoricalChartControls';
@@ -9,6 +10,8 @@ import { useHistoricalMonitoring } from '@/hooks/useHistoricalMonitoring';
 import { useLatestPrediction } from '@/hooks/useLatestPrediction';
 import RecommendationCard from '@/components/monitoring/RecommendationCard';
 import DeviceAccessForbidden from '@/components/navigation/DeviceAccessForbidden';
+import { MeasurementHistoryPanel } from '@/components/monitoring/MeasurementHistoryPanel';
+import type { HistoryMetricColumn } from '@/components/monitoring/ReadingHistoryTable';
 import { CheckCircle, TrendingUp, Cpu, Clock, AlertTriangle } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
@@ -111,6 +114,11 @@ export default function WaterPage() {
     ? selectedDevice?.id || selectedDevice?.deviceId || null
     : null;
 
+  const [annotationToken, setAnnotationToken] = React.useState('initial');
+  const handleAnnotationChange = React.useCallback(() => {
+    setAnnotationToken((prev) => `${prev}:${Date.now()}`);
+  }, []);
+
   const {
     preset,
     setPreset,
@@ -120,7 +128,11 @@ export default function WaterPage() {
     setCustomFrom,
     customTo,
     setCustomTo,
+    locations,
+    selectedLocationKey,
+    setSelectedLocationKey,
     data: historyData,
+    resolvedRange: historyRange,
     loading: historyLoading,
     error: historyError,
     dateRangeError,
@@ -128,7 +140,23 @@ export default function WaterPage() {
     deviceId: activeDeviceId,
     domain: 'water',
     initialMetric: 'ec',
+    annotationCacheToken: annotationToken,
   });
+
+  /**
+   * Descriptors are memoised so their identity stays stable. Fresh arrays on
+   * every render would retrigger the pagination fetch effect and cause a
+   * request storm on each state change.
+   */
+  const waterHistoryColumns = useMemo<HistoryMetricColumn[]>(
+    () => [
+      { key: 'ph', label: 'pH', unit: 'pH', precision: 2 },
+      { key: 'tds', label: 'TDS', unit: 'ppm', precision: 1 },
+      { key: 'ec', label: 'EC', unit: 'µS/cm', precision: 0 },
+      { key: 'temperature', label: '°C', unit: '°C', precision: 1 },
+    ],
+    []
+  );
 
   const waterData = snapshot?.water?.data;
   const recordedAt = snapshot?.water?.recordedAt;
@@ -312,6 +340,9 @@ export default function WaterPage() {
                 customTo={customTo}
                 onCustomToChange={setCustomTo}
                 dateRangeError={dateRangeError}
+                locations={locations}
+                selectedLocationKey={selectedLocationKey}
+                onSelectLocationKey={setSelectedLocationKey}
               />
               <WaterNutrientChart
                 data={historyData}
@@ -319,8 +350,28 @@ export default function WaterPage() {
                 preset={preset}
                 loading={historyLoading}
                 error={historyError}
+                selectedLocationKey={selectedLocationKey}
               />
             </div>
+
+            {/*
+              Measurement history with portable location annotations.
+              Water readings are the sparse series the device actually published,
+              so the chart replays them as stored rather than interpolating the
+              gaps between samples.
+            */}
+            {activeDeviceId ? (
+              <div className="animate-fade-in space-y-2">
+                <MeasurementHistoryPanel
+                  deviceId={activeDeviceId}
+                  domain="water"
+                  metricColumns={waterHistoryColumns}
+                  from={historyRange?.from ?? new Date(Date.now() - 24 * 60 * 60 * 1000)}
+                  to={historyRange?.to ?? new Date()}
+                  onAnnotationChange={handleAnnotationChange}
+                />
+              </div>
+            ) : null}
 
             {/* Recommendation */}
             <RecommendationCard

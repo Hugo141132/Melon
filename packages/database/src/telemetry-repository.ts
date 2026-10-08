@@ -22,6 +22,71 @@ export interface SoilTelemetryIngestionResult {
 
 export type { WaterTelemetryIngestionResult };
 
+/**
+ * Maximum stored length of a location annotation.
+ *
+ * Kept in sync with the Prisma `location_name` / `location_key` VarChar(120)
+ * column width and with `LOCATION_NAME_MAX_LENGTH` in the web request schema.
+ */
+export const LOCATION_NAME_MAX_LENGTH = 120;
+
+/**
+ * Normalizes a free-text location into a stable comparison identity.
+ *
+ * Portable soil and water-quality devices carry NO firmware location identifier,
+ * so the operator-typed string is the only location identity available. Without
+ * normalization, typing "Bed A", " bed a " and "BED A" would create three distinct
+ * chart series for what is physically one location.
+ *
+ * Rules:
+ *   - Trims leading/trailing whitespace.
+ *   - Collapses internal whitespace runs to a single space.
+ *   - Lowercases, because location identity is case-insensitive.
+ *
+ * Returns `null` for input that is empty or whitespace-only, which callers treat
+ * as "no location assigned" (existing and unnamed readings stay unnamed).
+ */
+export function normalizeLocationKey(raw: string | null | undefined): string | null {
+  if (raw === null || raw === undefined) {
+    return null;
+  }
+
+  const collapsed = raw.trim().replace(/\s+/g, ' ').toLowerCase();
+  return collapsed.length === 0 ? null : collapsed;
+}
+
+/**
+ * Normalizes a location for storage, truncating to the column width.
+ *
+ * The display value (`locationName`) is whitespace-collapsed so the table does not
+ * render ragged padding, but otherwise keeps the operator's original casing.
+ */
+export function normalizeLocationDisplay(raw: string | null | undefined): string | null {
+  if (raw === null || raw === undefined) {
+    return null;
+  }
+
+  const collapsed = raw.trim().replace(/\s+/g, ' ');
+  return collapsed.length === 0 ? null : collapsed.slice(0, LOCATION_NAME_MAX_LENGTH);
+}
+
+export interface ReadingLocationAnnotation {
+  readingId: string;
+  locationName: string | null;
+  locationKey: string | null;
+  annotatedAt: Date | null;
+  namedBy: { id: string; fullName: string; email: string } | null;
+  previousLocationName: string | null;
+}
+
+export interface ReadingLocationOption {
+  locationKey: string;
+  locationName: string;
+  readingCount: number;
+  firstRecordedAt: Date | null;
+  lastRecordedAt: Date | null;
+}
+
 export interface ReservoirTelemetryIngestionResult {
   readingId: string;
   deviceId: string;
@@ -532,6 +597,12 @@ export class TelemetryRepository {
     metrics?: string[];
     page?: number;
     pageSize?: number;
+    /**
+     * Normalized location identity to filter by. When provided, only readings
+     * annotated with that exact location are returned, which is what keeps the
+     * chart from connecting different physical locations into one trend.
+     */
+    locationKey?: string | null;
   }) {
     const canonicalDeviceId = options.deviceIdentifier.trim();
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
@@ -561,7 +632,10 @@ export class TelemetryRepository {
     }
 
     const page = options.page || 1;
-    const pageSize = options.pageSize || 20;
+    // TASK-0503/TASK-0504: the approved history page size is exactly 5 readings.
+    // The server owns this default so pagination stays consistent even when a
+    // caller omits `pageSize`; clients render the control from the same value.
+    const pageSize = options.pageSize || 5;
 
     const whereClause: Prisma.SoilReadingWhereInput = {
       deviceId: device.id,
@@ -569,6 +643,14 @@ export class TelemetryRepository {
         gte: options.from,
         lte: options.to,
       },
+      // Unnamed readings remain reachable: omitting `locationKey` returns everything,
+      // and passing an explicit empty value is treated as "no location assigned".
+      ...(options.locationKey !== undefined
+        ? {
+            locationKey:
+              options.locationKey === null ? null : normalizeLocationKey(options.locationKey),
+          }
+        : {}),
     };
 
     const filterMetric = (field: string) => {
@@ -581,14 +663,43 @@ export class TelemetryRepository {
 
     const readings = await this.prisma.soilReading.findMany({
       where: whereClause,
-      orderBy: { receivedAt: 'asc' },
+      // Deterministic ordering: `receivedAt` plus an `id` tiebreaker. Portable
+      // devices can publish several readings inside the same millisecond, and a
+      // non-deterministic order would let new rows reshuffle older pages.
+      orderBy: [{ receivedAt: 'asc' }, { id: 'asc' }],
       skip,
       take: pageSize,
+      select: {
+        id: true,
+        nitrogen: true,
+        phosphorus: true,
+        potassium: true,
+        temperature: true,
+        moisture: true,
+        ph: true,
+        ec: true,
+        status: true,
+        recordedAt: true,
+        receivedAt: true,
+        locationName: true,
+        locationKey: true,
+        locationAnnotatedAt: true,
+        namedByUser: { select: { id: true, fullName: true, email: true } },
+      },
     });
 
     const series = readings.map((r) => {
       const item: Record<string, any> = {
         timestamp: (r.recordedAt || r.receivedAt).toISOString(),
+        readingId: r.id,
+        recordedAt: (r.recordedAt || r.receivedAt).toISOString(),
+        receivedAt: r.receivedAt.toISOString(),
+        locationName: r.locationName ?? null,
+        locationKey: r.locationKey ?? null,
+        locationAnnotatedAt: r.locationAnnotatedAt ? r.locationAnnotatedAt.toISOString() : null,
+        locationNamedBy: r.namedByUser
+          ? { id: r.namedByUser.id, fullName: r.namedByUser.fullName, email: r.namedByUser.email }
+          : null,
       };
       if (filterMetric('nitrogen')) item.nitrogen = toNumberOrNull(r.nitrogen);
       if (filterMetric('phosphorus')) item.phosphorus = toNumberOrNull(r.phosphorus);
@@ -626,6 +737,8 @@ export class TelemetryRepository {
     metrics?: string[];
     page?: number;
     pageSize?: number;
+    /** See `getSoilHistory`. */
+    locationKey?: string | null;
   }) {
     const canonicalDeviceId = options.deviceIdentifier.trim();
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
@@ -655,7 +768,10 @@ export class TelemetryRepository {
     }
 
     const page = options.page || 1;
-    const pageSize = options.pageSize || 20;
+    // TASK-0503/TASK-0504: the approved history page size is exactly 5 readings.
+    // The server owns this default so pagination stays consistent even when a
+    // caller omits `pageSize`; clients render the control from the same value.
+    const pageSize = options.pageSize || 5;
 
     const filterMetric = (field: string) => {
       if (!options.metrics || options.metrics.length === 0) return true;
@@ -665,6 +781,12 @@ export class TelemetryRepository {
     const waterWhere: Prisma.WaterReadingWhereInput = {
       deviceId: device.id,
       receivedAt: { gte: options.from, lte: options.to },
+      ...(options.locationKey !== undefined
+        ? {
+            locationKey:
+              options.locationKey === null ? null : normalizeLocationKey(options.locationKey),
+          }
+        : {}),
     };
 
     const skip = (page - 1) * pageSize;
@@ -672,14 +794,37 @@ export class TelemetryRepository {
 
     const waterReadings = await this.prisma.waterReading.findMany({
       where: waterWhere,
-      orderBy: { receivedAt: 'asc' },
+      // Deterministic ordering, matching `getSoilHistory`.
+      orderBy: [{ receivedAt: 'asc' }, { id: 'asc' }],
       skip,
       take: pageSize,
+      select: {
+        id: true,
+        ph: true,
+        tds: true,
+        ec: true,
+        status: true,
+        recordedAt: true,
+        receivedAt: true,
+        locationName: true,
+        locationKey: true,
+        locationAnnotatedAt: true,
+        namedByUser: { select: { id: true, fullName: true, email: true } },
+      },
     });
 
     const series = waterReadings.map((w) => {
       const item: Record<string, any> = {
         timestamp: (w.recordedAt || w.receivedAt).toISOString(),
+        readingId: w.id,
+        recordedAt: (w.recordedAt || w.receivedAt).toISOString(),
+        receivedAt: w.receivedAt.toISOString(),
+        locationName: w.locationName ?? null,
+        locationKey: w.locationKey ?? null,
+        locationAnnotatedAt: w.locationAnnotatedAt ? w.locationAnnotatedAt.toISOString() : null,
+        locationNamedBy: w.namedByUser
+          ? { id: w.namedByUser.id, fullName: w.namedByUser.fullName, email: w.namedByUser.email }
+          : null,
       };
       if (filterMetric('ph')) item.ph = toNumberOrNull(w.ph);
       if (filterMetric('tds')) item.tds = toNumberOrNull(w.tds);
@@ -700,6 +845,444 @@ export class TelemetryRepository {
         totalPages: Math.ceil(totalRecords / pageSize) || 1,
       },
     };
+  }
+
+  /**
+   * Lists distinct annotated locations for a device, newest-activity first.
+   *
+   * Uses the normalized `locationKey` as the identity so whitespace and case
+   * variants collapse into one option, and takes the most recent `locationName`
+   * for display so the label reflects how the location was last written.
+   */
+  async getSoilReadingLocations(deviceIdentifier: string): Promise<ReadingLocationOption[]> {
+    const device = await this.resolveDeviceId(deviceIdentifier);
+
+    const grouped = await this.prisma.$queryRaw<
+      Array<{
+        location_key: string;
+        location_name: string;
+        reading_count: bigint;
+        first_recorded_at: Date | null;
+        last_recorded_at: Date | null;
+      }>
+    >`
+      SELECT location_key,
+             (ARRAY_AGG(location_name ORDER BY location_annotated_at DESC NULLS LAST))[1] AS location_name,
+             COUNT(*)::bigint AS reading_count,
+             MIN(COALESCE(recorded_at, received_at)) AS first_recorded_at,
+             MAX(COALESCE(recorded_at, received_at)) AS last_recorded_at
+      FROM soil_readings
+      WHERE device_id = ${device}::uuid
+        AND location_key IS NOT NULL
+      GROUP BY location_key
+      ORDER BY last_recorded_at DESC NULLS LAST
+      LIMIT 200
+    `;
+
+    return grouped.map((row) => ({
+      locationKey: row.location_key,
+      locationName: row.location_name,
+      readingCount: Number(row.reading_count),
+      firstRecordedAt: row.first_recorded_at,
+      lastRecordedAt: row.last_recorded_at,
+    }));
+  }
+
+  /**
+   * Sets, renames, or clears the location annotation on one immutable soil reading.
+   *
+   * The update is scoped by reading id AND device id, so a reading belonging to a
+   * different device cannot be reached through this path even with a valid id.
+   * Returns the previous location so the caller can record it in the audit log,
+   * keeping the full edit history outside the readings table itself.
+   */
+  async setSoilReadingLocation(params: {
+    deviceIdentifier: string;
+    readingId: string;
+    locationName: string | null;
+    namedByUserId: string;
+  }): Promise<{ applied: boolean; previousLocationName: string | null; readingId: string }> {
+    const deviceId = await this.resolveDeviceId(params.deviceIdentifier);
+
+    const existing = await this.prisma.soilReading.findFirst({
+      where: { id: params.readingId, deviceId },
+      select: { id: true, locationName: true },
+    });
+
+    if (!existing) {
+      return { applied: false, previousLocationName: null, readingId: params.readingId };
+    }
+
+    const display = normalizeLocationDisplay(params.locationName);
+    const key = normalizeLocationKey(params.locationName);
+
+    await this.prisma.soilReading.update({
+      where: { id: existing.id },
+      data:
+        key === null
+          ? {
+              // Clearing resets the attribution too: an unnamed reading has no
+              // meaningful "named by", and leaving it would misrepresent who
+              // last touched the record.
+              locationName: null,
+              locationKey: null,
+              locationAnnotatedAt: null,
+              locationNamedById: null,
+            }
+          : {
+              locationName: display,
+              locationKey: key,
+              locationAnnotatedAt: new Date(),
+              locationNamedById: params.namedByUserId,
+            },
+    });
+
+    return {
+      applied: true,
+      previousLocationName: existing.locationName ?? null,
+      readingId: existing.id,
+    };
+  }
+
+  /**
+   * Named-only chart series for one soil location within a bounded window.
+   *
+   * `locationKey` is REQUIRED (never optional) because the chart must never mix
+   * measurements taken at different physical locations into one line. Callers are
+   * expected to pass a location the operator explicitly selected.
+   *
+   * Supports bounded keyset cursor pagination on `[receivedAt, id]` for complete,
+   * non-aggregating retrieval without unbounded memory spikes or query timeouts.
+   */
+  async getSoilChartSeries(params: {
+    deviceIdentifier: string;
+    locationKey: string;
+    from: Date;
+    to: Date;
+    limit?: number;
+    cursor?: string | null;
+  }) {
+    const deviceId = await this.resolveDeviceId(params.deviceIdentifier);
+    const locationKey = normalizeLocationKey(params.locationKey);
+
+    if (!locationKey) {
+      throw new Error('A non-blank locationKey is required for chart queries.');
+    }
+
+    const limit = Math.min(Math.max(params.limit ?? 1000, 1), 2000);
+
+    let cursorFilter: Prisma.SoilReadingWhereInput = {};
+    if (params.cursor) {
+      const sepIdx = params.cursor.indexOf('_');
+      if (sepIdx === -1) {
+        throw new Error('Invalid or malformed pagination cursor.');
+      }
+      const cursorReceivedAtStr = params.cursor.substring(0, sepIdx);
+      const cursorId = params.cursor.substring(sepIdx + 1);
+      const cursorDate = new Date(cursorReceivedAtStr);
+      if (isNaN(cursorDate.getTime()) || !cursorId) {
+        throw new Error('Invalid or malformed pagination cursor.');
+      }
+      cursorFilter = {
+        OR: [{ receivedAt: { gt: cursorDate } }, { receivedAt: cursorDate, id: { gt: cursorId } }],
+      };
+    }
+
+    const baseWhere: Prisma.SoilReadingWhereInput = {
+      deviceId,
+      locationKey,
+      receivedAt: { gte: params.from, lte: params.to },
+    };
+
+    const where: Prisma.SoilReadingWhereInput = {
+      ...baseWhere,
+      ...cursorFilter,
+    };
+
+    // Count is evaluated on the initial query without cursor
+    const [totalRows, rows] = await Promise.all([
+      !params.cursor
+        ? this.prisma.soilReading.count({ where: baseWhere })
+        : Promise.resolve(undefined),
+      this.prisma.soilReading.findMany({
+        where,
+        // Deterministic ascending keyset ordering on [receivedAt, id]
+        orderBy: [{ receivedAt: 'asc' }, { id: 'asc' }],
+        take: limit,
+        select: {
+          id: true,
+          nitrogen: true,
+          phosphorus: true,
+          potassium: true,
+          temperature: true,
+          moisture: true,
+          ph: true,
+          ec: true,
+          recordedAt: true,
+          receivedAt: true,
+          locationName: true,
+        },
+      }),
+    ]);
+
+    let nextCursor: string | null = null;
+    if (rows.length === limit) {
+      const lastRow = rows[rows.length - 1];
+      nextCursor = `${lastRow.receivedAt.toISOString()}_${lastRow.id}`;
+    }
+
+    // Preserve actual sensor recordedAt chronological order for display
+    const ordered = [...rows].sort((a, b) => {
+      const at = a.recordedAt ?? a.receivedAt;
+      const bt = b.recordedAt ?? b.receivedAt;
+      if (at.getTime() !== bt.getTime()) return at.getTime() - bt.getTime();
+      return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+    });
+
+    return {
+      locationKey,
+      locationName: rows[0]?.locationName ?? null,
+      series: ordered.map((r) => ({
+        readingId: r.id,
+        timestamp: (r.recordedAt || r.receivedAt).toISOString(),
+        recordedAt: (r.recordedAt || r.receivedAt).toISOString(),
+        receivedAt: r.receivedAt.toISOString(),
+        nitrogen: toNumberOrNull(r.nitrogen),
+        phosphorus: toNumberOrNull(r.phosphorus),
+        potassium: toNumberOrNull(r.potassium),
+        temperature: toNumberOrNull(r.temperature),
+        moisture: toNumberOrNull(r.moisture),
+        ph: toNumberOrNull(r.ph),
+        ec: toNumberOrNull(r.ec),
+      })),
+      nextCursor,
+      totalRows,
+      truncated: false,
+    };
+  }
+
+  /** Lists distinct annotated water-quality locations for a device. */
+  async getWaterReadingLocations(deviceIdentifier: string): Promise<ReadingLocationOption[]> {
+    const device = await this.resolveDeviceId(deviceIdentifier);
+
+    const grouped = await this.prisma.$queryRaw<
+      Array<{
+        location_key: string;
+        location_name: string;
+        reading_count: bigint;
+        first_recorded_at: Date | null;
+        last_recorded_at: Date | null;
+      }>
+    >`
+      SELECT location_key,
+             (ARRAY_AGG(location_name ORDER BY location_annotated_at DESC NULLS LAST))[1] AS location_name,
+             COUNT(*)::bigint AS reading_count,
+             MIN(COALESCE(recorded_at, received_at)) AS first_recorded_at,
+             MAX(COALESCE(recorded_at, received_at)) AS last_recorded_at
+      FROM water_readings
+      WHERE device_id = ${device}::uuid
+        AND location_key IS NOT NULL
+      GROUP BY location_key
+      ORDER BY last_recorded_at DESC NULLS LAST
+      LIMIT 200
+    `;
+
+    return grouped.map((row) => ({
+      locationKey: row.location_key,
+      locationName: row.location_name,
+      readingCount: Number(row.reading_count),
+      firstRecordedAt: row.first_recorded_at,
+      lastRecordedAt: row.last_recorded_at,
+    }));
+  }
+
+  /** Sets, renames, or clears the location annotation on one immutable water reading. */
+  async setWaterReadingLocation(params: {
+    deviceIdentifier: string;
+    readingId: string;
+    locationName: string | null;
+    namedByUserId: string;
+  }): Promise<{ applied: boolean; previousLocationName: string | null; readingId: string }> {
+    const deviceId = await this.resolveDeviceId(params.deviceIdentifier);
+
+    const existing = await this.prisma.waterReading.findFirst({
+      where: { id: params.readingId, deviceId },
+      select: { id: true, locationName: true },
+    });
+
+    if (!existing) {
+      return { applied: false, previousLocationName: null, readingId: params.readingId };
+    }
+
+    const display = normalizeLocationDisplay(params.locationName);
+    const key = normalizeLocationKey(params.locationName);
+
+    await this.prisma.waterReading.update({
+      where: { id: existing.id },
+      data:
+        key === null
+          ? {
+              locationName: null,
+              locationKey: null,
+              locationAnnotatedAt: null,
+              locationNamedById: null,
+            }
+          : {
+              locationName: display,
+              locationKey: key,
+              locationAnnotatedAt: new Date(),
+              locationNamedById: params.namedByUserId,
+            },
+    });
+
+    return {
+      applied: true,
+      previousLocationName: existing.locationName ?? null,
+      readingId: existing.id,
+    };
+  }
+
+  /**
+   * Named-only chart series for one water-quality location within a bounded window.
+   *
+   * Mirrors `getSoilChartSeries`: a location is mandatory and no aggregation is
+   * applied, so every stored reading is charted at its actual timestamp.
+   *
+   * Supports bounded keyset cursor pagination on `[receivedAt, id]` for complete,
+   * non-aggregating retrieval without unbounded memory spikes or query timeouts.
+   */
+  async getWaterChartSeries(params: {
+    deviceIdentifier: string;
+    locationKey: string;
+    from: Date;
+    to: Date;
+    limit?: number;
+    cursor?: string | null;
+  }) {
+    const deviceId = await this.resolveDeviceId(params.deviceIdentifier);
+    const locationKey = normalizeLocationKey(params.locationKey);
+
+    if (!locationKey) {
+      throw new Error('A non-blank locationKey is required for chart queries.');
+    }
+
+    const limit = Math.min(Math.max(params.limit ?? 1000, 1), 2000);
+
+    let cursorFilter: Prisma.WaterReadingWhereInput = {};
+    if (params.cursor) {
+      const sepIdx = params.cursor.indexOf('_');
+      if (sepIdx === -1) {
+        throw new Error('Invalid or malformed pagination cursor.');
+      }
+      const cursorReceivedAtStr = params.cursor.substring(0, sepIdx);
+      const cursorId = params.cursor.substring(sepIdx + 1);
+      const cursorDate = new Date(cursorReceivedAtStr);
+      if (isNaN(cursorDate.getTime()) || !cursorId) {
+        throw new Error('Invalid or malformed pagination cursor.');
+      }
+      cursorFilter = {
+        OR: [{ receivedAt: { gt: cursorDate } }, { receivedAt: cursorDate, id: { gt: cursorId } }],
+      };
+    }
+
+    const baseWhere: Prisma.WaterReadingWhereInput = {
+      deviceId,
+      locationKey,
+      receivedAt: { gte: params.from, lte: params.to },
+    };
+
+    const where: Prisma.WaterReadingWhereInput = {
+      ...baseWhere,
+      ...cursorFilter,
+    };
+
+    const [totalRows, rows] = await Promise.all([
+      !params.cursor
+        ? this.prisma.waterReading.count({ where: baseWhere })
+        : Promise.resolve(undefined),
+      this.prisma.waterReading.findMany({
+        where,
+        // Deterministic ascending keyset ordering on [receivedAt, id]
+        orderBy: [{ receivedAt: 'asc' }, { id: 'asc' }],
+        take: limit,
+        select: {
+          id: true,
+          ph: true,
+          tds: true,
+          ec: true,
+          recordedAt: true,
+          receivedAt: true,
+          locationName: true,
+        },
+      }),
+    ]);
+
+    let nextCursor: string | null = null;
+    if (rows.length === limit) {
+      const lastRow = rows[rows.length - 1];
+      nextCursor = `${lastRow.receivedAt.toISOString()}_${lastRow.id}`;
+    }
+
+    // Preserve actual sensor recordedAt chronological order for display
+    const ordered = [...rows].sort((a, b) => {
+      const at = a.recordedAt ?? a.receivedAt;
+      const bt = b.recordedAt ?? b.receivedAt;
+      if (at.getTime() !== bt.getTime()) return at.getTime() - bt.getTime();
+      return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+    });
+
+    return {
+      locationKey,
+      locationName: rows[0]?.locationName ?? null,
+      series: ordered.map((r) => ({
+        readingId: r.id,
+        timestamp: (r.recordedAt || r.receivedAt).toISOString(),
+        recordedAt: (r.recordedAt || r.receivedAt).toISOString(),
+        receivedAt: r.receivedAt.toISOString(),
+        ph: toNumberOrNull(r.ph),
+        tds: toNumberOrNull(r.tds),
+        ec: toNumberOrNull(r.ec),
+      })),
+      nextCursor,
+      totalRows,
+      truncated: false,
+    };
+  }
+
+  /**
+   * Resolves a device by internal id or by firmware identifier.
+   *
+   * Returns the immutable internal `devices.id` used by every reading foreign key.
+   */
+  private async resolveDeviceId(deviceIdentifier: string): Promise<string> {
+    const canonicalDeviceId = deviceIdentifier.trim();
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      canonicalDeviceId
+    );
+
+    const device = await this.prisma.device.findFirst({
+      where: isUuid
+        ? {
+            OR: [
+              { id: canonicalDeviceId },
+              { deviceId: canonicalDeviceId },
+              { deviceId: { equals: canonicalDeviceId, mode: 'insensitive' } },
+            ],
+          }
+        : {
+            OR: [
+              { deviceId: canonicalDeviceId },
+              { deviceId: { equals: canonicalDeviceId, mode: 'insensitive' } },
+            ],
+          },
+      select: { id: true },
+    });
+
+    if (!device) {
+      throw new DeviceNotFoundError(`Device '${canonicalDeviceId}' not found.`);
+    }
+
+    return device.id;
   }
 }
 

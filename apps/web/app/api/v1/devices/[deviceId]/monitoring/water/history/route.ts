@@ -104,7 +104,14 @@ export async function GET(request: Request, props: { params: Promise<{ deviceId:
       );
     }
 
-    const { from: fromParam, to: toParam, metrics: metricsStr, page, pageSize } = parsedQuery.data;
+    const {
+      from: fromParam,
+      to: toParam,
+      metrics: metricsStr,
+      locationKey,
+      page,
+      pageSize,
+    } = parsedQuery.data;
 
     const dateRange = parseAndValidateDateRange(fromParam, toParam);
     if (dateRange.errorResponse) {
@@ -136,6 +143,8 @@ export async function GET(request: Request, props: { params: Promise<{ deviceId:
       metrics,
       page,
       pageSize,
+      // See the soil history route for the undefined vs empty-string semantics.
+      locationKey,
     });
 
     return NextResponse.json(

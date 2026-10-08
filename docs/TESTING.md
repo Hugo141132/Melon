@@ -3549,6 +3549,98 @@ The following five verification commands must be executed **exclusively by opera
 
 <!-- TASK-0507 Testing Evidence Recorded: 2026-10-04 -->
 
+---
+
+## 52. TASK-0503 & TASK-0504: Portable Reading History, Location Annotations, Single-Chart UI, Keyset Pagination & Verification Evidence
+
+### 1. Test Suite Coverage & Verification Scope
+Automated testing for TASK-0503 and TASK-0504 covers repository query semantics, deterministic ordering, in-memory fake database verification, contract parsing, location key normalization, forward keyset cursor pagination, and chart rendering across **65 unit tests** (100% pass rate):
+
+- **Database Repository Query Semantics (`packages/database/test/telemetry-repository.test.ts`):**
+  - Result: **31/31 passed** (100%, exit code 0).
+  - Verifies server-enforced `pageSize = 5` default, accurate pagination metadata (`page`, `pageSize`, `totalRecords`, `totalPages`).
+  - Verifies deterministic ordering `[{ receivedAt: 'asc' }, { id: 'asc' }]` ensuring stability during incoming telemetry.
+  - Verifies retention of unnamed readings with `0` preserved and `null` never coerced to zero.
+  - Verifies reading-bound annotation scoping by primary key and audit trail creation on save/rename/clear.
+  - Verifies normalized location identity (`locationKey`: trimmed, whitespace-collapsed, lower-cased).
+- **Telemetry Chart Completeness Fake DB (`packages/database/test/telemetry-chart-completeness.test.ts`):**
+  - Result: **7/7 passed** (100%, exit code 0).
+  - Uses in-memory Prisma fake applying actual `orderBy: [{ receivedAt: 'asc' }, { id: 'asc' }]` and `take: limit`.
+  - Verifies forward keyset cursor pagination, cursor format (`${receivedAtIso}_${id}`), deterministic `nextCursor` generation when rows equal limit, `null` nextCursor on terminal batch, and strict rejection of malformed or non-date cursors.
+- **Chart Timestamp Ordering (`packages/database/test/chart-timestamp-ordering.test.ts`):**
+  - Result: **6/6 passed** (100%, exit code 0).
+  - Verifies chronological ordering on genuine sensor timestamps (`recordedAt`, fallback `receivedAt`) with ID tie-breaker without inversions or hourly bucketing.
+- **Contract Schema & DTO Validation (`apps/web/test/unit/measurement-location-contracts.test.ts`):**
+  - Result: **10/10 passed** (100%, exit code 0).
+  - Verifies rejection of invalid query parameters, `pageSize` deviation from 5, date range validation (max 31 days), cursor format validation, and string normalization.
+- **Frontend Keyset Pagination & Multi-Batch Accumulation (`apps/web/test/unit/chart-completeness-overflow.test.tsx`):**
+  - Result: **9/9 passed** (100%, exit code 0).
+  - Verifies seamless retrieval of datasets spanning multiple batches (e.g., 999, 1,000, 1,001 points) via sequential keyset cursor loop without 1,000-point rejection.
+  - Verifies wire-level request cancellation via `AbortController` on filter change or unmount.
+  - Verifies detection and abortion on non-advancing cursors (loop protection).
+  - Verifies HTTP 400 validation response on malformed cursors (`INVALID_CURSOR` / `VALIDATION_ERROR`).
+  - Verifies honest error handling: discards partial data on batch failure (never renders partial datasets as complete).
+  - Preserves exact sensor timestamps, zero values, and null values (`connectNulls={false}`).
+- **X-Axis Tick Distribution & Edge Layout (`apps/web/test/unit/chart-xaxis-ticks-labels.test.tsx`):**
+  - Result: **6/6 passed** (100%, exit code 0).
+  - Verifies responsive tick count (4–6 ticks) with proportional index distribution anchoring first and last data points (`data[0]` and `data[N-1]`).
+  - Verifies prevention of adjacent duplicate day labels for 7d/30d and hour crowding for 24h.
+  - Verifies chart margin and axis padding (`padding={{ left: 16, right: 16 }}`) preventing label clipping on mobile (390px) and desktop SVG viewports in both Indonesian and English.
+- **Historical Chart Controls & Device Revocation UI:**
+  - `apps/web/test/unit/historical-charts.test.tsx`: **19/19 passed** (100%).
+  - `apps/web/test/unit/device-revocation-ui.test.tsx`: **5/5 passed** (100%).
+  - `apps/web/test/unit/soil-telemetry-ui.test.tsx`: **8/8 passed** (100%).
+- **Typecheck Status:**
+  - `tsc --noEmit` passes with 0 errors across `@kebun-melon/contracts`, `@kebun-melon/database`, and `apps/web`.
+
+### 2. Website Verification & Operational Status
+- **Operator Manual Website Verification:** **OPERATOR-REPORTED PASS** (Confirmed by operator JEMBOT).
+  - Evaluated on live web server (`npm run dev:web`) on desktop and mobile (390px) viewports across Indonesian (`id`) and English (`en`) locales.
+  - Verified 24h, 7d, and 30d views for Soil and Water Quality charts.
+  - Verified first and last X-axis labels remain visible without clipping or tick collisions.
+  - Verified interactive tooltip precision preserving exact values and sensor timestamps on hover/touch.
+  - Verified dots are hidden (`dot={false}`) to keep line series uncluttered.
+  - Verified history table remains strictly at 5 rows per page (`HISTORY_PAGE_SIZE = 5`) with stable pagination.
+  - *Note:* In accordance with governance, no speculative latency, timing figures, profiling results, baseline comparisons, or unmeasured live database performance claims are recorded.
+
+### 3. Consistency Limits & Architectural Boundaries
+- **Time Window Boundaries vs. Transactional Snapshot:**
+  - Locking `from`/`to` ISO boundaries client-side maintains a consistent SQL filter window across sequential keyset batches. However, this does **not** constitute a PostgreSQL multi-request ACID Repeatable Read transactional snapshot; readings inserted concurrently with timestamps within the bounded range could appear across batch boundaries.
+- **Client Fetch Abort vs. Database Query Execution:**
+  - The client-side `AbortController` terminates the HTTP fetch request and TCP socket connection on the wire when filters change. This active abort prevents client-side processing of stale responses, but does **not** guarantee immediate cancellation of already-running SQL queries inside PostgreSQL backend processes.
+
+### 4. Hardware Ingestion Verification Distinction
+- **Synthetic DEV Fixtures:** Verification was conducted using synthetic DEV fixtures in the local DEV database environment.
+- **Live Physical Hardware Verification:** End-to-end telemetry ingestion from physical ESP32 hardware sensors via MQTT over TLS remains **untested / pending** physical hardware deployment (`TASK-0414`).
+
+### 5. DEV Fixture Inventory & Verified Cleanup Evidence
+- **Initial Task Fixtures Created in DEV Database (`unbyxlkrzqlafolxcypi`):** Exactly **1,023 records** (1,016 soil readings, 7 water readings):
+  - Soil baseline readings: 8 (`dev-fixture-soil-01` .. `dev-fixture-soil-08`).
+  - Soil boundary crossing readings: 2 (`dev-fixture-boundary-crossing`, `dev-fixture-received-outside`).
+  - Soil overflow test readings: 1,005 (`dev-fixture-overflow-0000` .. `dev-fixture-overflow-1004`).
+  - Soil live incoming stability reading: 1 (`dev-fixture-stability-incoming`).
+  - Water baseline readings: 7 (`dev-fixture-water-01` .. `dev-fixture-water-07`).
+- **Cleanup Execution Record (2026-10-08):** `CLEANED_UP`.
+  - All 1,023 task-generated fixtures were safely purged via an isolated database transaction targeting strictly `where: { messageId: { startsWith: 'dev-fixture-' } }`.
+  - Post-cleanup verification confirmed:
+    - Exactly 0 remaining fixtures matching `dev-fixture-` (soilFixtureCount: 0, waterFixtureCount: 0).
+    - 0 cascade or foreign-key integrity issues.
+    - Non-fixture records completely preserved: 7 users, 3 devices, 1,837 audit logs intact. Zero collateral deletion.
+  - **Remaining Task Fixtures:** **0 records**.
+
+### 6. Pre-Commit Operator CI Gates Protocol
+The five mandatory CI gates must be executed **exclusively by operator JEMBOT** before git commit/push:
+1. `npm run check:quality` (Typecheck, lint, format check, i18n check, secret scan, dep check, production build).
+2. `npm test` (Monorepo Vitest unit test suites).
+3. `npm run test:integration` (Relational database integration tests against dedicated test database).
+4. `npm run test:coverage` (Full test suite with coverage collection).
+5. `npm run test:e2e` (Playwright end-to-end smoke tests).
+
+- **Current Status of 5 Gates:** **PENDING** (to be executed by operator JEMBOT).
+- **Git Commit, Push, Remote CI, and Deployment:** **PENDING** until evidenced.
+
+<!-- TASK-0503 & TASK-0504 Testing Evidence Recorded: 2026-10-08 -->
+
 
 
 

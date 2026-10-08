@@ -32,14 +32,22 @@
    - **Preserved Rollback Baseline:** Tagged `kebun-melon-web:rollback-baseline` and `kebun-melon-gateway:rollback-baseline` preserved in local Docker daemon.
    - **Reverse Proxy & HTTPS Restoration:** Container `kebun-melon-proxy` (`caddy:2.9-alpine`) was restarted after an unexpected shutdown (shutdown cause unknown; investigation pending if recurrence observed); HTTPS restored with valid TLS certificate.
    - **Database Migration Status:**
-     - Staging Database (`ihgoxqdncepbcrqkchxu`): Confirmed `UP TO DATE` ("Database schema is up to date!" confirmed by operator after applying `20261005193000_add_faucet_command_idempotency_tombstones`; no pending migrations in staging).
-     - Dev Database: Tombstone applied; reservoir migration `20261003230000` remains separate and pending in dev.
+     - Staging Database (`ihgoxqdncepbcrqkchxu`): Migration `20261008103000_add_reading_location_annotations` is **PENDING OPERATOR DEPLOYMENT** via Staging `DIRECT_URL` (Port 5432).
+     - Dev Database (`unbyxlkrzqlafolxcypi`): Migration `20261008103000_add_reading_location_annotations` created and tested with DEV fixtures; reservoir migration `20261003230000` remains separate and pending in dev.
    - **Verified Post-Deployment Smoke Test Acceptance:**
      - Public HTTPS probe to `https://monitoring.melonmadura.my.id/health` returns HTTP 200 with valid TLS certificate.
      - Web and Gateway container status: `healthy`.
      - Faucet command history table server-side pagination (10 rows/page, terminal status filter preservation) verified operational.
      - Event-driven command history refresh via SSE verified functional without continuous polling.
      - Owner approval workflow (top toast notifier, dynamic sidebar badge, bilingual Resend email dispatch) verified functional.
+   - **TASK-0503 / TASK-0504 Deployment & Rollout Guidance:**
+     - **Migration Deployment (Staging):** Run non-interactively using Staging `DIRECT_URL` prior to container recreation:
+       `$env:DATABASE_URL = "<STAGING_POOLED_URL>"; $env:DIRECT_URL = "<STAGING_DIRECT_URL>"; npm run db:migrate:deploy --workspace=packages/database` (or `scripts/cutover/deploy_singapore_staging_migrations.ps1`).
+     - **Container Image Status:** Web container image incorporating the single-chart UI and reading-bound annotations is **PENDING OPERATOR BUILD OFF-VPS** after CI gates pass. Specific tag (e.g. `kebun-melon-web:0.2.0-annotated` or commit SHA tag) must be compiled off-VPS with `--platform linux/amd64`.
+     - **Rollout Command (Staging):** `docker compose -f docker-compose.staging.yml up -d --remove-orphans web`
+     - **Rollout Command (Production):** `WEB_IMAGE=kebun-melon-web:<tag> docker compose --env-file .env.production -f docker-compose.prod.yml up -d --no-deps web`
+     - **Rollback Command (Production):** `WEB_IMAGE=kebun-melon-web:ada891e docker compose --env-file .env.production -f docker-compose.prod.yml up -d --no-deps web`
+     - **Zero Architectural Impact on Gateway & Caddy:** IoT Gateway MQTT ingestion is completely unaffected (new DB columns are nullable). Caddy reverse proxy (`Caddyfile`) requires zero changes; SSE streaming at `/api/v1/realtime/stream*` and port 3000 proxying remain identical.
    - **Remaining Unverified / Separate Deployment Items:**
      - Actual deletion and tombstone insertion with aged real data remain unverified; the successful zero-row scheduled run does not exercise those paths.
      - Physical valve hardware actuation prerequisites remain blocked on physical hardware (`TASK-0414`).

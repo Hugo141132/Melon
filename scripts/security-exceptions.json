@@ -157,6 +157,15 @@
       "approvedBy": "Security Team",
       "approvedDate": "2026-10-07",
       "expiresDate": "2026-11-07"
+    },
+    {
+      "id": "EXC-DEP-017",
+      "packageName": "next",
+      "advisoryId": "GHSA-cjq9-62q9-8jv4",
+      "reason": "Server-Side Request Forgery (SSRF) in Next.js Image Optimization API (GHSA-cjq9-62q9-8jv4); application processes numerical IoT telemetry, does not accept arbitrary external user image URLs, and strictly restricts image remotePatterns to approved Google and Pinterest avatar origins.",
+      "approvedBy": "Security Team",
+      "approvedDate": "2026-10-08",
+      "expiresDate": "2026-11-08"
     }
   ]
 }

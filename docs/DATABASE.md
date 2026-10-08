@@ -87,6 +87,40 @@ Under `TASK-0814`, `TASK-0918`, and `DEC-DEV-036`:
 - **Anti-Replay Security Guarantee:** Purging executes inside an interactive database transaction: tombstone records are created first, followed by deletion of dependent `faucet_command_events`, and finally deletion of the target `faucet_commands`. Subsequent command submissions presenting purged idempotency keys are deterministically rejected with `FaucetCommandConflictError` (HTTP 409 Conflict).
 - **Migration & Live Database Invariant:** Migration file is committed to the repository codebase (`prisma/migrations/20261005193000_add_faucet_command_idempotency_tombstones/migration.sql`), while execution against live databases (Dev/Staging) is strictly deferred to scheduled deployment windows.
 
+### 2.7 TASK-0503 / TASK-0504 Database Model, Indexes & Telemetry History Reconciliation
+
+Under `TASK-0503`, `TASK-0504`, and `DEC-MON-093`:
+- **Reading Location Annotation Model & Prior Migration Status:**
+  - Added columns via migration `20261008103000_add_reading_location_annotations` to both `soil_readings` and `water_readings`:
+    - `location_name` (`VARCHAR(120)`, nullable): Human-readable annotated location display name (e.g. `"Bedeng Timur"`).
+    - `location_key` (`VARCHAR(120)`, nullable): Lower-cased, trimmed, and whitespace-collapsed normalized search key (e.g. `"bedeng timur"`).
+    - `location_annotated_at` (`TIMESTAMPTZ`, nullable): Timestamp of operator annotation action.
+    - `location_named_by_id` (`UUID`, nullable): Foreign key reference to `users(id)` representing the authenticated actor.
+  - Actual applied indexes in `schema.prisma`:
+    - `soil_readings_device_location_idx` ON `soil_readings("device_id", "location_key", "recorded_at" DESC)`.
+    - `water_readings_device_location_idx` ON `water_readings("device_id", "location_key", "recorded_at" DESC)`.
+    - `soil_readings_device_received_idx` ON `soil_readings("device_id", "received_at" DESC)`.
+    - `soil_readings_location_named_by_idx` ON `soil_readings("location_named_by_id")` WHERE `location_named_by_id IS NOT NULL`.
+  - Staging/Production Status: Migration `20261008103000` remains pending deployment to Staging (`ihgoxqdncepbcrqkchxu`) and VPS production.
+- **Chart Bounded Keyset Pagination — Zero New Migrations Required:**
+  - The removal of the 1,000-point total restriction and transition to keyset cursor pagination (`[receivedAt, id]`, 1,000 points/batch, max 2,000) utilizes existing table columns and requires **zero additive database migrations**.
+  - Query consistency limits: Keyset pagination locks `from`/`to` ISO timestamps in application queries to keep temporal windows stable, but does not execute inside a multi-request PostgreSQL ACID transactional snapshot.
+- **Deterministic History Pagination & Stability:**
+  - `/history` routes query with server-pinned `pageSize = 5` and `orderBy: [{ receivedAt: 'asc' }, { id: 'asc' }]`.
+  - Because `receivedAt` is ordered ascending, new readings arriving with current timestamps append at the dataset tail, ensuring `skip = (page - 1) * pageSize` remains 100% stable on earlier pages without shifting rows under an active operator.
+- **DEV Fixture Lifecycle & Verified Cleanup Evidence:**
+  - Verification was executed using synthetic DEV fixtures in the local DEV database (`unbyxlkrzqlafolxcypi`), totaling exactly **1,023 records** (1,016 soil readings, 7 water readings):
+    - Soil Baseline: 8 readings (`dev-fixture-soil-01` .. `dev-fixture-soil-08`).
+    - Soil Boundary Cases: 2 readings (`dev-fixture-boundary-crossing`, `dev-fixture-received-outside`).
+    - Soil Point Overflow: 1,005 readings for location `Overflow Test Zone` (`dev-fixture-overflow-0000` .. `dev-fixture-overflow-1004`).
+    - Soil Incoming Stability Test: 1 live reading (`dev-fixture-stability-incoming`).
+    - Water Baseline: 7 readings (`dev-fixture-water-01` .. `dev-fixture-water-07`).
+  - **Cleanup Execution Record (2026-10-08):** `CLEANED_UP`. All 1,023 task-generated fixtures were safely purged via an isolated interactive database transaction targeting strictly `where: { messageId: { startsWith: 'dev-fixture-' } }`.
+  - Post-cleanup verification confirmed:
+    - 0 remaining fixtures matching `dev-fixture-`.
+    - 0 cascade or foreign-key violations.
+    - All existing devices (3) and users (7) preserved intact. Zero data alterations on non-task records.
+
 ---
 
 

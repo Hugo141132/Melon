@@ -50,6 +50,16 @@ const ACTIVE_STATUSES: FaucetCommandStatus[] = [
   FaucetCommandStatus.IN_PROGRESS,
 ];
 
+/**
+ * Hardened transaction options for repository interactive transactions.
+ * Configures maxWait=15s and timeout=30s to withstand remote database pool latency
+ * (e.g. Supabase poolers over TLS) across multi-step transactions.
+ */
+const DEFAULT_TRANSACTION_OPTIONS = {
+  maxWait: 15000,
+  timeout: 30000,
+};
+
 const VALID_TRANSITIONS: Record<FaucetCommandStatus, FaucetCommandStatus[]> = {
   [FaucetCommandStatus.QUEUED]: [
     FaucetCommandStatus.SENT,
@@ -284,7 +294,7 @@ export class FaucetCommandRepository {
         });
 
         return { ...cmd, events: [evt] };
-      });
+      }, DEFAULT_TRANSACTION_OPTIONS);
 
       return this.formatCommandDto(created);
     } catch (error: any) {
@@ -536,7 +546,7 @@ export class FaucetCommandRepository {
       });
 
       return this.formatCommandDto(updated!);
-    });
+    }, DEFAULT_TRANSACTION_OPTIONS);
   }
 
   /**
@@ -621,6 +631,6 @@ export class FaucetCommandRepository {
         }
         throw error;
       }
-    });
+    }, DEFAULT_TRANSACTION_OPTIONS);
   }
 }

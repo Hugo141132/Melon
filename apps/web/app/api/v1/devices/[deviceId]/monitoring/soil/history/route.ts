@@ -103,7 +103,14 @@ export async function GET(request: Request, props: { params: Promise<{ deviceId:
       );
     }
 
-    const { from: fromParam, to: toParam, metrics: metricsStr, page, pageSize } = parsedQuery.data;
+    const {
+      from: fromParam,
+      to: toParam,
+      metrics: metricsStr,
+      locationKey,
+      page,
+      pageSize,
+    } = parsedQuery.data;
 
     const dateRange = parseAndValidateDateRange(fromParam, toParam);
     if (dateRange.errorResponse) {
@@ -135,6 +142,9 @@ export async function GET(request: Request, props: { params: Promise<{ deviceId:
       metrics,
       page,
       pageSize,
+      // `undefined` returns every retained reading (unnamed included);
+      // an empty string selects only readings without a location.
+      locationKey,
     });
 
     return NextResponse.json(

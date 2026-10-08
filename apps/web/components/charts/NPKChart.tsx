@@ -27,6 +27,7 @@ export interface NPKChartProps {
   preset?: string;
   loading?: boolean;
   error?: string | null;
+  selectedLocationKey?: string;
 }
 
 export function formatDayMonth(date: Date, locale: string = 'id'): string {
@@ -66,7 +67,7 @@ export function getCustomXTicks(
   const tickLabels = new Map<string, string>();
 
   if (is24h) {
-    // 24 Hours: show ~5-8 readable time labels without displaying every single hour
+    // 24 Hours: show ~5-8 evenly-spaced readable time labels without displaying every single point
     if (data.length <= 8) {
       for (const d of data) {
         const itemDate = new Date(d.timestamp);
@@ -80,16 +81,24 @@ export function getCustomXTicks(
       };
     }
 
-    const step = Math.max(1, Math.floor(data.length / 6));
+    const targetCount = 6;
     const selectedTicks: string[] = [];
-    for (let i = 0; i < data.length; i += step) {
-      const item = data[i];
+    const chosenIndices = new Set<number>();
+
+    for (let k = 0; k < targetCount; k++) {
+      const idx = Math.round((k * (data.length - 1)) / (targetCount - 1));
+      chosenIndices.add(idx);
+    }
+
+    for (const idx of Array.from(chosenIndices).sort((a, b) => a - b)) {
+      const item = data[idx];
       selectedTicks.push(item.time);
       const itemDate = new Date(item.timestamp);
       const hh = String(itemDate.getHours()).padStart(2, '0');
       const mm = String(itemDate.getMinutes()).padStart(2, '0');
       tickLabels.set(item.time, `${hh}:${mm}`);
     }
+
     return {
       ticks: selectedTicks,
       formatTick: (v: string) => tickLabels.get(v) || v,
@@ -97,7 +106,7 @@ export function getCustomXTicks(
   }
 
   if (is7d) {
-    // 7 Days: group by calendar date, display with comfortable spacing (4-5 labels to prevent overlap)
+    // 7 Days: group by calendar date, display 4-5 evenly distributed labels preventing overlap
     const dayGroups = new Map<string, BaseSeriesItem>();
     for (const item of data) {
       const d = new Date(item.timestamp);
@@ -108,21 +117,30 @@ export function getCustomXTicks(
     }
 
     const distinctDays = Array.from(dayGroups.values());
-    const selectedTicks: string[] = [];
-
-    // Step of 2 when > 4 days ensures 4 clean labels with plenty of margin, completely eliminating label overlap
-    const step = distinctDays.length > 4 ? 2 : 1;
-    for (let i = 0; i < distinctDays.length; i += step) {
-      const item = distinctDays[i];
-      selectedTicks.push(item.time);
-      tickLabels.set(item.time, formatDayMonth(new Date(item.timestamp), locale));
+    if (distinctDays.length <= 4) {
+      const ticks = distinctDays.map((d) => d.time);
+      for (const d of distinctDays) {
+        tickLabels.set(d.time, formatDayMonth(new Date(d.timestamp), locale));
+      }
+      return {
+        ticks,
+        formatTick: (v: string) => tickLabels.get(v) || v,
+      };
     }
 
-    // Include the final day if not yet included
-    const lastDayItem = distinctDays[distinctDays.length - 1];
-    if (!selectedTicks.includes(lastDayItem.time)) {
-      selectedTicks.push(lastDayItem.time);
-      tickLabels.set(lastDayItem.time, formatDayMonth(new Date(lastDayItem.timestamp), locale));
+    const targetCount = Math.min(5, distinctDays.length);
+    const selectedTicks: string[] = [];
+    const chosenIndices = new Set<number>();
+
+    for (let k = 0; k < targetCount; k++) {
+      const idx = Math.round((k * (distinctDays.length - 1)) / (targetCount - 1));
+      chosenIndices.add(idx);
+    }
+
+    for (const idx of Array.from(chosenIndices).sort((a, b) => a - b)) {
+      const item = distinctDays[idx];
+      selectedTicks.push(item.time);
+      tickLabels.set(item.time, formatDayMonth(new Date(item.timestamp), locale));
     }
 
     return {
@@ -135,7 +153,7 @@ export function getCustomXTicks(
     };
   }
 
-  // 30 Days: group by day, display ~5-7 date labels with appropriate spacing
+  // 30 Days: group by calendar day, display 5-7 evenly distributed date labels
   const dayGroups = new Map<string, BaseSeriesItem>();
   for (const item of data) {
     const d = new Date(item.timestamp);
@@ -146,18 +164,30 @@ export function getCustomXTicks(
   }
 
   const distinctDays = Array.from(dayGroups.values());
-  const step = Math.ceil(distinctDays.length / 6);
-  const selectedTicks: string[] = [];
-  for (let i = 0; i < distinctDays.length; i += step) {
-    const item = distinctDays[i];
-    selectedTicks.push(item.time);
-    tickLabels.set(item.time, formatDayMonth(new Date(item.timestamp), locale));
+  if (distinctDays.length <= 6) {
+    const ticks = distinctDays.map((d) => d.time);
+    for (const d of distinctDays) {
+      tickLabels.set(d.time, formatDayMonth(new Date(d.timestamp), locale));
+    }
+    return {
+      ticks,
+      formatTick: (v: string) => tickLabels.get(v) || v,
+    };
   }
 
-  const lastDayItem = distinctDays[distinctDays.length - 1];
-  if (!selectedTicks.includes(lastDayItem.time)) {
-    selectedTicks.push(lastDayItem.time);
-    tickLabels.set(lastDayItem.time, formatDayMonth(new Date(lastDayItem.timestamp), locale));
+  const targetCount = 6;
+  const selectedTicks: string[] = [];
+  const chosenIndices = new Set<number>();
+
+  for (let k = 0; k < targetCount; k++) {
+    const idx = Math.round((k * (distinctDays.length - 1)) / (targetCount - 1));
+    chosenIndices.add(idx);
+  }
+
+  for (const idx of Array.from(chosenIndices).sort((a, b) => a - b)) {
+    const item = distinctDays[idx];
+    selectedTicks.push(item.time);
+    tickLabels.set(item.time, formatDayMonth(new Date(item.timestamp), locale));
   }
 
   return {
@@ -176,6 +206,7 @@ export default function NPKChart({
   preset,
   loading = false,
   error = null,
+  selectedLocationKey,
 }: NPKChartProps) {
   const tSoil = useTranslations('soil');
   const tHistory = useTranslations('history');
@@ -251,17 +282,26 @@ export default function NPKChart({
         <div className="h-44 w-full flex items-center justify-center bg-red-500/5 rounded-lg border border-red-500/20 p-4 text-center">
           <span className="text-[13px] text-red-600 font-medium">{error}</span>
         </div>
+      ) : selectedLocationKey !== undefined && !selectedLocationKey ? (
+        <div className="h-44 w-full flex flex-col items-center justify-center bg-app-surface-container/20 rounded-lg p-4 text-center">
+          <span className="text-[13px] text-app-on-surface font-medium">
+            {tHistory('chartSelectLocation')}
+          </span>
+          <span className="text-[11px] text-app-on-surface-variant mt-1 max-w-md">
+            {tHistory('chartSelectLocationHint')}
+          </span>
+        </div>
       ) : data.length === 0 ? (
         <div className="h-44 w-full flex items-center justify-center bg-app-surface-container/20 rounded-lg p-4 text-center">
           <span className="text-[13px] text-app-on-surface-variant font-medium">
-            {tHistory('noData')}
+            {selectedLocationKey ? tHistory('chartNoData') : tHistory('noData')}
           </span>
         </div>
       ) : (
         <div className="h-44 sm:h-52">
           <ResponsiveContainer width="100%" height="100%">
             {isSingleMetric && singleConfig ? (
-              <AreaChart data={data} margin={{ top: 4, right: 4, left: -25, bottom: 0 }}>
+              <AreaChart data={data} margin={{ top: 8, right: 14, left: -14, bottom: 0 }}>
                 <defs>
                   <linearGradient id={`grad-${selectedMetric}`} x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor={singleConfig.color} stopOpacity={0.3} />
@@ -275,6 +315,7 @@ export default function NPKChart({
                   tickFormatter={formatTick}
                   interval={0}
                   tick={{ fontSize: 11, fill: '#40493d' }}
+                  padding={{ left: 16, right: 16 }}
                   axisLine={false}
                   tickLine={false}
                 />
@@ -307,7 +348,7 @@ export default function NPKChart({
                 />
               </AreaChart>
             ) : (
-              <LineChart data={data} margin={{ top: 4, right: 4, left: -25, bottom: 0 }}>
+              <LineChart data={data} margin={{ top: 8, right: 14, left: -14, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#eeeeee" vertical={false} />
                 <XAxis
                   dataKey="time"
@@ -315,6 +356,7 @@ export default function NPKChart({
                   tickFormatter={formatTick}
                   interval={0}
                   tick={{ fontSize: 11, fill: '#40493d' }}
+                  padding={{ left: 16, right: 16 }}
                   axisLine={false}
                   tickLine={false}
                 />

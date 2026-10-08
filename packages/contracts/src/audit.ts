@@ -33,6 +33,8 @@ export enum AuditEventKey {
   FAUCET_COMMAND_FAILED = 'faucet.command.failed',
   FAUCET_COMMAND_TIMEOUT = 'faucet.command.timeout',
   ALERT_ACKNOWLEDGED = 'alert.acknowledged',
+  READING_LOCATION_SET = 'reading.location.set',
+  READING_LOCATION_CLEARED = 'reading.location.cleared',
   AUTHORISATION_HIGH_RISK_DENIED = 'authorisation.high_risk.denied',
 }
 

@@ -1,15 +1,32 @@
+/** Maximum selectable range per DEC-MON-087. Exported so API routes can report the bound. */
+export const MAX_RANGE_MS = 31 * 24 * 60 * 60 * 1000;
+
+/**
+ * Result of range validation, modelled as a discriminated union.
+ *
+ * TASK-0503/0504: when the requested range exceeds the bound, no usable range is
+ * returned at all. Carrying `from`/`to` alongside the error made it possible for
+ * a caller that forgot the early return to plot a silently truncated trend, which
+ * is exactly the incomplete-chart failure mode this validator exists to prevent.
+ */
+export type DateRangeValidationResult =
+  | { from: Date; to: Date; errorResponse?: undefined }
+  | {
+      from?: undefined;
+      to?: undefined;
+      errorResponse: { code: string; message: string; statusCode: number };
+    };
+
 export function parseAndValidateDateRange(
   fromParam?: string,
   toParam?: string
-): { from: Date; to: Date; errorResponse?: { code: string; message: string; statusCode: number } } {
+): DateRangeValidationResult {
   const now = new Date();
   let toDate = now;
   if (toParam) {
     toDate = new Date(toParam);
     if (isNaN(toDate.getTime())) {
       return {
-        from: now,
-        to: now,
         errorResponse: {
           code: 'INVALID_DATE_RANGE',
           message: "Query parameter 'to' must be a valid ISO 8601 date string.",
@@ -24,8 +41,6 @@ export function parseAndValidateDateRange(
     fromDate = new Date(fromParam);
     if (isNaN(fromDate.getTime())) {
       return {
-        from: now,
-        to: now,
         errorResponse: {
           code: 'INVALID_DATE_RANGE',
           message: "Query parameter 'from' must be a valid ISO 8601 date string.",
@@ -37,8 +52,6 @@ export function parseAndValidateDateRange(
 
   if (fromDate.getTime() > toDate.getTime()) {
     return {
-      from: fromDate,
-      to: toDate,
       errorResponse: {
         code: 'INVALID_DATE_RANGE',
         message: "'from' timestamp must be before or equal to 'to' timestamp.",
@@ -47,14 +60,11 @@ export function parseAndValidateDateRange(
     };
   }
 
-  const MAX_RANGE_MS = 31 * 24 * 60 * 60 * 1000;
   if (toDate.getTime() - fromDate.getTime() > MAX_RANGE_MS) {
     return {
-      from: fromDate,
-      to: toDate,
       errorResponse: {
         code: 'DATE_RANGE_EXCEEDED',
-        message: 'Requested date range exceeds maximum allowed limit of 31 days.',
+        message: `Requested date range exceeds maximum allowed limit of ${MAX_RANGE_MS / (24 * 60 * 60 * 1000)} days. Narrow the selected range to at most 31 days.`,
         statusCode: 400,
       },
     };

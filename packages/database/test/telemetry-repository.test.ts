@@ -641,4 +641,472 @@ describe('TelemetryRepository Unit Tests (TASK-0405)', () => {
       });
     });
   });
+
+  // TASK-0503 / TASK-0504: portable soil & water-quality reading history with
+  // location annotations. These tests lock the approved behaviour so a later
+  // refactor cannot silently reintroduce hourly aggregation, drop unnamed
+  // readings, blend two physical locations, or lose the annotation actor.
+  describe('Reading location & pagination contracts (TASK-0503/TASK-0504)', () => {
+    let mockPrisma: any;
+    let repo: TelemetryRepository;
+
+    const readingId = '3f2504e0-4f89-11d3-9a0c-0305e82c3301';
+    const otherReadingId = '4f2504e0-4f89-11d3-9a0c-0305e82c3302';
+    // Declared locally: the location contract tests must not depend on the
+    // device fixture owned by the TASK-0405 suite above.
+    const mockDevice = {
+      id: '11111111-2222-4333-8444-555555555555',
+      deviceId: 'DEV-SOIL-001',
+      name: 'Soil Sensor',
+      deviceType: 'SOIL',
+    } as any;
+
+    beforeEach(() => {
+      mockPrisma = {
+        device: {
+          findFirst: vi.fn(),
+          update: vi.fn(),
+        },
+        soilReading: {
+          findUnique: vi.fn(),
+          findFirst: vi.fn(),
+          count: vi.fn(),
+          findMany: vi.fn(),
+          update: vi.fn(),
+        },
+        waterReading: {
+          findUnique: vi.fn(),
+          findFirst: vi.fn(),
+          count: vi.fn(),
+          findMany: vi.fn(),
+          update: vi.fn(),
+        },
+        auditLog: {
+          create: vi.fn(),
+        },
+        $transaction: vi.fn(async (cb: any) => cb(mockPrisma)),
+        $executeRaw: vi.fn().mockResolvedValue(0),
+      };
+
+      repo = new TelemetryRepository(mockPrisma as any);
+    });
+
+    /** Minimal chart row: only the fields the chart query maps are set. */
+    const chartRow = (n: number, iso: string) => ({
+      id: `00000000-0000-4000-8000-00000000000${n}`,
+      recordedAt: new Date(iso),
+      receivedAt: new Date(iso),
+      nitrogen: new Prisma.Decimal(1),
+      phosphorus: new Prisma.Decimal(1),
+      potassium: new Prisma.Decimal(1),
+      temperature: new Prisma.Decimal(25),
+      moisture: new Prisma.Decimal(60),
+      ph: new Prisma.Decimal(6.5),
+      ec: new Prisma.Decimal(1),
+    });
+
+    it('defaults history pagination to exactly five readings per page', async () => {
+      mockPrisma.device.findFirst.mockResolvedValue(mockDevice);
+      mockPrisma.soilReading.count.mockResolvedValue(12);
+      mockPrisma.soilReading.findMany.mockResolvedValue([]);
+
+      await repo.getSoilHistory({
+        deviceIdentifier: 'DEV-SOIL-001',
+        from: new Date('2026-10-01T00:00:00Z'),
+        to: new Date('2026-10-02T00:00:00Z'),
+      });
+
+      expect(mockPrisma.soilReading.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ take: 5, skip: 0 })
+      );
+    });
+
+    it('computes pagination metadata from the total record count', async () => {
+      mockPrisma.device.findFirst.mockResolvedValue(mockDevice);
+      mockPrisma.soilReading.count.mockResolvedValue(12);
+      mockPrisma.soilReading.findMany.mockResolvedValue([]);
+
+      const result = await repo.getSoilHistory({
+        deviceIdentifier: 'DEV-SOIL-001',
+        from: new Date('2026-10-01T00:00:00Z'),
+        to: new Date('2026-10-02T00:00:00Z'),
+        page: 3,
+      });
+
+      expect(result.pagination).toEqual({
+        page: 3,
+        pageSize: 5,
+        totalRecords: 12,
+        totalPages: 3,
+      });
+      // Page 3 of a 12-record set must skip past the two earlier pages.
+      expect(mockPrisma.soilReading.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ take: 5, skip: 10 })
+      );
+    });
+
+    it('orders chronologically by receivedAt with a deterministic id tiebreaker', async () => {
+      mockPrisma.device.findFirst.mockResolvedValue(mockDevice);
+      mockPrisma.soilReading.count.mockResolvedValue(1);
+      mockPrisma.soilReading.findMany.mockResolvedValue([]);
+
+      await repo.getSoilHistory({
+        deviceIdentifier: 'DEV-SOIL-001',
+        from: new Date('2026-10-01T00:00:00Z'),
+        to: new Date('2026-10-02T00:00:00Z'),
+      });
+
+      // Rows are appended over time and ordered oldest-first by `receivedAt`
+      // with an `id` tiebreaker. A reading arriving while a user is on an older
+      // page therefore lands after those rows instead of shifting them.
+      const [args] = mockPrisma.soilReading.findMany.mock.calls[0];
+      expect(args.orderBy).toEqual([{ receivedAt: 'asc' }, { id: 'asc' }]);
+    });
+
+    it('keeps unnamed readings in the history table', async () => {
+      mockPrisma.device.findFirst.mockResolvedValue(mockDevice);
+      mockPrisma.soilReading.count.mockResolvedValue(7);
+      mockPrisma.soilReading.findMany.mockResolvedValue([
+        {
+          id: readingId,
+          recordedAt: new Date('2026-10-01T05:00:00Z'),
+          receivedAt: new Date('2026-10-01T05:00:02Z'),
+          nitrogen: new Prisma.Decimal(0),
+          phosphorus: null,
+          potassium: new Prisma.Decimal(50.5),
+          temperature: new Prisma.Decimal(25),
+          moisture: new Prisma.Decimal(60),
+          ph: new Prisma.Decimal(6.5),
+          ec: new Prisma.Decimal(1.1),
+          status: 'NORMAL',
+          locationName: null,
+          locationKey: null,
+          locationAnnotatedAt: null,
+          namedByUser: null,
+        },
+      ]);
+
+      const result = await repo.getSoilHistory({
+        deviceIdentifier: 'DEV-SOIL-001',
+        from: new Date('2026-10-01T00:00:00Z'),
+        to: new Date('2026-10-02T00:00:00Z'),
+      });
+
+      // Unnamed readings stay reachable: the table lists every retained
+      // reading, it is only the chart that requires a location.
+      expect(result.series.length).toBe(1);
+      expect(result.series[0].locationName).toBeNull();
+      // 0 must survive as 0 and a missing value must stay null, never zero.
+      expect(result.series[0].nitrogen).toBe(0);
+      expect(result.series[0].phosphorus).toBeNull();
+      expect(result.pagination.totalRecords).toBe(7);
+    });
+
+    it('excludes readings without a location from the chart series', async () => {
+      mockPrisma.device.findFirst.mockResolvedValue(mockDevice);
+      mockPrisma.soilReading.findMany.mockResolvedValue([]);
+
+      await repo.getSoilChartSeries({
+        deviceIdentifier: 'DEV-SOIL-001',
+        locationKey: 'Bed A1',
+        from: new Date('2026-10-01T00:00:00Z'),
+        to: new Date('2026-10-02T00:00:00Z'),
+        limit: 800,
+      });
+
+      const [args] = mockPrisma.soilReading.findMany.mock.calls[0];
+      expect(args.where.locationKey).toBe('bed a1');
+    });
+
+    it('normalises the chart location filter so casing or padding cannot split one place', async () => {
+      mockPrisma.device.findFirst.mockResolvedValue(mockDevice);
+      mockPrisma.soilReading.findMany.mockResolvedValue([]);
+
+      await repo.getSoilChartSeries({
+        deviceIdentifier: 'DEV-SOIL-001',
+        locationKey: '  bed a1  ',
+        from: new Date('2026-10-01T00:00:00Z'),
+        to: new Date('2026-10-02T00:00:00Z'),
+      });
+
+      const [args] = mockPrisma.soilReading.findMany.mock.calls[0];
+      expect(args.where.locationKey).toBe('bed a1');
+    });
+
+    it('queries the chart over the selected window rather than a single table page', async () => {
+      mockPrisma.device.findFirst.mockResolvedValue(mockDevice);
+      mockPrisma.soilReading.findMany.mockResolvedValue([]);
+
+      await repo.getSoilChartSeries({
+        deviceIdentifier: 'DEV-SOIL-001',
+        locationKey: 'Bed A1',
+        from: new Date('2026-10-01T00:00:00Z'),
+        to: new Date('2026-10-02T00:00:00Z'),
+        limit: 800,
+      });
+
+      const [args] = mockPrisma.soilReading.findMany.mock.calls[0];
+      // The chart is independent of table pagination: it selects by date and
+      // by location, never by the page slice the table happens to show.
+      expect(args.where).toEqual({
+        deviceId: mockDevice.id,
+        locationKey: 'bed a1',
+        receivedAt: {
+          gte: new Date('2026-10-01T00:00:00Z'),
+          lte: new Date('2026-10-02T00:00:00Z'),
+        },
+      });
+      // Ascending keyset ordering [receivedAt, id] for deterministic batched retrieval
+      expect(args.orderBy).toEqual([{ receivedAt: 'asc' }, { id: 'asc' }]);
+      expect(args.take).toBe(800);
+    });
+
+    it('returns pagination cursor when result reaches limit', async () => {
+      mockPrisma.device.findFirst.mockResolvedValue(mockDevice);
+      // Three matching rows for a limit of two. Keyset cursor pagination uses
+      // `nextCursor` to allow continuous bounded batched retrieval.
+      mockPrisma.soilReading.count.mockResolvedValue(3);
+      mockPrisma.soilReading.findMany.mockResolvedValue([
+        { ...chartRow(1, '2026-10-01T05:00:00Z'), locationName: 'Bed A1', locationKey: 'bed a1' },
+        { ...chartRow(2, '2026-10-01T05:00:01Z'), locationName: 'Bed A1', locationKey: 'bed a1' },
+      ]);
+
+      const result = await repo.getSoilChartSeries({
+        deviceIdentifier: 'DEV-SOIL-001',
+        locationKey: 'Bed A1',
+        from: new Date('2026-10-01T00:00:00Z'),
+        to: new Date('2026-10-02T00:00:00Z'),
+        limit: 2,
+      });
+
+      expect(result.nextCursor).toBe(
+        '2026-10-01T05:00:01.000Z_00000000-0000-4000-8000-000000000002'
+      );
+      expect(result.truncated).toBe(false);
+      // Readings stay in chronological order.
+      expect(result.series.length).toBe(2);
+      expect(result.series[0].timestamp).toBe('2026-10-01T05:00:00.000Z');
+      expect(result.series[1].timestamp).toBe('2026-10-01T05:00:01.000Z');
+    });
+
+    it('returns null nextCursor when the row count is below limit', async () => {
+      mockPrisma.device.findFirst.mockResolvedValue(mockDevice);
+      mockPrisma.soilReading.count.mockResolvedValue(1);
+      mockPrisma.soilReading.findMany.mockResolvedValue([
+        { ...chartRow(1, '2026-10-01T05:00:00Z'), locationName: 'Bed A1', locationKey: 'bed a1' },
+      ]);
+
+      const result = await repo.getSoilChartSeries({
+        deviceIdentifier: 'DEV-SOIL-001',
+        locationKey: 'Bed A1',
+        from: new Date('2026-10-01T00:00:00Z'),
+        to: new Date('2026-10-02T00:00:00Z'),
+        limit: 2,
+      });
+
+      expect(result.nextCursor).toBeNull();
+      expect(result.truncated).toBe(false);
+      expect(result.series.length).toBe(1);
+      expect(result.series[0].timestamp).toBe('2026-10-01T05:00:00.000Z');
+    });
+
+    it('keeps every stored reading without hourly aggregation or downsampling', async () => {
+      mockPrisma.device.findFirst.mockResolvedValue(mockDevice);
+      // The repository queries newest-first (with an `id` tie-break) and then
+      // reverses for display, so the mock returns rows in that shape. Both
+      // readings share a `receivedAt`, which is exactly the case the tie-break
+      // has to make deterministic.
+      mockPrisma.soilReading.count.mockResolvedValue(2);
+      mockPrisma.soilReading.findMany.mockResolvedValue([
+        {
+          id: otherReadingId,
+          recordedAt: new Date('2026-10-01T05:00:01Z'),
+          receivedAt: new Date('2026-10-01T05:00:02Z'),
+          nitrogen: new Prisma.Decimal(12),
+          phosphorus: new Prisma.Decimal(4),
+          potassium: new Prisma.Decimal(51),
+          temperature: new Prisma.Decimal(26),
+          moisture: new Prisma.Decimal(58),
+          ph: new Prisma.Decimal(6.6),
+          ec: new Prisma.Decimal(1.2),
+          status: 'NORMAL',
+          locationName: 'Bed A1',
+          locationKey: 'bed a1',
+          locationAnnotatedAt: new Date('2026-10-01T06:00:00Z'),
+          namedByUser: null,
+        },
+        {
+          id: readingId,
+          recordedAt: new Date('2026-10-01T05:00:00Z'),
+          receivedAt: new Date('2026-10-01T05:00:02Z'),
+          nitrogen: new Prisma.Decimal(0),
+          phosphorus: null,
+          potassium: new Prisma.Decimal(50.5),
+          temperature: new Prisma.Decimal(25),
+          moisture: new Prisma.Decimal(60),
+          ph: new Prisma.Decimal(6.5),
+          ec: new Prisma.Decimal(1.1),
+          status: 'NORMAL',
+          locationName: 'Bed A1',
+          locationKey: 'bed a1',
+          locationAnnotatedAt: new Date('2026-10-01T06:00:00Z'),
+          namedByUser: null,
+        },
+      ]);
+
+      const result = await repo.getSoilChartSeries({
+        deviceIdentifier: 'DEV-SOIL-001',
+        locationKey: 'Bed A1',
+        from: new Date('2026-10-01T00:00:00Z'),
+        to: new Date('2026-10-02T00:00:00Z'),
+        limit: 800,
+      });
+
+      // Two readings one second apart are both returned at their own
+      // timestamps; nothing is merged into an hourly bucket or interpolated.
+      expect(result.series.length).toBe(2);
+      expect(result.series[0].timestamp).toBe('2026-10-01T05:00:00.000Z');
+      expect(result.series[1].timestamp).toBe('2026-10-01T05:00:01.000Z');
+      expect(result.series[0].nitrogen).toBe(0);
+      expect(result.series[1].phosphorus).toBe(4);
+      // A metric with no stored value stays null instead of collapsing to 0.
+      expect(result.series[0].phosphorus).toBeNull();
+    });
+
+    it('binds an annotation to one immutable reading id, not the device location', async () => {
+      mockPrisma.device.findFirst.mockResolvedValue(mockDevice);
+      mockPrisma.soilReading.findFirst.mockResolvedValue({
+        id: readingId,
+        deviceId: 'DEV-SOIL-001',
+        locationName: null,
+        locationKey: null,
+        locationAnnotatedAt: null,
+      });
+      mockPrisma.soilReading.update.mockResolvedValue({
+        id: readingId,
+        deviceId: 'DEV-SOIL-001',
+        locationName: 'Bed A1',
+        locationKey: 'bed a1',
+        locationAnnotatedAt: new Date('2026-10-01T06:00:00Z'),
+        locationNamedById: 'operator-1',
+      });
+
+      const result = await repo.setSoilReadingLocation({
+        deviceIdentifier: 'DEV-SOIL-001',
+        readingId,
+        locationName: 'Bed A1',
+        namedByUserId: 'operator-1',
+      });
+
+      expect(mockPrisma.soilReading.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ id: readingId }),
+          data: expect.objectContaining({
+            locationName: 'Bed A1',
+            locationKey: 'bed a1',
+            locationNamedById: 'operator-1',
+          }),
+        })
+      );
+      // The device row itself is never rewritten: a portable device must not
+      // accumulate a single "current" place that later readings would inherit.
+      expect(mockPrisma.device.update).not.toHaveBeenCalled();
+      expect(result.readingId).toBe(readingId);
+    });
+
+    it('records an audit entry whenever a location is saved or cleared', async () => {
+      mockPrisma.device.findFirst.mockResolvedValue(mockDevice);
+      mockPrisma.soilReading.findFirst.mockResolvedValue({
+        id: readingId,
+        deviceId: 'DEV-SOIL-001',
+        locationName: 'Bed A1',
+        locationKey: 'bed a1',
+        locationAnnotatedAt: new Date('2026-10-01T06:00:00Z'),
+      });
+      mockPrisma.soilReading.update.mockResolvedValue({
+        id: readingId,
+        deviceId: 'DEV-SOIL-001',
+        locationName: null,
+        locationKey: null,
+        locationAnnotatedAt: null,
+        locationNamedById: null,
+      });
+
+      const result = await repo.setSoilReadingLocation({
+        deviceIdentifier: 'DEV-SOIL-001',
+        readingId,
+        locationName: null,
+        namedByUserId: 'operator-2',
+      });
+
+      // Clearing preserves the previous name in the return value so the route
+      // can write it to the audit log instead of losing it with the columns.
+      expect(result.applied).toBe(true);
+      expect(result.previousLocationName).toBe('Bed A1');
+      expect(mockPrisma.soilReading.update).toHaveBeenCalledWith({
+        where: { id: readingId },
+        data: {
+          locationName: null,
+          locationKey: null,
+          locationAnnotatedAt: null,
+          locationNamedById: null,
+        },
+      });
+    });
+
+    it('normalises a whitespace or casing variant to the same location identity', async () => {
+      mockPrisma.device.findFirst.mockResolvedValue(mockDevice);
+      mockPrisma.soilReading.findFirst.mockResolvedValue({
+        id: readingId,
+        deviceId: mockDevice.id,
+        locationName: null,
+        locationKey: null,
+        locationAnnotatedAt: null,
+      });
+      mockPrisma.soilReading.update.mockResolvedValue({
+        id: readingId,
+        deviceId: 'DEV-SOIL-001',
+        locationName: 'Bed A1',
+        locationKey: 'bed a1',
+        locationAnnotatedAt: new Date('2026-10-01T06:00:00Z'),
+        locationNamedById: 'operator-1',
+      });
+
+      await repo.setSoilReadingLocation({
+        deviceIdentifier: 'DEV-SOIL-001',
+        readingId,
+        locationName: '  Bed   A1  ',
+        namedByUserId: 'operator-1',
+      });
+
+      // Whitespace inside the name is collapsed for the display form and the
+      // identity key is lowercased, so the same physical place cannot fragment
+      // into several location identities that would split the chart series.
+      expect(mockPrisma.soilReading.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            locationName: 'Bed A1',
+            locationKey: 'bed a1',
+          }),
+        })
+      );
+    });
+
+    it('refuses an annotation that targets a reading not owned by the device', async () => {
+      mockPrisma.device.findFirst.mockResolvedValue(mockDevice);
+      mockPrisma.soilReading.findFirst.mockResolvedValue(null);
+
+      const result = await repo.setSoilReadingLocation({
+        deviceIdentifier: 'DEV-SOIL-001',
+        readingId,
+        locationName: 'Bed A1',
+        namedByUserId: 'operator-1',
+      });
+
+      // Nothing is written when the reading is not part of this device, so an
+      // annotation can never leak across devices.
+      expect(result.applied).toBe(false);
+      expect(mockPrisma.soilReading.update).not.toHaveBeenCalled();
+    });
+  });
 });

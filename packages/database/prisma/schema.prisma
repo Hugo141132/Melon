@@ -114,6 +114,8 @@ model User {
   emailVerificationTokens EmailVerificationToken[]
   sessionRecoveryChallenges SessionRecoveryChallenge[]
   actedAuditLogs       AuditLog[]             @relation("AuditLogActor")
+  namedSoilLocations   SoilReading[]          @relation("SoilReadingLocationNamedBy")
+  namedWaterLocations  WaterReading[]         @relation("WaterReadingLocationNamedBy")
 
   @@index([accountStatus], map: "users_account_status_idx")
   @@index([createdAt(sort: Desc)], map: "users_created_at_idx")
@@ -348,12 +350,23 @@ model SoilReading {
   validationStatus String    @default("VALID") @map("validation_status") @db.VarChar(30)
   createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
-  device Device @relation(fields: [deviceId], references: [id], onDelete: Restrict)
+  // Portable-device location annotation (TASK-0503 / TASK-0504).
+  // Bound to this immutable reading row, NOT to the device's current location.
+  // `locationKey` is the normalized identity (trim + lowercase) used for grouping
+  // and chart filtering; `locationName` preserves the operator's exact typed text.
+  locationName        String?   @map("location_name") @db.VarChar(120)
+  locationKey         String?   @map("location_key") @db.VarChar(120)
+  locationAnnotatedAt DateTime? @map("location_annotated_at") @db.Timestamptz
+  locationNamedById   String?   @map("location_named_by_id") @db.Uuid
+
+  device      Device @relation(fields: [deviceId], references: [id], onDelete: Restrict)
+  namedByUser User?  @relation("SoilReadingLocationNamedBy", fields: [locationNamedById], references: [id], onDelete: SetNull)
 
   @@unique([deviceId, messageId], map: "soil_readings_message_unique")
   @@index([deviceId, recordedAt(sort: Desc)], map: "soil_readings_device_recorded_idx")
   @@index([deviceId, receivedAt(sort: Desc)], map: "soil_readings_device_received_idx")
   @@index([deviceId, status, recordedAt(sort: Desc)], map: "soil_readings_status_idx")
+  @@index([deviceId, locationKey, recordedAt(sort: Desc)], map: "soil_readings_device_location_idx")
   @@map("soil_readings")
 }
 
@@ -372,12 +385,23 @@ model WaterReading {
   validationStatus String    @default("VALID") @map("validation_status") @db.VarChar(30)
   createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
-  device Device @relation(fields: [deviceId], references: [id], onDelete: Restrict)
+  // Portable-device location annotation (TASK-0503 / TASK-0504).
+  // Bound to this immutable reading row, NOT to the device's current location.
+  // `locationKey` is the normalized identity (trim + lowercase) used for grouping
+  // and chart filtering; `locationName` preserves the operator's exact typed text.
+  locationName        String?   @map("location_name") @db.VarChar(120)
+  locationKey         String?   @map("location_key") @db.VarChar(120)
+  locationAnnotatedAt DateTime? @map("location_annotated_at") @db.Timestamptz
+  locationNamedById   String?   @map("location_named_by_id") @db.Uuid
+
+  device      Device @relation(fields: [deviceId], references: [id], onDelete: Restrict)
+  namedByUser User?  @relation("WaterReadingLocationNamedBy", fields: [locationNamedById], references: [id], onDelete: SetNull)
 
   @@unique([deviceId, messageId], map: "water_readings_message_unique")
   @@index([deviceId, recordedAt(sort: Desc)], map: "water_readings_device_recorded_idx")
   @@index([deviceId, receivedAt(sort: Desc)], map: "water_readings_device_received_idx")
   @@index([deviceId, status, recordedAt(sort: Desc)], map: "water_readings_status_idx")
+  @@index([deviceId, locationKey, recordedAt(sort: Desc)], map: "water_readings_device_location_idx")
   @@map("water_readings")
 }
 

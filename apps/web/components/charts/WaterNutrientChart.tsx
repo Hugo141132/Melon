@@ -20,6 +20,7 @@ export interface WaterNutrientChartProps {
   preset?: string;
   loading?: boolean;
   error?: string | null;
+  selectedLocationKey?: string;
 }
 
 export default function WaterNutrientChart({
@@ -28,6 +29,7 @@ export default function WaterNutrientChart({
   preset,
   loading = false,
   error = null,
+  selectedLocationKey,
 }: WaterNutrientChartProps) {
   const tWater = useTranslations('water');
   const tHistory = useTranslations('history');
@@ -79,16 +81,25 @@ export default function WaterNutrientChart({
         <div className="h-40 w-full flex items-center justify-center bg-red-500/5 rounded-lg border border-red-500/20 p-4 text-center">
           <span className="text-[13px] text-red-600 font-medium">{error}</span>
         </div>
+      ) : selectedLocationKey !== undefined && !selectedLocationKey ? (
+        <div className="h-40 w-full flex flex-col items-center justify-center bg-app-surface-container/20 rounded-lg p-4 text-center">
+          <span className="text-[13px] text-app-on-surface font-medium">
+            {tHistory('chartSelectLocation')}
+          </span>
+          <span className="text-[11px] text-app-on-surface-variant mt-1 max-w-md">
+            {tHistory('chartSelectLocationHint')}
+          </span>
+        </div>
       ) : data.length === 0 ? (
         <div className="h-40 w-full flex items-center justify-center bg-app-surface-container/20 rounded-lg p-4 text-center">
           <span className="text-[13px] text-app-on-surface-variant font-medium">
-            {tHistory('noData')}
+            {selectedLocationKey ? tHistory('chartNoData') : tHistory('noData')}
           </span>
         </div>
       ) : (
         <div className="h-40 sm:h-48">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={data} margin={{ top: 4, right: 4, left: -25, bottom: 0 }}>
+            <AreaChart data={data} margin={{ top: 8, right: 14, left: -14, bottom: 0 }}>
               <defs>
                 <linearGradient id={`gradWater-${selectedMetric}`} x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor={active.color} stopOpacity={0.25} />
@@ -102,6 +113,7 @@ export default function WaterNutrientChart({
                 tickFormatter={formatTick}
                 interval={0}
                 tick={{ fontSize: 11, fill: '#40493d' }}
+                padding={{ left: 16, right: 16 }}
                 axisLine={false}
                 tickLine={false}
               />

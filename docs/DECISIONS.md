@@ -1782,3 +1782,41 @@ The following facts are supported by the verified decisions governance of `TASK-
      - Sidebar Badge: `Sidebar.tsx` integrates `useAdminApprovalBadge` to render a red badge counter on `/approvals` for `OWNER`, updating dynamically on SSE events and manual decisions.
      - Isolation: Approval events are strictly isolated from the sensor `Alert` table and `/notifications` route.
 <!-- DEC-DEV-036 Reconciled: 2026-10-05 -->
+
+---
+
+## DEC-MON-093: Soil & Water Telemetry History, Reading-Bound Location Annotations, Single-Chart Architecture & Keyset Cursor Pagination
+- **Status:** APPROVED & IMPLEMENTED (2026-10-08)
+- **Related Task IDs:** `TASK-0503`, `TASK-0504`, `DEC-MON-087`, `DEC-MON-091`
+- **Context:**
+  Soil and water-quality sensors are portable field devices without onboard GPS or firmware location hardware. Previous visualization lacked granular physical spot attribution, causing measurements from different locations to risk connecting into misleading single-line trends. In addition, the previous chart implementation enforced an arbitrary 1,000-point total restriction (`CHART_POINTS_EXCEEDED` HTTP 400) which failed when dense or long-range datasets were retrieved, while dense line charts suffered from X-axis label collision, end-tick clipping, and point dot clutter.
+- **Approved Decision & Implementation Directives:**
+  1. **Single-Chart Architecture & Zero Parallel Fallbacks:**
+     - Exactly one primary chart component per monitoring domain (`NPKChart` for `/soil`, `WaterNutrientChart` for `/water`).
+     - Obsolete secondary components such as `LocationChart` are permanently deleted; parallel fallback branches are strictly prohibited.
+     - Historical charts query `/chart` independently of history table pagination.
+  2. **Location Isolation & Named-Only Charts:**
+     - Because devices are portable, charts require an explicit location selection from normalized assigned spots and plot only readings annotated with that specific `locationKey`.
+     - Readings from distinct physical spots never connect into one line trend.
+  3. **Server-Side History Pagination & Older-Page Stability:**
+     - History tables enforce a server-side page size of exactly 5 readings (`HISTORY_PAGE_SIZE = 5`) ordered deterministically oldest-first: `[{ receivedAt: 'asc' }, { id: 'asc' }]`.
+     - Unnamed readings remain retained and visible in history.
+     - New incoming telemetry records append at the dataset tail and never shift older pages under an active operator.
+     - Background polling is prohibited while browsing historical pages.
+  4. **Reading-Bound Location Annotations & Normalization:**
+     - Location annotations bind directly to immutable individual reading IDs (`soil_readings.id`, `water_readings.id`) via migration `20261008103000_add_reading_location_annotations`.
+     - Location identity is strictly normalized (`locationKey`: trimmed, whitespace-collapsed, lower-cased).
+     - Actor identity (`locationNamedById`) is derived strictly from the authenticated server session, with changes auditable in `audit_logs` (`telemetry.location_annotated`).
+  5. **Keyset Cursor Pagination & Elimination of 1,000-Point Rejection:**
+     - Date ranges remain strictly bounded (max 31 days per DEC-MON-087).
+     - The 1,000-point total limit is eliminated in favor of bounded keyset cursor pagination (`[receivedAt, id]`, 1,000 points/batch, max 2,000) retrieving 100% of matching retained readings without memory explosion or query timeouts.
+     - Next cursor encodes `"${receivedAt.toISOString()}_${id}"`. Malformed or non-advancing cursors reject with HTTP 400 (`VALIDATION_ERROR` / `INVALID_CURSOR`).
+     - Client hook sequentially retrieves all batches with wire-level request cancellation via `AbortController`, non-advancing cursor detection (loop protection), stale request cancellation, plotting complete datasets while preserving actual sensor timestamps (`recordedAt`), zero/null values (`connectNulls={false}`), and honest error handling (discards partial batches on failure).
+  6. **X-Axis Responsiveness & Anti-Clipping Geometry:**
+     - Algorithmic responsive tick distribution (`getCustomXTicks`) generates 4–6 ticks anchoring first and last data points (`data[0]` and `data[N-1]`).
+     - Axis horizontal padding (`padding={{ left: 16, right: 16 }}`) and adjusted chart margin (`left: -14, right: 14`) prevent first/last-label clipping and tick collisions across mobile (390px) and desktop in bilingual locales (`id`/`en`).
+     - Point dots are hidden (`dot={false}`) to keep dense line series clean, while interactive tooltips preserve full precision and genuine sensor timestamps.
+  7. **Consistency Boundaries & Architectural Limits:**
+     - Locking `from`/`to` ISO boundaries client-side maintains a consistent SQL filter window across sequential batches but does not constitute an ACID transactional snapshot; readings inserted concurrently within the window could appear across batch boundaries.
+     - Client HTTP fetch abort terminates network transfer on the wire but does not prove backend PostgreSQL query execution cancellation.
+<!-- DEC-MON-093 Reconciled: 2026-10-08 -->

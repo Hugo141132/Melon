@@ -142,20 +142,65 @@ describe('TASK-0504 — Historical Monitoring Charts & Controls Fixes Test Suite
     });
   });
 
-  describe('useHistoricalMonitoring Hook & Presentation Boundary EC Conversion', () => {
-    it('fetches history API, formats series data, and verifies EC in µS/cm', async () => {
+  describe('useHistoricalMonitoring Hook & Dedicated /chart Location Flow', () => {
+    it('enforces location isolation: does not fetch chart data when location is not selected', async () => {
+      const fetchMock = vi.fn().mockImplementation((url: string) => {
+        if (url.includes('/locations')) {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              success: true,
+              data: {
+                locations: [
+                  {
+                    locationKey: 'bed-a',
+                    locationName: 'Bed A',
+                    readingCount: 5,
+                    firstRecordedAt: null,
+                    lastRecordedAt: null,
+                  },
+                ],
+              },
+            }),
+          });
+        }
+        return Promise.reject(new Error(`Unexpected fetch URL: ${url}`));
+      });
+      global.fetch = fetchMock;
+
+      const { result } = renderHook(() =>
+        useHistoricalMonitoring({
+          deviceId: 'soil-node-001',
+          domain: 'soil',
+          initialPreset: '24h',
+        })
+      );
+
+      await waitFor(() => {
+        expect(result.current.locations.length).toBe(1);
+      });
+
+      // No location selected yet -> data must be empty and /chart never called
+      expect(result.current.selectedLocationKey).toBe('');
+      expect(result.current.data).toEqual([]);
+      expect(fetchMock).not.toHaveBeenCalledWith(expect.stringContaining('/chart'));
+    });
+
+    it('fetches dedicated /chart API for selected location, formats series data, and verifies EC in µS/cm', async () => {
       const now = new Date();
       const tenHoursAgo = new Date(now.getTime() - 10 * 60 * 60 * 1000);
       const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-      const mockHistoryResponse = {
+      const mockChartResponse = {
         success: true,
         data: {
-          deviceId: 'soil-node-001',
+          locationKey: 'bed-a',
+          locationName: 'Bed A',
           from: yesterday.toISOString(),
           to: now.toISOString(),
-          series: [
+          points: [
             {
+              readingId: 'read-001',
               timestamp: tenHoursAgo.toISOString(),
               nitrogen: 45,
               phosphorus: 20,
@@ -165,25 +210,46 @@ describe('TASK-0504 — Historical Monitoring Charts & Controls Fixes Test Suite
               moisture: null, // null value preserved
             },
           ],
-          pagination: {
-            page: 1,
-            pageSize: 100,
-            totalRecords: 1,
-            totalPages: 1,
-          },
+          truncated: false,
         },
       };
 
-      (global.fetch as any).mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockHistoryResponse,
+      const fetchMock = vi.fn().mockImplementation((url: string) => {
+        if (url.includes('/locations')) {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              success: true,
+              data: {
+                locations: [
+                  {
+                    locationKey: 'bed-a',
+                    locationName: 'Bed A',
+                    readingCount: 1,
+                    firstRecordedAt: null,
+                    lastRecordedAt: null,
+                  },
+                ],
+              },
+            }),
+          });
+        }
+        if (url.includes('/chart')) {
+          return Promise.resolve({
+            ok: true,
+            json: async () => mockChartResponse,
+          });
+        }
+        return Promise.reject(new Error(`Unexpected fetch URL: ${url}`));
       });
+      global.fetch = fetchMock;
 
       const { result } = renderHook(() =>
         useHistoricalMonitoring({
           deviceId: 'soil-node-001',
           domain: 'soil',
           initialPreset: '24h',
+          initialLocationKey: 'bed-a',
         })
       );
 
@@ -196,73 +262,6 @@ describe('TASK-0504 — Historical Monitoring Charts & Controls Fixes Test Suite
       expect(result.current.data[0].ec).toBe(1800); // verified direct EC in µS/cm
       expect(result.current.data[0].moisture).toBeNull(); // verify null preserved
       expect(result.current.error).toBeNull();
-    });
-
-    it('updates immediately from cache without loading state when switching presets for already-fetched ranges', async () => {
-      const now = new Date();
-      const twoDaysAgo = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
-      const sixDaysAgo = new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000);
-      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-
-      const mock7dResponse = {
-        success: true,
-        data: {
-          deviceId: 'soil-node-cache-test',
-          from: sevenDaysAgo.toISOString(),
-          to: now.toISOString(),
-          series: [
-            {
-              timestamp: sixDaysAgo.toISOString(),
-              nitrogen: 50,
-              phosphorus: 25,
-              potassium: 30,
-              temperature: 27,
-              ec: 1500,
-              moisture: 60,
-            },
-            {
-              timestamp: twoDaysAgo.toISOString(),
-              nitrogen: 40,
-              phosphorus: 20,
-              potassium: 35,
-              temperature: 26,
-              ec: 1800,
-              moisture: 65,
-            },
-          ],
-          pagination: { page: 1, pageSize: 100, totalRecords: 2, totalPages: 1 },
-        },
-      };
-
-      const fetchMock = vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => mock7dResponse,
-      });
-      global.fetch = fetchMock;
-
-      const { result } = renderHook(() =>
-        useHistoricalMonitoring({
-          deviceId: 'soil-node-cache-test',
-          domain: 'soil',
-          initialPreset: '7d',
-        })
-      );
-
-      await waitFor(() => {
-        expect(result.current.loading).toBe(false);
-      });
-
-      expect(fetchMock).toHaveBeenCalledTimes(1);
-      expect(result.current.data.length).toBe(2);
-
-      // Now switch preset to 24h (which is a subset of 7d, but data timestamp is 2 days ago so 24h will have 0 or subset)
-      act(() => {
-        result.current.setPreset('24h');
-      });
-
-      // Loading should immediately be false without any extra fetch
-      expect(result.current.loading).toBe(false);
-      expect(fetchMock).toHaveBeenCalledTimes(1); // No new network call!
     });
 
     it('enforces maximum 31 days date range limit per DEC-MON-087', async () => {
@@ -282,6 +281,125 @@ describe('TASK-0504 — Historical Monitoring Charts & Controls Fixes Test Suite
       await waitFor(() => {
         expect(result.current.dateRangeError).toContain('31 hari');
       });
+    });
+
+    it('stale-response protection: out-of-order response from location A cannot overwrite location B', async () => {
+      let resolveLocationA: (val: any) => void = () => {};
+      const locationAPromise = new Promise((resolve) => {
+        resolveLocationA = resolve;
+      });
+
+      const now = new Date();
+      const mockLocationAResponse = {
+        success: true,
+        data: {
+          locationKey: 'location-a',
+          locationName: 'Location A',
+          points: [
+            {
+              readingId: 'read-a',
+              timestamp: now.toISOString(),
+              nitrogen: 10,
+              phosphorus: 10,
+              potassium: 10,
+              temperature: 20,
+              ec: 1000,
+              moisture: 50,
+            },
+          ],
+          truncated: false,
+        },
+      };
+
+      const mockLocationBResponse = {
+        success: true,
+        data: {
+          locationKey: 'location-b',
+          locationName: 'Location B',
+          points: [
+            {
+              readingId: 'read-b',
+              timestamp: now.toISOString(),
+              nitrogen: 90,
+              phosphorus: 90,
+              potassium: 90,
+              temperature: 30,
+              ec: 2000,
+              moisture: 70,
+            },
+          ],
+          truncated: false,
+        },
+      };
+
+      const fetchMock = vi.fn().mockImplementation((url: string) => {
+        if (url.includes('/locations')) {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              success: true,
+              data: {
+                locations: [
+                  { locationKey: 'location-a', locationName: 'Location A', readingCount: 1 },
+                  { locationKey: 'location-b', locationName: 'Location B', readingCount: 1 },
+                ],
+              },
+            }),
+          });
+        }
+        if (url.includes('/chart') && url.includes('locationKey=location-a')) {
+          return locationAPromise.then(() => ({
+            ok: true,
+            json: async () => mockLocationAResponse,
+          }));
+        }
+        if (url.includes('/chart') && url.includes('locationKey=location-b')) {
+          return Promise.resolve({
+            ok: true,
+            json: async () => mockLocationBResponse,
+          });
+        }
+        return Promise.reject(new Error(`Unexpected fetch URL: ${url}`));
+      });
+      global.fetch = fetchMock;
+
+      // 1. Mount with location-a (starts slow fetch for location-a)
+      const { result } = renderHook(() =>
+        useHistoricalMonitoring({
+          deviceId: 'soil-node-001',
+          domain: 'soil',
+          initialPreset: '24h',
+          initialLocationKey: 'location-a',
+        })
+      );
+
+      // Verify fetch for location-a was dispatched
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining('locationKey=location-a'),
+        expect.anything()
+      );
+
+      // 2. Switch to location-b before location-a finishes
+      act(() => {
+        result.current.setSelectedLocationKey('location-b');
+      });
+
+      // 3. Wait for location-b to complete and populate data
+      await waitFor(() => {
+        expect(result.current.data.length).toBe(1);
+        expect(result.current.data[0].nitrogen).toBe(90);
+      });
+      expect(result.current.selectedLocationKey).toBe('location-b');
+
+      // 4. Now resolve delayed location-a response
+      await act(async () => {
+        resolveLocationA(true);
+      });
+
+      // 5. Verify location-b data is preserved and NOT overwritten by stale location-a
+      expect(result.current.data.length).toBe(1);
+      expect(result.current.data[0].nitrogen).toBe(90);
+      expect(result.current.selectedLocationKey).toBe('location-b');
     });
   });
 

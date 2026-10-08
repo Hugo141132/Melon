@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import TopAppBar from '@/components/navigation/TopAppBar';
 import HistoricalChartControls from '@/components/charts/HistoricalChartControls';
@@ -12,6 +12,9 @@ import RecommendationCard from '@/components/monitoring/RecommendationCard';
 import DeviceAccessForbidden from '@/components/navigation/DeviceAccessForbidden';
 import { CheckCircle, TrendingUp, Cpu, Clock, AlertTriangle, Info } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+
+import { MeasurementHistoryPanel } from '@/components/monitoring/MeasurementHistoryPanel';
+import type { HistoryMetricColumn } from '@/components/monitoring/ReadingHistoryTable';
 
 const NPKChart = dynamic(() => import('@/components/charts/NPKChart'), { ssr: false });
 
@@ -142,6 +145,11 @@ export default function SoilPage() {
   const isSoilNode = !isWaterNode;
   const activeDeviceId = isSoilNode ? selectedDevice?.id || selectedDevice?.deviceId || null : null;
 
+  const [annotationToken, setAnnotationToken] = React.useState('initial');
+  const handleAnnotationChange = React.useCallback(() => {
+    setAnnotationToken((prev) => `${prev}:${Date.now()}`);
+  }, []);
+
   const {
     preset,
     setPreset,
@@ -151,7 +159,11 @@ export default function SoilPage() {
     setCustomFrom,
     customTo,
     setCustomTo,
+    locations,
+    selectedLocationKey,
+    setSelectedLocationKey,
     data: historyData,
+    resolvedRange: historyRange,
     loading: historyLoading,
     error: historyError,
     dateRangeError,
@@ -159,7 +171,26 @@ export default function SoilPage() {
     deviceId: activeDeviceId,
     domain: 'soil',
     initialMetric: 'npk',
+    annotationCacheToken: annotationToken,
   });
+
+  /**
+   * Column descriptors are module-level constants so their identity is stable
+   * across renders. A fresh array on every render would retrigger the pagination
+   * fetch effect and cause a request storm.
+   */
+  const soilHistoryColumns = useMemo<HistoryMetricColumn[]>(
+    () => [
+      { key: 'nitrogen', label: 'N', unit: 'ppm', precision: 2 },
+      { key: 'phosphorus', label: 'P', unit: 'ppm', precision: 2 },
+      { key: 'potassium', label: 'K', unit: 'ppm', precision: 2 },
+      { key: 'temperature', label: '°C', unit: '°C', precision: 1 },
+      { key: 'moisture', label: '%', unit: '%', precision: 1 },
+      { key: 'ph', label: 'pH', unit: 'pH', precision: 2 },
+      { key: 'ec', label: 'EC', unit: 'µS/cm', precision: 0 },
+    ],
+    []
+  );
 
   const soilData = snapshot?.soil?.data;
   const recordedAt = snapshot?.soil?.recordedAt;
@@ -429,6 +460,9 @@ export default function SoilPage() {
                 customTo={customTo}
                 onCustomToChange={setCustomTo}
                 dateRangeError={dateRangeError}
+                locations={locations}
+                selectedLocationKey={selectedLocationKey}
+                onSelectLocationKey={setSelectedLocationKey}
               />
               <NPKChart
                 data={historyData}
@@ -436,8 +470,27 @@ export default function SoilPage() {
                 preset={preset}
                 loading={historyLoading}
                 error={historyError}
+                selectedLocationKey={selectedLocationKey}
               />
             </div>
+
+            {/*
+              Measurement history with portable location annotations.
+              The panel receives the same date window the user already selected
+              above, so both views stay consistent without a second date picker.
+            */}
+            {activeDeviceId ? (
+              <div className="animate-fade-in space-y-2">
+                <MeasurementHistoryPanel
+                  deviceId={activeDeviceId}
+                  domain="soil"
+                  metricColumns={soilHistoryColumns}
+                  from={historyRange?.from ?? new Date(Date.now() - 24 * 60 * 60 * 1000)}
+                  to={historyRange?.to ?? new Date()}
+                  onAnnotationChange={handleAnnotationChange}
+                />
+              </div>
+            ) : null}
 
             {/* Recommendation */}
             <RecommendationCard

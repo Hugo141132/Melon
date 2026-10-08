@@ -267,6 +267,48 @@ The 2026-10-04 refinement introduces lightweight shared page transitions, smooth
    - **Asset Location Authority:** Assets reside strictly in `apps/web/public/` (the Next.js public root directory). Redundant root-level duplicates (`public/favicon-*.png`) were removed following build audit.
    - **Browser Lifecycle & Acceptance:** In Chromium-based browsers, background tabs (`visibilityState === 'hidden'`) throttle or defer `matchMedia` event callbacks until the tab is activated. BAMABAA formally accepted tab-activation updates on 2026-10-04; background update investigation is closed.
 
+### 1.12 Single-Chart Architecture, Location Annotations & Historical Telemetry Governance (TASK-0503 / TASK-0504 / DEC-MON-093)
+The 2026-10-08 telemetry history and visualization update unifies monitoring pages into a single location-isolated chart and structured measurement history table:
+- **Frontend impact:** `MATERIAL REDESIGN`
+- **Selected UI direction:** `Premium Minimal Ops`
+- **Existing color template:** `UNCHANGED`
+- **Selected motion effects:** `Skeleton loading`, `Dropdown`, `New event`
+- **21st.dev MCP:** `NOT REQUIRED` (Reuses existing design tokens and component patterns; no new visual system)
+
+#### Presentation, Interaction & Visual Governance Rules
+1. **Single-Chart Architecture & Elimination of LocationChart:**
+   - Exactly one unified chart component per monitoring domain: `NPKChart` on `/soil` and `WaterNutrientChart` on `/water`.
+   - The obsolete secondary `LocationChart` component is permanently deleted, eliminating redundant chart boxes and confusing dual-chart layouts.
+   - Zero parallel fallback branches: all location trends render strictly within the primary chart surface.
+   - Historical chart data fetches from dedicated `/chart` endpoints independently of table pagination.
+2. **Named-Only Location Isolation:**
+   - Because soil and water-quality sensors are portable without firmware location hardware, charts require an explicit location selection via the location dropdown selector.
+   - Charts plot only readings annotated with that specific location, preventing distinct physical spots from connecting into one misleading line trend.
+   - When no location is selected, the chart presents a clean, informative empty prompt instructing the operator to select a location.
+3. **Bounded Windows, Keyset Batched Retrieval & X-Axis Responsiveness:**
+   - Date range selector supports predefined presets (24 Hours default, 7 Days, 30 Days) and custom range picker (strictly bounded to max 31 days per DEC-MON-087).
+   - The 1,000-point total restriction is eliminated. All matching retained readings are completely retrieved via bounded keyset cursor pagination (1,000 readings/batch, max 2,000) without memory explosion or unbounded queries. `CHART_POINTS_EXCEEDED` rejection is removed.
+   - Cursor safety & loop prevention: cursor format strictly validated (`${receivedAtIso}_${id}`); malformed cursors reject with HTTP 400 (`VALIDATION_ERROR` / `INVALID_CURSOR`). Client tracks seen cursors, terminating immediately if a non-advancing cursor is detected.
+   - Wire-level request cancellation: multi-batch retrievals load seamlessly and actively abort in-flight socket requests via `AbortController` when the operator changes filters or unmounts. Partial results are never rendered as complete.
+   - Consistency boundaries: locking `from`/`to` ISO boundaries client-side maintains a consistent SQL filter window across sequential batches but does not constitute an ACID transactional snapshot; client HTTP fetch abort terminates network transfer but does not prove backend PostgreSQL query execution cancellation.
+   - X-Axis Label Layout & Clipping Prevention: displays a responsive, evenly distributed subset of 4-6 labels across 24h, 7d, and 30d ranges. Horizontal padding (`padding={{ left: 16, right: 16 }}`) and calibrated chart margins (`left: -14, right: 14`) eliminate first- and last-label clipping on mobile (390px) and desktop viewports, preventing label collisions in both Indonesian and English. Tooltips preserve exact sensor timestamps and numeric precision on hover/active touch. Dots are hidden (`dot={false}`) to keep dense line series crisp.
+   - Operational Website Verification: Operator-confirmed live browser verification (`PASS`) on desktop and 390px mobile viewports across bilingual locales (`id`/`en`).
+4. **Timestamp Semantics & Visual Gap Handling:**
+   - Server-side date range filtering operates on gateway receipt timestamp (`receivedAt`), while Recharts plots each data point chronologically at its original measurement timestamp (`recordedAt`).
+   - Telemetry metrics are plotted without synthetic hourly bucketing or downsampling.
+   - Missing sensor values render as visual gaps (`connectNulls={false}`) without coercion to zero.
+5. **Measurement History Table & Pagination:**
+   - Renders below the chart in `MeasurementHistoryPanel`.
+   - Displays all retained readings, including unnamed readings.
+   - Enforces server-side pagination of exactly 5 readings per page (`HISTORY_PAGE_SIZE = 5`) ordered oldest-first (`receivedAt ASC, id ASC`).
+   - Incoming readings append at the dataset tail, ensuring row stability on earlier pages without layout shifts or offset drifting.
+   - Background polling is prohibited while the operator browses historical pages.
+6. **Annotation Modal Workflow:**
+   - Clicking the location cell opens a focused modal to assign, edit, or clear location names for an individual reading ID.
+   - Input is trimmed and whitespace-collapsed, generating a normalized lower-cased `locationKey`.
+   - Actor identity is derived strictly from the authenticated server session (`locationNamedById`).
+   - Saving, editing, or clearing an annotation writes an audit log entry (`telemetry.location_annotated`) and dynamically refreshes the location dropdown list and chart.
+
 ---
 
 ## 2. Source-of-Truth Hierarchy
