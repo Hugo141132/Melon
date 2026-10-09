@@ -3674,48 +3674,21 @@ The five mandatory CI gates must be executed **exclusively by operator JEMBOT** 
   - Command: `npm run typecheck:web` (`tsc --noEmit`)
   - Output: Exit code 0 (0 errors).
 
-### 3. Manual Website Verification Evidence
-- **Verification Status:** **OPERATOR-REPORTED PASS** by Rahmat.
-- **Scope of Acceptance:** Confirms visual loading and table/chart rendering on `/soil` and `/water` for the tested devices and spots.
-- **Explicit Invariant & Limitation:** This operator confirmation does **not** infer that every edge case, RBAC permission scenario, or >1,000-point dataset was individually verified in the manual check.
-
-### 4. Separation of Evidence, Baselines, and Hypotheses
-- **Observed Evidence:**
-  - Direct route handler invocations and local unauthenticated curl requests returned valid JSON (`HTTP 401 UNAUTHENTICATED`), proving route matching on localhost.
-  - Targeted vitest suites passed 100%.
-  - Local browser requests prior to server route indexing returned Next.js 404 HTML (`_not-found`).
-- **Historical Deployment Baselines:**
-  - Evidenced previous failure (2026-10-06 / pre-release baseline): The recorded VPS web container baseline was `kebun-melon-web:ada891e`. Commit `ada891e` predated `ddbd93d`, so the nested routes were absent from that built image.
-  - Current VPS runtime image tag and live smoke-test status remain **NOT VERIFIED** (no recent live observation has been performed; `ada891e` is not claimed to be the current running container without live evidence).
-- **Unverified Hypotheses:**
-  - Stale dev server Turbopack routing cache and image lag are documented as explanations based on observed facts, not newly verified live facts on production.
-
-### 5. Staging & Production Deployment Requirements
-- **Database Migration Status:**
-  - Migration `20261008103000_add_reading_location_annotations` (8 columns) is present in the DEV database (`unbyxlkrzqlafolxcypi`).
-  - Staging (`ihgoxqdncepbcrqkchxu`) and production database migration deployment status remains **PENDING OPERATOR VERIFICATION / EXECUTION**.
-- **Web Image Rollout:**
-  - Off-VPS image build with `--platform linux/amd64` required.
-  - Rollback baseline: `kebun-melon-web:ada891e`.
-- **Environment & Configuration:**
-  - Zero secrets touched; `.env.production` preserved.
-- **IoT Gateway & Reverse Proxy:**
-  - IoT Gateway MQTT ingestion: Zero impact (new columns nullable).
-  - Single Gateway rule: Strictly preserved (only ONE active gateway).
-  - Reverse proxy (Caddy): Zero changes required.
-- **Runtime Deployment Status:** **NOT VERIFIED** (pending image build and deployment by operator).
-
-### 6. Five Reserved Operator CI Gates (PENDING EXECUTION)
-The following five mandatory CI gates must be executed **exclusively by operator Rahmat**:
-1. `npm run test:coverage`
-2. `npm run test:integration`
-3. `npm run check:quality`
-4. `npm run test`
-5. `npm run test:e2e`
-
-- **Current Status of 5 Gates:** **PENDING OPERATOR EXECUTION**.
-- **Git Commit, Push, Remote CI, and Deployment:** **PENDING OPERATOR EXECUTION**.
-<!-- TASK-0503 & TASK-0504 Error Hardening Evidence Recorded: 2026-10-09 -->
+### 3. Deployment, Migration, and Live VPS Closeout Evidence
+- **Release Commit:** `7b8d9cdb65dacc4312d8cae01ef0ea2b70c088ee` (`7b8d9cd`).
+- **Remote CI Run:** GitHub Actions run `37940268821` passed cleanly.
+- **Local Pre-Commit Gates:** Executed and passed locally by operator prior to commit and push to `main`.
+- **Web Container Rollout:** Built off-VPS with `--platform linux/amd64` as `kebun-melon-web:7b8d9cd` and deployed via in-place web recreation (`--no-deps`).
+- **Target Database:** VPS points to Supabase staging project `ihgoxqdncepbcrqkchxu`.
+- **PostgreSQL 42703 Incident & Resolution:**
+  - Upon initial deployment of image `7b8d9cd`, soil and water history queries failed with PostgreSQL error 42703 (`undefined_column`) because annotation columns were absent in `ihgoxqdncepbcrqkchxu`. (The earlier command reporting "No pending migrations" is hypothesized to have evaluated a different target).
+  - Operator executed migration `20261008103000_add_reading_location_annotations` directly against staging project `ihgoxqdncepbcrqkchxu`, applying the required columns, indexes, and constraints.
+- **Live VPS Smoke Test Verification:**
+  - **Status:** **OPERATOR-REPORTED PASS**.
+  - Operator reported the VPS website operates correctly following the staging migration, including soil/water monitoring, with no remaining errors observed.
+- **Rollback Routine:** Durable rollback tag preserved in `/opt/kebun-melon/.prev_web_image`.
+- **Ancillary Components:** No gateway or Caddy configuration changes were required for this update. Single-gateway rule preserved.
+<!-- TASK-0503 & TASK-0504 Deployment Closeout Recorded: 2026-10-09 -->
 
 
 

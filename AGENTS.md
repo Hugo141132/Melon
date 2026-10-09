@@ -3170,16 +3170,16 @@ The following facts are supported by the current implementation regarding device
 
 ---
 
-## TASK-0503 & TASK-0504 Post-Release ddbd93d History & Location Error Hardening Record
+## TASK-0503 & TASK-0504 Post-Release 7b8d9cd Deployment & Error Hardening Closeout Record
 
-`TASK-0503` and `TASK-0504` post-release `ddbd93d` history and location route error hardening record:
-- **Status:** `PENDING_VERIFICATION` (Implementation complete; manual website verification passed; operator 5-gate CI suite pending)
+`TASK-0503` and `TASK-0504` post-release `7b8d9cd` history and location error hardening and deployment closeout record:
+- **Status:** `DONE` (Completed 2026-10-09; off-VPS container rollout and staging migration confirmed as OPERATOR-REPORTED PASS)
 - **Frontend impact:** `MINOR`
 - **Selected UI direction:** `Premium Minimal Ops`
 - **Existing color template:** `UNCHANGED`
 - **Selected motion effects:** `Skeleton loading`
 - **21st.dev MCP:** `NOT REQUIRED`
-- **Summary:** Investigated and resolved 404 Route Not Found and 500 mapping defects across Soil and Water Quality monitoring history, locations, and chart routes following release `ddbd93de4178fecab779855964a3a7dfb7e598f0`:
+- **Summary:** Investigated, resolved, and deployed fixes for Route Not Found and error mapping defects across Soil and Water Quality monitoring history, locations, and chart routes:
   - **Route Error Mapping Hardening:** Updated `soil/locations/route.ts`, `soil/chart/route.ts`, `water/locations/route.ts`, and `water/chart/route.ts` to explicitly catch `DeviceNotFoundError` from `TelemetryRepository.resolveDeviceId()` and return HTTP 404 `{ code: 'DEVICE_NOT_FOUND', message: error.message }` rather than falling through to HTTP 500 `INTERNAL_ERROR`.
   - **Device Type Validation Invariant:** Updated `water/history/route.ts` to strictly validate `device.deviceType !== 'WATER_QUALITY_NODE'`, rejecting `WATER_TANK_NODE` with HTTP 400 `VALIDATION_ERROR` (`Device ... is of type 'WATER_TANK_NODE' and does not support water quality monitoring`).
   - **Client Hook Guarding & Resiliency:** Hardened `useHistoricalMonitoring.ts` and `useHistoryPagination.ts` with whitespace-trimmed deviceId guards (`!deviceId || typeof deviceId !== 'string' || !deviceId.trim()`), and safe JSON content-type verification (`res.headers?.get?.('content-type')`) before parsing to prevent unhandled `SyntaxError: Unexpected token <` on HTML 404 proxy or Next.js `_not-found` responses.
@@ -3187,25 +3187,13 @@ The following facts are supported by the current implementation regarding device
     - Dedicated test suite `apps/web/test/unit/monitoring-history-location-errors.test.ts` (7/7 tests passed, 16ms).
     - Chart completeness unit test `apps/web/test/unit/chart-completeness-overflow.test.tsx` (9/9 tests passed, 382ms).
     - Monorepo typecheck: `npm run typecheck:web` (`tsc --noEmit`) clean with 0 errors.
-  - **Manual Website Acceptance:**
-    - Operator-reported PASS by Rahmat on `/soil` and `/water`.
-    - Verification scope note: Confirms visual loading and table/chart rendering on tested devices/locations; does NOT infer that every edge case, RBAC permission scenario, or >1,000-point dataset was individually verified.
-  - **Evidence vs Baseline vs Hypotheses:**
-    - Observed evidence: Local direct route handler invocations and unauthenticated curl requests returned valid JSON (HTTP 401), test suites passed cleanly.
-    - Historical deployment baseline: Evidenced previous failure (2026-10-06 / pre-release baseline) recorded VPS web container as `ada891e`, which predated `ddbd93d` and did not contain these routes. Current live VPS image tag and runtime smoke-test status remain NOT VERIFIED (not claimed to be running `ada891e` without recent live observation).
-    - Hypotheses: Dev server Turbopack routing cache and image build lag documented as explanations, not newly verified live facts on production.
-  - **Remaining Deployment & Runtime Requirements:**
-    - Target database migration status: Migration `20261008103000_add_reading_location_annotations` (all 8 columns exist in DEV; staging/production migration deployment status is PENDING OPERATOR VERIFICATION / EXECUTION).
-    - Web image rollout: Off-VPS build with `--platform linux/amd64` required.
-    - Rollback baseline: `kebun-melon-web:ada891e`.
-    - Environment: Zero secret modifications, preserved `.env.production`.
-    - Single Gateway rule & zero gateway impact: Preserved (only ONE gateway active; DB columns nullable).
-    - Reverse proxy (Caddy): Zero changes required.
-    - Runtime status marked as `NOT VERIFIED`.
-  - **Pending Operator Pre-Commit Gates:**
-    - `npm run test:coverage`
-    - `npm run test:integration`
-    - `npm run check:quality`
-    - `npm run test`
-    - `npm run test:e2e`
+    - Remote CI: GitHub Actions run `37940268821` on commit `7b8d9cdb65dacc4312d8cae01ef0ea2b70c088ee` (`7b8d9cd`) passed.
+  - **Deployment, Migration, and Live Smoke Test Closeout:**
+    - Operator deployed web image `kebun-melon-web:7b8d9cd` built off-VPS with `--platform linux/amd64` using in-place web recreation (`--no-deps`).
+    - VPS container configuration points to Supabase staging project `ihgoxqdncepbcrqkchxu`.
+    - **PostgreSQL 42703 Incident:** Initial container run encountered PostgreSQL error 42703 (`undefined_column`) due to missing `location_name` and `location_key` columns in `ihgoxqdncepbcrqkchxu`. An earlier local command reporting "No pending migrations" is hypothesized to have targeted a different database.
+    - Operator executed migration `20261008103000_add_reading_location_annotations` directly on `ihgoxqdncepbcrqkchxu`.
+    - Following migration execution, operator reported the live VPS website operates correctly (OPERATOR-REPORTED PASS), including soil and water monitoring, with no remaining errors observed.
+    - Rollback baseline preserved via `/opt/kebun-melon/.prev_web_image`.
+    - No gateway or Caddy configuration changes were required for this update; single-gateway rule preserved.
 <!-- TASK-0503 & TASK-0504 Hardening Reconciled: 2026-10-09 -->

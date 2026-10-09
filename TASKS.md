@@ -2514,7 +2514,7 @@ Display:
 ## TASK-0503 — Implement Historical Query API
 
 **Priority:** `P1`
-**Status:** `PENDING_VERIFICATION` (Historical scope completed 2026-08-11; portable location annotations pending live DB verification)
+**Status:** `DONE` (Historical scope completed 2026-08-11; portable location annotations, container rollout, and staging migration confirmed as OPERATOR-REPORTED PASS 2026-10-09)
 **Dependencies:** `TASK-0405`
 **Completed (Historical Base Scope):** 2026-08-11 — Implemented Historical Query API endpoints (`GET /api/v1/devices/[deviceId]/monitoring/soil/history` and `GET /api/v1/devices/[deviceId]/monitoring/water/history`) adhering to `DEC-MON-087` (default range: last 24h, max range: 31 days, default `pageSize`: 20, max `pageSize`: 100). Enforced RBAC and device access authorization, preserved null/missing values without zero-coercion, separated water-quality telemetry from reservoir data, omitted combined-history endpoint, and utilized indexed database queries (`soil_readings_device_received_idx` and `water_readings_device_received_idx`). Updated unit and integration test coverage across contract, database, and API layers.
 **Reconciliation & Hardening (2026-08-19):** Reconciled historical route handlers and `TelemetryRepository` to accept both canonical `deviceId` and immutable database UUID `devices.id`. Verified queries returning zero records return HTTP 200 `{ series: [], pagination: { ... } }`, avoiding false 404 errors per `DEC-MON-087`. Added targeted unit test suites with 100% pass rate.
@@ -2560,24 +2560,21 @@ Implement bounded history for soil and water.
   - Enforced strict `device.deviceType !== 'WATER_QUALITY_NODE'` rejection with HTTP 400 `VALIDATION_ERROR` in `water/history`.
   - Hardened `useHistoricalMonitoring` and `useHistoryPagination` client hooks against empty/whitespace `deviceId` and non-JSON HTML 404 responses.
   - Automated targeted verification: `monitoring-history-location-errors.test.ts` (7/7 passed), `chart-completeness-overflow.test.tsx` (9/9 passed), `npm run typecheck:web` clean (0 errors).
-  - Manual website verification: OPERATOR-REPORTED PASS by Rahmat on `/soil` and `/water` (confirms visual loading and table/chart rendering on tested devices/locations; does NOT infer that every edge case, RBAC permission scenario, or >1,000-point dataset was individually verified).
-- **Remaining Deployment Requirements & Pending Operator Gates:**
-  - Migration `20261008103000_add_reading_location_annotations` status in staging/production is PENDING OPERATOR VERIFICATION / DEPLOYMENT (columns present in DEV).
-  - Web image off-VPS build (`--platform linux/amd64`) and rollout needed on VPS (historical baseline recorded `ada891e`; current live VPS image and runtime status remain NOT VERIFIED).
-  - The five CI gates remain PENDING OPERATOR EXECUTION:
-    1. `npm run test:coverage`
-    2. `npm run test:integration`
-    3. `npm run check:quality`
-    4. `npm run test`
-    5. `npm run test:e2e`
-  - Overall status remains `PENDING_VERIFICATION`.
+  - Manual website verification: OPERATOR-REPORTED PASS on `/soil` and `/water` (confirms visual loading and table/chart rendering on tested devices/locations; does NOT infer that every edge case, RBAC permission scenario, or >1,000-point dataset was individually verified).
+- **Deployment, Staging Migration & Live Verification Closeout (2026-10-09):**
+  - **Release Commit:** `7b8d9cdb65dacc4312d8cae01ef0ea2b70c088ee` (`7b8d9cd`), verified passing GitHub Actions CI run `37940268821`. Local pre-commit gates executed and passed on workstation by operator.
+  - **Off-VPS Image Rollout:** `kebun-melon-web:7b8d9cd` built off-VPS (`--platform linux/amd64`) and deployed to VPS with in-place web recreation (`--no-deps`).
+  - **Database Target & PostgreSQL 42703 Resolution:** VPS environment targets Supabase staging project `ihgoxqdncepbcrqkchxu`. Initial run of image `7b8d9cd` surfaced PostgreSQL error 42703 (`undefined_column`) due to missing annotation columns. Operator executed migration `20261008103000_add_reading_location_annotations` directly on `ihgoxqdncepbcrqkchxu`.
+  - **Live Website Verification:** OPERATOR-REPORTED PASS on `/soil` and `/water` following staging migration, with soil and water monitoring functions active and zero remaining errors observed.
+  - **Safeguards:** Rollback tag preserved in `/opt/kebun-melon/.prev_web_image`. Single-gateway rule preserved; no gateway or Caddy configuration changes were required for this update.
+  - **Status:** `DONE`.
 
 ---
 
 ## TASK-0504 — Implement Historical Charts
 
 **Priority:** `P1`
-**Status:** `PENDING_VERIFICATION` (Historical scope completed 2026-08-11; chart completeness, single-chart integration & browser verification completed; operator CI gates & staging/production rollout pending)
+**Status:** `DONE` (Historical scope, chart completeness, single-chart integration, and operator CI gates completed; container rollout and staging database migration confirmed as OPERATOR-REPORTED PASS 2026-10-09)
 **Dependencies:** `TASK-0503`
 **Completed (Historical Base Scope):** 2026-08-11
 **Chart Completeness Correction (2026-10-08):**

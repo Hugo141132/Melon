@@ -101,7 +101,7 @@ Under `TASK-0503`, `TASK-0504`, and `DEC-MON-093`:
     - `water_readings_device_location_idx` ON `water_readings("device_id", "location_key", "recorded_at" DESC)`.
     - `soil_readings_device_received_idx` ON `soil_readings("device_id", "received_at" DESC)`.
     - `soil_readings_location_named_by_idx` ON `soil_readings("location_named_by_id")` WHERE `location_named_by_id IS NOT NULL`.
-  - Staging/Production Status: Migration `20261008103000` remains pending deployment to Staging (`ihgoxqdncepbcrqkchxu`) and VPS production.
+  - Staging Deployment Status: Migration `20261008103000` successfully applied to Staging (`ihgoxqdncepbcrqkchxu`) and verified active on the live VPS web container (2026-10-09).
 - **Chart Bounded Keyset Pagination — Zero New Migrations Required:**
   - The removal of the 1,000-point total restriction and transition to keyset cursor pagination (`[receivedAt, id]`, 1,000 points/batch, max 2,000) utilizes existing table columns and requires **zero additive database migrations**.
   - Query consistency limits: Keyset pagination locks `from`/`to` ISO timestamps in application queries to keep temporal windows stable, but does not execute inside a multi-request PostgreSQL ACID transactional snapshot.
