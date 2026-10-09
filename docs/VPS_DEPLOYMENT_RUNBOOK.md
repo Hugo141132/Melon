@@ -595,6 +595,25 @@ docker inspect --format '{{json .State.Health.Status}}' kebun-melon-web
 ```
 > **DOWNTIME & ROLLBACK NOTE:** Recreating containers causes a brief (~2–5 second) sub-second container swap. True zero-downtime rolling deploys require multi-replica blue/green routing not present on a single-node small VPS. Image rollback rolls back application code only; it does **not** roll back database schema changes.
 
+### 8.9 Post-Release ddbd93d History & Locations 404 RCA and Image Rebuild Requirement
+* **Post-Deployment Smoke Test Status:** **NOT VERIFIED** (Current live VPS image tag and runtime smoke-test status are NOT VERIFIED without recent live observation. Evidenced previous failure on pre-release baseline is recorded as historical).
+* **Root Cause Analysis (RCA):**
+  1. **VPS Route Absence (Historical Image Lag Baseline):** The last evidenced historical VPS web container baseline was image tag `kebun-melon-web:ada891e` (recorded 2026-10-06). Commit `ada891e` predates commit `ddbd93d` (`TASK-0503` / `TASK-0504`) and therefore did not contain `/api/v1/devices/[deviceId]/monitoring/{soil|water}/{history|locations|chart}`, resulting in HTTP 404 HTML (`_not-found`) during earlier testing. The current running VPS image tag and live status remain NOT VERIFIED until inspected live.
+  2. **Route Handler Error Mapping Bug:** In `locations` and `chart` route handlers, `DeviceNotFoundError` lacked a `.status` property, defaulting error mapping to HTTP 500 (`INTERNAL_ERROR`) instead of HTTP 404 (`DEVICE_NOT_FOUND`).
+  3. **Water History Device Validation:** `water/history` only checked `if (device.deviceType === 'SOIL_NODE')`, inadvertently permitting `WATER_TANK_NODE`.
+  4. **Client-Side Resiliency:** `useHistoricalMonitoring` and `useHistoryPagination` lacked empty `deviceId` guarding and crashed on non-JSON HTML 404 responses.
+* **Resolution Applied in Codebase:**
+  - Explicit `DeviceNotFoundError` handling mapped to HTTP 404 across all soil and water history, location, and chart routes.
+  - Strict `device.deviceType !== 'WATER_QUALITY_NODE'` validation in `water/history` route returning HTTP 400.
+  - Hardened client hooks with empty string trimming, safe JSON parse checks, and clean error messages.
+  - Added test suite `apps/web/test/unit/monitoring-history-location-errors.test.ts` (7/7 passed).
+* **Operator Action Required for VPS:**
+  1. Pass the 5 reserved CI gates locally.
+  2. Build fresh web container image off-VPS with `--platform linux/amd64` from current commit.
+  3. Transfer image archive to VPS and load via `sudo docker load -i`.
+  4. Recreate web container: `WEB_IMAGE=kebun-melon-web:<tag> sudo docker compose --env-file .env.production -f docker-compose.prod.yml up -d --no-deps web`.
+  5. Verify HTTP 200 responses on `/health` and `/api/v1/devices/.../monitoring/{soil|water}/history`.
+
 ---
 
 ## 9. Comprehensive Deployment Checklist (Pre-Flight & Execution)

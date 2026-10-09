@@ -167,22 +167,27 @@ export function useHistoricalMonitoring({
 
   // Load distinct annotated locations for device and domain
   const loadLocations = useCallback(async () => {
-    if (!deviceId) {
+    if (!deviceId || typeof deviceId !== 'string' || !deviceId.trim()) {
       setLocations([]);
       return;
     }
 
     try {
       const res = await fetch(
-        `/api/v1/devices/${encodeURIComponent(deviceId)}/monitoring/${domain}/locations`,
+        `/api/v1/devices/${encodeURIComponent(deviceId.trim())}/monitoring/${domain}/locations`,
         { headers: { Accept: 'application/json' }, cache: 'no-store' }
       );
       if (!res.ok) {
         setLocations([]);
         return;
       }
-      const json = await res.json();
-      if (!json.success || !json.data?.locations) {
+      const contentType = res.headers?.get?.('content-type');
+      if (contentType && !contentType.includes('application/json')) {
+        setLocations([]);
+        return;
+      }
+      const json = await res.json().catch(() => null);
+      if (!json?.success || !json.data?.locations) {
         setLocations([]);
         return;
       }
@@ -216,7 +221,7 @@ export function useHistoricalMonitoring({
 
     const currentRequestId = ++chartRequestIdRef.current;
 
-    if (!deviceId) {
+    if (!deviceId || typeof deviceId !== 'string' || !deviceId.trim()) {
       setData([]);
       setLoading(false);
       setError(null);

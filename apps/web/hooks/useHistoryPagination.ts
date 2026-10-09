@@ -101,14 +101,20 @@ export function useHistoryPagination<TItem>(
 
       if (token !== requestTokenRef.current) return;
 
-      const payload = await response.json();
+      const contentType = response.headers?.get?.('content-type');
+      let payload: any = null;
+      if (!contentType || contentType.includes('application/json')) {
+        payload = await response.json().catch(() => null);
+      }
 
       if (token !== requestTokenRef.current) return;
 
       if (!response.ok || (payload as { success?: boolean })?.success === false) {
         setError(
           (payload as { error?: { message?: string } })?.error?.message ??
-            'Failed to load measurement history.'
+            (response.status === 404
+              ? 'Measurement history not found.'
+              : 'Failed to load measurement history.')
         );
         setItems([]);
         return;

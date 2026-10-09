@@ -1819,4 +1819,8 @@ The following facts are supported by the verified decisions governance of `TASK-
   7. **Consistency Boundaries & Architectural Limits:**
      - Locking `from`/`to` ISO boundaries client-side maintains a consistent SQL filter window across sequential batches but does not constitute an ACID transactional snapshot; readings inserted concurrently within the window could appear across batch boundaries.
      - Client HTTP fetch abort terminates network transfer on the wire but does not prove backend PostgreSQL query execution cancellation.
+   8. **Monitoring History & Location Route Error Mapping Invariants:**
+      - All `/monitoring/soil/*` and `/monitoring/water/*` route handlers (`locations`, `chart`, `history`) explicitly catch and map `DeviceNotFoundError` to HTTP 404 `{ code: 'DEVICE_NOT_FOUND', message: '...' }` rather than falling through to HTTP 500 `INTERNAL_ERROR`.
+      - `GET /monitoring/water/history` strictly enforces `device.deviceType === 'WATER_QUALITY_NODE'`, rejecting `WATER_TANK_NODE` or invalid node types with HTTP 400 `VALIDATION_ERROR`.
+      - Client hooks (`useHistoricalMonitoring` and `useHistoryPagination`) guard against unassigned/revoked/empty device identifiers and handle non-JSON or HTML 404 responses safely without unhandled JSON parse exceptions.
 <!-- DEC-MON-093 Reconciled: 2026-10-08 -->

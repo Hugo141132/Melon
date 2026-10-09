@@ -3641,6 +3641,82 @@ The five mandatory CI gates must be executed **exclusively by operator JEMBOT** 
 
 <!-- TASK-0503 & TASK-0504 Testing Evidence Recorded: 2026-10-08 -->
 
+---
+
+# 48. Soil & Water History, Location & Chart Error Hardening Verification Evidence (Post-ddbd93d)
+
+**Task Reference:** `TASK-0503` / `TASK-0504` post-release `ddbd93d` defect resolution  
+**Status:** `PENDING_VERIFICATION` (Implementation complete, manual website acceptance verified; 5 CI gates pending operator execution)  
+**Date:** 2026-10-09  
+
+### 1. Implementation Scope & Affected Files
+- **API Routes:**
+  - `apps/web/app/api/v1/devices/[deviceId]/monitoring/soil/locations/route.ts`: Explicit `DeviceNotFoundError` catch mapped to HTTP 404 (`DEVICE_NOT_FOUND`).
+  - `apps/web/app/api/v1/devices/[deviceId]/monitoring/soil/chart/route.ts`: Explicit `DeviceNotFoundError` catch mapped to HTTP 404 (`DEVICE_NOT_FOUND`).
+  - `apps/web/app/api/v1/devices/[deviceId]/monitoring/water/locations/route.ts`: Explicit `DeviceNotFoundError` catch mapped to HTTP 404 (`DEVICE_NOT_FOUND`).
+  - `apps/web/app/api/v1/devices/[deviceId]/monitoring/water/chart/route.ts`: Explicit `DeviceNotFoundError` catch mapped to HTTP 404 (`DEVICE_NOT_FOUND`).
+  - `apps/web/app/api/v1/devices/[deviceId]/monitoring/water/history/route.ts`: Strict `device.deviceType !== 'WATER_QUALITY_NODE'` rejection with HTTP 400 (`VALIDATION_ERROR`).
+- **Client Hooks:**
+  - `apps/web/hooks/useHistoricalMonitoring.ts`: Whitespace-trimmed `deviceId` guarding and mock-friendly JSON `content-type` verification before JSON parsing.
+  - `apps/web/hooks/useHistoryPagination.ts`: Mock-friendly JSON `content-type` verification and informative 404 fallback message.
+- **Unit Test Suite:**
+  - `apps/web/test/unit/monitoring-history-location-errors.test.ts`: 7 dedicated test cases.
+
+### 2. Automated Targeted Test Results (Executed & Verified)
+- **New Error-Handling Test Suite:**
+  - Command: `npx vitest run apps/web/test/unit/monitoring-history-location-errors.test.ts`
+  - Output: 7/7 tests passed (16ms duration).
+  - Coverage: Validates 404 on `DeviceNotFoundError` across soil/water locations and charts, 200 on valid devices, 400 on `WATER_TANK_NODE` for water quality history, 404 on unknown device in history.
+- **Regression Chart Completeness Test Suite:**
+  - Command: `npx vitest run apps/web/test/unit/chart-completeness-overflow.test.tsx`
+  - Output: 9/9 tests passed (382ms duration).
+- **TypeScript Static Typecheck:**
+  - Command: `npm run typecheck:web` (`tsc --noEmit`)
+  - Output: Exit code 0 (0 errors).
+
+### 3. Manual Website Verification Evidence
+- **Verification Status:** **OPERATOR-REPORTED PASS** by Rahmat.
+- **Scope of Acceptance:** Confirms visual loading and table/chart rendering on `/soil` and `/water` for the tested devices and spots.
+- **Explicit Invariant & Limitation:** This operator confirmation does **not** infer that every edge case, RBAC permission scenario, or >1,000-point dataset was individually verified in the manual check.
+
+### 4. Separation of Evidence, Baselines, and Hypotheses
+- **Observed Evidence:**
+  - Direct route handler invocations and local unauthenticated curl requests returned valid JSON (`HTTP 401 UNAUTHENTICATED`), proving route matching on localhost.
+  - Targeted vitest suites passed 100%.
+  - Local browser requests prior to server route indexing returned Next.js 404 HTML (`_not-found`).
+- **Historical Deployment Baselines:**
+  - Evidenced previous failure (2026-10-06 / pre-release baseline): The recorded VPS web container baseline was `kebun-melon-web:ada891e`. Commit `ada891e` predated `ddbd93d`, so the nested routes were absent from that built image.
+  - Current VPS runtime image tag and live smoke-test status remain **NOT VERIFIED** (no recent live observation has been performed; `ada891e` is not claimed to be the current running container without live evidence).
+- **Unverified Hypotheses:**
+  - Stale dev server Turbopack routing cache and image lag are documented as explanations based on observed facts, not newly verified live facts on production.
+
+### 5. Staging & Production Deployment Requirements
+- **Database Migration Status:**
+  - Migration `20261008103000_add_reading_location_annotations` (8 columns) is present in the DEV database (`unbyxlkrzqlafolxcypi`).
+  - Staging (`ihgoxqdncepbcrqkchxu`) and production database migration deployment status remains **PENDING OPERATOR VERIFICATION / EXECUTION**.
+- **Web Image Rollout:**
+  - Off-VPS image build with `--platform linux/amd64` required.
+  - Rollback baseline: `kebun-melon-web:ada891e`.
+- **Environment & Configuration:**
+  - Zero secrets touched; `.env.production` preserved.
+- **IoT Gateway & Reverse Proxy:**
+  - IoT Gateway MQTT ingestion: Zero impact (new columns nullable).
+  - Single Gateway rule: Strictly preserved (only ONE active gateway).
+  - Reverse proxy (Caddy): Zero changes required.
+- **Runtime Deployment Status:** **NOT VERIFIED** (pending image build and deployment by operator).
+
+### 6. Five Reserved Operator CI Gates (PENDING EXECUTION)
+The following five mandatory CI gates must be executed **exclusively by operator Rahmat**:
+1. `npm run test:coverage`
+2. `npm run test:integration`
+3. `npm run check:quality`
+4. `npm run test`
+5. `npm run test:e2e`
+
+- **Current Status of 5 Gates:** **PENDING OPERATOR EXECUTION**.
+- **Git Commit, Push, Remote CI, and Deployment:** **PENDING OPERATOR EXECUTION**.
+<!-- TASK-0503 & TASK-0504 Error Hardening Evidence Recorded: 2026-10-09 -->
+
 
 
 

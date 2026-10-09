@@ -41,13 +41,13 @@ export async function GET(request: Request, props: { params: Promise<{ deviceId:
       );
     }
 
-    if (device.deviceType === 'SOIL_NODE') {
+    if (device.deviceType !== 'WATER_QUALITY_NODE') {
       return NextResponse.json(
         {
           success: false,
           error: {
             code: 'VALIDATION_ERROR',
-            message: `Device '${targetDeviceId}' is of type '${device.deviceType}' and does not support water monitoring.`,
+            message: `Device '${targetDeviceId}' is of type '${device.deviceType}' and does not support water quality monitoring.`,
           },
           meta: { requestId },
         },

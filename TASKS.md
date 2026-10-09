@@ -2553,8 +2553,24 @@ Implement bounded history for soil and water.
   3. **Location Annotation Normalization & Refresh**: Verified whitespace trimming and case normalization on both Soil (`   Bedeng   Barat   Super   ` -> `Bedeng Barat Super` / `bedeng barat super`) and Water (`   Tandon   Nutrisi   Baru   ` -> `Tandon Nutrisi Baru` / `tandon nutrisi baru`). Saving, renaming, and clearing annotations dynamically refreshes location selectors and charts.
   4. **Older-Page Stability**: While browsing Page 2 of history, injected live telemetry record `dev-fixture-stability-incoming` (`receivedAt = now`). Verified reading IDs and row contents on Page 2 remain 100% stable without shifting or unprompted layout refetch, governed by deterministic `orderBy: [{ receivedAt: 'asc' }, { id: 'asc' }]`.
   5. **Latency Clarification**: Clarified timing metrics unambiguously: ~1,000–1,300 ms denotes milliseconds (~1.0–1.3 seconds) attributable to public WAN RTT to remote Supabase Cloud. Dev-server Turbopack route compilation incurs a 2,500–3,800 ms cold start on initial hit; subsequent warm requests run stably at 600–1,250 ms.
-- **Fixture Retention Status**: Exactly 1,023 DEV fixture records (1,016 soil readings, 7 water readings) currently reside in the DEV database under identifiable IDs (`dev-fixture-soil-*`, `dev-fixture-water-*`, `dev-fixture-overflow-*`, `dev-fixture-stability-incoming`).
-- **Pending Operator Gates**: The five CI gates (`check:quality`, `test`, `test:integration`, `test:coverage`, `test:e2e`) remain reserved for the operator. Staging/production migrations and image deployments remain operator handoff steps. Status remains `PENDING_VERIFICATION`.
+- **Fixture Retention Status**: All 1,023 DEV fixture records were safely cleaned up on 2026-10-08 (`dev-fixture-*` count = 0).
+- **Post-Release ddbd93d Error Hardening & Route Resolution (2026-10-09):**
+  - Resolved 404 Route Not Found and 500 error mapping defects across history, location, and chart routes.
+  - Mapped `DeviceNotFoundError` explicitly to HTTP 404 `{ code: 'DEVICE_NOT_FOUND', message: error.message }` across `soil/locations`, `soil/chart`, `water/locations`, and `water/chart`.
+  - Enforced strict `device.deviceType !== 'WATER_QUALITY_NODE'` rejection with HTTP 400 `VALIDATION_ERROR` in `water/history`.
+  - Hardened `useHistoricalMonitoring` and `useHistoryPagination` client hooks against empty/whitespace `deviceId` and non-JSON HTML 404 responses.
+  - Automated targeted verification: `monitoring-history-location-errors.test.ts` (7/7 passed), `chart-completeness-overflow.test.tsx` (9/9 passed), `npm run typecheck:web` clean (0 errors).
+  - Manual website verification: OPERATOR-REPORTED PASS by Rahmat on `/soil` and `/water` (confirms visual loading and table/chart rendering on tested devices/locations; does NOT infer that every edge case, RBAC permission scenario, or >1,000-point dataset was individually verified).
+- **Remaining Deployment Requirements & Pending Operator Gates:**
+  - Migration `20261008103000_add_reading_location_annotations` status in staging/production is PENDING OPERATOR VERIFICATION / DEPLOYMENT (columns present in DEV).
+  - Web image off-VPS build (`--platform linux/amd64`) and rollout needed on VPS (historical baseline recorded `ada891e`; current live VPS image and runtime status remain NOT VERIFIED).
+  - The five CI gates remain PENDING OPERATOR EXECUTION:
+    1. `npm run test:coverage`
+    2. `npm run test:integration`
+    3. `npm run check:quality`
+    4. `npm run test`
+    5. `npm run test:e2e`
+  - Overall status remains `PENDING_VERIFICATION`.
 
 ---
 
