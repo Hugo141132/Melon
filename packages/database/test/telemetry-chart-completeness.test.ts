@@ -22,12 +22,13 @@ const TO = new Date('2026-10-02T00:00:00Z');
  */
 function applyQuery(store: Row[], args: any): Row[] {
   const where = args?.where ?? {};
-  const range = where.receivedAt ?? {};
+  const range = where.recordedAt ?? where.receivedAt ?? {};
 
   let rows = store.filter((row) => {
-    const receivedAt = row.receivedAt as Date;
-    if (range.gte && receivedAt < range.gte) return false;
-    if (range.lte && receivedAt > range.lte) return false;
+    const timestamp = (row.recordedAt ?? row.receivedAt) as Date;
+    if (range.gte && timestamp < range.gte) return false;
+    if (range.lte && timestamp > range.lte) return false;
+    if (range.lt && timestamp >= range.lt) return false;
     if (where.deviceId && row.deviceId !== where.deviceId) return false;
     if (where.locationKey && row.locationKey !== where.locationKey) return false;
     return true;
@@ -35,20 +36,17 @@ function applyQuery(store: Row[], args: any): Row[] {
 
   if (where.OR && Array.isArray(where.OR)) {
     rows = rows.filter((row) => {
-      const receivedAt = row.receivedAt as Date;
+      const timestamp = (row.recordedAt ?? row.receivedAt) as Date;
       const id = row.id as string;
       return where.OR.some((clause: any) => {
-        if (clause.receivedAt?.gt) {
-          const gtDate =
-            clause.receivedAt.gt instanceof Date
-              ? clause.receivedAt.gt
-              : new Date(clause.receivedAt.gt);
-          if (receivedAt.getTime() > gtDate.getTime()) return true;
+        const timeClause = clause.recordedAt ?? clause.receivedAt;
+        if (timeClause?.gt) {
+          const gtDate = timeClause.gt instanceof Date ? timeClause.gt : new Date(timeClause.gt);
+          if (timestamp.getTime() > gtDate.getTime()) return true;
         }
-        if (clause.receivedAt && !(clause.receivedAt as any).gt) {
-          const eqDate =
-            clause.receivedAt instanceof Date ? clause.receivedAt : new Date(clause.receivedAt);
-          if (receivedAt.getTime() === eqDate.getTime() && clause.id?.gt && id > clause.id.gt) {
+        if (timeClause && !(timeClause as any).gt) {
+          const eqDate = timeClause instanceof Date ? timeClause : new Date(timeClause);
+          if (timestamp.getTime() === eqDate.getTime() && clause.id?.gt && id > clause.id.gt) {
             return true;
           }
         }
@@ -359,6 +357,51 @@ describe('TelemetryRepository chart keyset pagination & completeness (TASK-0504)
       const combined = [...b1.series, ...b2.series];
       expect(combined).toHaveLength(15);
       expect(new Set(combined.map((r) => r.readingId)).size).toBe(15);
+    });
+
+    it('correctly includes reading with delayed ingestion and excludes reading beyond boundary', async () => {
+      // Custom range: Oct 10 00:00 WIB to Oct 11 00:00 WIB
+      const customFrom = new Date('2026-10-09T17:00:00.000Z');
+      const customTo = new Date('2026-10-10T17:00:00.000Z');
+
+      // Row 1: recorded at Oct 10 23:59 WIB, received at Oct 11 00:01 WIB
+      waterStore.push({
+        id: 'water-delayed-1',
+        deviceId: 'device-1',
+        locationKey: 'bed-a',
+        locationName: 'Bed A',
+        recordedAt: new Date('2026-10-10T16:59:00.000Z'), // 23:59 WIB
+        receivedAt: new Date('2026-10-10T17:01:00.000Z'), // 00:01 WIB next day
+        ph: new Prisma.Decimal(7),
+        tds: new Prisma.Decimal(300),
+        ec: new Prisma.Decimal(500),
+      });
+
+      // Row 2: recorded at Oct 11 00:14 WIB, received at Oct 11 00:15 WIB
+      waterStore.push({
+        id: 'water-nextday-2',
+        deviceId: 'device-1',
+        locationKey: 'bed-a',
+        locationName: 'Bed A',
+        recordedAt: new Date('2026-10-10T17:14:00.000Z'), // 00:14 WIB next day
+        receivedAt: new Date('2026-10-10T17:15:00.000Z'), // 00:15 WIB next day
+        ph: new Prisma.Decimal(7.1),
+        tds: new Prisma.Decimal(310),
+        ec: new Prisma.Decimal(510),
+      });
+
+      const res = await repo.getWaterChartSeries({
+        deviceIdentifier: 'device-1',
+        locationKey: 'bed-a',
+        from: customFrom,
+        to: customTo,
+      });
+
+      const ids = res.series.map((s) => s.readingId);
+      // Row 1 MUST be included because recordedAt is within [customFrom, customTo)
+      expect(ids).toContain('water-delayed-1');
+      // Row 2 MUST NOT be included because recordedAt is >= customTo
+      expect(ids).not.toContain('water-nextday-2');
     });
   });
 });

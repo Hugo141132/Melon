@@ -12,7 +12,7 @@ import {
 } from 'recharts';
 import { useTranslations, useLocale } from 'next-intl';
 import { BaseSeriesItem } from '@/hooks/useHistoricalMonitoring';
-import { getCustomXTicks, formatDayMonth } from './NPKChart';
+import { getCustomXTicks, formatTooltipDateTime } from './NPKChart';
 
 export interface WaterNutrientChartProps {
   data?: BaseSeriesItem[];
@@ -53,11 +53,7 @@ export default function WaterNutrientChart({
 
   const cleanLabelFormatter = (label: any, payload: any[]) => {
     if (payload && payload.length > 0 && payload[0]?.payload?.timestamp) {
-      const d = new Date(payload[0].payload.timestamp);
-      const dateStr = formatDayMonth(d, locale);
-      const hh = String(d.getHours()).padStart(2, '0');
-      const mm = String(d.getMinutes()).padStart(2, '0');
-      return preset === '24h' ? `${hh}:${mm}` : `${dateStr} ${hh}:${mm}`;
+      return formatTooltipDateTime(payload[0].payload.timestamp, preset, locale);
     }
     return typeof label === 'string' ? label.replace(/,/g, '').replace(/\./g, '').trim() : label;
   };

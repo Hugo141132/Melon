@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React from 'react';
 import dynamic from 'next/dynamic';
 import TopAppBar from '@/components/navigation/TopAppBar';
 import HistoricalChartControls from '@/components/charts/HistoricalChartControls';
@@ -133,6 +133,21 @@ function SoilMetricMeter({
   );
 }
 
+/**
+ * Column descriptors are module-level constants so their identity is stable
+ * across renders. A fresh array on every render would retrigger the pagination
+ * fetch effect and cause a request storm.
+ */
+export const soilHistoryColumns: HistoryMetricColumn[] = [
+  { key: 'nitrogen', label: 'N', unit: 'ppm', precision: 2 },
+  { key: 'phosphorus', label: 'P', unit: 'ppm', precision: 2 },
+  { key: 'potassium', label: 'K', unit: 'ppm', precision: 2 },
+  { key: 'temperature', label: '°C', unit: '°C', precision: 1 },
+  { key: 'moisture', label: '%', unit: '%', precision: 1 },
+  { key: 'ph', label: 'pH', unit: 'pH', precision: 2 },
+  { key: 'ec', label: 'EC', unit: 'µS/cm', precision: 0 },
+];
+
 export default function SoilPage() {
   const tSoil = useTranslations('soil');
   const tCommon = useTranslations('common');
@@ -163,7 +178,6 @@ export default function SoilPage() {
     selectedLocationKey,
     setSelectedLocationKey,
     data: historyData,
-    resolvedRange: historyRange,
     loading: historyLoading,
     error: historyError,
     dateRangeError,
@@ -173,24 +187,6 @@ export default function SoilPage() {
     initialMetric: 'npk',
     annotationCacheToken: annotationToken,
   });
-
-  /**
-   * Column descriptors are module-level constants so their identity is stable
-   * across renders. A fresh array on every render would retrigger the pagination
-   * fetch effect and cause a request storm.
-   */
-  const soilHistoryColumns = useMemo<HistoryMetricColumn[]>(
-    () => [
-      { key: 'nitrogen', label: 'N', unit: 'ppm', precision: 2 },
-      { key: 'phosphorus', label: 'P', unit: 'ppm', precision: 2 },
-      { key: 'potassium', label: 'K', unit: 'ppm', precision: 2 },
-      { key: 'temperature', label: '°C', unit: '°C', precision: 1 },
-      { key: 'moisture', label: '%', unit: '%', precision: 1 },
-      { key: 'ph', label: 'pH', unit: 'pH', precision: 2 },
-      { key: 'ec', label: 'EC', unit: 'µS/cm', precision: 0 },
-    ],
-    []
-  );
 
   const soilData = snapshot?.soil?.data;
   const recordedAt = snapshot?.soil?.recordedAt;
@@ -476,8 +472,7 @@ export default function SoilPage() {
 
             {/*
               Measurement history with portable location annotations.
-              The panel receives the same date window the user already selected
-              above, so both views stay consistent without a second date picker.
+              History independently paginates all retained readings for the selected device.
             */}
             {activeDeviceId ? (
               <div className="animate-fade-in space-y-2">
@@ -485,8 +480,6 @@ export default function SoilPage() {
                   deviceId={activeDeviceId}
                   domain="soil"
                   metricColumns={soilHistoryColumns}
-                  from={historyRange?.from ?? new Date(Date.now() - 24 * 60 * 60 * 1000)}
-                  to={historyRange?.to ?? new Date()}
                   onAnnotationChange={handleAnnotationChange}
                 />
               </div>

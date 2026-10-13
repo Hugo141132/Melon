@@ -30,4 +30,23 @@ describe('Layout Metadata: Adaptive Favicon & Document Title', () => {
     expect(icons.shortcut).toBeUndefined();
     expect(icons.apple).toBeUndefined();
   });
+
+  it('verifies physical existence and validity of root static favicon.ico asset', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const faviconPath =
+      [
+        path.join(process.cwd(), 'public', 'favicon.ico'),
+        path.join(process.cwd(), 'apps', 'web', 'public', 'favicon.ico'),
+        path.resolve(__dirname, '../../public/favicon.ico'),
+      ].find((p) => fs.existsSync(p)) || path.resolve(__dirname, '../../public/favicon.ico');
+    expect(fs.existsSync(faviconPath)).toBe(true);
+
+    const buf = fs.readFileSync(faviconPath);
+    expect(buf.length).toBeGreaterThan(100);
+    // Verify ICO magic numbers: reserved 0, type 1 (ICO), count >= 1
+    expect(buf.readUInt16LE(0)).toBe(0);
+    expect(buf.readUInt16LE(2)).toBe(1);
+    expect(buf.readUInt16LE(4)).toBeGreaterThanOrEqual(1);
+  });
 });

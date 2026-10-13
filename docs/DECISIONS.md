@@ -1019,11 +1019,11 @@ The following facts are supported by the verified decisions governance of `TASK-
 ---
 
 ## DEC-UIUX-104: Historical Monitoring Chart Visualization, Instant Client-Side Cache Reuse, and Range-Based X-Axis Separation
-- **Status:** APPROVED
+- **Status:** SUPERSEDED by `DEC-MON-093` & `DEC-MON-094` (Hourly aggregation and synthetic interpolation permanently retired in favor of genuine sensor readings plotted via keyset pagination; locale-aware tick spacing and NPK multi-line visualization preserved)
 - **Context:** The Soil historical chart on `/soil` experienced visual rendering gaps (NPK bar charts requiring property key alignment `nitrogen`/`phosphorus`/`potassium` to `n`/`p`/`k`), unnecessary full-range loading flashes during preset switches (24h, 7d, 30d) even when data was cached, X-axis label crowding and overlap on multi-day ranges due to tight coupling between hourly aggregation and label display density, and hardcoded Indonesian punctuation (`20 Agu,`).
 - **Decision:**
   1. **NPK LineChart Visualization:** NPK trend is visualized using a multi-line Recharts `LineChart` with three distinct series (Nitrogen `#0d631b`, Phosphorus `#884200`, Potassium `#476800`) with smooth monotone curves, active hover dots, and null-gap preservation (`connectNulls={false}`).
-  2. **Visualization-Only 1-Hour Aggregation:** Historical chart data is aggregated at 1-hour intervals on the client side purely for visual stability and noise reduction. This does not alter backend telemetry ingestion, storage precision, or real-time SSE stream updates.
+  2. **Visualization-Only 1-Hour Aggregation (Superseded):** Originally aggregated at 1-hour intervals on the client side. Superseded by `DEC-MON-093` which eliminated hourly aggregation in favor of genuine raw sensor readings (`recordedAt`) without collapsing points into synthetic averages.
   3. **Instant Client Cache Range Switching:** The `useHistoricalMonitoring` hook checks global in-memory telemetry bounds before triggering network fetches. When switching between 24h, 7d, and 30d presets where requested ranges already reside in memory, data is filtered, aggregated, and rendered immediately with `loading = false`, eliminating skeleton loading flashes and redundant HTTP roundtrips.
   4. **Decoupling X-Axis Label Density from Data Resolution (`getCustomXTicks`):**
      - **24 Hours:** Retains full 1-hour resolution with ~5–8 evenly spaced readable time ticks (e.g. `00:00`, `04:00`, `08:00`, etc.).
@@ -1824,3 +1824,67 @@ The following facts are supported by the verified decisions governance of `TASK-
       - `GET /monitoring/water/history` strictly enforces `device.deviceType === 'WATER_QUALITY_NODE'`, rejecting `WATER_TANK_NODE` or invalid node types with HTTP 400 `VALIDATION_ERROR`.
       - Client hooks (`useHistoricalMonitoring` and `useHistoryPagination`) guard against unassigned/revoked/empty device identifiers and handle non-JSON or HTML 404 responses safely without unhandled JSON parse exceptions.
 <!-- DEC-MON-093 Reconciled: 2026-10-08 -->
+
+---
+
+## DEC-MON-094: Decoupling Measurement History from Chart Presets & Sensor Measurement Timestamp Filtering (`recordedAt`)
+- **Status:** APPROVED & IMPLEMENTED (2026-10-12)
+- **Related Task IDs:** `TASK-0503`, `TASK-0504 Follow-up`
+- **Context:**
+  Under `DEC-MON-093`, two discrepancies remained:
+  1. Measurement history tables on `/soil` and `/water` were tied to chart date presets (24h, 7d, 30d, custom). When operators changed chart time presets, history tables reset pagination and restricted their rows to the chart date window, contrary to operational requirements where history paginates across all retained device measurements.
+  2. Chart SQL queries filtered by gateway ingestion timestamp (`receivedAt >= from AND receivedAt < to`), while UI tooltips and series points displayed sensor measurement timestamps (`recordedAt`). When devices experienced transmission delays (e.g. reading recorded at 23:59:00 WIB Oct 10 and received at 00:01:00 WIB Oct 11), backend SQL filtering excluded the record from the Oct 10 chart window, omitting valid readings.
+  3. Custom date boundaries and tick formatting used browser-local `Date` methods (`getHours()`, `getDate()`), which risked shifting boundaries when client machines operated outside the application's operational timezone (`Asia/Jakarta`, UTC+7).
+- **Decision & Implementation Directives:**
+  1. **Complete Decoupling of History Tables from Chart Filters**:
+     - History tables (`MeasurementHistoryPanel`, `ReadingHistoryTable`) paginate across all retained records for the device (`HISTORY_PAGE_SIZE = 5`) independently of chart presets or custom date filters.
+     - Changing chart presets (24h, 7d, 30d, custom) never resets history pagination, never modifies total counts, and never triggers history refetches.
+     - History reset key is pinned strictly to `deviceId`.
+  2. **History API Default Behavior Change**:
+     - `GET /monitoring/soil/history` and `GET /monitoring/water/history` treat omitted `from` and `to` query parameters as requesting all retained readings across the device lifetime (omitting date `where` clauses in Prisma). This is a behavioral contract change documented in `docs/API.md`.
+  3. **Sensor Measurement Timestamp Filtering & Keyset Ordering (`recordedAt`)**:
+     - `getSoilChartSeries` and `getWaterChartSeries` filter SQL records strictly on `recordedAt: { gte: params.from, lt: params.to }`.
+     - Keyset cursor pagination orders and advances by `orderBy: [{ recordedAt: 'asc' }, { id: 'asc' }]`.
+     - Keyset cursors encode `"${recordedAt.toISOString()}_${id}"`.
+     - Measurements with delayed receipt (recorded Oct 10 23:59, received Oct 11 00:01) are correctly included in the Oct 10 chart series and excluded from Oct 11.
+  4. **Browser Display Timezone & Calendar Boundaries**:
+     - Monitoring UI resolves runtime browser display timezone via `getDisplayTimezone()` (`Intl.DateTimeFormat().resolvedOptions().timeZone` with canonical fallback `Asia/Jakarta`).
+     - This is strictly distinguished from server-side `UserPreference.timezone`, which governs background notifications, alerts, and transactional emails.
+     - Custom date pickers convert `YYYY-MM-DD` inputs to calendar-day boundaries spanning local start-of-day (`00:00:00.000` inclusive) to next-day-start (`00:00:00.000` exclusive), without assuming every calendar day has exactly 24 hours (e.g. handling daylight saving shifts or clock adjustments).
+     - Single-day filters (e.g. `2026-10-10` to `2026-10-10`) display exactly that complete calendar day in the local display timezone, preventing UTC boundary bleed-through (`11 Oct 00:14`).
+     - Tooltips and X-axis ticks format in the active display timezone, eliminating timezone drift.
+  5. **Water Quality History Column Calibration**:
+     - In `apps/web/app/water/page.tsx`, `temperature` (`°C`) is excluded from `waterHistoryColumns`, displaying only `ph`, `tds`, `ec`, and metadata columns.
+     - Soil history retains `temperature` (`°C`).
+     - Location inline editing, "Named by" (`tHistory('namedBy')`), and table responsive styling remain fully intact across both domains. Stored database records remain untouched.
+  6. **Calendar-Date-First Validation for Custom Date Ranges**:
+     - Original calendar dates are validated BEFORE converting end date to next-day-start: `startDate > endDate` is strictly invalid (`dateRangeOrder`); same-day selection (`startDate === endDate`) is valid.
+     - Inline error displays immediately once both date inputs are present, independent of location selection.
+     - Locale-reactive error keys (`dateRangeOrder`, `dateRangeSelectBoth`, `dateRangeInvalid`, `maxBoundsExceeded`) follow the active application locale (`next-intl`).
+     - Invalid ranges immediately clear data (`setData([])`) and bypass chart network requests. Correcting date inputs immediately clears the error state.
+  7. **Technical Helper Copy Removal**:
+     - The technical helper text `"(Max. 31 days per DEC-MON-087)"` is removed from chart controls in both languages with zero replacement text or hidden fallback rendering.
+     - Strict 31-day enforcement (`MAX_RANGE_MS`) remains active in client validation and backend API.
+<!-- DEC-MON-094 Reconciled: 2026-10-12 -->
+
+---
+
+## DEC-UIUX-109: Static Root Favicon Fallback Asset (`apps/web/public/favicon.ico`)
+- **Status:** APPROVED & IMPLEMENTED (2026-10-12)
+- **Related Task IDs:** `TASK-0507`
+- **Context:**
+  Browser user agents, crawlers, and automated clients issue direct root `GET /favicon.ico` HTTP requests regardless of declarative HTML `<link rel="icon">` tags. In local development and production environments, the absence of `apps/web/public/favicon.ico` caused intermittent HTTP 404 (Not Found) errors in browser consoles and server logs.
+- **Decision & Implementation Directives:**
+  1. **Physical Static Root Fallback Asset**:
+     - Added physical static fallback asset `apps/web/public/favicon.ico` (reported size: 2,948 bytes) containing 3 embedded PNG icon directory entries (16×16, 32×32, 48×48 px) with RGBA alpha transparency.
+  2. **Root HTTP 200 Resolution**:
+     - Direct browser requests to `/favicon.ico` resolve with HTTP 200 without runtime JavaScript execution, server handlers, or dynamic Next.js route rewrites.
+  3. **Preservation of Declarative Adaptive Metadata**:
+     - Existing adaptive light/dark PNG metadata in `apps/web/app/layout.tsx` (`(prefers-color-scheme: dark)` -> `/favicon-dark.png`, `(prefers-color-scheme: light)` -> `/favicon-light.png`) is preserved 100% without modification or duplication.
+  4. **Zero Runtime Dependencies**:
+     - Zero new dependencies, libraries, or client-side JavaScript execution added.
+  5. **Status & Verification**:
+     - Manual website verification: PASS (user-reported).
+     - Automated test gates (`metadata-icons.test.ts`) and GitHub Actions: PENDING.
+<!-- DEC-UIUX-109 Reconciled: 2026-10-12 -->
+

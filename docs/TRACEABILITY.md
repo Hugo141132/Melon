@@ -901,13 +901,46 @@ The following facts are verified in the traceability matrix regarding `TASK-0507
   - **Connection Outage Resilience:** Implemented bounded confirmation probing (3 probes at 2s = 4–7s detection window), inline Outage View replacing protected operational content, Server Component GET purity in Next.js App Router, client-side logout mutation with `outageLogoutPromiseRef` mutex protection, and `activeEpochRef` epoch fencing to discard stale telemetry.
   - **Shared Page Transitions:** Implemented `animate-fade-in` (~400ms duration) on root `<main>` container across App Router pages, removing redundant inner card transitions. Fully disabled under `@media (prefers-reduced-motion: reduce)`.
   - **Dashboard Animated Counting:** Implemented `AnimatedNumber.tsx` with RAF interpolation over 400ms, automatic reduced-motion bypass, retargeting stability, and unmount cancellation.
-  - **Adaptive Favicon & Brand Title:** Configured root App Router metadata title to `"Melon Governance"`. Created uniform white logo variant for dark mode (`/favicon-dark.png`, 48,621 bytes) and uniform black logo variant for light mode (`/favicon-light.png`, 48,834 bytes), preserving master `logo2.webp`. Configured dual media-query icons in root metadata. Removed unused root-level duplicate assets.
+  - **Adaptive Favicon & Brand Title:** Configured root App Router metadata title to `"Melon Governance"`. Created uniform white logo variant for dark mode (`/favicon-dark.png`, 48,621 bytes) and uniform black logo variant for light mode (`/favicon-light.png`, 48,834 bytes), preserving master `logo2.webp`. Configured dual media-query icons in root metadata. Removed unused root-level duplicate assets. Added physical static fallback asset `apps/web/public/favicon.ico` (2,948 bytes, 3 embedded PNG icon directory entries at 16×16, 32×32, 48×48 px) resolving browser default root `GET /favicon.ico` with HTTP 200 without runtime JS/dependency overhead.
 - **Verification & Acceptance Status:**
-  - Automated Unit Tests: 100% pass across targeted unit test suites (`outage-detection.test.tsx`, `animated-number.test.tsx`, `metadata-icons.test.ts`).
-  - Manual Favicon Acceptance: Whole-logo adaptive favicon branding formally reviewed and accepted by BAMABAA on 2026-10-04 (updates upon tab activation accepted; background update investigation closed).
-  - Remaining Manual Operator Tests: Real server shutdown outage test, outage recovery navigation test, and heap/FPS profiling remain pending execution by BAMABAA.
-  - Pre-Commit CI Gates: Five pre-commit commands (`check:quality`, `test`, `test:coverage`, `test:integration`, `test:e2e`) are reserved exclusively for execution by operator BAMABAA.
-<!-- TASK-0507 Traceability Reconciled: 2026-10-04 -->
+  - Automated Unit Tests: 100% pass across targeted unit test suites (`outage-detection.test.tsx`, `animated-number.test.tsx`, `metadata-icons.test.ts`). Static favicon.ico test added in `metadata-icons.test.ts` (execution pending).
+  - Manual Favicon Acceptance: Whole-logo adaptive favicon branding and static fallback resolution confirmed PASS (user-reported on 2026-10-12).
+  - Remaining Manual Operator Tests: Real server shutdown outage test, outage recovery navigation test, and heap/FPS profiling remain pending execution.
+  - Pre-Commit CI Gates: Five pre-commit commands (`check:quality`, `test`, `test:coverage`, `test:integration`, `test:e2e`) are reserved exclusively for execution by operator.
+<!-- TASK-0507 Traceability Reconciled: 2026-10-12 -->
+
+---
+
+## Monitoring Telemetry History Decoupling, Timezone Boundaries & Water History Column Traceability Note (TASK-0504 Follow-up / DEC-MON-094 / Reconciled 2026-10-12)
+
+The following facts are verified in the traceability matrix regarding `TASK-0504 Follow-up`:
+- **Traceability Baseline:**
+  - Tasks: `TASK-0504 Follow-up`, referencing `TASK-0503` and `TASK-0504` in `TASKS.md`.
+  - Architecture & Decisions: `DEC-MON-087`, `DEC-MON-093`, `DEC-MON-094`, and `DEC-UIUX-104` (superseded) in `docs/DECISIONS.md`.
+  - API & Contracts: `docs/API.md` §2.2, `@kebun-melon/contracts` (`SoilHistoryResponseDtoSchema`, `WaterHistoryResponseDtoSchema`).
+  - Database: `docs/DATABASE.md` §3.5, `@kebun-melon/database` (`TelemetryRepository`).
+  - UI/UX & I18N: `docs/UI_UX.md` §1.12, `docs/I18N.md` §3.7.
+  - Testing: `docs/TESTING.md` §53.
+  - Governance: `AGENTS.md` §2 (`Soil & Water Telemetry History & Location Annotations`).
+- **Implementation Status:**
+  - **History & Chart Decoupling:** Measurement history tables on `/soil` and `/water` (`MeasurementHistoryPanel`, `ReadingHistoryTable`) paginate independently across all retained device telemetry (`HISTORY_PAGE_SIZE = 5`) ordered deterministically (`receivedAt ASC, id ASC`). Changing chart presets (24h, 7d, 30d, custom) never resets history pagination, never modifies total counts, and never triggers history refetches.
+  - **API Contract Change:** `GET /monitoring/soil/history` and `GET /monitoring/water/history` treat omitted `from` and `to` query parameters as requesting all retained readings across the device lifetime, removing the fallback 24-hour date boundary.
+  - **Sensor Measurement Timestamp Filtering (`recordedAt`):** Backend SQL chart queries and keyset cursors filter and order strictly by `recordedAt` (`[recordedAt, id]`), ensuring measurements with delayed gateway receipt belong to their actual sensor measurement date.
+  - **Browser Display Timezone & Calendar Boundaries:** Monitoring UI resolves runtime browser display timezone (`getDisplayTimezone()`, reading `Intl.DateTimeFormat().resolvedOptions().timeZone` with canonical fallback `Asia/Jakarta`). Strictly distinguished from server-side `UserPreference.timezone`, which governs background notifications, alerts, and transactional emails. Calendar-day boundaries span local start-of-day (`00:00:00.000` inclusive) to next-day-start (`00:00:00.000` exclusive), without assuming every calendar day is exactly 24 hours. Single-day selections display exactly that complete local calendar day.
+  - **Reversed Date Validation & Same-Day Selection:** Original calendar dates are validated BEFORE converting end date to next-day-start: `startDate > endDate` is strictly rejected (`dateRangeOrder`); same-day selection (`startDate === endDate`) is valid. Validation runs inline immediately once both date inputs are present, without requiring location selection. Locale-reactive error keys (`dateRangeOrder`, `dateRangeSelectBoth`, `dateRangeInvalid`, `maxBoundsExceeded`) follow the active application locale (`next-intl`). Invalid ranges clear chart data immediately (`setData([])`) and bypass chart network requests. Correcting date inputs immediately clears the error state.
+  - **Technical Helper Copy Removal:** Technical helper text `"(Max. 31 days per DEC-MON-087)"` removed from rendered chart controls in both languages with zero replacement text or hidden DOM fallbacks; 31-day enforcement (`MAX_RANGE_MS`) remains active.
+  - **Water Column Calibration:** Temperature (`°C`) excluded from water quality history table; retained in soil history. Stored database records remain untouched.
+- **Verification Evidence:**
+  - Manual Website Verification: **PASS (USER-REPORTED on 2026-10-12)**.
+  - Automated Regression Test Suite: `apps/web/test/unit/monitoring-history-separation.test.ts` added (execution PENDING).
+  - Pre-Commit CI Gates: Five pre-commit commands (`check:quality`, `test`, `test:coverage`, `test:integration`, `test:e2e`) remain PENDING execution by operator.
+- **Deployment & Infrastructure Assessment:**
+  - Web Container Rollout: **REQUIRED** (Requires building and restarting `kebun-melon-web` container image to deploy updated frontend hook, chart controls, and route handlers).
+  - IoT Gateway: **NOT REQUIRED** (Zero gateway changes).
+  - Database Migrations: **NOT REQUIRED** (Zero schema migrations needed).
+  - Environment Variables & Reverse Proxy (Caddy): **NOT REQUIRED** (Zero configuration changes).
+<!-- TASK-0504 Follow-up Traceability Reconciled: 2026-10-12 -->
+
 
 
 

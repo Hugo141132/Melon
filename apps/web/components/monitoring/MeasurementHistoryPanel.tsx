@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import {
   ReadingHistoryTable,
@@ -25,8 +25,6 @@ export interface MeasurementHistoryPanelProps {
   domain: 'soil' | 'water';
   /** Stable column descriptors; identity must not change per render. */
   metricColumns: HistoryMetricColumn[];
-  from: Date;
-  to: Date;
   onAnnotationChange?: () => void;
 }
 
@@ -48,31 +46,21 @@ export function MeasurementHistoryPanel({
   deviceId,
   domain,
   metricColumns,
-  from,
-  to,
   onAnnotationChange,
 }: MeasurementHistoryPanelProps) {
   const tHistory = useTranslations('history');
 
   const basePath = `/api/v1/devices/${deviceId}/monitoring/${domain}`;
 
-  // The window identity changes only when the date controls actually change,
-  const windowKey = useMemo(
-    () => `${Math.floor(from.getTime() / 60000)}|${Math.floor(to.getTime() / 60000)}`,
-    [from, to]
-  );
-
   const buildQuery = useCallback(
     (page: number, pageSize: number) => {
       const params = new URLSearchParams({
-        from: from.toISOString(),
-        to: to.toISOString(),
         page: String(page),
         pageSize: String(pageSize),
       });
       return `${basePath}/history?${params.toString()}`;
     },
-    [basePath, from, to]
+    [basePath]
   );
 
   const selectItems = useCallback((payload: unknown) => {
@@ -106,7 +94,7 @@ export function MeasurementHistoryPanel({
     buildQuery,
     selectItems,
     selectMeta,
-    resetKey: windowKey,
+    resetKey: deviceId,
     enabled: Boolean(deviceId),
   });
 

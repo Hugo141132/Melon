@@ -1,8 +1,18 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type { ReadingLocationOption } from '@kebun-melon/contracts';
+import { useTranslations } from 'next-intl';
 
 export type DateRangePreset = '24h' | '7d' | '30d' | 'custom';
 export type DomainType = 'soil' | 'water';
+
+export type DateRangeErrorKey =
+  'dateRangeSelectBoth' | 'dateRangeInvalid' | 'dateRangeOrder' | 'maxBoundsExceeded' | null;
+
+export interface ValidatedCustomDateRange {
+  isValid: boolean;
+  errorKey: DateRangeErrorKey;
+  range: { from: Date; to: Date } | null;
+}
 
 export interface BaseSeriesItem {
   timestamp: string;
@@ -22,7 +32,110 @@ export interface UseHistoricalMonitoringOptions {
   annotationCacheToken?: string;
 }
 
-const MAX_RANGE_MS = 31 * 24 * 60 * 60 * 1000; // 31 days per DEC-MON-087
+export const MAX_RANGE_MS = 31 * 24 * 60 * 60 * 1000; // 31 days per DEC-MON-087
+
+/**
+ * Validates custom calendar date strings before boundary extension.
+ * Validates original calendar dates: startDate > endDate is invalid, same-day is valid.
+ */
+export function validateCustomCalendarRange(
+  customFrom: string,
+  customTo: string
+): ValidatedCustomDateRange {
+  if (!customFrom && !customTo) {
+    return {
+      isValid: false,
+      errorKey: null,
+      range: null,
+    };
+  }
+
+  if (!customFrom || !customTo) {
+    return {
+      isValid: false,
+      errorKey: 'dateRangeSelectBoth',
+      range: null,
+    };
+  }
+
+  const startCal = customFrom.includes('T')
+    ? new Date(customFrom)
+    : parseLocalDateStart(customFrom);
+  const endCal = customTo.includes('T') ? new Date(customTo) : parseLocalDateStart(customTo);
+
+  if (isNaN(startCal.getTime()) || isNaN(endCal.getTime())) {
+    return {
+      isValid: false,
+      errorKey: 'dateRangeInvalid',
+      range: null,
+    };
+  }
+
+  // Validate original calendar dates BEFORE converting end date to next-day-start:
+  // startDate > endDate is invalid; same-day selection (startDate === endDate) is valid.
+  if (startCal.getTime() > endCal.getTime()) {
+    return {
+      isValid: false,
+      errorKey: 'dateRangeOrder',
+      range: null,
+    };
+  }
+
+  const from = startCal;
+  const to = customTo.includes('T') ? new Date(customTo) : parseLocalDateNextDayStart(customTo);
+
+  if (isNaN(from.getTime()) || isNaN(to.getTime())) {
+    return {
+      isValid: false,
+      errorKey: 'dateRangeInvalid',
+      range: null,
+    };
+  }
+
+  if (to.getTime() - from.getTime() > MAX_RANGE_MS) {
+    return {
+      isValid: false,
+      errorKey: 'maxBoundsExceeded',
+      range: null,
+    };
+  }
+
+  return {
+    isValid: true,
+    errorKey: null,
+    range: { from, to },
+  };
+}
+
+/**
+ * Resolves the active display timezone, prioritizing runtime user display environment
+ * with canonical fallback to 'Asia/Jakarta' (WIB, UTC+7).
+ */
+export function getDisplayTimezone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Jakarta';
+  } catch {
+    return 'Asia/Jakarta';
+  }
+}
+
+/**
+ * Parses YYYY-MM-DD string into a Date representing start of that calendar day (00:00:00.000)
+ * in the active display timezone (start-inclusive boundary).
+ */
+export function parseLocalDateStart(dateStr: string): Date {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d, 0, 0, 0, 0);
+}
+
+/**
+ * Parses YYYY-MM-DD string into a Date representing start of next calendar day (next-day 00:00:00.000)
+ * in the active display timezone (next-day-exclusive boundary).
+ */
+export function parseLocalDateNextDayStart(dateStr: string): Date {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d + 1, 0, 0, 0, 0);
+}
 
 /**
  * Maps each stored reading onto a chart point WITHOUT changing its value or
@@ -32,17 +145,27 @@ const MAX_RANGE_MS = 31 * 24 * 60 * 60 * 1000; // 31 days per DEC-MON-087
  * bucketing or synthetic aggregation.
  */
 function mapReadingsToSeries(data: any[], isMultiDay: boolean): BaseSeriesItem[] {
+  const tz = getDisplayTimezone();
+  const timeFormatter = new Intl.DateTimeFormat('id-ID', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: tz,
+  });
+  const dayMonthFormatter = new Intl.DateTimeFormat('id-ID', {
+    day: '2-digit',
+    month: 'short',
+    timeZone: tz,
+  });
+
   return data.map((item) => {
-    const itemDate = new Date(item.timestamp);
+    const itemDate = new Date(item.recordedAt || item.timestamp || item.receivedAt);
 
     const numeric = (field: string): number | null =>
       typeof item[field] === 'number' ? (item[field] as number) : null;
 
-    const hh = String(itemDate.getHours()).padStart(2, '0');
-    const mm = String(itemDate.getMinutes()).padStart(2, '0');
-    const timeStr = isMultiDay
-      ? `${itemDate.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' })} ${hh}:${mm}`
-      : `${hh}:${mm}`;
+    const timePart = timeFormatter.format(itemDate);
+    const timeStr = isMultiDay ? `${dayMonthFormatter.format(itemDate)} ${timePart}` : timePart;
 
     const n = numeric('nitrogen');
     const p = numeric('phosphorus');
@@ -50,7 +173,7 @@ function mapReadingsToSeries(data: any[], isMultiDay: boolean): BaseSeriesItem[]
     const ec = numeric('ec');
 
     return {
-      readingId: item.readingId,
+      readingId: item.readingId || item.id,
       timestamp: itemDate.toISOString(),
       time: timeStr,
       nitrogen: n,
@@ -77,6 +200,7 @@ export function useHistoricalMonitoring({
   initialLocationKey = '',
   annotationCacheToken,
 }: UseHistoricalMonitoringOptions) {
+  const tHistory = useTranslations('history');
   const defaultMetric = initialMetric || (domain === 'soil' ? 'npk' : 'ec');
 
   const [preset, setPreset] = useState<DateRangePreset>(initialPreset);
@@ -90,10 +214,13 @@ export function useHistoricalMonitoring({
   const [data, setData] = useState<BaseSeriesItem[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [dateRangeError, setDateRangeError] = useState<string | null>(null);
+  const [dateRangeErrorKey, setDateRangeErrorKey] = useState<DateRangeErrorKey>(null);
   const [truncated, setTruncated] = useState<boolean>(false);
   const chartRequestIdRef = useRef<number>(0);
   const chartAbortControllerRef = useRef<AbortController | null>(null);
+
+  // Dynamically resolve error string from active next-intl locale dictionary
+  const dateRangeError = dateRangeErrorKey ? tHistory(dateRangeErrorKey) : null;
 
   // Pure computation for the effective date range window
   const calculateDateRange = useCallback((): { from: Date; to: Date } | null => {
@@ -108,13 +235,11 @@ export function useHistoricalMonitoring({
     } else if (preset === '30d') {
       from = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     } else {
-      if (!customFrom) {
+      const validated = validateCustomCalendarRange(customFrom, customTo);
+      if (!validated.isValid || !validated.range) {
         return null;
       }
-      from = new Date(customFrom);
-      to = customTo
-        ? new Date(customTo.includes('T') ? customTo : `${customTo}T23:59:59.999Z`)
-        : now;
+      return validated.range;
     }
 
     if (isNaN(from.getTime()) || isNaN(to.getTime())) {
@@ -135,35 +260,17 @@ export function useHistoricalMonitoring({
 
   const resolvedRange = useMemo(() => calculateDateRange(), [calculateDateRange]);
 
-  // Validate date range and report user-facing error message
+  // Validate date range and report user-facing error message.
+  // Evaluates inline once inputs are present, independent of whether location is selected.
   useEffect(() => {
-    if (resolvedRange) {
-      setDateRangeError(null);
+    if (preset !== 'custom') {
+      setDateRangeErrorKey(null);
       return;
     }
 
-    const customStart = customFrom ? new Date(customFrom) : null;
-    const customEnd = customTo
-      ? new Date(customTo.includes('T') ? customTo : `${customTo}T23:59:59.999Z`)
-      : null;
-
-    if (customStart && isNaN(customStart.getTime())) {
-      setDateRangeError('Format tanggal tidak valid.');
-      return;
-    }
-    if (customEnd && isNaN(customEnd.getTime())) {
-      setDateRangeError('Format tanggal tidak valid.');
-      return;
-    }
-    if (customStart && customEnd && customStart.getTime() > customEnd.getTime()) {
-      setDateRangeError('Tanggal mulai harus sebelum tanggal selesai.');
-      return;
-    }
-    if (customStart && customEnd && customEnd.getTime() - customStart.getTime() > MAX_RANGE_MS) {
-      setDateRangeError('Rentang tanggal tidak boleh melebihi 31 hari (DEC-MON-087).');
-      return;
-    }
-  }, [resolvedRange, customFrom, customTo]);
+    const validated = validateCustomCalendarRange(customFrom, customTo);
+    setDateRangeErrorKey(validated.errorKey);
+  }, [preset, customFrom, customTo]);
 
   // Load distinct annotated locations for device and domain
   const loadLocations = useCallback(async () => {
@@ -328,8 +435,19 @@ export function useHistoricalMonitoring({
         return aId < bId ? -1 : aId > bId ? 1 : 0;
       });
 
+      // Strictly bound displayed chart points and tooltips within the active date range for custom dates
+      const inRangePoints =
+        preset === 'custom'
+          ? accumulatedPoints.filter((point) => {
+              const pt = new Date(
+                point.recordedAt || point.timestamp || point.receivedAt
+              ).getTime();
+              return pt >= fromTime && pt < toTime;
+            })
+          : accumulatedPoints;
+
       const isMultiDay = toTime - fromTime > 24 * 60 * 60 * 1000;
-      const mapped = mapReadingsToSeries(accumulatedPoints, isMultiDay);
+      const mapped = mapReadingsToSeries(inRangePoints, isMultiDay);
 
       setData(mapped);
       setTruncated(false);
@@ -377,6 +495,7 @@ export function useHistoricalMonitoring({
     loading,
     error,
     dateRangeError,
+    dateRangeErrorKey,
     truncated,
     refetchLocations: loadLocations,
     refetchChart: loadChartData,

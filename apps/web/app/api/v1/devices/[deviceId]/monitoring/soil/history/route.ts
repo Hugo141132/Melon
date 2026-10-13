@@ -112,19 +112,23 @@ export async function GET(request: Request, props: { params: Promise<{ deviceId:
       pageSize,
     } = parsedQuery.data;
 
-    const dateRange = parseAndValidateDateRange(fromParam, toParam);
-    if (dateRange.errorResponse) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: dateRange.errorResponse.code,
-            message: dateRange.errorResponse.message,
+    let dateRange: { from?: Date; to?: Date } = {};
+    if (fromParam !== undefined || toParam !== undefined) {
+      const parsedRange = parseAndValidateDateRange(fromParam, toParam);
+      if (parsedRange.errorResponse) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: parsedRange.errorResponse.code,
+              message: parsedRange.errorResponse.message,
+            },
+            meta: { requestId },
           },
-          meta: { requestId },
-        },
-        { status: dateRange.errorResponse.statusCode }
-      );
+          { status: parsedRange.errorResponse.statusCode }
+        );
+      }
+      dateRange = { from: parsedRange.from, to: parsedRange.to };
     }
 
     const metrics = metricsStr

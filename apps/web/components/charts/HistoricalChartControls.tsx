@@ -179,9 +179,6 @@ export default function HistoricalChartControls({
               className="bg-app-surface-container-lowest border border-app-outline-variant/50 rounded px-2 py-1 text-app-on-surface text-[12px]"
             />
           </div>
-          <span className="text-[11px] text-app-on-surface-variant">
-            {tHistory('max31DaysNote')}
-          </span>
         </div>
       )}
 

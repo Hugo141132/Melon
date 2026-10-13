@@ -3690,6 +3690,60 @@ The five mandatory CI gates must be executed **exclusively by operator JEMBOT** 
 - **Ancillary Components:** No gateway or Caddy configuration changes were required for this update. Single-gateway rule preserved.
 <!-- TASK-0503 & TASK-0504 Deployment Closeout Recorded: 2026-10-09 -->
 
+---
+
+# 53. TASK-0504 Follow-up & TASK-0507 Verification Evidence: Telemetry History Decoupling, Timezone Boundaries, Reversed Date Validation & Static Favicon Fallback
+
+**Task References:** `TASK-0504 Follow-up` (`DEC-MON-094`), `TASK-0507` (`DEC-UIUX-109`)  
+**Status:** `READY FOR CI GATES & DEPLOYMENT` (Implementation complete; manual website verification PASS; 5 automated CI gates pending operator execution)  
+**Date:** 2026-10-12  
+
+### 1. Implementation Scope & Invariants
+- **Telemetry History & Chart Decoupling:**
+  - Measurement history tables (`MeasurementHistoryPanel`, `ReadingHistoryTable`) paginate across all retained device telemetry (`HISTORY_PAGE_SIZE = 5`) ordered by `receivedAt ASC, id ASC` independently of chart presets (24h, 7d, 30d, custom).
+  - API endpoints `GET /monitoring/soil/history` and `GET /monitoring/water/history` treat omitted `from`/`to` parameters as querying across all retained readings.
+- **Sensor Measurement Timestamp Filtering (`recordedAt`):**
+  - Keyset cursor pagination and chart filtering operate on sensor measurement timestamps (`recordedAt >= from AND recordedAt < to`), ordering by `[{ recordedAt: 'asc' }, { id: 'asc' }]` with cursor `${recordedAtIso}_${id}`.
+- **Browser Display Timezone & Calendar Boundaries:**
+  - Timezone resolved dynamically from runtime browser environment (`getDisplayTimezone()`, reading `Intl.DateTimeFormat().resolvedOptions().timeZone` with canonical fallback `Asia/Jakarta`).
+  - Strictly distinguished from server-side `UserPreference.timezone`, which governs background notifications, alerts, and transactional emails.
+  - Calendar boundaries span local start-of-day (`00:00:00.000` inclusive) to next-day-start (`00:00:00.000` exclusive), without assuming every calendar day is exactly 24 hours. Single-day selections span exactly that complete calendar day.
+- **Calendar-Date-First Validation for Custom Date Ranges:**
+  - Original calendar dates are validated BEFORE converting end date to next-day-start: `startDate > endDate` is strictly invalid (`dateRangeOrder`); same-day selection (`startDate === endDate`) is valid.
+  - Validation displays inline error immediately once both date inputs are filled, independent of location selection.
+  - Locale-reactive error keys (`dateRangeOrder`, `dateRangeSelectBoth`, `dateRangeInvalid`, `maxBoundsExceeded`) follow the active application locale (`next-intl`).
+  - Invalid ranges clear chart data immediately (`setData([])`) and bypass chart requests; correcting date inputs immediately clears the error state.
+- **Technical Helper Copy Removal:**
+  - Helper copy `"(Max. 31 days per DEC-MON-087)"` removed from rendered chart controls in both languages with zero replacement text or hidden DOM fallbacks; 31-day enforcement (`MAX_RANGE_MS`) remains active.
+- **Water Quality Column Calibration:**
+  - Temperature (`°C`) excluded from water quality history table; retained in soil history. Stored database records remain untouched.
+- **Static Root Favicon.ico Fallback Asset:**
+  - Physical asset `apps/web/public/favicon.ico` (2,948 bytes, 3 embedded PNG icon directory entries at 16×16, 32×32, 48×48 px) resolving browser default root `GET /favicon.ico` with HTTP 200 without runtime JS/dependency overhead.
+  - Declarative adaptive light/dark PNG metadata in `apps/web/app/layout.tsx` preserved 100% without modification or duplication.
+
+### 2. Regression Test Suites (Implemented, Execution Pending)
+- **Monitoring History Separation & Date Boundary Test Suite (`apps/web/test/unit/monitoring-history-separation.test.ts`):**
+  - Covers column definitions (temperature present in soil, omitted in water).
+  - Covers custom calendar boundaries in browser display timezone (`[start_of_day, next_day_start)`).
+  - Covers next-day exclusion (`11 Oct 00:14` excluded from October 10 single-day query).
+  - Covers optional date query contract for history endpoint.
+  - Covers reversed-by-one-day, reversed-by-two-days, same-day validity, and input correction flow.
+  - Covers localized error strings across `id` and `en` locales.
+  - *Status:* `IMPLEMENTED (EXECUTION PENDING)`.
+- **Layout Metadata & Static Favicon Asset Test Suite (`apps/web/test/unit/metadata-icons.test.ts`):**
+  - Added test case verifying physical existence, minimum size, and valid ICO container headers for `apps/web/public/favicon.ico`.
+  - *Status:* `IMPLEMENTED (EXECUTION PENDING)`.
+
+### 3. Website Acceptance & Deployment Status
+- **Manual Website Verification:** **PASS (USER-REPORTED on 2026-10-12)**.
+- **Pre-Commit Operator CI Gates Protocol:**
+  - The five mandatory CI gates (`npm run test:coverage`, `npm run test:integration`, `npm run check:quality`, `npm test`, `npm run test:e2e`) remain **PENDING** execution by operator.
+- **Git Commit, Push & Remote CI:** **PENDING**.
+- **Live Database Migrations:** **NOT REQUIRED** (Zero schema changes).
+- **Staging / VPS Deployment Guidance:** **PENDING**. Requires building and restarting `kebun-melon-web` container image only. Gateway, database migrations, environment variables, and reverse proxy (Caddy) remain untouched.
+<!-- TASK-0504 Follow-up & TASK-0507 Testing Evidence Recorded: 2026-10-12 -->
+
+
 
 
 

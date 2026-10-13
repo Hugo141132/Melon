@@ -2,7 +2,7 @@
 
 import React, { useCallback, useMemo, useState } from 'react';
 import { ArrowLeft, ArrowRight, MapPin, Pencil, RefreshCw, X } from 'lucide-react';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import { cn } from '@/lib/utils';
 
 /**
@@ -75,6 +75,8 @@ export function ReadingHistoryTable({
 }: ReadingHistoryTableProps) {
   const tHistory = useTranslations('history');
   const tCommon = useTranslations('common');
+  const locale = useLocale();
+  const intlLocale = locale === 'en' ? 'en-US' : 'id-ID';
 
   const [editing, setEditing] = useState<EditingState>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -216,7 +218,7 @@ export function ReadingHistoryTable({
                 >
                   <td className="p-3">
                     <div className="font-mono text-[11px] text-app-on-surface">
-                      {new Date(row.recordedAt).toLocaleString(undefined, {
+                      {new Date(row.recordedAt).toLocaleString(intlLocale, {
                         dateStyle: 'short',
                         timeStyle: 'medium',
                       })}
@@ -224,7 +226,7 @@ export function ReadingHistoryTable({
                     {row.receivedAt ? (
                       <div className="mt-0.5 text-[10px] text-app-on-surface-variant">
                         {tHistory('receivedAt')}:{' '}
-                        {new Date(row.receivedAt).toLocaleString(undefined, {
+                        {new Date(row.receivedAt).toLocaleString(intlLocale, {
                           dateStyle: 'short',
                           timeStyle: 'medium',
                         })}
@@ -328,7 +330,7 @@ export function ReadingHistoryTable({
         <p className="px-4 py-6 text-center text-xs text-app-error">{error}</p>
       ) : isEmpty ? (
         <p className="px-4 py-6 text-center text-xs text-app-on-surface-variant">
-          {tHistory('noData')}
+          {tHistory('historyNoData')}
         </p>
       ) : null}
 

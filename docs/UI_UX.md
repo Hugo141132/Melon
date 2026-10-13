@@ -263,7 +263,7 @@ The 2026-10-04 refinement introduces lightweight shared page transitions, smooth
    - **Dual Media-Query Metadata Icons:** Declared in Next.js root metadata:
      - `{ rel: 'icon', url: '/favicon-dark.png', media: '(prefers-color-scheme: dark)' }`
      - `{ rel: 'icon', url: '/favicon-light.png', media: '(prefers-color-scheme: light)' }`
-     - Dedicated shortcut icon references `/favicon-light.png` for legacy user agents.
+     - Dedicated shortcut icon references `/favicon-light.png` for legacy user agents, complemented by static root fallback `apps/web/public/favicon.ico` (2,948 bytes, 3 embedded PNG icon directory entries at 16×16, 32×32, 48×48 px with RGBA transparency) resolving direct `GET /favicon.ico` browser requests with HTTP 200 without runtime JavaScript execution or dependencies.
    - **Asset Location Authority:** Assets reside strictly in `apps/web/public/` (the Next.js public root directory). Redundant root-level duplicates (`public/favicon-*.png`) were removed following build audit.
    - **Browser Lifecycle & Acceptance:** In Chromium-based browsers, background tabs (`visibilityState === 'hidden'`) throttle or defer `matchMedia` event callbacks until the tab is activated. BAMABAA formally accepted tab-activation updates on 2026-10-04; background update investigation is closed.
 
@@ -1953,7 +1953,41 @@ The Physical Valve State presentation on the `/controls` page (`FaucetControlPan
   - **Initial View Mount Hydration:** On initial mount or active device selection, the panel calls `GET /api/v1/devices/{deviceId}/valve-status` to hydrate the latest confirmed hardware feedback persisted in `device_status_events`, eliminating blank or erroneous initial states without waiting for a new command.
 - **Bilingual Localization & Design Integrity:**
   - Fully bound to existing translation keys under the `faucet.*` namespace in `messages/en.json` and `messages/id.json`.
-  - Zero layout shift, no added modal disruptions, and strict compliance with `Premium Minimal Ops`.
 <!-- Physical Valve State UI/UX Reconciled: 2026-10-01 -->
+
+---
+
+## Monitoring Telemetry History & Chart Filter Decoupling UI/UX Specification (TASK-0504 Follow-up / DEC-MON-094 / Reconciled 2026-10-12)
+
+The Soil (`/soil`) and Water Quality (`/water`) telemetry history pagination, custom chart date boundary calculation, and column presentation are refined:
+- **Frontend Impact:** `MINOR`
+- **Selected UI Direction:** `Premium Minimal Ops`
+- **Existing Color Template:** `UNCHANGED`
+- **Selected Motion Effects:** `None`
+- **21st.dev MCP:** `NOT REQUIRED`
+- **Independent History Table Pagination:**
+  - Measurement history (`MeasurementHistoryPanel.tsx`, `ReadingHistoryTable.tsx`) is completely decoupled from chart preset and custom range filters (`24h`, `7d`, `30d`, `custom`).
+  - Switching chart filters does not reset history pagination, modify total counts, or trigger history refetches.
+  - History independently paginates all retained telemetry readings for the active device at exactly 5 rows per page (`HISTORY_PAGE_SIZE = 5`) ordered deterministically (`receivedAt ASC, id ASC`).
+  - History empty-state copy (`historyNoData`) reflects absence of stored device telemetry rather than chart date filtering, and `allDataNote` informs users that all retained readings remain reachable via pagination.
+- **Browser Display Timezone & Calendar Boundaries:**
+  - Monitoring UI resolves the runtime browser display timezone (`getDisplayTimezone()`, reading `Intl.DateTimeFormat().resolvedOptions().timeZone` with canonical fallback `Asia/Jakarta`).
+  - This is strictly distinguished from server-side `UserPreference.timezone`, which governs background notifications, alerts, and transactional emails.
+  - Custom date inputs (`YYYY-MM-DD`) are interpreted as calendar-day boundaries spanning local start-of-day (`00:00:00.000` inclusive) to next-day-start (`00:00:00.000` exclusive), without assuming every calendar day is exactly 24 hours (handles daylight saving shifts and clock adjustments).
+  - Single-day filters (e.g. `2026-10-10` to `2026-10-10`) display exactly that complete calendar day in the local display timezone, preventing boundary bleed-through into subsequent dates (such as `11 Oct 00:14`).
+  - Incomplete or empty custom date inputs clear plotted data safely (`setData([])`) rather than falling back to current timestamps or retaining stale chart points.
+- **Calendar-Date-First Validation for Custom Date Ranges:**
+  - Original calendar dates are validated BEFORE converting end date to next-day-start: `startDate > endDate` is strictly invalid (`dateRangeOrder`); same-day selection (`startDate === endDate`) is valid.
+  - Inline error displays immediately once both date inputs are present, independent of location selection.
+  - Locale-reactive error keys (`dateRangeOrder`, `dateRangeSelectBoth`, `dateRangeInvalid`, `maxBoundsExceeded`) follow the active application locale (`next-intl`).
+  - Invalid ranges immediately clear data (`setData([])`) and bypass chart network requests. Correcting date inputs immediately clears the error state.
+- **Technical Helper Copy Removal:**
+  - The technical helper text `"(Max. 31 days per DEC-MON-087)"` is removed from rendered chart controls in both languages with zero replacement text or hidden DOM fallback rendering.
+  - The 31-day enforcement (`MAX_RANGE_MS`) remains active in client validation and backend API.
+- **Water Quality Column Calibration:**
+  - Water quality measurement history (`waterHistoryColumns`) strictly omits the temperature (`°C`) column across table headers, row cells, and column configuration.
+  - Soil measurement history (`soilHistoryColumns`) retains temperature (`°C`). Stored database records remain untouched.
+<!-- Monitoring Telemetry History & Chart Filter Decoupling Reconciled: 2026-10-12 -->
+
 
 

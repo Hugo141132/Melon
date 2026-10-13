@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React from 'react';
 import dynamic from 'next/dynamic';
 import TopAppBar from '@/components/navigation/TopAppBar';
 import HistoricalChartControls from '@/components/charts/HistoricalChartControls';
@@ -96,6 +96,17 @@ function PHBar({ value }: { value: number | null | undefined }) {
   );
 }
 
+/**
+ * Descriptors are module-level constants so their identity stays stable across renders.
+ * Fresh arrays on every render would retrigger the pagination fetch effect and cause a
+ * request storm on each state change.
+ */
+export const waterHistoryColumns: HistoryMetricColumn[] = [
+  { key: 'ph', label: 'pH', unit: 'pH', precision: 2 },
+  { key: 'tds', label: 'TDS', unit: 'ppm', precision: 1 },
+  { key: 'ec', label: 'EC', unit: 'µS/cm', precision: 0 },
+];
+
 export default function WaterPage() {
   const tWater = useTranslations('water');
   const tSoil = useTranslations('soil');
@@ -132,7 +143,6 @@ export default function WaterPage() {
     selectedLocationKey,
     setSelectedLocationKey,
     data: historyData,
-    resolvedRange: historyRange,
     loading: historyLoading,
     error: historyError,
     dateRangeError,
@@ -142,21 +152,6 @@ export default function WaterPage() {
     initialMetric: 'ec',
     annotationCacheToken: annotationToken,
   });
-
-  /**
-   * Descriptors are memoised so their identity stays stable. Fresh arrays on
-   * every render would retrigger the pagination fetch effect and cause a
-   * request storm on each state change.
-   */
-  const waterHistoryColumns = useMemo<HistoryMetricColumn[]>(
-    () => [
-      { key: 'ph', label: 'pH', unit: 'pH', precision: 2 },
-      { key: 'tds', label: 'TDS', unit: 'ppm', precision: 1 },
-      { key: 'ec', label: 'EC', unit: 'µS/cm', precision: 0 },
-      { key: 'temperature', label: '°C', unit: '°C', precision: 1 },
-    ],
-    []
-  );
 
   const waterData = snapshot?.water?.data;
   const recordedAt = snapshot?.water?.recordedAt;
@@ -366,8 +361,6 @@ export default function WaterPage() {
                   deviceId={activeDeviceId}
                   domain="water"
                   metricColumns={waterHistoryColumns}
-                  from={historyRange?.from ?? new Date(Date.now() - 24 * 60 * 60 * 1000)}
-                  to={historyRange?.to ?? new Date()}
                   onAnnotationChange={handleAnnotationChange}
                 />
               </div>

@@ -281,8 +281,8 @@ export type SoilHistorySeriesItem = z.infer<typeof SoilHistorySeriesItemSchema>;
 
 export const SoilHistoryResponseDtoSchema = z.object({
   deviceId: z.string(),
-  from: z.string(),
-  to: z.string(),
+  from: z.string().optional(),
+  to: z.string().optional(),
   interval: z.string().optional(),
   series: z.array(SoilHistorySeriesItemSchema),
   pagination: z.object({
@@ -335,8 +335,8 @@ export type WaterHistorySeriesItem = z.infer<typeof WaterHistorySeriesItemSchema
 
 export const WaterHistoryResponseDtoSchema = z.object({
   deviceId: z.string(),
-  from: z.string(),
-  to: z.string(),
+  from: z.string().optional(),
+  to: z.string().optional(),
   interval: z.string().optional(),
   series: z.array(WaterHistorySeriesItemSchema),
   pagination: z.object({

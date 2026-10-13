@@ -342,7 +342,7 @@ describe('Historical Monitoring API Endpoints (TASK-0503 & TASK-0504 Repairs)', 
       );
     });
 
-    it('uses last 24 hours as default range when from and to are omitted', async () => {
+    it('omits date boundaries when from and to are omitted to query all retained readings', async () => {
       mockOwnerSession();
       mockGetDeviceByCanonicalId.mockResolvedValue(dummySoilDevice);
 
@@ -358,10 +358,8 @@ describe('Historical Monitoring API Endpoints (TASK-0503 & TASK-0504 Repairs)', 
       expect(response.status).toBe(200);
       expect(body.success).toBe(true);
       const callArgs = mockGetSoilHistory.mock.calls[0][0];
-      const fromTime = callArgs.from.getTime();
-      const toTime = callArgs.to.getTime();
-      const diffHours = (toTime - fromTime) / (1000 * 60 * 60);
-      expect(diffHours).toBeCloseTo(24, 1);
+      expect(callArgs.from).toBeUndefined();
+      expect(callArgs.to).toBeUndefined();
     });
   });
 

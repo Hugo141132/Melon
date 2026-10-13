@@ -851,13 +851,13 @@ describe('TelemetryRepository Unit Tests (TASK-0405)', () => {
       expect(args.where).toEqual({
         deviceId: mockDevice.id,
         locationKey: 'bed a1',
-        receivedAt: {
+        recordedAt: {
           gte: new Date('2026-10-01T00:00:00Z'),
-          lte: new Date('2026-10-02T00:00:00Z'),
+          lt: new Date('2026-10-02T00:00:00Z'),
         },
       });
-      // Ascending keyset ordering [receivedAt, id] for deterministic batched retrieval
-      expect(args.orderBy).toEqual([{ receivedAt: 'asc' }, { id: 'asc' }]);
+      // Ascending keyset ordering [recordedAt, id] for deterministic batched retrieval
+      expect(args.orderBy).toEqual([{ recordedAt: 'asc' }, { id: 'asc' }]);
       expect(args.take).toBe(800);
     });
 

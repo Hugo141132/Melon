@@ -4897,16 +4897,22 @@ The following full CI gates were deferred for this checkpoint and must be verifi
   - Refactored `apps/web/components/dashboard/AnimatedNumber.tsx`: removed `process.env.NODE_ENV === 'test'` bypass, supporting full RAF animation lifecycle, rapid target retargeting, unmount cleanup, `prefers-reduced-motion` instantaneous formatting, unchanged value stability, decimal formatting, zero value `'0'`, and fallback `'--'`.
   - Replaced conflicting legacy declarations with native declarative dual media-queried metadata icons in `apps/web/app/layout.tsx`: strictly dual media-queried `icon` array (`(prefers-color-scheme: light)` -> `/favicon-light.png` and `(prefers-color-scheme: dark)` -> `/favicon-dark.png`), ensuring Next.js SSR and client hydration stably own the icon declarations across navigations without conflicting client-side DOM overwrites.
   - Recolored the ENTIRE logo uniformly (crown/emblem, "KING", and subtitle) from original `logo2.webp`: pure white (`RGB(255, 255, 255)`) across all visible pixels for dark preference (`/favicon-dark.png`) and pure black (`RGB(0, 0, 0)`) for light preference (`/favicon-light.png`), preserving original silhouette, proportions, transparent background, and anti-aliased alpha edges. Preserved exact document title `"Melon Governance"`.
+- **Static Root Favicon.ico Fallback Asset (`DEC-UIUX-109` / Reconciled 2026-10-12):**
+  - Added physical static fallback asset `apps/web/public/favicon.ico` (2,948 bytes, 3 embedded PNG icon directory entries at 16×16, 32×32, 48×48 px with RGBA transparency).
+  - Resolves direct browser root `GET /favicon.ico` 404 requests with HTTP 200, resolving intermittent console and server log errors.
+  - Preserves existing declarative adaptive light/dark metadata in `apps/web/app/layout.tsx` without duplication.
+  - Zero new runtime JavaScript or dependencies.
+  - Added regression test in `apps/web/test/unit/metadata-icons.test.ts` (execution pending).
 
-### 2. CI Gate Execution Status (Assigned to BAMABAA)
-- **Gate 1 (`npm run check:quality`):** Pending manual execution by BAMABAA.
-- **Gate 2 (`npm test`):** Pending manual execution by BAMABAA.
-- **Gate 3 (`npm run test:coverage`):** Pending manual execution by BAMABAA.
-- **Gate 4 (`npm run test:integration`):** Pending manual execution by BAMABAA.
-- **Gate 5 (`npm run test:e2e`):** Pending manual execution by BAMABAA (isolated web server port 3005 and disposable test DB environment prepared).
+### 2. CI Gate Execution Status (Assigned to Operator)
+- **Gate 1 (`npm run check:quality`):** Pending manual execution by operator.
+- **Gate 2 (`npm test`):** Pending manual execution by operator.
+- **Gate 3 (`npm run test:coverage`):** Pending manual execution by operator.
+- **Gate 4 (`npm run test:integration`):** Pending manual execution by operator.
+- **Gate 5 (`npm run test:e2e`):** Pending manual execution by operator.
 
-### 3. Pending Manual Verification Items (Operator Execution)
-- [x] **Favicon Branding Verification (ACCEPTED by BAMABAA on 2026-10-04):** Entire logo (crown emblem, "KING", and subtitle) renders pure white on dark mode and pure black on light mode. Updating upon tab activation is formally accepted. Background update investigations concluded and production implementation preserved.
+### 3. Verification Items Status
+- [x] **Favicon Branding & Root Fallback Verification (PASS, USER-REPORTED on 2026-10-12):** Entire logo adaptive rendering confirmed; static `/favicon.ico` resolves HTTP 200.
 - [ ] Real server shutdown & inline outage view display within 4–7 seconds on active session.
 - [ ] Outage recovery navigation to `/login?reason=outage`, verifying cookie revocation and guest guard blocking silent redirect.
 - [ ] Focused dashboard runtime heap and FPS profiling under authenticated session.
@@ -5160,17 +5166,6 @@ The following full CI gates were deferred for this checkpoint and must be verifi
   - `packages/database/test/telemetry-chart-completeness.test.ts`: 7/7 passed (100%) — verifies forward keyset pagination, determinisme nextCursor, dan penolakan malformed cursor.
   - `packages/database/test/chart-timestamp-ordering.test.ts`: 6/6 passed (100%).
   - Typecheck: 0 errors across `@kebun-melon/contracts`, `@kebun-melon/database`, and `apps/web`.
-### 2. Verification
-
-- **Automated Unit & Integration Test Suites (65/65 Passed — 100%):**
-  - `apps/web/test/unit/chart-completeness-overflow.test.tsx`: 9/9 passed (100%) — verifies retrieval of 999, 1000, 1001 points across multi-batch keyset, HTTP 400 validation response on malformed cursors, non-advancing cursor detection, stale cancellation, error honesty, and zero/null values.
-  - `apps/web/test/unit/chart-xaxis-ticks-labels.test.tsx`: 6/6 passed (100%) — verifies responsive tick counts, anchor ticks, prevention of adjacent collision, and margin/padding geometry.
-  - `apps/web/test/unit/historical-charts.test.tsx`: 19/19 passed (100%).
-  - `apps/web/test/unit/measurement-location-contracts.test.ts`: 10/10 passed (100%).
-  - `apps/web/test/unit/soil-telemetry-ui.test.tsx`: 8/8 passed (100%).
-  - `packages/database/test/telemetry-chart-completeness.test.ts`: 7/7 passed (100%) — verifies forward keyset pagination, determinism of nextCursor, and rejection of malformed cursors.
-  - `packages/database/test/chart-timestamp-ordering.test.ts`: 6/6 passed (100%).
-  - Typecheck: 0 errors across `@kebun-melon/contracts`, `@kebun-melon/database`, and `apps/web`.
 - **Operator Manual Website Verification:** **OPERATOR-REPORTED PASS** (Confirmed by operator JEMBOT).
   - Evaluated on live web server (`npm run dev:web`) on desktop and mobile (390px) viewports across Indonesian (`id`) and English (`en`) locales.
   - Verified 24h, 7d, and 30d views for Soil and Water Quality charts.
@@ -5190,14 +5185,87 @@ The following full CI gates were deferred for this checkpoint and must be verifi
   - Status: **PENDING** (to be executed by operator JEMBOT).
 
 ### 3. Acceptance & Deployment Tracking
+ 
+ - **Code & Test Implementation:** `COMPLETE`
+ - **Operator Website Verification:** `OPERATOR-REPORTED PASS`
+ - **DEV Fixture Cleanup:** `COMPLETE` (1,023 purged, 0 remaining)
+ - **Pre-Commit 5 CI Gates:** `PENDING` (Reserved for operator JEMBOT)
+ - **Git Commit, Push & Remote CI:** `PENDING`
+ - **Live Database Migration:** `NOT REQUIRED for keyset pagination`. Tables are `soil_readings` and `water_readings`. Existing indexes include `soil_readings_device_location_idx` on `(device_id, location_key, recorded_at DESC)` and `soil_readings_device_received_idx` on `(device_id, received_at DESC)`. While previously applied migration `20261008103000_add_reading_location_annotations` added location columns and composite indexes, this keyset pagination change requires zero additive schema migrations. (Migration `20261008103000` remains `PENDING DEPLOYMENT` on Staging & Production VPS).
+ - **Staging / VPS Deployment Requirement:** `PENDING`. Requires building and restarting `kebun-melon-web` container image to deploy updated frontend hook, chart components, and route handlers. Gateway, reverse proxy, and environment variables remain untouched.
+
+---
+
+## TASK-0504 Follow-up: Decouple Chart Date Filters from Measurement History, Calibrate Browser Display Boundaries, and Refine Water History Columns
+
+**Priority:** `P1` (Data Integrity, Visual Legibility, Boundary Correctness & Operational Usability)  
+**Status:** `READY FOR CI GATES & DEPLOYMENT`  
+**Dependencies:** `DEC-MON-087`, `DEC-MON-093`, `DEC-MON-094`, `TASK-0503`, `TASK-0504`  
+**Frontend Impact:** `MINOR`  
+**Selected UI Direction:** `Premium Minimal Ops`  
+**Existing Color Template:** `UNCHANGED`  
+**Selected Motion Effects:** `None`  
+**21st.dev MCP:** `NOT REQUIRED`  
+
+### 1. Implemented Changes
+
+- **Decoupling Measurement History from Chart Date Filters (`packages/contracts/src/telemetry.ts`, `packages/database/src/telemetry-repository.ts`, `apps/web/app/api/v1/devices/[deviceId]/monitoring/soil/history/route.ts`, `apps/web/app/api/v1/devices/[deviceId]/monitoring/water/history/route.ts`, `apps/web/components/monitoring/MeasurementHistoryPanel.tsx`, `apps/web/app/soil/page.tsx`, `apps/web/app/water/page.tsx`):**
+  - Updated API contracts and DTO schemas (`SoilHistoryResponseDtoSchema`, `WaterHistoryResponseDtoSchema`) to make `from` and `to` optional.
+  - In `TelemetryRepository.getSoilHistory` and `getWaterHistory`, applied `receivedAt` filtering only when `from` or `to` is explicitly provided.
+  - In soil and water `/history` route handlers, removed the fallback 24-hour date window when query parameters are omitted, querying all retained records without date boundaries.
+  - Decoupled `MeasurementHistoryPanel` by removing `from` and `to` props, resetting history pagination strictly on `deviceId` change rather than chart date filter transitions.
+  - History independently paginates all retained telemetry readings for the authorized active device at exactly 5 rows per page (`HISTORY_PAGE_SIZE = 5`) ordered by `receivedAt ASC, id ASC`.
+  - Changing chart presets (24h, 7d, 30d) or custom calendar ranges does not reset history pagination, modify total counts, or trigger history refetches.
+- **Calibrated Custom Calendar Date Boundaries in Browser Display Timezone (`apps/web/hooks/useHistoricalMonitoring.ts`):**
+  - Implemented local calendar date boundary conversion functions `parseLocalDateStart` (`00:00:00.000` inclusive) and `parseLocalDateNextDayStart` (`00:00:00.000` exclusive of next day) in the runtime browser display timezone (`getDisplayTimezone()`, with canonical fallback `Asia/Jakarta`).
+  - Distinguishes monitoring UI display timezone from server-side `UserPreference.timezone`, which governs background notifications, alerts, and transactional emails.
+  - Calendar boundaries span local start-of-day to next-day-start (`[start_of_day, next_day_start)`) without assuming every calendar day is exactly 24 hours (handles daylight saving transitions and local clock adjustments).
+  - Single-day selections (e.g. `2026-10-10` to `2026-10-10`) span exactly that complete calendar day in the local display timezone, preventing UTC boundary bleed-through (e.g. UTC+7) that previously caused points like `11 Oct 00:14` to be fetched and plotted.
+  - In `useHistoricalMonitoring.loadChartData`, strictly filtered accumulated points to `[fromTime, toTime)` for custom dates (and `<= toTime` for presets) so plotted points and interactive tooltips remain strictly within selected displayed dates.
+  - Incomplete or empty custom date inputs clear data safely without falling back to current timestamps or retaining stale chart points.
+- **Removal of Temperature Column from Water Quality Measurement History (`apps/web/app/water/page.tsx`, `apps/web/components/monitoring/ReadingHistoryTable.tsx`):**
+  - Removed temperature (`°C`) from `waterHistoryColumns` in `apps/web/app/water/page.tsx`.
+  - Retained temperature (`°C`) in `soilHistoryColumns` in `apps/web/app/soil/page.tsx`.
+  - No hidden column, placeholder, or fallback rendering in water quality history table. Stored database records remain untouched.
+- **Calendar-Date-First Validation for Custom Date Ranges (`apps/web/hooks/useHistoricalMonitoring.ts`):**
+  - Resolved root cause of reversed-by-one-day bug (`2026-10-15` to `2026-10-14` previously accepted because validation checked against already-incremented exclusive next-day-start `2026-10-15 00:00:00`).
+  - Implemented `validateCustomCalendarRange` which evaluates calendar dates BEFORE converting end date to next-day-start: `startDate > endDate` is strictly invalid (`dateRangeOrder`); same-day (`startDate === endDate`) is valid.
+  - Inline error displays immediately once both date inputs are present, independent of location selection.
+  - Invalid ranges immediately clear data (`setData([])`) and bypass chart requests; correcting date inputs immediately clears the error state. Backend API range validation is strictly preserved.
+- **Locale-Reactive Validation Error Keys via next-intl (`apps/web/hooks/useHistoricalMonitoring.ts`, `apps/web/messages/en.json`, `apps/web/messages/id.json`):**
+  - Stored error state as a dictionary key (`dateRangeErrorKey`) rather than a cached translated string, dynamically resolving `dateRangeError` via `useTranslations('history')` so switching languages immediately updates displayed validation errors.
+  - Standardized localized error strings:
+    - `dateRangeOrder`: `en` "Start date must be on or before end date.", `id` "Tanggal mulai harus sebelum atau sama dengan tanggal selesai."
+    - `dateRangeSelectBoth`: `en` "Select both start date and end date.", `id` "Pilih tanggal mulai dan tanggal selesai."
+    - `dateRangeInvalid`: `en` "Invalid date format.", `id` "Format tanggal tidak valid."
+    - `maxBoundsExceeded`: `en` "Date range cannot exceed 31 days.", `id` "Rentang tanggal tidak boleh melebihi 31 hari."
+- **Removal of Technical Helper Copy (`apps/web/components/charts/HistoricalChartControls.tsx`, `apps/web/messages/en.json`, `apps/web/messages/id.json`):**
+  - Removed `"(Max. 31 days per DEC-MON-087)"` helper copy from rendered chart controls in both languages with zero replacement text or hidden fallback rendering.
+  - Preserved strict 31-day enforcement (`MAX_RANGE_MS`) and user-facing error message upon violation. Retired unused key `max31DaysNote`.
+- **Bilingual History Copy Alignment (`apps/web/messages/en.json`, `apps/web/messages/id.json`):**
+  - Added `historyNoData` ("No measurement history available for this device." / "Belum ada riwayat pengukuran untuk perangkat ini.") to empty state in `ReadingHistoryTable.tsx`.
+  - Formatted history table timestamps in the active application locale (`en-US` / `id-ID`).
+  - Updated `allDataNote` to clarify that all retained readings remain reachable through pagination without referencing date filters.
+
+### 2. Verification
+
+- **Operator Manual Website Verification:** `PASS (USER-REPORTED)`
+  - Manual website verification for soil/water monitoring date ranges, boundary isolation, reversed date validation, and water column calibration confirmed PASS.
+- **Automated Regression Test Suite:**
+  - Added `apps/web/test/unit/monitoring-history-separation.test.ts` covering column definitions, custom calendar boundaries in local display timezone, next-day exclusion (`11 Oct 00:14`), optional date contract, reversed-by-one-day, reversed-by-two-days, same-day selection, correction flow, and localized id/en error strings.
+  - Execution Status: `IMPLEMENTED (EXECUTION PENDING)`.
+- **Pre-Commit Operator CI Gates Protocol:**
+  - The five mandatory CI gates (`npm run test:coverage`, `npm run test:integration`, `npm run check:quality`, `npm test`, `npm run test:e2e`) remain PENDING execution by the operator.
+
+### 3. Acceptance & Deployment Tracking
 
 - **Code & Test Implementation:** `COMPLETE`
-- **Operator Website Verification:** `OPERATOR-REPORTED PASS`
-- **DEV Fixture Cleanup:** `COMPLETE` (1,023 purged, 0 remaining)
-- **Pre-Commit 5 CI Gates:** `PENDING` (Reserved for operator JEMBOT)
+- **Manual Website Verification:** `PASS (USER-REPORTED)`
+- **Pre-Commit 5 CI Gates:** `PENDING` (Reserved for operator)
 - **Git Commit, Push & Remote CI:** `PENDING`
-- **Live Database Migration:** `NOT REQUIRED for keyset pagination`. Tables are `soil_readings` and `water_readings`. Existing indexes include `soil_readings_device_location_idx` on `(device_id, location_key, recorded_at DESC)` and `soil_readings_device_received_idx` on `(device_id, received_at DESC)`. While previously applied migration `20261008103000_add_reading_location_annotations` added location columns and composite indexes, this keyset pagination change requires zero additive schema migrations. (Migration `20261008103000` remains `PENDING DEPLOYMENT` on Staging & Production VPS).
-- **Staging / VPS Deployment Requirement:** `PENDING`. Requires building and restarting `kebun-melon-web` container image to deploy updated frontend hook, chart components, and route handlers. Gateway, reverse proxy, and environment variables remain untouched.
+- **Live Database Migration:** `NOT REQUIRED` (No schema changes, no migrations needed).
+- **Staging / VPS Deployment Requirement:** `PENDING`. Requires building and restarting `kebun-melon-web` container image only. Gateway, database migrations, environment variables, and reverse proxy (Caddy) remain untouched.
+
 
 
 

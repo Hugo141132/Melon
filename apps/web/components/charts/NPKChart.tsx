@@ -30,21 +30,44 @@ export interface NPKChartProps {
   selectedLocationKey?: string;
 }
 
-export function formatDayMonth(date: Date, locale: string = 'id'): string {
-  const day = date.getDate();
+export function formatDayMonth(date: Date, locale: string = 'id', timeZone?: string): string {
   const intlLocale = locale === 'en' ? 'en-US' : 'id-ID';
-  const month = date
-    .toLocaleDateString(intlLocale, { month: 'short' })
-    .replace(/,/g, '')
-    .replace(/\./g, '')
-    .trim();
-  return `${day} ${month}`;
+  const tz =
+    timeZone ||
+    (typeof Intl !== 'undefined'
+      ? Intl.DateTimeFormat().resolvedOptions().timeZone
+      : 'Asia/Jakarta') ||
+    'Asia/Jakarta';
+  try {
+    const formatter = new Intl.DateTimeFormat(intlLocale, {
+      day: 'numeric',
+      month: 'short',
+      timeZone: tz,
+    });
+    const parts = formatter.formatToParts(date);
+    const day = parts.find((p) => p.type === 'day')?.value ?? date.getDate().toString();
+    const month =
+      parts
+        .find((p) => p.type === 'month')
+        ?.value.replace(/,/g, '')
+        .replace(/\./g, '') ?? '';
+    return `${day} ${month}`.trim();
+  } catch {
+    const day = date.getDate();
+    const month = date
+      .toLocaleDateString(intlLocale, { month: 'short' })
+      .replace(/,/g, '')
+      .replace(/\./g, '')
+      .trim();
+    return `${day} ${month}`;
+  }
 }
 
 export function getCustomXTicks(
   data: BaseSeriesItem[],
   preset?: string,
-  locale: string = 'id'
+  locale: string = 'id',
+  timeZone?: string
 ): {
   ticks: string[];
   formatTick: (value: string) => string;
@@ -57,6 +80,13 @@ export function getCustomXTicks(
     return { ticks: [data[0].time], formatTick: (v: string) => v };
   }
 
+  const tz =
+    timeZone ||
+    (typeof Intl !== 'undefined'
+      ? Intl.DateTimeFormat().resolvedOptions().timeZone
+      : 'Asia/Jakarta') ||
+    'Asia/Jakarta';
+
   const firstTime = new Date(data[0].timestamp).getTime();
   const lastTime = new Date(data[data.length - 1].timestamp).getTime();
   const spanHours = (lastTime - firstTime) / (1000 * 60 * 60);
@@ -65,15 +95,25 @@ export function getCustomXTicks(
   const is7d = preset === '7d' || (spanHours > 24 && spanHours <= 8 * 24);
 
   const tickLabels = new Map<string, string>();
+  const timeFormatter = new Intl.DateTimeFormat('id-ID', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: tz,
+  });
+  const dayKeyFormatter = new Intl.DateTimeFormat('en-CA', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    timeZone: tz,
+  });
 
   if (is24h) {
     // 24 Hours: show ~5-8 evenly-spaced readable time labels without displaying every single point
     if (data.length <= 8) {
       for (const d of data) {
         const itemDate = new Date(d.timestamp);
-        const hh = String(itemDate.getHours()).padStart(2, '0');
-        const mm = String(itemDate.getMinutes()).padStart(2, '0');
-        tickLabels.set(d.time, `${hh}:${mm}`);
+        tickLabels.set(d.time, timeFormatter.format(itemDate).replace(/\./g, ':'));
       }
       return {
         ticks: data.map((d) => d.time),
@@ -94,9 +134,7 @@ export function getCustomXTicks(
       const item = data[idx];
       selectedTicks.push(item.time);
       const itemDate = new Date(item.timestamp);
-      const hh = String(itemDate.getHours()).padStart(2, '0');
-      const mm = String(itemDate.getMinutes()).padStart(2, '0');
-      tickLabels.set(item.time, `${hh}:${mm}`);
+      tickLabels.set(item.time, timeFormatter.format(itemDate).replace(/\./g, ':'));
     }
 
     return {
@@ -110,7 +148,7 @@ export function getCustomXTicks(
     const dayGroups = new Map<string, BaseSeriesItem>();
     for (const item of data) {
       const d = new Date(item.timestamp);
-      const dateKey = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+      const dateKey = dayKeyFormatter.format(d);
       if (!dayGroups.has(dateKey)) {
         dayGroups.set(dateKey, item);
       }
@@ -120,7 +158,7 @@ export function getCustomXTicks(
     if (distinctDays.length <= 4) {
       const ticks = distinctDays.map((d) => d.time);
       for (const d of distinctDays) {
-        tickLabels.set(d.time, formatDayMonth(new Date(d.timestamp), locale));
+        tickLabels.set(d.time, formatDayMonth(new Date(d.timestamp), locale, timeZone));
       }
       return {
         ticks,
@@ -140,7 +178,7 @@ export function getCustomXTicks(
     for (const idx of Array.from(chosenIndices).sort((a, b) => a - b)) {
       const item = distinctDays[idx];
       selectedTicks.push(item.time);
-      tickLabels.set(item.time, formatDayMonth(new Date(item.timestamp), locale));
+      tickLabels.set(item.time, formatDayMonth(new Date(item.timestamp), locale, tz));
     }
 
     return {
@@ -157,7 +195,7 @@ export function getCustomXTicks(
   const dayGroups = new Map<string, BaseSeriesItem>();
   for (const item of data) {
     const d = new Date(item.timestamp);
-    const dateKey = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+    const dateKey = dayKeyFormatter.format(d);
     if (!dayGroups.has(dateKey)) {
       dayGroups.set(dateKey, item);
     }
@@ -167,7 +205,7 @@ export function getCustomXTicks(
   if (distinctDays.length <= 6) {
     const ticks = distinctDays.map((d) => d.time);
     for (const d of distinctDays) {
-      tickLabels.set(d.time, formatDayMonth(new Date(d.timestamp), locale));
+      tickLabels.set(d.time, formatDayMonth(new Date(d.timestamp), locale, tz));
     }
     return {
       ticks,
@@ -187,7 +225,7 @@ export function getCustomXTicks(
   for (const idx of Array.from(chosenIndices).sort((a, b) => a - b)) {
     const item = distinctDays[idx];
     selectedTicks.push(item.time);
-    tickLabels.set(item.time, formatDayMonth(new Date(item.timestamp), locale));
+    tickLabels.set(item.time, formatDayMonth(new Date(item.timestamp), locale, tz));
   }
 
   return {
@@ -198,6 +236,34 @@ export function getCustomXTicks(
       return parts.length >= 2 ? `${parts[0]} ${parts[1]}` : v;
     },
   };
+}
+
+export function formatTooltipDateTime(
+  timestamp: string | number | Date,
+  preset?: string,
+  locale: string = 'id',
+  timeZone?: string
+): string {
+  const d = new Date(timestamp);
+  const intlLocale = locale === 'en' ? 'en-US' : 'id-ID';
+  const tz =
+    timeZone ||
+    (typeof Intl !== 'undefined'
+      ? Intl.DateTimeFormat().resolvedOptions().timeZone
+      : 'Asia/Jakarta') ||
+    'Asia/Jakarta';
+  const timeFormatter = new Intl.DateTimeFormat(intlLocale, {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: tz,
+  });
+  const timeStr = timeFormatter.format(d).replace(/\./g, ':');
+  if (preset === '24h') {
+    return timeStr;
+  }
+  const dateStr = formatDayMonth(d, locale, tz);
+  return `${dateStr} ${timeStr}`;
 }
 
 export default function NPKChart({
@@ -241,11 +307,7 @@ export default function NPKChart({
 
   const cleanLabelFormatter = (label: any, payload: any[]) => {
     if (payload && payload.length > 0 && payload[0]?.payload?.timestamp) {
-      const d = new Date(payload[0].payload.timestamp);
-      const dateStr = formatDayMonth(d, locale);
-      const hh = String(d.getHours()).padStart(2, '0');
-      const mm = String(d.getMinutes()).padStart(2, '0');
-      return preset === '24h' ? `${hh}:${mm}` : `${dateStr} ${hh}:${mm}`;
+      return formatTooltipDateTime(payload[0].payload.timestamp, preset, locale);
     }
     return typeof label === 'string' ? label.replace(/,/g, '').replace(/\./g, '').trim() : label;
   };
