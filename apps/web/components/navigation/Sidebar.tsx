@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
@@ -45,11 +45,15 @@ export default function Sidebar({ isOpen, onClose, onMouseEnter, onMouseLeave }:
   const { user, role } = useAuth();
   const { count: alertCount, refetch: refetchAlertBadge } = useAlertBadge();
   const { count: approvalCount, refetch: refetchApprovalBadge } = useAdminApprovalBadge();
+  const wasOpenRef = useRef(false);
 
   useEffect(() => {
-    if (isOpen) {
-      refetchAlertBadge();
+    if (isOpen && !wasOpenRef.current) {
+      wasOpenRef.current = true;
+      refetchAlertBadge(false);
       refetchApprovalBadge();
+    } else if (!isOpen) {
+      wasOpenRef.current = false;
     }
   }, [isOpen, refetchAlertBadge, refetchApprovalBadge]);
 

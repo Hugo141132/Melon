@@ -118,15 +118,20 @@ An Owner must approve the Admin before protected access is allowed.
 - **Water-Tank Rate Limiter Isolation & SSE Reconnect Protection (DEC-CTRL-099):**
   - Faucet command history rate limiter uses isolated prefix `faucet_history` (separated from `/alerts`).
   - Adaptive polling with bounded backoff and `Retry-After` adherence in `FaucetStatusCard.tsx` and mount duplication protection (`hasEverOpenedRef`) in `FaucetHistoryTable.tsx`.
+- **Alerts Rate Limiter Isolation & Badge Synchronization Invariants:**
+  - `GET /api/v1/alerts` rate limiter enforces an isolated key prefix (`keyPrefix: 'alerts'`) distinct from `history` or `faucet_history` to prevent cross-endpoint quota exhaustion.
+  - Badge synchronization hooks (`useAlertBadge`) must memoize `refetch` (`useCallback`) to eliminate re-render loops in consuming navigation components.
+  - Drawer and navigation components (`Sidebar.tsx`) must guard refetch triggers to fire strictly on state transition edges (`wasOpenRef` edge-detection on opening) and respect the 10-second TTL cache (`refetch(false)`) rather than forcing a remote request on every layout re-render.
 - **Profile Save Navigation:**
   - Successful profile save triggers full navigation to `/dashboard` with refreshed session identity. Failures remain on the form with error feedback.
 - **Device Management Regex & Localized Toast (DEC-DEV-040):**
   - Server and browser regex escaping standardized (`/^[a-zA-Z0-9 _-]{3,50}$/`). Localized success toast interpolates the persisted device name.
-- **Operational Commands & Verification Status:**
+- **Operational Commands, Deployment & Verification Status:**
   - Local development restart: `npm run dev:web`.
   - Release builds: executed off-VPS (for `linux/amd64`).
-  - VPS deployment: deploy using actual Compose configuration and release image tag with `--no-deps web`. Single-active-gateway rule is strictly preserved.
-  - Manual Acceptance: `USER-REPORTED COMPLETE` dated `2026-10-16`. All five CI gates remain `PENDING USER EXECUTION`.
+  - VPS deployment: deploy using actual Compose configuration (`docker-compose.prod.yml`) and release image tag with `--no-deps web`. Single-active-gateway rule is strictly preserved.
+  - Active Deployed Host: Release `525caa2` deployed to VPS operating under `APP_ENV=staging` at `APP_URL=https://monitoring.melonmadura.my.id` (staging environment despite prod compose filename; verified rollback image is `kebun-melon-web:55671ac`).
+  - Follow-up Alerts 429 Repair: Manual acceptance `USER-REPORTED COMPLETE` dated `2026-10-16`. All five CI gates (`check:quality`, `test`, `test:coverage`, `test:integration`, `test:e2e`), new commit/push, new CI run, and follow-up deployment remain `PENDING USER EXECUTION`. Earlier CI success on `525caa2` does not validate this follow-up batch.
 
 ---
 

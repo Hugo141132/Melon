@@ -52,23 +52,32 @@
      - Memory/latency profiling under production load remains unmeasured; a single `787 ms` zero-row run establishes no performance guarantee.
      - Staging application status (`docker-compose.staging.yml`) must be verified independently.
      - GitHub CI for `875f91b` passed per operator confirmation. None of the five reserved CI commands is necessary for this documentation-only closeout; lightweight documentation checks suffice. No staging/VPS, Docker, database, or reverse-proxy update is required.
-5. **2026-10-16 Reliability & Consistency Repair Batch Deployment Guidance:**
-   - **Local Development Restart Command:** If restarting the local development server after codebase updates, use:
+5. **2026-10-16 Release 525caa2 Deployment & Post-Deployment Alerts-429 Follow-Up:**
+   - **Release 525caa2 Deployment Status (COMPLETED):**
+     - Release commit `525caa2` passed GitHub CI (`run 38875901401`) and was successfully deployed to the Nebula VPS host (`38.103.171.46`).
+     - **Deployed Environment & Configuration:** The deployed service executes `/opt/kebun-melon` with `WEB_IMAGE=kebun-melon-web:525caa2` using `docker compose --env-file .env.production -f docker-compose.prod.yml up -d --no-deps web`.
+     - **Staging Runtime Invariant:** Even though `docker-compose.prod.yml` is used as the compose file name, the runtime environment explicitly operates with `APP_ENV=staging` and `APP_URL=https://monitoring.melonmadura.my.id` pointing to Supabase Staging (`ihgoxqdncepbcrqkchxu`). Do not classify this host as production solely based on the compose filename.
+     - **Verified Rollback Image:** The previous active web image tag preserved in `/opt/kebun-melon/.prev_web_image` is `kebun-melon-web:55671ac`. Rollback target command:
+       ```bash
+       WEB_IMAGE=kebun-melon-web:55671ac docker compose --env-file .env.production -f docker-compose.prod.yml up -d --no-deps web
+       ```
+   - **Post-Deployment Incident: Alerts HTTP 429:**
+     - Post-deployment testing revealed HTTP 429 `TOO_MANY_REQUESTS` on `GET /api/v1/alerts?status=OPEN&pageSize=100` (`requestId: req-1792143270110`).
+     - Root cause analysis identified two contributing factors:
+       1. **Client Re-render Loop:** In `Sidebar.tsx`, the `useEffect` listening to `[isOpen, refetchAlertBadge]` was re-triggering whenever `refetchAlertBadge` was recreated on every render of `useAlertBadge`. Badge state updates triggered component re-renders, causing a rapid continuous request loop.
+       2. **Limiter Prefix Collision:** `/api/v1/alerts` was using shared `keyPrefix: 'history'` on its 30 requests/minute sliding window, causing it to quickly exhaust the history quota during drawer opens.
+   - **Alerts-429 Follow-Up Code Fix (LOCAL IMPLEMENTATION COMPLETE):**
+     - `apps/web/hooks/useAlertBadge.ts`: Wrapped `refetch` in `useCallback((force = true) => fetchBadgeCount(force), [fetchBadgeCount])` to maintain stable reference identity.
+     - `apps/web/components/navigation/Sidebar.tsx`: Added `wasOpenRef` edge-detection to trigger badge refetch strictly on the opening transition (`!wasOpenRef.current && isOpen`), and passed `refetchAlertBadge(false)` to respect the 10-second TTL cache rather than forcing cache bypass.
+     - `apps/web/app/api/v1/alerts/route.ts`: Isolated the rate limiter key prefix to `keyPrefix: 'alerts'`.
+     - Regression tests added in `apps/web/test/unit/use-alert-badge.test.tsx` and `apps/web/test/unit/sidebar-navigation.test.tsx`.
+   - **Local Development Restart Command:**
      ```bash
      npm run dev:web
      ```
-     *(Restarts the Next.js web application cleanly without triggering background IoT Gateway processes).*
-   - **Off-VPS Image Build Invariant:** All release container images MUST be compiled off-VPS for target architecture `--platform linux/amd64` (via workstation Docker buildx or CI), tagging identifiable release tags.
-   - **VPS Deployment Command:** Deployment on VPS targets web recreation only without altering supporting services:
-     ```bash
-     WEB_IMAGE=<tag> docker compose --env-file .env.production -f docker-compose.prod.yml up -d --no-deps web
-     ```
-   - **Environment Configuration & Database Target Parity:**
-     - *Local Dev:* `APP_ENV=development`, `APP_URL=http://localhost:3000`, database target Supabase DEV (`unbyxlkrzqlafolxcypi`).
-     - *Staging:* `APP_ENV=staging`, `APP_URL=http://localhost:3000` (configured explicitly in `.env.staging`), database target Supabase Staging (`ihgoxqdncepbcrqkchxu`). Never invent unverified hostnames; distinguish application deployment from database project.
-     - *Production:* `APP_ENV=production`, `APP_URL=https://monitoring.melonmadura.my.id`, database target Supabase Production.
-   - **Zero Impact on Database, Gateway & Proxy:** Zero migrations required (schema untouched); zero gateway MQTT topic or broker changes; zero Caddy configuration changes. Single-active-gateway rule is strictly preserved.
-   - **Deployment Status:** Deployment remains **PENDING** until the operator verifies manual acceptance and completes the five mandatory CI gates prior to git push.
+   - **Verification & Deployment Gates:**
+     - Manual acceptance of the alerts-429 fix is `USER-REPORTED COMPLETE` (dated 2026-10-16).
+     - Automated verification commands (`npm run check:quality`, `npm run test`, `npm run test:coverage`, `npm run test:integration`, `npm run test:e2e`), git commit/push, new GitHub CI run, and VPS container update with the new release image remain **PENDING USER EXECUTION**. Earlier CI pass on `525caa2` does not validate the new follow-up code changes.
 
 ---
 

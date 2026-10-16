@@ -5,6 +5,7 @@ import Sidebar from '@/components/navigation/Sidebar';
 import TopAppBar from '@/components/navigation/TopAppBar';
 import { DeviceProvider, AuthorisedDevice } from '@/context/DeviceContext';
 import DeviceSelector from '@/components/navigation/DeviceSelector';
+import { resetAlertBadgeState } from '@/hooks/useAlertBadge';
 
 let mockPathname = '/sensor';
 
@@ -77,6 +78,7 @@ describe('Sidebar Navigation Header Display Name & Fallback', () => {
     mockPathname = '/sensor';
     sessionStorage.clear();
     localStorage.clear();
+    resetAlertBadgeState();
     mockUser = null;
     mockRole = null;
     global.fetch = vi.fn().mockImplementation(() =>
@@ -242,6 +244,7 @@ describe('Sidebar Alerts Notification Badge (Live Backend State)', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    resetAlertBadgeState();
     mockPathname = '/';
     mockUser = { fullName: 'Wahyu Prasetyo' };
     mockRole = 'ADMIN';
@@ -363,6 +366,40 @@ describe('Sidebar Alerts Notification Badge (Live Backend State)', () => {
     window.dispatchEvent(new CustomEvent('melon:alert-updated'));
 
     expect(await screen.findByText('1')).toBeInTheDocument();
+  });
+
+  it('does not re-trigger alert fetch on subsequent re-renders while sidebar remains open', async () => {
+    let fetchCount = 0;
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (typeof url === 'string' && url.includes('/api/v1/alerts')) {
+        fetchCount++;
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              success: true,
+              data: [{ id: '1', severity: 'CRITICAL', status: 'OPEN' }],
+              meta: { pagination: { totalItems: 1 } },
+            }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ success: true, data: [] }),
+      });
+    });
+
+    const { rerender } = render(<Sidebar isOpen={true} onClose={mockClose} />);
+
+    expect(await screen.findByText('1')).toBeInTheDocument();
+    expect(fetchCount).toBe(1);
+
+    // Re-render multiple times with isOpen={true}
+    rerender(<Sidebar isOpen={true} onClose={mockClose} />);
+    rerender(<Sidebar isOpen={true} onClose={mockClose} />);
+
+    // fetchCount must remain 1 — no duplicate fetches while already open
+    expect(fetchCount).toBe(1);
   });
 
   it('renders top logo alert dot on TopAppBar when open alerts exist, and hides when zero', async () => {

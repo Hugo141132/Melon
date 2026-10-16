@@ -3778,6 +3778,10 @@ The five mandatory CI gates must be executed **exclusively by operator JEMBOT** 
   - Rate limiter prefix isolated to `faucet_history`, preventing quota collision with `/api/v1/alerts`.
   - Added `hasEverOpenedRef` in `FaucetHistoryTable.tsx` to eliminate duplicate fetch amplification on initial SSE mount.
   - Adaptive polling with bounded backoff and `Retry-After` adherence in `FaucetStatusCard.tsx`.
+- **Alerts HTTP 429 Follow-Up Fixes & Invariants (`DEC-ALRT-098`):**
+  - In `apps/web/hooks/useAlertBadge.ts`, wrapped `refetch` in `useCallback((force = true) => fetchBadgeCount(force), [fetchBadgeCount])`, stabilizing the callback reference across hook re-renders.
+  - In `apps/web/components/navigation/Sidebar.tsx`, added `wasOpenRef` edge-detection to trigger badge refetch strictly on the opening transition (`!wasOpenRef.current && isOpen`), and passed `refetchAlertBadge(false)` to reuse cached counts within the 10-second TTL rather than bypassing cache.
+  - In `apps/web/app/api/v1/alerts/route.ts`, isolated the rate limiter key prefix to `keyPrefix: 'alerts'`, separating alert count requests from `history` and `faucet_history`.
 - **Successful Profile Save Navigation:**
   - On successful profile update, client executes full navigation (`window.location.assign('/dashboard')`), rehydrating updated user identity across SSR header, top app bar, and dashboard greeting. Form values and error feedback preserved on failure.
 - **Device Management Regex Escaping & Localized Toast (`DEC-DEV-040`):**
@@ -3793,9 +3797,12 @@ The five mandatory CI gates must be executed **exclusively by operator JEMBOT** 
 - `apps/web/test/unit/dashboard-page.test.tsx`: initial "-" counters and animation.
 - `apps/web/test/unit/resend-email.test.ts`: canonical URL resolution, multi-environment rules, HTML/text parity.
 - `packages/contracts/src/__tests__/device.test.ts`: device DTO validation and regex.
+- `apps/web/test/unit/use-alert-badge.test.tsx`: `useAlertBadge` `refetch` function reference memoization stability across renders.
+- `apps/web/test/unit/sidebar-navigation.test.tsx`: `Sidebar` edge-detection preventing duplicate alert badge fetches on internal re-renders while open.
 
 ### 3. Website Acceptance & Deployment Status
-- **Manual Website Acceptance:** `USER-REPORTED COMPLETE (2026-10-16)`.
+- **Release 525caa2 VPS Deployment:** Deployed successfully to VPS (`38.103.171.46`) under `APP_ENV=staging` at `APP_URL=https://monitoring.melonmadura.my.id` with Compose file `docker-compose.prod.yml` and rollback tag `kebun-melon-web:55671ac`.
+- **Alerts-429 Follow-Up Manual Acceptance:** `USER-REPORTED COMPLETE (2026-10-16)`.
 - **Pre-Commit Operator CI Gates Protocol:**
   - All five mandatory CI gates remain **PENDING USER EXECUTION** prior to commit/push:
     1. `npm run check:quality` (lint, format, typecheck, env check, traceability)
@@ -3807,6 +3814,7 @@ The five mandatory CI gates must be executed **exclusively by operator JEMBOT** 
 - **Git Commit, Push & Remote CI:** `PENDING`.
 - **Live Database Migrations:** `NOT REQUIRED` (Zero schema changes; existing tables, enums, and indexes preserved).
 - **Staging / VPS Deployment Guidance:** `PENDING`. Build container image off-VPS (`--platform linux/amd64`), push release image, deploy on VPS using actual Compose configuration and `--no-deps web`. Reverse proxy (Caddy), database configuration, and single-active-gateway rule remain untouched.
+
 
 
 

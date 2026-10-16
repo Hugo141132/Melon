@@ -218,9 +218,11 @@ export function useAlertBadge() {
     };
   }, [isAuthenticated, pathname, fetchBadgeCount]);
 
+  const refetch = useCallback((force = true) => fetchBadgeCount(force), [fetchBadgeCount]);
+
   return {
     count,
     isLoading,
-    refetch: (force?: boolean) => fetchBadgeCount(force ?? true),
+    refetch,
   };
 }

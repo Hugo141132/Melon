@@ -2571,6 +2571,14 @@ Response item (`AlertDto`):
 
 The frontend translates `titleKey` and `messageKey`. Per `DEC-CTRL-098`, user-facing alert templates use friendly parameters (such as `{deviceName}`) without exposing internal `commandId` strings to operators. Raw `commandId` remains in `messageParams` and `sourceId` for diagnostic and audit referencing.
 
+### Rate Limiting & Client Consumption Invariants (DEC-ALRT-098 / Reconciled 2026-10-16)
+
+- **Isolated Key Prefix:** `GET /api/v1/alerts` enforces an isolated rate limiter key (`keyPrefix: 'alerts'`) on its 30 requests/minute sliding window (`RATE_LIMIT_HISTORY_MAX = 30`), completely separated from telemetry history (`keyPrefix: 'history'`) and faucet command history (`keyPrefix: 'faucet_history'`).
+- **HTTP 429 Contract:** When the limit is exceeded, the endpoint returns HTTP 429 with `Retry-After` header and body `{ success: false, error: { code: 'TOO_MANY_REQUESTS', message: '...' } }`.
+- **Client Badge Synchronization:** The client-side badge hook (`useAlertBadge`) maintains an in-memory 10-second TTL cache for open alert counts (`badgeCountCache`). Consumers must invoke `refetchAlertBadge(false)` by default so that drawer renders and route transitions reuse fresh cache hits without exhausting the 30 req/min budget.
+- **Reference Stability:** The hook provides a memoized `refetch` callback (`useCallback`) to prevent layout re-render loops in consuming navigation components (`Sidebar.tsx`, `Header.tsx`).
+- **Drawer Opening Edge Guard:** Navigation drawers must guard badge refetches using transition-edge detection (`wasOpenRef.current !== isOpen` when opening) rather than continuously executing on every drawer re-render.
+
 ---
 
 ## 19.2 Get Alert

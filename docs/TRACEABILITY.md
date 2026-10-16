@@ -228,7 +228,14 @@ The following facts are verified in the traceability matrix regarding `TASK-0705
 - **Dynamic API Binding:** Replaced legacy static mock `ALERTS` constant filter with lightweight client hook `useAlertBadge`, querying canonical backend `GET /api/v1/alerts?status=OPEN&severity=CRITICAL`.
 - **Event-Driven Reactivity:** Subscribes to custom browser event `melon:alert-updated` emitted on alert acknowledgement in `/notifikasi` page, guaranteeing immediate badge count synchronization without requiring a page reload.
 - **Visual Design Integrity:** Preserves `Premium Minimal Ops` layout, badge placement, and design tokens (`bg-app-error text-white text-[9px] font-bold`) with automatic zero-count suppression.
-<!-- TASK-0705 Reconciled: 2026-08-23 -->
+- **Alerts-429 Re-render Loop Fix & Rate Limiter Isolation (Reconciled 2026-10-16):**
+  - Following release `525caa2` deployment to VPS (`APP_ENV=staging`, `APP_URL=https://monitoring.melonmadura.my.id`), post-deployment testing exposed HTTP 429 on `GET /api/v1/alerts?status=OPEN&pageSize=100`.
+  - Stabilized `useAlertBadge` `refetch` callback using `useCallback` to prevent unnecessary re-render loops in consuming navigation components.
+  - Hardened `Sidebar.tsx` with `wasOpenRef` edge-detection to trigger badge refetch strictly on the drawer opening transition (`!wasOpenRef.current && isOpen`), and passed `refetchAlertBadge(false)` to reuse cached badge counts within the 10-second TTL.
+  - Isolated `/api/v1/alerts` rate limiter key prefix to `keyPrefix: 'alerts'`.
+  - Added regression test suites in `apps/web/test/unit/use-alert-badge.test.tsx` and `apps/web/test/unit/sidebar-navigation.test.tsx`. Manual acceptance is `USER-REPORTED COMPLETE (2026-10-16)`; automated pre-commit gates (`check:quality`, `test`, `test:coverage`, `test:integration`, `test:e2e`), new commit/push, CI run, and VPS deployment remain `PENDING USER EXECUTION`.
+<!-- TASK-0705 Reconciled: 2026-10-16 -->
+
 
 ---
 

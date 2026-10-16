@@ -175,4 +175,23 @@ describe('useAlertBadge Hook Shared State & Deduplication Tests', () => {
 
     expect(fetchCount).toBe(1);
   });
+
+  it('memoizes refetch function reference across re-renders when route and auth remain unchanged', () => {
+    let capturedRefetch1: any = null;
+    let capturedRefetch2: any = null;
+
+    function TestComponent({ step }: { step: number }) {
+      const { refetch } = useAlertBadge();
+      if (step === 1) capturedRefetch1 = refetch;
+      if (step === 2) capturedRefetch2 = refetch;
+      return <div data-testid="step">{step}</div>;
+    }
+
+    const { rerender } = render(<TestComponent step={1} />);
+    rerender(<TestComponent step={2} />);
+
+    expect(capturedRefetch1).not.toBeNull();
+    expect(capturedRefetch2).not.toBeNull();
+    expect(capturedRefetch1).toBe(capturedRefetch2);
+  });
 });
