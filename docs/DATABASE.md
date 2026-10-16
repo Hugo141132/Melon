@@ -346,8 +346,9 @@ DEACTIVATED
 - Public registration shall create `ADMIN` separately through role assignment.
 - Public registration shall set `account_status = PENDING_APPROVAL`.
 - Public registration shall not set `ACTIVE`.
-- Password hashes shall never be logged.
 - `APPROVED` and `ACTIVE` remain separate until the activation policy is finalised.
+- **Pending Admin Rejection & Account Deletion (`DEC-AUTH-113`):** Rejecting a pending Admin transactionally removes the user row from `users` along with child credentials, tokens, sessions, and preferences, preserving audit logs (`ACCOUNT_REJECTED`). Rejection requires status `PENDING_APPROVAL`, target role `ADMIN` (never `OWNER`), and zero operational history (telemetry, alerts, faucet commands, audit actor records).
+- **Historical REJECTED Accounts Cleanup Note:** A separate, DEV-only maintenance script was reported complete by the user on 2026-10-16 for DEV project `unbyxlkrzqlafolxcypi` cleaning 4 historical accounts rejected prior to `DEC-AUTH-113`. Staging and production databases were not modified, and no unverified row counts are claimed.
 
 ### Recommended indexes
 

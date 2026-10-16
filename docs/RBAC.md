@@ -310,15 +310,17 @@ A user with this status shall:
 - Require `emailVerifiedAt IS NOT NULL` to log in or obtain an active session (unverified Owners receive HTTP 403 `EMAIL_NOT_VERIFIED` until verified).
 - Have full access to protected UI routes and APIs according to their assigned role and device access scope.
 
-#### `REJECTED` (RBAC-STATE-004)
+#### `REJECTED` (RBAC-STATE-004 / DEC-AUTH-113)
 
-The Owner rejected the verified account registration.
+The Owner rejected the verified pending Admin account registration.
 
-A rejected account shall:
+Under `DEC-AUTH-113`, rejecting a pending Admin applicant transactionally deletes the pending account record from `users` along with child tokens, credentials, and preferences, allowing clean re-registration while permanently denying unapproved access.
 
-- Be denied protected access and login.
-- Be prevented from gaining access through an earlier session.
-- Display an appropriate account-status message (`/status?status=REJECTED`).
+Rejection safety invariants:
+- **Owner Account Protection:** Rejection of an account holding an `OWNER` role is strictly forbidden (HTTP 403 `FORBIDDEN_TARGET`).
+- **Operational History Protection:** Targets with existing operational records (`faucet_commands`, `alert_acknowledgements`, device access, telemetry, or audit actor history) cannot be rejected/deleted via this flow; the transaction is aborted with HTTP 409 `OPERATION_BLOCKED` to preserve operational integrity.
+- **Audit Log Preservation:** An immutable audit event (`ACCOUNT_REJECTED`) is recorded in `audit_logs` referencing the target user ID and acting Owner before transaction commit.
+- **Historical Accounts Cleanup:** Historical accounts rejected prior to `DEC-AUTH-113` remain in the database unless cleaned up via a separate verified maintenance procedure (such as the DEV cleanup completed on 2026-10-16 for DEV project `unbyxlkrzqlafolxcypi`). Staging and production databases were not modified.
 
 #### `SUSPENDED` (RBAC-STATE-005)
 

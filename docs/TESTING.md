@@ -3743,6 +3743,72 @@ The five mandatory CI gates must be executed **exclusively by operator JEMBOT** 
 - **Staging / VPS Deployment Guidance:** **PENDING**. Requires building and restarting `kebun-melon-web` container image only. Gateway, database migrations, environment variables, and reverse proxy (Caddy) remain untouched.
 <!-- TASK-0504 Follow-up & TASK-0507 Testing Evidence Recorded: 2026-10-12 -->
 
+---
+
+## 35.13 Reliability & Consistency Multi-Domain Repair Batch Verification Evidence (2026-10-16)
+
+### 1. Implementation Scope & Invariants
+- **Pending-Admin Rejection Transactional Deletion & Safety Checks (`DEC-AUTH-113`):**
+  - Owner rejection of pending Admin applicants transactionally deletes the target user row from `users` along with child records (`user_roles`, `account_approvals`, tokens, sessions, preferences).
+  - Pre-mutation safety checks verify target status is `PENDING_APPROVAL`, target has `ADMIN` role only (rejecting an `OWNER` is strictly rejected with HTTP 403 `FORBIDDEN_TARGET`), and target has NO operational records (faucet commands, alerts, device assignments, telemetry, audit log actor records). If operational references exist, transaction aborts with HTTP 409 `OPERATION_BLOCKED`.
+  - Minimal immutable audit log (`ACCOUNT_REJECTED`) is recorded in `audit_logs` referencing target user ID and acting Owner before transaction commit.
+  - UI displays explicit server failure message or `tErrors('generic')` on rejection error, preventing deceptive success toasts.
+- **Historical REJECTED Accounts DEV-Only Maintenance:**
+  - One-off maintenance script was executed targeting 4 historical accounts rejected before this repair batch in DEV project `unbyxlkrzqlafolxcypi`.
+  - Operation reported complete by user on 2026-10-16.
+  - Strictly decoupled from staging/production: zero claims of staging/prod cleanup or independently verified row counts asserted.
+- **Shared 3–3 Grouped OTP Input Component (`DEC-UIUX-110`):**
+  - Replaced single text inputs with reusable `OtpCodeInput.tsx` adopting a 3–3 grouped cell layout with central dash separator (`—`) per explicit user design override.
+  - Strictly preserves authoritative Kebun Melon semantic color tokens (`border-outline-variant/60`, `focus:border-primary`, `bg-surface-container-lowest`), rejecting dark/black palettes.
+  - Full accessibility (per-cell ARIA labels, numeric input mode, focus auto-advance, backspace navigation, arrow keys, paste distribution).
+  - Security timing, token expiry (15-min registration code, 1-min password token), and attempt rate limits remain strictly intact.
+- **Dashboard Counters & Weather Data Lifecycle (`DEC-UIUX-111`):**
+  - Operational counters and weather numeric metrics initially render `"-"` placeholders (never false zero `0` or layout-shifting skeleton blocks).
+  - `AnimatedNumber.tsx` smoothly animates to real numbers upon receiving live telemetry, treating genuine zero (`0`) as a valid number.
+  - Refresh lifecycle & cancellation: client unmount or filter adjustments trigger clean `AbortController` cancellation, handled as normal lifecycle flow rather than treated as a system error. Factual reporting invariant: no unverified claims of measured zero CLS, eliminated memory leaks, or zero latency overhead without empirical profiler evidence.
+- **Admin Approval Decision Notification & Delivery Behavior (`DEC-AUTH-114`):**
+  - Owner approval dispatches bilingual transactional email (`sendAdminApprovalResultEmail`) to the approved Admin applicant with direct login URL (`${baseUrl}/login`), distinct from Owner real-time notifications and agronomic alerts (`alerts` table / `/notifications`).
+  - Delivery failure is isolated from the database transaction; awaited sending may slightly increase HTTP endpoint latency.
+- **Transactional Email Canonical URL Resolution & Multi-Environment Rules (`DEC-AUTH-114`):**
+  - Authoritative source: strictly uses validated server-side `APP_URL` (`validateServerEnv()`).
+  - Raw `process.env` lookups, client public variables (`NEXT_PUBLIC_*`), and silent hardcoded domain fallbacks (`melonmadura.my.id` / `monitoring.melonmadura.my.id`) are eliminated.
+  - Local development/test permits `http://localhost:3000`. Deployed staging requires explicit configured `APP_URL` (`http://localhost:3000` in `.env.staging`), distinct from Supabase staging project `ihgoxqdncepbcrqkchxu`. Deployed production strictly requires valid HTTPS `APP_URL` and forbids `localhost` or `127.0.0.1`.
+  - HTML href and plain-text links match identically across all email templates. Existing emails retain original links.
+- **Water-Tank Rate Limiter Isolation & SSE Reconnect Protection (`DEC-CTRL-099`):**
+  - Rate limiter prefix isolated to `faucet_history`, preventing quota collision with `/api/v1/alerts`.
+  - Added `hasEverOpenedRef` in `FaucetHistoryTable.tsx` to eliminate duplicate fetch amplification on initial SSE mount.
+  - Adaptive polling with bounded backoff and `Retry-After` adherence in `FaucetStatusCard.tsx`.
+- **Successful Profile Save Navigation:**
+  - On successful profile update, client executes full navigation (`window.location.assign('/dashboard')`), rehydrating updated user identity across SSR header, top app bar, and dashboard greeting. Form values and error feedback preserved on failure.
+- **Device Management Regex Escaping & Localized Toast (`DEC-DEV-040`):**
+  - Standardized device name validation regex escaping (`/^[a-zA-Z0-9 _-]{3,50}$/`) across contracts and API route handlers.
+  - Localized update success toast interpolates the persisted device name: `t('deviceUpdated', { name: device.name })`.
+
+### 2. Regression Test Suites Written (Implemented, Execution Pending)
+- `packages/database/test/user-repository.test.ts`: rejection transactional deletion, owner protection, operational history block.
+- `packages/database/test/approvals.service.integration.test.ts`: approvals integration.
+- `apps/web/test/unit/otp-code-input.test.tsx`: 3–3 cell navigation, paste, keyboard, ARIA accessibility.
+- `apps/web/test/unit/approvals-error-feedback.test.ts`: truthful rejection failure feedback.
+- `apps/web/test/unit/device-toast-interpolation.test.ts`: device name toast interpolation.
+- `apps/web/test/unit/dashboard-page.test.tsx`: initial "-" counters and animation.
+- `apps/web/test/unit/resend-email.test.ts`: canonical URL resolution, multi-environment rules, HTML/text parity.
+- `packages/contracts/src/__tests__/device.test.ts`: device DTO validation and regex.
+
+### 3. Website Acceptance & Deployment Status
+- **Manual Website Acceptance:** `USER-REPORTED COMPLETE (2026-10-16)`.
+- **Pre-Commit Operator CI Gates Protocol:**
+  - All five mandatory CI gates remain **PENDING USER EXECUTION** prior to commit/push:
+    1. `npm run check:quality` (lint, format, typecheck, env check, traceability)
+    2. `npm run test` (workspace unit tests)
+    3. `npm run test:coverage` (code coverage threshold verification)
+    4. `npm run test:integration` (isolated PostgreSQL database integration tests; prerequisite: running test DB `kebun_melon_test`)
+    5. `npm run test:e2e` (Playwright E2E smoke tests; prerequisite: running web instance / Microsoft Edge)
+- **Batch Release Status:** `PENDING CI GATES` (Not release-ready / not fully DONE until required gates are verified).
+- **Git Commit, Push & Remote CI:** `PENDING`.
+- **Live Database Migrations:** `NOT REQUIRED` (Zero schema changes; existing tables, enums, and indexes preserved).
+- **Staging / VPS Deployment Guidance:** `PENDING`. Build container image off-VPS (`--platform linux/amd64`), push release image, deploy on VPS using actual Compose configuration and `--no-deps web`. Reverse proxy (Caddy), database configuration, and single-active-gateway rule remain untouched.
+
+
 
 
 

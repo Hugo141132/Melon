@@ -32,7 +32,7 @@ describe('AnimatedNumber Component Lifecycle & Lifecycle Verification', () => {
 
   it('renders fallback when value is null, undefined, or NaN', () => {
     const { rerender } = render(<AnimatedNumber value={null} dataTestId="test-fallback" />);
-    expect(screen.getByTestId('test-fallback')).toHaveTextContent('--');
+    expect(screen.getByTestId('test-fallback')).toHaveTextContent('-');
 
     rerender(<AnimatedNumber value={undefined} fallback="N/A" dataTestId="test-fallback" />);
     expect(screen.getByTestId('test-fallback')).toHaveTextContent('N/A');

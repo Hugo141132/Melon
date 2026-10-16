@@ -36,15 +36,15 @@
 
 | Subsystem | Decision IDs | Status | Approved Policy |
 |---|---|---|---|
-| **Authentication** | `DEC-AUTH-001` to `DEC-AUTH-012`, `DEC-AUTH-102` to `DEC-AUTH-112` | **APPROVED** | HTTP-only secure cookies (`HttpOnly`, `Secure`, `SameSite=Strict`), PostgreSQL session table, 30m idle / 8h absolute maximum lifetime, CLI Owner seed, no public Owner creation, mandatory 6-digit email verification, 1m unified expiry & cooldown, verified self-email change, single active session enforcement, cross-client email PNG logo & 'Melon Governance' branding, Owner User Management email verification isolation with ADMINISTRATOR role presentation, and Owner real-time approval notifications with role.code database queries (`DEC-AUTH-112`). |
+| **Authentication** | `DEC-AUTH-001` to `DEC-AUTH-012`, `DEC-AUTH-102` to `DEC-AUTH-114` | **APPROVED** | HTTP-only secure cookies (`HttpOnly`, `Secure`, `SameSite=Strict`), PostgreSQL session table, 30m idle / 8h absolute maximum lifetime, CLI Owner seed, no public Owner creation, mandatory 6-digit email verification, 1m unified expiry & cooldown, verified self-email change, single active session enforcement, cross-client email PNG logo & 'Melon Governance' branding, Owner User Management email verification isolation with ADMINISTRATOR role presentation, Owner real-time approval notifications with role.code database queries (`DEC-AUTH-112`), pending Admin rejection transactional account deletion with Owner protection (`DEC-AUTH-113`), and approved Admin email notification with authoritative canonical URL resolution (`DEC-AUTH-114`). |
 | **RBAC** | `DEC-RBAC-013` to `DEC-RBAC-019` | **APPROVED** | Owner has global device visibility. Admins have mandatory per-device assignments; device assignment automatically grants both monitoring and faucet control. Owners manage assignments. No separate per-user-device `canControl` permission in v1. |
-| **Devices** | `DEC-DEV-020` to `DEC-DEV-039` | **APPROVED** | Unified EMQX Cloud broker architecture (`DEC-DEV-035` superseding `DEC-DEV-033`): all soil, water quality, and reservoir water tank telemetry consolidated onto EMQX Cloud with HiveMQ fallback permanently retired. Direct 2-tier gateway for single water tank node (`DEC-DEV-032`). Resilient hardware payload normalization in `SoilWaterMqttAdapter` supporting real ESP32 envelopes (`device`, nested `water`, `device_code`) while strictly preserving database device identity validation (`DEC-DEV-036`). External ML prediction resolution decoupled from immutable `devices.deviceId` via `device_external_mappings.external_device_id = 'soil001'`, and EMQX broker ACL policy granting scoped bidirectional `Publish & Subscribe` for `petanimelon` (`DEC-DEV-037`). Device identity security rotation architecture (`DEC-DEV-038`): relational identity `devices.id` UUID is immutable, `devices.device_id` is an OWNER-rotatable security identifier, and `devices.client_id` is hardware MQTT identity. Complete removal of device activation/deactivation lifecycle in favor of pre-provisioned devices monitored strictly by Connected vs Disconnected statuses (`DEC-DEV-039` superseding `DEC-DEV-030`). In-app device creation removed (`DEC-DEV-027`). Zero hard deletion preserved. |
+| **Devices** | `DEC-DEV-020` to `DEC-DEV-040` | **APPROVED** | Unified EMQX Cloud broker architecture (`DEC-DEV-035` superseding `DEC-DEV-033`): all soil, water quality, and reservoir water tank telemetry consolidated onto EMQX Cloud with HiveMQ fallback permanently retired. Direct 2-tier gateway for single water tank node (`DEC-DEV-032`). Resilient hardware payload normalization in `SoilWaterMqttAdapter` supporting real ESP32 envelopes (`device`, nested `water`, `device_code`) while strictly preserving database device identity validation (`DEC-DEV-036`). External ML prediction resolution decoupled from immutable `devices.deviceId` via `device_external_mappings.external_device_id = 'soil001'`, and EMQX broker ACL policy granting scoped bidirectional `Publish & Subscribe` for `petanimelon` (`DEC-DEV-037`). Device identity security rotation architecture (`DEC-DEV-038`): relational identity `devices.id` UUID is immutable, `devices.device_id` is an OWNER-rotatable security identifier, and `devices.client_id` is hardware MQTT identity. Complete removal of device activation/deactivation lifecycle in favor of pre-provisioned devices monitored strictly by Connected vs Disconnected statuses (`DEC-DEV-039` superseding `DEC-DEV-030`). Standardized device name validation regex escaping and localized update success toast interpolating persisted device name (`DEC-DEV-040`). In-app device creation removed (`DEC-DEV-027`). Zero hard deletion preserved. |
 | **Monitoring** | `DEC-MON-036` to `DEC-MON-050`, `DEC-MON-085` to `DEC-MON-092` | **APPROVED** | Three distinct monitoring domains: 1) Soil monitoring (NPK, Temp, Moisture, pH, EC in `µS/cm`, status), 2) Water Quality monitoring (pH, TDS in ppm, EC in `µS/cm`, status), 3) Water Tank monitoring (Tank Vol in `L`, 0 L–2200 L scale per `DEC-MON-089`, status; Flow rate deleted per `DEC-MON-089`). Canonical EC unit standardized directly in `µS/cm` without multiplier conversions across storage, API, UI, simulator, and ML inference (`DEC-MON-091`). Soil & Water Quality ML classification is ingested from an external ML team's Supabase project over read-only PostgREST HTTPS (`ExternalPredictionClient`), mapped dynamically via `device_external_mappings`, and hybrid MQTT recommendations are published asynchronously via `apps/iot-gateway` without local ML compute (`DEC-MON-090`). Raw telemetry remains immutable. 90-day retention TTL with chunked batch maintenance for Soil and Water Quality (`DEC-MON-048` / `TASK-0913`); strict per-device latest-5 records retention for reservoir water tank readings (`DEC-MON-092` / `TASK-0917`). |
-| **Faucet Control** | `DEC-CTRL-051` to `DEC-CTRL-067`, `DEC-CTRL-090`, `DEC-CTRL-094`, `DEC-CTRL-095`, `DEC-CTRL-096`, `DEC-CTRL-097`, `DEC-CTRL-098` | **APPROVED** | Max 1 active command/device, no auto retries, `ENABLE_FAUCET_CONTROL=true` permanently enabled across all environments (`DEC-CTRL-096`). Duplicate command IDs never re-dispense. Automated timeout sweep for stale SENT commands (`DEC-CTRL-094`). Hardware valve feedback bridging and STATUS query contract (`DEC-CTRL-095`). Staging validation executed with `ENABLE_FAUCET_CONTROL=true` (`DEC-CTRL-096`). Event-driven history refresh, terminal status filtering & server-side pagination (`DEC-CTRL-097`). 3-calendar-month command retention with anti-replay tombstones (`DEC-CTRL-098`). Timeout ≠ completion. Cancellation/stop support: **TBD**. |
+| **Faucet Control** | `DEC-CTRL-051` to `DEC-CTRL-067`, `DEC-CTRL-090`, `DEC-CTRL-094` to `DEC-CTRL-099` | **APPROVED** | Max 1 active command/device, no auto retries, `ENABLE_FAUCET_CONTROL=true` permanently enabled across all environments (`DEC-CTRL-096`). Duplicate command IDs never re-dispense. Automated timeout sweep for stale SENT commands (`DEC-CTRL-094`). Hardware valve feedback bridging and STATUS query contract (`DEC-CTRL-095`). Staging validation executed with `ENABLE_FAUCET_CONTROL=true` (`DEC-CTRL-096`). Event-driven history refresh, terminal status filtering & server-side pagination (`DEC-CTRL-097`). 3-calendar-month command retention with anti-replay tombstones (`DEC-CTRL-098`). Rate limiting key prefix isolation (`faucet_history`) and SSE reconnect protection (`DEC-CTRL-099`). Timeout ≠ completion. Cancellation/stop support: **TBD**. |
 | **I18N** | `DEC-I18N-068` to `DEC-I18N-074` | **APPROVED** | Default `id` (Bahasa Indonesia), `en` fallback, mandatory centered language-selection gate for unauthenticated visitors without valid locale (`English` -> `en`, `Bahasa Indonesia` -> `id`), cookie-based non-prefixed routing (no URL path pollution), subsequent language changes strictly in Settings (`/settings`), UTC storage with `Asia/Jakarta` (WIB) presentation. |
 | **Infrastructure** | `DEC-INF-075` to `DEC-INF-088` | **APPROVED** | npm monorepo, PostgreSQL with Prisma ORM, internal health probes, dedicated Linux VPS production with Docker Compose (`TASK-1011`), and containerized staging decoupled from Railway (`TASK-1012`). Backup schedule and retention: daily automated encrypted pg_dump with offsite object storage. |
 | **Testing** | `DEC-TST-089` to `DEC-TST-100` | **APPROVED** | Modern Evergreen browsers. Mobile viewport primary (360-430px). Accessibility standard: **TBD**. API performance targets (p95): **TBD**. Physical test run count per faucet phase: **TBD**. |
-| **UI/UX & Frontend** | `DEC-UIUX-101` to `DEC-UIUX-109` | **APPROVED** | 6 primary UI directions (1 per task), authoritative Kebun Melon color palette (UNCHANGED), controlled 12-motion library, performant motion quality, mandatory task-level frontend declaration, 21st.dev MCP required ONLY for material redesigns, removal of Linked Devices from profile, Account/Session Security management, simplified faucet confirmation modal, device connection status presentation normalization (`Connected` vs `Disconnected` per `DEC-UIUX-106`), shared page transitions (`animate-fade-in`), dashboard animated KPI counting (`AnimatedNumber.tsx`), and whole-logo adaptive favicon branding with "Melon Governance" title (`DEC-UIUX-109`). |
+| **UI/UX & Frontend** | `DEC-UIUX-101` to `DEC-UIUX-111` | **APPROVED** | 6 primary UI directions (1 per task), authoritative Kebun Melon color palette (UNCHANGED), controlled 12-motion library, performant motion quality, mandatory task-level frontend declaration, 21st.dev MCP required ONLY for material redesigns, removal of Linked Devices from profile, Account/Session Security management, simplified faucet confirmation modal, device connection status presentation normalization (`Connected` vs `Disconnected` per `DEC-UIUX-106`), shared page transitions (`animate-fade-in`), dashboard animated KPI counting (`AnimatedNumber.tsx`), whole-logo adaptive favicon branding (`DEC-UIUX-109`), shared 3-3 OTP code input component (`DEC-UIUX-110`), and dashboard counters & weather lifecycle with initial "-" placeholders (`DEC-UIUX-111`). |
 | **Resilience & Architecture** | `DEC-ARCH-036` | **APPROVED** | Bounded confirmation outage probing (3 failed probes at 2s = 4–7s detection window), immediate inline Outage View for protected states, Server Component GET purity in Next.js App Router (zero session revocation during GET SSR), client-side recovery logout mutation with submission race prevention (`outageLogoutPromiseRef`), and epoch fencing (`activeEpochRef`) to drop stale in-flight telemetry frames. |
 
 ---
@@ -1887,4 +1887,107 @@ The following facts are supported by the verified decisions governance of `TASK-
      - Manual website verification: PASS (user-reported).
      - Automated test gates (`metadata-icons.test.ts`) and GitHub Actions: PENDING.
 <!-- DEC-UIUX-109 Reconciled: 2026-10-12 -->
+
+---
+
+## DEC-AUTH-113: Pending-Admin Rejection Transactional Deletion, Owner Protection & Audit Preservation
+- **Status:** APPROVED & IMPLEMENTED (2026-10-16)
+- **Related Task IDs:** `TASK-0208`, `TASK-REPAIR-20261016`
+- **Context:**
+  When an Owner rejected a pending Admin registration, the system previously retained the user row in `users` with `accountStatus = 'REJECTED'`. This left dead accounts permanently occupying email identifiers and cluttering user directory state. Additionally, rejection safety checks needed hardening to prevent accidental deletion of accounts with operational history or Owner accounts.
+- **Decision & Implementation Directives:**
+  1. **Transactional Account Purge:**
+     - Rejecting a pending Admin (`rejectPendingAdmin` in `packages/database/src/user-repository.ts`) transactionally deletes the target user row from `users` along with all child records (`user_roles`, `account_approvals`, tokens, sessions, preferences).
+  2. **Pre-Mutation Safety & Role Invariants:**
+     - Rejection is strictly blocked with HTTP 403 `FORBIDDEN_TARGET` if the target user has an `OWNER` role.
+     - Target must have status `PENDING_APPROVAL` and role `ADMIN`.
+     - Target must have zero operational history (`faucet_commands`, `alert_acknowledgements`, device assignments, or audit log actor entries). If unexpected operational records exist, rejection is aborted with HTTP 409 `OPERATION_BLOCKED`.
+  3. **Immutable Audit Preservation:**
+     - A minimal audit record (`ACCOUNT_REJECTED`) is recorded in `audit_logs` referencing target user ID and acting Owner before transaction commit, without foreign key integrity violations.
+  4. **Historical Cleanup Decoupling:**
+     - Historical REJECTED accounts cleanup was an isolated DEV-only operational script reported complete by the user on 2026-10-16 in project `unbyxlkrzqlafolxcypi`. Never claim staging/production cleanup without verified evidence.
+<!-- DEC-AUTH-113 Reconciled: 2026-10-16 -->
+
+---
+
+## DEC-UIUX-110: Shared 3–3 OTP Code Input with Project Color Preservation (User Design Override)
+- **Status:** APPROVED & IMPLEMENTED (2026-10-16)
+- **Related Task IDs:** `TASK-0214`, `TASK-REPAIR-20261016`
+- **Context:**
+  Email verification and password reset previously rendered individual text inputs or unstyled boxes. An explicit user design override directed adoption of a 3–3 grouped cell layout with a central dash separator (`—`).
+- **Decision & Implementation Directives:**
+  1. **Shared Component Architecture:**
+     - Created `apps/web/components/auth/OtpCodeInput.tsx` shared across `/verify-email` and `/reset-password`.
+  2. **Authoritative Color Token Governance:**
+     - Adopts 3–3 grouped cell layout per user directive while strictly preserving the Kebun Melon semantic color tokens (`border-outline-variant/60`, `focus:border-primary`, `bg-surface-container-lowest`), avoiding dark/black rebrandings.
+  3. **Input Handling & Accessibility:**
+     - Supports automatic focus progression, backspace backward navigation, arrow keys, paste distribution across all 6 cells, numeric input mode (`inputMode="numeric"`), and ARIA labels.
+  4. **Security Timing Invariant:**
+     - Token expiry (15-min registration code, 1-min password token), attempt limits, and rate limits remain unchanged.
+<!-- DEC-UIUX-110 Reconciled: 2026-10-16 -->
+
+---
+
+## DEC-UIUX-111: Dashboard Operational Counters & Weather Data Lifecycle (Initial "-" Placeholders, Counting & Cancellation Handling)
+- **Status:** APPROVED & IMPLEMENTED (2026-10-16)
+- **Related Task IDs:** `TASK-0506`, `TASK-REPAIR-20261016`
+- **Context:**
+  Dashboard operational node counters and weather metrics previously flashed `0` or shifting skeleton blocks prior to data arrival, creating visual flicker. In addition, unmount/refresh aborts required clean operational handling.
+- **Decision & Implementation Directives:**
+  1. **Initial "-" Placeholders:**
+     - Standardized operational counters (`Total Devices`, `Connected`, `Disconnected`) in `DashboardView.tsx` and numeric metrics in `WeatherCard.tsx` to initially render `"-"` placeholders.
+  2. **Smooth Number Animation & Genuine Zero Handling:**
+     - `AnimatedNumber.tsx` smoothly animates to real numbers upon data arrival while preserving genuine zero (`0`), decimal precision, and error states.
+  3. **Lifecycle Cancellation Handling:**
+     - Client unmount or filter adjustments trigger `AbortController` cancellation, which is handled as normal lifecycle flow rather than treated as a system error.
+     - Factual reporting invariant: No unverified claims of zero CLS, eliminated memory leaks, or zero latency overhead are asserted without profiler measurements.
+<!-- DEC-UIUX-111 Reconciled: 2026-10-16 -->
+
+---
+
+## DEC-AUTH-114: Approved Admin Decision Email Dispatch & Authoritative Canonical URL Resolution
+- **Status:** APPROVED & IMPLEMENTED (2026-10-16)
+- **Related Task IDs:** `TASK-0207`, `TASK-0219`, `TASK-REPAIR-20261016`
+- **Context:**
+  Admin approval decisions needed direct email notification to the applicant. In testing, the approval email button incorrectly directed users to an external website (`https://melonmadura.my.id/login`) due to improper fallbacks.
+- **Decision & Implementation Directives:**
+  1. **Direct Applicant Notification:**
+     - Owner approval dispatches bilingual transactional email (`sendAdminApprovalResultEmail`) to the approved Admin with trusted login link. Email failure is isolated from the database transaction. Awaited sending may increase HTTP latency.
+  2. **Authoritative Server APP_URL Resolver:**
+     - `getCanonicalAppBaseUrl()` in `apps/web/lib/email/resend.ts` uses validated server-side `APP_URL` (`validateServerEnv()`) as the sole authoritative source.
+     - Raw `process.env` lookups, client public variables (`NEXT_PUBLIC_*`), and silent hardcoded domain fallbacks are strictly eliminated.
+     - Local development/test permits `http://localhost:3000`. Deployed staging requires explicit configured `APP_URL` (`http://localhost:3000` in `.env.staging`), distinct from Supabase staging project `ihgoxqdncepbcrqkchxu`. Deployed production strictly requires valid HTTPS `APP_URL` and forbids `localhost` or `127.0.0.1`.
+     - HTML href and plain-text links are guaranteed identical across all transactional emails. Existing emails retain original links.
+<!-- DEC-AUTH-114 Reconciled: 2026-10-16 -->
+
+---
+
+## DEC-CTRL-099: Water Tank Command History & Status Polling Rate Limiting Isolation and SSE Reconnect Protection
+- **Status:** APPROVED & IMPLEMENTED (2026-10-16)
+- **Related Task IDs:** `TASK-0902`, `TASK-REPAIR-20261016`
+- **Context:**
+  Water tank control components (`FaucetStatusCard.tsx` and `FaucetHistoryTable.tsx`) encountered HTTP 429 rate limit errors due to shared rate-limiter keys with alerts polling and duplicate fetches on initial SSE connection.
+- **Decision & Implementation Directives:**
+  1. **Rate Limiter Prefix Isolation:**
+     - Isolated faucet command history rate limiter to prefix `faucet_history` (separated from `/api/v1/alerts`).
+  2. **SSE Mount Duplicate Fetch Prevention:**
+     - Added `hasEverOpenedRef` in `FaucetHistoryTable.tsx` so reconnect refetches only execute following an actual disconnection.
+  3. **Adaptive Polling & Backoff:**
+     - Refactored `FaucetStatusCard.tsx` from fixed 2.5s interval to adaptive timeout-based polling adhering to `Retry-After` headers and backoff.
+<!-- DEC-CTRL-099 Reconciled: 2026-10-16 -->
+
+---
+
+## DEC-DEV-040: Device Identifier Regex Escaping Standardization & Localized Persisted Name Interpolation
+- **Status:** APPROVED & IMPLEMENTED (2026-10-16)
+- **Related Task IDs:** `TASK-0302`, `TASK-REPAIR-20261016`
+- **Context:**
+  Device name validation regex had escaping discrepancies between browser and server runtime parsers, and update success toasts leaked raw `{name}` placeholders.
+- **Decision & Implementation Directives:**
+  1. **Regex Escaping Standardization:**
+     - Standardized device name validation regex pattern across `packages/contracts/src/device.ts` to `/^[a-zA-Z0-9 _-]{3,50}$/`.
+  2. **Localized Name Interpolation:**
+     - Updated `apps/web/app/devices/page.tsx` so update success toast interpolates the persisted device name: `t('deviceUpdated', { name: device.name })`.
+<!-- DEC-DEV-040 Reconciled: 2026-10-16 -->
+
 

@@ -500,7 +500,8 @@ flowchart TD
 4. The server verifies `emailVerifiedAt IS NOT NULL` (`DEC-AUTH-104`).
 5. The server transitions status to `ACTIVE`.
 6. The server records acting Owner, previous status, new status, timestamp, and optional note in `approval_history` and `audit_logs`.
-7. The Owner sees confirmation and the table refreshes.
+7. The server dispatches an approval notification email via Resend (`sendAdminApprovalResultEmail`) to the approved Admin applicant with a direct login link (`${baseUrl}/login`) resolved via `getCanonicalAppBaseUrl()`. Email dispatch failure is isolated and does not abort approval.
+8. The Owner sees confirmation and the table refreshes.
 
 **Error flows:**
 
@@ -522,26 +523,28 @@ flowchart TD
 **Preconditions:** Owner is active; target is `PENDING_APPROVAL` with `emailVerifiedAt IS NOT NULL`.
 **Trigger:** Owner confirms rejection.
 
-**Main success flow:**
+**Main success flow (`DEC-AUTH-113`):**
 
 1. The Owner selects reject in `/approvals`.
 2. The UI requests confirmation and optional reason.
 3. The server validates Owner permission (`account.reject`).
-4. The server reloads the target account asserting `accountStatus === 'PENDING_APPROVAL'` and `emailVerifiedAt IS NOT NULL` (via `emailVerifiedAt: true` select projection, `DEC-AUTH-104`).
-5. The server changes status to `REJECTED`.
-6. The server records the decision in `approval_history` and emits `account.rejected` audit event.
-7. The Owner sees confirmation.
+4. The server reloads the target account asserting `accountStatus === 'PENDING_APPROVAL'`, role is `ADMIN` (never `OWNER`), and target has NO operational records.
+5. The server records an audit event (`ACCOUNT_REJECTED`) in `audit_logs` capturing acting Owner and target identity before deletion.
+6. The server transactionally deletes the target user row from `users` along with all child records (`user_roles`, `account_approvals`, tokens, sessions, preferences).
+7. The Owner sees confirmation and the table refreshes.
 
 **Error flows:**
 
+- Target holds an `OWNER` role: return HTTP 403 `FORBIDDEN_TARGET`.
+- Target has unexpected operational history (faucet commands, alerts, device assignments): return HTTP 409 `OPERATION_BLOCKED`.
 - Target is unverified (`emailVerifiedAt IS NULL`): return HTTP 409 `INVALID_STATUS`.
 - Target already decided: return HTTP 409 `INVALID_STATUS`.
 
-**Postconditions:** Target status is `REJECTED`; target cannot log in.
+**Postconditions:** Target account is transactionally deleted from `users`; audit record preserved; target cannot log in.
 **Required permissions:** `account.reject`.
-**Relevant account statuses:** Target `PENDING_APPROVAL` to `REJECTED`.
-**UI states:** Confirmation, reason field, success, conflict.
-**Audit events:** `account.rejected`.
+**Relevant account statuses:** Target `PENDING_APPROVAL` -> Deleted.
+**UI states:** Confirmation, reason field, success, conflict, error.
+**Audit events:** `account.rejected` (`ACCOUNT_REJECTED`).
 
 ---
 
@@ -841,11 +844,11 @@ flowchart TD
 4. The server validates fields.
 5. The server saves permitted changes.
 6. The system records an audit event.
-7. The frontend shows success.
+7. The frontend displays success feedback and executes full navigation (`window.location.assign('/dashboard')`), rehydrating updated user identity across SSR header, top app bar, and dashboard greeting.
 
-**Alternative flows:** Email change requires reverification: `TBD`.
-**Error flows:** Validation failure, duplicate email, stale version conflict.
-**Postconditions:** Own profilee is updated.
+**Alternative flows:** Email change requires reverification via modal with password re-authentication (`DEC-AUTH-106`).
+**Error flows:** Validation failure, duplicate email, stale version conflict. The user remains on the edit form with fields preserved and inline error feedback displayed.
+**Postconditions:** Own profile is updated; navigation shell displays fresh identity.
 **Required permissions:** `profilee.self.update`.
 **Relevant account statuses:** `ACTIVE`.
 **UI states:** Edit, saving, success, validation errors.

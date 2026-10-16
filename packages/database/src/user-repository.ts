@@ -763,7 +763,7 @@ export class UserRepository {
   async rejectPendingAdmin(input: RejectAdminInput): Promise<RejectAdminResult> {
     try {
       const txResult = await this.prisma.$transaction(async (tx) => {
-        // 1. Fetch user to verify current state
+        // 1. Fetch user to verify current state and roles
         const targetUser = await tx.user.findUnique({
           where: { id: input.targetUserId },
           select: {
@@ -775,6 +775,12 @@ export class UserRepository {
             emailVerifiedAt: true,
             createdAt: true,
             updatedAt: true,
+            userRoles: {
+              where: { revokedAt: null },
+              select: {
+                role: { select: { code: true } },
+              },
+            },
           },
         });
 
@@ -783,6 +789,16 @@ export class UserRepository {
             success: false as const,
             error: 'USER_NOT_FOUND' as const,
             message: `Target user with ID '${input.targetUserId}' does not exist.`,
+          };
+        }
+
+        // Owner protection: Owners can never be rejected or deleted
+        if (targetUser.userRoles?.some((r) => r.role.code === ContractUserRole.OWNER)) {
+          return {
+            success: false as const,
+            error: 'INVALID_STATUS' as const,
+            message: 'Owner accounts cannot be rejected or removed.',
+            currentStatus: targetUser.accountStatus as AccountStatus,
           };
         }
 
@@ -805,50 +821,25 @@ export class UserRepository {
           };
         }
 
-        // 2. Update account status to REJECTED
-        const updatedUser = await tx.user.update({
-          where: { id: input.targetUserId },
-          data: { accountStatus: AccountStatus.REJECTED },
-          select: {
-            id: true,
-            fullName: true,
-            email: true,
-            username: true,
-            accountStatus: true,
-            emailVerifiedAt: true,
-            lastLoginAt: true,
-            suspendedAt: true,
-            deactivatedAt: true,
-            createdAt: true,
-            updatedAt: true,
-            userRoles: {
-              where: { revokedAt: null },
-              select: {
-                id: true,
-                userId: true,
-                roleId: true,
-                assignedByUserId: true,
-                assignedAt: true,
-                revokedAt: true,
-                role: { select: { code: true } },
-              },
-            },
-          },
-        });
+        // 2. Safety check: Verify account does not have unexpected operational references
+        // Must execute before any destructive writes or audit log creation.
+        // Never delete operational history to satisfy foreign keys.
+        const [operationalCommandsCount, operationalAlertAcksCount] = await Promise.all([
+          tx.faucetCommand.count({ where: { initiatedByUserId: targetUser.id } }),
+          tx.alertAcknowledgement.count({ where: { acknowledgedByUserId: targetUser.id } }),
+        ]);
 
-        // 3. Create AccountApproval history entry
-        const approvalRecord = await tx.accountApproval.create({
-          data: {
-            applicantUserId: targetUser.id,
-            decision: 'REJECT',
-            previousStatus: AccountStatus.PENDING_APPROVAL,
-            newStatus: AccountStatus.REJECTED,
-            decidedByUserId: input.decidedByUserId,
-            decisionNote: input.decisionNote?.trim() || null,
-          },
-        });
+        if (operationalCommandsCount > 0 || operationalAlertAcksCount > 0) {
+          return {
+            success: false as const,
+            error: 'INVALID_STATUS' as const,
+            message:
+              'Cannot reject applicant: unexpected operational history (faucet commands or alert acknowledgements) is associated with this account. Manual review required.',
+            currentStatus: targetUser.accountStatus as AccountStatus,
+          };
+        }
 
-        // 4. Log AuditLog event (strictly no secrets/passwords/tokens)
+        // 3. Log AuditLog event before cleanup (targetId is stored without FK; survives deletion)
         const auditLog = await tx.auditLog.create({
           data: {
             eventKey: AuditEventKey.ACCOUNT_REJECTED,
@@ -858,7 +849,7 @@ export class UserRepository {
             targetId: targetUser.id,
             result: 'SUCCESS',
             previousValues: { accountStatus: AccountStatus.PENDING_APPROVAL },
-            newValues: { accountStatus: AccountStatus.REJECTED },
+            newValues: { accountStatus: AccountStatus.REJECTED, removed: true },
             metadata: {
               decision: 'REJECT',
               decisionNote: input.decisionNote?.trim() || null,
@@ -871,10 +862,48 @@ export class UserRepository {
           },
         });
 
+        // 4. Clean up applicant-owned credentials, tokens, sessions, preferences, and assignments
+        await tx.userRoleAssignment.deleteMany({ where: { userId: targetUser.id } });
+        await tx.accountApproval.deleteMany({
+          where: {
+            OR: [{ applicantUserId: targetUser.id }, { decidedByUserId: targetUser.id }],
+          },
+        });
+        await tx.emailVerificationToken.deleteMany({ where: { userId: targetUser.id } });
+        await tx.passwordResetToken.deleteMany({ where: { userId: targetUser.id } });
+        await tx.sessionRecoveryChallenge.deleteMany({ where: { userId: targetUser.id } });
+        await tx.session.deleteMany({ where: { userId: targetUser.id } });
+        await tx.userPreference.deleteMany({ where: { userId: targetUser.id } });
+        await tx.userDeviceAccess.deleteMany({
+          where: {
+            OR: [{ userId: targetUser.id }, { assignedByUserId: targetUser.id }],
+          },
+        });
+
+        // 5. Remove account row from users table
+        await tx.user.delete({
+          where: { id: targetUser.id },
+        });
+
+        const safeRejectedUserDto: PublicSafeUserDto = {
+          id: targetUser.id,
+          fullName: targetUser.fullName,
+          email: targetUser.email,
+          username: targetUser.username,
+          accountStatus: AccountStatus.REJECTED,
+          emailVerifiedAt: targetUser.emailVerifiedAt,
+          lastLoginAt: null,
+          suspendedAt: null,
+          deactivatedAt: null,
+          createdAt: targetUser.createdAt,
+          updatedAt: new Date(),
+          activeRoles: [],
+        };
+
         return {
           success: true as const,
-          user: toPublicSafeUserDto(this.mapPrismaUserToRawDbUser(updatedUser)),
-          approvalRecordId: approvalRecord.id,
+          user: safeRejectedUserDto,
+          approvalRecordId: auditLog.id,
           auditLogId: auditLog.id,
           applicantInfo: {
             id: targetUser.id,

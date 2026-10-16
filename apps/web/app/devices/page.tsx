@@ -146,7 +146,8 @@ export default function DeviceRegistryPage() {
 
       const json = await res.json();
       if (json.success) {
-        setSuccessMsg(tDevices('updateSuccess', { name: json.data.name }));
+        const persistedName = json.data?.name || editName.trim() || editDevice.name;
+        setSuccessMsg(tDevices('updateSuccess', { name: persistedName }));
         setEditModalOpen(false);
         setEditDevice(null);
         setDevices((prev) =>
@@ -641,7 +642,7 @@ export default function DeviceRegistryPage() {
                   required
                   value={editDeviceId}
                   onChange={(e) => setEditDeviceId(e.target.value)}
-                  pattern="^[a-z0-9-_]+$"
+                  pattern={'^[a-z0-9_\\-]+$'}
                   title={tDevices('deviceIdPatternHint')}
                   className="w-full px-3.5 py-2 bg-app-surface border border-app-outline-variant/40 rounded-xl text-[14px] font-mono focus:outline-none focus:border-app-primary"
                 />

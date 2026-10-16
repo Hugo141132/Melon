@@ -1024,6 +1024,9 @@ The server shall reject self-updates to:
 - Approval metadata.
 - Immutable IDs.
 
+**Client Hydration Behavior:**
+Upon successful profile update, the web client performs full-page navigation to `/dashboard` to rehydrate the updated user identity across SSR header, top app bar, and dashboard greeting. If the request fails, the client retains form values and displays an error message without navigating away.
+
 Response:
 
 ```json
@@ -1582,6 +1585,7 @@ Server behaviour:
 5. Insert audit log.
 6. Commit transaction.
 7. Send notification after commit.
+8. Send localized transactional approval email (`sendAdminApprovalResultEmail`) to approved Admin applicant post-commit with login URL (`${baseUrl}/login`) resolved via `getCanonicalAppBaseUrl()`. Email dispatch failure is isolated and does not abort approval; awaited sending may add slight endpoint latency.
 
 Response:
 
@@ -1636,14 +1640,14 @@ Request:
 }
 ```
 
-Server behaviour:
+Server behaviour (`DEC-AUTH-113`):
 
 1. Verify target user exists and `accountStatus` is `PENDING_APPROVAL`.
-2. Verify target user has verified email ownership (`emailVerifiedAt` is not null, selected via `emailVerifiedAt: true` projection per `DEC-AUTH-104`). Unverified targets return HTTP 409 `INVALID_STATUS`.
-3. Prevent duplicate or conflicting decisions.
-4. Update `accountStatus` to `REJECTED`.
-5. Insert approval history record in `approval_history`.
-6. Insert audit log (`account.rejected`).
+2. Owner protection invariant: verify target user does NOT have the `OWNER` role (returns HTTP 403 `FORBIDDEN_TARGET` if target is an Owner).
+3. Verify target user has verified email ownership (`emailVerifiedAt` is not null). Unverified targets return HTTP 409 `INVALID_STATUS`.
+4. Pre-mutation safety check: verify target user has NO operational records (`faucet_commands`, `alert_acknowledgements`, device access, telemetry, or audit log actor entries). If unexpected operational records exist, rejection is aborted with HTTP 409 `OPERATION_BLOCKED` and a truthful failure message.
+5. Transactional account deletion (`rejectPendingAdmin`): transactionally deletes the target user row from `users` along with all child records (`user_roles`, `account_approvals`, tokens, sessions, preferences).
+6. Insert audit log record (`ACCOUNT_REJECTED`) in `audit_logs` referencing target user ID and acting Owner before transaction commit.
 7. Commit transaction.
 
 Response (HTTP 200 OK):
@@ -1824,6 +1828,8 @@ Rules:
 - **Security Identifier Rotation (`DEC-DEV-038`)**: Rotating `deviceId` immediately invalidates the previous identifier (API lookups targeting the old identifier return HTTP 404).
 - **Relational Integrity**: Rotating `deviceId` preserves all relational child records (`devices.id` foreign key references) including telemetry, faucet commands, alerts, and user access records.
 - **Hardware Decoupling**: Physical microcontroller firmware uses `devices.client_id` (`melon-esp32-tanah1`, `melon-esp32-air1`, `NodeMCU_Irigasi_Fix`) and does NOT require firmware reflashing when the Owner rotates the external `deviceId`.
+- **Device Name Regex Standardization (`DEC-DEV-040`)**: `name` is validated using `/^[a-zA-Z0-9 _-]{3,50}$/`, standardized identically across client browser and server runtime parsers.
+- **Localized Feedback**: Successful device update toasts interpolate the persisted device name (`t('deviceUpdated', { name: device.name })`).
 - **Audit Logging**: The system writes a structured audit log event (`device.identifier_rotated`) capturing the previous identifier, new identifier, actor user ID, and device UUID.
 
 ---
@@ -2345,6 +2351,7 @@ orderBy: [{ [sortField]: sortOrder }, { id: sortOrder }]
 - Independent table state: `FaucetControlPanel` does not overwrite the table's state with parent `initialItems` on re-renders, preventing race conditions.
 - Stale-response protection: monotonic `fetchSeqRef` ensures delayed or out-of-order network responses are safely ignored.
 - If the current page becomes empty due to background retention purging, the UI automatically recovers by fetching the last valid page (`totalPages`).
+- **Rate Limiter Prefix Isolation & SSE Protection (`DEC-CTRL-099`):** Faucet command history rate limiter uses isolated prefix `faucet_history` (separated from `/api/v1/alerts`). `FaucetHistoryTable` employs `hasEverOpenedRef` to eliminate duplicate fetch amplification on initial SSE mount, and `FaucetStatusCard` applies adaptive timeout-based polling adhering to `Retry-After` headers and backoff.
 
 ---
 

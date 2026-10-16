@@ -11,17 +11,47 @@ import {
 
 describe('Device Contracts (TASK-0302)', () => {
   describe('CanonicalDeviceIdSchema', () => {
-    it('accepts valid canonical device IDs', () => {
+    it('accepts valid canonical device IDs with lowercase letters, digits, underscores, and hyphens', () => {
       expect(CanonicalDeviceIdSchema.parse('water-node-001')).toBe('water-node-001');
       expect(CanonicalDeviceIdSchema.parse('soil_node_2')).toBe('soil_node_2');
       expect(CanonicalDeviceIdSchema.parse('esp32-abc-123')).toBe('esp32-abc-123');
+      expect(CanonicalDeviceIdSchema.parse('a-b_c-1')).toBe('a-b_c-1');
     });
 
-    it('rejects invalid or translated/display device IDs', () => {
-      expect(() => CanonicalDeviceIdSchema.parse('Water Node 1')).toThrow();
-      expect(() => CanonicalDeviceIdSchema.parse('Node/01')).toThrow();
-      expect(() => CanonicalDeviceIdSchema.parse('esp32!@#')).toThrow();
-      expect(() => CanonicalDeviceIdSchema.parse('ab')).toThrow(); // too short
+    it('rejects invalid canonical device IDs (uppercase, spaces, backslash, punctuation, too short)', () => {
+      expect(() => CanonicalDeviceIdSchema.parse('Water Node 1')).toThrow(); // uppercase & spaces
+      expect(() => CanonicalDeviceIdSchema.parse('Node/01')).toThrow(); // slash
+      expect(() => CanonicalDeviceIdSchema.parse('esp32!@#')).toThrow(); // punctuation
+      expect(() => CanonicalDeviceIdSchema.parse('node\\01')).toThrow(); // backslash strictly rejected
+      expect(() => CanonicalDeviceIdSchema.parse('node\\-01')).toThrow(); // escaped backslash in input strictly rejected
+      expect(() => CanonicalDeviceIdSchema.parse('UPPERCASE_NODE')).toThrow(); // uppercase
+      expect(() => CanonicalDeviceIdSchema.parse('ab')).toThrow(); // too short (<3 chars)
+      expect(() => CanonicalDeviceIdSchema.parse('node 123')).toThrow(); // spaces
+    });
+
+    it('validates HTML pattern attribute v-mode compatibility', () => {
+      // In JSX, pattern={'^[a-z0-9_\\-]+$'} emits the DOM attribute string: ^[a-z0-9_\-]+$
+      const domPatternString = '^[a-z0-9_\\-]+$';
+
+      // HTML5 specification compiles pattern as: ^(?:<pattern>)$
+      // Modern engines with unicodeSets / v-mode must compile without character-class range errors
+      let vModeRegex: RegExp;
+      try {
+        vModeRegex = new RegExp(`^(?:${domPatternString})$`, 'v');
+      } catch {
+        // Fallback for Node/V8 environments where 'v' flag might not be supported without flag
+        vModeRegex = new RegExp(`^(?:${domPatternString})$`, 'u');
+      }
+
+      expect(vModeRegex.test('water-node-001')).toBe(true);
+      expect(vModeRegex.test('soil_node_2')).toBe(true);
+      expect(vModeRegex.test('node-01')).toBe(true);
+
+      // Must reject backslash, uppercase, spaces, and punctuation in browser constraint validation
+      expect(vModeRegex.test('node\\01')).toBe(false);
+      expect(vModeRegex.test('water node')).toBe(false);
+      expect(vModeRegex.test('NODE-01')).toBe(false);
+      expect(vModeRegex.test('node@01')).toBe(false);
     });
   });
 

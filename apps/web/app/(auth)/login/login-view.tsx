@@ -13,13 +13,13 @@ import {
   AlertCircle,
   CheckCircle,
   ShieldAlert,
-  KeyRound,
   RefreshCw,
   X,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useAuth } from '@/context/AuthContext';
 import { ALERT_UPDATED_EVENT } from '@/hooks/useAlertBadge';
+import OtpCodeInput from '@/components/auth/OtpCodeInput';
 
 function LoginForm() {
   const router = useRouter();
@@ -463,33 +463,20 @@ function LoginForm() {
 
                 <div>
                   <label
-                    className="text-[13px] font-semibold text-on-surface mb-1.5 block tracking-wide uppercase"
-                    htmlFor="recovery-otp-input"
+                    className="text-[13px] font-semibold text-on-surface mb-1.5 block tracking-wide uppercase text-center"
+                    htmlFor="recovery-otp-0"
                   >
                     {tAuth('verificationCode')}
                   </label>
-                  <div className="relative group">
-                    <KeyRound
-                      size={18}
-                      className="absolute left-4 top-1/2 -translate-y-1/2 text-outline group-focus-within:text-primary transition-colors"
-                    />
-                    <input
-                      id="recovery-otp-input"
-                      name="recoveryOtp"
-                      type="text"
-                      inputMode="numeric"
-                      autoComplete="one-time-code"
-                      pattern="[0-9]*"
-                      maxLength={6}
-                      required
-                      autoFocus
-                      value={recoveryOtp}
-                      onChange={(e) => setRecoveryOtp(e.target.value.replace(/[^0-9]/g, ''))}
-                      placeholder="000000"
-                      className="w-full h-[52px] pl-12 pr-4 bg-surface border border-outline-variant rounded-xl text-[20px] tracking-[6px] font-mono text-on-surface transition-all focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
-                    />
-                  </div>
-                  <p className="text-[12px] text-on-surface-variant mt-1.5">
+                  <OtpCodeInput
+                    value={recoveryOtp}
+                    onChange={(val) => setRecoveryOtp(val)}
+                    hasError={Boolean(recoveryError)}
+                    disabled={recoveryLoading || recoveryCountdown === 0}
+                    onComplete={(val) => setRecoveryOtp(val)}
+                    idPrefix="recovery-otp"
+                  />
+                  <p className="text-[12px] text-on-surface-variant text-center mt-1.5">
                     {tAuth('recoveryCodeExpiryNotice')}
                   </p>
                 </div>

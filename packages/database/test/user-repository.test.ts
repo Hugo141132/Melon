@@ -274,7 +274,7 @@ describe('UserRepository Unit Tests', () => {
     const ownerId = '10000000-0000-0000-0000-000000000001';
     const adminId = '10000000-0000-0000-0000-000000000002';
 
-    it('rejectPendingAdmin succeeds for verified PENDING_APPROVAL admin', async () => {
+    it('rejectPendingAdmin succeeds for verified PENDING_APPROVAL admin with transactional deletion', async () => {
       const mockTx: any = {
         user: {
           findUnique: vi.fn().mockResolvedValue({
@@ -286,27 +286,42 @@ describe('UserRepository Unit Tests', () => {
             emailVerifiedAt: new Date(),
             createdAt: new Date(),
             updatedAt: new Date(),
-          }),
-          update: vi.fn().mockResolvedValue({
-            id: adminId,
-            fullName: 'Pending Admin',
-            email: 'admin.pending@example.com',
-            username: null,
-            accountStatus: 'REJECTED',
-            emailVerifiedAt: new Date(),
-            lastLoginAt: null,
-            suspendedAt: null,
-            deactivatedAt: null,
-            createdAt: new Date(),
-            updatedAt: new Date(),
             userRoles: [],
           }),
+          delete: vi.fn().mockResolvedValue({ id: adminId }),
+        },
+        userRoleAssignment: {
+          deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
         },
         accountApproval: {
-          create: vi.fn().mockResolvedValue({ id: 'appr-1' }),
+          deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
+        },
+        emailVerificationToken: {
+          deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
+        },
+        passwordResetToken: {
+          deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+        },
+        sessionRecoveryChallenge: {
+          deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+        },
+        session: {
+          deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+        },
+        userPreference: {
+          deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
+        },
+        userDeviceAccess: {
+          deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+        },
+        faucetCommand: {
+          count: vi.fn().mockResolvedValue(0),
+        },
+        alertAcknowledgement: {
+          count: vi.fn().mockResolvedValue(0),
         },
         auditLog: {
-          create: vi.fn().mockResolvedValue({ id: 'audit-1' }),
+          create: vi.fn().mockResolvedValue({ id: 'audit-reject-1' }),
         },
       };
 
@@ -324,13 +339,100 @@ describe('UserRepository Unit Tests', () => {
       expect(result.success).toBe(true);
       if (!result.success) return;
       expect(result.user.accountStatus).toBe(AccountStatus.REJECTED);
-      expect(result.approvalRecordId).toBe('appr-1');
-      expect(mockTx.user.update).toHaveBeenCalledWith(
+      expect(result.approvalRecordId).toBe('audit-reject-1');
+      expect(mockTx.user.delete).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: adminId },
-          data: { accountStatus: 'REJECTED' },
         })
       );
+      expect(mockTx.userRoleAssignment.deleteMany).toHaveBeenCalledWith({
+        where: { userId: adminId },
+      });
+      expect(mockTx.auditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            eventKey: 'account.rejected',
+            targetId: adminId,
+          }),
+        })
+      );
+    });
+
+    it('rejectPendingAdmin halts and flags unexpected operational references (faucet commands)', async () => {
+      const mockTx: any = {
+        user: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: adminId,
+            fullName: 'Pending Admin with Leaked Commands',
+            email: 'admin.leaked@example.com',
+            username: null,
+            accountStatus: 'PENDING_APPROVAL',
+            emailVerifiedAt: new Date(),
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            userRoles: [{ role: { code: 'ADMIN' } }],
+          }),
+          delete: vi.fn(),
+        },
+        auditLog: {
+          create: vi.fn().mockResolvedValue({ id: 'audit-reject-1' }),
+        },
+        faucetCommand: {
+          count: vi.fn().mockResolvedValue(2), // Unexpected operational commands exist!
+        },
+        alertAcknowledgement: {
+          count: vi.fn().mockResolvedValue(0),
+        },
+      };
+
+      const mockPrismaClient: any = {
+        $transaction: vi.fn().mockImplementation((cb: any) => cb(mockTx)),
+      };
+
+      const repo = new UserRepository(mockPrismaClient);
+      const result = await repo.rejectPendingAdmin({
+        targetUserId: adminId,
+        decidedByUserId: ownerId,
+      });
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error).toBe('INVALID_STATUS');
+      expect(result.message).toContain('unexpected operational history');
+      expect(mockTx.user.delete).not.toHaveBeenCalled();
+    });
+
+    it('rejectPendingAdmin prevents rejecting an OWNER account', async () => {
+      const mockTx: any = {
+        user: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: adminId,
+            fullName: 'Owner Account',
+            email: 'owner@example.com',
+            username: null,
+            accountStatus: 'PENDING_APPROVAL',
+            emailVerifiedAt: new Date(),
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            userRoles: [{ role: { code: 'OWNER' } }],
+          }),
+        },
+      };
+
+      const mockPrismaClient: any = {
+        $transaction: vi.fn().mockImplementation((cb: any) => cb(mockTx)),
+      };
+
+      const repo = new UserRepository(mockPrismaClient);
+      const result = await repo.rejectPendingAdmin({
+        targetUserId: adminId,
+        decidedByUserId: ownerId,
+      });
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error).toBe('INVALID_STATUS');
+      expect(result.message).toContain('Owner accounts cannot be rejected or removed');
     });
 
     it('rejectPendingAdmin rejects unverified PENDING_APPROVAL admin (emailVerifiedAt is null)', async () => {

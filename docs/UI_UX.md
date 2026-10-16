@@ -309,6 +309,27 @@ The 2026-10-08 telemetry history and visualization update unifies monitoring pag
    - Actor identity is derived strictly from the authenticated server session (`locationNamedById`).
    - Saving, editing, or clearing an annotation writes an audit log entry (`telemetry.location_annotated`) and dynamically refreshes the location dropdown list and chart.
 
+### 1.13 Reliability & Consistency Repair UI/UX Governance (DEC-UIUX-110, DEC-UIUX-111, DEC-DEV-040)
+The 2026-10-16 repair batch refines the shared OTP code input layout, dashboard initial loading lifecycle, and device toast interpolation:
+- **Frontend impact:** `MINOR`
+- **Selected UI direction:** `Premium Minimal Ops`
+- **Existing color template:** `UNCHANGED`
+- **Selected motion effects:** `Skeleton loading`, `Button hover`, `Modal`
+- **21st.dev MCP:** `NOT REQUIRED` (Reuses existing design tokens, components, and grounded card layouts)
+
+#### Presentation, Interaction & Visual Governance Rules
+1. **Shared 3–3 Grouped OTP Input (`OtpCodeInput.tsx` / `DEC-UIUX-110`):**
+   - **User Design Override:** Replaced single text inputs across `/verify-email` and `/reset-password` with a 3–3 grouped cell layout featuring a central dash separator (`—`) per explicit user directive.
+   - **Authoritative Color Token Governance:** Styled strictly using Kebun Melon semantic color tokens (`bg-surface-container-lowest`, `border-outline-variant/60`, `focus:border-primary`, `border-error`), preventing arbitrary black/dark themes.
+   - **Full Accessibility & Input Navigation:** Provides per-cell labels (`aria-label="Digit N"`), numeric keypad on mobile (`inputMode="numeric"`), automatic focus advancement, backward backspace traversal, arrow key navigation, and paste distribution across all 6 cells.
+   - **Security Timing Invariant:** 15-minute registration code expiry, 1-minute password token expiry, attempt rate limits, and 60-second cooldown timer remain completely intact.
+2. **Dashboard Counters & Weather Data Lifecycle (`DashboardView.tsx`, `WeatherCard.tsx`, `AnimatedNumber.tsx` / `DEC-UIUX-111`):**
+   - **Initial `"-"` Placeholders:** Operational node counters (`Total Devices`, `Connected`, `Disconnected`) and weather numeric metrics render `"-"` upon mount, preventing deceptive initial `0` flashes or layout-shifting skeleton blocks.
+   - **Smooth Number Animation & Genuine Zero:** `AnimatedNumber.tsx` smoothly interpolates to real numbers upon receiving live telemetry, strictly treating genuine zero (`0`) as a valid numeric value rather than null/placeholder.
+   - **Lifecycle Cancellation:** Unmount or filter adjustments trigger clean `AbortController` cancellation as normal lifecycle behavior without displaying error alerts. Factual reporting invariant: no unverified claims of measured zero CLS, eliminated memory leaks, or zero latency overhead without profiler measurements.
+3. **Device Management Update Toast Interpolation (`DEC-DEV-040`):**
+   - Toast notifications interpolate the persisted device name dynamically (`t('deviceUpdated', { name: device.name })`), preventing raw `{name}` placeholder leakage to the user.
+
 ---
 
 ## 2. Source-of-Truth Hierarchy

@@ -52,6 +52,23 @@
      - Memory/latency profiling under production load remains unmeasured; a single `787 ms` zero-row run establishes no performance guarantee.
      - Staging application status (`docker-compose.staging.yml`) must be verified independently.
      - GitHub CI for `875f91b` passed per operator confirmation. None of the five reserved CI commands is necessary for this documentation-only closeout; lightweight documentation checks suffice. No staging/VPS, Docker, database, or reverse-proxy update is required.
+5. **2026-10-16 Reliability & Consistency Repair Batch Deployment Guidance:**
+   - **Local Development Restart Command:** If restarting the local development server after codebase updates, use:
+     ```bash
+     npm run dev:web
+     ```
+     *(Restarts the Next.js web application cleanly without triggering background IoT Gateway processes).*
+   - **Off-VPS Image Build Invariant:** All release container images MUST be compiled off-VPS for target architecture `--platform linux/amd64` (via workstation Docker buildx or CI), tagging identifiable release tags.
+   - **VPS Deployment Command:** Deployment on VPS targets web recreation only without altering supporting services:
+     ```bash
+     WEB_IMAGE=<tag> docker compose --env-file .env.production -f docker-compose.prod.yml up -d --no-deps web
+     ```
+   - **Environment Configuration & Database Target Parity:**
+     - *Local Dev:* `APP_ENV=development`, `APP_URL=http://localhost:3000`, database target Supabase DEV (`unbyxlkrzqlafolxcypi`).
+     - *Staging:* `APP_ENV=staging`, `APP_URL=http://localhost:3000` (configured explicitly in `.env.staging`), database target Supabase Staging (`ihgoxqdncepbcrqkchxu`). Never invent unverified hostnames; distinguish application deployment from database project.
+     - *Production:* `APP_ENV=production`, `APP_URL=https://monitoring.melonmadura.my.id`, database target Supabase Production.
+   - **Zero Impact on Database, Gateway & Proxy:** Zero migrations required (schema untouched); zero gateway MQTT topic or broker changes; zero Caddy configuration changes. Single-active-gateway rule is strictly preserved.
+   - **Deployment Status:** Deployment remains **PENDING** until the operator verifies manual acceptance and completes the five mandatory CI gates prior to git push.
 
 ---
 

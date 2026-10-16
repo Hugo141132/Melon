@@ -185,7 +185,8 @@ describe('Dashboard UI & Fixed-Location Weather Suite (TASK-0506 Final Refined)'
     // Verify Open-Meteo was called with fixed coordinates
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('latitude=-7.172934&longitude=113.2257627')
+        expect.stringContaining('latitude=-7.172934&longitude=113.2257627'),
+        expect.any(Object)
       );
     });
 
@@ -266,5 +267,21 @@ describe('Dashboard UI & Fixed-Location Weather Suite (TASK-0506 Final Refined)'
     const emojiRegex = /\p{Extended_Pictographic}/u;
     const textContent = container.textContent || '';
     expect(emojiRegex.test(textContent)).toBe(false);
+  });
+
+  it('7. Renders "-" initially on operational counters when DeviceContext is loading', () => {
+    // Provide empty devices with isLoading = true
+    render(
+      <AuthProvider initialSession={mockSession}>
+        <DeviceProvider>
+          <DashboardPage />
+        </DeviceProvider>
+      </AuthProvider>
+    );
+
+    // All counter testids render clean fallback '-' without fake 0
+    expect(screen.getByTestId('total-devices-count')).toHaveTextContent('-');
+    expect(screen.getByTestId('online-devices-count')).toHaveTextContent('-');
+    expect(screen.getByTestId('offline-devices-count')).toHaveTextContent('-');
   });
 });

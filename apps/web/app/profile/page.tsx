@@ -172,7 +172,12 @@ export default function ProfilePage() {
         setFullName(json.data.fullName || '');
         setUsername(json.data.username || '');
         setSaved(true);
-        setTimeout(() => setSaved(false), 3000);
+        updateUser?.({
+          fullName: json.data.fullName || undefined,
+        });
+        // Full-page navigation/reload to /dashboard so updated identity is hydrated
+        window.location.assign('/dashboard');
+        return;
       } else {
         if (res.status === 422) {
           setErrorMsg(json.error?.message || 'Data yang dimasukkan tidak valid.');

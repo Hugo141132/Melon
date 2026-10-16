@@ -675,9 +675,11 @@ Create Owner UI.
 ## TASK-0207 — Implement Owner Approval
 
 **Priority:** `P0`
-**Status:** `DONE`
+**Status:** `IN PROGRESS (Awaiting User Test Evidence)`
 **Dependencies:** `TASK-0206`, `TASK-0002`
 **Completed:** 2026-07-29 — Implemented transactional Owner approval (`approvePendingAdmin`) in `UserRepository` (`packages/database`), created API route handler `POST /api/v1/approvals/[userId]/approve` (`apps/web`), added Owner approval action UI in `apps/web/app/approvals/page.tsx`, and added complete unit & Docker-backed PostgreSQL integration test coverage verifying status rechecks, conflict protection (`409 CONFLICT`), `AccountApproval` audit history insertion, `AuditLog` event recording (with secret redaction), and notification failure isolation.
+- **2026-10-15 Admin Approval Email Follow-up:** Implemented localized transactional notification email via Resend (`sendAdminApprovalResultEmail` in `apps/web/lib/email/resend.ts`) sent directly to the approved Admin with trusted login URL upon successful committed Owner approval. Attached post-commit trigger in `apps/web/app/api/v1/approvals/[userId]/approve/route.ts`. Isolated email dispatch from database transaction, prevented duplicate emails on repeated approval requests, decoupled from sensor alerts and `/notifications` entries, and distinguished provider acceptance from confirmed delivery. Added regression unit test in `apps/web/test/unit/resend-email.test.ts`.
+- **2026-10-16 Transactional Email Canonical URL & Domain Routing Calibration:** Resolved a critical URL generation bug where the "Masuk ke Sistem" button in Admin approval decision emails (`sendAdminApprovalResultEmail`) directed newly approved Admins to `https://melonmadura.my.id/login` (external marketing website / wrong application panel). Implemented centralized server-side canonical URL helper `getCanonicalAppBaseUrl()` in `apps/web/lib/email/resend.ts` using the validated server-side `APP_URL` as the sole authoritative source of truth. Eliminated raw `process.env` lookups, client public variable bypasses, and silent hardcoded domain fallbacks. Required explicit valid application URL configuration for deployed staging/production, permitting localhost HTTP strictly for local development/test. Enforced consistent URL formatting across HTML href and plain-text links, trimmed trailing slashes, shielded against Host-header injection, and aligned logo branding asset reference to `getEmailLogoUrl()`. Added focused regression unit tests in `apps/web/test/unit/resend-email.test.ts`.
 
 ### Work
 
@@ -690,24 +692,30 @@ Implement transactional approval.
 - Approval history is inserted.
 - Audit event is inserted.
 - Account becomes approved/active according to policy.
+- Localized transactional approval email sent to approved Admin via Resend with trusted login URL.
 - Notification failure does not roll back decision.
+- Zero sensor alerts or `/notifications` entries created for admin approval.
 
 ---
 
 ## TASK-0208 — Implement Owner Rejection
 
 **Priority:** `P0`
-**Status:** `DONE`
+**Status:** `IN PROGRESS (Awaiting User Test Evidence)`
 **Dependencies:** `TASK-0206`
 **Completed:** 2026-07-29 — Implemented transactional Owner rejection (`rejectPendingAdmin`) in `UserRepository` (`packages/database`), created API route handler `POST /api/v1/approvals/[userId]/reject` (`apps/web`), updated Owner UI in `apps/web/app/approvals/page.tsx` with rejection action button and error/success states, and added unit test coverage verifying `401`, `403`, `404`, `409` conflict responses, audit log recording without secret exposure, and isolated post-commit notifications.
+- **2026-10-15 Transactional Account Removal Follow-up:** Updated `rejectPendingAdmin` in `packages/database/src/user-repository.ts` so that rejecting a pending Admin transactionally cleans up all account-owned child records (`userRoleAssignment`, `accountApproval`, tokens, sessions, preferences, user device access) and removes the user row from `users` (instead of retaining the row as `REJECTED`). Retains a minimal rejection audit record in `AuditLog` (`eventKey: 'ACCOUNT_REJECTED'`, `targetType: 'USER'`, non-FK `targetId: targetUser.id`, `actorUserId: ownerId`) with sanitized metadata. Preserves Owner protection (rejecting an Owner is rejected with 403 Forbidden), authorization, and concurrency rechecks (`409 CONFLICT`). Added unit regression tests in `packages/database/test/user-repository.test.ts`.
+- **2026-10-16 Approvals Error Fallback & Rejection Safety Audit:** Resolved UI error fallback in `apps/web/app/approvals/page.tsx` (`setRejectError` and `setApproveError`) which previously fell back to `tApprovals('rejectedToast')` / `tApprovals('approvedToast')` on response failures without an explicit server message, replacing it with `tErrors('generic')` to prevent deceptive success toasts when transactions fail or return 409 Conflict. Verified transaction safety control flow: all prerequisite checks (target existence, Owner protection, PENDING_APPROVAL status, and operational history checks across `faucetCommand` and `alertAcknowledgement`) execute strictly before mutations, ensuring no partial writes or FK constraint violations. Confirmed with user that visible `REJECTED` database records are historical accounts rejected prior to this repair batch, not newly rejected applicants; their persistence is expected and does not indicate a failure in the new rejection flow. Historical account cleanup remains explicitly deferred (no records deleted, no migrations run). Transactional deletion for newly rejected applicants remains pending manual user verification. Added regression test `apps/web/test/unit/approvals-error-feedback.test.ts`.
 
 ### Acceptance Criteria
 
 - Only pending accounts may be rejected.
 - Decision is transactional.
-- Target becomes `REJECTED`.
-- Decision is audited.
-- Duplicate conflicting actions return conflict.
+- Target account is completely deleted from the `users` table.
+- Account-owned child records (credentials, tokens, sessions, role assignments, approvals, preferences) are cleaned up transactionally.
+- Minimal rejection audit record is inserted into `AuditLog` without exposing secrets or breaking FK constraints.
+- Owner protection invariant: Rejecting an `OWNER` account is strictly prohibited (403 Forbidden).
+- Duplicate conflicting actions return 409 Conflict.
 
 ---
 
@@ -767,9 +775,10 @@ requireDeviceControlAccess()
 ## TASK-0211 — Implement Self profileee
 
 **Priority:** `P1`
-**Status:** `DONE`
+**Status:** `IN PROGRESS (Awaiting User Test Evidence)`
 **Completed:** `2026-07-30`
 **Dependencies:** `TASK-0204`, `TASK-0209`
+- **2026-10-15 Profile Save Navigation Follow-up:** Updated `apps/web/app/profile/page.tsx` so that upon successful ordinary profile update (`updateUser`), a full-page navigation/reload (`window.location.assign('/dashboard')`) is executed. This guarantees that the updated user identity (fullName, username) is completely rehydrated across the top navigation bar, avatar, and dashboard greeting. On failure, form field values are retained and an error message is displayed. Separate email-verification and password-change/session flows remain strictly preserved.
 
 ### Work
 
@@ -786,14 +795,17 @@ PATCH /api/v1/me
 - Only allowlisted fields can be edited.
 - Role and status injection fail.
 - Changes are audited where required.
+- Successful profile update navigates/reloads to `/dashboard` to rehydrate updated identity across the application shell.
+- Failed profile update retains form values and displays an explicit error message.
 
 ---
 
 ## TASK-0212 — Implement Owner User Management
 
 **Priority:** `P1`
-**Status:** `DONE`
+**Status:** `IN PROGRESS (Awaiting User Test Evidence)`
 **Dependencies:** `TASK-0209`
+- **2026-10-15 Rejected Applicants Scope Alignment Follow-up:** Aligned Owner User Management with transactional deletion of rejected applicants (`TASK-0208`). Rejecting a pending applicant completely cleans up child records and deletes their row from `users`, ensuring the `/users` table and operational management only track approved accounts (`ACTIVE`, `SUSPENDED`) without accumulation of rejected applicant drift.
 
 ### Work
 
@@ -934,9 +946,10 @@ Implemented complete Owner User Management:
 ## TASK-0214 — Implement Registration Email Verification
 
 **Priority:** `P1`
-**Status:** `DONE`
+**Status:** `IN PROGRESS (Awaiting User Test Evidence)`
 **Dependencies:** `TASK-0203`, `TASK-0204`, `TASK-0213`
 **Completed:** 2026-08-22 — Redesigned email verification into a secure 6-digit verification code flow per user directive (`{ email, code }` with 15-minute expiry and `sha256(userId:code)` hashing), audited Resend email service and added exponential backoff retry with jitter for rate limits (429) and transient errors, updated verification email template with prominent 6-digit monospace code box, updated `/verify-email` UI with 6-digit code input, target email switcher, and 60-second resend cooldown timer, removed decorative illustration frame from `/reset-password`, and verified 100% test pass rate across 31 unit test suites (255/255 tests) and TypeScript typecheck (0 errors).
+- **2026-10-15 OTP 3–3 Grouped Cell Layout Follow-up:** Replaced single input element with reusable `OtpCodeInput` component (`apps/web/components/auth/OtpCodeInput.tsx`) adhering to the 3–3 cell grouped layout with central dash separator (`—`) based on approved visual reference. Styled using the project's semantic color tokens (`bg-app-surface`, `border-app-outline-variant/60`, `focus:border-app-primary`, `border-error`) instead of dark/black palettes. Supports automatic focus progression, backspace backward navigation across cells, arrow key navigation, paste distribution across all 6 cells, mobile numeric input mode (`inputMode="numeric"`), accessible per-cell labels (`aria-label="Digit N"`), responsive scaling, and error ring highlights. Preserved 1-minute expiration per TASK-0218, 60s cooldown, attempt limits, and verification behavior. Added regression test suite `apps/web/test/unit/otp-code-input.test.tsx`.
 
 ### Work
 
@@ -1010,9 +1023,10 @@ Implemented complete Owner User Management:
 ## TASK-0215 — Centralized Authentication State Hydration
 
 **Priority:** `P1`
-**Status:** `DONE`
+**Status:** `IN PROGRESS (Awaiting User Test Evidence)`
 **Dependencies:** `TASK-0204`, `TASK-0208`, `DEC-AUTH-105`
 **Completed:** 2026-08-22 — Implemented centralized authentication state hydration to eliminate delayed UI rendering and layout shifts across navigation and protected pages. Added React `AuthContext` (`AuthProvider` / `useAuth()`) in `@kebun-melon/web`, providing unified access to `{ user, role, isAuthenticated }`. Implemented `getSessionOrNull()` server helper in `lib/auth/rbac.ts` for safe, non-throwing session retrieval in `RootLayout` during SSR. Eliminated redundant client-side `useEffect` and `fetch('/api/v1/auth/session')` calls from `/`, `/setting`, `/profileee`, `TopAppBar`, and `Sidebar`. Refactored `Sidebar` and `TopAppBar` to consume `useAuth()` directly, removing unnecessary prop drilling. Refactored `/setting` and `/profileee` to instantaneously render user profileee identity and role-conditional menu items (`/users` and `/approvals` for `OWNER`) without loading spinners. Maintained strict server-side RBAC and route protection. Verified 100% test pass rate across 35 unit test suites (260/260 tests) and 14 E2E critical flows.
+- **2026-10-15 Profile Save Hydration Alignment Follow-up:** Updated profile edit submission in `apps/web/app/profile/page.tsx` so that upon successful profile update (`updateUser`), a full-page reload and navigation (`window.location.assign('/dashboard')`) is executed. This completely rehydrates the updated session identity across root layout SSR components, top navigation bar, avatar initials, and dashboard greetings without stale client-state artifacts. Retains form values and displays error message on failure; preserves separate email change and password update flows.
 
 ### Work
 
@@ -1102,9 +1116,10 @@ Implemented complete Owner User Management:
 ## TASK-0216 — Implement Verified Self-Email Change Workflow
 
 **Priority:** `P1`
-**Status:** `DONE`
+**Status:** `IN PROGRESS (Awaiting User Test Evidence)`
 **Dependencies:** `TASK-0201`, `TASK-0211`, `TASK-0214`, `DEC-AUTH-106`
 **Completed:** 2026-08-30 (Implementation, DEV migration, manual credentialed verification, full test isolation hardening, and all 5 pre-commit test gates passed with 100% success rate)
+- **2026-10-15 OTP 3–3 Grouped Cell Layout Follow-up:** Updated Step 2 of `EmailChangeModal` (`apps/web/app/profile/EmailChangeModal.tsx`) to replace single input box with reusable `OtpCodeInput` adhering to 3–3 cell grouping with central dash separator (`—`). Preserved password confirmation requirement in Step 1, 1-minute expiration per TASK-0218, 60s cooldown, attempt limits, and single-session preservation upon email update. Added unit regression coverage in `apps/web/test/unit/otp-code-input.test.tsx`.
 - Added nullable `pending_email VARCHAR(320)` to `EmailVerificationToken` model in `schema.prisma` and created SQL migration `20260829170000_add_pending_email_to_email_verification_tokens` (applied and verified on DEV database).
 - Defined `RequestEmailChangeInputSchema` (requiring `newEmail` and `currentPassword`) and `VerifyEmailChangeInputSchema` (`{ code: string }`) in `@kebun-melon/contracts`.
 - Added `AuditEventKey.ACCOUNT_EMAIL_CHANGED` (`account.email.changed`) and canonical permission `profilee.self.update` in `seed.ts`.
@@ -1208,9 +1223,10 @@ Unified all authentication token validity lifetimes and UI resend cooldown timer
 ## TASK-0218 — OTP-Based Single-Session Force-Recovery Flow
 
 **Priority:** `P0`
-**Status:** `DONE`
+**Status:** `IN PROGRESS (Awaiting User Test Evidence)`
 **Dependencies:** `TASK-0204`, `TASK-0217`, `DEC-AUTH-107`
 **Completed:** 2026-09-25 (Implementation, database migration, API routes, email notification, UI modal, and test suites complete; 100% test pass rate across all auth and database test suites)
+- **2026-10-15 OTP 3–3 Grouped Cell Layout Follow-up:** Updated session recovery OTP verification modal in `apps/web/app/(auth)/login/login-view.tsx` to replace single input box with reusable `OtpCodeInput` component adhering to 3–3 cell grouping with central dash separator (`—`). Styled using the project's semantic color tokens (`bg-app-surface`, `border-app-outline-variant/60`, `focus:border-app-primary`, `border-error`). Preserved single active session enforcement, 60-second OTP challenge validity, 3-attempt limit, timing-safe salted hashing, and transaction row locking (`FOR UPDATE`). Added unit regression coverage in `apps/web/test/unit/otp-code-input.test.tsx`.
 
 ### Work
 
@@ -1283,9 +1299,10 @@ Implement sites if required for version 1.
 ## TASK-0302 — Implement Device Registry
 
 **Priority:** `P0`
-**Status:** `DONE`
+**Status:** `IN PROGRESS (Awaiting User Test Evidence)`
 **Dependencies:** `TASK-0104`
 **Completed:** 2026-08-23 — Reconciled and implemented Device Registry per `DEC-DEV-027`, `DEC-DEV-028`, and `DEC-DEV-030`:
+- **2026-10-15 Modern Unicode v-mode Regex Fix Follow-up:** Fixed invalid HTML pattern `^[a-z0-9-_]+$` in `apps/web/app/devices/page.tsx` and contracts regex in `packages/contracts/src/device.ts` to `^[a-z0-9_-]+$`. Placing the hyphen `-` at the end of the character class eliminates invalid character range errors under modern browser HTML regex engines and Unicode `v`-mode while preserving allowed lowercase alphanumeric characters, digits, underscores, and hyphens with 100% server-validation parity and immutable device UUID invariants.
 - Removed all in-app/API device creation (`POST /api/v1/devices`, "Add Device" button/modal, creation DTOs/types, and `device.create` permission from `seed.ts` and `device-repository.ts` per `DEC-DEV-027`); existing pre-provisioned devices remain preserved in PostgreSQL database.
 - Permanently eliminated hard device deletion (`DELETE /api/v1/devices/{deviceId}` and delete UI modal removed per `DEC-DEV-030`), preserving all historical relational telemetry, alerts, and audit logs.
 - Implemented `POST /api/v1/devices/{deviceId}/activate` and `POST /api/v1/devices/{deviceId}/deactivate` backed by `activateDevice` and `deactivateDevice` in `DeviceRepository` with `device.activate` and `device.deactivate` Owner permissions.
@@ -1327,6 +1344,9 @@ Implement sites if required for version 1.
     - Cleaned up `/devices` UI: removed Deactivate (`PowerOff`) and Activate (`RotateCcw`) action buttons and modals; retained strictly the Owner Edit (`Edit2`) button.
     - Cleaned up connection status filter: removed "Inactive" option, standardizing strictly on 2 operational states: Connected (`ONLINE`) and Disconnected (`OFFLINE`, `STALE`, `UNKNOWN`).
     - Preserved PostgreSQL schema (`devices.account_status` and `devices.deactivated_at`) to eliminate migration overhead and prevent schema drift.
+  - **Device Management Regex Escaping & Localized Toast Follow-up (2026-10-15 / DEC-DEV-040)**:
+    - Standardized device name validation regex pattern across `packages/contracts/src/device.ts` (`/^[a-zA-Z0-9 _-]{3,50}$/`), resolving escaping inconsistencies between browser and server runtime parsers.
+    - Updated `apps/web/app/devices/page.tsx` so that device update success toast properly interpolates the persisted device name (`t('deviceUpdated', { name: device.name })`), preventing raw placeholder leakage. Added dedicated unit test `apps/web/test/unit/device-toast-interpolation.test.ts`.
   - **Verification**: 55/55 targeted unit tests passed, 133/133 full test files (1,380/1,380 tests) passed across monorepo packages, and 0 TypeScript typecheck errors across all 4 workspaces.
 
 ### Work
@@ -1426,9 +1446,10 @@ revokedAt
 ## TASK-0305 — Implement Authorised Device List
 
 **Priority:** `P0`
-**Status:** `DONE`
+**Status:** `IN PROGRESS (Awaiting User Test Evidence)`
 **Dependencies:** `TASK-0304`
 **Completed:** 2026-07-31 — Implemented authorised device listing and device detail access endpoints (`GET /api/v1/devices`, `GET /api/v1/devices/{deviceId}`). `OWNER` role receives global device visibility across all sites. `ADMIN` role receives strictly scoped device access filtered by active `UserDeviceAccess` assignments (`revokedAt === null`), with revoked or unassigned devices disappearing immediately and direct access attempts returning HTTP 403 `DEVICE_NOT_ASSIGNED`. Integrated dynamic `permissions` DTO (`canView`, `canControl`) on all returned device objects, dynamically evaluated using RBAC, active account status, device capabilities, and the `ENABLE_FAUCET_CONTROL` feature flag. Added comprehensive unit and integration test coverage across list filtering, detail authorization, permissions computation, and negative auth security rules.
+- **2026-10-15 Device Identifier Unicode v-mode Pattern Alignment Follow-up:** Reconciled device editing validation in `apps/web/app/devices/page.tsx` line 644 with `packages/contracts/src/device.ts` line 151, fixing `^[a-z0-9-_]+$` to `^[a-z0-9_-]+$`. Prevents browser console warnings and form validation breakage under modern browser HTML5 validation while maintaining device naming invariants.
 **Reconciliation & Hardening (2026-08-18):** Reconciled endpoints per `DEC-DEV-027` and `DEC-DEV-028`:
 - `GET /api/v1/devices` and `GET /api/v1/devices/{deviceId}` enforce role-based projection: canonical `deviceId` is included for Owner users and strictly concealed (omitted or masked) for Admin users (`DEC-DEV-028`) while preserving safe internal UUID `id`.
 - `GET /api/v1/devices/{deviceId}` hardened with baseline permission check (`requirePermission(session, 'device.read')`) and active account enforcement prior to database lookup, eliminating device-existence leakage on non-active accounts.
@@ -2456,10 +2477,11 @@ The external ML inference pipeline classifies soil and irrigation water telemetr
 ## TASK-0501 — Implement Latest Monitoring API
 
 **Priority:** `P0`
-**Status:** `DONE`
+**Status:** `IN PROGRESS (Awaiting User Test Evidence)`
 **Dependencies:** `TASK-0405`, `TASK-0305`
 **Completed:** 2026-08-05 — Implemented latest monitoring endpoints (`GET /api/v1/devices/[deviceId]/monitoring/latest`, `GET /api/v1/devices/[deviceId]/monitoring/soil/latest`, `GET /api/v1/devices/[deviceId]/monitoring/water/latest`) serving soil, water quality, and reservoir metrics with RBAC access verification and zero/null semantics preserved.
 **Reconciliation & Hardening (2026-08-19):** Reconciled route handlers and data access layers to accept both canonical string `deviceId` and immutable database primary key `devices.id` UUID in route params. Hardened RBAC checks (`requireDeviceViewAccess`) and repository lookup to transparently resolve device identity across both identifier forms. Preserved strict Admin canonical `deviceId` concealment (`DEC-DEV-028`). Added unit test coverage for UUID-based querying with 100% pass rate.
+- **2026-10-15 Water-Tank Telemetry & Polling Resilience Follow-up:** Eliminated request amplification on water-tank controls by transforming fixed-interval polling in `apps/web/components/controls/FaucetStatusCard.tsx` to adaptive polling with bounded backoff and HTTP 429 `Retry-After` adherence. Preserved telemetry freshness and real zero volume semantics while protecting gateway and API resources.
 
 ### Work
 
@@ -2648,9 +2670,11 @@ Server-Sent Events
 ## TASK-0506 — Premium Modern Monitoring Dashboard UI Upgrade
 
 **Priority:** `P1`
-**Status:** `DONE`
+**Status:** `IN PROGRESS (Awaiting User Test Evidence)`
 **Dependencies:** `TASK-0502`, `TASK-0501`
 **Completed:** 2026-09-02 — Upgraded the root overview dashboard (`/` and `/dashboard`) into a focused premium modern operational bento dashboard adhering to `Premium Minimal Ops`:
+- **2026-10-15 Initial Loading Display "-" & Layout Stability Follow-up:** Updated operational node counters (`Total Devices`, `Connected`, `Disconnected`) in `apps/web/components/dashboard/DashboardView.tsx` and weather metrics in `apps/web/components/dashboard/WeatherCard.tsx` to initially render `"-"` instead of fake `0` zero values or numeric skeleton blocks. Eliminated `weather-skeleton` shifting placeholder, ensuring card layout remains completely stable from initial mount. Once real data is hydrated from `DeviceContext` and Open-Meteo, `AnimatedNumber.tsx` animates to the actual values. Preserved real zero (`0`), decimal precision, units, error states, and `prefers-reduced-motion`. Added regression unit test in `apps/web/test/unit/dashboard-page.test.tsx`.
+- **2026-10-16 Weather Request Cancellation & Device Toast Interpolation Audit:** Audited dashboard weather request lifecycle in `WeatherCard.tsx`. Confirmed that initial `(canceled)` status on development load is the expected result of React 18/19 Strict Mode effect double-invocation (simulating mount -> cleanup -> remount) and unmount navigation cleanup, where `abortControllerRef.current.abort()` cancels the initial in-flight fetch. The immediate successor request executes cleanly with a fresh controller, completes with HTTP 200, and renders weather data. Catch block safely suppresses `AbortError` (`if (err?.name === 'AbortError') return;`), `fetchSeqRef.current` eliminates stale response races, and loading state transitions cleanly without infinite loops or stuck loading spinners. In `apps/web/messages/{en,id}.json`, fixed ICU MessageFormat literal `{name}` escaping by upgrading `'{name}'` to `''{name}''` for `devices.updateSuccess` and `devices.addSuccess`. In `apps/web/app/devices/page.tsx`, preserved `persistedName = json.data?.name || editName.trim() || editDevice.name` before clearing edit modal state. Added regression test `apps/web/test/unit/device-toast-interpolation.test.ts`.
 - **Fake Health Score Removal:** Permanently eliminated the synthetic `92/100` score gauge, "Excellent" indicator, and fake "Your farm conditions are overall in an optimal state" text from all dashboard views.
 - **Fixed-Location Weather Integration:** Implemented `WeatherCard.tsx` bound strictly to fixed coordinates: Latitude `-7.172934`, Longitude `113.2257627` (King Agrowisata). Integrated Open-Meteo REST API (`temperature_2m`, `apparent_temperature`, `relative_humidity_2m`, `weather_code`, `wind_speed_10m`, `uv_index`) with zero browser geolocation, WMO code interpretation, smooth skeleton loader, full-width untruncated metrics grid below the hero card, subtle semantic color tints (green for humidity, neutral olive for wind, warm amber for UV), and fallback states.
 - **Focused Operational Bento Layout:** Streamlined the root dashboard to focus strictly on real-time operational essentials (Hero Overview card with system greeting and 3-column node summary metrics, plus full-width environmental weather panel below). Avoided portal clutter and duplicate telemetry cards by delegating detailed monitoring to `/sensor`, controls to `/controls`, notifications to `/notifikasi`, and settings to `/setting`.
@@ -3516,9 +3540,14 @@ Implement:
 ## TASK-0902 — Implement Rate Limiting
 
 **Priority:** `P0`
-**Status:** `DONE`
+**Status:** `IN PROGRESS (Awaiting User Test Evidence)`
 **Dependencies:** `TASK-0204`, `TASK-0002`
 **Notes:** Sliding window rate limiting designed in `SECURITY.md` §4 with environment-configurable limits. Note: Revalidation required for `DISPENSE` (with `plantCount`), `OPEN`, and `CLOSE` command actions during Phase 8 API revision.
+- **2026-10-15 Water-Tank 429 Limiter Collision & SSE Reconnection Amplification Follow-up:** Diagnosed and resolved HTTP 429 rate limit triggers on water tank controls:
+  1. *Rate Limiter Key Collision:* Both `/api/v1/alerts` and `/api/v1/devices/[deviceId]/faucet-commands` used `keyPrefix: 'history'` with `RATE_LIMIT_HISTORY_MAX = 30` req/min. The shared key caused alerts polling to prematurely consume the quota for faucet command history. Isolated faucet commands rate limiter to `keyPrefix: 'faucet_history'`.
+  2. *SSE Mount Amplification:* `FaucetHistoryTable.tsx` reconnected effect was triggering an immediate duplicate fetch on initial `CONNECTING` -> `OPEN` state transition. Added `hasEverOpenedRef` to ensure fetch on reconnect only triggers after an actual disconnection/reconnection.
+  3. *Active Backoff Window:* Added `retryAfterUntilRef` in `FaucetHistoryTable.tsx` to prevent fetch amplification during active 429 `Retry-After` windows.
+  4. *Adaptive Polling:* Refactored `FaucetStatusCard.tsx` from fixed 2.5s polling loop to adaptive timeout-based polling with bounded backoff and `Retry-After` header adherence. Preserved authorization, freshness, and command protections without globally disabling rate limits or adding unnecessary external Redis dependencies.
 
 ### Work
 
@@ -4903,6 +4932,10 @@ The following full CI gates were deferred for this checkpoint and must be verifi
   - Preserves existing declarative adaptive light/dark metadata in `apps/web/app/layout.tsx` without duplication.
   - Zero new runtime JavaScript or dependencies.
   - Added regression test in `apps/web/test/unit/metadata-icons.test.ts` (execution pending).
+- **Dashboard Loading Displays "-" & Layout Stability Follow-up (2026-10-15):**
+  - Standardized dashboard operational node counters (`Total Devices`, `Connected`, `Disconnected`) in `apps/web/components/dashboard/DashboardView.tsx` and weather numeric metrics in `apps/web/components/dashboard/WeatherCard.tsx` to initially render `"-"` rather than zero `0` or numeric skeleton pulse blocks.
+  - Removed shifting `weather-skeleton` placeholder from `WeatherCard.tsx`, maintaining a rock-stable visual grid from initial mount.
+  - Once live telemetry and Open-Meteo weather data arrive, `AnimatedNumber.tsx` animates to the real numbers while preserving real zero (`0`), decimal precision, units, error states, and `prefers-reduced-motion`. Added regression unit test in `apps/web/test/unit/dashboard-page.test.tsx`.
 
 ### 2. CI Gate Execution Status (Assigned to Operator)
 - **Gate 1 (`npm run check:quality`):** Pending manual execution by operator.
@@ -5053,6 +5086,8 @@ The following full CI gates were deferred for this checkpoint and must be verifi
 - **Live Website Acceptance:** `USER-CONFIRMED COMPLETE on 2026-10-05` (Interactive verification completed by operator `wnf2fn2nc0n`).
 - **VPS Deployment & Container Health:** `DEPLOYED on 2026-10-06` (Release `ada891e` deployed to Nebula VPS `38.103.171.46`; web container healthy; Caddy restarted after shutdown and HTTPS restored; real-time toast, dynamic badge, and Resend email dispatch verified via post-deployment smoke test).
 - **Deferred Verification Items:** Real inbox physical receipt remains unobserved (provider acceptance logged); final CI checks remain deferred.
+- **Admin Approval Decision Notification to Applicant Follow-up (2026-10-15):** Added localized transactional email dispatch via Resend (`sendAdminApprovalResultEmail` in `apps/web/lib/email/resend.ts`) to the approved Admin upon committed Owner approval in `POST /api/v1/approvals/[userId]/approve`. Isolated from transaction, non-duplicating on repeated requests, zero sensor alert records created, and provider acceptance distinguished from delivery. Unit regression coverage in `apps/web/test/unit/resend-email.test.ts`.
+- **Admin Approval URL Resolution & Environment Alignment Follow-up (2026-10-16):** Calibrated application URL building in transactional emails (`resend.ts`). Enforced validated server-side `APP_URL` as authoritative, eliminating raw process.env and public-variable bypasses as well as silent hardcoded domain fallbacks. Local development resolves strictly to the configured local application URL (`http://localhost:3000`), staging requires explicit `APP_URL` (configured as `http://localhost:3000` in `.env.staging`), and production strictly requires explicit HTTPS URL (`https://monitoring.melonmadura.my.id`), preventing cross-environment account leakage and landing on unrelated root domain panels. Focused unit tests added in `apps/web/test/unit/resend-email.test.ts`.
 
 ---
 
@@ -5118,6 +5153,13 @@ The following full CI gates were deferred for this checkpoint and must be verifi
 - **Code & Test Implementation:** `COMPLETE` (All source and test files verified).
 - **Live Database Migration:** `NOT REQUIRED` (Database schema untouched; queries use existing tables and enums).
 - **Staging / VPS Deployment Requirement:** Requires building and restarting `kebun-melon-web` container image to deploy updated frontend bundle, Next.js CSP header configuration, and updated API route handlers. No gateway or reverse proxy changes required.
+- **2026-10-15 Reliability & Consistency Seven-Item Repair Follow-up:**
+  - *Rejected Applicants Deletion:* Transactionally cleans credentials, tokens, sessions, preferences, and removes user row from `users` upon Owner rejection, retaining minimal audit log in `AuditLog` (`ACCOUNT_REJECTED`) with Owner protection preserved.
+  - *Water-Tank 429 Prevention:* Isolated rate limiter prefix (`faucet_history`), prevented SSE reconnection fetch amplification on initial mount, and implemented adaptive polling with backoff in `FaucetStatusCard.tsx` and `FaucetHistoryTable.tsx`.
+  - *Modern Unicode v-mode Regex:* Corrected device regex pattern in contracts and web to `^[a-z0-9_-]+$`.
+  - *Profile Save Navigation:* Added full-page navigation to `/dashboard` upon successful profile edit to rehydrate user identity across SSR and application shell.
+  - *Dashboard Initial Loading:* Standardized operational counters and weather card numeric metrics to render `"-"` initially without shifting skeleton blocks, smoothly animating via `AnimatedNumber` once valid data is received.
+  - *Admin Approval Notification Email:* Integrated bilingual Resend transactional email notification to applicant upon Owner approval.
 
 ---
 
@@ -5265,6 +5307,99 @@ The following full CI gates were deferred for this checkpoint and must be verifi
 - **Git Commit, Push & Remote CI:** `PENDING`
 - **Live Database Migration:** `NOT REQUIRED` (No schema changes, no migrations needed).
 - **Staging / VPS Deployment Requirement:** `PENDING`. Requires building and restarting `kebun-melon-web` container image only. Gateway, database migrations, environment variables, and reverse proxy (Caddy) remain untouched.
+
+---
+
+## TASK-REPAIR-20261016: Multi-Domain Reliability & Consistency Repair Batch Reconciliation
+
+**Priority:** `P0` (Reliability, Security, Operational Correctness & Multi-Environment Parity)  
+**Status:** `READY FOR RELEASE TESTING` (Manual Acceptance: `USER-REPORTED COMPLETE` dated 2026-10-16; Five CI Gates: `PENDING USER EXECUTION`)  
+**Dependencies:** `TASK-0207`, `TASK-0208`, `TASK-0210`, `TASK-0211`, `TASK-0214`, `TASK-0219`, `TASK-0302`, `TASK-0506`, `TASK-0902`  
+**Frontend Impact:** `MINOR`  
+**Selected UI Direction:** `Premium Minimal Ops`  
+**Existing Color Template:** `UNCHANGED`  
+**Selected Motion Effects:** `Skeleton loading`, `Button hover`, `Modal`  
+**21st.dev MCP:** `NOT REQUIRED` (Reuses existing design tokens, components, and grounded card layouts)
+
+### 1. Implemented Reconciled Changes Across Nine Domain Areas
+
+1. **Pending-Admin Rejection Transactional Deletion & Owner Safety Checks (`packages/database/src/user-repository.ts`, `apps/web/app/approvals/page.tsx`):**
+   - Transformed pending Admin rejection from soft state setting to transactional account deletion (`rejectPendingAdmin`), permanently purging `users` record, credentials, tokens, preferences, and sessions.
+   - Enforced pre-mutation safety checks: target must exist, status must be `PENDING_APPROVAL`, target role must be `ADMIN` only (rejecting an `OWNER` is strictly blocked with HTTP 403 `FORBIDDEN_TARGET`), and target must have NO operational history (faucet commands, device assignments, telemetry, alerts, or audit actor history). If operational references exist, rejection is aborted with HTTP 409 `OPERATION_BLOCKED`.
+   - Immutable audit log preservation: records `ACCOUNT_REJECTED` in `audit_logs` referencing target user ID and acting Owner, verified to survive transaction commit without foreign key violations.
+   - Truthful UI feedback: replaced misleading fallback toasts on rejection failure with explicit server error messages or `tErrors('generic')`.
+
+2. **Historical REJECTED Accounts Cleanup (DEV Project `unbyxlkrzqlafolxcypi`):**
+   - Executed as an isolated, separate DEV-only maintenance operation targeting 4 historical accounts rejected before this repair batch (`4ab4ae80-3bff-4eb1-a3ca-30fa6ba7c411`, `ce2bf83c-36c2-49a6-b1fb-636c7d511810`, `a27c7559-7684-466c-b821-f8a5b75fb997`, `4f3675a0-5fc2-45e1-a533-3d3f4700a8af`).
+   - Operation reported complete by the user on 2026-10-16.
+   - Strictly decoupled from staging and production: no claims of staging or production cleanup, and no unverified row counts asserted without empirical evidence.
+
+3. **Shared 3–3 OTP Input Component & User Design Override (`apps/web/components/auth/OtpCodeInput.tsx`):**
+   - Implemented reusable `OtpCodeInput` across `/verify-email` and `/reset-password` adopting a 3–3 grouped cell layout with central dash separator (`—`) per explicit user design override.
+   - Strictly preserved authoritative Kebun Melon semantic color tokens (`border-outline-variant/60`, `focus:border-primary`, `bg-surface-container-lowest`), rejecting hardcoded dark palettes.
+   - Features automatic focus progression, backspace backward navigation, arrow keys, paste distribution across 6 cells, numeric input mode (`inputMode="numeric"`), and ARIA accessibility labels.
+   - Authentication security timing, token expiry (15-min registration code, 1-min password token), and attempt rate limits remain strictly intact.
+
+4. **Dashboard Loading Displays & Weather Data Lifecycle (`apps/web/components/dashboard/DashboardView.tsx`, `apps/web/components/dashboard/WeatherCard.tsx`, `apps/web/components/dashboard/AnimatedNumber.tsx`):**
+   - Operational node counters (`Total Devices`, `Connected`, `Disconnected`) and weather numeric values initially display `"-"` placeholders instead of false zero `0` or layout-shifting skeleton blocks.
+   - Once data arrives, `AnimatedNumber` counts up smoothly to real numbers while preserving genuine zero (`0`), decimal precision, and error states.
+   - Refresh lifecycle & cancellation: client unmount or filter changes trigger `AbortController` cancellation, which is handled cleanly as expected lifecycle flow rather than treated as an error. (Note: no unverified claims of zero CLS, eliminated memory leaks, or zero latency overhead are made without profiler measurements).
+
+5. **Admin Approval Decision Notification & Delivery Behavior (`apps/web/app/api/v1/approvals/[userId]/approve/route.ts`, `apps/web/lib/email/resend.ts`):**
+   - Owner approval triggers transactional email dispatch to the approved Admin applicant ("Akun Disetujui", "Masuk ke Sistem"), distinct from Owner real-time notifications and agronomic alerts (`alerts` table / `/notifications`).
+   - Delivery failure isolation: email failures are logged and do not abort the committed database approval transaction. Awaited dispatch can slightly increase HTTP endpoint latency.
+
+6. **Transactional Email Canonical URL Resolution & Multi-Environment Rules (`apps/web/lib/email/resend.ts`):**
+   - Authoritative source: strictly uses validated server-side `APP_URL` from `validateServerEnv()`.
+   - Eliminated raw `process.env` lookups, client public variables (`NEXT_PUBLIC_*`), and silent hardcoded domain fallbacks (`melonmadura.my.id` / `monitoring.melonmadura.my.id`).
+   - Local development / test: permits `http://localhost:3000` (defaults cleanly if unconfigured in local dev).
+   - Deployed staging: requires explicitly configured `APP_URL` (configured as `http://localhost:3000` in `.env.staging`), distinct from Supabase staging project `ihgoxqdncepbcrqkchxu`. No fictional hostnames invented.
+   - Deployed production: strictly requires valid `APP_URL` with `https://` protocol and forbids `localhost` or `127.0.0.1`.
+   - Guaranteed consistency between HTML `href` and plain-text links across all email templates. Existing emails retain their original links.
+
+7. **Water-Tank Rate Limiter Isolation & SSE Reconnect Protection (`apps/web/components/controls/FaucetHistoryTable.tsx`, `apps/web/components/controls/FaucetStatusCard.tsx`):**
+   - Isolated rate limiter prefix to `faucet_history`, preventing quota collision with `/api/v1/alerts`.
+   - Bounded retries with backoff and `Retry-After` adherence in `FaucetStatusCard.tsx`.
+   - Added `hasEverOpenedRef` in `FaucetHistoryTable.tsx` to eliminate duplicate fetch amplification on initial SSE mount.
+   - Polling cleanup on component unmount, stale-response protection, and SSE reconnect catch-up.
+
+8. **Successful Profile Save Navigation & Session Rehydration (`apps/web/app/profile/page.tsx`):**
+   - On successful profile update, executes full navigation (`window.location.assign('/dashboard')`) to rehydrate updated identity across SSR header, top app bar, and dashboard greeting.
+   - On update failure, preserves form state and displays translated error message. Separate email change and password reset flows remain untouched.
+
+9. **Device Management Regex Escaping & Localized Toast (`packages/contracts/src/device.ts`, `apps/web/app/devices/page.tsx`):**
+   - Corrected device name regex pattern escaping (`/^[a-zA-Z0-9 _-]{3,50}$/`) across contracts and API route handlers.
+   - Localized update success toast correctly interpolates persisted device name: `t('deviceUpdated', { name: device.name })`.
+
+### 2. Testing & Verification Summary
+
+- **Manual Acceptance:** `USER-REPORTED COMPLETE` dated 2026-10-16 across all 9 repair batch items.
+- **Automated Regression Test Suites Written for Batch:**
+  - `packages/database/test/user-repository.test.ts`: rejection deletion, owner protection, operational history block.
+  - `packages/database/test/approvals.service.integration.test.ts`: approvals integration.
+  - `apps/web/test/unit/otp-code-input.test.tsx`: 3–3 cell navigation, paste, keyboard, ARIA.
+  - `apps/web/test/unit/approvals-error-feedback.test.ts`: truthful rejection failure feedback.
+  - `apps/web/test/unit/device-toast-interpolation.test.ts`: device name toast interpolation.
+  - `apps/web/test/unit/dashboard-page.test.tsx`: initial "-" counters and animation.
+  - `apps/web/test/unit/resend-email.test.ts`: canonical URL resolution, multi-environment rules, HTML/text parity.
+  - `packages/contracts/src/__tests__/device.test.ts`: device DTO validation and regex.
+- **Pre-Commit Operator CI Gates Protocol:**
+  - All five mandatory CI gates remain `PENDING USER EXECUTION` prior to commit/push:
+    1. `npm run check:quality` (lint, format, typecheck, env check, traceability)
+    2. `npm run test` (workspace unit tests)
+    3. `npm run test:coverage` (code coverage threshold verification)
+    4. `npm run test:integration` (isolated PostgreSQL database integration tests; prerequisite: running test DB `kebun_melon_test`)
+    5. `npm run test:e2e` (Playwright E2E smoke tests; prerequisite: running web instance / Microsoft Edge)
+
+### 3. Acceptance & Deployment Tracking
+
+- **Code Implementation:** `COMPLETE`
+- **Manual Acceptance Testing:** `USER-REPORTED COMPLETE` (2026-10-16)
+- **Automated CI Gates Execution:** `PENDING USER EXECUTION`
+- **Batch Release Status:** `PENDING CI GATES` (Not release-ready / not fully DONE until required gates are verified)
+- **Live Database Migration:** `NOT REQUIRED` (Database schema untouched; existing tables, enums, and indexes preserved)
+- **Deployment Requirement:** `PENDING`. Build container image off-VPS (`--platform linux/amd64`), push release image, deploy on VPS using actual Compose configuration and `--no-deps web`. Reverse proxy (Caddy), database configuration, and single-active-gateway rule remain untouched.
+
 
 
 

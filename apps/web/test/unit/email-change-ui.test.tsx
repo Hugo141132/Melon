@@ -96,7 +96,7 @@ describe('TASK-0216 EmailChangeModal UI Test Suite', () => {
     await waitFor(() => {
       expect(screen.getByText('candidate.new@example.com')).toBeInTheDocument();
       expect(screen.getByText('Kode Verifikasi (6 Digit)')).toBeInTheDocument();
-      expect(screen.getByPlaceholderText('000000')).toBeInTheDocument();
+      expect(screen.getByTestId('otp-code-input')).toBeInTheDocument();
     });
 
     expect(sessionStorage.getItem('email_change_resend_cooldown')).toBeTruthy();
@@ -152,7 +152,8 @@ describe('TASK-0216 EmailChangeModal UI Test Suite', () => {
     fireEvent.click(screen.getByText('Send Verification Code'));
 
     // In Step 2
-    const codeInput = await screen.findByPlaceholderText('000000');
+    await screen.findByTestId('otp-code-input');
+    const codeInput = screen.getByLabelText('Digit 1');
     fireEvent.change(codeInput, { target: { value: '654321' } });
 
     const verifyBtn = screen.getByText('Verify & Save Email');
@@ -225,7 +226,7 @@ describe('TASK-0216 EmailChangeModal UI Test Suite', () => {
     });
     fireEvent.click(screen.getByText('Send Verification Code'));
 
-    await screen.findByPlaceholderText('000000');
+    await screen.findByTestId('otp-code-input');
 
     // Click back button
     const backBtn = screen.getByLabelText('Back');

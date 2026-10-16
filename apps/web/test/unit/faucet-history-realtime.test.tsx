@@ -182,11 +182,17 @@ describe('FaucetHistoryTable Real-Time Optimization & Invariants Tests', () => {
       } as Response;
     });
 
-    mockHookReturn = { status: 'CONNECTING', lastEvent: null, error: null };
+    // Initial mount with active connection
+    mockHookReturn = { status: 'OPEN', lastEvent: null, error: null };
     const { rerender } = render(<FaucetHistoryTable deviceId={mockDeviceId} />);
     expect(fetchCount).toBe(1);
 
-    // Simulate transition to OPEN (reconnect)
+    // Stream drops to CLOSED
+    mockHookReturn = { status: 'CLOSED', lastEvent: null, error: null };
+    rerender(<FaucetHistoryTable deviceId={mockDeviceId} />);
+    expect(fetchCount).toBe(1);
+
+    // Simulate true reconnection back to OPEN
     mockHookReturn = { status: 'OPEN', lastEvent: null, error: null };
     rerender(<FaucetHistoryTable deviceId={mockDeviceId} />);
 

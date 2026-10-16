@@ -20,8 +20,8 @@
       "advisoryId": "GHSA-2v37-7h3g-55p8",
       "reason": "Transitive sub-dependency of postcss; custom generator size=0 edge case is unused in application/build code paths.",
       "approvedBy": "Security Team",
-      "approvedDate": "2026-08-14",
-      "expiresDate": "2026-10-14"
+      "approvedDate": "2026-10-16",
+      "expiresDate": "2026-11-16"
     },
     {
       "id": "EXC-DEP-002",

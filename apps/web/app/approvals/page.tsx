@@ -55,7 +55,7 @@ export default function PendingApprovalsPage() {
       });
       const json = await res.json();
       if (!res.ok || !json.success) {
-        setApproveError(json.error?.message || tApprovals('approvedToast'));
+        setApproveError(json.error?.message || tErrors('generic'));
       } else {
         setApproveSuccess(true);
         setDecisionNote('');
@@ -88,7 +88,7 @@ export default function PendingApprovalsPage() {
       });
       const json = await res.json();
       if (!res.ok || !json.success) {
-        setRejectError(json.error?.message || tApprovals('rejectedToast'));
+        setRejectError(json.error?.message || tErrors('generic'));
       } else {
         setRejectSuccess(true);
         setDecisionNote('');

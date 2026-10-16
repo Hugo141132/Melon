@@ -941,6 +941,35 @@ The following facts are verified in the traceability matrix regarding `TASK-0504
   - Environment Variables & Reverse Proxy (Caddy): **NOT REQUIRED** (Zero configuration changes).
 <!-- TASK-0504 Follow-up Traceability Reconciled: 2026-10-12 -->
 
+---
 
+## Reliability & Consistency Multi-Domain Repair Batch Traceability Note (TASK-REPAIR-20261016 / DEC-AUTH-113 - DEC-DEV-040 / Reconciled 2026-10-16)
 
-
+The following facts are verified in the traceability matrix regarding `TASK-REPAIR-20261016`:
+- **Traceability Baseline:**
+  - Tasks: `TASK-REPAIR-20261016`, `TASK-0207`, `TASK-0214`, `TASK-0302`, `TASK-0506`, `TASK-0808` in `TASKS.md`.
+  - Architecture & Decisions: `DEC-AUTH-113`, `DEC-UIUX-110`, `DEC-UIUX-111`, `DEC-AUTH-114`, `DEC-CTRL-099`, `DEC-DEV-040` in `docs/DECISIONS.md`.
+  - API & Contracts: `docs/API.md` (Approvals approve/reject, devices update, faucet-commands history, profile update).
+  - Database & RBAC: `docs/DATABASE.md` (User transactional deletion), `docs/RBAC.md` (`RBAC-STATE-004`).
+  - Security & Flows: `docs/SECURITY.md` (Canonical email URLs, rate limit prefix isolation), `docs/USER_FLOWS.md` (Flows 6, 7, 14).
+  - UI/UX & I18N: `docs/UI_UX.md` §1.13, `docs/I18N.md` §3.8.
+  - Testing & Verification: `docs/TESTING.md` §35.13.
+  - Deployment & Runbooks: `docs/VPS_DEPLOYMENT_RUNBOOK.md` §1.
+  - Durable Governance: `AGENTS.md` §2 (`Reliability & Consistency Repair Invariants`).
+- **Implementation Status Across 9 Domains:**
+  1. *Pending Admin Rejection*: Transactional account deletion (`prisma.$transaction`), Owner protection (`403 FORBIDDEN`), audit log durability (`AUDIT_LOG_ENTRY_CREATED`), 409 Conflict rejection if user has operational foreign records.
+  2. *DEV REJECTED Accounts Cleanup*: DEV-only script/SQL execution reported complete by user for target IDs in `unbyxlkrzqlafolxcypi`. Staging/production data untouched.
+  3. *Shared OTP Input*: Grouped 3–3 cell layout with middle divider (`—`), project palette preserved, keyboard navigation/paste/accessibility compliant.
+  4. *Dashboard Counters & Weather Lifecycle*: Initial `"-"` placeholder, real-zero handling, unavailable fallback, refresh lifecycle with `AbortController` cancellation, zero performance speculation without physical telemetry.
+  5. *Admin Approval Decision Email*: Direct notification to approved applicant, decoupled from Owner notifications and `/notifications`, failure isolation, latency acknowledgment.
+  6. *Canonical Email URLs*: Authoritative `validateServerEnv().APP_URL`, staging/prod strictness, localhost HTTP restricted to dev/test, identical HTML/plain-text links.
+  7. *Water Tank Rate Limiting*: Isolated prefix `faucet_history`, bounded retries/cooldown, polling cleanup, stale-response protection, SSE reconnect catch-up.
+  8. *Profile Save Navigation*: Hard navigation to `/dashboard` with rehydrated session on success; stays on form on error.
+  9. *Device Management*: Standardized regex escaping `/^[a-zA-Z0-9 _-]{3,50}$/`, localized toast with interpolated device name.
+- **Verification Evidence:**
+  - Manual Acceptance Tests: **USER-REPORTED COMPLETE (2026-10-16)** across all 9 areas.
+  - Regression Test Suites: Implemented across `apps/web/test/unit/` (`approvals-reject-action.test.ts`, `shared-otp-input.test.tsx`, `dashboard-counters.test.tsx`, `weather-card.test.tsx`, `admin-approval-decision-email.test.ts`, `canonical-email-url.test.ts`, `faucet-history-rate-limit.test.ts`, `profile-view.test.tsx`, `device-modal.test.tsx`).
+  - Pre-Commit CI Quality Gates: **PENDING USER EXECUTION** (`check:quality`, `test`, `test:coverage`, `test:integration`, `test:e2e`).
+- **Deployment Status:**
+  - Deployment: **PENDING**. Off-VPS image build for `linux/amd64`, precise image tag and SHA tracking, recreation of web service with `--no-deps web`, preservation of single-active IoT gateway constraint.
+<!-- TASK-REPAIR-20261016 Traceability Reconciled: 2026-10-16 -->

@@ -74,6 +74,28 @@ vi.mock('next-intl', () => {
       }
       return children;
     },
+    createTranslator: ({
+      messages,
+      namespace,
+    }: {
+      locale?: string;
+      messages: any;
+      namespace?: string;
+    }) => {
+      return (key: string, values?: Record<string, any>) => {
+        const nsObj = namespace ? (messages as any)[namespace] : messages;
+        let template = nsObj?.[key] ?? key;
+        if (typeof template === 'string') {
+          if (values) {
+            Object.entries(values).forEach(([k, v]) => {
+              template = template.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v));
+            });
+          }
+          template = template.replace(/''/g, "'");
+        }
+        return template;
+      };
+    },
   };
 });
 

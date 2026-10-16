@@ -148,7 +148,7 @@ export const CanonicalDeviceIdSchema = z
   .min(3, 'deviceId must be at least 3 characters')
   .max(150, 'deviceId must not exceed 150 characters')
   .regex(
-    /^[a-z0-9-_]+$/,
+    /^[a-z0-9_-]+$/,
     'deviceId must contain only lowercase alphanumeric characters, hyphens, and underscores'
   );
 

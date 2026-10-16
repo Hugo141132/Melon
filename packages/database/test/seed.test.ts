@@ -46,6 +46,18 @@ describe('Permanent RBAC Database Seed & Idempotency Test', () => {
 
   beforeAll(async () => {
     await prisma.$connect();
+    // Ensure clean state from any prior integration suites before testing seed isolation
+    await prisma.faucetCommandEvent.deleteMany({});
+    await prisma.faucetCommand.deleteMany({});
+    await prisma.userDeviceAccess.deleteMany({});
+    await prisma.alertAcknowledgement.deleteMany({});
+    await prisma.alert.deleteMany({});
+    await prisma.auditLog.deleteMany({});
+    await prisma.accountApproval.deleteMany({});
+    await prisma.userRoleAssignment.deleteMany({});
+    await prisma.session.deleteMany({});
+    await prisma.userPreference.deleteMany({});
+    await prisma.user.deleteMany({});
   });
 
   afterAll(async () => {

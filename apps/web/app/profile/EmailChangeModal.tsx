@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X, Loader2, AlertCircle, Mail, Eye, EyeOff, ArrowLeft, RefreshCw } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import OtpCodeInput from '@/components/auth/OtpCodeInput';
 
 interface EmailChangeModalProps {
   isOpen: boolean;
@@ -345,16 +346,13 @@ export function EmailChangeModal({
                 <label className="text-[14px] font-semibold text-app-on-surface-variant px-1 block text-center">
                   {tProfile('verificationCode')}
                 </label>
-                <input
-                  type="text"
-                  maxLength={6}
+                <OtpCodeInput
                   value={code}
-                  onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+                  onChange={(val) => setCode(val)}
                   disabled={loading}
-                  autoFocus
-                  className="w-full h-[56px] text-center text-2xl font-mono tracking-widest bg-app-surface-container-lowest border-[1.5px] border-app-outline-variant rounded-xl focus:border-app-primary focus:ring-1 focus:ring-app-primary outline-none transition-all font-bold text-app-primary"
-                  placeholder="000000"
-                  required
+                  hasError={Boolean(errorMsg)}
+                  onComplete={(val) => setCode(val)}
+                  idPrefix="email-change-otp"
                 />
               </div>
 

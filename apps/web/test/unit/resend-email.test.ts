@@ -470,4 +470,181 @@ describe('TASK-0213 Resend Email Service Unit Tests', () => {
       })
     );
   });
+
+  it('sendAdminApprovalResultEmail sends approval notification email to newly approved admin', async () => {
+    process.env.RESEND_API_KEY = 're_test_dummy_key';
+    process.env.RESEND_FROM_EMAIL = 'Melon Governance <noreply@melonmadura.my.id>';
+    (process.env as Record<string, string | undefined>).NODE_ENV = 'development';
+
+    const sendMock = vi.fn().mockResolvedValue({
+      data: { id: 'email_approval_res_123' },
+      error: null,
+    });
+
+    (Resend as unknown as any).mockImplementation(function (this: any) {
+      this.emails = { send: sendMock };
+    });
+
+    const { sendAdminApprovalResultEmail } = await import('../../lib/email/resend');
+    const result = await sendAdminApprovalResultEmail({
+      toEmail: 'siti@example.com',
+      recipientName: 'Siti Aminah',
+      locale: 'id',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.emailSent).toBe(true);
+    expect(result.id).toBe('email_approval_res_123');
+    expect(sendMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        from: 'Melon Governance <noreply@melonmadura.my.id>',
+        to: ['siti@example.com'],
+        subject: 'Akun Admin Anda Telah Disetujui - Melon Governance',
+        text: expect.stringContaining('disetujui oleh Pemilik'),
+      })
+    );
+  });
+
+  describe('Transactional Email URL Canonical Resolution', () => {
+    it('resolves canonical base URL using validated APP_URL in development without trailing slash', async () => {
+      process.env.APP_URL = 'http://localhost:3000/';
+      (process.env as Record<string, string | undefined>).NODE_ENV = 'development';
+      (process.env as Record<string, string | undefined>).APP_ENV = 'development';
+
+      const { getCanonicalAppBaseUrl, getAdminApprovalResultEmailHtml } =
+        await import('../../lib/email/resend');
+
+      expect(getCanonicalAppBaseUrl()).toBe('http://localhost:3000');
+
+      const { html, text } = getAdminApprovalResultEmailHtml({
+        toEmail: 'devadmin@example.com',
+        recipientName: 'Dev Admin',
+      });
+
+      expect(html).toContain('href="http://localhost:3000/login"');
+      expect(text).toContain('Masuk ke Sistem: http://localhost:3000/login');
+      expect(html).not.toContain('melonmadura.my.id/login');
+      expect(text).not.toContain('melonmadura.my.id/login');
+    });
+
+    it('defaults to http://localhost:3000 in development/test when APP_URL is omitted', async () => {
+      delete process.env.APP_URL;
+      delete process.env.NEXT_PUBLIC_APP_URL;
+      (process.env as Record<string, string | undefined>).NODE_ENV = 'development';
+      (process.env as Record<string, string | undefined>).APP_ENV = 'development';
+
+      const { getCanonicalAppBaseUrl } = await import('../../lib/email/resend');
+      expect(getCanonicalAppBaseUrl()).toBe('http://localhost:3000');
+    });
+
+    it('resolves canonical base URL in production using explicit validated APP_URL', async () => {
+      process.env.APP_URL = 'https://monitoring.melonmadura.my.id';
+      process.env.INTERNAL_GATEWAY_URL = 'https://gateway.melonmadura.internal:3001';
+      process.env.INTERNAL_SERVICE_TOKEN = 'production_super_secret_token_12345';
+      (process.env as Record<string, string | undefined>).NODE_ENV = 'production';
+      (process.env as Record<string, string | undefined>).APP_ENV = 'production';
+
+      const { getCanonicalAppBaseUrl, getAdminApprovalResultEmailHtml } =
+        await import('../../lib/email/resend');
+
+      expect(getCanonicalAppBaseUrl()).toBe('https://monitoring.melonmadura.my.id');
+
+      const { html, text } = getAdminApprovalResultEmailHtml({
+        toEmail: 'prodadmin@example.com',
+        recipientName: 'Prod Admin',
+      });
+
+      expect(html).toContain('href="https://monitoring.melonmadura.my.id/login"');
+      expect(text).toContain('Masuk ke Sistem: https://monitoring.melonmadura.my.id/login');
+    });
+
+    it('rejects missing APP_URL in deployed production without silent fallbacks', async () => {
+      delete process.env.APP_URL;
+      delete process.env.NEXT_PUBLIC_APP_URL;
+      process.env.INTERNAL_GATEWAY_URL = 'https://gateway.melonmadura.internal:3001';
+      process.env.INTERNAL_SERVICE_TOKEN = 'production_super_secret_token_12345';
+      (process.env as Record<string, string | undefined>).NODE_ENV = 'production';
+      (process.env as Record<string, string | undefined>).APP_ENV = 'production';
+
+      const { getCanonicalAppBaseUrl } = await import('../../lib/email/resend');
+      expect(() => getCanonicalAppBaseUrl()).toThrowError(/APP_URL is required/);
+    });
+
+    it('rejects localhost HTTP APP_URL in deployed production', async () => {
+      process.env.APP_URL = 'http://localhost:3000';
+      process.env.INTERNAL_GATEWAY_URL = 'https://gateway.melonmadura.internal:3001';
+      process.env.INTERNAL_SERVICE_TOKEN = 'production_super_secret_token_12345';
+      (process.env as Record<string, string | undefined>).NODE_ENV = 'production';
+      (process.env as Record<string, string | undefined>).APP_ENV = 'production';
+
+      const { getCanonicalAppBaseUrl } = await import('../../lib/email/resend');
+      expect(() => getCanonicalAppBaseUrl()).toThrowError(
+        /cannot point to localhost or 127\.0\.0\.1/
+      );
+    });
+
+    it('resolves explicit configured staging APP_URL without inventing hostnames', async () => {
+      process.env.APP_URL = 'http://localhost:3000';
+      (process.env as Record<string, string | undefined>).APP_ENV = 'staging';
+      (process.env as Record<string, string | undefined>).NODE_ENV = 'production';
+
+      const { getCanonicalAppBaseUrl } = await import('../../lib/email/resend');
+      expect(getCanonicalAppBaseUrl()).toBe('http://localhost:3000');
+    });
+
+    it('rejects missing APP_URL in deployed staging without silent fallback', async () => {
+      delete process.env.APP_URL;
+      delete process.env.NEXT_PUBLIC_APP_URL;
+      (process.env as Record<string, string | undefined>).APP_ENV = 'staging';
+      (process.env as Record<string, string | undefined>).NODE_ENV = 'production';
+
+      const { getCanonicalAppBaseUrl } = await import('../../lib/email/resend');
+      expect(() => getCanonicalAppBaseUrl()).toThrowError(
+        /APP_URL is required and must be explicitly configured/
+      );
+    });
+
+    it('rejects invalid URL format in APP_URL', async () => {
+      process.env.APP_URL = 'not-a-valid-url';
+      (process.env as Record<string, string | undefined>).NODE_ENV = 'development';
+      (process.env as Record<string, string | undefined>).APP_ENV = 'development';
+
+      const { getCanonicalAppBaseUrl } = await import('../../lib/email/resend');
+      expect(() => getCanonicalAppBaseUrl()).toThrowError(/Environment validation failed/);
+    });
+
+    it('ensures alert notifications and admin approval requests use canonical URL with consistent HTML and text', async () => {
+      process.env.APP_URL = 'http://localhost:3000';
+      (process.env as Record<string, string | undefined>).NODE_ENV = 'development';
+
+      const { getAlertNotificationEmailHtml, getAdminApprovalRequestEmailHtml } =
+        await import('../../lib/email/resend');
+
+      const alert = getAlertNotificationEmailHtml(
+        'Farmer John',
+        {
+          alertType: 'CRITICAL',
+          severity: 'HIGH',
+          title: 'pH Out of Bounds',
+          message: 'pH is 3.5',
+          deviceName: 'Soil Sensor Node 1',
+        },
+        'id'
+      );
+      expect(alert.html).toContain('href="http://localhost:3000/notifications"');
+      expect(alert.text).toContain('http://localhost:3000/notifications');
+
+      const approvalReq = getAdminApprovalRequestEmailHtml(
+        {
+          toEmail: 'owner@example.com',
+          recipientName: 'Owner',
+          applicantName: 'Calon Admin',
+          applicantEmail: 'calon@example.com',
+        },
+        'id'
+      );
+      expect(approvalReq.html).toContain('href="http://localhost:3000/approvals"');
+      expect(approvalReq.text).toContain('http://localhost:3000/approvals');
+    });
+  });
 });

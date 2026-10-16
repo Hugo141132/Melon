@@ -33,7 +33,7 @@ export default function AnimatedNumber({
   prefix = '',
   suffix = '',
   duration = 600,
-  fallback = '--',
+  fallback = '-',
   className,
   dataTestId,
 }: AnimatedNumberProps) {
@@ -45,14 +45,14 @@ export default function AnimatedNumber({
     const el = spanRef.current;
     if (!el) return;
 
-    // Handle null, undefined, or NaN
+    // Handle null, undefined, or NaN: display standalone clean fallback '-'
     if (value === null || value === undefined || isNaN(value)) {
       if (rafIdRef.current !== null) {
         cancelAnimationFrame(rafIdRef.current);
         rafIdRef.current = null;
       }
       prevValueRef.current = null;
-      el.textContent = `${prefix}${fallback}${suffix}`;
+      el.textContent = fallback;
       return;
     }
 
@@ -117,7 +117,7 @@ export default function AnimatedNumber({
 
   const initialDisplay =
     value === null || value === undefined || isNaN(value)
-      ? `${prefix}${fallback}${suffix}`
+      ? fallback
       : formatValue(value, decimals, prefix, suffix);
 
   return (

@@ -100,6 +100,34 @@ accountStatus = PENDING_APPROVAL
 
 An Owner must approve the Admin before protected access is allowed.
 
+### Reliability & Consistency Repair Invariants (DEC-AUTH-113, DEC-AUTH-114, DEC-UIUX-110, DEC-UIUX-111, DEC-CTRL-099, DEC-DEV-040)
+
+- **Pending-Admin Rejection & Safety Checks (DEC-AUTH-113):**
+  - Owner rejection of a pending Admin applicant transactionally deletes the pending account (`users` record, credentials, tokens, preferences, sessions) to prevent orphaned inactive registrations, while preserving immutable audit logs (`audit_logs` record `ACCOUNT_REJECTED` with acting Owner identity).
+  - Pre-mutation safety checks strictly verify that target user has status `PENDING_APPROVAL`, target has `ADMIN` role only (never `OWNER`), and target has NO unexpected operational history (device assignments, telemetry, alerts, faucet commands, audit log actor records). Rejection is blocked with truthful failure feedback if operational references exist.
+  - Historical REJECTED accounts cleanup was an isolated DEV-only operational script reported complete by the user on 2026-10-16 in DEV project `unbyxlkrzqlafolxcypi`. Never assert staging/production cleanup or independent unverified row counts without direct empirical evidence.
+- **Shared 3-3 OTP Input & Color Governance (DEC-UIUX-110):**
+  - Shared OTP code input component (`OtpCodeInput.tsx`) across email verification and password reset conforms to explicit user design override (3-3 split layout with separator) while strictly preserving authoritative project color tokens (`border-outline-variant`, focus rings) and accessibility. Security attempt limits and token expiry timing remain untouched.
+- **Dashboard & Weather Data Lifecycle (DEC-UIUX-111):**
+  - Operational counters and weather metrics initially render `"-"` placeholders (never false zero `0` or layout-shifting skeleton blocks).
+  - Once live telemetry/weather arrives, `AnimatedNumber` animates smoothly to real numbers while preserving genuine zero (`0`), decimal precision, and error states.
+  - Client unmount/refresh `AbortController` cancellation is an expected operational lifecycle event, not a system failure. Do not claim measured zero CLS, memory leaks eliminated, or zero latency overhead without empirical profiler evidence.
+- **Admin Approval Decision Notification & Canonical Email URLs (DEC-AUTH-114):**
+  - Approval sends bilingual transactional email to approved Admin with direct login link; failure is isolated (does not rollback approval transaction), though awaited sending can increase HTTP latency.
+  - Authoritative URL source for transactional emails is strictly `validateServerEnv().APP_URL`. Raw `process.env` bypasses, public client variables, and hardcoded domain fallbacks are strictly prohibited. Localhost HTTP is permitted ONLY for explicitly local dev/test use. Deployed staging/production requires an explicit valid application URL. HTML href and plain-text links must match identically. Existing emails retain their original links.
+- **Water-Tank Rate Limiter Isolation & SSE Reconnect Protection (DEC-CTRL-099):**
+  - Faucet command history rate limiter uses isolated prefix `faucet_history` (separated from `/alerts`).
+  - Adaptive polling with bounded backoff and `Retry-After` adherence in `FaucetStatusCard.tsx` and mount duplication protection (`hasEverOpenedRef`) in `FaucetHistoryTable.tsx`.
+- **Profile Save Navigation:**
+  - Successful profile save triggers full navigation to `/dashboard` with refreshed session identity. Failures remain on the form with error feedback.
+- **Device Management Regex & Localized Toast (DEC-DEV-040):**
+  - Server and browser regex escaping standardized (`/^[a-zA-Z0-9 _-]{3,50}$/`). Localized success toast interpolates the persisted device name.
+- **Operational Commands & Verification Status:**
+  - Local development restart: `npm run dev:web`.
+  - Release builds: executed off-VPS (for `linux/amd64`).
+  - VPS deployment: deploy using actual Compose configuration and release image tag with `--no-deps web`. Single-active-gateway rule is strictly preserved.
+  - Manual Acceptance: `USER-REPORTED COMPLETE` dated `2026-10-16`. All five CI gates remain `PENDING USER EXECUTION`.
+
 ---
 
 ## 3. Mandatory Reading Order
@@ -474,6 +502,26 @@ Reliability, consistency, and rate-limit mitigation audit record:
   - Session & Device State Synchronization: Enhanced `AuthContext` with silent tab focus/visibility revalidation (`validateSession(true)`). Enhanced `DeviceContext` to reuse already-loaded device arrays across route navigation (`setIsLoading(prev => devices.length === 0 ? true : prev)`), preventing disruptive loading spinners and redundant API roundtrips.
   - Alert Request Storm & HTTP 429 Mitigation: Resolved duplicated hook queries and un-throttled polling loops on `/notifications` by introducing a module-level singleton in `useAlertBadge.ts` (shared count, shared loading, subscriber list), in-flight promise deduplication, 10-second TTL cache, route-based polling suppression on `/notifications`, HTTP 429 `Retry-After` backoff cooldown, and direct `melon:alert-updated` CustomEvent count synchronization (`{ detail: { count: openCount } }`).
   - Automated Verification: Verified 0 TypeScript errors across `apps/web`, 4/4 tests passed in `use-alert-badge.test.tsx`, 2/2 in `notifications-bulk-acknowledge-ui.test.tsx`, 2/2 in `notifications-user-scope.test.tsx`, 12/12 in `sidebar-navigation.test.tsx`, 2/2 in `users-page.test.tsx`, and passed repository test suites in `packages/database`. Five full CI release commands remain deferred for manual developer execution.
+
+#### Seven-Item Repair Batch Governance Record (2026-10-15)
+
+Seven-item repair batch implementation record (TASK-0208, TASK-0212, TASK-0214, TASK-0216, TASK-0218, TASK-0506, TASK-0507, TASK-0207, TASK-0219, TASK-0501, TASK-0902, TASK-0211, TASK-0215, TASK-0302, TASK-0305, TASK-RELIABILITY-01):
+- Status: `AWAITING USER OPERATOR TEST EVIDENCE` (Code & focused regression test implementation complete; zero test runners executed; manual website verification and full CI gates assigned to user)
+- Priority: `P0` / `P1` (Security Invariants, Real-Time Resilience & Operational UI Polish)
+- Frontend impact: `MINOR`
+- Selected UI direction: `Premium Minimal Ops`
+- Existing color template: `UNCHANGED`
+- Selected motion effects: `KPI refresh`, `Button hover`, `Modal`
+- 21st.dev MCP: `NOT REQUIRED` (Layout structured using project semantic tokens based on approved visual asset)
+- Reason: Seven-item bugfix and UX refinement batch covering rejected applicant transactional cleanup, 3-3 grouped OTP code input layout, dashboard initial loading state display "-", approval decision email to applicant, water-tank HTTP 429 limiter prefix collision resolution, profile save full-page navigation, and Unicode v-mode device regex fix.
+- Summary of implementations:
+  - Item 1 (Rejected Applicants Transactional Deletion): Updated `rejectPendingAdmin` in `packages/database/src/user-repository.ts` to transactionally clean up credentials, tokens, sessions, preferences, and delete the rejected applicant row from `users` (instead of retaining as `REJECTED`). Inserted minimal audit record in `AuditLog` (`ACCOUNT_REJECTED`, non-FK `targetId`). Enforced Owner protection (rejecting an Owner returns 403 Forbidden) and concurrency rechecks.
+  - Item 2 (OTP Design 3–3 Grouped Cell Layout): Created `OtpCodeInput.tsx` with 3-3 cell grouping, central dash separator (`—`), arrow/backspace navigation, paste handling, numeric mobile inputMode, accessible `aria-label`, and project semantic color tokens (`bg-app-surface`, `border-app-outline-variant/60`, `focus:border-app-primary`, `border-error`). Applied to `/verify-email`, login session-recovery modal, and email-change modal. Preserved 1-minute expiration per TASK-0218. Added regression unit test suite `otp-code-input.test.tsx`.
+  - Item 3 (Dashboard Loading Displays "-" & Layout Stability): Updated `DashboardView.tsx` and `WeatherCard.tsx` so that operational counters and weather numeric metrics initially display `"-"` instead of fake zero `0` or numeric skeleton blocks. Removed shifting `weather-skeleton` placeholder. Once live data arrives, smoothly animates to real values via `AnimatedNumber.tsx`. Preserved real zero, decimals, units, error states, and `prefers-reduced-motion`. Added unit test in `dashboard-page.test.tsx`.
+  - Item 4 (Approval Email to Admin): Added `sendAdminApprovalResultEmail` in `apps/web/lib/email/resend.ts` and attached post-commit trigger in `apps/web/app/api/v1/approvals/[userId]/approve/route.ts`. Sends localized transactional email to approved Admin with trusted login URL upon successful committed Owner approval. Isolated email dispatch from database transaction, prevented duplicate emails on repeated approval requests, decoupled from sensor alerts and `/notifications` entries, and distinguished provider acceptance from confirmed delivery. Added regression unit test in `resend-email.test.ts`.
+  - Item 5 (Water-Tank HTTP 429 & SSE Reconnection Amplification): Diagnosed and resolved HTTP 429 rate limit triggers on water tank controls by isolating rate limiter key prefix to `faucet_history` (preventing quota collision with `/api/v1/alerts`), adding `hasEverOpenedRef` and `retryAfterUntilRef` in `FaucetHistoryTable.tsx` to stop redundant fetch loops upon SSE reconnect, and replacing fixed 2.5s interval polling in `FaucetStatusCard.tsx` with adaptive polling respecting `Retry-After`.
+  - Item 6 (Profile Save Navigation): Updated profile save handler in `apps/web/app/profile/page.tsx` to execute a full-page reload and navigation (`window.location.assign('/dashboard')`) after successful profile update, guaranteeing immediate rehydration of updated identity across root SSR components, avatar initials, and navigation shell. Retains form values and shows error on failure.
+  - Item 7 (Device Management Unicode v-mode Regex): Fixed invalid HTML pattern `^[a-z0-9-_]+$` in `apps/web/app/devices/page.tsx` line 644 and `packages/contracts/src/device.ts` line 151 to `^[a-z0-9_-]+$`, eliminating syntax errors under modern browser HTML5 validation and Unicode v-mode while strictly preserving server validation parity and immutable UUID rules.
 
 #### TASK-0109 Governance Record
 

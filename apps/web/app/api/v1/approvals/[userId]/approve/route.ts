@@ -10,6 +10,7 @@ import {
 } from '../../../../../../lib/rate-limit';
 import { validateServerEnv } from '../../../../../../lib/env/server';
 import { realtimeEventHub } from '../../../../../../lib/realtime/event-hub';
+import { sendAdminApprovalResultEmail } from '../../../../../../lib/email/resend';
 
 export async function POST(request: Request, props: { params: Promise<{ userId: string }> }) {
   const params = await props.params;
@@ -89,6 +90,17 @@ export async function POST(request: Request, props: { params: Promise<{ userId: 
       requestId,
       ipAddress,
       userAgent,
+      notifyFn: async (applicant) => {
+        try {
+          await sendAdminApprovalResultEmail({
+            toEmail: applicant.email,
+            recipientName: applicant.fullName,
+            requestId,
+          });
+        } catch {
+          // Email dispatch failure is non-blocking and isolated from committed approval
+        }
+      },
     });
 
     if (!result.success) {

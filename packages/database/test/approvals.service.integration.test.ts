@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { PrismaClient } from '@prisma/client';
 import { UserRepository } from '../src/user-repository';
-import { AccountStatus, UserRole } from '@kebun-melon/contracts';
+import { AccountStatus, AuditEventKey, UserRole } from '@kebun-melon/contracts';
 import { validateTestDatabaseUrl } from '../src/owner-provisioning';
 
 describe('TASK-0206 Approvals Database Integration & Security Test Suite', () => {
@@ -30,6 +30,17 @@ describe('TASK-0206 Approvals Database Integration & Security Test Suite', () =>
   });
 
   afterAll(async () => {
+    await prisma.faucetCommandEvent.deleteMany({});
+    await prisma.faucetCommand.deleteMany({});
+    await prisma.userDeviceAccess.deleteMany({});
+    await prisma.alertAcknowledgement.deleteMany({});
+    await prisma.alert.deleteMany({});
+    await prisma.auditLog.deleteMany({});
+    await prisma.accountApproval.deleteMany({});
+    await prisma.userRoleAssignment.deleteMany({});
+    await prisma.session.deleteMany({});
+    await prisma.userPreference.deleteMany({});
+    await prisma.user.deleteMany({});
     await prisma.$disconnect();
   });
 
@@ -447,28 +458,16 @@ describe('TASK-0206 Approvals Database Integration & Security Test Suite', () =>
       expect(result.user.accountStatus).toBe(AccountStatus.REJECTED);
       expect(notifyCalled).toBe(true);
 
-      // Verify DB User account status update
+      // Verify DB User account was completely removed from the users table per TASK-0208
       const dbUser = await prisma.user.findUnique({ where: { id: pendingUser.id } });
-      expect(dbUser?.accountStatus).toBe(AccountStatus.REJECTED);
+      expect(dbUser).toBeNull();
 
-      // Verify AccountApproval history record
-      const approvalHistory = await prisma.accountApproval.findUnique({
-        where: { id: result.approvalRecordId },
-      });
-      expect(approvalHistory).not.toBeNull();
-      expect(approvalHistory?.applicantUserId).toBe(pendingUser.id);
-      expect(approvalHistory?.decidedByUserId).toBe(ownerUser.id);
-      expect(approvalHistory?.decision).toBe('REJECT');
-      expect(approvalHistory?.previousStatus).toBe(AccountStatus.PENDING_APPROVAL);
-      expect(approvalHistory?.newStatus).toBe(AccountStatus.REJECTED);
-      expect(approvalHistory?.decisionNote).toBe('Unverified credentials and identity mismatch');
-
-      // Verify AuditLog record and audit secrecy (no password hashes or secrets in values/metadata)
+      // Verify AuditLog record survives deletion without FK constraint violation
       const auditLog = await prisma.auditLog.findUnique({
         where: { id: result.auditLogId },
       });
       expect(auditLog).not.toBeNull();
-      expect(auditLog?.eventKey).toBe('account.rejected');
+      expect(auditLog?.eventKey).toBe(AuditEventKey.ACCOUNT_REJECTED);
       expect(auditLog?.actorUserId).toBe(ownerUser.id);
       expect(auditLog?.targetId).toBe(pendingUser.id);
       expect(auditLog?.targetType).toBe('USER');
@@ -585,11 +584,60 @@ describe('TASK-0206 Approvals Database Integration & Security Test Suite', () =>
       expect(successes.length).toBe(1);
       expect(failures.length).toBe(1);
 
-      // Verify exactly 1 AccountApproval record
-      const approvalRecords = await prisma.accountApproval.findMany({
-        where: { applicantUserId: pendingUser.id },
+      if (res1.success) {
+        // Reject won: user was transactionally deleted
+        const dbUser = await prisma.user.findUnique({ where: { id: pendingUser.id } });
+        expect(dbUser).toBeNull();
+      } else {
+        // Approve won: user is ACTIVE
+        const dbUser = await prisma.user.findUnique({ where: { id: pendingUser.id } });
+        expect(dbUser?.accountStatus).toBe(AccountStatus.ACTIVE);
+      }
+    });
+
+    it('rejectPendingAdmin strictly prevents rejecting and deleting an OWNER account', async () => {
+      const ownerUser = await prisma.user.create({
+        data: {
+          fullName: 'Owner To Protect',
+          email: 'owner.protected@example.com',
+          passwordHash: '$argon2id$v=19$m=65536,t=3,p=4$dummyhashowner5',
+          accountStatus: AccountStatus.PENDING_APPROVAL,
+          emailVerifiedAt: new Date(),
+        },
       });
-      expect(approvalRecords.length).toBe(1);
+
+      const ownerRole = await prisma.role.findUnique({ where: { code: UserRole.OWNER } });
+      if (ownerRole) {
+        await prisma.userRoleAssignment.create({
+          data: {
+            userId: ownerUser.id,
+            roleId: ownerRole.id,
+          },
+        });
+      }
+
+      const actingOwner = await prisma.user.create({
+        data: {
+          fullName: 'Acting Owner',
+          email: 'acting.owner@example.com',
+          passwordHash: '$argon2id$v=19$m=65536,t=3,p=4$dummyhashowner6',
+          accountStatus: AccountStatus.ACTIVE,
+        },
+      });
+
+      const result = await userRepo.rejectPendingAdmin({
+        targetUserId: ownerUser.id,
+        decidedByUserId: actingOwner.id,
+      });
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error).toBe('INVALID_STATUS');
+      expect(result.message).toContain('Owner accounts cannot be rejected or removed');
+
+      // Verify Owner account row remains intact in database
+      const dbOwner = await prisma.user.findUnique({ where: { id: ownerUser.id } });
+      expect(dbOwner).not.toBeNull();
     });
   });
 });

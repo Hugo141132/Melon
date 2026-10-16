@@ -15,15 +15,19 @@ export default function DashboardView() {
   const locale = typeof useLocale === 'function' ? useLocale() : 'id';
 
   const { user } = useAuth();
-  const { devices } = useDeviceContext();
+  const { devices, isLoading } = useDeviceContext();
 
   const rawName = user?.fullName || user?.email || '';
   const userName = rawName.replace(/^pak\s+/i, '').trim();
 
-  const onlineDevicesCount = devices.filter(
-    (d) => normalizeConnectionStatus(d.connectionStatus) === 'CONNECTED'
-  ).length;
-  const offlineDevicesCount = devices.length - onlineDevicesCount;
+  const totalDevices = isLoading ? null : devices.length;
+  const onlineDevicesCount = isLoading
+    ? null
+    : devices.filter((d) => normalizeConnectionStatus(d.connectionStatus) === 'CONNECTED').length;
+  const offlineDevicesCount =
+    isLoading || totalDevices === null || onlineDevicesCount === null
+      ? null
+      : totalDevices - onlineDevicesCount;
 
   // Format today's localized date
   const todayFormatted = new Intl.DateTimeFormat(locale === 'id' ? 'id-ID' : 'en-US', {
@@ -60,7 +64,11 @@ export default function DashboardView() {
                   {tDash('totalDevices')}
                 </span>
                 <span className="text-[22px] sm:text-[26px] font-extrabold text-app-on-surface">
-                  <AnimatedNumber value={devices.length} dataTestId="total-devices-count" />
+                  <AnimatedNumber
+                    value={totalDevices}
+                    fallback="-"
+                    dataTestId="total-devices-count"
+                  />
                 </span>
               </div>
               <div className="w-10 h-10 rounded-xl bg-app-surface-container-high text-app-on-surface-variant flex items-center justify-center flex-shrink-0">
@@ -75,7 +83,11 @@ export default function DashboardView() {
                   {tDash('onlineDevices')}
                 </span>
                 <span className="text-[22px] sm:text-[26px] font-extrabold text-white">
-                  <AnimatedNumber value={onlineDevicesCount} dataTestId="online-devices-count" />
+                  <AnimatedNumber
+                    value={onlineDevicesCount}
+                    fallback="-"
+                    dataTestId="online-devices-count"
+                  />
                 </span>
               </div>
               <div className="w-10 h-10 rounded-xl bg-app-primary-fixed text-app-on-primary-fixed flex items-center justify-center flex-shrink-0">
@@ -90,7 +102,11 @@ export default function DashboardView() {
                   {tDash('offlineDevices')}
                 </span>
                 <span className="text-[22px] sm:text-[26px] font-extrabold text-app-on-surface-variant">
-                  <AnimatedNumber value={offlineDevicesCount} dataTestId="offline-devices-count" />
+                  <AnimatedNumber
+                    value={offlineDevicesCount}
+                    fallback="-"
+                    dataTestId="offline-devices-count"
+                  />
                 </span>
               </div>
               <div className="w-10 h-10 rounded-xl bg-app-surface-container-high flex items-center justify-center flex-shrink-0">

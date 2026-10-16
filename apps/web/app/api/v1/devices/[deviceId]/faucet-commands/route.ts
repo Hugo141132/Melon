@@ -285,7 +285,7 @@ export async function GET(request: Request, props: { params: Promise<{ deviceId:
     const env = validateServerEnv();
     const rateLimitIdentifier = session.id || getClientIp(request);
     const rateLimitInfo = checkRateLimit(rateLimitIdentifier, {
-      keyPrefix: 'history',
+      keyPrefix: 'faucet_history',
       limit: env.RATE_LIMIT_HISTORY_MAX,
       windowMs: env.RATE_LIMIT_WINDOW_MS,
     });

@@ -132,7 +132,7 @@ describe('TASK-0218 Login View Single-Session Recovery UI Tests', () => {
     // In OTP step, shows masked email and OTP input
     await waitFor(() => {
       expect(within(dialog).getByText(/u\*\*\*r@example\.com/)).toBeInTheDocument();
-      expect(within(dialog).getByPlaceholderText('000000')).toBeInTheDocument();
+      expect(within(dialog).getByTestId('otp-code-input')).toBeInTheDocument();
       expect(
         within(dialog).getByRole('button', {
           name: /Konfirmasi & Pulihkan Sesi|Confirm & Recover Session/i,
@@ -236,10 +236,10 @@ describe('TASK-0218 Login View Single-Session Recovery UI Tests', () => {
     fireEvent.click(modalSendCodeBtn);
 
     await waitFor(() => {
-      expect(within(dialog).getByPlaceholderText('000000')).toBeInTheDocument();
+      expect(within(dialog).getByTestId('otp-code-input')).toBeInTheDocument();
     });
 
-    const otpInput = within(dialog).getByPlaceholderText('000000');
+    const otpInput = within(dialog).getByLabelText('Digit 1');
     fireEvent.change(otpInput, { target: { value: '654321' } });
 
     const confirmBtn = within(dialog).getByRole('button', {

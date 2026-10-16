@@ -83,10 +83,23 @@ export default function FaucetHistoryTable({
   const fetchSeqRef = React.useRef<number>(0);
   const lastDeviceIdRef = React.useRef<string | null | undefined>(null);
   const lastFilterRef = React.useRef<string>('ALL');
+  const retryAfterUntilRef = React.useRef<number>(0);
+  const abortControllerRef = React.useRef<AbortController | null>(null);
 
   const fetchHistory = useCallback(
     async (pageToFetch = 1) => {
       if (!deviceId) return;
+      // Do not amplify requests during active Retry-After cool-down
+      if (Date.now() < retryAfterUntilRef.current) {
+        return;
+      }
+
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+
       const fetchSeq = ++fetchSeqRef.current;
       setLoading(true);
       setErrorMsg(null);
@@ -102,8 +115,22 @@ export default function FaucetHistoryTable({
         }
 
         const res = await fetch(
-          `/api/v1/devices/${deviceId}/faucet-commands?${queryParams.toString()}`
+          `/api/v1/devices/${deviceId}/faucet-commands?${queryParams.toString()}`,
+          { signal: controller.signal }
         );
+
+        if (res.status === 429) {
+          const retryHeader = res.headers.get('Retry-After');
+          const waitSeconds = Math.max(1, Math.min(60, parseInt(retryHeader || '5', 10) || 5));
+          retryAfterUntilRef.current = Date.now() + waitSeconds * 1000;
+          if (fetchSeq === fetchSeqRef.current) {
+            setErrorMsg(
+              `Batas permintaan riwayat tercapai. Mohon tunggu ${waitSeconds} detik sebelum memuat ulang.`
+            );
+          }
+          return;
+        }
+
         const json = await res.json();
 
         // Discard stale in-flight response
@@ -127,7 +154,8 @@ export default function FaucetHistoryTable({
         } else {
           setErrorMsg(json.error?.message || tFaucetRef.current('historySubtitle'));
         }
-      } catch {
+      } catch (err: any) {
+        if (err?.name === 'AbortError') return;
         if (fetchSeq === fetchSeqRef.current) {
           setErrorMsg(tFaucetRef.current('networkErrorDispense'));
         }
@@ -139,6 +167,13 @@ export default function FaucetHistoryTable({
     },
     [deviceId, statusFilter]
   );
+
+  // Clean up in-flight requests on unmount
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
 
   // Reset to page 1 on device change or filter change
   useEffect(() => {
@@ -153,6 +188,11 @@ export default function FaucetHistoryTable({
 
     lastDeviceIdRef.current = deviceId;
     lastFilterRef.current = statusFilter;
+
+    if (deviceChanged) {
+      hasEverOpenedRef.current = false;
+      retryAfterUntilRef.current = 0;
+    }
 
     if (deviceChanged || filterChanged || isFirstMountRef.current) {
       fetchHistory(1);
@@ -217,22 +257,22 @@ export default function FaucetHistoryTable({
     onEvent: handleRealtimeEvent,
   });
 
+  const hasEverOpenedRef = React.useRef<boolean>(false);
+
   // Reconcile history table upon stream reconnection
   useEffect(() => {
-    if (isFirstMountRef.current) {
-      isFirstMountRef.current = false;
-      prevRealtimeStatusRef.current = realtimeStatus;
-      return;
-    }
-
-    if (
-      (prevRealtimeStatusRef.current === 'CLOSED' ||
-        prevRealtimeStatusRef.current === 'CONNECTING' ||
-        prevRealtimeStatusRef.current === 'POLLING') &&
-      realtimeStatus === 'OPEN'
-    ) {
-      // Stream reconnected, reconcile history
-      fetchHistory(paginationRef.current.page);
+    if (realtimeStatus === 'OPEN') {
+      if (!hasEverOpenedRef.current) {
+        // Initial connection established; initial mount already fetched page 1
+        hasEverOpenedRef.current = true;
+      } else if (
+        prevRealtimeStatusRef.current === 'CLOSED' ||
+        prevRealtimeStatusRef.current === 'POLLING' ||
+        prevRealtimeStatusRef.current === 'CONNECTING'
+      ) {
+        // True stream reconnection after prior established session dropped
+        fetchHistory(paginationRef.current.page);
+      }
     }
 
     prevRealtimeStatusRef.current = realtimeStatus;

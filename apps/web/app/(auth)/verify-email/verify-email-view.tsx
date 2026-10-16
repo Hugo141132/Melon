@@ -4,16 +4,9 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import {
-  ArrowLeft,
-  Loader2,
-  CheckCircle,
-  AlertCircle,
-  Mail,
-  KeyRound,
-  RefreshCw,
-} from 'lucide-react';
+import { ArrowLeft, Loader2, CheckCircle, AlertCircle, Mail, RefreshCw } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import OtpCodeInput from '@/components/auth/OtpCodeInput';
 
 interface VerificationResponse {
   ok: boolean;
@@ -377,39 +370,28 @@ function VerifyEmailContent() {
       <form className="flex flex-col gap-[20px]" onSubmit={handleVerifyCode}>
         <div className="flex flex-col gap-2">
           <label
-            className="text-[14px] leading-[20px] font-semibold tracking-[0.05em] text-primary uppercase"
-            htmlFor="verification-code-input"
+            className="text-[14px] leading-[20px] font-semibold tracking-[0.05em] text-primary uppercase text-center"
+            htmlFor="verify-email-otp-0"
           >
             {tAuth('verificationCode')}
           </label>
-          <div className="relative group">
-            <KeyRound
-              size={20}
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-outline group-focus-within:text-primary transition-colors"
-            />
-            <input
-              id="verification-code-input"
-              name="code"
-              type="text"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              pattern="[0-9]*"
-              maxLength={8}
-              required
-              autoFocus
-              value={code}
-              onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, ''))}
-              placeholder="000000"
-              className="w-full h-[56px] pl-12 pr-4 bg-white border border-outline-variant rounded-xl text-[22px] tracking-[6px] font-mono text-on-surface transition-all focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
-            />
-          </div>
-          <p className="text-[13px] text-on-surface-variant mt-1">{tAuth('codeExpiryNotice')}</p>
+          <OtpCodeInput
+            value={code}
+            onChange={(val) => setCode(val)}
+            hasError={Boolean(errorMessage)}
+            disabled={state === 'loading'}
+            onComplete={(val) => setCode(val)}
+            idPrefix="verify-email-otp"
+          />
+          <p className="text-[13px] text-on-surface-variant text-center mt-1">
+            {tAuth('codeExpiryNotice')}
+          </p>
         </div>
 
         <button
-          className="h-[56px] w-full bg-primary text-on-primary rounded-xl text-[18px] leading-[24px] font-semibold shadow-md hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70 mt-2"
+          className="h-[52px] w-full bg-primary text-on-primary rounded-xl text-[16px] sm:text-[17px] leading-[24px] font-semibold shadow-md hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70 mt-2"
           type="submit"
-          disabled={state === 'loading' || !code.trim()}
+          disabled={state === 'loading' || code.trim().length !== 6}
         >
           {state === 'loading' ? (
             <>

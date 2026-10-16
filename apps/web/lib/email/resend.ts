@@ -183,17 +183,69 @@ async function sendWithRetry(
 }
 
 /**
+ * Resolves canonical application base URL for transactional emails and public assets.
+ *
+ * Authoritative Source: Validated server-side APP_URL from validateServerEnv().
+ *
+ * Strict Rules:
+ * - Uses ONLY the validated server environment APP_URL.
+ * - Raw process.env lookups and client public variables that bypass server validation are strictly removed.
+ * - Silent hardcoded domain fallbacks (e.g. melonmadura.my.id / monitoring.melonmadura.my.id) are strictly prohibited.
+ * - Requires an explicitly configured valid application URL for deployed staging/production.
+ * - Localhost HTTP is permitted ONLY for explicitly local development/test use.
+ * - Preserves existing trusted-origin and HTTPS protections; never infers the application
+ *   environment solely from NODE_ENV or database labels.
+ * - All trailing slashes are cleanly removed.
+ */
+export function getCanonicalAppBaseUrl(): string {
+  const env = validateServerEnv();
+  const appEnv = env.APP_ENV || 'development';
+  const isLocalDevOrTest =
+    (appEnv === 'development' || appEnv === 'test' || env.NODE_ENV === 'test') &&
+    appEnv !== 'staging' &&
+    appEnv !== 'production';
+
+  const rawUrl = env.APP_URL;
+
+  if (!rawUrl) {
+    if (isLocalDevOrTest) {
+      return 'http://localhost:3000';
+    }
+    throw new Error(
+      `Configuration error: APP_URL is required and must be explicitly configured for deployed '${appEnv}' environment.`
+    );
+  }
+
+  // Deployed production environment: strict HTTPS enforcement and forbid localhost / 127.0.0.1
+  const isProd = appEnv === 'production' || (env.NODE_ENV === 'production' && appEnv !== 'staging');
+  if (isProd) {
+    if (
+      !rawUrl.startsWith('https://') ||
+      rawUrl.includes('localhost') ||
+      rawUrl.includes('127.0.0.1')
+    ) {
+      throw new Error(
+        'Configuration error: APP_URL must be an explicit trusted HTTPS URL and cannot point to localhost or 127.0.0.1 in production.'
+      );
+    }
+  } else if (!isLocalDevOrTest) {
+    // Deployed staging environment: require explicit URL starting with http:// or https://
+    if (!rawUrl.startsWith('http://') && !rawUrl.startsWith('https://')) {
+      throw new Error(
+        `Configuration error: APP_URL must start with http:// or https:// in '${appEnv}' environment.`
+      );
+    }
+  }
+
+  return rawUrl.replace(/\/+$/, '');
+}
+
+/**
  * Builds trusted reset password link using ONLY configured server environment URL.
  * Never relies on untrusted request Host headers.
  */
 export function buildTrustedResetUrl(rawToken: string): string {
-  const env = validateServerEnv();
-  const rawBaseUrl =
-    env.APP_URL ||
-    process.env.NEXT_PUBLIC_APP_URL ||
-    process.env.APP_URL ||
-    'http://localhost:3000';
-  const baseUrl = rawBaseUrl.replace(/\/+$/, '');
+  const baseUrl = getCanonicalAppBaseUrl();
   return `${baseUrl}/reset-password?token=${encodeURIComponent(rawToken)}`;
 }
 
@@ -206,13 +258,7 @@ export function getEmailLogoUrl(): string {
     return 'cid:logo1';
   }
 
-  const env = validateServerEnv();
-  const rawBaseUrl =
-    env.APP_URL ||
-    process.env.NEXT_PUBLIC_APP_URL ||
-    process.env.APP_URL ||
-    'http://localhost:3000';
-  const baseUrl = rawBaseUrl.replace(/\/+$/, '');
+  const baseUrl = getCanonicalAppBaseUrl();
   return `${baseUrl}/logo1-email.png`;
 }
 
@@ -1522,9 +1568,9 @@ export function getAlertNotificationEmailHtml(
     openedAt?: Date | string;
     timezone?: string;
   },
-  locale: string
+  locale = 'id'
 ): { subject: string; html: string; text: string } {
-  const isId = locale.startsWith('id');
+  const isId = (locale || 'id').startsWith('id');
   const severityUpper = input.severity.toUpperCase();
 
   let severityLabel = severityUpper;
@@ -1570,12 +1616,11 @@ export function getAlertNotificationEmailHtml(
 
   const formattedTime = formatAlertTimestamp(input.openedAt || new Date(), locale, input.timezone);
 
-  const appBaseUrl =
-    process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'https://melonmadura.my.id';
-  const notificationsUrl = `${appBaseUrl.replace(/\/$/, '')}/notifications`;
+  const appBaseUrl = getCanonicalAppBaseUrl();
+  const notificationsUrl = `${appBaseUrl}/notifications`;
 
   const logoAttachment = getLogoAttachment();
-  const logoUrl = logoAttachment ? 'cid:logo1' : `${appBaseUrl.replace(/\/$/, '')}/logo1-email.png`;
+  const logoUrl = logoAttachment ? 'cid:logo1' : `${appBaseUrl}/logo1-email.png`;
 
   const html = `
 <!DOCTYPE html>
@@ -1771,18 +1816,12 @@ export interface SendAdminApprovalRequestEmailResult {
 
 export function getAdminApprovalRequestEmailHtml(
   input: SendAdminApprovalRequestEmailInput,
-  locale: string
+  locale = 'id'
 ): { subject: string; html: string; text: string } {
-  const isId = locale.startsWith('id');
+  const isId = (locale || 'id').startsWith('id');
   const logoUrl = getEmailLogoUrl();
 
-  const env = validateServerEnv();
-  const rawBaseUrl =
-    env.APP_URL ||
-    process.env.NEXT_PUBLIC_APP_URL ||
-    process.env.APP_URL ||
-    'http://localhost:3000';
-  const baseUrl = rawBaseUrl.replace(/\/+$/, '');
+  const baseUrl = getCanonicalAppBaseUrl();
   const approvalsUrl = `${baseUrl}/approvals`;
 
   const subject = isId
@@ -1969,6 +2008,174 @@ export async function sendAdminApprovalRequestEmail(
   } catch (err: any) {
     reqLogger.error(
       'Unexpected exception during Resend admin approval request email dispatch: ' +
+        (err?.message || String(err))
+    );
+    return {
+      success: false,
+      emailSent: false,
+      error: err?.message || 'Email delivery failed',
+    };
+  }
+}
+
+export interface SendAdminApprovalResultEmailInput {
+  toEmail: string;
+  recipientName?: string;
+  locale?: string;
+  requestId?: string;
+}
+
+export interface SendAdminApprovalResultEmailResult {
+  success: boolean;
+  emailSent: boolean;
+  simulated?: boolean;
+  id?: string;
+  error?: string;
+}
+
+export function getAdminApprovalResultEmailHtml(
+  input: SendAdminApprovalResultEmailInput,
+  locale = 'id'
+): { subject: string; html: string; text: string } {
+  const isId = locale === 'id';
+  const subject = isId
+    ? 'Akun Admin Anda Telah Disetujui - Melon Governance'
+    : 'Your Admin Account Has Been Approved - Melon Governance';
+
+  const baseUrl = getCanonicalAppBaseUrl();
+  const loginUrl = `${baseUrl}/login`;
+
+  const logoUrl = getEmailLogoUrl();
+
+  const title = isId ? 'Pendaftaran Admin Disetujui' : 'Admin Registration Approved';
+  const greeting = isId
+    ? `Halo, ${input.recipientName || 'Admin'}`
+    : `Hello, ${input.recipientName || 'Admin'}`;
+  const message = isId
+    ? 'Selamat! Permohonan pendaftaran akun Administrator Anda untuk sistem pemantauan dan tata kelola Kebun Melon telah disetujui oleh Pemilik (Owner). Anda sekarang dapat masuk dan mengakses fitur manajemen operasional sistem.'
+    : 'Congratulations! Your Administrator account registration for the Melon farm monitoring and governance system has been approved by the Owner. You can now log in and access operational management features.';
+  const buttonText = isId ? 'Masuk ke Sistem' : 'Log In to System';
+  const securityNotice = isId
+    ? 'Pemberitahuan Keamanan: Tautan di atas mengarahkan langsung ke portal login resmi sistem tata kelola Melon. Jangan pernah membagikan kredensial akun Anda kepada pihak mana pun.'
+    : 'Security Notice: The link above directs strictly to the official Melon governance login portal. Never share your account credentials with anyone.';
+
+  const html = `
+<!DOCTYPE html>
+<html lang="${locale}">
+<head>
+  <meta charset="utf-8">
+  <title>${subject}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 0; color: #1e293b; }
+    .container { max-width: 600px; margin: 32px auto; background-color: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+    .header { padding: 32px 32px 24px 32px; text-align: center; border-bottom: 1px solid #f1f5f9; }
+    .content { padding: 32px; }
+    .btn { display: inline-block; background-color: #1b5e20; color: #ffffff !important; padding: 14px 28px; text-decoration: none; border-radius: 10px; font-weight: 600; font-size: 15px; text-align: center; margin: 24px 0; }
+    .notice { font-size: 13px; color: #64748b; line-height: 1.5; background-color: #f8fafc; padding: 16px; border-radius: 8px; border-left: 3px solid #1b5e20; margin-top: 24px; }
+    .footer { padding: 24px 32px; text-align: center; font-size: 12px; color: #94a3b8; background-color: #f8fafc; border-top: 1px solid #f1f5f9; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <img src="${logoUrl}" alt="Melon Governance" style="height: 38px; width: auto; max-width: 200px; margin-bottom: 12px;" />
+      <h2 style="margin: 0; color: #0f172a; font-size: 20px;">${title}</h2>
+    </div>
+    <div class="content">
+      <p style="font-size: 16px; font-weight: 600; margin-top: 0;">${greeting},</p>
+      <p style="font-size: 14px; line-height: 1.6; color: #334155;">${message}</p>
+      <div style="text-align: center;">
+        <a href="${loginUrl}" class="btn">${buttonText}</a>
+      </div>
+      <div class="notice">
+        ${securityNotice}
+      </div>
+    </div>
+    <div class="footer">
+      <p style="margin: 0;">© ${new Date().getFullYear()} Melon Governance Monitoring System. Hak cipta dilindungi.</p>
+    </div>
+  </div>
+</body>
+</html>
+  `.trim();
+
+  const text = `
+${title}
+${greeting},
+
+${message}
+
+${buttonText}: ${loginUrl}
+
+${securityNotice}
+© ${new Date().getFullYear()} Melon Governance Monitoring System.
+  `.trim();
+
+  return { subject, html, text };
+}
+
+export async function sendAdminApprovalResultEmail(
+  input: SendAdminApprovalResultEmailInput
+): Promise<SendAdminApprovalResultEmailResult> {
+  const reqLogger = logger.child({
+    requestId: input.requestId,
+    recipientEmail: input.toEmail,
+  });
+
+  const env = validateServerEnv();
+  const locale = input.locale || env.DEFAULT_LOCALE || 'id';
+
+  const { subject, html, text } = getAdminApprovalResultEmailHtml(input, locale);
+
+  const apiKey = env.RESEND_API_KEY || process.env.RESEND_API_KEY;
+  const fromEmail =
+    env.RESEND_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || DEFAULT_RESEND_FROM_EMAIL;
+
+  if (!apiKey || env.NODE_ENV === 'test' || process.env.NODE_ENV === 'test') {
+    reqLogger.info('Simulated admin approval result email delivery to ' + input.toEmail);
+    return {
+      success: true,
+      emailSent: false,
+      simulated: true,
+    };
+  }
+
+  try {
+    const resend = new Resend(apiKey);
+    const result = await sendWithRetry(
+      resend,
+      {
+        from: fromEmail,
+        to: [input.toEmail],
+        subject,
+        html,
+        text,
+      },
+      reqLogger
+    );
+
+    if (!result.success) {
+      reqLogger.error(
+        'Resend delivery reported error for admin approval result: ' +
+          (result.error || 'Unknown error')
+      );
+      return {
+        success: false,
+        emailSent: false,
+        error: result.error,
+      };
+    }
+
+    reqLogger.info('Admin approval result email dispatched successfully via Resend');
+    return {
+      success: true,
+      emailSent: true,
+      id: result.id,
+    };
+  } catch (err: any) {
+    reqLogger.error(
+      'Unexpected exception during Resend admin approval result email dispatch: ' +
         (err?.message || String(err))
     );
     return {

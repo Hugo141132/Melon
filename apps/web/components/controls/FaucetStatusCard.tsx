@@ -179,14 +179,40 @@ export default function FaucetStatusCard({
     }
 
     let isMounted = true;
+    let pollTimer: ReturnType<typeof setTimeout> | null = null;
+    let activePollController: AbortController | null = null;
     setIsPolling(true);
 
-    const pollInterval = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/v1/devices/${deviceId}/faucet-commands/${targetCommandId}`);
-        if (!res.ok || !isMounted) return;
-        const json = await res.json();
+    const scheduleNextPoll = (delayMs: number) => {
+      if (!isMounted) return;
+      pollTimer = setTimeout(pollTick, delayMs);
+    };
 
+    const pollTick = async () => {
+      if (activePollController) {
+        activePollController.abort();
+      }
+      activePollController = new AbortController();
+
+      try {
+        const res = await fetch(`/api/v1/devices/${deviceId}/faucet-commands/${targetCommandId}`, {
+          signal: activePollController.signal,
+        });
+        if (!isMounted) return;
+
+        if (res.status === 429) {
+          const retryHeader = res.headers.get('Retry-After');
+          const waitSeconds = Math.max(2, Math.min(30, parseInt(retryHeader || '5', 10) || 5));
+          scheduleNextPoll(waitSeconds * 1000);
+          return;
+        }
+
+        if (!res.ok) {
+          scheduleNextPoll(4000);
+          return;
+        }
+
+        const json = await res.json();
         if (isMounted && json.success && json.data) {
           setCurrentCommand(json.data);
           if (onCommandUpdatedRef.current) {
@@ -196,16 +222,24 @@ export default function FaucetStatusCard({
           // If command has reached terminal state, stop polling immediately
           if (TERMINAL_COMMAND_STATUSES.includes(json.data.status)) {
             setIsPolling(false);
+            return;
           }
         }
-      } catch {
-        // Ignore background polling errors
+      } catch (err: any) {
+        if (err?.name === 'AbortError') return;
+        // Ignore background polling errors and retry with gentle backoff
       }
-    }, 2500);
+
+      scheduleNextPoll(2500);
+    };
+
+    // Start polling cycle
+    scheduleNextPoll(2500);
 
     return () => {
       isMounted = false;
-      clearInterval(pollInterval);
+      if (pollTimer) clearTimeout(pollTimer);
+      if (activePollController) activePollController.abort();
       setIsPolling(false);
     };
   }, [deviceId, targetCommandId, isActiveState]);
