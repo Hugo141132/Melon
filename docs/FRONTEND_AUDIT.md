@@ -664,5 +664,36 @@ The following frontend components, hooks, and contexts were audited, refined, an
 
 <!-- Reliability Refinement Frontend Audit Reconciled: 2026-10-07 -->
 
+---
 
+## Telemetry Chart Reading-Sequence X-Axis, Burst Clumping Resolution & Clean Line Audit Note (TASK-0504 Follow-up 4 / DEC-MON-096 / Reconciled 2026-10-17)
 
+The following chart components, layout styles, and tooltip mechanisms were audited, implemented, and verified under `TASK-0504 Follow-up 4` / `DEC-MON-096`:
+
+- **Live API Reality & Burst Clumping Diagnosis:**
+  - Operator verified live API response for location "Testing (90), 30 Days, pH" contains 90 points, 90 unique reading IDs, 90 distinct timestamps, `nextCursor=null`, and `truncated=false`. All 90 points reach the chart component data prop intact.
+  - 65 of those 90 readings occurred within ~11 minutes, which was compressed visually by an elapsed-time proportional scale into $<0.03\%$ of horizontal chart width, causing an unreadable clump while the rest of the chart was empty.
+
+- **`apps/web/components/charts/WaterNutrientChart.tsx` [AUDITED & RECONCILED]:**
+  - **Reading-Sequence X-Axis:** Sumbu X configured as categorical reading sequence with `interval={0}`, `ticks={ticks.length > 0 ? ticks : undefined}`, `tickFormatter={formatTick}`, and explicit axis label `"Urutan pembacaan"` (id) / `"Reading sequence"` (en) (`position: 'insideBottom'`, `offset: -12`).
+  - **Clean Line Rendering:** Area series configured with `type="linear"`, `dot={false}`, and `activeDot={false}`, rendering clean straight segments without visual marker clutter or active highlight rings.
+  - **Zero Brush & Layout Restoration:** Removed `<Brush>` component, `brushIndices` state, and brush handlers; container height restored to original compact dimensions (`h-40 sm:h-48`).
+  - **Dataset Completeness:** 100% of discrete readings received via `data` prop remain in the dataset without client-side downsampling, averaging, or deduplication.
+  - **Tooltip Overlap Inspection:** Passes `allData={data}` and `metricKey={active.dataKey}` to `WaterChartTooltipContent`.
+  - **Missing Value Gaps:** `connectNulls={false}` preserved.
+
+- **`apps/web/components/charts/NPKChart.tsx` [AUDITED & RECONCILED]:**
+  - **Reading-Sequence X-Axis:** Sumbu X configured as categorical reading sequence with `interval={0}`, `ticks={ticks.length > 0 ? ticks : undefined}`, `tickFormatter={formatTick}`, and explicit axis label `"Urutan pembacaan"` (id) / `"Reading sequence"` (en) (`position: 'insideBottom'`, `offset: -12`).
+  - **Combined NPK Alignment:** All three series (N, P, K) align strictly to identical reading indices; missing values remain `null` with `connectNulls={false}` and never shift one series relative to another.
+  - **Clean Line Rendering:** Single-metric Area and multi-metric NPK Line components configured with `type="linear"`, `dot={false}`, and `activeDot={false}`.
+  - **Zero Brush & Layout Restoration:** Removed `<Brush>` component from both single-metric and multi-metric charts; container height restored to compact dimensions (`h-44 sm:h-52`).
+  - **Tooltip Overlap Inspection:** Passes `allData={data}` and `singleMetricKey` to `NPKChartTooltipContent`.
+  - **Missing Value Gaps:** `connectNulls={false}` preserved.
+
+- **Tooltip Components (`WaterChartTooltipContent`, `NPKChartTooltipContent`) [AUDITED & RECONCILED]:**
+  - **Multi-Reading Detection:** Inspects `allData` for all items sharing the hovered timestamp.
+  - **Overlap Feedback:** When `matchingItems.length > 1`, renders a multi-reading badge (`N readings`) and lists each individual reading with its distinct truncated `readingId` (`ID: ...`) and exact sensor value + unit.
+  - **Unique Reading Display:** For unique points, renders the standard clean header with timestamp, `ID: ...`, and sensor value.
+  - **Preserved Raw Values:** Unusual sensor values (such as negative pH present in test/source data) are rendered truthfully without clamping or replacement.
+
+<!-- Telemetry Chart Reading-Sequence X-Axis Audit Reconciled: 2026-10-17 -->

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import React, { useMemo } from 'react';
 import {
   AreaChart,
   Area,
@@ -9,7 +9,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Brush,
 } from 'recharts';
 import { useTranslations, useLocale } from 'next-intl';
 import { BaseSeriesItem } from '@/hooks/useHistoricalMonitoring';
@@ -30,6 +29,8 @@ export function WaterChartTooltipContent({
   label,
   metricLabel,
   metricUnit,
+  metricKey,
+  allData,
   preset,
   locale,
   tCommon,
@@ -39,6 +40,86 @@ export function WaterChartTooltipContent({
   const firstItem = payload[0]?.payload as BaseSeriesItem | undefined;
   const rawTs = firstItem?.timestamp || firstItem?.timestampMs || label;
   const formattedTime = formatTooltipDateTime(rawTs, preset, locale);
+
+  const currentTsMs =
+    typeof firstItem?.timestampMs === 'number'
+      ? firstItem.timestampMs
+      : firstItem?.timestamp
+        ? new Date(firstItem.timestamp).getTime()
+        : typeof label === 'number'
+          ? label
+          : new Date(label).getTime();
+
+  const matchingItems = useMemo<BaseSeriesItem[]>(() => {
+    if (!allData || allData.length === 0) return firstItem ? [firstItem] : [];
+    if (typeof currentTsMs !== 'number' || isNaN(currentTsMs)) {
+      return firstItem ? [firstItem] : [];
+    }
+    const matches = allData.filter((item: BaseSeriesItem) => {
+      const itemMs =
+        typeof item.timestampMs === 'number'
+          ? item.timestampMs
+          : item.timestamp
+            ? new Date(item.timestamp).getTime()
+            : NaN;
+      return itemMs === currentTsMs;
+    });
+    return matches.length > 0 ? matches : firstItem ? [firstItem] : [];
+  }, [allData, firstItem, currentTsMs]);
+
+  if (matchingItems.length > 1) {
+    return (
+      <div
+        className="bg-white/95 backdrop-blur-sm border border-app-outline-variant/60 rounded-xl p-3 shadow-md text-xs space-y-2 min-w-[200px] max-w-[280px]"
+        data-testid="chart-custom-tooltip"
+      >
+        <div className="font-semibold text-app-on-surface flex items-center justify-between gap-2 border-b border-app-outline-variant/30 pb-1">
+          <span>{formattedTime}</span>
+          <span className="font-semibold text-[10px] text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+            {tCommon('overlappingReadings', { count: matchingItems.length })}
+          </span>
+        </div>
+        <div className="max-h-48 overflow-y-auto space-y-1.5 pr-0.5">
+          {matchingItems.map((item: BaseSeriesItem, idx: number) => {
+            const val = metricKey
+              ? item[metricKey]
+              : (item[payload[0]?.dataKey] ?? payload[0]?.value);
+            const displayVal =
+              val !== null && val !== undefined
+                ? `${val} ${metricUnit || ''}`.trim()
+                : tCommon('unavailable');
+            const itemRawTs = item.timestamp || item.timestampMs;
+            const itemTimeStr = itemRawTs ? formatTooltipDateTime(itemRawTs, preset, locale) : '';
+            const itemTimePart = itemTimeStr.split(' ').pop();
+            return (
+              <div
+                key={item.readingId || `overlap-${idx}`}
+                className="flex items-center justify-between gap-2 text-[11px] border-b border-app-outline-variant/15 pb-1 last:border-b-0 last:pb-0"
+              >
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span
+                    className="font-mono text-[10px] text-app-on-surface-variant bg-app-surface-container/60 px-1 py-0.5 rounded shrink-0"
+                    title={String(item.readingId || '')}
+                  >
+                    ID: {String(item.readingId || '—').slice(0, 8)}
+                  </span>
+                  {itemTimePart && (
+                    <span className="text-[10px] text-app-on-surface-variant shrink-0">
+                      {itemTimePart}
+                    </span>
+                  )}
+                </div>
+                <span className="font-bold text-app-on-surface font-mono shrink-0">
+                  {displayVal}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   const readingId = firstItem?.readingId;
 
   return (
@@ -95,37 +176,6 @@ export default function WaterNutrientChart({
   const tCommon = useTranslations('common');
   const locale = useLocale();
 
-  const [brushIndices, setBrushIndices] = useState<{ startIndex?: number; endIndex?: number }>({});
-
-  // Reset zoom whenever data source, location, or preset changes
-  useEffect(() => {
-    setBrushIndices((prev) => {
-      if (prev.startIndex === undefined && prev.endIndex === undefined) {
-        return prev;
-      }
-      return {};
-    });
-  }, [data, selectedLocationKey, preset]);
-
-  const handleBrushChange = useCallback((range: { startIndex?: number; endIndex?: number }) => {
-    if (typeof range?.startIndex === 'number' && typeof range?.endIndex === 'number') {
-      setBrushIndices(range);
-    }
-  }, []);
-
-  const visibleData = useMemo(() => {
-    if (
-      typeof brushIndices.startIndex === 'number' &&
-      typeof brushIndices.endIndex === 'number' &&
-      brushIndices.startIndex >= 0 &&
-      brushIndices.endIndex < data.length &&
-      (brushIndices.startIndex > 0 || brushIndices.endIndex < data.length - 1)
-    ) {
-      return data.slice(brushIndices.startIndex, brushIndices.endIndex + 1);
-    }
-    return data;
-  }, [data, brushIndices]);
-
   const waterMetricConfig: Record<
     string,
     { label: string; unit: string; color: string; dataKey: string }
@@ -138,28 +188,8 @@ export default function WaterNutrientChart({
   const active = waterMetricConfig[selectedMetric] || waterMetricConfig.ec;
 
   const { ticks, formatTick } = useMemo(() => {
-    return getCustomXTicks(visibleData, preset, locale);
-  }, [visibleData, preset, locale]);
-
-  const timeDomain = useMemo<[number, number] | ['dataMin', 'dataMax']>(() => {
-    if (!visibleData || visibleData.length === 0) return ['dataMin', 'dataMax'];
-    const getMs = (item: BaseSeriesItem): number =>
-      typeof item.timestampMs === 'number' ? item.timestampMs : new Date(item.timestamp).getTime();
-    const tFirst = getMs(visibleData[0]);
-    const tLast = getMs(visibleData[visibleData.length - 1]);
-    if (tFirst === tLast && !isNaN(tFirst)) {
-      // Single-point or equal-timestamp dataset: add +/- 1 hour padding so domain is non-degenerate
-      return [tFirst - 3600000, tLast + 3600000];
-    }
-    if (
-      typeof brushIndices.startIndex === 'number' &&
-      typeof brushIndices.endIndex === 'number' &&
-      (brushIndices.startIndex > 0 || brushIndices.endIndex < data.length - 1)
-    ) {
-      return [tFirst, tLast];
-    }
-    return ['dataMin', 'dataMax'];
-  }, [visibleData, brushIndices, data.length]);
+    return getCustomXTicks(data, preset, locale);
+  }, [data, preset, locale]);
 
   return (
     <div className="bg-app-surface-container-lowest rounded-xl p-5 soft-elevation-lg border border-app-outline-variant/30">
@@ -196,9 +226,9 @@ export default function WaterNutrientChart({
           </span>
         </div>
       ) : (
-        <div className={data.length > 1 ? 'h-48 sm:h-56' : 'h-40 sm:h-48'}>
+        <div className="h-44 sm:h-52">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={data} margin={{ top: 8, right: 14, left: -14, bottom: 0 }}>
+            <AreaChart data={data} margin={{ top: 8, right: 14, left: -14, bottom: 20 }}>
               <defs>
                 <linearGradient id={`gradWater-${selectedMetric}`} x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor={active.color} stopOpacity={0.25} />
@@ -207,18 +237,21 @@ export default function WaterNutrientChart({
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#eeeeee" vertical={false} />
               <XAxis
-                dataKey="timestampMs"
-                type="number"
-                scale="time"
-                domain={timeDomain}
                 ticks={ticks.length > 0 ? ticks : undefined}
                 tickFormatter={formatTick}
-                interval="preserveStartEnd"
-                minTickGap={25}
+                interval={0}
                 tick={{ fontSize: 11, fill: '#40493d' }}
                 padding={{ left: 16, right: 16 }}
                 axisLine={false}
                 tickLine={false}
+                label={{
+                  value: tCommon('readingSequence'),
+                  position: 'insideBottom',
+                  offset: -12,
+                  fill: '#71796f',
+                  fontSize: 10,
+                  fontWeight: 600,
+                }}
               />
               <YAxis tick={{ fontSize: 11, fill: '#40493d' }} axisLine={false} tickLine={false} />
               <Tooltip
@@ -227,6 +260,8 @@ export default function WaterNutrientChart({
                     {...props}
                     metricLabel={active.label}
                     metricUnit={active.unit}
+                    metricKey={active.dataKey}
+                    allData={data}
                     preset={preset}
                     locale={locale}
                     tCommon={tCommon}
@@ -241,30 +276,9 @@ export default function WaterNutrientChart({
                 strokeWidth={2}
                 fill={`url(#gradWater-${selectedMetric})`}
                 connectNulls={false}
-                dot={{
-                  r: 3,
-                  fill: active.color,
-                  stroke: '#ffffff',
-                  strokeWidth: 1,
-                }}
-                activeDot={{
-                  r: 6,
-                  fill: active.color,
-                  stroke: '#ffffff',
-                  strokeWidth: 2,
-                }}
+                dot={false}
+                activeDot={false}
               />
-              {data.length > 1 && (
-                <Brush
-                  dataKey="timestampMs"
-                  height={24}
-                  stroke={active.color}
-                  fill="#f8fafc"
-                  tickFormatter={formatTick}
-                  travellerWidth={10}
-                  onChange={handleBrushChange}
-                />
-              )}
             </AreaChart>
           </ResponsiveContainer>
         </div>

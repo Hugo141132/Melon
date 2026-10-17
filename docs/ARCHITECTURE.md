@@ -2607,34 +2607,53 @@ The root layout metadata (`apps/web/app/layout.tsx`) implements dual media-query
 
 ---
 
-## 40. Telemetry Chart Discrete Presentation Architecture (TASK-0504 Follow-up 3, DEC-MON-096 / Reconciled 2026-10-17)
+## 40. Telemetry Chart Reading-Sequence X-Axis, Burst Clumping Resolution & Clean Line Architecture (TASK-0504 Follow-up 4, DEC-MON-096 / Reconciled 2026-10-17)
 
-### 40.1 Architectural Context & Presentation Defect Analysis
-- **Pipeline Data Integrity:** Audit of the telemetry query pipeline (`telemetry-repository.ts`, `/monitoring/soil/chart`, `/monitoring/water/chart`, and `useHistoricalMonitoring.ts`) confirmed that backend data delivery is 100% lossless. Zero bucketing, downsampling, averaging, or aggregation occurs. All matching readings in the requested time and location boundary are delivered to the frontend.
-- **Presentation Defect on Release 08f0d79:**
-  - Initial VPS testing on release `08f0d79` for Water Quality $\to$ Testing (90) $\to$ 30 Days $\to$ pH failed because Recharts was configured with cubic curve interpolation (`type="monotone"`) and hidden dots (`dot={false}` / omitted).
-  - Ninety discrete readings appeared as a single smooth summary line without discernible individual points, creating the false visual impression that the system was downsampling or summarizing data.
+### 40.1 Live API Response Reality & Burst Clumping Diagnosis
+- **Live API Reality Confirmed by Operator:**
+  - Operator verified the actual live API response for location "Testing (90), 30 Days, pH":
+    - **Total Points:** Exactly 90 points.
+    - **Unique Reading IDs:** Exactly 90 distinct reading IDs.
+    - **Distinct Timestamps:** Exactly 90 distinct timestamps.
+    - **Pagination & Truncation:** `nextCursor: null`, `truncated: false`.
+    - **Data Pipeline Preservation:** All 90 points reach the chart component data prop intact without dropping or deduplication.
+- **Root Cause of Visual Clumping:**
+  - Of the 90 readings, **65 occurred within approximately 11 minutes** (every ~10 seconds), while the remaining 25 readings were spread across the 30-day filter window.
+  - On an elapsed-time proportional numeric scale (`scale="time"`), 11 minutes out of 30 days occupied $<0.03\%$ of horizontal chart width, causing 65 readings to compress into an unreadable vertical spike while the rest of the chart was empty.
+- **Frontend Reading-Sequence X-Axis Solution:**
+  - Replaced elapsed-time proportional numeric scaling with an **equidistant reading-sequence X-axis** ($x = 0, 1, \dots, n-1$).
+  - Every reading occupies an equal categorical slot, giving burst readings generous, readable spacing.
+  - Explicitly labeled the axis as `"Urutan pembacaan"` (id) / `"Reading sequence"` (en) (`position: 'insideBottom'`, `offset: -12`, `fontSize: 10`, `fontWeight: 600`) to prevent implying that horizontal distances represent elapsed physical duration.
+  - Sparse axis ticks (5–7 ticks) are formatted directly from original sensor timestamps (`recordedAt`).
+  - Rendered with straight linear connecting segments (`type="linear"`), `dot={false}`, `activeDot={false}`, and NO `<Brush>`, restoring clean container heights (`h-44 sm:h-52` for soil, `h-40 sm:h-48` for water).
+  - Combined NPK aligns all three series (N, P, K) to identical reading indices; missing values remain `null` with `connectNulls={false}` and never shift one series relative to another.
+  - Full domain scope: Soil (Nitrogen, Phosphorus, Potassium, combined NPK, Temperature, Moisture, pH, EC) and Water Quality (pH, EC, TDS).
+  - Reservoir Water Tank monitoring is completely excluded (uses `WaterTankMonitoringCard.tsx` without historical line charts).
 
-### 40.2 Presentation Calibration Architecture (`DEC-MON-096`)
-- **Linear Segment Rendering (`type="linear"`):**
+### 40.2 Clean Line Chart & Tooltip Inspection Architecture (`DEC-MON-096`)
+- **Clean Linear Segment Rendering (`type="linear"`, `dot={false}`, `activeDot={false}`):**
   - All chart series across `WaterNutrientChart.tsx` (Area) and `NPKChart.tsx` (Area and Line) use `type="linear"`. Straight line segments connect consecutive chronologically sorted data points, visually preserving actual rate-of-change and measurement transitions without synthetic cubic spline waviness.
-- **Explicit Reading Markers (`dot` & `activeDot`):**
-  - Discrete reading markers are configured on every series (`dot: { r: 3, fill: color, stroke: '#ffffff', strokeWidth: 1 }` and `activeDot: { r: 6, fill: color, stroke: '#ffffff', strokeWidth: 2 }`). Every retained database record matching the filter is visibly represented as an identifiable dot.
-- **Interactive Zoom Brush Controls (`<Brush>`):**
-  - Integrated Recharts `<Brush dataKey="timestampMs" />` when dataset contains multiple points (`data.length > 1`).
-  - In wide observation windows (e.g., 30 Days with 90+ readings), operators can drag brush handles to zoom into high-density clusters, visually separating closely spaced readings without modifying underlying data or triggering network refetches.
-  - Brush state automatically resets (`setBrushIndices({})`) whenever the active device, selected location, or date preset changes.
-- **Reading Identification in Tooltips:**
-  - Chart tooltip components (`WaterChartTooltipContent`, `NPKChartTooltipContent`) extract and display the truncated `readingId` (`ID: ...`), timestamp, and exact value + unit for the hovered point, enabling unambiguous verification of individual database readings.
+  - Visible circle markers (`dot={false}`) and hover highlight rings (`activeDot={false}`) are completely disabled across all soil and water chart paths to maintain a clean, uncluttered visual line.
+- **Complete Brush Removal & Restored Clean Layout:**
+  - Recharts `<Brush>` component, `brushIndices` state, and change handlers are completely removed from `WaterNutrientChart` and `NPKChart`.
+  - Chart container heights are restored to original compact dimensions (`h-40 sm:h-48` for water, `h-44 sm:h-52` for soil) with zero layout shift or reserved brush space.
+- **Overlapping Readings Tooltip Inspection:**
+  - Distinct readings sharing timestamps or screen coordinates remain in the dataset and are inspectable through the tooltip without changing timestamps, values, or adding markers/Brush.
+  - When multiple distinct readings share the hovered timestamp/coordinate, the tooltip surfaces a multi-reading badge (`N readings` in EN, `N pembacaan` in ID) and lists each individual reading with its distinct truncated `readingId` (`ID: ...`) and exact sensor value + unit.
+  - When a single reading is hovered, the standard clean header with timestamp, `ID: ...`, and metric values is displayed.
+- **Flat Line Legitimacy:**
+  - When all readings in a dataset have identical or near-identical values (e.g. constant pH 6.8), straight line interpolation (`type="linear"`) legitimately produces a flat horizontal line reflecting stable sensor telemetry; artificial visual variance is never manufactured.
+- **Preserved Source Data Fidelity (No Clamping):**
+  - Unusual source values (such as negative pH values present in source data) are strictly preserved as raw sensor evidence and never clamped, replaced, or silently dropped.
 - **Sparse X-Axis Label Invariant:**
   - Responsive sparse X-axis tick generation (`getCustomXTicks`, 5–7 labels for 30d, 4–5 for 7d, 5–8 for 24h) distributes readable date/time labels across the axis without clipping or overlap on mobile (390px) and desktop.
-  - *Invariant:* Sparse labels govern axis text layout only; they do NOT reduce, bucket, or filter the plotted data points, dot markers, or tooltips.
+  - *Invariant:* Sparse labels govern axis text layout only; they do NOT reduce, bucket, or filter the plotted data points, and 100% of discrete readings remain in the dataset and plotted.
 - **System Invariants Preserved:**
   - *Location Isolation:* Only readings matching the explicitly selected location are plotted.
   - *Missing Value Gaps:* Missing sensor values render as visual gaps (`connectNulls={false}`).
-  - *Table Decoupling:* History table pagination (`HISTORY_PAGE_SIZE = 5`) remains completely independent from chart filtering and brush zoom.
+  - *Table Decoupling:* History table pagination (`HISTORY_PAGE_SIZE = 5`) remains completely independent from chart filtering.
   - *Alert Decoupling:* Chart presentation is decoupled from agronomic alert evaluation.
-<!-- Telemetry Chart Discrete Presentation Architecture Reconciled: 2026-10-17 -->
+<!-- Telemetry Chart Reading-Sequence X-Axis Architecture Reconciled: 2026-10-17 -->
 
 
 

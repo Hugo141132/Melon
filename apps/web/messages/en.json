@@ -56,7 +56,9 @@
     "recordedAt": "Recorded: {time}",
     "online": "Online",
     "offline": "Offline",
-    "stale": "Disconnected"
+    "stale": "Disconnected",
+    "overlappingReadings": "{count} readings",
+    "readingSequence": "Reading sequence"
   },
   "auth": {
     "loginTitle": "Login",
@@ -490,7 +492,9 @@
     "unitEc": "µS/cm",
     "unitTds": "ppm",
     "unitNpk": "ppm",
-    "noValue": "—"
+    "noValue": "—",
+    "overlappingReadings": "{count} readings",
+    "readingSequence": "Reading sequence"
   },
   "faucet": {
     "title": "Valve Control",

@@ -2083,41 +2083,33 @@ The following facts are supported by the verified decisions governance of `TASK-
 
 ---
 
-## DEC-MON-096: Raw Telemetry Discrete Chart Rendering, Straight Segments, Individual Markers, Interactive Zoom Brush & Reading ID Tooltips
-- **Status:** IMPLEMENTED (2026-10-17) — Software implementation and unit regression tests completed; initial VPS verification on release 08f0d79 FAILED; unreleased patch implemented and operator verification PENDING.
-- **Related Task IDs:** `TASK-0503`, `TASK-0504`, `TASK-0504 Follow-up 3`
+## DEC-MON-096: Raw Telemetry Reading-Sequence X-Axis, Clean Line Presentation, Dataset Preservation, Zero Markers, No Brush & Overlap-Inspecting Tooltips
+- **Status:** IMPLEMENTED (2026-10-17) — Software implementation and unit regression tests completed; live API response reality verified by operator (90 points, 90 distinct IDs, 90 timestamps, `nextCursor=null`, `truncated=false`); reading-sequence X-axis implemented across Soil and Water Quality; operator verification and CI quality gates PENDING.
+- **Related Task IDs:** `TASK-0503`, `TASK-0504`, `TASK-0504 Follow-up 3`, `TASK-0504 Follow-up 4`
 - **Context:**
-  - Release `08f0d79` was deployed to VPS (images built off-VPS for `linux/amd64`, loaded, and recreated; container recreation and health checks confirmed by operator; rollback pair stored in `/opt/kebun-melon/.rollback-08f0d79.env`).
-  - VPS chart verification for Water Quality $\to$ location Testing (90 readings) $\to$ 30 Days $\to$ pH FAILED: readings appeared as a summarized trend line on a smoothed curve without discernible individual readings.
-  - Auditing confirmed database queries and `/chart` endpoint already deliver 100% of discrete rows without aggregation, bucketing, or averaging. Client hook `useHistoricalMonitoring` keys into `accumulatedPointsMap` by `readingId` and preserves all 90 items without reduction.
-  - Defect was entirely in the UI presentation layer:
-    1. Cubic spline curve smoothing (`type="monotone"`) interpolated raw points into a generalized wavy trend curve.
-    2. Data point markers were completely hidden (`dot={false}` / omitted), making 90 discrete readings appear as a single smooth summary line.
-    3. Dense readings in 30-day views had no zoom mechanism to isolate closely spaced data points.
-    4. Tooltips lacked the reading ID and could not disambiguate readings recorded at similar times.
+  - Live API response inspection for location "Testing (90), 30 Days, pH" confirmed exactly 90 points, 90 unique reading IDs, 90 distinct timestamps, `nextCursor=null`, and `truncated=false`. All 90 points reach the chart component data prop intact.
+  - However, 65 of those 90 readings occurred within approximately 11 minutes (out of a 30-day filter window). Under an elapsed-time proportional scale (`scale="time"`), these 65 points were compressed into $<0.03\%$ of horizontal chart width, appearing as an unreadable vertical spike while the rest of the chart was empty.
+  - Final requirement: Implement an equidistant **reading-sequence X-axis** (`Urutan pembacaan` / `Reading sequence`), preserving 100% of raw data in chronological order with equal visual spacing, clean line segments (`type="linear"`), completely WITHOUT markers (`dot={false}`), WITHOUT active highlights (`activeDot={false}`), and WITHOUT `<Brush>`.
 - **Decision & Implementation Directives:**
-  1. **Straight Line Segments (`type="linear"`):**
-     Replaced cubic spline curve smoothing (`type="monotone"`) with straight line segments (`type="linear"`) across `WaterNutrientChart` (`Area`) and `NPKChart` (`Area` and `Line` components). Preserves raw transitions and rates of change without misleading curve artifacts.
-  2. **Individual Reading Markers (`dot` & `activeDot`):**
-     Configured explicit `dot` markers (`r: 3, fill: color, stroke: '#ffffff', strokeWidth: 1`) and hover highlights (`activeDot: { r: 6, fill: color, stroke: '#ffffff', strokeWidth: 2 }`) across all series. Every matching database reading appears as a distinct visible point.
-  3. **Interactive Zoom Brush Controls (`<Brush>`):**
-     Integrated Recharts `<Brush dataKey="timestampMs" />` when `data.length > 1`. In dense time windows (e.g. 30 Days with 90+ readings), operators can drag brush handles to zoom in and inspect individual readings. Brush state automatically resets (`setBrushIndices({})`) upon location, device, or preset range changes.
-  4. **Reading Identification in Tooltips:**
-     Enhanced `WaterChartTooltipContent` and `NPKChartTooltipContent` to display truncated `readingId` (`ID: ...`), formatted timestamp, and exact numeric value with unit.
-  5. **Sparse X-Axis Labels Without Data Loss:**
-     Maintained responsive sparse label distribution (5–7 ticks for 30d, 4–5 for 7d, 5–8 for 24h) via `getCustomXTicks` avoiding label collisions. Sparse ticks govern only date/time label text; 100% of raw data points remain rendered.
-  6. **Shared Rendering Paths:**
-     Applied identical straight-line, marker, zoom brush, and per-reading tooltip patterns to EC and TDS in `WaterNutrientChart`, as well as Temperature, Moisture, pH, EC, and multi-metric NPK in `NPKChart`.
-  7. **Preserved Invariants:**
-     Preserved location/date filtering, raw values/timestamps, null gaps (`connectNulls={false}`), and table pagination independence (`HISTORY_PAGE_SIZE = 5`).
-  8. **Unresolved Recommendation-Alert Separation:**
-     Kept strictly separate from chart rendering: post-ack Critical escalation visibility remains unconfirmed; auto-recovery and independent background polling are NOT approved or enabled. Acknowledgement is strictly per-user in `alert_acknowledgements` and is NOT episode resolution.
-  9. **Deployment Scope for New Patch:**
+  1. **Equidistant Reading-Sequence Positions ($x = 0, 1, \dots, n-1$):**
+     Replaced elapsed-time proportional numeric scaling (`scale="time"`, `dataKey="timestampMs"`) with an equidistant reading-sequence X-axis across all soil and water quality charts. Each reading occupies an equal categorical coordinate slot based on its chronological sequence index ($x = 0, 1, \dots, n-1$). Bursts (such as 65 readings in 11 minutes) receive equal visual spacing alongside sparse readings, eliminating unreadable visual clumps.
+  2. **Explicit Axis Labeling ("Urutan pembacaan" / "Reading sequence"):**
+     The axis is prominently labeled `"Urutan pembacaan"` (id) / `"Reading sequence"` (en) (`position: 'insideBottom'`, `offset: -12`, `fontSize: 10`, `fontWeight: 600`) to explicitly communicate that horizontal distances represent sequential reading order rather than elapsed physical duration.
+  3. **Sparse Timestamp Ticks & Exact Tooltips:**
+     Generates 5–7 evenly spaced index ticks (`[0, ..., n-1]`) with `tickFormatter` deriving readable date/time labels (`formatItem(data[idx])`) directly from original sensor timestamps (`recordedAt`). Tooltips display full timestamp, exact sensor values with units, and discrete reading IDs.
+  4. **Clean Line Presentation Invariants (`type="linear"`, `dot={false}`, `activeDot={false}`, NO `<Brush>`):**
+     Render straight connecting line segments (`type="linear"`), completely without markers (`dot={false}`), without hover active highlights (`activeDot={false}`), and with Recharts `<Brush>` completely removed, restoring clean container heights (`h-44 sm:h-52` for soil, `h-40 sm:h-48` for water).
+  5. **Combined NPK Alignment:**
+     In `NPKChart` combined view, all three series (N, P, K) align strictly to identical reading indices. Missing values remain `null` with `connectNulls={false}` and never shift one series relative to another.
+  6. **Full Domain Scope & Water Tank Exclusion:**
+     Applies consistently across ALL historical charts in Soil (Nitrogen, Phosphorus, Potassium, combined NPK, Temperature, Moisture, pH, EC) and Water Quality (pH, EC, TDS). Reservoir Water Tank monitoring is completely excluded (uses separate `WaterTankMonitoringCard.tsx` without historical line charts).
+  7. **Preserved Invariants & Table Independence:**
+     100% of raw readings (all 90 reading IDs), exact original timestamps, unusual/negative values, zero/null values, and independent table pagination (`HISTORY_PAGE_SIZE = 5`) remain intact. Zero changes to backend, API, database, or gateway code.
+  8. **Deployment Scope for New Patch:**
      - Web container rebuild and redeployment required with **NEW commit SHA**.
      - Gateway container **UNCHANGED** at `08f0d79`.
      - Database migrations and Caddy changes **NOT REQUIRED**.
-     - Next web deployment must capture current web `08f0d79` as its rollback baseline without overwriting `/opt/kebun-melon/.rollback-08f0d79.env`.
-     - Do not reuse image tag `08f0d79` for changed code.
+     - Next web deployment must capture current web `295ee17` as its rollback baseline.
 <!-- DEC-MON-096 Reconciled: 2026-10-17 -->
 
 

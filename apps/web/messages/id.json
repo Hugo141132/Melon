@@ -56,7 +56,9 @@
     "recordedAt": "Tercatat: {time}",
     "online": "Online",
     "offline": "Offline",
-    "stale": "Terputus"
+    "stale": "Terputus",
+    "overlappingReadings": "{count} pembacaan",
+    "readingSequence": "Urutan pembacaan"
   },
   "auth": {
     "loginTitle": "Masuk Akun",
@@ -490,7 +492,9 @@
     "unitEc": "µS/cm",
     "unitTds": "ppm",
     "unitNpk": "ppm",
-    "noValue": "—"
+    "noValue": "—",
+    "overlappingReadings": "{count} pembacaan",
+    "readingSequence": "Urutan pembacaan"
   },
   "faucet": {
     "title": "Kontrol Valve",

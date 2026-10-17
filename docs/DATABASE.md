@@ -121,10 +121,10 @@ Under `TASK-0503`, `TASK-0504`, and `DEC-MON-093`:
     - 0 cascade or foreign-key violations.
     - All existing devices (3) and users (7) preserved intact. Zero data alterations on non-task records.
 
-### 2.8 TASK-0504 Follow-up 3 / DEC-MON-096 Telemetry Chart Presentation & Zero Schema Migrations
-Under `TASK-0504 Follow-up 3` and `DEC-MON-096`:
-- **Zero Schema Migrations:** The patch to render discrete raw telemetry points using straight lines, individual dot markers, zoom brush controls, and per-reading tooltips is strictly a frontend presentation calibration. It requires **zero schema migrations**, zero index changes, and zero data alterations in PostgreSQL.
-- **Data Fidelity Invariant:** Database queries continue to return 100% of raw discrete readings without downsampling or averaging. Sparse X-axis labels in the UI do not modify database queries or result sets.
+### 2.8 TASK-0504 Follow-up 4 / DEC-MON-096 Reading-Sequence Telemetry Chart Presentation & Zero Schema Migrations
+Under `TASK-0504 Follow-up 4` and `DEC-MON-096`:
+- **Zero Schema Migrations:** The calibration to resolve visual burst clumping via an equidistant reading-sequence X-axis (`Urutan pembacaan` / `Reading sequence`), straight linear segments (`type="linear"`), clean line presentation (`dot={false}`, `activeDot={false}`, NO `<Brush>`), and per-reading tooltips is strictly a frontend presentation calibration. It requires **zero schema migrations**, zero index changes, and zero data alterations in PostgreSQL.
+- **Data Fidelity Invariant:** Database queries continue to return 100% of raw discrete readings without downsampling, bucketing, or averaging. Categorical sequence indexing ($x = 0, \dots, n-1$) in the UI operates purely at the chart presentation layer and does not modify database queries, cursor pagination, or stored telemetry records.
 
 ---
 

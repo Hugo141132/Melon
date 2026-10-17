@@ -1,5 +1,5 @@
 /**
- * Regression Test: Raw Readings Chart Pipeline & Presentation Preservation
+ * Regression Test: Raw Readings Chart Pipeline & Clean Line Presentation Preservation
  *
  * Concrete Acceptance Case: "Testing (90), 30 Days, pH"
  *
@@ -9,13 +9,14 @@
  * 2. Each item strictly preserves its distinct reading ID, original timestamp, and exact value.
  * 3. No aggregation, averaging, bucketing, sampling, or deduplication collapses distinct readings.
  * 4. Line segments are straight (type="linear"), not smoothed cubic curves (type="monotone").
- * 5. Individual reading markers (dot) and hover highlights (activeDot) are rendered for every reading.
- * 6. Interactive zoom/brush (<Brush>) is rendered when data.length > 1 so densely clustered readings
- *    can be inspected individually without altering underlying timestamps or values.
- * 7. Per-reading tooltips accurately surface the reading ID, formatted timestamp, and exact values.
- * 8. Shared rendering paths for EC, TDS, and Soil parameters (Temperature, Moisture, pH, EC, NPK)
- *    adhere to the same raw-reading straight-line and marker requirements.
- * 9. Null gaps (connectNulls={false}) and table pagination independence are preserved.
+ * 5. Rendered as a clean line chart WITHOUT markers (dot={false}) and WITHOUT active highlights (activeDot={false}).
+ * 6. NO Brush or extra layout height is rendered; clean layout restored.
+ * 7. Precise hover/touch tooltips surface reading ID, formatted timestamp, and exact values.
+ * 8. Overlapping readings sharing identical timestamps/coordinates remain distinct in data and are
+ *    fully inspectable through the tooltip with their individual IDs and values.
+ * 9. Shared rendering paths for EC, TDS, and Soil parameters (Temperature, Moisture, pH, EC, NPK)
+ *    adhere to the same clean line, no-dot, no-Brush, and straight-line requirements.
+ * 10. Null gaps (connectNulls={false}) and table pagination independence are preserved.
  */
 
 import React from 'react';
@@ -33,6 +34,7 @@ let capturedBrushProps: any[] = [];
 let capturedAreaChartData: any[] = [];
 let capturedLineChartData: any[] = [];
 let capturedTooltipContentProps: any[] = [];
+let capturedXAxisProps: any[] = [];
 
 vi.mock('recharts', () => ({
   ResponsiveContainer: ({ children }: any) => (
@@ -67,14 +69,18 @@ vi.mock('recharts', () => ({
     return <div data-testid="recharts-brush" />;
   },
   CartesianGrid: () => <div />,
-  XAxis: (props: any) => (
-    <div
-      data-testid="recharts-xaxis"
-      data-key={props.dataKey}
-      data-type={props.type}
-      data-scale={props.scale}
-    />
-  ),
+  XAxis: (props: any) => {
+    capturedXAxisProps.push(props);
+    return (
+      <div
+        data-testid="recharts-xaxis"
+        data-key={props.dataKey}
+        data-type={props.type}
+        data-scale={props.scale}
+        data-label={props.label?.value}
+      />
+    );
+  },
   YAxis: () => <div />,
   Tooltip: (props: any) => {
     capturedTooltipContentProps.push(props);
@@ -106,13 +112,14 @@ vi.mock('next-intl', () => ({
       tdsCardTitle: 'Total Dissolved Solids',
       metricHistoryTitle: `History of ${params?.metric ?? ''}`,
       unavailable: 'Unavailable',
+      readingSequence: 'Urutan pembacaan',
     };
     return messages[key] ?? key;
   },
   useLocale: () => 'id',
 }));
 
-describe('Raw Readings Chart Pipeline & Presentation Fixes (TASK-0504 Follow-up)', () => {
+describe('Raw Readings Chart Pipeline & Clean Line Presentation (TASK-0504 Follow-up 3)', () => {
   beforeEach(() => {
     capturedAreaProps = [];
     capturedLineProps = [];
@@ -120,6 +127,7 @@ describe('Raw Readings Chart Pipeline & Presentation Fixes (TASK-0504 Follow-up)
     capturedAreaChartData = [];
     capturedLineChartData = [];
     capturedTooltipContentProps = [];
+    capturedXAxisProps = [];
     vi.clearAllMocks();
   });
 
@@ -127,7 +135,7 @@ describe('Raw Readings Chart Pipeline & Presentation Fixes (TASK-0504 Follow-up)
     // Generate 90 raw readings assigned to location "Testing" across a 30-day span
     const baseTime = new Date('2026-09-17T08:00:00.000Z').getTime();
     const raw90Readings = Array.from({ length: 90 }, (_, i) => {
-      // 90 readings over 30 days (some spaced 8 hours, some closer together)
+      // 90 readings over 30 days
       const recordedAt = new Date(baseTime + (i * (30 * 24 * 3600 * 1000)) / 90).toISOString();
       return {
         id: `reading-testing-uuid-${String(i + 1).padStart(3, '0')}`,
@@ -163,7 +171,7 @@ describe('Raw Readings Chart Pipeline & Presentation Fixes (TASK-0504 Follow-up)
       expect(distinctIds.size).toBe(90);
     });
 
-    it('renders WaterNutrientChart with all 90 discrete data points, straight lines, dot markers, and zoom brush', () => {
+    it('renders WaterNutrientChart with all 90 discrete data points, straight lines, no dot markers, and NO Brush', () => {
       const series = mapReadingsToSeries(raw90Readings as any, true);
 
       render(
@@ -183,21 +191,18 @@ describe('Raw Readings Chart Pipeline & Presentation Fixes (TASK-0504 Follow-up)
       const areaProps = capturedAreaProps[capturedAreaProps.length - 1];
       expect(areaProps.type).toBe('linear');
 
-      // 3. Individual reading markers (dot) and active highlight (activeDot) are enabled
-      expect(areaProps.dot).toBeTruthy();
-      expect(areaProps.dot.r).toBe(3);
-      expect(areaProps.activeDot).toBeTruthy();
-      expect(areaProps.activeDot.r).toBe(6);
+      // 3. No dot markers and no active highlights (clean line presentation)
+      expect(areaProps.dot).toBe(false);
+      expect(areaProps.activeDot).toBe(false);
 
       // 4. Null gaps preserved (connectNulls is false)
       expect(areaProps.connectNulls).toBe(false);
 
-      // 5. Interactive zoom/brush is rendered because data.length > 1
-      expect(capturedBrushProps.length).toBeGreaterThan(0);
-      expect(capturedBrushProps[capturedBrushProps.length - 1].dataKey).toBe('timestampMs');
+      // 5. NO Brush rendered
+      expect(capturedBrushProps).toHaveLength(0);
     });
 
-    it('displays per-reading tooltip with reading ID, formatted timestamp, and exact pH value', () => {
+    it('displays per-reading tooltip with reading ID, formatted timestamp, and exact pH value for single point', () => {
       const testItem: BaseSeriesItem = {
         readingId: 'reading-testing-uuid-042',
         timestamp: '2026-10-01T10:15:30.000Z',
@@ -231,10 +236,56 @@ describe('Raw Readings Chart Pipeline & Presentation Fixes (TASK-0504 Follow-up)
         />
       );
 
-      // Reading ID is rendered
       expect(container.textContent).toContain('ID: reading-');
-      // Exact pH value is rendered
       expect(container.textContent).toContain('6.85');
+    });
+
+    it('surfaces all overlapping readings at identical timestamp through tooltip without dropping records', () => {
+      const item1: BaseSeriesItem = {
+        readingId: 'reading-overlap-001',
+        timestamp: '2026-10-01T10:00:00.000Z',
+        timestampMs: 1760000000000,
+        time: '17:00',
+        ph: 6.5,
+      };
+      const item2: BaseSeriesItem = {
+        readingId: 'reading-overlap-002',
+        timestamp: '2026-10-01T10:00:00.000Z',
+        timestampMs: 1760000000000,
+        time: '17:00',
+        ph: -1.2, // unusual negative pH preserved as raw sensor evidence
+      };
+      const allData = [item1, item2];
+
+      const mockPayload = [
+        {
+          name: 'pH Level',
+          value: 6.5,
+          unit: '',
+          color: '#884200',
+          payload: item1,
+        },
+      ];
+
+      const { container } = render(
+        <WaterChartTooltipContent
+          active={true}
+          payload={mockPayload}
+          label={item1.timestampMs}
+          metricLabel="pH Level"
+          metricUnit=""
+          metricKey="ph"
+          allData={allData}
+          preset="30d"
+          locale="id"
+          tCommon={(k: string, p?: any) => (p?.count ? `${p.count} readings` : k)}
+        />
+      );
+
+      expect(container.textContent).toContain('2 readings');
+      expect(container.textContent).toContain('ID: reading-');
+      expect(container.textContent).toContain('6.5');
+      expect(container.textContent).toContain('-1.2');
     });
 
     it('generates sparse X-axis ticks (5-7 ticks) avoiding label overlap while preserving 100% of data points', () => {
@@ -268,7 +319,7 @@ describe('Raw Readings Chart Pipeline & Presentation Fixes (TASK-0504 Follow-up)
       },
     ];
 
-    it('renders EC with straight lines, dot markers, and activeDot', () => {
+    it('renders EC with straight lines, dot={false}, activeDot={false}, and NO Brush', () => {
       const series = mapReadingsToSeries(rawWaterReadings as any, false);
 
       render(
@@ -284,12 +335,12 @@ describe('Raw Readings Chart Pipeline & Presentation Fixes (TASK-0504 Follow-up)
       const ecProps = capturedAreaProps[capturedAreaProps.length - 1];
       expect(ecProps.dataKey).toBe('ec');
       expect(ecProps.type).toBe('linear');
-      expect(ecProps.dot).toBeTruthy();
-      expect(ecProps.dot.r).toBe(3);
-      expect(ecProps.activeDot.r).toBe(6);
+      expect(ecProps.dot).toBe(false);
+      expect(ecProps.activeDot).toBe(false);
+      expect(capturedBrushProps).toHaveLength(0);
     });
 
-    it('renders TDS with straight lines, dot markers, and activeDot', () => {
+    it('renders TDS with straight lines, dot={false}, activeDot={false}, and NO Brush', () => {
       const series = mapReadingsToSeries(rawWaterReadings as any, false);
 
       render(
@@ -305,9 +356,9 @@ describe('Raw Readings Chart Pipeline & Presentation Fixes (TASK-0504 Follow-up)
       const tdsProps = capturedAreaProps[capturedAreaProps.length - 1];
       expect(tdsProps.dataKey).toBe('tds');
       expect(tdsProps.type).toBe('linear');
-      expect(tdsProps.dot).toBeTruthy();
-      expect(tdsProps.dot.r).toBe(3);
-      expect(tdsProps.activeDot.r).toBe(6);
+      expect(tdsProps.dot).toBe(false);
+      expect(tdsProps.activeDot).toBe(false);
+      expect(capturedBrushProps).toHaveLength(0);
     });
   });
 
@@ -337,7 +388,7 @@ describe('Raw Readings Chart Pipeline & Presentation Fixes (TASK-0504 Follow-up)
       },
     ];
 
-    it('renders single-metric AreaChart (e.g. temperature) with straight lines, dot markers, and brush', () => {
+    it('renders single-metric AreaChart (e.g. temperature) with straight lines, dot={false}, activeDot={false}, and NO Brush', () => {
       const series = mapReadingsToSeries(rawSoilReadings as any, false);
 
       render(
@@ -353,13 +404,12 @@ describe('Raw Readings Chart Pipeline & Presentation Fixes (TASK-0504 Follow-up)
       const tempProps = capturedAreaProps[capturedAreaProps.length - 1];
       expect(tempProps.dataKey).toBe('temperature');
       expect(tempProps.type).toBe('linear');
-      expect(tempProps.dot).toBeTruthy();
-      expect(tempProps.dot.r).toBe(3);
-      expect(tempProps.activeDot.r).toBe(6);
-      expect(capturedBrushProps.length).toBeGreaterThan(0);
+      expect(tempProps.dot).toBe(false);
+      expect(tempProps.activeDot).toBe(false);
+      expect(capturedBrushProps).toHaveLength(0);
     });
 
-    it('renders multi-metric LineChart (NPK) with straight lines (linear) and dot markers on all 3 lines', () => {
+    it('renders multi-metric LineChart (NPK) with straight lines (linear), dot={false}, and activeDot={false} on all 3 lines', () => {
       const series = mapReadingsToSeries(rawSoilReadings as any, false);
 
       render(
@@ -372,15 +422,14 @@ describe('Raw Readings Chart Pipeline & Presentation Fixes (TASK-0504 Follow-up)
       expect(latestLines).toHaveLength(3);
       for (const lineProps of latestLines) {
         expect(lineProps.type).toBe('linear');
-        expect(lineProps.dot).toBeTruthy();
-        expect(lineProps.dot.r).toBe(3);
-        expect(lineProps.activeDot.r).toBe(6);
+        expect(lineProps.dot).toBe(false);
+        expect(lineProps.activeDot).toBe(false);
         expect(lineProps.connectNulls).toBe(false);
       }
-      expect(capturedBrushProps.length).toBeGreaterThan(0);
+      expect(capturedBrushProps).toHaveLength(0);
     });
 
-    it('displays per-reading tooltip in NPKChart with reading ID and exact values', () => {
+    it('displays per-reading tooltip in NPKChart with reading ID and exact values for single item', () => {
       const testItem: BaseSeriesItem = {
         readingId: 'soil-reading-042',
         timestamp: '2026-10-15T10:00:00.000Z',
@@ -412,6 +461,53 @@ describe('Raw Readings Chart Pipeline & Presentation Fixes (TASK-0504 Follow-up)
       expect(container.textContent).toContain('48 mg/kg');
       expect(container.textContent).toContain('28 mg/kg');
       expect(container.textContent).toContain('58 mg/kg');
+    });
+
+    it('surfaces overlapping readings in NPKChart tooltip when multiple readings share identical timestamp', () => {
+      const item1: BaseSeriesItem = {
+        readingId: 'soil-overlap-001',
+        timestamp: '2026-10-15T10:00:00.000Z',
+        timestampMs: 1760500000000,
+        time: '17:00',
+        temperature: 28.5,
+      };
+      const item2: BaseSeriesItem = {
+        readingId: 'soil-overlap-002',
+        timestamp: '2026-10-15T10:00:00.000Z',
+        timestampMs: 1760500000000,
+        time: '17:00',
+        temperature: 29.2,
+      };
+      const allData = [item1, item2];
+
+      const mockPayload = [
+        {
+          name: 'Temperature',
+          value: 28.5,
+          unit: '°C',
+          color: '#d97706',
+          payload: item1,
+        },
+      ];
+
+      const { container } = render(
+        <NPKChartTooltipContent
+          active={true}
+          payload={mockPayload}
+          label={item1.timestampMs}
+          defaultUnit="°C"
+          preset="24h"
+          locale="id"
+          tCommon={(k: string, p?: any) => (p?.count ? `${p.count} readings` : k)}
+          allData={allData}
+          singleMetricKey="temperature"
+        />
+      );
+
+      expect(container.textContent).toContain('2 readings');
+      expect(container.textContent).toContain('ID: soil-ove');
+      expect(container.textContent).toContain('28.5 °C');
+      expect(container.textContent).toContain('29.2 °C');
     });
   });
 
@@ -467,6 +563,167 @@ describe('Raw Readings Chart Pipeline & Presentation Fixes (TASK-0504 Follow-up)
       );
 
       expect(capturedAreaChartData).toHaveLength(90);
+    });
+  });
+
+  describe('Reading-Sequence X-Axis & Full Domain Coverage (TASK-0504 Follow-up 4)', () => {
+    it('configures X-axis with explicit label "Urutan pembacaan" and categorical spacing on WaterNutrientChart', () => {
+      const rawWater = [
+        { id: 'w-1', ph: 6.8, ec: 1100, tds: 550, recordedAt: '2026-10-15T08:00:00Z' },
+        { id: 'w-2', ph: 6.9, ec: 1120, tds: 560, recordedAt: '2026-10-15T08:05:00Z' },
+      ];
+      const series = mapReadingsToSeries(rawWater as any, false);
+
+      render(
+        <WaterNutrientChart
+          data={series}
+          selectedMetric="ph"
+          selectedLocationKey="tank-1"
+          preset="24h"
+        />
+      );
+      expect(capturedXAxisProps.length).toBeGreaterThan(0);
+      const xAxis = capturedXAxisProps[capturedXAxisProps.length - 1];
+      expect(xAxis.label?.value).toBe('Urutan pembacaan');
+      expect(xAxis.interval).toBe(0);
+      expect(xAxis.scale).toBeUndefined();
+    });
+
+    it('configures X-axis with explicit label "Urutan pembacaan" on NPKChart (multi & single metric)', () => {
+      const rawSoil = [
+        {
+          id: 's-1',
+          temperature: 28,
+          moisture: 60,
+          ph: 6.5,
+          ec: 1500,
+          nitrogen: 40,
+          phosphorus: 20,
+          potassium: 50,
+          recordedAt: '2026-10-15T08:00:00Z',
+        },
+        {
+          id: 's-2',
+          temperature: 29,
+          moisture: 62,
+          ph: 6.6,
+          ec: 1520,
+          nitrogen: 42,
+          phosphorus: 22,
+          potassium: 52,
+          recordedAt: '2026-10-15T08:05:00Z',
+        },
+      ];
+      const series = mapReadingsToSeries(rawSoil as any, false);
+
+      // Single metric (temperature, moisture, pH, EC)
+      render(
+        <NPKChart
+          data={series}
+          selectedMetric="temperature"
+          selectedLocationKey="bed-1"
+          preset="24h"
+        />
+      );
+      let xAxis = capturedXAxisProps[capturedXAxisProps.length - 1];
+      expect(xAxis.label?.value).toBe('Urutan pembacaan');
+      expect(xAxis.interval).toBe(0);
+
+      // Multi-metric combined NPK
+      render(
+        <NPKChart data={series} selectedMetric="npk" selectedLocationKey="bed-1" preset="24h" />
+      );
+      xAxis = capturedXAxisProps[capturedXAxisProps.length - 1];
+      expect(xAxis.label?.value).toBe('Urutan pembacaan');
+      expect(xAxis.interval).toBe(0);
+    });
+
+    it('aligns all three series (N, P, K) in combined NPK against the exact same reading indices without shifting when values are null', () => {
+      const rawNPKWithNulls = [
+        {
+          id: 'npk-1',
+          nitrogen: 45,
+          phosphorus: 25,
+          potassium: 55,
+          recordedAt: '2026-10-15T08:00:00Z',
+        },
+        {
+          id: 'npk-2',
+          nitrogen: 48,
+          phosphorus: null,
+          potassium: 58,
+          recordedAt: '2026-10-15T08:05:00Z',
+        },
+        {
+          id: 'npk-3',
+          nitrogen: null,
+          phosphorus: 28,
+          potassium: null,
+          recordedAt: '2026-10-15T08:10:00Z',
+        },
+      ];
+      const series = mapReadingsToSeries(rawNPKWithNulls as any, true);
+
+      render(
+        <NPKChart data={series} selectedMetric="npk" selectedLocationKey="bed-1" preset="24h" />
+      );
+
+      // Exactly 3 readings in dataset, exactly 3 data points passed to LineChart
+      expect(capturedLineChartData).toHaveLength(3);
+      expect(capturedLineChartData[0].readingId).toBe('npk-1');
+      expect(capturedLineChartData[1].readingId).toBe('npk-2');
+      expect(capturedLineChartData[2].readingId).toBe('npk-3');
+
+      // Index 1 has p=null, n=48, k=58; index 2 has n=null, p=28, k=null
+      // Verify values remain precisely aligned at their index without shifting series
+      expect(capturedLineChartData[1].p).toBeNull();
+      expect(capturedLineChartData[1].n).toBe(48);
+      expect(capturedLineChartData[1].k).toBe(58);
+      expect(capturedLineChartData[2].n).toBeNull();
+      expect(capturedLineChartData[2].p).toBe(28);
+      expect(capturedLineChartData[2].k).toBeNull();
+
+      // All 3 lines configured with connectNulls={false} to preserve gap without interpolation
+      const latestLines = capturedLineProps.slice(-3);
+      expect(latestLines).toHaveLength(3);
+      for (const line of latestLines) {
+        expect(line.connectNulls).toBe(false);
+      }
+    });
+
+    it('covers all soil metrics (Nitrogen, Phosphorus, Potassium, combined NPK, Temperature, Moisture, pH, EC) and water metrics (pH, EC, TDS)', () => {
+      const singleReading = [
+        {
+          id: 'full-metrics-1',
+          temperature: 28,
+          moisture: 60,
+          ph: 6.5,
+          ec: 1500,
+          nitrogen: 40,
+          phosphorus: 20,
+          potassium: 50,
+          tds: 750,
+          recordedAt: '2026-10-15T08:00:00Z',
+        },
+      ];
+      const series = mapReadingsToSeries(singleReading as any, true);
+
+      const soilMetrics: Array<
+        'temperature' | 'moisture' | 'ph' | 'ec' | 'nitrogen' | 'phosphorus' | 'potassium' | 'npk'
+      > = ['temperature', 'moisture', 'ph', 'ec', 'nitrogen', 'phosphorus', 'potassium', 'npk'];
+      for (const metric of soilMetrics) {
+        render(<NPKChart data={series} selectedMetric={metric} selectedLocationKey="loc-1" />);
+      }
+
+      const waterMetrics: Array<'ph' | 'ec' | 'tds'> = ['ph', 'ec', 'tds'];
+      for (const metric of waterMetrics) {
+        render(
+          <WaterNutrientChart data={series} selectedMetric={metric} selectedLocationKey="loc-1" />
+        );
+      }
+
+      // No brush rendered across any metric
+      expect(capturedBrushProps).toHaveLength(0);
     });
   });
 });

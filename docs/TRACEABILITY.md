@@ -1068,33 +1068,34 @@ The following facts are verified in the traceability matrix regarding the curren
 
 ---
 
-## Current Work Reconciliation: Raw Telemetry Discrete Presentation Patch (TASK-0504 Follow-up 3, DEC-MON-096 / Reconciled 2026-10-17)
+## Current Work Reconciliation: Reading-Sequence X-Axis & Clean Line Presentation (TASK-0504 Follow-up 4, DEC-MON-096 / Reconciled 2026-10-17)
 
 The following facts are verified in the traceability matrix regarding the current unreleased chart presentation patch:
 - **Traceability Baseline:**
-  - Tasks: `TASK-0504 Follow-up 3` in `TASKS.md`.
+  - Tasks: `TASK-0504 Follow-up 4` (refining `TASK-0504 Follow-up 3`) in `TASKS.md`.
   - Decisions: `DEC-MON-096` in `docs/DECISIONS.md`.
   - UI/UX & Quality: `docs/UI_UX.md`, `docs/FRONTEND_AUDIT.md`, `docs/TESTING.md`.
   - Architecture: `docs/ARCHITECTURE.md` §40.
   - Deployment Runbook: `docs/VPS_DEPLOYMENT_RUNBOOK.md` §1.
-- **Authoritative Progress & Prior Release Deployment:**
-  - *Release 08f0d79 Baseline:* Pushed to `main`; remote GitHub Actions CI run `39015583836` passed. Web and gateway images tagged `08f0d79` built off-VPS for `linux/amd64`, loaded, and recreated on Nebula VPS staging. Operator confirmed container recreation and health checks succeeded. Rollback pair in `/opt/kebun-melon/.rollback-08f0d79.env`: `WEB_IMAGE=kebun-melon-web:d1c1c13`, `GATEWAY_IMAGE=kebun-melon-gateway:875f91b`. (Public HTTP probes and broader website checks were not supplied and must not be claimed).
-  - *Initial VPS Chart Verification FAILED:* Water quality $\to$ location Testing (90 readings) $\to$ 30 Days $\to$ pH. Operator reported readings appeared summarized rather than individually visible; screenshot showed smoothed curve. (No live parity evidence was supplied reconciling all 90 live database/API/chart IDs; live parity must not be claimed. Localization previously passed operator testing locally. Do not infer additional PASS results for Clear Location or alerts).
-- **Presentation-Layer Calibration in Unreleased Patch:**
-  - Backend database and `/chart` API already deliver 100% of matching discrete readings without downsampling or averaging.
-  - `WaterNutrientChart.tsx` and `NPKChart.tsx`: replaced cubic spline smoothing (`type="monotone"`) with straight line segments (`type="linear"`).
-  - Explicit dot markers (`dot` and `activeDot`) configured across all metrics (pH, EC, TDS, Temperature, Moisture, NPK) so every reading is visually distinguishable.
-  - Integrated Recharts `<Brush dataKey="timestampMs" />` for datasets with `data.length > 1`, enabling zoom into dense time windows without modifying data.
-  - Tooltips enhanced with truncated `readingId` (`ID: ...`) alongside timestamp and exact value.
-  - Sparse X-axis labels (5–7 ticks) are preserved to prevent text collisions without dropping data points.
-  - Location/date filtering, null gaps (`connectNulls={false}`), and table pagination independence (`HISTORY_PAGE_SIZE = 5`) remain intact.
-- **Verification Evidence:**
-  - *Regression Test Suites:* Added `apps/web/test/unit/raw-readings-chart-pipeline.test.tsx` (acceptance case "Testing (90), 30 Days, pH"); updated Recharts mocks in existing chart tests (`chart-xaxis-ticks-labels.test.tsx`, `chart-completeness-overflow.test.tsx`). (Synthetic 90-reading fixture is regression coverage, not live VPS parity proof; tests not executed by agent).
-  - *Operator Verification Status:* Operator local website testing, pre-commit CI gates, and VPS verification are PENDING. Task must not be marked DONE prior to VPS verification.
+- **Live API Response Reality & Root Cause Resolution:**
+  - *Live API Response Verified:* The live API response for location "Testing (90), 30 Days, pH" contains exactly 90 points, 90 unique reading IDs, 90 distinct timestamps, `nextCursor=null`, and `truncated=false`. All 90 points reach the chart component data path intact without data loss or dropping.
+  - *Root Cause of Visual Clumping:* 65 of the 90 readings occur within approximately 11 minutes (out of a 30-day filter window). Under an elapsed-time proportional scale (`scale="time"`), these 65 points were compressed into a tiny horizontal clump ($<0.03\%$ of chart width), appearing as an unreadable vertical spike while the remaining width was empty.
+- **Frontend Reading-Sequence X-Axis Architecture:**
+  - *Equidistant Reading Spacing:* Replaced the elapsed-time proportional numeric axis with an equidistant reading-sequence X-axis. Every reading occupies an equal categorical coordinate slot based on its chronological sequence index ($x = 0, 1, \dots, n-1$). Visual bursts (e.g. 65 readings in 11 minutes) now display with generous, readable spacing.
+  - *Explicit Axis Labeling:* The axis is prominently labeled `"Urutan pembacaan"` (id) / `"Reading sequence"` (en) (`position: 'insideBottom'`, `offset: -12`, `fontSize: 10`, `fontWeight: 600`) to explicitly avoid implying that horizontal distances represent physical elapsed time.
+  - *Sparse Timestamp Ticks:* Generates 5–7 evenly spaced index ticks (`[0, ..., n-1]`) with `tickFormatter` deriving readable date/time labels (`formatItem(data[idx])`) directly from original sensor timestamps (`recordedAt`).
+  - *Clean Presentation Invariants:* Rendered as a clean line chart with straight linear connecting segments (`type="linear"`), `dot={false}`, `activeDot={false}`, and NO `<Brush>`, restoring clean container heights (`h-44 sm:h-52` for soil, `h-40 sm:h-48` for water).
+  - *Combined NPK Alignment:* In `NPKChart` combined view, all three series (N, P, K) align strictly to the same reading indices. Missing values remain `null` with `connectNulls={false}` and never shift one series relative to another.
+  - *Scope & Domain Isolation:* Applies consistently across ALL historical charts in Soil (Nitrogen, Phosphorus, Potassium, combined NPK, Temperature, Moisture, pH, EC) and Water Quality (pH, EC, TDS). Reservoir Water Tank monitoring is completely excluded (uses separate `WaterTankMonitoringCard.tsx` without historical line charts).
+  - *Zero Aggregation & Data Preservation:* 100% of raw readings (all 90 reading IDs), exact original timestamps, unusual/negative values, zero/null values, and independent table pagination (`HISTORY_PAGE_SIZE = 5`) remain intact. Tooltips inspect full timestamps, exact values, and distinct reading IDs.
+- **Verification Evidence & Operational Restrictions:**
+  - *Regression Test Suites:* Updated `apps/web/test/unit/chart-xaxis-ticks-labels.test.tsx` and `apps/web/test/unit/raw-readings-chart-pipeline.test.tsx` verifying reading-sequence index spacing, explicit axis labels, burst spacing (65 readings in 11m equally spaced), clean line segments (`type="linear"`, `dot={false}`, `activeDot={false}`, `capturedBrushProps.length === 0`), and combined NPK series alignment.
+  - *Agent Test Execution Prohibition:* Coding agent executed ZERO tests or builds during this turn. All 5 quality gates and website checks are reserved strictly for the operator.
+  - *Status:* `TASK-0504` remains `PENDING` until operator completes manual verification and passes CI gates.
 - **Deployment & Infrastructure Assessment:**
   - *Web Container:* Rebuild and redeploy required with **NEW commit SHA**.
-  - *IoT Gateway:* **UNCHANGED** at `08f0d79`.
-  - *Database & Caddy:* **NOT REQUIRED** (Zero schema migrations or reverse proxy changes).
-  - *Rollback Baseline:* Next web deployment must capture current web `08f0d79` as its rollback baseline without overwriting `/opt/kebun-melon/.rollback-08f0d79.env`. Do not reuse tag `08f0d79`.
-<!-- TASK-0504-Followup-3 Traceability Reconciled: 2026-10-17 -->
+  - *IoT Gateway, Database & Caddy:* **UNCHANGED** (Zero backend/API/database/gateway changes).
+  - *Rollback Baseline:* Next web deployment must capture current web `295ee17` as its rollback baseline without overwriting `/opt/kebun-melon/.rollback-08f0d79.env`.
+<!-- TASK-0504-Followup-4 Traceability Reconciled: 2026-10-17 -->
+
 

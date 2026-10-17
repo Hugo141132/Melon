@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import React, { useMemo } from 'react';
 import {
   LineChart,
   Line,
@@ -11,7 +11,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Brush,
 } from 'recharts';
 import { useTranslations, useLocale } from 'next-intl';
 import { BaseSeriesItem } from '@/hooks/useHistoricalMonitoring';
@@ -77,23 +76,6 @@ export function getCustomXTicks(
     return { ticks: [], formatTick: (v: number | string) => String(v) };
   }
 
-  const getMs = (item: BaseSeriesItem): number => {
-    if (typeof item.timestampMs === 'number') return item.timestampMs;
-    const t = new Date(item.timestamp).getTime();
-    return isNaN(t) ? 0 : t;
-  };
-
-  if (data.length <= 1) {
-    const t0 = getMs(data[0]);
-    return {
-      ticks: [t0],
-      formatTick: (v: number | string) => {
-        const d = new Date(Number(v));
-        return isNaN(d.getTime()) ? String(v) : formatDayMonth(d, locale, timeZone);
-      },
-    };
-  }
-
   const tz =
     timeZone ||
     (typeof Intl !== 'undefined'
@@ -101,181 +83,66 @@ export function getCustomXTicks(
       : 'Asia/Jakarta') ||
     'Asia/Jakarta';
 
-  const firstTime = getMs(data[0]);
-  const lastTime = getMs(data[data.length - 1]);
-  const spanHours = (lastTime - firstTime) / (1000 * 60 * 60);
-
-  const is24h = preset === '24h' || (spanHours > 0 && spanHours <= 24);
-  const is7d = preset === '7d' || (spanHours > 24 && spanHours <= 8 * 24);
-
-  const tickLabels = new Map<number, string>();
-  const timeFormatter = new Intl.DateTimeFormat('id-ID', {
+  const intlLocale = locale === 'en' ? 'en-US' : 'id-ID';
+  const timeFormatter = new Intl.DateTimeFormat(intlLocale, {
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
     timeZone: tz,
   });
-  const dayKeyFormatter = new Intl.DateTimeFormat('en-CA', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    timeZone: tz,
-  });
 
-  if (is24h) {
-    // 24 Hours: show ~5-8 evenly-spaced readable time labels without displaying every single point
-    if (data.length <= 8) {
-      for (const d of data) {
-        const ms = getMs(d);
-        tickLabels.set(ms, timeFormatter.format(new Date(ms)).replace(/\./g, ':'));
-      }
-      return {
-        ticks: data.map(getMs),
-        formatTick: (v: number | string) => {
-          const num = Number(v);
-          if (tickLabels.has(num)) return tickLabels.get(num)!;
-          const d = new Date(num);
-          return isNaN(d.getTime()) ? String(v) : timeFormatter.format(d).replace(/\./g, ':');
-        },
-      };
+  const getMs = (it: BaseSeriesItem): number => {
+    if (typeof it.timestampMs === 'number') return it.timestampMs;
+    const t = new Date(it.timestamp).getTime();
+    return isNaN(t) ? 0 : t;
+  };
+
+  const spanHours =
+    data.length > 1 ? (getMs(data[data.length - 1]) - getMs(data[0])) / (1000 * 60 * 60) : 0;
+  const isTimeFormat = preset === '24h' || (!preset && spanHours > 0 && spanHours <= 24);
+
+  const formatItem = (item: BaseSeriesItem): string => {
+    const raw = item.timestamp || item.timestampMs;
+    const d = new Date(raw);
+    if (isNaN(d.getTime())) return '';
+    if (isTimeFormat) {
+      return timeFormatter.format(d).replace(/\./g, ':');
     }
+    return formatDayMonth(d, locale, tz);
+  };
 
-    const targetCount = 6;
-    const selectedTicks: number[] = [];
-    const chosenIndices = new Set<number>();
-
-    for (let k = 0; k < targetCount; k++) {
-      const idx = Math.round((k * (data.length - 1)) / (targetCount - 1));
-      chosenIndices.add(idx);
-    }
-
-    for (const idx of Array.from(chosenIndices).sort((a, b) => a - b)) {
-      const item = data[idx];
-      const ms = getMs(item);
-      selectedTicks.push(ms);
-      tickLabels.set(ms, timeFormatter.format(new Date(ms)).replace(/\./g, ':'));
-    }
-
+  const n = data.length;
+  if (n <= 1) {
     return {
-      ticks: selectedTicks,
-      formatTick: (v: number | string) => {
-        const num = Number(v);
-        if (tickLabels.has(num)) return tickLabels.get(num)!;
-        const d = new Date(num);
-        return isNaN(d.getTime()) ? String(v) : timeFormatter.format(d).replace(/\./g, ':');
-      },
+      ticks: [0],
+      formatTick: () => formatItem(data[0]),
     };
   }
 
-  if (is7d) {
-    // 7 Days: group by calendar date, display 4-5 evenly distributed labels preventing overlap
-    const dayGroups = new Map<string, BaseSeriesItem>();
-    for (const item of data) {
-      const ms = getMs(item);
-      const d = new Date(ms);
-      const dateKey = dayKeyFormatter.format(d);
-      if (!dayGroups.has(dateKey)) {
-        dayGroups.set(dateKey, item);
-      }
-    }
-
-    const distinctDays = Array.from(dayGroups.values());
-    if (distinctDays.length <= 4) {
-      const ticks = distinctDays.map(getMs);
-      for (const d of distinctDays) {
-        const ms = getMs(d);
-        tickLabels.set(ms, formatDayMonth(new Date(ms), locale, tz));
-      }
-      return {
-        ticks,
-        formatTick: (v: number | string) => {
-          const num = Number(v);
-          if (tickLabels.has(num)) return tickLabels.get(num)!;
-          const d = new Date(num);
-          return isNaN(d.getTime()) ? String(v) : formatDayMonth(d, locale, tz);
-        },
-      };
-    }
-
-    const targetCount = Math.min(5, distinctDays.length);
-    const selectedTicks: number[] = [];
-    const chosenIndices = new Set<number>();
-
-    for (let k = 0; k < targetCount; k++) {
-      const idx = Math.round((k * (distinctDays.length - 1)) / (targetCount - 1));
-      chosenIndices.add(idx);
-    }
-
-    for (const idx of Array.from(chosenIndices).sort((a, b) => a - b)) {
-      const item = distinctDays[idx];
-      const ms = getMs(item);
-      selectedTicks.push(ms);
-      tickLabels.set(ms, formatDayMonth(new Date(ms), locale, tz));
-    }
-
-    return {
-      ticks: selectedTicks,
-      formatTick: (v: number | string) => {
-        const num = Number(v);
-        if (tickLabels.has(num)) return tickLabels.get(num)!;
-        const d = new Date(num);
-        return isNaN(d.getTime()) ? String(v) : formatDayMonth(d, locale, tz);
-      },
-    };
-  }
-
-  // 30 Days: group by calendar day, display 5-7 evenly distributed date labels
-  const dayGroups = new Map<string, BaseSeriesItem>();
-  for (const item of data) {
-    const ms = getMs(item);
-    const d = new Date(ms);
-    const dateKey = dayKeyFormatter.format(d);
-    if (!dayGroups.has(dateKey)) {
-      dayGroups.set(dateKey, item);
-    }
-  }
-
-  const distinctDays = Array.from(dayGroups.values());
-  if (distinctDays.length <= 6) {
-    const ticks = distinctDays.map(getMs);
-    for (const d of distinctDays) {
-      const ms = getMs(d);
-      tickLabels.set(ms, formatDayMonth(new Date(ms), locale, tz));
-    }
-    return {
-      ticks,
-      formatTick: (v: number | string) => {
-        const num = Number(v);
-        if (tickLabels.has(num)) return tickLabels.get(num)!;
-        const d = new Date(num);
-        return isNaN(d.getTime()) ? String(v) : formatDayMonth(d, locale, tz);
-      },
-    };
-  }
-
-  const targetCount = 6;
-  const selectedTicks: number[] = [];
+  // Choose 4 to 6 sparse ticks equally distributed across the reading sequence
+  const targetCount = preset === '7d' ? Math.min(5, n) : Math.min(6, n);
   const chosenIndices = new Set<number>();
-
   for (let k = 0; k < targetCount; k++) {
-    const idx = Math.round((k * (distinctDays.length - 1)) / (targetCount - 1));
+    const idx = Math.round((k * (n - 1)) / (targetCount - 1));
     chosenIndices.add(idx);
   }
-
-  for (const idx of Array.from(chosenIndices).sort((a, b) => a - b)) {
-    const item = distinctDays[idx];
-    const ms = getMs(item);
-    selectedTicks.push(ms);
-    tickLabels.set(ms, formatDayMonth(new Date(ms), locale, tz));
-  }
+  const ticks = Array.from(chosenIndices).sort((a, b) => a - b);
 
   return {
-    ticks: selectedTicks,
+    ticks,
     formatTick: (v: number | string) => {
-      const num = Number(v);
-      if (tickLabels.has(num)) return tickLabels.get(num)!;
-      const d = new Date(num);
-      return isNaN(d.getTime()) ? String(v) : formatDayMonth(d, locale, tz);
+      const idx = Number(v);
+      if (idx >= 0 && idx < n) {
+        return formatItem(data[idx]);
+      }
+      const d = new Date(Number(v));
+      if (!isNaN(d.getTime())) {
+        if (isTimeFormat) {
+          return timeFormatter.format(d).replace(/\./g, ':');
+        }
+        return formatDayMonth(d, locale, tz);
+      }
+      return String(v);
     },
   };
 }
@@ -316,12 +183,95 @@ export function NPKChartTooltipContent({
   locale,
   tCommon,
   defaultUnit = '',
+  allData,
+  singleMetricKey,
 }: any) {
   if (!active || !payload || payload.length === 0) return null;
 
   const firstItem = payload[0]?.payload as BaseSeriesItem | undefined;
   const rawTs = firstItem?.timestamp || firstItem?.timestampMs || label;
   const formattedTime = formatTooltipDateTime(rawTs, preset, locale);
+
+  const currentTsMs =
+    typeof firstItem?.timestampMs === 'number'
+      ? firstItem.timestampMs
+      : firstItem?.timestamp
+        ? new Date(firstItem.timestamp).getTime()
+        : typeof label === 'number'
+          ? label
+          : new Date(label).getTime();
+
+  const matchingItems = useMemo<BaseSeriesItem[]>(() => {
+    if (!allData || allData.length === 0) return firstItem ? [firstItem] : [];
+    if (typeof currentTsMs !== 'number' || isNaN(currentTsMs)) {
+      return firstItem ? [firstItem] : [];
+    }
+    const matches = allData.filter((item: BaseSeriesItem) => {
+      const itemMs =
+        typeof item.timestampMs === 'number'
+          ? item.timestampMs
+          : item.timestamp
+            ? new Date(item.timestamp).getTime()
+            : NaN;
+      return itemMs === currentTsMs;
+    });
+    return matches.length > 0 ? matches : firstItem ? [firstItem] : [];
+  }, [allData, firstItem, currentTsMs]);
+
+  if (matchingItems.length > 1) {
+    return (
+      <div
+        className="bg-white/95 backdrop-blur-sm border border-app-outline-variant/60 rounded-xl p-3 shadow-md text-xs space-y-2 min-w-[200px] max-w-[280px]"
+        data-testid="chart-custom-tooltip"
+      >
+        <div className="font-semibold text-app-on-surface flex items-center justify-between gap-2 border-b border-app-outline-variant/30 pb-1">
+          <span>{formattedTime}</span>
+          <span className="font-semibold text-[10px] text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+            {tCommon('overlappingReadings', { count: matchingItems.length })}
+          </span>
+        </div>
+        <div className="max-h-48 overflow-y-auto space-y-1.5 pr-0.5">
+          {matchingItems.map((item: BaseSeriesItem, idx: number) => {
+            const itemRawTs = item.timestamp || item.timestampMs;
+            const itemTimeStr = itemRawTs ? formatTooltipDateTime(itemRawTs, preset, locale) : '';
+            const itemTimePart = itemTimeStr.split(' ').pop();
+            return (
+              <div
+                key={item.readingId || `overlap-${idx}`}
+                className="flex items-center justify-between gap-2 text-[11px] border-b border-app-outline-variant/15 pb-1 last:border-b-0 last:pb-0"
+              >
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span
+                    className="font-mono text-[10px] text-app-on-surface-variant bg-app-surface-container/60 px-1 py-0.5 rounded shrink-0"
+                    title={String(item.readingId || '')}
+                  >
+                    ID: {String(item.readingId || '—').slice(0, 8)}
+                  </span>
+                  {itemTimePart && (
+                    <span className="text-[10px] text-app-on-surface-variant shrink-0">
+                      {itemTimePart}
+                    </span>
+                  )}
+                </div>
+                {singleMetricKey ? (
+                  <span className="font-bold text-app-on-surface font-mono shrink-0">
+                    {item[singleMetricKey] !== null && item[singleMetricKey] !== undefined
+                      ? `${item[singleMetricKey]} ${defaultUnit}`.trim()
+                      : tCommon('unavailable')}
+                  </span>
+                ) : (
+                  <span className="font-bold text-app-on-surface font-mono text-[10px] shrink-0">
+                    N:{item.n ?? '-'} P:{item.p ?? '-'} K:{item.k ?? '-'}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   const readingId = firstItem?.readingId;
 
   return (
@@ -377,36 +327,6 @@ export default function NPKChart({
   const tCommon = useTranslations('common');
   const locale = useLocale();
 
-  const [brushIndices, setBrushIndices] = useState<{ startIndex?: number; endIndex?: number }>({});
-
-  useEffect(() => {
-    setBrushIndices((prev) => {
-      if (prev.startIndex === undefined && prev.endIndex === undefined) {
-        return prev;
-      }
-      return {};
-    });
-  }, [data, selectedLocationKey, preset]);
-
-  const handleBrushChange = useCallback((range: { startIndex?: number; endIndex?: number }) => {
-    if (typeof range?.startIndex === 'number' && typeof range?.endIndex === 'number') {
-      setBrushIndices(range);
-    }
-  }, []);
-
-  const visibleData = useMemo(() => {
-    if (
-      typeof brushIndices.startIndex === 'number' &&
-      typeof brushIndices.endIndex === 'number' &&
-      brushIndices.startIndex >= 0 &&
-      brushIndices.endIndex < data.length &&
-      (brushIndices.startIndex > 0 || brushIndices.endIndex < data.length - 1)
-    ) {
-      return data.slice(brushIndices.startIndex, brushIndices.endIndex + 1);
-    }
-    return data;
-  }, [data, brushIndices]);
-
   const singleMetricConfig: Record<
     string,
     { label: string; unit: string; color: string; dataKey: string }
@@ -430,28 +350,8 @@ export default function NPKChart({
     : tSoil('npkTrend');
 
   const { ticks, formatTick } = useMemo(() => {
-    return getCustomXTicks(visibleData, preset, locale);
-  }, [visibleData, preset, locale]);
-
-  const timeDomain = useMemo<[number, number] | ['dataMin', 'dataMax']>(() => {
-    if (!visibleData || visibleData.length === 0) return ['dataMin', 'dataMax'];
-    const getMs = (item: BaseSeriesItem): number =>
-      typeof item.timestampMs === 'number' ? item.timestampMs : new Date(item.timestamp).getTime();
-    const tFirst = getMs(visibleData[0]);
-    const tLast = getMs(visibleData[visibleData.length - 1]);
-    if (tFirst === tLast && !isNaN(tFirst)) {
-      // Single-point or equal-timestamp dataset: add +/- 1 hour padding so domain is non-degenerate
-      return [tFirst - 3600000, tLast + 3600000];
-    }
-    if (
-      typeof brushIndices.startIndex === 'number' &&
-      typeof brushIndices.endIndex === 'number' &&
-      (brushIndices.startIndex > 0 || brushIndices.endIndex < data.length - 1)
-    ) {
-      return [tFirst, tLast];
-    }
-    return ['dataMin', 'dataMax'];
-  }, [visibleData, brushIndices, data.length]);
+    return getCustomXTicks(data, preset, locale);
+  }, [data, preset, locale]);
 
   return (
     <div className="bg-app-surface-container-lowest rounded-xl p-5 soft-elevation-lg border border-app-outline-variant/30">
@@ -501,10 +401,10 @@ export default function NPKChart({
           </span>
         </div>
       ) : (
-        <div className={data.length > 1 ? 'h-52 sm:h-60' : 'h-44 sm:h-52'}>
+        <div className="h-44 sm:h-52">
           <ResponsiveContainer width="100%" height="100%">
             {isSingleMetric && singleConfig ? (
-              <AreaChart data={data} margin={{ top: 8, right: 14, left: -14, bottom: 0 }}>
+              <AreaChart data={data} margin={{ top: 8, right: 14, left: -14, bottom: 20 }}>
                 <defs>
                   <linearGradient id={`grad-${selectedMetric}`} x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor={singleConfig.color} stopOpacity={0.3} />
@@ -513,18 +413,21 @@ export default function NPKChart({
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#eeeeee" vertical={false} />
                 <XAxis
-                  dataKey="timestampMs"
-                  type="number"
-                  scale="time"
-                  domain={timeDomain}
                   ticks={ticks.length > 0 ? ticks : undefined}
                   tickFormatter={formatTick}
-                  interval="preserveStartEnd"
-                  minTickGap={25}
+                  interval={0}
                   tick={{ fontSize: 11, fill: '#40493d' }}
                   padding={{ left: 16, right: 16 }}
                   axisLine={false}
                   tickLine={false}
+                  label={{
+                    value: tCommon('readingSequence'),
+                    position: 'insideBottom',
+                    offset: -12,
+                    fill: '#71796f',
+                    fontSize: 10,
+                    fontWeight: 600,
+                  }}
                 />
                 <YAxis tick={{ fontSize: 11, fill: '#40493d' }} axisLine={false} tickLine={false} />
                 <Tooltip
@@ -535,6 +438,8 @@ export default function NPKChart({
                       preset={preset}
                       locale={locale}
                       tCommon={tCommon}
+                      allData={data}
+                      singleMetricKey={singleConfig.dataKey}
                     />
                   )}
                 />
@@ -546,47 +451,29 @@ export default function NPKChart({
                   strokeWidth={2}
                   fill={`url(#grad-${selectedMetric})`}
                   connectNulls={false}
-                  dot={{
-                    r: 3,
-                    fill: singleConfig.color,
-                    stroke: '#ffffff',
-                    strokeWidth: 1,
-                  }}
-                  activeDot={{
-                    r: 6,
-                    fill: singleConfig.color,
-                    stroke: '#ffffff',
-                    strokeWidth: 2,
-                  }}
+                  dot={false}
+                  activeDot={false}
                 />
-                {data.length > 1 && (
-                  <Brush
-                    dataKey="timestampMs"
-                    height={24}
-                    stroke={singleConfig.color}
-                    fill="#f8fafc"
-                    tickFormatter={formatTick}
-                    travellerWidth={10}
-                    onChange={handleBrushChange}
-                  />
-                )}
               </AreaChart>
             ) : (
-              <LineChart data={data} margin={{ top: 8, right: 14, left: -14, bottom: 0 }}>
+              <LineChart data={data} margin={{ top: 8, right: 14, left: -14, bottom: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#eeeeee" vertical={false} />
                 <XAxis
-                  dataKey="timestampMs"
-                  type="number"
-                  scale="time"
-                  domain={timeDomain}
                   ticks={ticks.length > 0 ? ticks : undefined}
                   tickFormatter={formatTick}
-                  interval="preserveStartEnd"
-                  minTickGap={25}
+                  interval={0}
                   tick={{ fontSize: 11, fill: '#40493d' }}
                   padding={{ left: 16, right: 16 }}
                   axisLine={false}
                   tickLine={false}
+                  label={{
+                    value: tCommon('readingSequence'),
+                    position: 'insideBottom',
+                    offset: -12,
+                    fill: '#71796f',
+                    fontSize: 10,
+                    fontWeight: 600,
+                  }}
                 />
                 <YAxis
                   domain={[0, 'auto']}
@@ -602,6 +489,7 @@ export default function NPKChart({
                       preset={preset}
                       locale={locale}
                       tCommon={tCommon}
+                      allData={data}
                     />
                   )}
                 />
@@ -612,8 +500,8 @@ export default function NPKChart({
                   stroke={NPK_COLORS.n}
                   strokeWidth={2}
                   connectNulls={false}
-                  dot={{ r: 3, fill: NPK_COLORS.n, stroke: '#ffffff', strokeWidth: 1 }}
-                  activeDot={{ r: 6, fill: NPK_COLORS.n, stroke: '#ffffff', strokeWidth: 2 }}
+                  dot={false}
+                  activeDot={false}
                 />
                 <Line
                   type="linear"
@@ -622,8 +510,8 @@ export default function NPKChart({
                   stroke={NPK_COLORS.p}
                   strokeWidth={2}
                   connectNulls={false}
-                  dot={{ r: 3, fill: NPK_COLORS.p, stroke: '#ffffff', strokeWidth: 1 }}
-                  activeDot={{ r: 6, fill: NPK_COLORS.p, stroke: '#ffffff', strokeWidth: 2 }}
+                  dot={false}
+                  activeDot={false}
                 />
                 <Line
                   type="linear"
@@ -632,20 +520,9 @@ export default function NPKChart({
                   stroke={NPK_COLORS.k}
                   strokeWidth={2}
                   connectNulls={false}
-                  dot={{ r: 3, fill: NPK_COLORS.k, stroke: '#ffffff', strokeWidth: 1 }}
-                  activeDot={{ r: 6, fill: NPK_COLORS.k, stroke: '#ffffff', strokeWidth: 2 }}
+                  dot={false}
+                  activeDot={false}
                 />
-                {data.length > 1 && (
-                  <Brush
-                    dataKey="timestampMs"
-                    height={24}
-                    stroke={NPK_COLORS.n}
-                    fill="#f8fafc"
-                    tickFormatter={formatTick}
-                    travellerWidth={10}
-                    onChange={handleBrushChange}
-                  />
-                )}
               </LineChart>
             )}
           </ResponsiveContainer>

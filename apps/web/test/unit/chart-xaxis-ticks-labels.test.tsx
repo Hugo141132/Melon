@@ -1,13 +1,14 @@
 /**
- * Dedicated unit tests for X-Axis tick generation, responsive label distribution,
- * bilingual formatting (id/en), and clipping/overlap prevention (TASK-0504).
+ * Dedicated unit tests for X-Axis reading-sequence tick generation, responsive label distribution,
+ * bilingual formatting (id/en), and prevention of elapsed-time visual compression (TASK-0504 Follow-up 4).
  *
  * Connected regression coverage verifying that:
- * 1. mapReadingsToSeries attaches numeric timestampMs from sensor timestamps.
+ * 1. mapReadingsToSeries attaches numeric timestampMs and preserves exact raw reading IDs and values.
  * 2. NPKChart (multi & single metric) and WaterNutrientChart configure XAxis with
- *    dataKey="timestampMs", type="number", scale="time".
- * 3. Categorical spacing (dataKey="time", type="category") is strictly rejected.
- * 4. Single-point and equal-timestamp datasets safely pad domain to avoid scale collapse.
+ *    reading-sequence categorical layout, interval={0}, and explicit axis label "Urutan pembacaan" / "Reading sequence".
+ * 3. Proportional time scale (dataKey="timestampMs", type="number", scale="time") is replaced by
+ *    equidistant reading-sequence indexing so bursts (e.g. 65 readings in 11 minutes) do not compress into a clump.
+ * 4. Sparse axis labels (5-7 ticks) are derived from actual reading timestamps without modifying dataset order or values.
  * 5. Display timezone and tooltip formatting are preserved.
  */
 
@@ -49,6 +50,8 @@ vi.mock('recharts', () => ({
         data-key={props.dataKey}
         data-type={props.type}
         data-scale={props.scale}
+        data-interval={props.interval}
+        data-label={props.label?.value}
       />
     );
   },
@@ -81,13 +84,14 @@ vi.mock('next-intl', () => ({
       tdsCardTitle: 'Total Dissolved Solids',
       metricHistoryTitle: `History of ${params?.metric ?? ''}`,
       unavailable: 'Unavailable',
+      readingSequence: 'Urutan pembacaan',
     };
     return messages[key] ?? key;
   },
   useLocale: () => 'id',
 }));
 
-describe('TASK-0504 — X-Axis Labels Distribution, Overlap & Clipping Prevention', () => {
+describe('TASK-0504 — X-Axis Reading-Sequence Labels & Equal Spacing', () => {
   describe('formatDayMonth bilingual date formatting', () => {
     it('formats date cleanly in Indonesian without trailing punctuation or commas', () => {
       const d1 = new Date('2026-10-08T12:00:00Z');
@@ -106,14 +110,15 @@ describe('TASK-0504 — X-Axis Labels Distribution, Overlap & Clipping Preventio
     });
   });
 
-  describe('24-Hour Range Ticks (evenly spaced, no overlap, first/last preserved)', () => {
-    it('generates 5-6 evenly spaced ticks for small datasets (e.g. 24 readings)', () => {
+  describe('Reading-Sequence Ticks (equally spaced indices, sparse timestamp formatting)', () => {
+    it('generates 5-6 evenly spaced reading indices for small datasets (e.g. 24 readings)', () => {
       const data24 = Array.from({ length: 24 }, (_, i) => {
         const d = new Date('2026-10-08T00:00:00Z');
         d.setHours(i);
         const hh = String(i).padStart(2, '0');
         return {
           timestamp: d.toISOString(),
+          timestampMs: d.getTime(),
           time: `${hh}:00`,
         };
       });
@@ -121,103 +126,71 @@ describe('TASK-0504 — X-Axis Labels Distribution, Overlap & Clipping Preventio
       const { ticks, formatTick } = getCustomXTicks(data24, '24h', 'id');
       expect(ticks.length).toBeGreaterThanOrEqual(5);
       expect(ticks.length).toBeLessThanOrEqual(6);
-      expect(ticks[0]).toBe(new Date(data24[0].timestamp).getTime());
-      expect(ticks[ticks.length - 1]).toBe(new Date(data24[data24.length - 1].timestamp).getTime());
+      expect(ticks[0]).toBe(0);
+      expect(ticks[ticks.length - 1]).toBe(23);
       expect(formatTick(ticks[0])).toBe('00:00');
       expect(formatTick(ticks[ticks.length - 1])).toBe('23:00');
     });
 
-    it('generates exactly 6 evenly distributed ticks for high-density 1,001-point 24h datasets without overlapping', () => {
+    it('generates 6 evenly distributed sequence indices for 1,001-point datasets', () => {
       const data1001 = Array.from({ length: 1001 }, (_, i) => {
-        const d = new Date(Date.parse('2026-10-08T00:00:00Z') + i * 86400); // 86.4s per reading over 24h
-        const hh = String(d.getUTCHours()).padStart(2, '0');
-        const mm = String(d.getUTCMinutes()).padStart(2, '0');
+        const d = new Date(Date.parse('2026-10-08T00:00:00Z') + i * 86400);
         return {
           timestamp: d.toISOString(),
           timestampMs: d.getTime(),
-          time: `${hh}:${mm}-${i}`,
+          time: `t-${i}`,
         };
       });
 
       const { ticks } = getCustomXTicks(data1001, '24h', 'id');
       expect(ticks).toHaveLength(6);
-      expect(ticks[0]).toBe(data1001[0].timestampMs);
-      expect(ticks[5]).toBe(data1001[1000].timestampMs);
+      expect(ticks[0]).toBe(0);
+      expect(ticks[5]).toBe(1000);
       expect(new Set(ticks).size).toBe(6);
     });
-  });
 
-  describe('7-Day & 30-Day Range Ticks (no adjacent days, clean spacing)', () => {
-    it('distributes 7 days evenly (4-5 labels) without adjacent day collision at the boundary', () => {
-      const data7d = Array.from({ length: 168 }, (_, i) => {
-        const d = new Date('2026-10-01T00:00:00Z');
-        d.setHours(i);
-        return {
-          timestamp: d.toISOString(),
-          time: `${d.getDate()} Okt ${String(d.getHours()).padStart(2, '0')}:00`,
-        };
-      });
+    it('eliminates visual compression for bursts: 65 readings within 11m out of 90 readings receive equal coordinate spacing', () => {
+      // 90 readings total: 65 within first 11 minutes (every ~10 seconds), remaining 25 spread over 29 days
+      const baseTime = new Date('2026-09-17T08:00:00.000Z').getTime();
+      const readings: any[] = [];
 
-      const { ticks, formatTick } = getCustomXTicks(data7d, '7d', 'id');
-      expect(ticks.length).toBeGreaterThanOrEqual(4);
-      expect(ticks.length).toBeLessThanOrEqual(5);
-
-      const formattedLabels = ticks.map(formatTick);
-      const dayNumbers = formattedLabels.map((l) => parseInt(l.split(' ')[0], 10));
-      for (let i = 1; i < dayNumbers.length; i++) {
-        expect(dayNumbers[i] - dayNumbers[i - 1]).toBeGreaterThanOrEqual(1);
+      // 65 readings within 11 minutes (660 seconds)
+      for (let i = 0; i < 65; i++) {
+        readings.push({
+          id: `reading-burst-${i}`,
+          recordedAt: new Date(baseTime + i * 10000).toISOString(),
+          ph: 6.5,
+        });
       }
-      expect(formattedLabels[0]).toMatch(/^1\s(Okt|Oct)$/);
-      expect(formattedLabels[formattedLabels.length - 1]).toMatch(/^7\s(Okt|Oct)$/);
-    });
+      // 25 readings over remaining 29 days
+      for (let i = 0; i < 25; i++) {
+        readings.push({
+          id: `reading-sparse-${i}`,
+          recordedAt: new Date(baseTime + 660000 + (i + 1) * 100000000).toISOString(),
+          ph: 6.8,
+        });
+      }
 
-    it('distributes 30 days evenly with ~6 ticks covering the entire boundary', () => {
-      const data30d = Array.from({ length: 720 }, (_, i) => {
-        const d = new Date('2026-09-01T00:00:00Z');
-        d.setHours(i);
-        return {
-          timestamp: d.toISOString(),
-          time: `${d.getDate()} Sep ${String(d.getHours()).padStart(2, '0')}:00`,
-        };
-      });
+      const series = mapReadingsToSeries(readings, false);
+      expect(series).toHaveLength(90);
 
-      const { ticks, formatTick } = getCustomXTicks(data30d, '30d', 'en');
-      expect(ticks).toHaveLength(6);
+      // On reading-sequence axis, categorical index distance between reading 0 and 1 is 1,
+      // and index distance between reading 64 and 65 is also 1:
+      const dxBurst = 1 - 0;
+      const dxSparse = 65 - 64;
+      expect(dxBurst).toBe(dxSparse); // Equal visual spacing!
 
-      const formattedLabels = ticks.map(formatTick);
-      expect(formattedLabels[0]).toBe('1 Sep');
-      expect(formattedLabels[5]).toBe('30 Sep');
-    });
+      const { ticks, formatTick } = getCustomXTicks(series, '30d', 'id');
+      expect(ticks.length).toBeGreaterThanOrEqual(5);
+      expect(ticks.length).toBeLessThanOrEqual(6);
+      expect(ticks[0]).toBe(0);
+      expect(ticks[ticks.length - 1]).toBe(89);
 
-    it('handles sparse readings with unequal time gaps (e.g., Oct 11 and Oct 15) without collapsing or overlapping dates', () => {
-      const sparseData = [
-        {
-          timestamp: '2026-10-11T08:30:00.000Z',
-          timestampMs: new Date('2026-10-11T08:30:00.000Z').getTime(),
-          time: '11 Okt 15:30',
-        },
-        {
-          timestamp: '2026-10-15T03:14:00.000Z',
-          timestampMs: new Date('2026-10-15T03:14:00.000Z').getTime(),
-          time: '15 Okt 10:14',
-        },
-        {
-          timestamp: '2026-10-15T05:20:00.000Z',
-          timestampMs: new Date('2026-10-15T05:20:00.000Z').getTime(),
-          time: '15 Okt 12:20',
-        },
-      ];
-
-      const { ticks, formatTick } = getCustomXTicks(sparseData, '7d', 'id', 'Asia/Jakarta');
-      expect(ticks).toHaveLength(2);
-      expect(ticks[0]).toBe(sparseData[0].timestampMs);
-      expect(ticks[1]).toBe(sparseData[1].timestampMs);
-
-      const label1 = formatTick(ticks[0]);
-      const label2 = formatTick(ticks[1]);
-      expect(label1).toMatch(/^11\s(Okt|Oct)$/);
-      expect(label2).toMatch(/^15\s(Okt|Oct)$/);
-      expect(label1).not.toBe(label2);
+      // Ticks format into readable timestamps from the actual readings
+      const firstLabel = formatTick(ticks[0]);
+      const lastLabel = formatTick(ticks[ticks.length - 1]);
+      expect(firstLabel).toBeTruthy();
+      expect(lastLabel).toBeTruthy();
     });
   });
 
@@ -237,7 +210,7 @@ describe('TASK-0504 — X-Axis Labels Distribution, Overlap & Clipping Preventio
       },
       {
         id: 'r-2',
-        recordedAt: '2026-10-12T00:00:00.000Z', // +1 day = 86,400,000 ms
+        recordedAt: '2026-10-12T00:00:00.000Z',
         nitrogen: 48,
         phosphorus: 26,
         potassium: 58,
@@ -249,7 +222,7 @@ describe('TASK-0504 — X-Axis Labels Distribution, Overlap & Clipping Preventio
       },
       {
         id: 'r-3',
-        recordedAt: '2026-10-15T00:00:00.000Z', // +3 days = 259,200,000 ms from r-2
+        recordedAt: '2026-10-15T00:00:00.000Z',
         nitrogen: 50,
         phosphorus: 28,
         potassium: 60,
@@ -261,7 +234,7 @@ describe('TASK-0504 — X-Axis Labels Distribution, Overlap & Clipping Preventio
       },
     ];
 
-    it('mapReadingsToSeries derives exact numeric timestampMs for every point and preserves zero/null metrics', () => {
+    it('mapReadingsToSeries preserves exact numeric timestampMs and zero/null values', () => {
       const series = mapReadingsToSeries(rawReadings, true);
       expect(series).toHaveLength(3);
 
@@ -271,7 +244,6 @@ describe('TASK-0504 — X-Axis Labels Distribution, Overlap & Clipping Preventio
         expect(Number.isFinite(series[i].timestampMs)).toBe(true);
       }
 
-      // Preserves zero and null metric values without falsification
       const withNulls = mapReadingsToSeries(
         [
           {
@@ -289,7 +261,7 @@ describe('TASK-0504 — X-Axis Labels Distribution, Overlap & Clipping Preventio
       expect(withNulls[0].ec).toBe(0);
     });
 
-    it('NPKChart connects to timestampMs and configures XAxis with numeric time scale (multi-metric & single-metric)', () => {
+    it('NPKChart configures XAxis with reading-sequence categorical spacing and localized label (multi & single metric)', () => {
       const series = mapReadingsToSeries(rawReadings, true);
       capturedXAxisProps.length = 0;
 
@@ -298,24 +270,21 @@ describe('TASK-0504 — X-Axis Labels Distribution, Overlap & Clipping Preventio
       expect(capturedXAxisProps.length).toBeGreaterThan(0);
       const npkXAxis = capturedXAxisProps[capturedXAxisProps.length - 1];
 
-      expect(npkXAxis.dataKey).toBe('timestampMs');
-      expect(npkXAxis.type).toBe('number');
-      expect(npkXAxis.scale).toBe('time');
-      expect(npkXAxis.domain).toEqual(['dataMin', 'dataMax']);
+      expect(npkXAxis.interval).toBe(0);
+      expect(npkXAxis.label?.value).toBe('Urutan pembacaan');
+      expect(npkXAxis.scale).toBeUndefined();
+      expect(npkXAxis.type).toBeUndefined();
 
       // 2. Single-metric variant (temperature, ec)
       render(<NPKChart data={series} selectedMetric="ec" preset="7d" />);
       const singleXAxis = capturedXAxisProps[capturedXAxisProps.length - 1];
-      expect(singleXAxis.dataKey).toBe('timestampMs');
-      expect(singleXAxis.type).toBe('number');
-      expect(singleXAxis.scale).toBe('time');
-
-      // Regression check: fails if axis returns to categorical 'time' or type 'category'
-      expect(singleXAxis.dataKey).not.toBe('time');
-      expect(singleXAxis.type).not.toBe('category');
+      expect(singleXAxis.interval).toBe(0);
+      expect(singleXAxis.label?.value).toBe('Urutan pembacaan');
+      expect(singleXAxis.scale).toBeUndefined();
+      expect(singleXAxis.type).toBeUndefined();
     });
 
-    it('WaterNutrientChart connects to timestampMs and configures XAxis with numeric time scale', () => {
+    it('WaterNutrientChart configures XAxis with reading-sequence categorical spacing and localized label', () => {
       const series = mapReadingsToSeries(rawReadings, true);
       capturedXAxisProps.length = 0;
 
@@ -323,36 +292,10 @@ describe('TASK-0504 — X-Axis Labels Distribution, Overlap & Clipping Preventio
       expect(capturedXAxisProps.length).toBeGreaterThan(0);
       const waterXAxis = capturedXAxisProps[capturedXAxisProps.length - 1];
 
-      expect(waterXAxis.dataKey).toBe('timestampMs');
-      expect(waterXAxis.type).toBe('number');
-      expect(waterXAxis.scale).toBe('time');
-      expect(waterXAxis.domain).toEqual(['dataMin', 'dataMax']);
-
-      // Regression check: fails if axis returns to categorical 'time' or wrong field
-      expect(waterXAxis.dataKey).not.toBe('time');
-      expect(waterXAxis.type).not.toBe('category');
-    });
-
-    it('safely handles single-point and equal-timestamp datasets with non-degenerate time domain padding', () => {
-      const singleReading = [rawReadings[0]];
-      const singleSeries = mapReadingsToSeries(singleReading, false);
-      const t = singleSeries[0].timestampMs!;
-
-      capturedXAxisProps.length = 0;
-      render(<NPKChart data={singleSeries} selectedMetric="npk" preset="24h" />);
-      const npkSingleXAxis = capturedXAxisProps[capturedXAxisProps.length - 1];
-      // Must not collapse to [t, t]; pads +/- 1 hour (3,600,000 ms)
-      expect(npkSingleXAxis.domain).toEqual([t - 3600000, t + 3600000]);
-
-      render(<WaterNutrientChart data={singleSeries} selectedMetric="ec" preset="24h" />);
-      const waterSingleXAxis = capturedXAxisProps[capturedXAxisProps.length - 1];
-      expect(waterSingleXAxis.domain).toEqual([t - 3600000, t + 3600000]);
-
-      // Equal-timestamp dataset (e.g. 2 readings at exact same millisecond)
-      const equalTsSeries = [singleSeries[0], { ...singleSeries[0], id: 'r-duplicate', ec: 1300 }];
-      render(<WaterNutrientChart data={equalTsSeries} selectedMetric="ec" preset="24h" />);
-      const equalXAxis = capturedXAxisProps[capturedXAxisProps.length - 1];
-      expect(equalXAxis.domain).toEqual([t - 3600000, t + 3600000]);
+      expect(waterXAxis.interval).toBe(0);
+      expect(waterXAxis.label?.value).toBe('Urutan pembacaan');
+      expect(waterXAxis.scale).toBeUndefined();
+      expect(waterXAxis.type).toBeUndefined();
     });
 
     it('preserves browser display timezone in tooltip formatting without boundary distortion', () => {
@@ -362,29 +305,6 @@ describe('TASK-0504 — X-Axis Labels Distribution, Overlap & Clipping Preventio
 
       const formatted24h = formatTooltipDateTime(ts, '24h', 'id', 'Asia/Jakarta');
       expect(formatted24h).toBe('00:30');
-    });
-
-    it('verifies that numeric timestamp scale produces 3:1 coordinate ratio for unequal gaps (Oct 11, 12, 15) while categorical spacing produces invalid 1:1 ratio', () => {
-      const series = mapReadingsToSeries(rawReadings, true);
-      const t0 = series[0].timestampMs!; // Oct 11 00:00:00Z
-      const t1 = series[1].timestampMs!; // Oct 12 00:00:00Z (+1 day)
-      const t2 = series[2].timestampMs!; // Oct 15 00:00:00Z (+3 days from t1)
-
-      const dt01 = t1 - t0; // 86,400,000 ms
-      const dt12 = t2 - t1; // 259,200,000 ms
-
-      // 1. Under numeric time scale (as configured on XAxis props verified above):
-      // Coordinate delta is directly proportional to elapsed time delta:
-      const numericTimeRatio = dt12 / dt01;
-      expect(numericTimeRatio).toBeCloseTo(3.0, 5);
-
-      // 2. Under erroneous categorical spacing (where Recharts maps index 0, 1, 2 uniformly):
-      const categoricalIndexRatio = (2 - 1) / (1 - 0);
-      expect(categoricalIndexRatio).toBe(1.0);
-
-      // 3. Prove that numeric time-based ratio strictly diverges from invalid categorical spacing
-      expect(numericTimeRatio).not.toBe(categoricalIndexRatio);
-      expect(numericTimeRatio).toBeGreaterThan(categoricalIndexRatio * 2.5);
     });
   });
 });

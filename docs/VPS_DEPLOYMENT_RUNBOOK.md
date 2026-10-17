@@ -87,13 +87,13 @@
      - Rollback pair durably stored in `/opt/kebun-melon/.rollback-08f0d79.env`:
        `WEB_IMAGE=kebun-melon-web:d1c1c13`
        `GATEWAY_IMAGE=kebun-melon-gateway:875f91b`
-   - **Initial VPS Chart Verification FAILED:**
-     - Test case: Water Quality $\to$ location Testing (90 readings) $\to$ 30 Days $\to$ pH.
-     - Operator reported readings appeared summarized rather than individually visible; screenshot showed a smoothed curve and insufficient individual-reading visibility.
-     - *(Factual Guard: No live parity evidence was supplied reconciling all 90 live database/API/chart IDs; live parity must not be claimed. Localization previously passed operator testing locally. Do not infer additional PASS results for Clear Location or alerts).*
-8. **2026-10-17 Raw Telemetry Discrete Presentation Patch Deployment Scope (PENDING):**
+   - **Live API Response Reality & Burst Clumping Resolution (TASK-0504 Follow-up 4):**
+     - Operator verified live API response for location "Testing (90), 30 Days, pH" containing 90 points, 90 unique reading IDs, 90 distinct timestamps, `nextCursor=null`, and `truncated=false`. All 90 points reach the chart component data prop intact.
+     - Diagnosis: 65 readings occurred within ~11 minutes, which an elapsed-time proportional scale compressed into $<0.03\%$ of horizontal chart width, causing visual clumping while the rest of the chart was empty.
+     - Resolved via reading-sequence categorical X-axis ($x = 0, \dots, n-1$) with explicit label "Urutan pembacaan" / "Reading sequence", straight linear segments (`type="linear"`), clean line presentation (`dot={false}`, `activeDot={false}`, NO `<Brush>`), sparse timestamp ticks, exact tooltips, and combined NPK alignment.
+8. **2026-10-17 Reading-Sequence Presentation Patch Deployment Scope (TASK-0504 Follow-up 4 PENDING):**
    - **Container Packaging & Rebuild Scope:**
-     - **Web Container (`kebun-melon-web`):** **REBUILD & RECREATE REQUIRED** using the **NEW commit SHA**. Code changes touch chart components (`WaterNutrientChart.tsx`, `NPKChart.tsx`), Recharts linear styling, dot markers, zoom brush controls, and per-reading tooltips. Must be built off-VPS for `linux/amd64`.
+     - **Web Container (`kebun-melon-web`):** **REBUILD & RECREATE REQUIRED** using the **NEW commit SHA**. Code changes touch chart components (`WaterNutrientChart.tsx`, `NPKChart.tsx`), categorical sequence X-axis, label localization, clean linear styling (`dot={false}`, `activeDot={false}`, NO `<Brush>`), and per-reading tooltips. Must be built off-VPS for `linux/amd64`.
      - **Gateway Container (`kebun-melon-gateway`):** **UNCHANGED** at `08f0d79`. Zero gateway code changes in this patch.
      - **Do Not Reuse Image Tag:** Do not reuse image tag `08f0d79` for changed web code.
    - **Infrastructure & Configuration Changes:**
@@ -103,12 +103,13 @@
    - **Rollback Baseline Invariant:**
      - Next web deployment must capture and preserve current web `08f0d79` as its rollback baseline without overwriting the historical rollback pair in `/opt/kebun-melon/.rollback-08f0d79.env`.
    - **Deferred Operator Acceptance Checklist on Nebula VPS:**
-     1. Exact Reading IDs & Values in tooltips (`ID: ...`, formatted timestamp, exact value).
-     2. Repeated Timestamps & Dense Readings (zoom brush separates closely spaced points).
-     3. Null Gaps (`connectNulls={false}`).
-     4. Zoom / Reset Behavior (smooth brush zoom; resets on device/location/preset change).
-     5. Responsive EN/ID Tooltips.
-     6. Sparse X-Axis Labels Without Collisions (5–7 readable ticks; 100% data points plotted).
+     1. Equidistant Reading-Sequence Positions: All readings receive uniform categorical spacing ($x = 0, \dots, n-1$), resolving visual clumping for burst readings.
+     2. Explicit Axis Label: Bottom X-axis clearly labeled "Urutan pembacaan" (`id`) / "Reading sequence" (`en`).
+     3. Exact Reading Values & Timestamps in Tooltips: Full sensor timestamp, exact metric value with unit, and discrete reading ID.
+     4. Clean Line Presentation: Straight linear connecting segments (`type="linear"`), `dot={false}`, `activeDot={false}`, NO `<Brush>`, clean container height.
+     5. Combined NPK Alignment: In `NPKChart`, all three series (N, P, K) align to identical categorical indices; nulls remain unshifted gaps (`connectNulls={false}`).
+     6. Sparse X-Axis Ticks Without Collisions: 5–7 evenly spaced index ticks formatted from original timestamps without label clipping.
+     7. Scope & Water Tank Exclusion: Applies to Soil and Water Quality historical charts; Water Tank is completely excluded (uses separate `WaterTankMonitoringCard.tsx`).
 
 ---
 

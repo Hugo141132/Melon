@@ -2638,6 +2638,15 @@ A prior claim that the chart window "keeps the most recent readings" was **incor
   - **Compact Numbered Pagination (`TASK-0504` & `TASK-0814`):** Created shared component `CompactPagination.tsx` matching Image 2 visual design (compact `<` `>` chevrons, rounded pill active indicator, numbered buttons, ellipsis `···`, focus rings, `aria-current="page"`, responsive padding) and integrated across Soil history, Water history (`ReadingHistoryTable.tsx`), and Valve command history (`FaucetHistoryTable.tsx`). Preserved server-side pagination contracts (5 rows for soil/water, 10 for valve), deterministic ordering, and filter behavior.
   - **Pagination Localization Defect & Minimal Fix (`MISSING_MESSAGE: history.paginationAriaLabel`):** Fixed reproduced missing translation error in `ReadingHistoryTable.tsx` caused by passing `{ defaultValue: ... }` to `tHistory` (in `next-intl`, the 2nd argument is strictly for interpolation variables). Added `history.paginationAriaLabel` (`"Reading history pagination"` / `"Navigasi halaman riwayat pengukuran"`), `faucet.paginationAriaLabel` (`"Valve command history pagination"` / `"Navigasi halaman riwayat perintah valve"`), and `common` pagination accessibility keys (`pagination`, `previousPage`, `nextPage`, `pageNumber`) to both `apps/web/messages/en.json` and `apps/web/messages/id.json`. Cleaned up call sites to `tHistory('paginationAriaLabel')` and `tFaucet('paginationAriaLabel')`. Confirmed that `NextIntlClientProvider` in `apps/web/app/layout.tsx` bundles all namespaces to the client. Localized button aria-labels in `CompactPagination.tsx` using `useTranslations('common')` without global suppression or hardcoded strings.
   - **Numeric Elapsed-Time X-Axis Resolution (`TASK-0504` & `TASK-0503–0504` refinement):** Replaced categorical `dataKey="time"` with numeric timestamp coordinate derived from each reading's `recordedAt` (`dataKey="timestampMs"`, `type="number"`, `scale="time"`, `domain={timeDomain}`) across all soil/water chart variants (`NPKChart.tsx` AreaChart & LineChart, `WaterNutrientChart.tsx` AreaChart). Ticks are generated as numeric millisecond timestamps (`number[]`) with responsive display formatting (`formatTick`) and label collision handling (`minTickGap={25}`, `interval="preserveStartEnd"`). Added non-degenerate time domain padding (`[tFirst - 3600000, tLast + 3600000]`) for single-point and equal-timestamp datasets to eliminate scale collapse, while multi-point datasets evaluate to `['dataMin', 'dataMax']`. Chart labels and tooltips use runtime browser display timezone (`getDisplayTimezone()`, resolved via `Intl.DateTimeFormat().resolvedOptions().timeZone` with fallback `Asia/Jakarta`), strictly distinguished from server-side notification timezone. Replaced standalone arithmetic test with connected regression coverage in `apps/web/test/unit/chart-xaxis-ticks-labels.test.tsx` directly linking `mapReadingsToSeries` and `NPKChart`/`WaterNutrientChart` `<XAxis>` props, verifying that coordinate spacing for unequal gaps (e.g. Oct 11, 12, 15) reflects elapsed time (~3:1 ratio) rather than equal array-index spacing (1:1 ratio), and asserting that categorical spacing or missing `timestampMs` fails. Preserved complete data retrieval, zero/null values, timezone formatting, and tooltip details. Manual website testing: `USER-REPORTED PASS (2026-10-17)`. GitHub Actions CI: `PASS (Run 38998551217 on d1c1c13)`. Deployed VPS release: `kebun-melon-web:d1c1c13 (USER-CONFIRMED COMPLETE on 2026-10-17)`.
+- **2026-10-17 Reading-Sequence X-Axis Follow-up (TASK-0504 Follow-up 4):**
+  - **Live API Reality & Burst Clumping Diagnosis:** Operator verified live API response for location "Testing (90), 30 Days, pH" containing 90 points, 90 unique reading IDs, 90 distinct timestamps, `nextCursor=null`, and `truncated=false`. All 90 points reach the chart component intact. However, 65 readings occurred within ~11 minutes, which an elapsed-time proportional scale compressed into $<0.03\%$ of horizontal chart width, causing an unreadable clump while the rest of the chart was empty.
+  - **Frontend Reading-Sequence X-Axis (`NPKChart.tsx`, `WaterNutrientChart.tsx`):** Implemented an equidistant reading-sequence X-axis where each reading occupies an equal categorical coordinate slot based on its chronological sequence index ($x = 0, 1, \dots, n-1$). Explicitly labeled the axis as `"Urutan pembacaan"` (id) / `"Reading sequence"` (en) (`position: 'insideBottom'`, `offset: -12`, `fontSize: 10`, `fontWeight: 600`), clearly communicating that horizontal distances represent reading sequence rather than physical elapsed duration.
+  - **Sparse Timestamp Labels & Tooltips:** Formatted 5–7 evenly spaced index ticks (`[0, ..., n-1]`) with `tickFormatter` deriving readable date/time labels (`formatItem(data[idx])`) directly from original sensor timestamps (`recordedAt`). Tooltips display full timestamp, exact sensor values with units, and discrete reading IDs.
+  - **Clean Line Chart Presentation:** Rendered with straight linear connecting segments (`type="linear"`), `dot={false}`, `activeDot={false}`, and NO `<Brush>`, restoring clean container heights (`h-44 sm:h-52` for soil, `h-40 sm:h-48` for water).
+  - **Combined NPK Alignment:** In `NPKChart` combined view, all three series (N, P, K) align strictly to identical reading indices. Missing values remain `null` with `connectNulls={false}` and never shift one series relative to another.
+  - **Full Domain Scope & Water Tank Exclusion:** Applies consistently across ALL historical charts in Soil (Nitrogen, Phosphorus, Potassium, combined NPK, Temperature, Moisture, pH, EC) and Water Quality (pH, EC, TDS). Reservoir Water Tank monitoring is completely excluded (uses separate `WaterTankMonitoringCard.tsx` without historical line charts).
+  - **Zero Backend/API Mutations & Table Independence:** Zero changes to backend, API, database, or gateway code. Server-side history table pagination (`HISTORY_PAGE_SIZE = 5`) and filters remain completely independent.
+  - **Regression Coverage & Status:** Updated `chart-xaxis-ticks-labels.test.tsx` and `raw-readings-chart-pipeline.test.tsx`. Agent executed zero tests or builds; all testing and CI quality gates are reserved for the operator. Status: `PENDING` (awaiting operator push and verification).
 
 ### Work
 
@@ -5524,12 +5533,12 @@ The following full CI gates were deferred for this checkpoint and must be verifi
 
 ---
 
-## TASK-0504 Follow-up 3: Raw Readings Chart Pipeline & Discrete Presentation Preservation ("Testing (90), 30 Days, pH")
+## TASK-0504 Follow-up 3: Raw Readings Chart Pipeline & Clean Line Presentation Preservation ("Testing (90), 30 Days, pH")
 
 **Priority:** `P1` (Data Accuracy, Raw Reading Fidelity & Chart Presentation)  
-**Status:** `READY_FOR_TEST` (Software implementation and regression tests completed; operator manual website verification PENDING; VPS verification FAILED on release 08f0d79)  
+**Status:** `READY_FOR_TEST` (Software implementation and regression tests completed; operator manual website verification PENDING; release 295ee17 deployed but operator acceptance FAILED)  
 **Dependencies:** `DEC-MON-087`, `DEC-MON-093`, `DEC-MON-094`, `DEC-MON-095`, `DEC-MON-096`, `TASK-0503`, `TASK-0504`  
-**Frontend Impact:** `MODERATE` (Chart visual rendering, markers, tooltips, and zoom interaction)  
+**Frontend Impact:** `MODERATE` (Chart clean line visual rendering, no markers, no Brush, tooltip multi-reading inspection)  
 **Selected UI Direction:** `Premium Minimal Ops`  
 **Existing Color Template:** `UNCHANGED`  
 **Selected Motion Effects:** `None`  
@@ -5537,69 +5546,57 @@ The following full CI gates were deferred for this checkpoint and must be verifi
 
 ### 1. Authoritative Operational Context & Root Cause
 
-- **Release 08f0d79 Deployment Baseline:**
-  - Release commit `08f0d795619196f97f5c07f2610c5c51bbd1cd80` (`08f0d79`) was pushed to `main`; remote GitHub Actions CI run `39015583836` passed.
-  - Web and gateway images tagged `08f0d79` were built off-VPS for `linux/amd64`, transferred, loaded, and recreated on Nebula VPS (`38.103.171.46`).
-  - Operator confirmed container recreation and health checks succeeded.
-  - Rollback pair stored in `/opt/kebun-melon/.rollback-08f0d79.env`:
-    `WEB_IMAGE=kebun-melon-web:d1c1c13`
-    `GATEWAY_IMAGE=kebun-melon-gateway:875f91b`
-  - (Public HTTP probes and broader website checks were not supplied and must not be claimed).
-- **Initial VPS Chart Verification FAILED:**
-  - Test case: Water quality $\to$ location Testing (90 readings) $\to$ 30 Days $\to$ pH.
-  - Operator reported readings appeared summarized rather than individually visible. Screenshot showed a smoothed curve and insufficient individual-reading visibility.
-  - (No live parity evidence was supplied reconciling all 90 live database/API/chart IDs; do not claim live parity).
-  - Localization previously passed operator testing locally. Do not infer additional PASS results for Clear Location or alerts.
-- **Defect Investigation & Root Cause:**
-  - Tracing proved that database queries and backend API (`/chart`) already deliver 100% of individual database rows without aggregation, bucketing, downsampling, or averaging.
+- **Release 295ee17 Deployment Baseline & Operator Acceptance FAILED:**
+  - Web release `295ee17` was deployed to VPS staging (`https://monitoring.melonmadura.my.id`).
+  - Operator chart acceptance testing on Water Quality $\to$ location Testing (90 readings) $\to$ 30 Days $\to$ pH remained **FAILED**.
+  - Operator clarification: "One reading = one data point" means 100% preservation of the underlying dataset (zero aggregation, averaging, bucketing, sampling, or deduplication across DB $\to$ API $\to$ hook $\to$ chart prop), **NOT** drawing visible circle markers or adding a zoom Brush.
+  - Final requirement: Render as a **clean LINE CHART** with straight segments (`type="linear"`), completely **WITHOUT markers (`dot={false}`)** and **WITHOUT active highlight (`activeDot={false}`)**, and completely **WITHOUT `<Brush>`**.
+- **Defect Investigation & Pipeline Trace:**
+  - Database queries (`getWaterChartSeries`, `getSoilChartSeries`) and backend API (`/chart`) already deliver 100% of individual database rows without aggregation, bucketing, downsampling, or averaging.
   - Client hook `useHistoricalMonitoring` keys into `accumulatedPointsMap` by `readingId` and preserves all 90 items without reduction.
-  - In `WaterNutrientChart.tsx` and `NPKChart.tsx`, the presentation layer suffered from four visual defects:
-    1. Cubic spline curve smoothing (`type="monotone"`) interpolated raw points into a generalized wavy trend curve.
-    2. Data point markers were completely hidden (`dot={false}` / omitted), making 90 discrete readings appear as a single smooth summary line.
-    3. Dense readings in 30-day views had no zoom mechanism to isolate closely spaced data points.
-    4. Tooltips lacked the reading ID and could not disambiguate readings recorded at similar times.
+  - In a 30-day window, readings recorded closely in time or sharing timestamps map to identical or neighboring screen coordinates, rendering as straight line segments.
+  - When distinct readings share timestamps or visual coordinates, tooltips previously only surfaced the first payload item, making overlapping readings invisible.
+  - Unused Brush and markers cluttered the UI and violated the approved clean line chart aesthetic.
 
-### 2. Implemented Corrections in Unreleased Chart Patch
+### 2. Implemented Corrections in Clean Line Chart Patch
 
-- **Raw Reading Integrity & Straight Lines (`type="linear"`):**
-  - Replaced cubic spline smoothing (`type="monotone"`) with straight line segments (`type="linear"`) across `WaterNutrientChart` (`Area`) and `NPKChart` (`Area` and `Line` components).
-  - Preserves every matching raw reading as a distinct chart data item with its original reading ID, sensor timestamp (`timestamp`, `timestampMs`), and exact values.
-- **Individual Reading Markers (`dot` & `activeDot`):**
-  - Configured explicit `dot` markers (`r: 3, fill: color, stroke: #ffffff, strokeWidth: 1`) and hover highlights (`activeDot: { r: 6, fill: color, stroke: #ffffff, strokeWidth: 2 }`) so every raw reading is visibly marked.
-- **Interactive Zoom / Brush Controls (`<Brush>`):**
-  - Integrated Recharts `<Brush dataKey="timestampMs" />` when `data.length > 1`, allowing dense or overlapping readings to be zoomed and inspected individually without altering underlying timestamps or values.
-  - Added container height expansion (`h-48 sm:h-56` in water, `h-52 sm:h-60` in soil) to accommodate brush controls.
-  - Reset behavior: Brush indices automatically reset (`setBrushIndices({})`) whenever the underlying dataset, selected location, or preset range changes.
-- **Precise Per-Reading Tooltips:**
-  - Enhanced `WaterChartTooltipContent` and `NPKChartTooltipContent` to render the truncated `readingId` (`ID: ...`), formatted timestamp, and exact value + unit.
+- **Clean Line Chart Presentation (`type="linear"`, `dot={false}`, `activeDot={false}`):**
+  - Rendered straight connecting line segments (`type="linear"`) across `WaterNutrientChart` (`Area`) and `NPKChart` (`Area` and `Line` components).
+  - Explicitly disabled circle markers (`dot={false}`) and hover highlights (`activeDot={false}`) across all soil and water chart paths.
+- **Complete Brush Removal & Restored Layout Heights:**
+  - Removed Recharts `<Brush>` component, `brushIndices` state, and change handlers from `WaterNutrientChart` and `NPKChart`.
+  - Restored original compact container heights (`h-40 sm:h-48` for water, `h-44 sm:h-52` for soil) with zero layout shifts or reserved brush space.
+- **Overlapping Readings Tooltip Inspection:**
+  - Enhanced `WaterChartTooltipContent` and `NPKChartTooltipContent` with `allData` prop.
+  - When multiple distinct readings share the hovered timestamp/coordinate, the tooltip surfaces a multi-reading badge (`N readings`) and lists every individual reading with its distinct truncated `readingId` (`ID: ...`) and exact sensor value + unit.
+  - Single readings display standard clean header with timestamp, `ID: ...`, and metric values.
 - **Sparse X-Axis Labels Without Data Loss:**
   - Maintained responsive sparse label distribution (5-7 ticks for 30d, 4-5 for 7d, 5-8 for 24h) via `getCustomXTicks` avoiding label collisions without dropping data points. Sparse ticks only govern the date/time display labels; 100% of raw data points remain rendered.
+- **Preserved Source Data Fidelity (No Clamping):**
+  - Unusual source values (such as negative pH values present in source data) are strictly preserved as raw sensor evidence and never clamped, replaced, or silently dropped.
 - **Shared Rendering Paths:**
-  - Applied identical straight-line, marker, zoom brush, and per-reading tooltip patterns to EC and TDS in `WaterNutrientChart`, as well as Temperature, Moisture, pH, EC, and multi-metric NPK in `NPKChart`.
+  - Applied identical clean straight-line, no-marker, no-Brush, and multi-reading tooltip patterns to EC and TDS in `WaterNutrientChart`, as well as Temperature, Moisture, pH, EC, and multi-metric NPK in `NPKChart`.
 - **Preserved Invariants:**
   - Preserved selected location/date boundaries, null gaps (`connectNulls={false}`), and strict independence from measurement history table pagination (`HISTORY_PAGE_SIZE = 5`).
-- **Unresolved Recommendation-Alert Separation:**
-  - Kept strictly separate from chart rendering: post-ack Critical escalation visibility remains unconfirmed; auto-recovery and independent background polling are NOT approved or enabled. Acknowledgement is strictly per-user in `alert_acknowledgements` and is NOT episode resolution.
 
 ### 3. Testing & Verification Summary
 
 - **Unit Regression Test Suites:**
-  - Added `apps/web/test/unit/raw-readings-chart-pipeline.test.tsx` verifying:
+  - Updated `apps/web/test/unit/raw-readings-chart-pipeline.test.tsx` verifying:
     - Concrete acceptance case "Testing (90), 30 Days, pH" maps all 90 raw readings preserving distinct reading IDs, timestamps, and values.
-    - `WaterNutrientChart` receives 90 distinct items and configures `type="linear"`, `dot`, `activeDot`, `connectNulls={false}`, and `<Brush>`.
-    - Per-reading tooltip displays `readingId`, timestamp, and exact pH value.
+    - `WaterNutrientChart` receives 90 distinct items and configures `type="linear"`, `dot={false}`, `activeDot={false}`, `connectNulls={false}`, and NO Brush.
+    - Per-reading tooltip displays `readingId`, timestamp, and exact pH value for single items.
+    - Tooltip multi-reading inspection surfaces all overlapping readings sharing identical timestamps with distinct IDs and exact values (including negative pH).
     - Sparse X-axis tick distribution (5-7 ticks) without data reduction.
     - Shared paths for EC, TDS, Temperature, Moisture, pH, EC, and NPK lines in `NPKChart`.
     - Null gaps and table pagination independence.
-  - Updated Recharts mock in `apps/web/test/unit/chart-xaxis-ticks-labels.test.tsx` and `apps/web/test/unit/chart-completeness-overflow.test.tsx` to include `Brush`, `AreaChart`, and `Area`.
-  - *Factual Note:* The 90-reading fixture is synthetic unit regression coverage, not proof of live VPS data completeness. Tests were NOT executed by the agent.
 - **Explicit Operator Acceptance Checks (Pending Execution):**
-  1. *Exact Reading IDs & Values:* Hover over chart dots; verify tooltip shows `ID: ...`, formatted timestamp, and exact sensor value.
-  2. *Repeated Timestamps & Dense Readings:* Drag Brush handles to zoom in; verify closely spaced points spread out and can be clicked/hovered individually.
-  3. *Null Gaps:* Verify missing reading periods appear as visual gaps (`connectNulls={false}`).
-  4. *Zoom / Reset Behavior:* Verify Brush zooms smoothly, and resets back to full view when switching devices, locations, or date presets.
+  1. *Clean Line Aesthetics:* Verify chart renders as a clean line chart without dots/circles and without bottom Brush.
+  2. *Dataset Completeness:* Verify all 90 readings are retained in chart dataset.
+  3. *Overlapping Tooltips:* Hover over coordinates with multiple readings; verify tooltip lists all overlapping reading IDs and values.
+  4. *Null Gaps:* Verify missing reading periods appear as visual gaps (`connectNulls={false}`).
   5. *Responsive EN/ID Tooltips:* Test in both English and Indonesian; verify no text clipping or layout shift.
-  6. *Sparse X-Axis Labels:* Verify 5–7 readable date/time labels without collisions across mobile (390px) and desktop, with 100% data points plotted.
+  6. *Sparse X-Axis Labels:* Verify 5–7 readable date/time labels without collisions across mobile (390px) and desktop.
 - **CI Protocol & Deployment Requirements:**
   - Software implementation: `COMPLETE`.
   - Operator local website testing: `PENDING`.
@@ -5607,8 +5604,8 @@ The following full CI gates were deferred for this checkpoint and must be verifi
   - Web Container Rebuild: **REBUILD & RECREATE REQUIRED** using the NEW commit SHA.
   - Gateway Container: **UNCHANGED** at `08f0d79`.
   - Database Migrations & Caddy: **NOT REQUIRED**.
-  - Rollback Invariant: Next web deployment must preserve current web `08f0d79` as its rollback baseline without overwriting `/opt/kebun-melon/.rollback-08f0d79.env`. Do not reuse tag `08f0d79` for changed code.
-  - Deployed VPS Verification: `PENDING` (do NOT mark task DONE before VPS verification).
+  - Rollback Invariant: Next web deployment must preserve current web `295ee17` as its rollback baseline.
+  - Deployed VPS Verification: `PENDING` (do NOT mark task DONE before operator VPS verification).
 
 
 
