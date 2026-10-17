@@ -2605,6 +2605,38 @@ The root layout metadata (`apps/web/app/layout.tsx`) implements dual media-query
   `useHistoricalMonitoring.ts` deduplicates points across batches using a Map keyed by unique reading ID, strictly bounds points within `[fromTime, toTime)`, and performs a global chronological sort: `(a.recordedAt || a.timestamp || a.receivedAt)` with deterministic ID tie-breaking.
 <!-- Recommendation & Telemetry Architecture Reconciled: 2026-10-17 -->
 
+---
+
+## 40. Telemetry Chart Discrete Presentation Architecture (TASK-0504 Follow-up 3, DEC-MON-096 / Reconciled 2026-10-17)
+
+### 40.1 Architectural Context & Presentation Defect Analysis
+- **Pipeline Data Integrity:** Audit of the telemetry query pipeline (`telemetry-repository.ts`, `/monitoring/soil/chart`, `/monitoring/water/chart`, and `useHistoricalMonitoring.ts`) confirmed that backend data delivery is 100% lossless. Zero bucketing, downsampling, averaging, or aggregation occurs. All matching readings in the requested time and location boundary are delivered to the frontend.
+- **Presentation Defect on Release 08f0d79:**
+  - Initial VPS testing on release `08f0d79` for Water Quality $\to$ Testing (90) $\to$ 30 Days $\to$ pH failed because Recharts was configured with cubic curve interpolation (`type="monotone"`) and hidden dots (`dot={false}` / omitted).
+  - Ninety discrete readings appeared as a single smooth summary line without discernible individual points, creating the false visual impression that the system was downsampling or summarizing data.
+
+### 40.2 Presentation Calibration Architecture (`DEC-MON-096`)
+- **Linear Segment Rendering (`type="linear"`):**
+  - All chart series across `WaterNutrientChart.tsx` (Area) and `NPKChart.tsx` (Area and Line) use `type="linear"`. Straight line segments connect consecutive chronologically sorted data points, visually preserving actual rate-of-change and measurement transitions without synthetic cubic spline waviness.
+- **Explicit Reading Markers (`dot` & `activeDot`):**
+  - Discrete reading markers are configured on every series (`dot: { r: 3, fill: color, stroke: '#ffffff', strokeWidth: 1 }` and `activeDot: { r: 6, fill: color, stroke: '#ffffff', strokeWidth: 2 }`). Every retained database record matching the filter is visibly represented as an identifiable dot.
+- **Interactive Zoom Brush Controls (`<Brush>`):**
+  - Integrated Recharts `<Brush dataKey="timestampMs" />` when dataset contains multiple points (`data.length > 1`).
+  - In wide observation windows (e.g., 30 Days with 90+ readings), operators can drag brush handles to zoom into high-density clusters, visually separating closely spaced readings without modifying underlying data or triggering network refetches.
+  - Brush state automatically resets (`setBrushIndices({})`) whenever the active device, selected location, or date preset changes.
+- **Reading Identification in Tooltips:**
+  - Chart tooltip components (`WaterChartTooltipContent`, `NPKChartTooltipContent`) extract and display the truncated `readingId` (`ID: ...`), timestamp, and exact value + unit for the hovered point, enabling unambiguous verification of individual database readings.
+- **Sparse X-Axis Label Invariant:**
+  - Responsive sparse X-axis tick generation (`getCustomXTicks`, 5–7 labels for 30d, 4–5 for 7d, 5–8 for 24h) distributes readable date/time labels across the axis without clipping or overlap on mobile (390px) and desktop.
+  - *Invariant:* Sparse labels govern axis text layout only; they do NOT reduce, bucket, or filter the plotted data points, dot markers, or tooltips.
+- **System Invariants Preserved:**
+  - *Location Isolation:* Only readings matching the explicitly selected location are plotted.
+  - *Missing Value Gaps:* Missing sensor values render as visual gaps (`connectNulls={false}`).
+  - *Table Decoupling:* History table pagination (`HISTORY_PAGE_SIZE = 5`) remains completely independent from chart filtering and brush zoom.
+  - *Alert Decoupling:* Chart presentation is decoupled from agronomic alert evaluation.
+<!-- Telemetry Chart Discrete Presentation Architecture Reconciled: 2026-10-17 -->
+
+
 
 
 

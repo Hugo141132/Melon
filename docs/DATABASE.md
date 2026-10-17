@@ -121,6 +121,11 @@ Under `TASK-0503`, `TASK-0504`, and `DEC-MON-093`:
     - 0 cascade or foreign-key violations.
     - All existing devices (3) and users (7) preserved intact. Zero data alterations on non-task records.
 
+### 2.8 TASK-0504 Follow-up 3 / DEC-MON-096 Telemetry Chart Presentation & Zero Schema Migrations
+Under `TASK-0504 Follow-up 3` and `DEC-MON-096`:
+- **Zero Schema Migrations:** The patch to render discrete raw telemetry points using straight lines, individual dot markers, zoom brush controls, and per-reading tooltips is strictly a frontend presentation calibration. It requires **zero schema migrations**, zero index changes, and zero data alterations in PostgreSQL.
+- **Data Fidelity Invariant:** Database queries continue to return 100% of raw discrete readings without downsampling or averaging. Sparse X-axis labels in the UI do not modify database queries or result sets.
+
 ---
 
 

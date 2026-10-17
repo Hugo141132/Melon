@@ -85,12 +85,19 @@ vi.mock('recharts', () => ({
       {children}
     </div>
   ),
+  AreaChart: ({ children, data }: any) => (
+    <div data-testid="area-chart" data-points-count={data?.length}>
+      {children}
+    </div>
+  ),
   Line: () => <div data-testid="recharts-line" />,
+  Area: () => <div data-testid="recharts-area" />,
   CartesianGrid: () => <div />,
   XAxis: () => <div />,
   YAxis: () => <div />,
   Tooltip: () => <div />,
   Legend: () => <div />,
+  Brush: () => <div data-testid="recharts-brush" />,
 }));
 
 import { GET as getSoilChart } from '@/app/api/v1/devices/[deviceId]/monitoring/soil/chart/route';

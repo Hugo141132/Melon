@@ -55,6 +55,7 @@ vi.mock('recharts', () => ({
   YAxis: () => <div />,
   Tooltip: () => <div />,
   Legend: () => <div />,
+  Brush: () => <div data-testid="recharts-brush" />,
 }));
 
 vi.mock('next-intl', () => ({

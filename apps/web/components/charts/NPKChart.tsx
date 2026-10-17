@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import {
   LineChart,
   Line,
@@ -11,6 +11,7 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  Brush,
 } from 'recharts';
 import { useTranslations, useLocale } from 'next-intl';
 import { BaseSeriesItem } from '@/hooks/useHistoricalMonitoring';
@@ -307,6 +308,60 @@ export function formatTooltipDateTime(
   return `${dateStr} ${timeStr}`;
 }
 
+export function NPKChartTooltipContent({
+  active,
+  payload,
+  label,
+  preset,
+  locale,
+  tCommon,
+  defaultUnit = '',
+}: any) {
+  if (!active || !payload || payload.length === 0) return null;
+
+  const firstItem = payload[0]?.payload as BaseSeriesItem | undefined;
+  const rawTs = firstItem?.timestamp || firstItem?.timestampMs || label;
+  const formattedTime = formatTooltipDateTime(rawTs, preset, locale);
+  const readingId = firstItem?.readingId;
+
+  return (
+    <div
+      className="bg-white/95 backdrop-blur-sm border border-app-outline-variant/60 rounded-xl p-3 shadow-md text-xs space-y-1.5 min-w-[150px]"
+      data-testid="chart-custom-tooltip"
+    >
+      <div className="font-semibold text-app-on-surface flex items-center justify-between gap-2 border-b border-app-outline-variant/30 pb-1">
+        <span>{formattedTime}</span>
+        {readingId && (
+          <span
+            className="font-mono text-[10px] text-app-on-surface-variant bg-app-surface-container/60 px-1.5 py-0.5 rounded"
+            title={String(readingId)}
+          >
+            ID: {String(readingId).slice(0, 8)}
+          </span>
+        )}
+      </div>
+      {payload.map((entry: any, idx: number) => {
+        const val = entry.value;
+        const unit = entry.unit !== undefined ? entry.unit : defaultUnit;
+        const displayVal =
+          val !== null && val !== undefined ? `${val} ${unit}`.trim() : tCommon('unavailable');
+        return (
+          <div key={`entry-${idx}`} className="flex items-center justify-between gap-3">
+            <span className="text-app-on-surface-variant flex items-center gap-1.5">
+              <span
+                className="w-2 h-2 rounded-full inline-block"
+                style={{ backgroundColor: entry.color || entry.stroke }}
+              />
+              {entry.name}
+            </span>
+            <span className="font-bold text-app-on-surface font-mono">{displayVal}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function NPKChart({
   data = [],
   selectedMetric = 'npk',
@@ -319,6 +374,31 @@ export default function NPKChart({
   const tHistory = useTranslations('history');
   const tCommon = useTranslations('common');
   const locale = useLocale();
+
+  const [brushIndices, setBrushIndices] = useState<{ startIndex?: number; endIndex?: number }>({});
+
+  useEffect(() => {
+    setBrushIndices({});
+  }, [data, selectedLocationKey, preset]);
+
+  const handleBrushChange = useCallback((range: { startIndex?: number; endIndex?: number }) => {
+    if (typeof range?.startIndex === 'number' && typeof range?.endIndex === 'number') {
+      setBrushIndices(range);
+    }
+  }, []);
+
+  const visibleData = useMemo(() => {
+    if (
+      typeof brushIndices.startIndex === 'number' &&
+      typeof brushIndices.endIndex === 'number' &&
+      brushIndices.startIndex >= 0 &&
+      brushIndices.endIndex < data.length &&
+      (brushIndices.startIndex > 0 || brushIndices.endIndex < data.length - 1)
+    ) {
+      return data.slice(brushIndices.startIndex, brushIndices.endIndex + 1);
+    }
+    return data;
+  }, [data, brushIndices]);
 
   const singleMetricConfig: Record<
     string,
@@ -343,39 +423,28 @@ export default function NPKChart({
     : tSoil('npkTrend');
 
   const { ticks, formatTick } = useMemo(() => {
-    return getCustomXTicks(data, preset, locale);
-  }, [data, preset, locale]);
+    return getCustomXTicks(visibleData, preset, locale);
+  }, [visibleData, preset, locale]);
 
   const timeDomain = useMemo<[number, number] | ['dataMin', 'dataMax']>(() => {
-    if (!data || data.length === 0) return ['dataMin', 'dataMax'];
+    if (!visibleData || visibleData.length === 0) return ['dataMin', 'dataMax'];
     const getMs = (item: BaseSeriesItem): number =>
       typeof item.timestampMs === 'number' ? item.timestampMs : new Date(item.timestamp).getTime();
-    const tFirst = getMs(data[0]);
-    const tLast = getMs(data[data.length - 1]);
+    const tFirst = getMs(visibleData[0]);
+    const tLast = getMs(visibleData[visibleData.length - 1]);
     if (tFirst === tLast && !isNaN(tFirst)) {
       // Single-point or equal-timestamp dataset: add +/- 1 hour padding so domain is non-degenerate
       return [tFirst - 3600000, tLast + 3600000];
     }
-    return ['dataMin', 'dataMax'];
-  }, [data]);
-
-  const cleanLabelFormatter = (label: any, payload: any[]) => {
     if (
-      payload &&
-      payload.length > 0 &&
-      (payload[0]?.payload?.timestamp || payload[0]?.payload?.timestampMs)
+      typeof brushIndices.startIndex === 'number' &&
+      typeof brushIndices.endIndex === 'number' &&
+      (brushIndices.startIndex > 0 || brushIndices.endIndex < data.length - 1)
     ) {
-      return formatTooltipDateTime(
-        payload[0].payload.timestamp || payload[0].payload.timestampMs,
-        preset,
-        locale
-      );
+      return [tFirst, tLast];
     }
-    if (typeof label === 'number') {
-      return formatTooltipDateTime(label, preset, locale);
-    }
-    return typeof label === 'string' ? label.replace(/,/g, '').replace(/\./g, '').trim() : label;
-  };
+    return ['dataMin', 'dataMax'];
+  }, [visibleData, brushIndices, data.length]);
 
   return (
     <div className="bg-app-surface-container-lowest rounded-xl p-5 soft-elevation-lg border border-app-outline-variant/30">
@@ -425,7 +494,7 @@ export default function NPKChart({
           </span>
         </div>
       ) : (
-        <div className="h-44 sm:h-52">
+        <div className={data.length > 1 ? 'h-52 sm:h-60' : 'h-44 sm:h-52'}>
           <ResponsiveContainer width="100%" height="100%">
             {isSingleMetric && singleConfig ? (
               <AreaChart data={data} margin={{ top: 8, right: 14, left: -14, bottom: 0 }}>
@@ -452,31 +521,48 @@ export default function NPKChart({
                 />
                 <YAxis tick={{ fontSize: 11, fill: '#40493d' }} axisLine={false} tickLine={false} />
                 <Tooltip
-                  contentStyle={{
-                    background: 'white',
-                    border: '1px solid #bfcaba',
-                    borderRadius: '12px',
-                    fontSize: '12px',
-                  }}
-                  labelFormatter={cleanLabelFormatter}
-                  formatter={(value: any) => [
-                    value !== null && value !== undefined
-                      ? `${value} ${singleConfig.unit}`.trim()
-                      : tCommon('unavailable'),
-                    singleConfig.label,
-                  ]}
+                  content={(props: any) => (
+                    <NPKChartTooltipContent
+                      {...props}
+                      defaultUnit={singleConfig.unit}
+                      preset={preset}
+                      locale={locale}
+                      tCommon={tCommon}
+                    />
+                  )}
                 />
                 <Area
-                  type="monotone"
+                  type="linear"
                   dataKey={singleConfig.dataKey}
                   name={singleConfig.label}
                   stroke={singleConfig.color}
-                  strokeWidth={2.5}
+                  strokeWidth={2}
                   fill={`url(#grad-${selectedMetric})`}
                   connectNulls={false}
-                  dot={false}
-                  activeDot={{ r: 5, fill: singleConfig.color }}
+                  dot={{
+                    r: 3,
+                    fill: singleConfig.color,
+                    stroke: '#ffffff',
+                    strokeWidth: 1,
+                  }}
+                  activeDot={{
+                    r: 6,
+                    fill: singleConfig.color,
+                    stroke: '#ffffff',
+                    strokeWidth: 2,
+                  }}
                 />
+                {data.length > 1 && (
+                  <Brush
+                    dataKey="timestampMs"
+                    height={24}
+                    stroke={singleConfig.color}
+                    fill="#f8fafc"
+                    tickFormatter={formatTick}
+                    travellerWidth={10}
+                    onChange={handleBrushChange}
+                  />
+                )}
               </AreaChart>
             ) : (
               <LineChart data={data} margin={{ top: 8, right: 14, left: -14, bottom: 0 }}>
@@ -502,53 +588,57 @@ export default function NPKChart({
                   tickLine={false}
                 />
                 <Tooltip
-                  contentStyle={{
-                    background: 'white',
-                    border: '1px solid #bfcaba',
-                    borderRadius: '12px',
-                    fontSize: '12px',
-                  }}
-                  labelFormatter={cleanLabelFormatter}
-                  formatter={(value: any, name: any) => [
-                    value !== null && value !== undefined
-                      ? `${value} mg/kg`
-                      : tCommon('unavailable'),
-                    name,
-                  ]}
+                  content={(props: any) => (
+                    <NPKChartTooltipContent
+                      {...props}
+                      defaultUnit="mg/kg"
+                      preset={preset}
+                      locale={locale}
+                      tCommon={tCommon}
+                    />
+                  )}
                 />
                 <Line
-                  type="monotone"
+                  type="linear"
                   dataKey="n"
                   name={tSoil('nitrogen')}
                   stroke={NPK_COLORS.n}
-                  strokeWidth={2.5}
+                  strokeWidth={2}
                   connectNulls={false}
-                  dot={false}
-                  activeDot={{ r: 5, fill: NPK_COLORS.n }}
-                  strokeLinecap="round"
+                  dot={{ r: 3, fill: NPK_COLORS.n, stroke: '#ffffff', strokeWidth: 1 }}
+                  activeDot={{ r: 6, fill: NPK_COLORS.n, stroke: '#ffffff', strokeWidth: 2 }}
                 />
                 <Line
-                  type="monotone"
+                  type="linear"
                   dataKey="p"
                   name={tSoil('phosphorus')}
                   stroke={NPK_COLORS.p}
-                  strokeWidth={2.5}
+                  strokeWidth={2}
                   connectNulls={false}
-                  dot={false}
-                  activeDot={{ r: 5, fill: NPK_COLORS.p }}
-                  strokeLinecap="round"
+                  dot={{ r: 3, fill: NPK_COLORS.p, stroke: '#ffffff', strokeWidth: 1 }}
+                  activeDot={{ r: 6, fill: NPK_COLORS.p, stroke: '#ffffff', strokeWidth: 2 }}
                 />
                 <Line
-                  type="monotone"
+                  type="linear"
                   dataKey="k"
                   name={tSoil('potassium')}
                   stroke={NPK_COLORS.k}
-                  strokeWidth={2.5}
+                  strokeWidth={2}
                   connectNulls={false}
-                  dot={false}
-                  activeDot={{ r: 5, fill: NPK_COLORS.k }}
-                  strokeLinecap="round"
+                  dot={{ r: 3, fill: NPK_COLORS.k, stroke: '#ffffff', strokeWidth: 1 }}
+                  activeDot={{ r: 6, fill: NPK_COLORS.k, stroke: '#ffffff', strokeWidth: 2 }}
                 />
+                {data.length > 1 && (
+                  <Brush
+                    dataKey="timestampMs"
+                    height={24}
+                    stroke={NPK_COLORS.n}
+                    fill="#f8fafc"
+                    tickFormatter={formatTick}
+                    travellerWidth={10}
+                    onChange={handleBrushChange}
+                  />
+                )}
               </LineChart>
             )}
           </ResponsiveContainer>

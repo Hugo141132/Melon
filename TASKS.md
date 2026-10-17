@@ -5522,6 +5522,95 @@ The following full CI gates were deferred for this checkpoint and must be verifi
   - `packages/database/test/chart-timestamp-ordering.test.ts` (updated for multi-column `receivedAt`, `id` ordering).
 - **Execution & Verification Status:** Software complete; operator website verification DEFERRED TO VPS because suitable un-clocked local test data is unavailable. Final five CI gates pending execution by operator.
 
+---
+
+## TASK-0504 Follow-up 3: Raw Readings Chart Pipeline & Discrete Presentation Preservation ("Testing (90), 30 Days, pH")
+
+**Priority:** `P1` (Data Accuracy, Raw Reading Fidelity & Chart Presentation)  
+**Status:** `READY_FOR_TEST` (Software implementation and regression tests completed; operator manual website verification PENDING; VPS verification FAILED on release 08f0d79)  
+**Dependencies:** `DEC-MON-087`, `DEC-MON-093`, `DEC-MON-094`, `DEC-MON-095`, `DEC-MON-096`, `TASK-0503`, `TASK-0504`  
+**Frontend Impact:** `MODERATE` (Chart visual rendering, markers, tooltips, and zoom interaction)  
+**Selected UI Direction:** `Premium Minimal Ops`  
+**Existing Color Template:** `UNCHANGED`  
+**Selected Motion Effects:** `None`  
+**21st.dev MCP:** `NOT REQUIRED`  
+
+### 1. Authoritative Operational Context & Root Cause
+
+- **Release 08f0d79 Deployment Baseline:**
+  - Release commit `08f0d795619196f97f5c07f2610c5c51bbd1cd80` (`08f0d79`) was pushed to `main`; remote GitHub Actions CI run `39015583836` passed.
+  - Web and gateway images tagged `08f0d79` were built off-VPS for `linux/amd64`, transferred, loaded, and recreated on Nebula VPS (`38.103.171.46`).
+  - Operator confirmed container recreation and health checks succeeded.
+  - Rollback pair stored in `/opt/kebun-melon/.rollback-08f0d79.env`:
+    `WEB_IMAGE=kebun-melon-web:d1c1c13`
+    `GATEWAY_IMAGE=kebun-melon-gateway:875f91b`
+  - (Public HTTP probes and broader website checks were not supplied and must not be claimed).
+- **Initial VPS Chart Verification FAILED:**
+  - Test case: Water quality $\to$ location Testing (90 readings) $\to$ 30 Days $\to$ pH.
+  - Operator reported readings appeared summarized rather than individually visible. Screenshot showed a smoothed curve and insufficient individual-reading visibility.
+  - (No live parity evidence was supplied reconciling all 90 live database/API/chart IDs; do not claim live parity).
+  - Localization previously passed operator testing locally. Do not infer additional PASS results for Clear Location or alerts.
+- **Defect Investigation & Root Cause:**
+  - Tracing proved that database queries and backend API (`/chart`) already deliver 100% of individual database rows without aggregation, bucketing, downsampling, or averaging.
+  - Client hook `useHistoricalMonitoring` keys into `accumulatedPointsMap` by `readingId` and preserves all 90 items without reduction.
+  - In `WaterNutrientChart.tsx` and `NPKChart.tsx`, the presentation layer suffered from four visual defects:
+    1. Cubic spline curve smoothing (`type="monotone"`) interpolated raw points into a generalized wavy trend curve.
+    2. Data point markers were completely hidden (`dot={false}` / omitted), making 90 discrete readings appear as a single smooth summary line.
+    3. Dense readings in 30-day views had no zoom mechanism to isolate closely spaced data points.
+    4. Tooltips lacked the reading ID and could not disambiguate readings recorded at similar times.
+
+### 2. Implemented Corrections in Unreleased Chart Patch
+
+- **Raw Reading Integrity & Straight Lines (`type="linear"`):**
+  - Replaced cubic spline smoothing (`type="monotone"`) with straight line segments (`type="linear"`) across `WaterNutrientChart` (`Area`) and `NPKChart` (`Area` and `Line` components).
+  - Preserves every matching raw reading as a distinct chart data item with its original reading ID, sensor timestamp (`timestamp`, `timestampMs`), and exact values.
+- **Individual Reading Markers (`dot` & `activeDot`):**
+  - Configured explicit `dot` markers (`r: 3, fill: color, stroke: #ffffff, strokeWidth: 1`) and hover highlights (`activeDot: { r: 6, fill: color, stroke: #ffffff, strokeWidth: 2 }`) so every raw reading is visibly marked.
+- **Interactive Zoom / Brush Controls (`<Brush>`):**
+  - Integrated Recharts `<Brush dataKey="timestampMs" />` when `data.length > 1`, allowing dense or overlapping readings to be zoomed and inspected individually without altering underlying timestamps or values.
+  - Added container height expansion (`h-48 sm:h-56` in water, `h-52 sm:h-60` in soil) to accommodate brush controls.
+  - Reset behavior: Brush indices automatically reset (`setBrushIndices({})`) whenever the underlying dataset, selected location, or preset range changes.
+- **Precise Per-Reading Tooltips:**
+  - Enhanced `WaterChartTooltipContent` and `NPKChartTooltipContent` to render the truncated `readingId` (`ID: ...`), formatted timestamp, and exact value + unit.
+- **Sparse X-Axis Labels Without Data Loss:**
+  - Maintained responsive sparse label distribution (5-7 ticks for 30d, 4-5 for 7d, 5-8 for 24h) via `getCustomXTicks` avoiding label collisions without dropping data points. Sparse ticks only govern the date/time display labels; 100% of raw data points remain rendered.
+- **Shared Rendering Paths:**
+  - Applied identical straight-line, marker, zoom brush, and per-reading tooltip patterns to EC and TDS in `WaterNutrientChart`, as well as Temperature, Moisture, pH, EC, and multi-metric NPK in `NPKChart`.
+- **Preserved Invariants:**
+  - Preserved selected location/date boundaries, null gaps (`connectNulls={false}`), and strict independence from measurement history table pagination (`HISTORY_PAGE_SIZE = 5`).
+- **Unresolved Recommendation-Alert Separation:**
+  - Kept strictly separate from chart rendering: post-ack Critical escalation visibility remains unconfirmed; auto-recovery and independent background polling are NOT approved or enabled. Acknowledgement is strictly per-user in `alert_acknowledgements` and is NOT episode resolution.
+
+### 3. Testing & Verification Summary
+
+- **Unit Regression Test Suites:**
+  - Added `apps/web/test/unit/raw-readings-chart-pipeline.test.tsx` verifying:
+    - Concrete acceptance case "Testing (90), 30 Days, pH" maps all 90 raw readings preserving distinct reading IDs, timestamps, and values.
+    - `WaterNutrientChart` receives 90 distinct items and configures `type="linear"`, `dot`, `activeDot`, `connectNulls={false}`, and `<Brush>`.
+    - Per-reading tooltip displays `readingId`, timestamp, and exact pH value.
+    - Sparse X-axis tick distribution (5-7 ticks) without data reduction.
+    - Shared paths for EC, TDS, Temperature, Moisture, pH, EC, and NPK lines in `NPKChart`.
+    - Null gaps and table pagination independence.
+  - Updated Recharts mock in `apps/web/test/unit/chart-xaxis-ticks-labels.test.tsx` and `apps/web/test/unit/chart-completeness-overflow.test.tsx` to include `Brush`, `AreaChart`, and `Area`.
+  - *Factual Note:* The 90-reading fixture is synthetic unit regression coverage, not proof of live VPS data completeness. Tests were NOT executed by the agent.
+- **Explicit Operator Acceptance Checks (Pending Execution):**
+  1. *Exact Reading IDs & Values:* Hover over chart dots; verify tooltip shows `ID: ...`, formatted timestamp, and exact sensor value.
+  2. *Repeated Timestamps & Dense Readings:* Drag Brush handles to zoom in; verify closely spaced points spread out and can be clicked/hovered individually.
+  3. *Null Gaps:* Verify missing reading periods appear as visual gaps (`connectNulls={false}`).
+  4. *Zoom / Reset Behavior:* Verify Brush zooms smoothly, and resets back to full view when switching devices, locations, or date presets.
+  5. *Responsive EN/ID Tooltips:* Test in both English and Indonesian; verify no text clipping or layout shift.
+  6. *Sparse X-Axis Labels:* Verify 5–7 readable date/time labels without collisions across mobile (390px) and desktop, with 100% data points plotted.
+- **CI Protocol & Deployment Requirements:**
+  - Software implementation: `COMPLETE`.
+  - Operator local website testing: `PENDING`.
+  - Pre-commit five CI gates: `PENDING` (to be executed by operator).
+  - Web Container Rebuild: **REBUILD & RECREATE REQUIRED** using the NEW commit SHA.
+  - Gateway Container: **UNCHANGED** at `08f0d79`.
+  - Database Migrations & Caddy: **NOT REQUIRED**.
+  - Rollback Invariant: Next web deployment must preserve current web `08f0d79` as its rollback baseline without overwriting `/opt/kebun-melon/.rollback-08f0d79.env`. Do not reuse tag `08f0d79` for changed code.
+  - Deployed VPS Verification: `PENDING` (do NOT mark task DONE before VPS verification).
+
+
 
 
 

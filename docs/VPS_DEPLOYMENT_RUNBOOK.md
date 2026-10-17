@@ -77,21 +77,38 @@
      - **Staging Runtime Invariant:** Executing under `APP_ENV=staging` at `APP_URL=https://monitoring.melonmadura.my.id` with Compose configuration `docker-compose.prod.yml` pointing to Supabase Staging (`ihgoxqdncepbcrqkchxu`).
      - **Preserved Rollback Baseline:** Baseline rollback image tag `kebun-melon-web:8304c44` is preserved in `/opt/kebun-melon/.prev_web_image` (without claiming its current availability was independently checked).
      - **Deployment & Smoke Test Acceptance:** User-performed deployment and post-deployment manual smoke testing passed (`USER-REPORTED PASS on 2026-10-17`), with public HTTPS probe to `https://monitoring.melonmadura.my.id/health` returning HTTP 200 OK.
-7. **2026-10-17 Multi-Domain Follow-up Deployment Requirements (Staging & Production):**
-   - **Container Packaging & Rebuild Requirements:**
-     - **Web Container (`kebun-melon-web`):** **REBUILD & RECREATE REQUIRED**. Code changes touch Next.js web application (`apps/web`), shared library (`packages/database`), translation dictionaries, and frontend components. Image must be built off-VPS for target architecture `linux/amd64`.
-     - **Gateway Container (`kebun-melon-gateway`):** **REBUILD & RECREATE REQUIRED**. Code changes touch `apps/iot-gateway/src/mqtt/soil-water-adapter.ts` to trigger asynchronous prediction alert evaluation via `evaluatePredictionAlerts` upon sensor telemetry arrival. Gateway image must be built off-VPS for `linux/amd64` and transferred to the VPS.
-     - **Strict Single-Active-Gateway Invariant:** When deploying the updated gateway image, ensure only ONE gateway container runs against the EMQX Cloud broker. Stop any staging gateway prior to updating production or vice versa.
+7. **2026-10-17 Release 08f0d79 Deployment & Initial VPS Chart Verification (COMPLETED / DEFECT DETECTED):**
+   - **Release 08f0d79 Deployment Status (COMPLETED):**
+     - Release commit `08f0d795619196f97f5c07f2610c5c51bbd1cd80` (`08f0d79`) was pushed to `main`; remote GitHub Actions CI run `39015583836` passed.
+     - Container images `kebun-melon-web:08f0d79` and `kebun-melon-gateway:08f0d79` were built off-VPS for `linux/amd64`, transferred via plain `.tar` archive, loaded, and recreated on Nebula VPS (`38.103.171.46`).
+     - Operator confirmed container recreation and health checks succeeded.
+     - *(Factual Guard: Public HTTP probes and broader website checks were not supplied and must not be claimed).*
+   - **Preserved Rollback Baseline Pair:**
+     - Rollback pair durably stored in `/opt/kebun-melon/.rollback-08f0d79.env`:
+       `WEB_IMAGE=kebun-melon-web:d1c1c13`
+       `GATEWAY_IMAGE=kebun-melon-gateway:875f91b`
+   - **Initial VPS Chart Verification FAILED:**
+     - Test case: Water Quality $\to$ location Testing (90 readings) $\to$ 30 Days $\to$ pH.
+     - Operator reported readings appeared summarized rather than individually visible; screenshot showed a smoothed curve and insufficient individual-reading visibility.
+     - *(Factual Guard: No live parity evidence was supplied reconciling all 90 live database/API/chart IDs; live parity must not be claimed. Localization previously passed operator testing locally. Do not infer additional PASS results for Clear Location or alerts).*
+8. **2026-10-17 Raw Telemetry Discrete Presentation Patch Deployment Scope (PENDING):**
+   - **Container Packaging & Rebuild Scope:**
+     - **Web Container (`kebun-melon-web`):** **REBUILD & RECREATE REQUIRED** using the **NEW commit SHA**. Code changes touch chart components (`WaterNutrientChart.tsx`, `NPKChart.tsx`), Recharts linear styling, dot markers, zoom brush controls, and per-reading tooltips. Must be built off-VPS for `linux/amd64`.
+     - **Gateway Container (`kebun-melon-gateway`):** **UNCHANGED** at `08f0d79`. Zero gateway code changes in this patch.
+     - **Do Not Reuse Image Tag:** Do not reuse image tag `08f0d79` for changed web code.
    - **Infrastructure & Configuration Changes:**
-     - **Database Migrations:** **NOT REQUIRED**. The schema changes for location annotations and alert structures were already applied in earlier migrations. All new query filters (`where.AND`, keyset cursor) and alert fields (`sourceType: 'ml_prediction'`, `alertType: 'REC_...'`) operate within the existing Prisma schema and PostgreSQL database structure.
-     - **Environment Variable Changes:** **NOT REQUIRED**. Existing credentials and configuration for database, MQTT TLS, and auth sessions remain 100% sufficient across staging and production.
-     - **Caddy Reverse Proxy (`Caddyfile`):** **NOT REQUIRED**. Caddy proxies port 3000 and handles SSE streaming endpoints (`/api/v1/realtime/stream*`) without configuration adjustments.
-   - **Pre-Swap Rollback Baseline Capture:**
-     - Prior to recreating containers on the VPS, capture running container IDs and image tags atomically to `/opt/kebun-melon/.prev_web_image` and `/opt/kebun-melon/.prev_gateway_image` to ensure clean rollback capability.
-   - **Pending Post-Deployment VPS Acceptance Checklist (Deferred Verification):**
-     - **Chart Completeness Test:** Navigate to `/soil` and `/water`. Verify chart plots complete reading series across 24h, 7d, and 30d without point truncation, tick collision, or scale collapse.
-     - **Row Annotation Save/Clear/Cancel:** In measurement history tables, click location cell on a row. Confirm input and action buttons (`Save`, `Clear`, `Cancel`) render inline on a single line (`min-w-[220px]`) without wrapping. Test Save, Clear, and Cancel without data fabrication.
-     - **Prediction Alert Lifecycle & RBAC:** Confirm external prediction anomalies produce `REC_${issueCode}` alerts visible to Owner and assigned Admin. Test acknowledgement and verify critical escalation visibility behavior if conditions worsen. Physical valve operations must NOT be triggered during verification.
+     - **Database Migrations:** **NOT REQUIRED** (Zero schema migrations needed).
+     - **Environment Variables:** **NOT REQUIRED** (Preserve existing `.env.production`; update only `WEB_IMAGE`).
+     - **Caddy Reverse Proxy (`Caddyfile`):** **NOT REQUIRED** (Zero Caddy changes).
+   - **Rollback Baseline Invariant:**
+     - Next web deployment must capture and preserve current web `08f0d79` as its rollback baseline without overwriting the historical rollback pair in `/opt/kebun-melon/.rollback-08f0d79.env`.
+   - **Deferred Operator Acceptance Checklist on Nebula VPS:**
+     1. Exact Reading IDs & Values in tooltips (`ID: ...`, formatted timestamp, exact value).
+     2. Repeated Timestamps & Dense Readings (zoom brush separates closely spaced points).
+     3. Null Gaps (`connectNulls={false}`).
+     4. Zoom / Reset Behavior (smooth brush zoom; resets on device/location/preset change).
+     5. Responsive EN/ID Tooltips.
+     6. Sparse X-Axis Labels Without Collisions (5–7 readable ticks; 100% data points plotted).
 
 ---
 

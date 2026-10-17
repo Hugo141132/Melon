@@ -2081,5 +2081,45 @@ The following facts are supported by the verified decisions governance of `TASK-
      Operator WOOIII confirmed website testing passed on `/soil` and `/water`. Comprehensive unit and regression test suite added in `apps/web/test/unit/recommendation-localization-regression.test.tsx`.
 <!-- DEC-I18N-096 Reconciled: 2026-10-17 -->
 
+---
+
+## DEC-MON-096: Raw Telemetry Discrete Chart Rendering, Straight Segments, Individual Markers, Interactive Zoom Brush & Reading ID Tooltips
+- **Status:** IMPLEMENTED (2026-10-17) — Software implementation and unit regression tests completed; initial VPS verification on release 08f0d79 FAILED; unreleased patch implemented and operator verification PENDING.
+- **Related Task IDs:** `TASK-0503`, `TASK-0504`, `TASK-0504 Follow-up 3`
+- **Context:**
+  - Release `08f0d79` was deployed to VPS (images built off-VPS for `linux/amd64`, loaded, and recreated; container recreation and health checks confirmed by operator; rollback pair stored in `/opt/kebun-melon/.rollback-08f0d79.env`).
+  - VPS chart verification for Water Quality $\to$ location Testing (90 readings) $\to$ 30 Days $\to$ pH FAILED: readings appeared as a summarized trend line on a smoothed curve without discernible individual readings.
+  - Auditing confirmed database queries and `/chart` endpoint already deliver 100% of discrete rows without aggregation, bucketing, or averaging. Client hook `useHistoricalMonitoring` keys into `accumulatedPointsMap` by `readingId` and preserves all 90 items without reduction.
+  - Defect was entirely in the UI presentation layer:
+    1. Cubic spline curve smoothing (`type="monotone"`) interpolated raw points into a generalized wavy trend curve.
+    2. Data point markers were completely hidden (`dot={false}` / omitted), making 90 discrete readings appear as a single smooth summary line.
+    3. Dense readings in 30-day views had no zoom mechanism to isolate closely spaced data points.
+    4. Tooltips lacked the reading ID and could not disambiguate readings recorded at similar times.
+- **Decision & Implementation Directives:**
+  1. **Straight Line Segments (`type="linear"`):**
+     Replaced cubic spline curve smoothing (`type="monotone"`) with straight line segments (`type="linear"`) across `WaterNutrientChart` (`Area`) and `NPKChart` (`Area` and `Line` components). Preserves raw transitions and rates of change without misleading curve artifacts.
+  2. **Individual Reading Markers (`dot` & `activeDot`):**
+     Configured explicit `dot` markers (`r: 3, fill: color, stroke: '#ffffff', strokeWidth: 1`) and hover highlights (`activeDot: { r: 6, fill: color, stroke: '#ffffff', strokeWidth: 2 }`) across all series. Every matching database reading appears as a distinct visible point.
+  3. **Interactive Zoom Brush Controls (`<Brush>`):**
+     Integrated Recharts `<Brush dataKey="timestampMs" />` when `data.length > 1`. In dense time windows (e.g. 30 Days with 90+ readings), operators can drag brush handles to zoom in and inspect individual readings. Brush state automatically resets (`setBrushIndices({})`) upon location, device, or preset range changes.
+  4. **Reading Identification in Tooltips:**
+     Enhanced `WaterChartTooltipContent` and `NPKChartTooltipContent` to display truncated `readingId` (`ID: ...`), formatted timestamp, and exact numeric value with unit.
+  5. **Sparse X-Axis Labels Without Data Loss:**
+     Maintained responsive sparse label distribution (5–7 ticks for 30d, 4–5 for 7d, 5–8 for 24h) via `getCustomXTicks` avoiding label collisions. Sparse ticks govern only date/time label text; 100% of raw data points remain rendered.
+  6. **Shared Rendering Paths:**
+     Applied identical straight-line, marker, zoom brush, and per-reading tooltip patterns to EC and TDS in `WaterNutrientChart`, as well as Temperature, Moisture, pH, EC, and multi-metric NPK in `NPKChart`.
+  7. **Preserved Invariants:**
+     Preserved location/date filtering, raw values/timestamps, null gaps (`connectNulls={false}`), and table pagination independence (`HISTORY_PAGE_SIZE = 5`).
+  8. **Unresolved Recommendation-Alert Separation:**
+     Kept strictly separate from chart rendering: post-ack Critical escalation visibility remains unconfirmed; auto-recovery and independent background polling are NOT approved or enabled. Acknowledgement is strictly per-user in `alert_acknowledgements` and is NOT episode resolution.
+  9. **Deployment Scope for New Patch:**
+     - Web container rebuild and redeployment required with **NEW commit SHA**.
+     - Gateway container **UNCHANGED** at `08f0d79`.
+     - Database migrations and Caddy changes **NOT REQUIRED**.
+     - Next web deployment must capture current web `08f0d79` as its rollback baseline without overwriting `/opt/kebun-melon/.rollback-08f0d79.env`.
+     - Do not reuse image tag `08f0d79` for changed code.
+<!-- DEC-MON-096 Reconciled: 2026-10-17 -->
+
+
 
 

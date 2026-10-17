@@ -291,7 +291,7 @@ The 2026-10-08 telemetry history and visualization update unifies monitoring pag
    - Cursor safety & loop prevention: cursor format strictly validated (`${receivedAtIso}_${id}`); malformed cursors reject with HTTP 400 (`VALIDATION_ERROR` / `INVALID_CURSOR`). Client tracks seen cursors, terminating immediately if a non-advancing cursor is detected.
    - Wire-level request cancellation: multi-batch retrievals load seamlessly and actively abort in-flight socket requests via `AbortController` when the operator changes filters or unmounts. Partial results are never rendered as complete.
    - Consistency boundaries: locking `from`/`to` ISO boundaries client-side maintains a consistent SQL filter window across sequential batches but does not constitute an ACID transactional snapshot; client HTTP fetch abort terminates network transfer but does not prove backend PostgreSQL query execution cancellation.
-   - X-Axis Label Layout & Clipping Prevention: displays a responsive, evenly distributed subset of 4-6 labels across 24h, 7d, and 30d ranges. Horizontal padding (`padding={{ left: 16, right: 16 }}`) and calibrated chart margins (`left: -14, right: 14`) eliminate first- and last-label clipping on mobile (390px) and desktop viewports, preventing label collisions in both Indonesian and English. Tooltips preserve exact sensor timestamps and numeric precision on hover/active touch. Dots are hidden (`dot={false}`) to keep dense line series crisp.
+   - X-Axis Label Layout & Clipping Prevention: displays a responsive, evenly distributed subset of 4-6 labels across 24h, 7d, and 30d ranges. Horizontal padding (`padding={{ left: 16, right: 16 }}`) and calibrated chart margins (`left: -14, right: 14`) eliminate first- and last-label clipping on mobile (390px) and desktop viewports, preventing label collisions in both Indonesian and English. Tooltips preserve exact sensor timestamps and numeric precision on hover/active touch. *(Note: The earlier instruction that dots are hidden `dot={false}` is SUPERSEDED by DEC-MON-096 / TASK-0504 Follow-up 3; individual reading markers `dot` and `activeDot` are rendered explicitly with linear segments and Brush controls to prevent discrete raw readings from appearing summarized).*
    - Operational Website Verification: Operator-confirmed live browser verification (`PASS`) on desktop and 390px mobile viewports across bilingual locales (`id`/`en`).
 4. **Timestamp Semantics & Visual Gap Handling:**
    - Server-side date range filtering operates on gateway receipt timestamp (`receivedAt`), while Recharts plots each data point chronologically at its original measurement timestamp (`recordedAt`).
@@ -2060,6 +2060,33 @@ The Soil (`/soil`) and Water Quality (`/water`) telemetry history pagination, cu
   - Water quality measurement history (`waterHistoryColumns`) strictly omits the temperature (`°C`) column across table headers, row cells, and column configuration.
   - Soil measurement history (`soilHistoryColumns`) retains temperature (`°C`). Stored database records remain untouched.
 <!-- Monitoring Telemetry History & Chart Filter Decoupling Reconciled: 2026-10-12 -->
+
+---
+
+## Raw Telemetry Discrete Presentation, Markers, and Brush Zoom Specification (TASK-0504 Follow-up 3 / DEC-MON-096 / Reconciled 2026-10-17)
+
+The Soil (`/soil`) and Water Quality (`/water`) telemetry charts (`NPKChart.tsx`, `WaterNutrientChart.tsx`) presentation is calibrated to ensure 100% visibility of discrete raw sensor readings:
+- **Frontend Impact:** `MODERATE` (Chart rendering lines, dot markers, zoom brush controls, and per-reading tooltips)
+- **Selected UI Direction:** `Premium Minimal Ops`
+- **Existing Color Template:** `UNCHANGED` (Brand emerald `#0d631b`, amber, red, blue, purple palette tokens preserved)
+- **Selected Motion Effects:** `None`
+- **21st.dev MCP:** `NOT REQUIRED`
+- **Linear Segments & Discrete Markers:**
+  - Replaces curve smoothing (`type="monotone"`) with straight line segments (`type="linear"`) across all chart metric lines and areas.
+  - Renders explicit data point markers (`dot: { r: 3, fill: color, stroke: '#ffffff', strokeWidth: 1 }`) and hover highlights (`activeDot: { r: 6, fill: color, stroke: '#ffffff', strokeWidth: 2 }`). Every matching reading from the database appears as an identifiable dot.
+- **Interactive Zoom Brush Controls (`<Brush>`):**
+  - Displays Recharts `<Brush dataKey="timestampMs" />` when dataset contains more than 1 reading (`data.length > 1`), enabling operators to zoom in on closely spaced readings or dense 30-day windows without altering underlying data.
+  - Height adjusted (`h-48 sm:h-56` in water quality, `h-52 sm:h-60` in soil) to comfortably accommodate the Brush track.
+  - Brush indices automatically reset (`setBrushIndices({})`) upon location change, device change, or date preset change.
+- **Per-Reading Tooltips:**
+  - Tooltips display truncated `readingId` (`ID: ...`), formatted timestamp, and exact sensor value with unit, enabling precise reading disambiguation.
+- **Sparse X-Axis Labels Without Data Loss:**
+  - X-axis labels display a sparse, evenly spaced subset of 5–7 labels (`getCustomXTicks`) to prevent text collisions. Sparse labels govern label layout only; 100% of discrete data points and dots remain rendered.
+- **Verification Status:**
+  - Initial VPS verification on release `08f0d79` FAILED (smoothed curve without individual reading visibility).
+  - Unreleased patch with linear segments, dots, and Brush zoom is implemented; operator browser verification on VPS remains PENDING.
+<!-- Raw Telemetry Discrete Presentation Reconciled: 2026-10-17 -->
+
 
 
 

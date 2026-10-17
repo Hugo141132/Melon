@@ -3911,6 +3911,84 @@ Upon manual commit, push, and deployment of container images to Nebula VPS stagi
 2. **Location Annotation Test:** On `/soil` and `/water` measurement history tables, click location cell on a row. Verify Save, Clear, and Cancel buttons render in a single line without wrapping. Test Save, test Clear, and test Cancel. Confirm chart updates accordingly.
 3. **Recommendation Alert Lifecycle Test:** Ingest anomalous sensor reading. Confirm active alert appears with correct `REC_${issueCode}` title and localized description. Verify acknowledgement behavior (per-user acknowledgement) and check whether critical escalation produces operator visibility if conditions worsen.
 
+---
+
+## 35.16 Raw Telemetry Discrete Presentation Patch Verification Evidence (TASK-0504 Follow-up 3, DEC-MON-096)
+
+### 1. Release 08f0d79 Deployment Baseline & Initial VPS Failure
+- **Release 08f0d79 Record:**
+  - Release commit `08f0d795619196f97f5c07f2610c5c51bbd1cd80` (`08f0d79`) was pushed to `main`; remote GitHub Actions CI run `39015583836` passed.
+  - Web and gateway images tagged `08f0d79` were built off-VPS for `linux/amd64`, transferred, loaded, and recreated on Nebula VPS staging.
+  - Operator confirmed container recreation and health checks succeeded.
+  - Durable rollback pair stored in `/opt/kebun-melon/.rollback-08f0d79.env`:
+    `WEB_IMAGE=kebun-melon-web:d1c1c13`
+    `GATEWAY_IMAGE=kebun-melon-gateway:875f91b`
+  - *(Factual Guard: Public HTTP probes and broader website checks were not supplied and must not be claimed).*
+- **Initial VPS Chart Verification FAILED:**
+  - Test case: Water Quality $\to$ location Testing (90 readings) $\to$ 30 Days $\to$ pH.
+  - Operator reported readings appeared summarized rather than individually visible. Screenshot showed a smoothed curve and insufficient individual-reading visibility.
+  - *(Factual Guard: No live parity evidence was supplied reconciling all 90 live database/API/chart IDs; live parity must not be claimed. Localization previously passed operator testing locally. Do not infer additional PASS results for Clear Location or alerts).*
+
+### 2. Defect Analysis & Presentation-Layer Calibration
+- **Investigation:**
+  - Auditing confirmed database queries and `/chart` endpoint already deliver 100% of discrete rows without aggregation, averaging, or downsampling.
+  - Defect was entirely in UI presentation: cubic curve smoothing (`type="monotone"`), hidden data dots (`dot={false}`), lack of zoom controls for dense 30-day views, and tooltips missing `readingId`.
+- **Implementation in Unreleased Patch:**
+  - `WaterNutrientChart.tsx` and `NPKChart.tsx`: straight line segments (`type="linear"`), explicit dot markers (`dot` and `activeDot`), Recharts `<Brush>` zoom controls, and tooltips displaying truncated `readingId`.
+  - Sparse X-axis labels (5–7 ticks) are maintained to prevent label collision; sparse ticks affect only label display, with zero reduction in plotted data points.
+  - Shared paths for EC, TDS, Temperature, Moisture, pH, and multi-metric NPK.
+  - Preserved location/date filtering, raw values/timestamps, null gaps (`connectNulls={false}`), and table pagination independence (`HISTORY_PAGE_SIZE = 5`).
+- **Regression Test Coverage:**
+  - Added `apps/web/test/unit/raw-readings-chart-pipeline.test.tsx` verifying:
+    - Concrete acceptance case "Testing (90), 30 Days, pH" maps all 90 raw readings preserving distinct reading IDs, timestamps, and values.
+    - `WaterNutrientChart` receives 90 distinct items and configures `type="linear"`, `dot`, `activeDot`, `connectNulls={false}`, and `<Brush>`.
+    - Per-reading tooltip displays `readingId`, timestamp, and exact pH value.
+    - Sparse X-axis tick distribution (5-7 ticks) without data reduction.
+    - Shared paths across all metrics in soil and water charts.
+  - Updated Recharts mock in `apps/web/test/unit/chart-xaxis-ticks-labels.test.tsx` and `apps/web/test/unit/chart-completeness-overflow.test.tsx` to include `Brush`, `AreaChart`, and `Area`.
+  - *(Factual Note: The 90-reading fixture is synthetic unit regression coverage, not proof of live VPS data completeness. Tests were NOT executed by the agent).*
+
+### 3. Authoritative Verification Status Matrix
+
+| Component / Feature | Implementation Status | Local Operator Test | CI Quality Gates | Deployment & VPS Test | Notes & Invariants |
+|---|---|---|---|---|---|
+| Raw Telemetry Discrete Presentation (Linear, Dots, Brush, Tooltip ID) | IMPLEMENTED | PENDING | PENDING | **FAILED (on 08f0d79)**<br>PENDING (on new patch) | Smoothed curve on release 08f0d79 failed VPS test; unreleased patch implemented with straight segments and dots. |
+| Recommendation Localization & Normalization | IMPLEMENTED | **PASS (2026-10-17)** | PENDING | PENDING | Verified by operator on local web interface. |
+| Chart Keyset Pagination & Un-Clocked Fallback | IMPLEMENTED | DEFERRED | PENDING | PENDING | Deferred to VPS due to lack of local multi-batch/un-clocked test fixtures. |
+| Clear Location Row-Editor Alignment | IMPLEMENTED | DEFERRED | PENDING | PENDING | Deferred to VPS due to local test data constraints. |
+| Prediction Alert Evaluation & Advisory Locking | IMPLEMENTED | DEFERRED | PENDING | PENDING | Deferred to VPS due to lack of local live external prediction feed. |
+| Critical Escalation Visibility After Ack | IMPLEMENTATION UNCONFIRMED | VERIFICATION PENDING | PENDING | PENDING | Consuming API and UI notification logic unconfirmed. |
+| Per-User Acknowledgement vs Episode Closure | ARCHITECTURAL INVARIANT | CONFIRMED | N/A | N/A | Acknowledgement is strictly per-user in `alert_acknowledgements`. It does not close episode. |
+| Automated Prediction Recovery | PROPOSED ONLY | NOT ENABLED | N/A | N/A | Unapproved product decision; not enabled in codebase. |
+| Independent Prediction Background Polling | PROPOSED ONLY | NOT ENABLED | N/A | N/A | Unapproved product decision; not enabled in codebase. |
+
+### 4. Operator Acceptance Checklist (Pending Browser Execution)
+1. **Exact Reading IDs & Values:** Hover over chart dots; verify tooltip displays `ID: ...`, formatted timestamp, and exact numeric sensor value.
+2. **Repeated Timestamps & Dense Readings:** Drag Brush handles to zoom in; verify closely spaced points spread out and can be clicked/hovered individually.
+3. **Null Gaps:** Verify missing reading intervals render as visible gaps (`connectNulls={false}`).
+4. **Zoom / Reset Behavior:** Verify Brush zooms smoothly and resets back to full view upon changing device, location, or date preset.
+5. **Responsive EN/ID Tooltips:** Test in English and Indonesian; verify no text clipping or layout shift.
+6. **Sparse X-Axis Labels Without Collisions:** Verify 5–7 readable date/time labels without collisions across mobile (390px) and desktop, with 100% data points plotted.
+
+### 5. Pre-Commit Quality Gates (To Be Executed by Operator)
+The five final CI quality gates must be executed in order:
+```bash
+npm run check:quality
+npm run test
+npm run test:coverage
+npm run test:integration
+npm run test:e2e
+```
+*Note: Stop immediately on any test failure. Commit and push manually on `main` only after all gates pass. Check GitHub Actions for the exact new SHA before deployment. Do NOT mark TASK-0504 Follow-up 3 DONE before VPS verification.*
+
+### 6. Deployment Impact for New Chart Patch
+- **Web Service:** Rebuild and redeployment required using the **NEW commit SHA**.
+- **Gateway Service:** **UNCHANGED** at `08f0d79`.
+- **Database Migrations & Caddy:** **NOT REQUIRED**.
+- **Rollback Baseline:** Next web deployment must capture and preserve current web `08f0d79` as its rollback baseline without overwriting `/opt/kebun-melon/.rollback-08f0d79.env`.
+- **Image Tagging:** Do not reuse image tag `08f0d79` for changed code.
+
+
 
 
 

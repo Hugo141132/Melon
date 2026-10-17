@@ -1065,3 +1065,36 @@ The following facts are verified in the traceability matrix regarding the curren
   - *Database Migrations:* **NOT REQUIRED** (Zero schema migrations needed; existing tables and columns preserved).
   - *Environment Variables & Reverse Proxy (Caddy):* **NOT REQUIRED** (Zero `.env` or Caddy changes).
 <!-- TASK-0413-0504-0708 Traceability Reconciled: 2026-10-17 -->
+
+---
+
+## Current Work Reconciliation: Raw Telemetry Discrete Presentation Patch (TASK-0504 Follow-up 3, DEC-MON-096 / Reconciled 2026-10-17)
+
+The following facts are verified in the traceability matrix regarding the current unreleased chart presentation patch:
+- **Traceability Baseline:**
+  - Tasks: `TASK-0504 Follow-up 3` in `TASKS.md`.
+  - Decisions: `DEC-MON-096` in `docs/DECISIONS.md`.
+  - UI/UX & Quality: `docs/UI_UX.md`, `docs/FRONTEND_AUDIT.md`, `docs/TESTING.md`.
+  - Architecture: `docs/ARCHITECTURE.md` §40.
+  - Deployment Runbook: `docs/VPS_DEPLOYMENT_RUNBOOK.md` §1.
+- **Authoritative Progress & Prior Release Deployment:**
+  - *Release 08f0d79 Baseline:* Pushed to `main`; remote GitHub Actions CI run `39015583836` passed. Web and gateway images tagged `08f0d79` built off-VPS for `linux/amd64`, loaded, and recreated on Nebula VPS staging. Operator confirmed container recreation and health checks succeeded. Rollback pair in `/opt/kebun-melon/.rollback-08f0d79.env`: `WEB_IMAGE=kebun-melon-web:d1c1c13`, `GATEWAY_IMAGE=kebun-melon-gateway:875f91b`. (Public HTTP probes and broader website checks were not supplied and must not be claimed).
+  - *Initial VPS Chart Verification FAILED:* Water quality $\to$ location Testing (90 readings) $\to$ 30 Days $\to$ pH. Operator reported readings appeared summarized rather than individually visible; screenshot showed smoothed curve. (No live parity evidence was supplied reconciling all 90 live database/API/chart IDs; live parity must not be claimed. Localization previously passed operator testing locally. Do not infer additional PASS results for Clear Location or alerts).
+- **Presentation-Layer Calibration in Unreleased Patch:**
+  - Backend database and `/chart` API already deliver 100% of matching discrete readings without downsampling or averaging.
+  - `WaterNutrientChart.tsx` and `NPKChart.tsx`: replaced cubic spline smoothing (`type="monotone"`) with straight line segments (`type="linear"`).
+  - Explicit dot markers (`dot` and `activeDot`) configured across all metrics (pH, EC, TDS, Temperature, Moisture, NPK) so every reading is visually distinguishable.
+  - Integrated Recharts `<Brush dataKey="timestampMs" />` for datasets with `data.length > 1`, enabling zoom into dense time windows without modifying data.
+  - Tooltips enhanced with truncated `readingId` (`ID: ...`) alongside timestamp and exact value.
+  - Sparse X-axis labels (5–7 ticks) are preserved to prevent text collisions without dropping data points.
+  - Location/date filtering, null gaps (`connectNulls={false}`), and table pagination independence (`HISTORY_PAGE_SIZE = 5`) remain intact.
+- **Verification Evidence:**
+  - *Regression Test Suites:* Added `apps/web/test/unit/raw-readings-chart-pipeline.test.tsx` (acceptance case "Testing (90), 30 Days, pH"); updated Recharts mocks in existing chart tests (`chart-xaxis-ticks-labels.test.tsx`, `chart-completeness-overflow.test.tsx`). (Synthetic 90-reading fixture is regression coverage, not live VPS parity proof; tests not executed by agent).
+  - *Operator Verification Status:* Operator local website testing, pre-commit CI gates, and VPS verification are PENDING. Task must not be marked DONE prior to VPS verification.
+- **Deployment & Infrastructure Assessment:**
+  - *Web Container:* Rebuild and redeploy required with **NEW commit SHA**.
+  - *IoT Gateway:* **UNCHANGED** at `08f0d79`.
+  - *Database & Caddy:* **NOT REQUIRED** (Zero schema migrations or reverse proxy changes).
+  - *Rollback Baseline:* Next web deployment must capture current web `08f0d79` as its rollback baseline without overwriting `/opt/kebun-melon/.rollback-08f0d79.env`. Do not reuse tag `08f0d79`.
+<!-- TASK-0504-Followup-3 Traceability Reconciled: 2026-10-17 -->
+
