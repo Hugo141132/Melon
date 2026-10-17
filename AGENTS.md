@@ -157,6 +157,32 @@ An Owner must approve the Admin before protected access is allowed.
   - Multi-tab synchronization via `localStorage` `melon_session_activity` and `melon_session_sync`.
   - Multi-tab storage listener security: requires authenticated session, validates non-secret `sessionId` match, validates finite timestamp bounds, enforces absolute expiry, and re-validates with server (`validateSession(false, true)`).
   - Idempotent `handleSessionExpired` unmounts protected content, purges session-scoped storage, broadcasts to other tabs, dispatches `melon:unauthenticated`, attempts best-effort server logout, and redirects to login.
+- **Settings Page Non-Functional Elements Pruning (DEC-UIUX-113, TASK-0604 Follow-up):**
+  - Completely removed the empty "Help & Support" card (`SettingItem`), its subtitle ("FAQ, tutorials, and contact"), icon (`HelpCircle`), and chevron from JSX DOM rendering in `apps/web/app/setting/page.tsx`.
+  - Completely removed the visible "v1.0.0" metadata footer container from DOM rendering.
+  - Cleaned up unused `HelpCircle` icon import from `lucide-react`.
+  - Pruned unreferenced translation keys `helpTitle`, `helpSubtitle`, `helpAndSupportTitle`, and `helpAndSupportSubtitle` from `apps/web/messages/en.json` and `apps/web/messages/id.json`, maintaining 100% key and placeholder parity.
+  - Preserved core settings components: user summary card (`UserAvatar`, full name, role badge), account controls (`/profile`), sensor alert notification toggle (`SettingsNotificationPreferences`), and language modal switcher (`SettingsLocaleSwitcher`). Semantic design tokens, responsive layout, and top app bar navigation shell remain intact.
+  - Updated regression unit test assertion in `apps/web/test/unit/branding-cleanup.test.tsx` to assert non-rendering of version label `v1.0.0`.
+  - Verification Evidence & Operator Results:
+    - Manual website testing: `PASS (operator-confirmed on 2026-10-17)` on `/setting` across desktop and mobile viewports in English and Indonesian.
+    - JSON syntax parsing: `PASS (performed directly via Node JSON.parse on both en.json and id.json)`.
+    - Automated translation parity check (`npm run i18n:check`): `PENDING` operator execution under `check:quality`.
+  - Reserved CI Pre-Commit Commands Assessment (inspected `.github/workflows/ci.yml`):
+    - `npm run check:quality`: Local compound gate; its underlying sub-commands (`format:check`, `lint`, `typecheck`, `i18n:check`, `scan:secrets`, `scan:deps`, `build`) run as individual **CI-Required** steps in `.github/workflows/ci.yml`.
+    - `npm run test:coverage`: **CI-Required** (runs Vitest with V8 coverage in CI).
+    - `npm run test:integration`: **CI-Required** (unconditionally executed in CI against PostgreSQL container).
+    - `npm run test:e2e`: **CI-Required** (unconditionally executed in CI under `APP_ENV=staging`).
+    - `npm run test`: **Not run directly in CI** (CI runs `test:coverage`; `test` is an optional local fast runner without coverage).
+    - All 5 reserved commands are strictly unexecuted by agent and remain `PENDING` operator execution.
+  - VPS Deployment Runbook Invariants (matching `VPS_DEPLOYMENT_RUNBOOK.md` §8 & §1.9):
+    - Web container image built off-VPS (`--platform linux/amd64`) with new release tag, transferred via plain `.tar` archive (`docker save -o`, `scp`, `docker load -i`).
+    - Invariant check: exactly 1 running web container before swap (`CONTAINER_COUNT -eq 1`).
+    - Rollback baseline capture: inspect running container ID, extract `.Config.Image`, atomically write to `/opt/kebun-melon/.prev_web_image` via `.tmp` -> `chmod 600` -> `mv -f`.
+    - Compose validation with explicit `--env-file .env.production` and `docker compose ... config --images`.
+    - In-place web container recreation: `docker compose --env-file .env.production -f docker-compose.prod.yml up -d --no-deps web`.
+    - Zero recreation of IoT Gateway (`08f0d79` preserved) and Caddy reverse proxy; zero database schema migrations.
+    - Health check verification: internal probe (`http://localhost:3000/health`) and public HTTPS probe (`https://monitoring.melonmadura.my.id/health`).
 - **Operational Commands, Deployment & Verification Status:**
   - Local development restart: `npm run dev:web`.
   - Release builds: executed off-VPS (for `linux/amd64`). Plain `.tar` archive supported on Windows workstations without external `gzip` tools.
@@ -1172,6 +1198,15 @@ Seven-item repair batch implementation record (TASK-0208, TASK-0212, TASK-0214, 
       - Monorepo Typecheck: `npm run typecheck` passed with 0 errors across all 4 packages.
       - Linter: `npm run lint:web` passed with 0 warnings/errors.
       - Playwright MCP visual and behavioral verification: Confirmed Indonesian and English flows, flag indicators, responsive touch targets, and form validation error states with zero regressions.
+- 2026-10-17 Settings Page UI Cleanup Record:
+  - Status: `DONE` (Implementation complete; manual website testing PASS per operator; local pre-commit quality gates, remote CI, and VPS deployment PENDING)
+  - Frontend impact: `MINOR`
+  - Selected UI direction: `Premium Minimal Ops`
+  - Existing color template: `UNCHANGED`
+  - Summary: Removed the empty "Help & Support" card (`SettingItem`), its subtitle ("FAQ, tutorials, and contact"), icon (`HelpCircle`), and visible "v1.0.0" metadata footer label from rendering in `apps/web/app/setting/page.tsx`. Cleaned up newly unused `HelpCircle` import from `lucide-react`. Removed unreferenced translation keys `helpTitle`, `helpSubtitle`, `helpAndSupportTitle`, and `helpAndSupportSubtitle` from `apps/web/messages/en.json` and `apps/web/messages/id.json` with 100% parity. Preserved profile navigation, account controls, notification preferences, language switcher (`SettingsLocaleSwitcher`), semantic tokens, responsive layout, and navigation shell untouched. Updated unit test assertion in `apps/web/test/unit/branding-cleanup.test.tsx` to assert non-rendering of version label.
+  - Verification & Testing: Manual website testing `PASS` (operator-confirmed on 2026-10-17 on `/setting` across desktop and mobile viewports in English and Indonesian). JSON syntax parsing `PASS` (performed via Node `JSON.parse` across both dictionaries). Automated dictionary parity check (`npm run i18n:check` under `check:quality`): `PENDING` operator execution.
+  - Reserved CI Pre-Commit Gates: Evaluated against `.github/workflows/ci.yml`. `npm run check:quality`, `npm run test:coverage`, `npm run test:integration`, and `npm run test:e2e` are CI-Required steps. `npm run test` is an optional local runner (CI runs `test:coverage`). All five commands remain strictly unexecuted by agent and `PENDING` operator execution.
+  - Deployment Protocol: Off-VPS build for `linux/amd64`, transfer via plain `.tar` archive, verify single running web container (`CONTAINER_COUNT -eq 1`), atomic rollback baseline capture from running container ID's `.Config.Image` to `/opt/kebun-melon/.prev_web_image`, recreation via `docker compose --env-file .env.production -f docker-compose.prod.yml up -d --no-deps web`. Gateway (`08f0d79`), Caddy, and database schema are 100% untouched.
 
 #### TASK-0703 Governance Record
 

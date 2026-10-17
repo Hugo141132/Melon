@@ -96,7 +96,7 @@ describe('Branding Cleanup: Visible UI text verification', () => {
     });
   });
 
-  it('renders SettingPage without "Kebun Melon" in version text', () => {
+  it('renders SettingPage without "Kebun Melon" or visible version label', () => {
     const { container } = render(
       <NextIntlClientProvider locale="id" messages={idMessages}>
         <SettingPage />
@@ -104,7 +104,7 @@ describe('Branding Cleanup: Visible UI text verification', () => {
     );
 
     expect(container.textContent).not.toContain('Kebun Melon');
-    expect(screen.getByText('v1.0.0')).toBeInTheDocument();
+    expect(screen.queryByText('v1.0.0')).not.toBeInTheDocument();
   });
 
   it('renders AccountStatusPage without "Kebun Melon" in footer', () => {

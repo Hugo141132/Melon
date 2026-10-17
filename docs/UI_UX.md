@@ -2087,6 +2087,29 @@ The Soil (`/soil`) and Water Quality (`/water`) telemetry charts (`NPKChart.tsx`
   - Unreleased patch with linear segments, dots, and Brush zoom is implemented; operator browser verification on VPS remains PENDING.
 <!-- Raw Telemetry Discrete Presentation Reconciled: 2026-10-17 -->
 
+---
 
+## Settings Page UI Cleanup Specification (TASK-0604 Follow-up / Reconciled 2026-10-17)
 
-
+- **Frontend Impact:** `MINOR`
+- **Selected UI Direction:** `Premium Minimal Ops`
+- **Existing Color Template:** `UNCHANGED`
+- **Selected Motion Effects:** `None`
+- **21st.dev MCP:** `NOT REQUIRED`
+- **Component:** `apps/web/app/setting/page.tsx`
+- **Removals from DOM Rendering:**
+  - Empty "Help & Support" card (`SettingItem`), including its subtitle ("FAQ, tutorials, and contact"), icon (`HelpCircle`), and navigation chevron.
+  - Visible "v1.0.0" metadata footer label (`text-app-on-surface-variant text-[12px]`).
+- **Preserved Invariants:**
+  - Preserved user profile summary card with dynamic monogram initials (`UserAvatar`), full name, and role indicator.
+  - Preserved account controls link (`/profile`).
+  - Preserved sensor alert email notification toggle (`SettingsNotificationPreferences`).
+  - Preserved language selection modal dialog (`SettingsLocaleSwitcher`).
+  - Preserved semantic color tokens, responsive container (`max-w-2xl mx-auto`), and top app bar navigation shell.
+- **Verification Status:**
+  - Manual Website Testing: `PASS` (operator-confirmed on 2026-10-17 across desktop and mobile viewports in English and Indonesian with zero visual regression, zero console errors, clean container margins, and preserved interactive controls).
+  - JSON Syntax Parsing: `PASS` (verified via Node `JSON.parse` across both dictionaries).
+  - Translation Parity Check (`npm run i18n:check`): `PENDING` operator execution under `check:quality`.
+  - Pre-Commit Reserved Quality Gates: `PENDING` operator execution (`check:quality`, `test:coverage`, `test:integration`, `test:e2e` are CI-Required; `test` is optional local).
+  - Remote GitHub Actions CI & VPS Deployment: `PENDING` operator push to `main` and container recreation matching `VPS_DEPLOYMENT_RUNBOOK.md` §8 & §1.9.
+<!-- Settings Page UI Cleanup Reconciled: 2026-10-17 -->

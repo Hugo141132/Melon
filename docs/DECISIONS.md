@@ -2113,6 +2113,42 @@ The following facts are supported by the verified decisions governance of `TASK-
      - Historical failed attempt on `295ee17` preserved as history.
 <!-- DEC-MON-096 Reconciled: 2026-10-17 -->
 
+---
 
-
+## DEC-UIUX-113: Settings Page Non-Functional Elements Pruning & Minimalist Presentation Standard (Help & Support Card and Version Label Removal)
+- **Status:** IMPLEMENTED (2026-10-17) — Manual website testing PASSED (operator-confirmed); local pre-commit quality gates, remote CI, and VPS deployment PENDING.
+- **Related Task IDs:** `TASK-0604`, `TASK-0604 Follow-up`
+- **Context:**
+  The settings page `/setting` (`apps/web/app/setting/page.tsx`) previously rendered an empty "Help & Support" card linking to `#` with subtitle "FAQ, tutorials, and contact", a HelpCircle icon, a navigation chevron, and an unmaintained static metadata footer label "v1.0.0". These elements created dead interactive paths and layout clutter, inconsistent with the `Premium Minimal Ops` design standard.
+- **Decision & Implementation Directives:**
+  1. **Complete DOM Removal (Non-CSS):**
+     Eliminated the empty "Help & Support" card (`SettingItem`), its subtitle, `HelpCircle` icon, chevron, and the `v1.0.0` metadata footer container from JSX DOM rendering completely (not merely hidden with CSS).
+  2. **Code & Import Cleanup:**
+     Cleaned up the unused `HelpCircle` icon import from `lucide-react`.
+  3. **Translation Dictionaries & Parity Pruning:**
+     Removed unreferenced translation keys `helpTitle`, `helpSubtitle`, `helpAndSupportTitle`, and `helpAndSupportSubtitle` from `apps/web/messages/en.json` and `apps/web/messages/id.json`, maintaining 100% key and placeholder parity.
+  4. **Preserved Core Settings Invariants:**
+     Preserved user profile summary card (`UserAvatar`, full name, role indicator), account controls link (`/profile`), sensor alert email notification toggle (`SettingsNotificationPreferences`), and language switcher modal dialog (`SettingsLocaleSwitcher`). Semantic color tokens, responsive container layout (`max-w-2xl mx-auto`), and top app bar navigation shell remain intact.
+  5. **Regression Test Alignment:**
+     Updated assertion in `apps/web/test/unit/branding-cleanup.test.tsx` to assert non-rendering of version label `v1.0.0`.
+  6. **Verification Evidence & Operator Results:**
+     - Manual website testing: `PASS (operator-confirmed on 2026-10-17)` on `/setting` across desktop and mobile viewports in English and Indonesian with zero visual regression, zero console errors, clean container margins, and preserved interactive controls.
+     - JSON syntax validation: `PASS` (verified syntax parsing via Node `JSON.parse` across both dictionaries).
+     - Automated translation parity check (`npm run i18n:check`): `PENDING` operator execution under `check:quality`.
+  7. **Reserved CI Pre-Commit Commands Assessment (`.github/workflows/ci.yml`):**
+     - `npm run check:quality`: Local compound gate; its underlying sub-commands (`format:check`, `lint`, `typecheck`, `i18n:check`, `scan:secrets`, `scan:deps`, `build`) run as individual **CI-Required** steps in `.github/workflows/ci.yml`.
+     - `npm run test:coverage`: **CI-Required** (runs Vitest with V8 coverage in CI).
+     - `npm run test:integration`: **CI-Required** (unconditionally executed in CI against PostgreSQL container).
+     - `npm run test:e2e`: **CI-Required** (unconditionally executed in CI under `APP_ENV=staging`).
+     - `npm run test`: **Not run directly in CI** (CI runs `test:coverage`; `test` is an optional local fast runner without coverage).
+     - All 5 reserved commands are strictly unexecuted by agent and remain `PENDING` operator execution.
+  8. **VPS Deployment Runbook Protocol (`VPS_DEPLOYMENT_RUNBOOK.md` §8 & §1.9):**
+     - Web container image built off-VPS (`--platform linux/amd64`) with new release tag, transferred via plain `.tar` archive (`docker save -o`, `scp`, `docker load -i`).
+     - Invariant check: exactly 1 running web container before swap (`CONTAINER_COUNT -eq 1`).
+     - Rollback baseline capture: inspect running container ID, extract `.Config.Image`, atomically write to `/opt/kebun-melon/.prev_web_image` via `.tmp` -> `chmod 600` -> `mv -f`.
+     - Compose validation with explicit `--env-file .env.production` and `docker compose ... config --images`.
+     - In-place web container recreation: `docker compose --env-file .env.production -f docker-compose.prod.yml up -d --no-deps web`.
+     - Zero recreation of IoT Gateway (`08f0d79` preserved) and Caddy reverse proxy; zero database schema migrations.
+     - Health check verification: internal probe (`http://localhost:3000/health`) and public HTTPS probe (`https://monitoring.melonmadura.my.id/health`).
+<!-- DEC-UIUX-113 Reconciled: 2026-10-17 -->
 

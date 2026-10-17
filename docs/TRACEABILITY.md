@@ -1098,4 +1098,32 @@ The following facts are verified in the traceability matrix regarding the curren
   - *Rollback Baseline:* Rollback web image: `kebun-melon-web:295ee17`, baseline stored in `/opt/kebun-melon/.rollback-web-e5e57fe.env` (historical rollback pairs preserved in `/opt/kebun-melon/.rollback-08f0d79.env`).
 <!-- TASK-0504-Followup-4 Traceability Reconciled: 2026-10-17 -->
 
+---
+
+## Current Work Reconciliation: Settings Page UI Cleanup (TASK-0604 Follow-up, DEC-UIUX-113 / Reconciled 2026-10-17)
+
+The following facts are verified in the traceability matrix regarding the current Settings cleanup:
+- **Traceability Baseline:**
+  - Tasks: `TASK-0604 Follow-up` in `TASKS.md`.
+  - Decisions: `DEC-UIUX-113` in `docs/DECISIONS.md`.
+  - UI/UX & I18N: `docs/UI_UX.md`, `docs/I18N.md` §3.11.
+  - Testing & Quality: `docs/TESTING.md` §9.
+  - Deployment Runbook: `docs/VPS_DEPLOYMENT_RUNBOOK.md` §8.
+- **Implementation Scope Across Components & Dictionaries:**
+  - *DOM Removal in `apps/web/app/setting/page.tsx`:* Completely removed the empty "Help & Support" card (`SettingItem`), its subtitle ("FAQ, tutorials, and contact"), icon (`HelpCircle`), chevron, and the visible `v1.0.0` metadata footer container from JSX DOM rendering (not merely hidden with CSS).
+  - *Dead Code & Import Cleanup:* Cleaned up the unused `HelpCircle` icon import from `lucide-react`.
+  - *Translation Dictionaries & Parity Pruning:* Removed unreferenced translation keys `helpTitle`, `helpSubtitle`, `helpAndSupportTitle`, and `helpAndSupportSubtitle` from `apps/web/messages/en.json` and `apps/web/messages/id.json`, maintaining 100% key and placeholder parity.
+  - *Preserved Core Invariants:* User summary card (`UserAvatar`, full name, role badge), account controls (`/profile`), sensor alert email notification toggle (`SettingsNotificationPreferences`), and language selection modal (`SettingsLocaleSwitcher`) remain intact.
+  - *Regression Test Assertion Alignment:* Updated `apps/web/test/unit/branding-cleanup.test.tsx` to assert that version label `v1.0.0` is not rendered.
+- **Verification Evidence:**
+  - *Manual Website Testing:* `PASS` (operator-confirmed on 2026-10-17 across desktop and mobile viewports in English and Indonesian with zero visual regression, zero console errors, clean container margins, and preserved interactive controls).
+  - *JSON Syntax Parsing:* `PASS` (verified via Node `JSON.parse` across both dictionaries).
+  - *Translation Parity Check (`npm run i18n:check`):* `PENDING` operator execution under `check:quality`.
+  - *Pre-Commit Reserved Quality Gates:* `PENDING` operator execution. Evaluated against `.github/workflows/ci.yml`: `check:quality`, `test:coverage`, `test:integration`, and `test:e2e` are CI-Required; `test` is an optional local fast runner.
+  - *Remote GitHub Actions CI:* `PENDING` operator push to `main`.
+- **Infrastructure & Deployment Assessment:**
+  - *Web Container Swap Protocol:* Follows `VPS_DEPLOYMENT_RUNBOOK.md` §8 & §1.9 — off-VPS container build for `linux/amd64`, transfer via plain `.tar` archive, single web container check (`CONTAINER_COUNT -eq 1`), atomic rollback baseline capture from running container ID to `/opt/kebun-melon/.prev_web_image`, recreation via `docker compose --env-file .env.production -f docker-compose.prod.yml up -d --no-deps web`.
+  - *IoT Gateway, Database & Caddy:* **UNCHANGED** (Zero database schema migrations; IoT gateway single-consumer rule preserved; Caddy proxy configuration untouched).
+<!-- TASK-0604-Followup Traceability Reconciled: 2026-10-17 -->
+
 

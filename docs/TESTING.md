@@ -4043,6 +4043,40 @@ npm run test:e2e
 - **Rollback Baseline:** Next web deployment must capture and preserve current web `295ee17` as its rollback baseline without overwriting `/opt/kebun-melon/.rollback-08f0d79.env`.
 - **Image Tagging:** Do not reuse image tag `295ee17` or `08f0d79` for changed code.
 
+---
+
+### 9. Settings Page UI Cleanup Verification Record (TASK-0604 Follow-up / DEC-UIUX-113 / Reconciled 2026-10-17)
+
+- **Test Scope:**
+  - Complete DOM removal of empty "Help & Support" card (`SettingItem`), its subtitle ("FAQ, tutorials, and contact"), icon (`HelpCircle`), chevron, and the visible `v1.0.0` metadata footer label from `apps/web/app/setting/page.tsx`.
+  - Unused `HelpCircle` icon import cleanup.
+  - Pruning of unreferenced keys `helpTitle`, `helpSubtitle`, `helpAndSupportTitle`, and `helpAndSupportSubtitle` from `en.json` and `id.json`.
+  - Preservation of user avatar, profile link (`/profile`), notification preferences (`SettingsNotificationPreferences`), and language modal switcher (`SettingsLocaleSwitcher`).
+- **Verification Evidence Matrix:**
+  1. **Manual Website Testing (Operator-Confirmed):** **`PASS` on 2026-10-17**. Verified on `/setting` across desktop and mobile viewports in English (`en`) and Indonesian (`id`) with zero visual regression, zero console errors, clean container margins, and preserved interactive controls.
+  2. **JSON Syntax Validation:** **`PASS`**. Node `JSON.parse` executed against both `apps/web/messages/en.json` and `apps/web/messages/id.json` with zero syntax errors.
+  3. **Translation Dictionary Parity Check:** **`PENDING`**. Automated dictionary comparison script (`npm run i18n:check`) is deferred to operator execution under `npm run check:quality`.
+  4. **Regression Unit Test Update:** Updated `apps/web/test/unit/branding-cleanup.test.tsx` lines 99-108 to assert non-rendering of version label (`expect(screen.queryByText('v1.0.0')).not.toBeInTheDocument()`).
+  5. **Reserved CI Pre-Commit Commands Assessment (`.github/workflows/ci.yml`):**
+
+| Command | CI Status | CI Workflow Job | Local Purpose | Execution Status |
+|---|---|---|---|---|
+| `npm run check:quality` | **CI-Required** | `lint-format`, `typecheck`, `translations`, `security-scan`, `build` | Compound local quality check (formatting, lint, types, i18n parity, secrets, dependencies, build) | **PENDING** (Operator Execution) |
+| `npm run test:coverage` | **CI-Required** | `test` | Vitest unit and component tests with V8 coverage reporting | **PENDING** (Operator Execution) |
+| `npm run test:integration` | **CI-Required** | `integration` | Integration tests against real PostgreSQL container service | **PENDING** (Operator Execution) |
+| `npm run test:e2e` | **CI-Required** | `e2e` | Playwright end-to-end browser tests under `APP_ENV=staging` | **PENDING** (Operator Execution) |
+| `npm run test` | **Optional Local** | Not directly run (CI executes `test:coverage`) | Fast test execution without coverage generation | **PENDING** (Operator Execution) |
+
+  6. **Remote CI & VPS Deployment Protocol (`VPS_DEPLOYMENT_RUNBOOK.md` §8 & §1.9):**
+     - Remote GitHub Actions CI: **`PENDING`** operator push to `main`.
+     - Container Image: Build off-VPS for `linux/amd64` using release tag (`kebun-melon-web:<new_tag>`).
+     - Transfer: Export to plain `.tar` archive via `docker save -o`, transfer via `scp`, load with `docker load -i`.
+     - Single Web Container Check: Confirm exactly 1 running container (`CONTAINER_COUNT -eq 1`).
+     - Atomic Rollback Baseline: Extract `.Config.Image` from running container ID and write atomically to `/opt/kebun-melon/.prev_web_image` via `.tmp` -> `chmod 600` -> `mv -f`.
+     - In-Place Recreation: `docker compose --env-file .env.production -f docker-compose.prod.yml up -d --no-deps web`.
+     - Untouched Services: IoT Gateway (`08f0d79`), Caddy reverse proxy, and database schema are 100% untouched.
+     - Post-Deployment Probes: Internal health probe (`http://localhost:3000/health`) and public HTTPS probe (`https://monitoring.melonmadura.my.id/health`).
+
 
 
 

@@ -6,7 +6,7 @@ import TopAppBar from '@/components/navigation/TopAppBar';
 import { SettingsLocaleSwitcher } from '@/components/settings/locale-switcher';
 import { SettingsNotificationPreferences } from '@/components/settings/notification-preferences';
 import { USER_PROFILE } from '@/lib/constants';
-import { User as UserIcon, ChevronRight, HelpCircle } from 'lucide-react';
+import { User as UserIcon, ChevronRight } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useAuth } from '@/context/AuthContext';
 
@@ -79,19 +79,6 @@ export default function SettingPage() {
           <SettingsNotificationPreferences />
 
           <SettingsLocaleSwitcher />
-
-          <SettingItem
-            icon={<HelpCircle size={22} className="text-app-on-surface-variant" />}
-            iconBg="bg-app-surface-container"
-            title={tSettings('helpAndSupportTitle')}
-            subtitle={tSettings('helpAndSupportSubtitle')}
-            href="#"
-          />
-        </div>
-
-        {/* App Metadata */}
-        <div className="text-center opacity-60 pt-2 animate-fade-in">
-          <p className="text-[12px] text-app-on-surface-variant">v1.0.0</p>
         </div>
       </main>
     </div>
