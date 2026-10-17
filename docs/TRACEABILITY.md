@@ -1006,13 +1006,13 @@ The following facts are verified in the traceability matrix regarding the 2026-1
   5. *Global Session Expiry & Multi-Tab Synchronization* (`TASK-0215`): Authoritative server deadlines (30m idle, 8h absolute), throttled physical user activity server touch (`touchLastSeen: true`), passive SSE / health check isolation (`touchLastSeen: false`), automated client-side login redirect, and multi-tab broadcast via `localStorage` with replay/stale guards.
   6. *Off-VPS Packaging & Rollback Procedure*: Plain `.tar` archive creation on Windows (`tar -cf`), `.prev_web_image` baseline tag capture.
 - **Verification Evidence:**
-  - Manual Acceptance Tests: **USER-REPORTED PASS (2026-10-17)** across all 5 areas.
+  - Manual Acceptance & Smoke Tests: **USER-REPORTED PASS (2026-10-17)** across all 5 areas and post-deployment health check (HTTP 200).
   - Regression Test Suites: Implemented across `apps/web/test/unit/` (`chart-xaxis-ticks-labels.test.tsx`, `outage-detection.test.tsx`, `resend-email.test.ts`, `route.test.ts`).
-  - Pre-Commit CI Quality Gates: **PENDING USER EXECUTION** (`check:quality`, `test`, `test:coverage`, `test:integration`, `test:e2e`).
+  - GitHub Actions CI Pipeline: **PASS** (Run ID `38998551217` on commit `d1c1c13`, verified independently via GitHub API).
 - **Deployment & Infrastructure Assessment:**
-  - Deployment Status: **PENDING**.
-  - Web Container Rollout: **REQUIRED** (Building off-VPS `kebun-melon-web` image and recreating web service with `--no-deps web`).
-  - IoT Gateway: **NOT REQUIRED** (Zero gateway changes, single-active gateway invariant preserved).
+  - Deployment Status: **COMPLETED (2026-10-17)** on Nebula VPS staging (`APP_ENV=staging`, `APP_URL=https://monitoring.melonmadura.my.id`).
+  - Web Container Rollout: Recreated in-place using `kebun-melon-web:d1c1c13` (`--no-deps web`). Prior rollback baseline `kebun-melon-web:8304c44` preserved in `/opt/kebun-melon/.prev_web_image`.
+  - IoT Gateway: **NOT MODIFIED** (Zero gateway changes, single-active gateway invariant preserved).
   - Database Migrations: **NOT REQUIRED** (Zero schema migrations needed).
-  - Environment Variables & Reverse Proxy (Caddy): **NOT REQUIRED** (Zero configuration changes).
+  - Environment Variables & Reverse Proxy (Caddy): **PRESERVED** (Zero reverse proxy changes; `WEB_IMAGE` updated in `.env.production` via `update_or_add_env`).
 <!-- TASK-0208-0504-0507-0814-0215 Traceability Reconciled: 2026-10-17 -->

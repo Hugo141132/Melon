@@ -359,6 +359,7 @@ The 2026-10-17 repair batch introduces shared compact numbered pagination, numer
    - Synchronizes multi-tab invalidation smoothly via `localStorage` storage events.
 5. **Verification Status:**
    - Manual website testing across `/soil`, `/water`, and `/controls` in English and Indonesian: `USER-REPORTED PASS on 2026-10-17`.
+   - Post-deployment acceptance and public health check (HTTP 200) for release `d1c1c13`: `USER-REPORTED PASS on 2026-10-17`.
 
 ---
 

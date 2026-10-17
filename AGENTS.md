@@ -160,9 +160,13 @@ An Owner must approve the Admin before protected access is allowed.
   - Release builds: executed off-VPS (for `linux/amd64`). Plain `.tar` archive supported on Windows workstations without external `gzip` tools.
   - VPS deployment: deploy using actual Compose configuration (`docker-compose.prod.yml`) and release image tag with `--no-deps web`. Single-active-gateway rule is strictly preserved.
   - Pre-swap rollback baseline capture: running container ID and image reference are inspected and atomically captured to `/opt/kebun-melon/.prev_web_image` with rollback tag before container recreation.
-  - Active Deployed Host: Release `8304c44` deployed to VPS operating under `APP_ENV=staging` at `APP_URL=https://monitoring.melonmadura.my.id` (staging environment despite prod compose filename; rollback tag `rollback-before-8304c44` created during deployment without claiming current availability was independently checked).
+  - Active Deployed Host: Release `d1c1c13` deployed to VPS operating under `APP_ENV=staging` at `APP_URL=https://monitoring.melonmadura.my.id` (staging environment despite prod compose filename; previous rollback baseline reference `kebun-melon-web:8304c44` preserved in durable state file `/opt/kebun-melon/.prev_web_image` without claiming current availability was independently checked).
   - Alerts 429 Repair Verification: All final verification tests, GitHub Actions CI, and post-deployment manual smoke tests passed (`USER-REPORTED COMPLETE`).
-  - 2026-10-17 Five-Item Repair Batch Status: Manual website testing across `/soil`, `/water`, and `/controls` in English and Indonesian passed (`USER-REPORTED PASS on 2026-10-17`). Pre-commit CI verification gates (`npm run check:quality`, `npm run test`, `npm run test:coverage`, `npm run test:integration`, `npm run test:e2e`), commit, push, remote GitHub Actions CI, and VPS deployment remain `PENDING USER EXECUTION`.
+  - 2026-10-17 Five-Item Repair Batch Deployment & Acceptance Status:
+    - Release Commit: `d1c1c13e93682222d59a81922f47753a85bc6d0b` (`d1c1c13`).
+    - GitHub Actions CI: PASS (Run ID `38998551217` on `d1c1c13`, verified independently via GitHub API).
+    - Website Acceptance & Deployment/Smoke Checks: `USER-REPORTED PASS on 2026-10-17` across `/soil`, `/water`, and `/controls` in English and Indonesian, with public HTTPS health check returning HTTP 200 OK.
+    - Deployment Status: `COMPLETE (USER-CONFIRMED on 2026-10-17)`.
 
 ---
 

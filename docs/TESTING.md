@@ -3851,14 +3851,14 @@ The five mandatory CI gates must be executed **exclusively by operator JEMBOT** 
 - **Manual Website Acceptance:**
   - User-performed interactive browser verification covering all five repaired items was reported PASSED on 2026-10-17 (`USER-REPORTED PASS on 2026-10-17`).
   - *Factual Note:* Manual testing is recorded as user-reported and was not independently executed or measured by the agent.
-- **Automated Verification Gates (Pending):**
-  - Gate 1: `npm run check:quality` -> `PENDING USER EXECUTION`
-  - Gate 2: `npm run test` -> `PENDING USER EXECUTION`
-  - Gate 3: `npm run test:coverage` -> `PENDING USER EXECUTION`
-  - Gate 4: `npm run test:integration` -> `PENDING USER EXECUTION`
-  - Gate 5: `npm run test:e2e` -> `PENDING USER EXECUTION`
+- **Automated Verification Gates & Remote CI:**
+  - Remote GitHub Actions CI: **PASS** (Run ID `38998551217` on commit `d1c1c13`, verified independently via GitHub API).
+  - *Distinction of Evidence:* Remote GitHub Actions CI pipeline execution was independently verified; local pre-commit command execution was not independently verified.
+- **Manual Website Acceptance & Post-Deployment Smoke Tests:**
+  - User-performed interactive browser verification and post-deployment smoke tests covering all five repaired items was reported PASSED on 2026-10-17 (`USER-REPORTED PASS on 2026-10-17`).
+  - *Factual Note:* Manual testing and smoke checks are recorded as user-reported and were not independently executed or measured by the agent.
 - **Deployment Status:**
-  - VPS deployment of current repair batch -> `PENDING` (Release `8304c44` remains the currently deployed baseline on VPS staging).
+  - VPS deployment of release `d1c1c13` -> **COMPLETED (2026-10-17)**. Active web service recreated with `kebun-melon-web:d1c1c13` on Nebula VPS staging (`APP_ENV=staging`, `APP_URL=https://monitoring.melonmadura.my.id`). Prior rollback baseline `kebun-melon-web:8304c44` is preserved in `/opt/kebun-melon/.prev_web_image`.
 
 
 

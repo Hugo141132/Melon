@@ -70,6 +70,13 @@
      - Regression tests added in `apps/web/test/unit/use-alert-badge.test.tsx` and `apps/web/test/unit/sidebar-navigation.test.tsx`.
    - **Verification Status:**
      - Final verification test commands, remote GitHub Actions CI, and post-deployment manual smoke testing passed (`USER-REPORTED COMPLETE`). Deployed verification is complete.
+6. **2026-10-17 Release d1c1c13 Deployment & Multi-Domain Repair Batch Closeout:**
+   - **Release d1c1c13 Deployment Status (COMPLETED):**
+     - Release commit `d1c1c13` (`d1c1c13e93682222d59a81922f47753a85bc6d0b`) was pushed to `main` and verified passing remote GitHub Actions CI run `38998551217`.
+     - **Deployed Environment & Configuration:** Built container image `kebun-melon-web:d1c1c13` off-VPS (`--platform linux/amd64`) and deployed to Nebula VPS (`38.103.171.46`) via isolated in-place web container recreation (`--no-deps web`).
+     - **Staging Runtime Invariant:** Executing under `APP_ENV=staging` at `APP_URL=https://monitoring.melonmadura.my.id` with Compose configuration `docker-compose.prod.yml` pointing to Supabase Staging (`ihgoxqdncepbcrqkchxu`).
+     - **Preserved Rollback Baseline:** Baseline rollback image tag `kebun-melon-web:8304c44` is preserved in `/opt/kebun-melon/.prev_web_image` (without claiming its current availability was independently checked).
+     - **Deployment & Smoke Test Acceptance:** User-performed deployment and post-deployment manual smoke testing passed (`USER-REPORTED PASS on 2026-10-17`), with public HTTPS probe to `https://monitoring.melonmadura.my.id/health` returning HTTP 200 OK.
 
 
 ---
