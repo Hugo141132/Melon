@@ -2910,7 +2910,7 @@ Key Implementation Details:
 
 ### 2026-10-17 Settings Page UI Cleanup (Follow-up)
 
-- **Status:** `DONE` (Implementation complete; manual website testing PASS per operator; local pre-commit quality gates, remote CI, and VPS deployment PENDING)
+- **Status:** `DONE` (Deployment and live smoke testing OPERATOR-REPORTED PASS on 2026-10-17)
 - **Frontend Impact:** `MINOR`
 - **Selected UI Direction:** `Premium Minimal Ops`
 - **Existing Color Template:** `UNCHANGED`
@@ -2930,12 +2930,21 @@ Key Implementation Details:
      - Preserved language selector modal (`SettingsLocaleSwitcher`).
      - Preserved semantic color tokens, responsive layout, and top app bar navigation shell.
      - Preserved package versions and unrelated version strings.
+     - All earlier TASK-0604 history is 100% preserved.
   4. **Regression Test Alignment:**
      - Updated unit regression assertion in `apps/web/test/unit/branding-cleanup.test.tsx` to assert non-rendering of version label `v1.0.0`.
   5. **Verification Evidence & Operator Results:**
      - Manual website testing: `PASS (operator-confirmed on 2026-10-17)` on `/setting` across desktop and mobile viewports in English and Indonesian with zero visual regression, zero console errors, clean container margins, and preserved interactive controls.
      - JSON syntax validation: `PASS` (verified syntax parsing via Node `JSON.parse` across both dictionaries).
      - Automated translation parity check (`npm run i18n:check`): `PENDING` operator execution under `check:quality`.
+     - GitHub Actions CI: `PASS (operator-reported for release d218cf7)`.
+     - Deployment & Live Smoke Testing: `OPERATOR-REPORTED PASS on 2026-10-17`.
+     - Deployed Target: Documented staging runtime on Nebula VPS (`38.103.171.46`, `APP_ENV=staging`, `monitoring.melonmadura.my.id`).
+     - Web Release Tag: `kebun-melon-web:d218cf7` (full SHA: `d218cf7370dfc1fd8a14c52fb684d7ca528a701a`).
+     - Container Health Status: `Healthy`.
+     - Internal Health Probe Response: `{"status":"ok"}`.
+     - Rollback Baseline: `kebun-melon-web:e5e57fe` captured and preserved in `/opt/kebun-melon/.prev_web_image`.
+     - Independent Live Verification Guard: Live status is strictly operator-reported; no independent agent live check claimed.
   6. **Reserved CI Pre-Commit Commands Assessment (`.github/workflows/ci.yml`):**
      - `npm run check:quality`: Local compound script running `format:check`, `lint`, `typecheck`, `i18n:check`, `scan:secrets`, `scan:deps`, and `build`. In `.github/workflows/ci.yml`, these are split into individual mandatory CI jobs (`lint-format`, `typecheck`, `translations`, `security-scan`, `build`). **CI-Required**.
      - `npm run test:coverage`: Executes Vitest with V8 code coverage. Invoked directly in CI under the `test` workflow job. **CI-Required**.
@@ -2943,22 +2952,15 @@ Key Implementation Details:
      - `npm run test:e2e`: Runs Playwright end-to-end tests under `APP_ENV=staging`. Invoked directly in CI under the `e2e` workflow job. **CI-Required**.
      - `npm run test`: Local fast test runner without coverage generation. Not run in CI (CI runs `test:coverage`). **Optional Local Gate**.
      - *Execution Policy:* All five reserved commands remain strictly unexecuted by the agent and `PENDING` operator execution.
-  7. **VPS Deployment Runbook Protocol (`VPS_DEPLOYMENT_RUNBOOK.md` §8 & §1.9):**
-     - **Off-VPS Image Build:** Workstation builds new web image off-VPS for `linux/amd64` using release tag: `docker build --platform linux/amd64 -t kebun-melon-web:<new_tag> -f apps/web/Dockerfile .`.
-     - **Transfer & Load:** Export to plain `.tar` (`docker save -o kebun-melon-web-<tag>.tar kebun-melon-web:<tag>`), transfer via `scp` to `/opt/kebun-melon`, and load on VPS (`docker load -i kebun-melon-web-<tag>.tar`).
-     - **Single Running Web Container Invariant:** Operator checks running container count on VPS: `CONTAINER_COUNT=$(docker ps --filter "name=kebun-melon-web" --format '{{.ID}}' | wc -l)` and verifies `CONTAINER_COUNT -eq 1`.
-     - **Atomic Rollback Baseline Capture:** Operator captures the running container ID and its exact image reference to `/opt/kebun-melon/.prev_web_image`:
-       ```bash
-       RUNNING_CONTAINER=$(docker ps --filter "name=kebun-melon-web" --format '{{.ID}}')
-       CURRENT_IMAGE=$(docker inspect --format '{{.Config.Image}}' "$RUNNING_CONTAINER")
-       echo "$CURRENT_IMAGE" > /opt/kebun-melon/.prev_web_image.tmp
-       chmod 600 /opt/kebun-melon/.prev_web_image.tmp
-       mv -f /opt/kebun-melon/.prev_web_image.tmp /opt/kebun-melon/.prev_web_image
-       ```
-     - **Compose Image Verification:** Verify resolved image with explicit production env: `WEB_IMAGE=kebun-melon-web:<new_tag> docker compose --env-file .env.production -f docker-compose.prod.yml config --images`.
-     - **In-Place Recreation:** Recreate web service only: `WEB_IMAGE=kebun-melon-web:<new_tag> docker compose --env-file .env.production -f docker-compose.prod.yml up -d --no-deps web`.
-     - **Untouched Services:** IoT Gateway container (`kebun-melon-gateway:08f0d79`) is preserved without recreation (satisfying the strict single-active-consumer rule). Reverse proxy (`caddy:2.9-alpine`) is untouched. Zero database schema migrations or DDL applied.
-     - **Post-Swap Verification:** Inspect container health (`docker ps --filter "name=kebun-melon-web"` -> `healthy`), verify internal endpoint probe (`curl -fsS http://localhost:3000/health`), and verify public HTTPS probe (`curl -fsS https://monitoring.melonmadura.my.id/health`).
+  7. **VPS Deployment Runbook Protocol & Executed Web Swap (`VPS_DEPLOYMENT_RUNBOOK.md` §8 & §1.9):**
+     - **Off-VPS Image Build:** Built web image off-VPS for `linux/amd64` using release tag: `kebun-melon-web:d218cf7`.
+     - **Transfer & Load:** Exported to plain `.tar` (`kebun-melon-web-d218cf7.tar`), transferred via `scp` to `/opt/kebun-melon`, and loaded on VPS (`docker load -i`).
+     - **Single Running Web Container Invariant:** Verified exactly 1 running web container on VPS before swap (`CONTAINER_COUNT -eq 1`).
+     - **Atomic Rollback Baseline Capture:** Captured running container's `.Config.Image` (`kebun-melon-web:e5e57fe`) atomically into `/opt/kebun-melon/.prev_web_image`.
+     - **Compose Image Verification:** Verified resolved image with explicit production env (`docker compose --env-file .env.production -f docker-compose.prod.yml config --images`).
+     - **In-Place Recreation:** Recreated web service only via `docker compose --env-file .env.production -f docker-compose.prod.yml up -d --no-deps web`.
+     - **Untouched Services:** IoT Gateway container (`kebun-melon-gateway:08f0d79`), Caddy reverse proxy, and database schema are 100% untouched (zero DDL/migrations).
+     - **Post-Swap Verification:** Container health status: `Healthy`. Health probe response: `{"status":"ok"}`. Live smoke testing: `OPERATOR-REPORTED PASS on 2026-10-17`.
 
 ---
 

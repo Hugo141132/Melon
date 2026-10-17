@@ -108,61 +108,34 @@
      5. **Water Tank Unchanged:** **PASS** — Reservoir Water Tank monitoring completely excluded and unchanged (`WaterTankMonitoringCard.tsx`).
    - **Historical Invariant:** Previous failed attempt (`FAILED on 295ee17` due to burst clumping) preserved as historical record.
    - **Scope Non-Extension Guard:** Unresolved alert escalation, auto-recovery, and background polling statuses remain unchanged (`PENDING`).
-9. **2026-10-17 Settings Page UI Cleanup Release Preparation & Web Swap Protocol (TASK-0604 Follow-up / DEC-UIUX-113):**
+9. **2026-10-17 Settings Page UI Cleanup Release d218cf7 Deployment & Verification Record (TASK-0604 Follow-up / DEC-UIUX-113 DONE — OPERATOR-REPORTED PASS):**
    - **Scope & Delivery Target:**
      - In-place recreation of `kebun-melon-web` only for the pruned Settings page non-functional elements (Help & Support card, subtitle, icon, chevron, and v1.0.0 metadata label).
-     - Manual website testing: **`PASS (operator-confirmed on 2026-10-17)`**. Local pre-commit quality gates and remote GitHub Actions CI remain pending operator execution and push to `main`.
-   - **Pre-Swap Build & Transfer Protocol:**
-     - **Off-VPS Image Build:** Must be built off-VPS for `linux/amd64` using the new commit SHA release tag:
-       ```bash
-       docker build --platform linux/amd64 -t kebun-melon-web:<new_tag> -f apps/web/Dockerfile .
-       ```
-     - **Export to Plain Tar Archive:** Save without gzip compression (Windows PowerShell compatible):
-       ```bash
-       docker save -o kebun-melon-web-<tag>.tar kebun-melon-web:<tag>
-       ```
-     - **Transfer to VPS:** Transfer archive via SCP:
-       ```bash
-       scp kebun-melon-web-<tag>.tar deploy@38.103.171.46:/opt/kebun-melon/
-       ```
-     - **Load on VPS:** Load image into VPS Docker daemon:
-       ```bash
-       docker load -i /opt/kebun-melon/kebun-melon-web-<tag>.tar
-       ```
+     - Deployed release: `kebun-melon-web:d218cf7` (full SHA: `d218cf7370dfc1fd8a14c52fb684d7ca528a701a`).
+     - Deployment and live smoke testing: **`OPERATOR-REPORTED PASS on 2026-10-17`**. Container health status: `Healthy`. Internal health probe response: `{"status":"ok"}`.
+     - Deployed target: Documented staging runtime on Nebula VPS (`38.103.171.46`, `APP_ENV=staging`, `monitoring.melonmadura.my.id`).
+     - Rollback baseline: `kebun-melon-web:e5e57fe` captured and preserved in `/opt/kebun-melon/.prev_web_image`.
+     - Independent live verification guard: Live status is strictly operator-reported; no independent agent live check claimed.
+   - **Executed Build & Transfer Protocol:**
+     - **Off-VPS Image Build:** Built off-VPS for `linux/amd64`: `docker build --platform linux/amd64 -t kebun-melon-web:d218cf7 -f apps/web/Dockerfile .`.
+     - **Export to Plain Tar Archive:** Exported directly without gzip compression: `docker save -o kebun-melon-web-d218cf7.tar kebun-melon-web:d218cf7`.
+     - **Transfer to VPS:** Transferred via SCP: `scp kebun-melon-web-d218cf7.tar deploy@38.103.171.46:/opt/kebun-melon/`.
+     - **Load on VPS:** Loaded into VPS Docker daemon: `docker load -i /opt/kebun-melon/kebun-melon-web-d218cf7.tar`. Verified `linux/amd64` architecture before archive removal.
    - **Pre-Swap Invariant Checks & Atomic Rollback Capture (On VPS):**
-     - **Single Web Container Invariant:** Confirm exactly 1 running web container before recreation:
-       ```bash
-       CONTAINER_COUNT=$(docker ps --filter "name=kebun-melon-web" --format '{{.ID}}' | wc -l)
-       [ "$CONTAINER_COUNT" -eq 1 ] || { echo "ERROR: Expected 1 running web container, found $CONTAINER_COUNT"; exit 1; }
-       ```
-     - **Atomic Rollback Baseline Capture:**
-       ```bash
-       RUNNING_CONTAINER=$(docker ps --filter "name=kebun-melon-web" --format '{{.ID}}')
-       CURRENT_IMAGE=$(docker inspect --format '{{.Config.Image}}' "$RUNNING_CONTAINER")
-       echo "$CURRENT_IMAGE" > /opt/kebun-melon/.prev_web_image.tmp
-       chmod 600 /opt/kebun-melon/.prev_web_image.tmp
-       mv -f /opt/kebun-melon/.prev_web_image.tmp /opt/kebun-melon/.prev_web_image
-       ```
-     - **Compose Image Verification:** Verify resolved images with explicit production env:
-       ```bash
-       WEB_IMAGE=kebun-melon-web:<new_tag> docker compose --env-file .env.production -f docker-compose.prod.yml config --images
-       ```
+     - **Single Web Container Invariant:** Verified exactly 1 running web container before recreation (`CONTAINER_COUNT -eq 1`).
+     - **Atomic Rollback Baseline Capture:** Captured running container's `.Config.Image` (`kebun-melon-web:e5e57fe`) atomically into `/opt/kebun-melon/.prev_web_image`.
+     - **Compose Image Verification:** Verified resolved image with explicit production env (`docker compose --env-file .env.production -f docker-compose.prod.yml config --images`).
    - **In-Place Recreation & Untouched Services:**
-     - **Recreate Web Only:**
-       ```bash
-       WEB_IMAGE=kebun-melon-web:<new_tag> docker compose --env-file .env.production -f docker-compose.prod.yml up -d --no-deps web
-       ```
-     - **Gateway Container (`kebun-melon-gateway`):** **UNCHANGED** at `08f0d79`. Must NOT be recreated (preserves strict single-active-consumer rule).
-     - **Caddy Reverse Proxy (`kebun-melon-proxy`):** **UNCHANGED**. Must NOT be recreated (preserves valid TLS and port 3000 proxying).
+     - **Recreate Web Only:** Recreated web container via `docker compose --env-file .env.production -f docker-compose.prod.yml up -d --no-deps web`.
+     - **Gateway Container (`kebun-melon-gateway`):** **UNCHANGED** at `08f0d79`. Was NOT recreated (preserves strict single-active-consumer rule).
+     - **Caddy Reverse Proxy (`kebun-melon-proxy`):** **UNCHANGED**. Was NOT recreated (preserves valid TLS and port 3000 proxying).
      - **Database Migrations:** **NOT REQUIRED** (Zero schema changes; no DDL executed).
    - **Post-Swap Verification & Health Probes:**
-     - Verify container status: `docker ps --filter "name=kebun-melon-web"` shows `healthy`.
-     - Internal health probe: `curl -fsS http://localhost:3000/health`.
-     - Public HTTPS probe: `curl -fsS https://monitoring.melonmadura.my.id/health`.
-     - Rollback command (if needed):
-       ```bash
-       WEB_IMAGE=$(cat /opt/kebun-melon/.prev_web_image) docker compose --env-file .env.production -f docker-compose.prod.yml up -d --no-deps web
-       ```
+     - Container status: `Healthy`.
+     - Internal health probe: `curl -fsS http://localhost:3000/health` returned `{"status":"ok"}`.
+     - Public HTTPS probe: `curl -fsS https://monitoring.melonmadura.my.id/health` passed.
+     - Authenticated `/setting` smoke test: passed on desktop/mobile and EN/ID viewports.
+     - Rollback reference: `kebun-melon-web:e5e57fe` preserved in `/opt/kebun-melon/.prev_web_image`.
 
 ---
 

@@ -168,6 +168,14 @@ An Owner must approve the Admin before protected access is allowed.
     - Manual website testing: `PASS (operator-confirmed on 2026-10-17)` on `/setting` across desktop and mobile viewports in English and Indonesian.
     - JSON syntax parsing: `PASS (performed directly via Node JSON.parse on both en.json and id.json)`.
     - Automated translation parity check (`npm run i18n:check`): `PENDING` operator execution under `check:quality`.
+    - GitHub Actions CI: `PASS (operator-reported for release d218cf7)`.
+    - Deployment & Live Smoke Testing: `OPERATOR-REPORTED PASS on 2026-10-17`.
+    - Deployed Target: Documented staging runtime on Nebula VPS (`38.103.171.46`, `APP_ENV=staging`, `monitoring.melonmadura.my.id`).
+    - Web Release Tag: `kebun-melon-web:d218cf7` (full SHA: `d218cf7370dfc1fd8a14c52fb684d7ca528a701a`).
+    - Container Health Status: `Healthy`.
+    - Internal Health Probe Response: `{"status":"ok"}`.
+    - Rollback Baseline: `kebun-melon-web:e5e57fe` captured and preserved in `/opt/kebun-melon/.prev_web_image`.
+    - Independent Live Verification Guard: Live status is strictly operator-reported; no independent agent live check claimed.
   - Reserved CI Pre-Commit Commands Assessment (inspected `.github/workflows/ci.yml`):
     - `npm run check:quality`: Local compound gate; its underlying sub-commands (`format:check`, `lint`, `typecheck`, `i18n:check`, `scan:secrets`, `scan:deps`, `build`) run as individual **CI-Required** steps in `.github/workflows/ci.yml`.
     - `npm run test:coverage`: **CI-Required** (runs Vitest with V8 coverage in CI).
@@ -182,13 +190,13 @@ An Owner must approve the Admin before protected access is allowed.
     - Compose validation with explicit `--env-file .env.production` and `docker compose ... config --images`.
     - In-place web container recreation: `docker compose --env-file .env.production -f docker-compose.prod.yml up -d --no-deps web`.
     - Zero recreation of IoT Gateway (`08f0d79` preserved) and Caddy reverse proxy; zero database schema migrations.
-    - Health check verification: internal probe (`http://localhost:3000/health`) and public HTTPS probe (`https://monitoring.melonmadura.my.id/health`).
+    - Health check verification: internal probe inside container (`curl -fsS http://localhost:3000/health`) and public HTTPS probe (`https://monitoring.melonmadura.my.id/health`).
 - **Operational Commands, Deployment & Verification Status:**
   - Local development restart: `npm run dev:web`.
   - Release builds: executed off-VPS (for `linux/amd64`). Plain `.tar` archive supported on Windows workstations without external `gzip` tools.
   - VPS deployment: deploy using actual Compose configuration (`docker-compose.prod.yml`) and release image tag with `--no-deps web`. Single-active-gateway rule is strictly preserved.
   - Pre-swap rollback baseline capture: running container ID and image reference are inspected and atomically captured to `/opt/kebun-melon/.prev_web_image` with rollback tag before container recreation.
-  - Active Deployed Host: Web release `e5e57fe1a3b9523e261b50a5a29793a2a8dc5b13` (web image: `kebun-melon-web:e5e57fe`), gateway release remains `08f0d79` (`kebun-melon-gateway:08f0d79`), deployed to VPS operating under `APP_ENV=staging` at `APP_URL=https://monitoring.melonmadura.my.id`. Web container recreation and health checks succeeded; gateway and Caddy were not recreated (`USER-CONFIRMED`). Rollback web image: `kebun-melon-web:295ee17`, baseline stored in `/opt/kebun-melon/.rollback-web-e5e57fe.env` (historical rollback pair preserved in `/opt/kebun-melon/.rollback-08f0d79.env`). Operator confirms all checks in the VPS chart checklist passed (`OPERATOR-REPORTED PASS on 2026-10-17`): reading-sequence charts across Soil and Water Quality, clean lines without markers or Brush, original timestamps/values in tooltips, readable EN/ID axis labels, and Water Tank unchanged. (Previous failed attempt on 295ee17 preserved as history). CI quality gates pending operator push. Unresolved alert escalation, auto-recovery, and background polling statuses remain unchanged.
+  - Active Deployed Host: Web release `d218cf7370dfc1fd8a14c52fb684d7ca528a701a` (web image: `kebun-melon-web:d218cf7`), gateway release remains `08f0d79` (`kebun-melon-gateway:08f0d79`), deployed to VPS operating under documented staging runtime (`APP_ENV=staging`) at `APP_URL=https://monitoring.melonmadura.my.id`. Container status: `Healthy`; internal health probe response: `{"status":"ok"}` (`OPERATOR-REPORTED PASS on 2026-10-17`). Rollback web image: `kebun-melon-web:e5e57fe` preserved in `/opt/kebun-melon/.prev_web_image`. Gateway and Caddy were not recreated (`USER-CONFIRMED`). Zero schema migrations. Unresolved alert escalation, auto-recovery, and background polling statuses remain unchanged.
 - **Discrete Raw Telemetry Presentation Invariants (DEC-MON-096, TASK-0504 Follow-up 3 / Follow-up 4):**
   - **Raw Reading Dataset Preservation & "One Reading = One Data Point":** "One reading = one data point" strictly means preserving 100% of the underlying dataset without averaging, bucketing, sampling, truncation, or deduplication across DB $\to$ API cursor batches $\to$ hook $\to$ chart data prop. It does NOT mean drawing visible circle markers or adding a zoom Brush.
   - **Clean Line Chart Presentation:** Rendered as a clean line chart with straight line segments (`type="linear"`), no curve smoothing (`type="monotone"` prohibited), and completely without markers (`dot={false}`) and without hover highlights (`activeDot={false}`).
@@ -1199,14 +1207,14 @@ Seven-item repair batch implementation record (TASK-0208, TASK-0212, TASK-0214, 
       - Linter: `npm run lint:web` passed with 0 warnings/errors.
       - Playwright MCP visual and behavioral verification: Confirmed Indonesian and English flows, flag indicators, responsive touch targets, and form validation error states with zero regressions.
 - 2026-10-17 Settings Page UI Cleanup Record:
-  - Status: `DONE` (Implementation complete; manual website testing PASS per operator; local pre-commit quality gates, remote CI, and VPS deployment PENDING)
+  - Status: `DONE` (Deployment and live smoke testing OPERATOR-REPORTED PASS on 2026-10-17)
   - Frontend impact: `MINOR`
   - Selected UI direction: `Premium Minimal Ops`
   - Existing color template: `UNCHANGED`
   - Summary: Removed the empty "Help & Support" card (`SettingItem`), its subtitle ("FAQ, tutorials, and contact"), icon (`HelpCircle`), and visible "v1.0.0" metadata footer label from rendering in `apps/web/app/setting/page.tsx`. Cleaned up newly unused `HelpCircle` import from `lucide-react`. Removed unreferenced translation keys `helpTitle`, `helpSubtitle`, `helpAndSupportTitle`, and `helpAndSupportSubtitle` from `apps/web/messages/en.json` and `apps/web/messages/id.json` with 100% parity. Preserved profile navigation, account controls, notification preferences, language switcher (`SettingsLocaleSwitcher`), semantic tokens, responsive layout, and navigation shell untouched. Updated unit test assertion in `apps/web/test/unit/branding-cleanup.test.tsx` to assert non-rendering of version label.
-  - Verification & Testing: Manual website testing `PASS` (operator-confirmed on 2026-10-17 on `/setting` across desktop and mobile viewports in English and Indonesian). JSON syntax parsing `PASS` (performed via Node `JSON.parse` across both dictionaries). Automated dictionary parity check (`npm run i18n:check` under `check:quality`): `PENDING` operator execution.
-  - Reserved CI Pre-Commit Gates: Evaluated against `.github/workflows/ci.yml`. `npm run check:quality`, `npm run test:coverage`, `npm run test:integration`, and `npm run test:e2e` are CI-Required steps. `npm run test` is an optional local runner (CI runs `test:coverage`). All five commands remain strictly unexecuted by agent and `PENDING` operator execution.
-  - Deployment Protocol: Off-VPS build for `linux/amd64`, transfer via plain `.tar` archive, verify single running web container (`CONTAINER_COUNT -eq 1`), atomic rollback baseline capture from running container ID's `.Config.Image` to `/opt/kebun-melon/.prev_web_image`, recreation via `docker compose --env-file .env.production -f docker-compose.prod.yml up -d --no-deps web`. Gateway (`08f0d79`), Caddy, and database schema are 100% untouched.
+  - Earlier History: All earlier TASK-0604 implementation and verification records are 100% preserved.
+  - Deployment & Live Verification: Deployed web image `kebun-melon-web:d218cf7` to documented staging runtime on Nebula VPS (`38.103.171.46`, `APP_ENV=staging`, `monitoring.melonmadura.my.id`). Container health is `Healthy`; internal health probe returned `{"status":"ok"}` (`OPERATOR-REPORTED PASS on 2026-10-17`). Rollback baseline `kebun-melon-web:e5e57fe` preserved in `/opt/kebun-melon/.prev_web_image`. No independent live verification claimed. GitHub Actions CI passed (operator-reported).
+  - Infrastructure Invariants: Gateway (`kebun-melon-gateway:08f0d79`), Caddy reverse proxy, and database schema are 100% untouched (zero DDL/migrations).
 
 #### TASK-0703 Governance Record
 
