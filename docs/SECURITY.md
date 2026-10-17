@@ -1956,5 +1956,13 @@ The following security controls govern session lifecycle, Server Component SSR b
 - **Epoch-Based State Isolation (`activeEpochRef`):** Both `AuthContext` and telemetry hooks track an `activeEpochRef` counter. In-flight telemetry or session validation responses initiated prior to an outage or reconnection event are unconditionally dropped if their epoch does not match the active epoch, preventing race-condition corruption of client-side operational state.
 <!-- Server Component Purity & Outage Recovery Security Reconciled: 2026-10-04 -->
 
+---
 
+## External Prediction Alert Evaluation & Advisory Lock Security Controls Note (DEC-ALRT-101 / TASK-0708 / Reconciled 2026-10-17)
 
+The following security controls govern external prediction evaluation, alert persistence, and concurrent processing:
+- **External Read-Only Isolation:** Predictions are pulled on demand from the external ML database via `ExternalPredictionClient` using scoped, read-only PostgREST credentials. Internal MQTT broker messages and state stores are never used to store or stage raw ML model payloads.
+- **Transactional Advisory Locking (`pg_advisory_xact_lock`):** Evaluator executions across IoT gateway telemetry listeners and web route handlers acquire a PostgreSQL transaction-level advisory lock hashed by device and domain: `pg_advisory_xact_lock(hashtext('prediction_alert_' || device.id || '_' || domain))`. This guarantees serialization of alert evaluation per device domain, preventing concurrent write races, double alert insertion, or race-conditioned status mutations during rapid telemetry bursts.
+- **Deterministic Episode Identity:** Active prediction alerts maintain a unique, deterministic identity scoped to `alertType: REC_${issueCode}` (clamped to 80 characters per schema invariants). Concurrent agronomic issues affecting different metrics (e.g. pH vs EC) maintain distinct episodes and cannot overwrite or dismiss each other.
+- **Alert RBAC Integrity:** Generated agronomic alerts (`sourceType: 'ml_prediction'`) adhere strictly to system-wide alert RBAC. Unauthenticated visitors and pending applicants cannot access alerts; assigned Admins access alerts only for their assigned devices, while Owners retain farm-wide visibility. Alert acknowledgements record immutable audit logs with authenticated actor identity (`telemetry.alert_acknowledged`). Acknowledgement is strictly per-user (`alert_acknowledgements`) and does not resolve or close the recommendation episode. Post-ack Critical escalation visibility is **IMPLEMENTATION UNCONFIRMED / VERIFICATION PENDING** (metadata persistence alone is unconfirmed without concrete API unread-count reset and UI logic).
+<!-- External Prediction Alert Security Reconciled: 2026-10-17 -->

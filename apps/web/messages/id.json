@@ -635,6 +635,8 @@
     "commandTimeoutTitle": "Perintah Valve Kehabisan Waktu",
     "commandTimeoutMessage": "Perintah valve untuk {deviceName} kehabisan waktu tanpa konfirmasi.",
     "commandTimeoutDesc": "Perintah valve untuk {deviceName} kehabisan waktu tanpa konfirmasi.",
+    "recommendationAlertTitle": "Rekomendasi AI: {issueLabel}",
+    "recommendationAlertMessage": "{deviceName}: {problem}. {impact}",
     "acknowledgeAction": "Acknowledge Peringatan",
     "acknowledgeConfirm": "Apakah Anda yakin ingin melakukan acknowledge pada peringatan ini?",
     "acknowledgedBy": "Di-acknowledge oleh",
@@ -924,6 +926,8 @@
     "impactPrefix": "Dampak",
     "detectedCount": "{count} Masalah",
     "actionsCount": "{count} Langkah",
-    "currentValue": "Nilai"
+    "currentValue": "Nilai",
+    "translationUnavailable": "Terjemahan tidak tersedia",
+    "viewOriginalText": "Lihat teks asli"
   }
 }

@@ -357,9 +357,29 @@ The 2026-10-17 repair batch introduces shared compact numbered pagination, numer
 4. **Global Automatic Session Expiry Logout (`AuthContext.tsx` / `TASK-0215`):**
    - Automatically unmounts protected content and redirects to `/login?reason=expired` upon 30-minute idle timeout or 8-hour absolute expiry without requiring user clicks or subsequent API requests.
    - Synchronizes multi-tab invalidation smoothly via `localStorage` storage events.
-5. **Verification Status:**
-   - Manual website testing across `/soil`, `/water`, and `/controls` in English and Indonesian: `USER-REPORTED PASS on 2026-10-17`.
-   - Post-deployment acceptance and public health check (HTTP 200) for release `d1c1c13`: `USER-REPORTED PASS on 2026-10-17`.
+### 1.15 Location Row-Editor Alignment & Recommendation Localization Governance (DEC-UIUX-112, DEC-I18N-096 / 2026-10-17)
+The 2026-10-17 refinement optimizes inline location editing ergonomics and bilingual presentation of agronomic intelligence recommendations:
+- **Frontend impact:** `MINOR`
+- **Selected UI direction:** `Premium Minimal Ops`
+- **Existing color template:** `UNCHANGED`
+- **Selected motion effects:** `Button hover`, `Skeleton loading`
+- **21st.dev MCP:** `NOT REQUIRED` (Adheres to established design tokens and layout boundaries)
+
+#### Presentation, Ergonomics & Localization Rules
+1. **Inline Location Row-Editor Ergonomics (`ReadingHistoryTable.tsx` / `DEC-UIUX-112`):**
+   - **Horizontal Alignment & Space Reservation:** The location table cell reserves adequate inline width (`min-w-[220px] sm:min-w-[240px]`) during active inline editing, preventing layout jitter or table column resizing.
+   - **Compact Touch & Click Actions:** Action buttons (`Save`, `Clear`, `Cancel`) are styled consistently with `h-7 text-xs px-2 sm:px-2.5 rounded-lg whitespace-nowrap font-medium transition-colors`.
+   - **Input Sizing:** Compact input field (`h-7 text-xs w-28 sm:w-32 px-2 py-1 rounded-lg border border-app-outline-variant/60 bg-app-surface-container-lowest text-app-on-surface focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary`).
+   - **Single-Line Flex Containment:** Actions and input align in a single non-wrapping row (`flex items-center gap-1.5 flex-nowrap`), ensuring the `Clear` button remains visible without vertical stacking or overflow clipping.
+   - **State Isolation:** Editing one row isolates state to that specific reading ID; pressing Cancel reverts to the original annotated label without persisting changes.
+2. **Agronomic Recommendation Presentation & Non-Intrusive Disclosure (`RecommendationCard.tsx`, `LocalizedTextDisplay` / `DEC-I18N-096`):**
+   - **Semantic Normalization:** Source strings from the external ML service are stripped of Markdown formatting, bullets, numbering, and trailing punctuation before dictionary key matching, preventing formatting artifacts from breaking translation.
+   - **Bilingual Screenshot Copy Parity:** Common diagnostic messages and action recommendations match exact phrasing across Indonesian (`id.json`) and English (`en.json`).
+   - **Dynamic Value Interpolation:** Diagnostics with live sensor values (e.g. Moisture %, EC µS/cm, Temperature °C, pH) interpolate numerical values into parameterized translation templates, rendering grammatically sound sentences in both languages.
+   - **Non-Intrusive Fallback Disclosure:** When unmapped freeform text is returned by external ML models, `LocalizedTextDisplay` displays the source text with a subtle, non-disruptive disclosure footnote (`Source: "..."` with tooltip) instead of aggressive error banners or bracketed translation warnings, preserving the clean Bento dashboard aesthetic.
+3. **Authoritative Verification Status:**
+   - Operator localization website testing across `/soil` and `/water` in Indonesian and English: `USER-REPORTED PASS on 2026-10-17`.
+   - Row-editor Save/Clear/Cancel operations, chart completeness, and recommendation alert evaluations: `DEFERRED TO VPS TESTING` (due to local test data constraints).
 
 ---
 

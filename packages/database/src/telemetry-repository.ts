@@ -988,26 +988,34 @@ export class TelemetryRepository {
       if (sepIdx === -1) {
         throw new Error('Invalid or malformed pagination cursor.');
       }
-      const cursorRecordedAtStr = params.cursor.substring(0, sepIdx);
+      const cursorReceivedAtStr = params.cursor.substring(0, sepIdx);
       const cursorId = params.cursor.substring(sepIdx + 1);
-      const cursorDate = new Date(cursorRecordedAtStr);
+      const cursorDate = new Date(cursorReceivedAtStr);
       if (isNaN(cursorDate.getTime()) || !cursorId) {
         throw new Error('Invalid or malformed pagination cursor.');
       }
       cursorFilter = {
-        OR: [{ recordedAt: { gt: cursorDate } }, { recordedAt: cursorDate, id: { gt: cursorId } }],
+        OR: [{ receivedAt: { gt: cursorDate } }, { receivedAt: cursorDate, id: { gt: cursorId } }],
       };
     }
+
+    const timeRangeFilter: Prisma.SoilReadingWhereInput = {
+      OR: [
+        { recordedAt: { gte: params.from, lt: params.to } },
+        { recordedAt: null, receivedAt: { gte: params.from, lt: params.to } },
+      ],
+    };
 
     const baseWhere: Prisma.SoilReadingWhereInput = {
       deviceId,
       locationKey,
-      recordedAt: { gte: params.from, lt: params.to },
+      AND: [timeRangeFilter],
     };
 
     const where: Prisma.SoilReadingWhereInput = {
-      ...baseWhere,
-      ...cursorFilter,
+      deviceId,
+      locationKey,
+      AND: params.cursor ? [timeRangeFilter, cursorFilter] : [timeRangeFilter],
     };
 
     // Count is evaluated on the initial query without cursor
@@ -1017,8 +1025,8 @@ export class TelemetryRepository {
         : Promise.resolve(undefined),
       this.prisma.soilReading.findMany({
         where,
-        // Deterministic ascending keyset ordering on [recordedAt, id]
-        orderBy: [{ recordedAt: 'asc' }, { id: 'asc' }],
+        // Deterministic ascending keyset traversal on non-null total order [receivedAt, id]
+        orderBy: [{ receivedAt: 'asc' }, { id: 'asc' }],
         take: limit,
         select: {
           id: true,
@@ -1039,8 +1047,7 @@ export class TelemetryRepository {
     let nextCursor: string | null = null;
     if (rows.length === limit) {
       const lastRow = rows[rows.length - 1];
-      const cursorDate = lastRow.recordedAt ?? lastRow.receivedAt;
-      nextCursor = `${cursorDate.toISOString()}_${lastRow.id}`;
+      nextCursor = `${lastRow.receivedAt.toISOString()}_${lastRow.id}`;
     }
 
     // Preserve actual sensor recordedAt chronological order for display
@@ -1186,26 +1193,34 @@ export class TelemetryRepository {
       if (sepIdx === -1) {
         throw new Error('Invalid or malformed pagination cursor.');
       }
-      const cursorRecordedAtStr = params.cursor.substring(0, sepIdx);
+      const cursorReceivedAtStr = params.cursor.substring(0, sepIdx);
       const cursorId = params.cursor.substring(sepIdx + 1);
-      const cursorDate = new Date(cursorRecordedAtStr);
+      const cursorDate = new Date(cursorReceivedAtStr);
       if (isNaN(cursorDate.getTime()) || !cursorId) {
         throw new Error('Invalid or malformed pagination cursor.');
       }
       cursorFilter = {
-        OR: [{ recordedAt: { gt: cursorDate } }, { recordedAt: cursorDate, id: { gt: cursorId } }],
+        OR: [{ receivedAt: { gt: cursorDate } }, { receivedAt: cursorDate, id: { gt: cursorId } }],
       };
     }
+
+    const timeRangeFilter: Prisma.WaterReadingWhereInput = {
+      OR: [
+        { recordedAt: { gte: params.from, lt: params.to } },
+        { recordedAt: null, receivedAt: { gte: params.from, lt: params.to } },
+      ],
+    };
 
     const baseWhere: Prisma.WaterReadingWhereInput = {
       deviceId,
       locationKey,
-      recordedAt: { gte: params.from, lt: params.to },
+      AND: [timeRangeFilter],
     };
 
     const where: Prisma.WaterReadingWhereInput = {
-      ...baseWhere,
-      ...cursorFilter,
+      deviceId,
+      locationKey,
+      AND: params.cursor ? [timeRangeFilter, cursorFilter] : [timeRangeFilter],
     };
 
     const [totalRows, rows] = await Promise.all([
@@ -1214,8 +1229,8 @@ export class TelemetryRepository {
         : Promise.resolve(undefined),
       this.prisma.waterReading.findMany({
         where,
-        // Deterministic ascending keyset ordering on [recordedAt, id]
-        orderBy: [{ recordedAt: 'asc' }, { id: 'asc' }],
+        // Deterministic ascending keyset traversal on non-null total order [receivedAt, id]
+        orderBy: [{ receivedAt: 'asc' }, { id: 'asc' }],
         take: limit,
         select: {
           id: true,
@@ -1232,8 +1247,7 @@ export class TelemetryRepository {
     let nextCursor: string | null = null;
     if (rows.length === limit) {
       const lastRow = rows[rows.length - 1];
-      const cursorDate = lastRow.recordedAt ?? lastRow.receivedAt;
-      nextCursor = `${cursorDate.toISOString()}_${lastRow.id}`;
+      nextCursor = `${lastRow.receivedAt.toISOString()}_${lastRow.id}`;
     }
 
     // Preserve actual sensor recordedAt chronological order for display

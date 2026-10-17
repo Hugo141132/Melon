@@ -201,7 +201,7 @@ export function ReadingHistoryTable({
                   {column.label}
                 </th>
               ))}
-              <th scope="col" className="p-3 font-medium">
+              <th scope="col" className="p-3 font-medium min-w-[220px] sm:min-w-[240px]">
                 {tHistory('chartLocationLabel')}
               </th>
               <th scope="col" className="p-3 font-medium">
@@ -243,7 +243,7 @@ export function ReadingHistoryTable({
                     </td>
                   ))}
 
-                  <td className="p-3">
+                  <td className="p-3 min-w-[220px] sm:min-w-[240px]">
                     {isEditingThis ? (
                       <div className="flex flex-col gap-2">
                         <input
@@ -254,15 +254,15 @@ export function ReadingHistoryTable({
                           }
                           placeholder={tHistory('locationPlaceholder')}
                           aria-label={tHistory('setLocation')}
-                          className="w-40 rounded-lg border border-outline bg-surface-container px-2 py-1 text-xs text-app-on-surface outline-none focus:border-primary"
+                          className="w-full max-w-[240px] rounded-lg border border-outline bg-surface-container px-2.5 py-1 text-xs text-app-on-surface outline-none focus:border-primary"
                           autoFocus
                         />
-                        <div className="flex items-center gap-1">
+                        <div className="flex flex-wrap items-center gap-1.5">
                           <button
                             type="button"
                             onClick={handleSave}
                             disabled={isSavingThis}
-                            className="rounded-lg bg-primary px-2 py-1 text-[11px] font-medium text-on-primary disabled:opacity-50"
+                            className="inline-flex h-7 items-center justify-center rounded-lg bg-primary px-2.5 text-[11px] font-medium text-on-primary transition-colors disabled:opacity-50"
                           >
                             {tHistory('saveLocation')}
                           </button>
@@ -270,7 +270,7 @@ export function ReadingHistoryTable({
                             type="button"
                             onClick={handleClear}
                             disabled={isSavingThis}
-                            className="rounded-lg border border-outline-variant px-2 py-1 text-[11px] font-medium text-app-on-surface disabled:opacity-50"
+                            className="inline-flex h-7 items-center justify-center whitespace-nowrap rounded-lg border border-outline-variant px-2.5 text-[11px] font-medium text-app-on-surface transition-colors hover:bg-surface-container-high disabled:opacity-50"
                           >
                             {tHistory('clearLocation')}
                           </button>
@@ -279,7 +279,7 @@ export function ReadingHistoryTable({
                             onClick={cancelEditing}
                             disabled={isSavingThis}
                             aria-label={tHistory('cancelLocation')}
-                            className="inline-flex h-6 w-6 items-center justify-center rounded-full text-app-on-surface-variant hover:bg-surface-container"
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-transparent text-app-on-surface-variant transition-colors hover:bg-surface-container hover:text-app-on-surface disabled:opacity-50"
                           >
                             <X className="h-3.5 w-3.5" />
                           </button>

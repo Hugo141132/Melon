@@ -635,6 +635,8 @@
     "commandTimeoutTitle": "Valve Command Timed Out",
     "commandTimeoutMessage": "The valve command for {deviceName} timed out without confirmation.",
     "commandTimeoutDesc": "The valve command for {deviceName} timed out without confirmation.",
+    "recommendationAlertTitle": "AI Recommendation: {issueLabel}",
+    "recommendationAlertMessage": "{deviceName}: {problem}. {impact}",
     "acknowledgeAction": "Acknowledge Alert",
     "acknowledgeConfirm": "Are you sure you want to acknowledge this alert?",
     "acknowledgedBy": "Acknowledged by",
@@ -924,6 +926,8 @@
     "impactPrefix": "Impact",
     "detectedCount": "{count} Issues",
     "actionsCount": "{count} Steps",
-    "currentValue": "Value"
+    "currentValue": "Value",
+    "translationUnavailable": "Translation unavailable",
+    "viewOriginalText": "View original text"
   }
 }

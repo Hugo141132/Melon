@@ -22,46 +22,79 @@ const TO = new Date('2026-10-02T00:00:00Z');
  */
 function applyQuery(store: Row[], args: any): Row[] {
   const where = args?.where ?? {};
-  const range = where.recordedAt ?? where.receivedAt ?? {};
+  let timeRangeFilter: any = null;
+  let cursorFilter: any = null;
+
+  if (where.AND && Array.isArray(where.AND)) {
+    for (const clause of where.AND) {
+      if (clause.OR && Array.isArray(clause.OR)) {
+        const isTimeRange = clause.OR.some((c: any) => c.recordedAt?.gte || c.receivedAt?.gte);
+        if (isTimeRange) {
+          timeRangeFilter = clause.OR;
+        } else {
+          cursorFilter = clause.OR;
+        }
+      }
+    }
+  }
 
   let rows = store.filter((row) => {
-    const timestamp = (row.recordedAt ?? row.receivedAt) as Date;
-    if (range.gte && timestamp < range.gte) return false;
-    if (range.lte && timestamp > range.lte) return false;
-    if (range.lt && timestamp >= range.lt) return false;
     if (where.deviceId && row.deviceId !== where.deviceId) return false;
     if (where.locationKey && row.locationKey !== where.locationKey) return false;
-    return true;
-  });
 
-  if (where.OR && Array.isArray(where.OR)) {
-    rows = rows.filter((row) => {
-      const timestamp = (row.recordedAt ?? row.receivedAt) as Date;
-      const id = row.id as string;
-      return where.OR.some((clause: any) => {
-        const timeClause = clause.recordedAt ?? clause.receivedAt;
-        if (timeClause?.gt) {
-          const gtDate = timeClause.gt instanceof Date ? timeClause.gt : new Date(timeClause.gt);
-          if (timestamp.getTime() > gtDate.getTime()) return true;
+    // Evaluate timeRangeFilter: OR: [{ recordedAt: [gte, lt) }, { recordedAt: null, receivedAt: [gte, lt) }]
+    if (timeRangeFilter) {
+      const matchesTime = timeRangeFilter.some((clause: any) => {
+        if (clause.recordedAt && !clause.receivedAt) {
+          const recAt = row.recordedAt as Date | null;
+          if (!recAt) return false;
+          if (clause.recordedAt.gte && recAt < clause.recordedAt.gte) return false;
+          if (clause.recordedAt.lt && recAt >= clause.recordedAt.lt) return false;
+          return true;
         }
-        if (timeClause && !(timeClause as any).gt) {
-          const eqDate = timeClause instanceof Date ? timeClause : new Date(timeClause);
-          if (timestamp.getTime() === eqDate.getTime() && clause.id?.gt && id > clause.id.gt) {
-            return true;
-          }
+        if (clause.recordedAt === null && clause.receivedAt) {
+          if (row.recordedAt !== null) return false;
+          const recAt = row.receivedAt as Date;
+          if (clause.receivedAt.gte && recAt < clause.receivedAt.gte) return false;
+          if (clause.receivedAt.lt && recAt >= clause.receivedAt.lt) return false;
+          return true;
         }
         return false;
       });
-    });
-  }
+      if (!matchesTime) return false;
+    }
+
+    // Evaluate cursorFilter: OR: [{ receivedAt: { gt } }, { receivedAt: date, id: { gt } }]
+    if (cursorFilter) {
+      const matchesCursor = cursorFilter.some((clause: any) => {
+        const recAt = row.receivedAt as Date;
+        if (clause.receivedAt?.gt) {
+          const gtDate =
+            clause.receivedAt.gt instanceof Date
+              ? clause.receivedAt.gt
+              : new Date(clause.receivedAt.gt);
+          return recAt.getTime() > gtDate.getTime();
+        }
+        if (clause.receivedAt && !(clause.receivedAt as any).gt && clause.id?.gt) {
+          const eqDate =
+            clause.receivedAt instanceof Date ? clause.receivedAt : new Date(clause.receivedAt);
+          return recAt.getTime() === eqDate.getTime() && (row.id as string) > clause.id.gt;
+        }
+        return false;
+      });
+      if (!matchesCursor) return false;
+    }
+
+    return true;
+  });
 
   const orderBy = args?.orderBy as Array<{ [k: string]: 'asc' | 'desc' }> | undefined;
   if (orderBy && orderBy.length > 0) {
     rows = [...rows].sort((a, b) => {
       for (const clause of orderBy) {
         for (const [field, direction] of Object.entries(clause)) {
-          const av = a[field] as never;
-          const bv = b[field] as never;
+          const av = (a[field] instanceof Date ? (a[field] as Date).getTime() : a[field]) as never;
+          const bv = (b[field] instanceof Date ? (b[field] as Date).getTime() : b[field]) as never;
           if (av === bv) continue;
           const cmp = av < bv ? -1 : 1;
           return direction === 'desc' ? -cmp : cmp;
@@ -78,14 +111,16 @@ function applyQuery(store: Row[], args: any): Row[] {
   return rows;
 }
 
-function soilRow(index: number, receivedAt: Date): Row {
+function soilRow(index: number, dateOrRecordedAt: Date, receivedAt?: Date, customId?: string): Row {
+  const recAt = dateOrRecordedAt;
+  const recvAt = receivedAt !== undefined ? receivedAt : dateOrRecordedAt;
   return {
-    id: `soil-${String(index).padStart(4, '0')}`,
+    id: customId ?? `soil-${String(index).padStart(4, '0')}`,
     deviceId: 'device-1',
     locationKey: 'bed-a',
     locationName: 'Bed A',
-    recordedAt: receivedAt,
-    receivedAt,
+    recordedAt: recAt,
+    receivedAt: recvAt,
     nitrogen: new Prisma.Decimal(index),
     phosphorus: new Prisma.Decimal(index + 1),
     potassium: new Prisma.Decimal(index + 2),
@@ -402,6 +437,230 @@ describe('TelemetryRepository chart keyset pagination & completeness (TASK-0504)
       expect(ids).toContain('water-delayed-1');
       // Row 2 MUST NOT be included because recordedAt is >= customTo
       expect(ids).not.toContain('water-nextday-2');
+    });
+
+    it('faithfully paginates across batches with interleaved NULL/non-NULL recordedAt and delayed uploads without skipping or duplicating', async () => {
+      // Setup 5 rows within [FROM, TO):
+      // Row 1: recordedAt 10:00, receivedAt 10:05
+      // Row 2: recordedAt NULL, receivedAt 10:06 (un-clocked reading)
+      // Row 3: recordedAt 09:50 (delayed upload), receivedAt 10:07
+      // Row 4: recordedAt NULL, receivedAt 10:08 (un-clocked reading)
+      // Row 5: recordedAt 10:20, receivedAt 10:09
+      soilStore.push({
+        id: 'soil-interleave-1',
+        deviceId: 'device-1',
+        locationKey: 'bed-a',
+        locationName: 'Bed A',
+        recordedAt: new Date('2026-10-01T10:00:00.000Z'),
+        receivedAt: new Date('2026-10-01T10:05:00.000Z'),
+        nitrogen: new Prisma.Decimal(10),
+      });
+      soilStore.push({
+        id: 'soil-interleave-2',
+        deviceId: 'device-1',
+        locationKey: 'bed-a',
+        locationName: 'Bed A',
+        recordedAt: null,
+        receivedAt: new Date('2026-10-01T10:06:00.000Z'),
+        nitrogen: new Prisma.Decimal(20),
+      });
+      soilStore.push({
+        id: 'soil-interleave-3',
+        deviceId: 'device-1',
+        locationKey: 'bed-a',
+        locationName: 'Bed A',
+        recordedAt: new Date('2026-10-01T09:50:00.000Z'),
+        receivedAt: new Date('2026-10-01T10:07:00.000Z'),
+        nitrogen: new Prisma.Decimal(30),
+      });
+      soilStore.push({
+        id: 'soil-interleave-4',
+        deviceId: 'device-1',
+        locationKey: 'bed-a',
+        locationName: 'Bed A',
+        recordedAt: null,
+        receivedAt: new Date('2026-10-01T10:08:00.000Z'),
+        nitrogen: new Prisma.Decimal(40),
+      });
+      soilStore.push({
+        id: 'soil-interleave-5',
+        deviceId: 'device-1',
+        locationKey: 'bed-a',
+        locationName: 'Bed A',
+        recordedAt: new Date('2026-10-01T10:20:00.000Z'),
+        receivedAt: new Date('2026-10-01T10:09:00.000Z'),
+        nitrogen: new Prisma.Decimal(50),
+      });
+
+      // Batch 1 (limit 2)
+      const b1 = await repo.getSoilChartSeries({
+        deviceIdentifier: 'device-1',
+        locationKey: 'bed-a',
+        from: FROM,
+        to: TO,
+        limit: 2,
+      });
+
+      // Retrieval is strictly ordered by receivedAt ASC, id ASC
+      // Rows fetched: soil-interleave-1 (10:05), soil-interleave-2 (10:06)
+      expect(b1.series.map((s) => s.readingId)).toEqual(['soil-interleave-1', 'soil-interleave-2']);
+      expect(b1.nextCursor).toBe(`2026-10-01T10:06:00.000Z_soil-interleave-2`);
+
+      // Batch 2 (limit 2)
+      const b2 = await repo.getSoilChartSeries({
+        deviceIdentifier: 'device-1',
+        locationKey: 'bed-a',
+        from: FROM,
+        to: TO,
+        limit: 2,
+        cursor: b1.nextCursor,
+      });
+
+      // Rows fetched: soil-interleave-3 (10:07), soil-interleave-4 (10:08)
+      // Display ordering sorts by (recordedAt ?? receivedAt): soil-interleave-3 (09:50) before soil-interleave-4 (10:08)
+      expect(b2.series.map((s) => s.readingId)).toEqual(['soil-interleave-3', 'soil-interleave-4']);
+      expect(b2.nextCursor).toBe(`2026-10-01T10:08:00.000Z_soil-interleave-4`);
+
+      // Batch 3 (limit 2)
+      const b3 = await repo.getSoilChartSeries({
+        deviceIdentifier: 'device-1',
+        locationKey: 'bed-a',
+        from: FROM,
+        to: TO,
+        limit: 2,
+        cursor: b2.nextCursor,
+      });
+
+      // Rows fetched: soil-interleave-5 (10:09)
+      expect(b3.series.map((s) => s.readingId)).toEqual(['soil-interleave-5']);
+      expect(b3.nextCursor).toBeNull();
+
+      // Combined dataset has 100% complete set of expected IDs without skipping or duplicates
+      const allFetchedIds = [...b1.series, ...b2.series, ...b3.series].map((s) => s.readingId);
+      expect(allFetchedIds).toEqual([
+        'soil-interleave-1',
+        'soil-interleave-2',
+        'soil-interleave-3',
+        'soil-interleave-4',
+        'soil-interleave-5',
+      ]);
+
+      // When sorted for final client chart plotting by (recordedAt ?? receivedAt):
+      // Row 3 (09:50), Row 1 (10:00), Row 2 (10:06), Row 4 (10:08), Row 5 (10:20)
+      const plottingOrder = [...b1.series, ...b2.series, ...b3.series]
+        .sort((a, b) => new Date(a.recordedAt).getTime() - new Date(b.recordedAt).getTime())
+        .map((s) => s.readingId);
+
+      expect(plottingOrder).toEqual([
+        'soil-interleave-3',
+        'soil-interleave-1',
+        'soil-interleave-2',
+        'soil-interleave-4',
+        'soil-interleave-5',
+      ]);
+    });
+
+    it('proves global sorting: later retrieval batch containing earlier sensor timestamps sorts into correct global order with deterministic tie-breaker', async () => {
+      const FROM = new Date('2026-10-01T00:00:00.000Z');
+      const TO = new Date('2026-10-01T23:59:59.999Z');
+
+      // Batch 1 records (received earlier, but have later sensor timestamps)
+      soilStore.push(
+        soilRow(
+          1,
+          new Date('2026-10-01T10:00:00.000Z'),
+          new Date('2026-10-01T10:00:00.000Z'),
+          'soil-b1-rec-1'
+        ),
+        soilRow(
+          2,
+          new Date('2026-10-01T10:01:00.000Z'),
+          new Date('2026-10-01T10:01:00.000Z'),
+          'soil-b1-rec-2'
+        )
+      );
+
+      // Batch 2 records (delayed upload: received later, but have earlier sensor timestamps)
+      soilStore.push(
+        soilRow(
+          3,
+          new Date('2026-10-01T09:30:00.000Z'),
+          new Date('2026-10-01T10:02:00.000Z'),
+          'soil-b2-early-sensor-b'
+        ),
+        soilRow(
+          4,
+          new Date('2026-10-01T09:30:00.000Z'),
+          new Date('2026-10-01T10:03:00.000Z'),
+          'soil-b2-early-sensor-a'
+        )
+      );
+
+      // Batch 1 (limit 2)
+      const b1 = await repo.getSoilChartSeries({
+        deviceIdentifier: 'device-1',
+        locationKey: 'bed-a',
+        from: FROM,
+        to: TO,
+        limit: 2,
+      });
+
+      expect(b1.series.map((s) => s.readingId)).toEqual(['soil-b1-rec-1', 'soil-b1-rec-2']);
+      expect(b1.nextCursor).toBe(`2026-10-01T10:01:00.000Z_soil-b1-rec-2`);
+
+      // Batch 2 (limit 2 with cursor)
+      const b2 = await repo.getSoilChartSeries({
+        deviceIdentifier: 'device-1',
+        locationKey: 'bed-a',
+        from: FROM,
+        to: TO,
+        limit: 2,
+        cursor: b1.nextCursor,
+      });
+
+      // Retrieval preserves keyset ordering on [receivedAt, id] mapped through series ordering
+      expect(b2.series.map((s) => s.readingId)).toEqual([
+        'soil-b2-early-sensor-a',
+        'soil-b2-early-sensor-b',
+      ]);
+      expect(b2.nextCursor).toBeDefined();
+
+      // Batch 3 (limit 2 with cursor) verifies clean termination
+      const b3 = await repo.getSoilChartSeries({
+        deviceIdentifier: 'device-1',
+        locationKey: 'bed-a',
+        from: FROM,
+        to: TO,
+        limit: 2,
+        cursor: b2.nextCursor,
+      });
+      expect(b3.series).toHaveLength(0);
+      expect(b3.nextCursor).toBeNull();
+
+      // Combined dataset contains 100% of rows
+      const combined = [...b1.series, ...b2.series];
+      expect(combined.map((s) => s.readingId)).toEqual([
+        'soil-b1-rec-1',
+        'soil-b1-rec-2',
+        'soil-b2-early-sensor-a',
+        'soil-b2-early-sensor-b',
+      ]);
+
+      // Client-side global sort across all accumulated batches with deterministic ID tie-breaker
+      const globallySorted = combined.sort((a, b) => {
+        const at = new Date(a.recordedAt).getTime();
+        const bt = new Date(b.recordedAt).getTime();
+        if (at !== bt) return at - bt;
+        return a.readingId.localeCompare(b.readingId);
+      });
+
+      // Expected global order: 09:30:00 (a then b via ID tie-breaker), then 10:00:00, then 10:01:00
+      expect(globallySorted.map((s) => s.readingId)).toEqual([
+        'soil-b2-early-sensor-a',
+        'soil-b2-early-sensor-b',
+        'soil-b1-rec-1',
+        'soil-b1-rec-2',
+      ]);
     });
   });
 });

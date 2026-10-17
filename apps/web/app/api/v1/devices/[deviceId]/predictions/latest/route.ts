@@ -4,6 +4,7 @@ import {
   DeviceRepository,
   DeviceNotFoundError,
   getExternalPredictionClient,
+  evaluatePredictionAlerts,
 } from '@kebun-melon/database';
 import { DeviceType, SoilPredictionDto, WaterPredictionDto } from '@kebun-melon/contracts';
 import { requireSession, requireDeviceViewAccess, AuthorizationError } from '@/lib/auth/rbac';
@@ -149,7 +150,18 @@ export async function GET(request: Request, props: { params: Promise<{ deviceId:
       });
     }
 
-    // 6. Return canonical DTO: mask internal/external device ID to Melon canonical deviceId, omit raw external fields & secrets
+    // 6. Idempotently evaluate in-app recommendation alerts
+    const domain = device.deviceType === DeviceType.SOIL_NODE ? 'SOIL' : 'WATER';
+    evaluatePredictionAlerts({
+      prisma,
+      device: { id: device.id, deviceId: device.deviceId, name: device.name },
+      domain,
+      prediction,
+    }).catch((err) => {
+      console.error('Failed to evaluate prediction alerts in latest prediction route:', err);
+    });
+
+    // 7. Return canonical DTO: mask internal/external device ID to Melon canonical deviceId, omit raw external fields & secrets
     const safeCanonicalDto = {
       id: prediction.id,
       deviceId: device.deviceId,
@@ -165,10 +177,17 @@ export async function GET(request: Request, props: { params: Promise<{ deviceId:
       createdAt: prediction.createdAt,
     };
 
-    return NextResponse.json({
-      success: true,
-      data: safeCanonicalDto,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        data: safeCanonicalDto,
+      },
+      {
+        headers: {
+          'Cache-Control': 'private, no-cache, no-store, must-revalidate',
+        },
+      }
+    );
   } catch (error: any) {
     if (error instanceof AuthorizationError) {
       return NextResponse.json(

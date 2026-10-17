@@ -3860,6 +3860,58 @@ The five mandatory CI gates must be executed **exclusively by operator JEMBOT** 
 - **Deployment Status:**
   - VPS deployment of release `d1c1c13` -> **COMPLETED (2026-10-17)**. Active web service recreated with `kebun-melon-web:d1c1c13` on Nebula VPS staging (`APP_ENV=staging`, `APP_URL=https://monitoring.melonmadura.my.id`). Prior rollback baseline `kebun-melon-web:8304c44` is preserved in `/opt/kebun-melon/.prev_web_image`.
 
+---
+
+## 35.15 Multi-Domain Follow-up Verification & Deferred Testing Evidence (2026-10-17)
+
+### 1. Scope of Implementation
+- **Chart Pagination & Un-Clocked Fallback (`TASK-0504 Follow-up 2`, `DEC-MON-095`):**
+  - Database keyset traversal in `telemetry-repository.ts` strictly ordered on non-nullable `[receivedAt ASC, id ASC]`, eliminating PostgreSQL NULL ordering ambiguities.
+  - Telemetry time filter supports sensors lacking hardware RTC via fallback predicate: `OR: [{ recordedAt: { gte, lt } }, { recordedAt: null, receivedAt: { gte, lt } }]` encapsulated within Prisma `where.AND`.
+  - Keyset cursor encodes `${lastRow.receivedAt.toISOString()}_${lastRow.id}` with strict format validation.
+  - Client-side hook (`useHistoricalMonitoring.ts`) retrieves all batches sequentially and applies global client sorting by `recordedAt ?? receivedAt` before deduplicating and rendering.
+- **Clear Location Button & Row Alignment (`DEC-UIUX-112`):**
+  - Table cell in `ReadingHistoryTable.tsx` styled with `min-w-[220px] sm:min-w-[240px]` with non-wrapping flex layout (`flex items-center gap-1.5 flex-nowrap`).
+  - Input field (`h-7 text-xs w-28 sm:w-32`) and action buttons (`Save`, `Clear`, `Cancel` with `h-7 text-xs px-2 sm:px-2.5 whitespace-nowrap`).
+- **Agronomic Recommendation Localization & Presentation (`TASK-0413 Phase D Follow-up`, `DEC-I18N-096`):**
+  - Text normalization strips Markdown formatting, bullets, numbering, and trailing punctuation before dictionary lookup.
+  - Full screenshot copy dictionary coverage in `apps/web/messages/en.json` and `apps/web/messages/id.json`.
+  - Dynamic parameter interpolation for live sensor values (Moisture %, EC µS/cm, Temperature °C, pH).
+  - Non-intrusive fallback disclosure via `LocalizedTextDisplay` for unmapped freeform ML model copy (`Source: "..."` tooltip).
+- **External Prediction Alert Evaluation & Advisory Locking (`TASK-0708`, `DEC-ALRT-101`):**
+  - Gateway and web route handlers evaluate predictions pulled from external database (`ExternalPredictionClient`).
+  - Alert evaluation enclosed within transaction acquiring PostgreSQL session/xact-level advisory lock: `pg_advisory_xact_lock(hashtext('prediction_alert_' || device.id || '_' || domain))`.
+  - Stable episode identity uses `alertType: REC_${issueCode}` (clamped to 80 chars) to prevent concurrent metric alerts (e.g. pH vs EC) from colliding.
+  - Orphaned syntax fragment in `prediction-alert-evaluator.ts` resolved.
+
+### 2. Authoritative Verification Status Matrix
+
+| Component / Feature | Implementation Status | Local Operator Test | CI Quality Gates | Deployment & VPS Test | Notes & Constraints |
+|---|---|---|---|---|---|
+| Recommendation Localization & Normalization | IMPLEMENTED | **PASS (2026-10-17)** | PENDING | PENDING | Verified by operator on local web interface in English & Indonesian. |
+| Chart Keyset Pagination & Un-Clocked Fallback | IMPLEMENTED | DEFERRED | PENDING | PENDING | Deferred to VPS due to lack of local multi-batch/un-clocked test data. |
+| Clear Location Row-Editor Alignment | IMPLEMENTED | DEFERRED | PENDING | PENDING | Deferred to VPS due to local test data constraints. |
+| Prediction Alert Evaluation & Advisory Locking | IMPLEMENTED | DEFERRED | PENDING | PENDING | Deferred to VPS due to lack of local live external prediction feed. |
+| Critical Escalation Visibility After Ack | IMPLEMENTATION UNCONFIRMED | VERIFICATION PENDING | PENDING | PENDING | Metadata persisted in messageParams (escalatedAt), but consuming API, unread-count reset, and UI notification logic are unconfirmed. |
+| Per-User Acknowledgement vs Episode Closure | ARCHITECTURAL INVARIANT | CONFIRMED | N/A | N/A | Acknowledgement is strictly per-user in `alert_acknowledgements`. It does not close the episode or constitute recovery. |
+| Automated Prediction Recovery | PROPOSED ONLY | NOT ENABLED | N/A | N/A | Unapproved product decision; not enabled in codebase. |
+| Independent Prediction Background Polling | PROPOSED ONLY | NOT ENABLED | N/A | N/A | Unapproved product decision; not enabled in codebase. |
+
+### 3. Local Pre-Commit Verification Prerequisites
+Before operator commits and pushes to `main`, the five mandatory CI gates must be executed locally:
+1. `npm run check:quality` (Format, linting, type checking across all workspaces, i18n check, secret scanning, dependency audit, and web build)
+2. `npm run test` (Vitest unit test suites across all packages and apps)
+3. `npm run test:coverage` (Vitest code coverage verification)
+4. `npm run test:integration` (Database and gateway integration test suites. Utilizes local Docker daemon to spawn an isolated, disposable PostgreSQL container on a dynamic port with automatic migration, seed, and teardown, or uses an isolated `TEST_DATABASE_URL`. Includes `prediction-alert-evaluator.integration.test.ts` via `'test/*.integration.test.ts'`. Manually started PostgreSQL on port 5432 is NOT required.)
+5. `npm run test:e2e` (Playwright end-to-end browser test suites. Automatically provisions a disposable Docker PostgreSQL container or consumes a validated `TEST_DATABASE_URL`/`E2E_DATABASE_URL` on dedicated port 3005.)
+
+### 4. Deferred VPS Testing Checklist (Post-Deployment on Nebula VPS)
+Upon manual commit, push, and deployment of container images to Nebula VPS staging:
+1. **Chart Completeness Test:** Navigate to `/soil` and `/water`. Verify chart plots complete reading series across 24h, 7d, and 30d without point truncation, label collision, or scale collapse.
+2. **Location Annotation Test:** On `/soil` and `/water` measurement history tables, click location cell on a row. Verify Save, Clear, and Cancel buttons render in a single line without wrapping. Test Save, test Clear, and test Cancel. Confirm chart updates accordingly.
+3. **Recommendation Alert Lifecycle Test:** Ingest anomalous sensor reading. Confirm active alert appears with correct `REC_${issueCode}` title and localized description. Verify acknowledgement behavior (per-user acknowledgement) and check whether critical escalation produces operator visibility if conditions worsen.
+
+
 
 
 

@@ -2849,4 +2849,18 @@ Electrical Conductivity (EC) across the entire platform is standardized directly
 
 <!-- Dual MQTT Broker Architecture Reconciled: 2026-09-19 -->
 
+---
+
+### 8. Outbound AI Recommendation Pipeline & External Prediction Pull Boundary (TASK-0413 / TASK-0708 / Reconciled 2026-10-17)
+
+#### 8.1 Ingestion & Outbound Publication Flow
+The AI recommendation pipeline operates as an asynchronous, non-blocking outbound workflow within `SoilWaterMqttAdapter` (`apps/iot-gateway`):
+1. **Telemetry Arrival**: The gateway receives and validates raw telemetry on `melon/sensor-tanah/data-2424600050` or `melon/sensor-air/data-2424600050` and persists records to PostgreSQL (`soil_readings` / `water_readings`).
+2. **External Database Pull**: Following successful persistence, the gateway invokes `executeRecommendationDispatch`. The gateway does **NOT** consume recommendations from an MQTT broker queue or internal tables; instead, it acts strictly as a read-only client pulling the latest prediction from the external Supabase database via `ExternalPredictionClient` over HTTPS PostgREST.
+3. **In-App Alert Evaluation**: Before publishing, the pulled prediction is evaluated asynchronously by `evaluatePredictionAlerts` (`@kebun-melon/database`), guarded by PostgreSQL transaction-level advisory locks to eliminate concurrency conflicts with web API requests.
+4. **Outbound MQTT Publication**: The gateway formats the outbound payload and publishes to `melon/ai-tanah/rekomendasi-2424600050` or `melon/ai-air/rekomendasi-2424600050` with QoS 1, `retain: false`.
+5. **Anti-Spam & Deduplication**: Outbound publication is debounced (`EXTERNAL_ML_DEBOUNCE_MS`), checks staleness (`EXTERNAL_ML_MAX_STALENESS_SECONDS`), and deduplicates by `lastPublishedPredictionIds` map.
+<!-- Outbound AI Recommendation Reconciled: 2026-10-17 -->
+
+
 

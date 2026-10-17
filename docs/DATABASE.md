@@ -2327,3 +2327,50 @@ The `recommendation` text column stores a structured JSON document:
 - **Production (`isProduction = true`):** Requires an active entry in `device_external_mappings`. If no mapping exists, queries fail closed safely without falling back to hardcoded strings.
 - **Development / Test:** If unmapped, falls back to `DEFAULT_ML_DEVICE_ALIASES` (`soil-node-jvbkdbv` $\rightarrow$ `melon002`, `water-quality-node-quiua` $\rightarrow$ `water001`) for convenience.
 <!-- External ML Database Reconciled: 2026-09-18 -->
+
+---
+
+## 8. Telemetry Keyset Query & Alert Episode Persistence Specification (TASK-0504 Follow-up 2 / TASK-0708 / Reconciled 2026-10-17)
+
+### 8.1 Un-clocked Telemetry Fallback & Keyset Traversal (`DEC-MON-095`)
+- **Un-clocked Ingestion Fallback:**
+  When field ESP32 microcontrollers ingest readings prior to NTP clock synchronization, `recordedAt` is `null` and `receivedAt` is populated. Repository queries (`TelemetryRepository.getSoilChartSeries` and `getWaterChartSeries`) query matching readings using `timeRangeFilter`:
+  ```typescript
+  const timeRangeFilter = {
+    OR: [
+      { recordedAt: { gte: params.from, lt: params.to } },
+      { recordedAt: null, receivedAt: { gte: params.from, lt: params.to } },
+    ],
+  };
+  ```
+- **Filter Composition Invariant:**
+  To prevent cursor filter `OR` clauses from overwriting date-range `OR` clauses in Prisma query translation, where filters are combined strictly via `AND`:
+  ```typescript
+  const where = {
+    deviceId,
+    locationKey,
+    AND: params.cursor ? [timeRangeFilter, cursorFilter] : [timeRangeFilter],
+  };
+  ```
+- **Deterministic Keyset Traversal Order:**
+  Database cursor traversal traverses records by non-null timestamps:
+  `orderBy: [{ receivedAt: 'asc' }, { id: 'asc' }]`
+  and formats cursors as `"${lastRow.receivedAt.toISOString()}_${lastRow.id}"`, guaranteeing monotonically advancing pagination without SQL NULL ordering edge cases.
+
+### 8.2 Recommendation In-App Alert Model & Concurrency Locking (`DEC-ALRT-101`)
+- **Table `alerts` Persistence Mapping:**
+  - `alertType`: `REC_${issueCode}` (e.g. `REC_SOIL_MOISTURE_LOW`, `REC_WATER_TDS_HIGH`), clamped to `@db.VarChar(80)`.
+  - `severity`: `WARNING` or `CRITICAL` derived from `predictedClass`.
+  - `status`: `OPEN` (created on Warning/Critical). Auto-recovery is UNAPPROVED / NOT ENABLED.
+  - `sourceType`: `'ml_prediction'`.
+  - `sourceId`: Source prediction UUID if valid UUID syntax; otherwise `null`.
+  - `messageParams`: Stores fingerprint `lastPredictionId`, issue details, summary, and action items.
+- **PostgreSQL Advisory Transaction Locking:**
+  Cross-process concurrency safety between IoT Gateway and Web API processes is enforced via transaction-level advisory locks:
+  `SELECT pg_advisory_xact_lock(hashtext('prediction_alert_' || device.id || '_' || domain))`.
+- **Anti-Spam Fingerprint Deduplication:**
+  Predictions are fingerprinted via SHA-256 hash or stable UUID. Repeated pulls or cache hits matching `messageParams.lastPredictionId` are discarded without modifying database rows.
+- **User Acknowledgement Preservation:**
+  Evidence updates on existing open alerts update `messageParams` and `updatedAt` without mutating `alert_acknowledgements` or resetting user review states. Acknowledgement is strictly per-user in `alert_acknowledgements` and does NOT close or resolve the recommendation episode. Post-ack Critical escalation visibility is **IMPLEMENTATION UNCONFIRMED / VERIFICATION PENDING** (metadata persistence in `messageParams` alone is unconfirmed without concrete API unread-count reset and UI logic).
+<!-- Telemetry Keyset & Alert Persistence Reconciled: 2026-10-17 -->
+

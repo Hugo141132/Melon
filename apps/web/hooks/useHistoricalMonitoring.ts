@@ -366,7 +366,7 @@ export function useHistoricalMonitoring({
       const BATCH_SIZE = 1000;
       let currentCursor: string | null = null;
       const seenCursors = new Set<string>();
-      const accumulatedPoints: any[] = [];
+      const accumulatedPointsMap = new Map<string, any>();
 
       do {
         // Stale response guard: cancel further batching if filters or location changed
@@ -410,7 +410,17 @@ export function useHistoricalMonitoring({
         }
 
         const batchPoints = json.data?.points || [];
-        accumulatedPoints.push(...batchPoints);
+        for (const pt of batchPoints) {
+          const id = pt.readingId || pt.id;
+          if (id) {
+            accumulatedPointsMap.set(id, pt);
+          } else {
+            accumulatedPointsMap.set(
+              `${pt.timestamp || pt.recordedAt}_${accumulatedPointsMap.size}`,
+              pt
+            );
+          }
+        }
 
         const nextCursor = json.data?.nextCursor || null;
         if (nextCursor) {
@@ -426,17 +436,19 @@ export function useHistoricalMonitoring({
         return;
       }
 
-      // Re-order strictly chronologically by sensor recordedAt (fallback receivedAt/timestamp)
+      const accumulatedPoints = Array.from(accumulatedPointsMap.values());
+
+      // Global sort across all accumulated batches chronologically by recordedAt ?? receivedAt with deterministic ID tie-breaker
       accumulatedPoints.sort((a, b) => {
         const at = new Date(a.recordedAt || a.timestamp || a.receivedAt).getTime();
         const bt = new Date(b.recordedAt || b.timestamp || b.receivedAt).getTime();
         if (at !== bt) return at - bt;
-        const aId = a.readingId || a.id || '';
-        const bId = b.readingId || b.id || '';
-        return aId < bId ? -1 : aId > bId ? 1 : 0;
+        const aId = String(a.readingId || a.id || '');
+        const bId = String(b.readingId || b.id || '');
+        return aId.localeCompare(bId);
       });
 
-      // Strictly bound displayed chart points and tooltips within the active date range for custom dates
+      // Strictly bound displayed chart points and tooltips within the active date range for custom dates (DEC-MON-094)
       const inRangePoints =
         preset === 'custom'
           ? accumulatedPoints.filter((point) => {

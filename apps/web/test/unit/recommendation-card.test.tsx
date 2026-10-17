@@ -185,7 +185,13 @@ describe('TASK-0413 Phase D — RecommendationCard Component Unit Tests', () => 
     expect(screen.getByText('Fosfor (P)')).toBeInTheDocument();
     expect(screen.getByText('18')).toBeInTheDocument();
     expect(screen.getByText('Kandungan fosfor di bawah ambang batas optimal')).toBeInTheDocument();
-    expect(screen.getByText('Dampak: Pertumbuhan akar dapat terhambat')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        (_, el) =>
+          el?.tagName.toLowerCase() === 'div' &&
+          Boolean(el?.textContent?.startsWith('Dampak: Pertumbuhan akar dapat terhambat'))
+      )
+    ).toBeInTheDocument();
 
     // Farmer actions
     expect(screen.getByText('Tindakan yang Disarankan')).toBeInTheDocument();
@@ -216,9 +222,9 @@ describe('TASK-0413 Phase D — RecommendationCard Component Unit Tests', () => 
       'Ditemukan 2 masalah kualitas air.'
     );
 
-    expect(screen.getByTestId('recommendation-issue-0')).toHaveTextContent('EC air');
+    expect(screen.getByTestId('recommendation-issue-0')).toHaveTextContent(/EC air/i);
     expect(screen.getByTestId('recommendation-issue-0')).toHaveTextContent('5.8');
-    expect(screen.getByTestId('recommendation-issue-1')).toHaveTextContent('TDS air');
+    expect(screen.getByTestId('recommendation-issue-1')).toHaveTextContent(/TDS air/i);
     expect(screen.getByTestId('recommendation-issue-1')).toHaveTextContent('4900');
 
     expect(screen.getByTestId('recommendation-action-0')).toHaveTextContent(
@@ -284,9 +290,9 @@ describe('TASK-0413 Phase D — RecommendationCard Component Unit Tests', () => 
       expect(badge).toBeInTheDocument();
       expect(badge).toHaveTextContent('Critical');
 
-      // AI Summary localized without "parameter soil"
+      // AI Summary localized with dynamic parameterized format
       expect(screen.getByTestId('recommendation-summary')).toHaveTextContent(
-        'Found 5 soil parameters requiring attention: Soil Moisture, Soil Temperature, Soil EC, Phosphorus, Potassium.'
+        '5 soil parameters need attention: soil moisture, soil temperature, soil EC, phosphorus, and potassium.'
       );
 
       // Detected issues in English
@@ -298,7 +304,11 @@ describe('TASK-0413 Phase D — RecommendationCard Component Unit Tests', () => 
       expect(screen.getByText('94.3')).toBeInTheDocument();
       expect(screen.getByText('Soil moisture is too high')).toBeInTheDocument();
       expect(
-        screen.getByText('Impact: Roots risk oxygen deficiency and impaired growth.')
+        screen.getByText(
+          (_, el) =>
+            el?.tagName.toLowerCase() === 'div' &&
+            el?.textContent === 'Impact: Roots risk oxygen deficiency and impaired growth.'
+        )
       ).toBeInTheDocument();
 
       expect(screen.getByText('Soil Temperature')).toBeInTheDocument();
@@ -358,9 +368,9 @@ describe('TASK-0413 Phase D — RecommendationCard Component Unit Tests', () => 
     expect(badge).toBeInTheDocument();
     expect(badge).toHaveTextContent('Kritis');
 
-    // AI Summary localized cleanly to "parameter tanah"
+    // AI Summary localized cleanly to "parameter tanah" with localized list
     expect(screen.getByTestId('recommendation-summary')).toHaveTextContent(
-      'Ditemukan 5 parameter tanah yang membutuhkan perhatian: Kelembapan Tanah, Suhu Tanah, EC Tanah, Phosphorus, Potassium.'
+      '5 parameter tanah memerlukan perhatian: kelembapan tanah, suhu tanah, EC tanah, fosfor, dan kalium.'
     );
 
     // Section headers & count badges
@@ -371,7 +381,11 @@ describe('TASK-0413 Phase D — RecommendationCard Component Unit Tests', () => 
 
     // Impact label rendered in Indonesian
     expect(
-      screen.getByText('Dampak: Akar berisiko kekurangan oksigen dan mengalami gangguan.')
+      screen.getByText(
+        (_, el) =>
+          el?.tagName.toLowerCase() === 'div' &&
+          el?.textContent === 'Dampak: Akar berisiko kekurangan oksigen dan mengalami gangguan.'
+      )
     ).toBeInTheDocument();
   });
 });

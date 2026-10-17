@@ -31,7 +31,21 @@ const TO = new Date('2026-10-01T23:59:59.000Z');
 /** Minimal in-memory `findMany` supporting the filter/order/take subset used here. */
 function applyQuery(store: Row[], args: any): Row[] {
   const where = args?.where ?? {};
-  const range = where.recordedAt ?? where.receivedAt ?? {};
+  let range = where.recordedAt ?? where.receivedAt ?? {};
+
+  if (where.AND && Array.isArray(where.AND)) {
+    for (const clause of where.AND) {
+      if (clause.recordedAt || clause.receivedAt) {
+        range = clause.recordedAt ?? clause.receivedAt ?? range;
+      }
+      if (clause.OR && Array.isArray(clause.OR)) {
+        const firstRange = clause.OR.find((c: any) => c.recordedAt?.gte || c.receivedAt?.gte);
+        if (firstRange) {
+          range = firstRange.recordedAt ?? firstRange.receivedAt ?? range;
+        }
+      }
+    }
+  }
 
   let rows = store.filter((row) => {
     const timestamp = (row.recordedAt ?? row.receivedAt) as Date;

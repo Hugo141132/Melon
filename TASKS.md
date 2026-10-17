@@ -2036,6 +2036,16 @@ Metrics:
 **Phase B Completed:** 2026-09-18 — Protected prediction endpoint `GET /api/v1/devices/[deviceId]/predictions/latest` implemented with RBAC verification and external ID masking.
 **Phase C Completed:** 2026-09-18 — Outbound recommendation dispatch integrated in `SoilWaterMqttAdapter` with dynamic mapping, debounce, deduplication, and EMQX publishing.
 **Phase D Completed:** 2026-09-19 — Dynamic dashboard recommendation cards bound to `/soil` and `/water` with `useLatestPrediction` hook, 4 card states, advisory disclaimer, and bilingual support.
+**Phase D Follow-up / Localization Refinement (2026-10-17):**
+- **Implementation Status:** `COMPLETE`
+  - Fixed localization regression in `apps/web/lib/recommendation-i18n.ts` and `apps/web/components/monitoring/RecommendationCard.tsx`.
+  - Normalization pipeline (`normalizeKey`): Unicode NFKC, whitespace collapsing, outer quote stripping, Indonesian spelling variant normalization (`kelembaban` $\to$ `kelembapan`), and trailing punctuation removal (`[.:;,!?]+$`).
+  - 100% screenshot copy coverage across all issues, impacts, and actions without inferring recommendations from raw numbers.
+  - Parameterized dynamic summaries for water and soil (singular/plural, Oxford comma in English, localized parameter names).
+  - Clean non-intrusive fallback via `LocalizedTextDisplay`: known strings render cleanly without wrappers; genuinely unknown strings render a concise localized notice (`Translation unavailable` / `Terjemahan tidak tersedia`) and a collapsible `<details><summary>` disclosure displaying the intact original text.
+- **Unit & Regression Tests:** Added comprehensive suite `apps/web/test/unit/recommendation-localization-regression.test.tsx` (8 describe blocks, 17 assertions covering exact screenshot strings, punctuation/whitespace variants, dynamic summaries, unknown disclosure, and locale switching).
+- **Operator Verification Status:** `OPERATOR-VERIFIED PASS` (Website testing completed successfully by operator WOOIII on `/soil` and `/water`).
+- **CI & Deployment:** Five final CI gates pending execution by operator; commit, push, and deployment pending.
 
 ### Background & Objective
 
@@ -3078,6 +3088,45 @@ Implement:
 - [x] Checkbox selection, "Select All", and batch action controls integrated on `/notifications`.
 - [x] Navigation badges immediately update upon bulk acknowledgement.
 - [x] Unit, integration, and i18n completeness tests passing.
+
+---
+
+## TASK-0708 — Recommendation In-App Alert Evaluation, Anti-Spam Deduplication & Lifecycle Synchronization
+
+**Priority:** `P1` (Operational Awareness, System Integrity & Agronomic Decision Support)  
+**Status:** `READY_FOR_TEST` (Software implementation, syntax fix, and unit tests completed; operator verification DEFERRED TO VPS)  
+**Dependencies:** `TASK-0413`, `TASK-0701`, `TASK-0704`, `TASK-0705`  
+**Frontend Impact:** `NONE` (Reuses existing `/notifications` UI and sidebar alert badge)  
+**21st.dev MCP:** `NOT REQUIRED`  
+
+### Background & Objective
+`TASK-0413` integrated external Supabase ML predictions pulled via REST API and displayed on `/soil` and `/water` recommendation cards. However, abnormal predictions (`WARNING` / `CRITICAL`) were not automatically surfaced to operators as in-app alerts in `/notifications` or reflected on the sidebar notification badge (`TASK-0705`).
+
+This task bridges pulled external predictions into the existing internal alerts pipeline without altering the read-only external database contract or inventing push architectures.
+
+### Implemented Architecture & Anti-Spam Invariants
+
+1. **Reused Server-Side Pull Retrieval Pathways & Triggers:**
+   - Evaluated on telemetry arrival via `SoilWaterMqttAdapter.executeRecommendationDispatch` in IoT Gateway.
+   - Evaluated on dashboard access via `GET /api/v1/devices/[deviceId]/predictions/latest` in Next.js web API (with explicit `Cache-Control: private, no-cache, no-store, must-revalidate` response header).
+   - **Unapproved Architecture:** Independent background polling is UNAPPROVED / NOT ENABLED. Unattended off-browser evaluation proposals remain pending operator decision.
+2. **Pure Server-Side Evaluator (`packages/database/src/prediction-alert-evaluator.ts`):**
+   - **PostgreSQL Advisory Locking:** Acquires transaction-level advisory lock `SELECT pg_advisory_xact_lock(hashtext('prediction_alert_' || device.id || '_' || domain))` to eliminate concurrency race conditions across Gateway and Web API processes.
+   - **Deterministic Identity & Fingerprinting (`getPredictionFingerprint`):** Extracts stable source prediction UUID or generates SHA-256 hash from source content (`deviceId`, `domain`, `timestamp`, `predictedClass`, `issues`). Repeated polls/cache hits of the SAME prediction yield identical fingerprints and are rejected as redundant observations without new alerts.
+   - **Stable Semantic Issue Codes (`deriveIssueCode`):** Canonicalizes issue strings to stable enum codes (`SOIL_MOISTURE_HIGH`, `SOIL_PH_ACIDIC`, `WATER_EC_HIGH`, etc.), decoupling alerts from free-text language differences.
+   - **Single Active Episode Invariant:** Strictly maintains 1 active open alert episode per `(deviceId, domain, issueCode)` stored in the `alertType` column formatted as `REC_${issueCode}` (clamped to 80 chars), with `sourceType = 'ml_prediction'`.
+   - **Warning / Critical Entry & Escalation:**
+     - Creates new `OPEN` alert on valid Warning/Critical entry.
+     - When a subsequent prediction has the same severity, updates alert evidence context idempotently without emitting duplicate notifications.
+     - When severity escalates (`WARNING` $\to$ `CRITICAL`), updates severity, title, message, and metadata, notifying operators of the escalation once. Note: Post-ack Critical escalation visibility is **IMPLEMENTATION UNCONFIRMED / VERIFICATION PENDING** (metadata persistence alone is unconfirmed without concrete API unread-count reset and UI logic consuming escalation metadata).
+   - **Preserved User-Scoped Acknowledgements:** Acknowledgement is strictly per-user acknowledgement (`alert_acknowledgements`), NOT automatic recovery or global episode resolution. Acknowledgement does NOT close the recommendation episode. Evidence updates do NOT reset individual operator acknowledgements in `alert_acknowledgements`.
+   - **Unresolved Policy (Auto-Recovery):** Automatic resolution of active episodes upon optimal predictions is NOT enabled. It remains pending explicit user decision.
+   - **Syntax Error Correction:** Corrected orphaned update argument block in `prediction-alert-evaluator.ts` (expression expected error), restoring valid AST and test execution without claiming full CI validation.
+   - **Strict Domain Boundary:** Scoped strictly to in-app alerts (`alerts` table, `/notifications`, sidebar badge). Does not trigger transactional emails, publish MQTT commands, or actuate physical valves.
+
+### Automated Test Coverage & Verification Status
+- **Unit & Integration Tests:** `packages/database/test/prediction-alert-evaluator.test.ts` (12 test cases) and `packages/database/test/prediction-alert-evaluator.integration.test.ts` (advisory lock serialization).
+- **Authoritative Verification Status:** Operator verification DEFERRED TO VPS because suitable local test data is unavailable. Post-ack Critical escalation visibility is **IMPLEMENTATION UNCONFIRMED / VERIFICATION PENDING**. Final five CI gates pending execution by operator.
 
 ---
 
@@ -5438,6 +5487,40 @@ The following full CI gates were deferred for this checkpoint and must be verifi
 - **Batch Release Status:** `DONE`
 - **Live Database Migration:** `NOT REQUIRED` (Database schema untouched; existing tables, enums, and indexes preserved)
 - **Deployment Requirement:** `DEPLOYED` on Nebula VPS with image `kebun-melon-web:8304c44` under `APP_ENV=staging`, `APP_URL=https://monitoring.melonmadura.my.id`, and rollback tag `rollback-before-8304c44` recorded.
+
+---
+
+## TASK-0504 Follow-up 2: Clear Location Alignment & Un-clocked Telemetry Location Chart Completeness
+
+**Priority:** `P1` (Data Accuracy, Responsive UI Alignment & Historical Completeness)  
+**Status:** `READY_FOR_TEST` (Software implementation and regression tests completed; operator website verification DEFERRED TO VPS)  
+**Dependencies:** `DEC-MON-087`, `DEC-MON-093`, `DEC-MON-094`, `TASK-0503`, `TASK-0504`  
+**Frontend Impact:** `MINOR`  
+**Selected UI Direction:** `Premium Minimal Ops`  
+**Existing Color Template:** `UNCHANGED`  
+**Selected Motion Effects:** `None`  
+**21st.dev MCP:** `NOT REQUIRED`  
+
+### 1. Implemented Changes
+
+- **Clear Location Action Alignment & Spacing (`apps/web/components/monitoring/ReadingHistoryTable.tsx`):**
+  - Standardized column width constraint `min-w-[220px] sm:min-w-[240px]` on both table header `<th>` and cell `<td>`.
+  - Standardized button heights uniformly to `h-7` (28px) with `px-2.5 py-1 text-xs`.
+  - Wrapped action buttons in `flex flex-wrap items-center gap-1.5` and applied `whitespace-nowrap` on Clear Location button.
+  - Guarantees seamless alignment alongside Save and Cancel without awkward line wrapping or vertical overflow across English and Indonesian text lengths on desktop and mobile viewports.
+- **Un-clocked Telemetry Chart Completeness & Keyset Pagination Traversal Fix (`packages/database/src/telemetry-repository.ts`, `apps/web/hooks/useHistoricalMonitoring.ts`):**
+  - **Root Cause Resolution (Un-clocked Telemetry):** Sensor readings ingested before RTC sync or from un-clocked ESP32 microcontrollers have `recordedAt: null` and populated `receivedAt`. While the history table displays `recordedAt || receivedAt` and allows location naming, `getSoilChartSeries` and `getWaterChartSeries` previously filtered on `recordedAt: { gte: from, lt: to }`, which evaluated to `NULL` (falsy) in SQL, causing all annotated un-clocked readings to disappear from location-filtered charts.
+  - Implemented `timeRangeFilter`: `OR: [{ recordedAt: { gte: from, lt: to } }, { recordedAt: null, receivedAt: { gte: from, lt: to } }]`.
+  - **Critical Prisma `where` Spread Overwrite Bug:** Previously, query filtering spread `baseWhere` and `cursorFilter`: `{ ...baseWhere, ...cursorFilter }`. Because both contained an `OR` property, the cursor filter `OR` completely overwrote `baseWhere.OR`, stripping the date range condition on paginated requests! Fixed by combining filters using Prisma `AND: params.cursor ? [timeRangeFilter, cursorFilter] : [timeRangeFilter]`.
+  - **Deterministic Non-Null Keyset Traversal Order:** Keyset pagination ordered in database by `[{ receivedAt: 'asc' }, { id: 'asc' }]` with cursor encoding `"${lastRow.receivedAt.toISOString()}_${lastRow.id}"`, avoiding SQL NULL sorting anomalies during pagination.
+  - **Client-Side Deduplication & Global Sort:** In `useHistoricalMonitoring.ts`, points are deduplicated by reading ID, strictly bounded within `[fromTime, toTime)`, and globally sorted chronologically across all batches by `recordedAt ?? receivedAt` with deterministic ID tie-breaking.
+  - **EC Unit Parity:** Confirmed Electrical Conductivity is canonically standardized in `µS/cm` across database, API, and UI without multipliers per `DEC-MON-091`.
+
+### 2. Testing & Verification Summary
+- **Unit & Integration Regression Tests:**
+  - `packages/database/test/telemetry-chart-completeness.test.ts` (updated for `where.AND` structure).
+  - `packages/database/test/chart-timestamp-ordering.test.ts` (updated for multi-column `receivedAt`, `id` ordering).
+- **Execution & Verification Status:** Software complete; operator website verification DEFERRED TO VPS because suitable un-clocked local test data is unavailable. Final five CI gates pending execution by operator.
 
 
 

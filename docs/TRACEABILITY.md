@@ -1016,3 +1016,52 @@ The following facts are verified in the traceability matrix regarding the 2026-1
   - Database Migrations: **NOT REQUIRED** (Zero schema migrations needed).
   - Environment Variables & Reverse Proxy (Caddy): **PRESERVED** (Zero reverse proxy changes; `WEB_IMAGE` updated in `.env.production` via `update_or_add_env`).
 <!-- TASK-0208-0504-0507-0814-0215 Traceability Reconciled: 2026-10-17 -->
+
+---
+
+## Current Work Reconciliation: Recommendation Localization, Chart Completeness & Recommendation Alerts (TASK-0413, TASK-0504 Follow-up 2, TASK-0708 / Reconciled 2026-10-17)
+
+The following facts are verified in the traceability matrix regarding the current working-tree batch:
+- **Traceability Baseline:**
+  - Tasks: `TASK-0413 Phase D Follow-up`, `TASK-0504 Follow-up 2`, `TASK-0708` in `TASKS.md`.
+  - Decisions: `DEC-I18N-096`, `DEC-MON-095`, `DEC-UIUX-112`, `DEC-ALRT-101` in `docs/DECISIONS.md`.
+  - Architecture: `docs/ARCHITECTURE.md` §39.
+  - API & Contracts: `docs/API.md` (Protected Prediction API & Historical Monitoring Keyset Traversal).
+  - Database: `docs/DATABASE.md` (Telemetry Keyset Query & Alert Episode Identity).
+  - UI/UX & I18N: `docs/UI_UX.md`, `docs/I18N.md`.
+  - Testing & Verification: `docs/TESTING.md`.
+- **Implementation Status Across 3 Scopes:**
+  1. *Recommendation Localization Refinement (`TASK-0413`, `DEC-I18N-096`):*
+     - Normalization pipeline in `apps/web/lib/recommendation-i18n.ts`: Unicode NFKC, whitespace collapsing, outer quotes stripping, Indonesian spelling variant normalization (`kelembaban` $\to$ `kelembapan`), and trailing punctuation removal (`[.:;,!?]+$`).
+     - 100% screenshot copy coverage across all issues, impacts, and actions without inferring recommendations from raw numbers.
+     - Dynamic parameterized summaries for water and soil (singular/plural, Oxford comma in English, localized parameter names).
+     - Clean non-intrusive fallback via `LocalizedTextDisplay` in `RecommendationCard.tsx`: known strings render cleanly without wrappers; genuinely unknown strings render a concise localized notice (`Translation unavailable` / `Terjemahan tidak tersedia`) and a collapsible `<details><summary>` disclosure displaying the intact original text.
+  2. *Clear Location Alignment & Un-clocked Telemetry Chart Completeness (`TASK-0504 Follow-up 2`, `DEC-MON-095`, `DEC-UIUX-112`):*
+     - Clear Location action in `ReadingHistoryTable.tsx`: standardized column width `min-w-[220px] sm:min-w-[240px]`, uniform button height `h-7` (28px), flex-wrap layout, and `whitespace-nowrap` on Clear Location button.
+     - Un-clocked telemetry fallback in `packages/database/src/telemetry-repository.ts`: `timeRangeFilter` matches readings within range via `OR: [{ recordedAt: { gte: from, lt: to } }, { recordedAt: null, receivedAt: { gte: from, lt: to } }]`.
+     - Prisma `where.AND` fix: combined filters using `AND: params.cursor ? [timeRangeFilter, cursorFilter] : [timeRangeFilter]`, eliminating the `baseWhere.OR` spread overwrite defect.
+     - Deterministic non-null keyset traversal order: database traverses by `orderBy: [{ receivedAt: 'asc' }, { id: 'asc' }]` with cursor encoding `"${lastRow.receivedAt.toISOString()}_${lastRow.id}"`.
+     - Client-side deduplication & global sort in `useHistoricalMonitoring.ts`: points deduplicated by reading ID, strictly bounded within `[fromTime, toTime)`, and globally sorted chronologically across all batches by `recordedAt ?? receivedAt` with deterministic ID tie-breaking.
+  3. *Recommendation In-App Alert Evaluation & Concurrency Safety (`TASK-0708`, `DEC-ALRT-101`):*
+     - Server-side evaluation in `packages/database/src/prediction-alert-evaluator.ts` triggered asynchronously on gateway telemetry arrival (`SoilWaterMqttAdapter`) and web API `/predictions/latest` (with `Cache-Control: private, no-cache, no-store, must-revalidate`). External database remains strictly read-only.
+     - PostgreSQL advisory transaction locking: `SELECT pg_advisory_xact_lock(hashtext('prediction_alert_' || device.id || '_' || domain))` to eliminate concurrency races across processes.
+     - Anti-spam deduplication via SHA-256 fingerprint; exact persisted episode identity stored in `alertType` column formatted as `REC_${issueCode}`, with `sourceType = 'ml_prediction'`.
+     - Warning/Critical lifecycle management, severity escalation (`WARNING` $\to$ `CRITICAL`), and preservation of user-scoped acknowledgements (acknowledgement is strictly per-user and does not close the episode).
+     - Unapproved architecture: Independent background polling and auto-recovery upon optimal predictions remain UNAPPROVED / NOT ENABLED.
+     - Syntax defect correction: Fixed orphaned update argument block in `prediction-alert-evaluator.ts` restoring valid syntax and test execution without claiming full CI validation.
+- **Verification Evidence:**
+  - *Localization Website Testing:* **OPERATOR-VERIFIED PASS (2026-10-17)** on `/soil` and `/water`.
+  - *Deferred Website Testing:* Chart completeness, Clear Location row-editor, and recommendation alerts **DEFERRED TO VPS** by operator due to local test data absence. Post-ack Critical escalation visibility is **IMPLEMENTATION UNCONFIRMED / VERIFICATION PENDING** (metadata persistence alone is unconfirmed without concrete API unread-count reset and UI logic).
+  - *Automated Unit & Regression Tests:*
+    - `apps/web/test/unit/recommendation-localization-regression.test.tsx` (new test suite).
+    - `apps/web/test/unit/recommendation-card.test.tsx` (updated).
+    - `packages/database/test/prediction-alert-evaluator.test.ts` (12/12 passing).
+    - `packages/database/test/telemetry-chart-completeness.test.ts` (passing).
+    - `packages/database/test/chart-timestamp-ordering.test.ts` (passing).
+  - *Pre-Commit Quality Gates:* **PENDING OPERATOR EXECUTION** (`check:quality`, `test`, `test:coverage`, `test:integration`, `test:e2e`).
+- **Deployment & Infrastructure Assessment:**
+  - *Deployment Status:* **PENDING**.
+  - *Image Rebuild Requirement:* **BOTH** Web (`kebun-melon-web`) and IoT Gateway (`kebun-melon-gateway`) images must be rebuilt and recreated off-VPS because code in both services was modified.
+  - *Database Migrations:* **NOT REQUIRED** (Zero schema migrations needed; existing tables and columns preserved).
+  - *Environment Variables & Reverse Proxy (Caddy):* **NOT REQUIRED** (Zero `.env` or Caddy changes).
+<!-- TASK-0413-0504-0708 Traceability Reconciled: 2026-10-17 -->

@@ -5,6 +5,7 @@ import { logger } from '../observability/logger';
 import { metricsCollector } from '../observability/metrics';
 import { publishRealtimeEvent } from '../events/webhook';
 import {
+  prisma,
   DeviceRepository,
   TelemetryRepository,
   DeviceNotFoundError,
@@ -12,6 +13,7 @@ import {
   ExternalPredictionClient,
   getExternalPredictionClient,
   buildOutboundRecommendationPayload,
+  evaluatePredictionAlerts,
 } from '@kebun-melon/database';
 import {
   DeviceType,
@@ -1043,7 +1045,21 @@ export class SoilWaterMqttAdapter {
       return { published: false, reason: 'PREDICTION_STALE' };
     }
 
-    // 4. Prevent duplicate publish of identical prediction ID
+    // 4. Idempotently evaluate internal in-app alerts from pulled prediction
+    evaluatePredictionAlerts({
+      prisma,
+      device: { id: params.deviceDbId, deviceId: params.canonicalDeviceId },
+      domain: params.domain,
+      prediction,
+      maxStalenessMs,
+    }).catch((err) => {
+      logger.error('Failed to evaluate prediction alerts in gateway dispatch', err, {
+        deviceId: params.canonicalDeviceId,
+        domain: params.domain,
+      });
+    });
+
+    // 5. Prevent duplicate publish of identical prediction ID
     const dedupeKey = `${params.canonicalDeviceId}:${params.domain}`;
     if (prediction.id && this.lastPublishedPredictionIds.get(dedupeKey) === prediction.id) {
       logger.info('Skipping recommendation publish: duplicate prediction ID already published', {

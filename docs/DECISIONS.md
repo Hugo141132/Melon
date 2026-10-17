@@ -1992,4 +1992,94 @@ The following facts are supported by the verified decisions governance of `TASK-
      - Updated `apps/web/app/devices/page.tsx` so update success toast interpolates the persisted device name: `t('deviceUpdated', { name: device.name })`.
 <!-- DEC-DEV-040 Reconciled: 2026-10-16 -->
 
+---
+
+## DEC-MON-095: Un-clocked Telemetry Fallback, Prisma AND Filter Preservation & Keyset Traversal Order
+- **Status:** IMPLEMENTED (2026-10-17) — Unit tests passing; operator verification DEFERRED TO VPS due to local un-clocked test data absence.
+- **Related Task IDs:** `TASK-0503`, `TASK-0504`, `TASK-0504 Follow-up 2`
+- **Context:**
+  Users reported missing readings in location-filtered charts despite those readings being visible and annotated in the history table. Investigation revealed:
+  1. Microcontrollers without RTC or before NTP time-sync ingest readings with `recordedAt: null` and populated `receivedAt`. The history table uses `(row.recordedAt || row.receivedAt)`, allowing location naming. But chart queries strictly filtered `recordedAt: { gte, lt }`, which evaluated to falsy `NULL` in SQL.
+  2. Spreading `{ ...baseWhere, ...cursorFilter }` in `telemetry-repository.ts` caused `cursorFilter.OR` to overwrite `baseWhere.OR`, silently stripping the date-range filter on paginated cursor requests.
+- **Decision & Implementation Directives:**
+  1. **Time Range Fallback (`timeRangeFilter`):**
+     Chart queries match readings within range using `OR: [{ recordedAt: { gte: from, lt: to } }, { recordedAt: null, receivedAt: { gte: from, lt: to } }]`.
+  2. **Prisma AND Query Structure:**
+     Query filters combine using `AND: params.cursor ? [timeRangeFilter, cursorFilter] : [timeRangeFilter]` to ensure cursor conditions never overwrite date-range conditions.
+  3. **Deterministic Keyset Traversal on Non-Null Total Order:**
+     Database traversal orders by non-null timestamps `orderBy: [{ receivedAt: 'asc' }, { id: 'asc' }]` with cursor encoding `"${lastRow.receivedAt.toISOString()}_${lastRow.id}"`, avoiding SQL NULL ordering pitfalls during cursor pagination.
+  4. **Client Deduplication & Global Chronological Sort:**
+     `useHistoricalMonitoring.ts` deduplicates points across batches using a Map keyed by reading `id`, bounds points strictly within `[fromTime, toTime)`, and performs a global chronological sort: `(a.recordedAt || a.timestamp || a.receivedAt)` with deterministic ID tie-breaking.
+  5. **Verification Status:**
+     Unit regression test `packages/database/test/telemetry-chart-completeness.test.ts` passes. Operator website verification deferred to VPS testing.
+<!-- DEC-MON-095 Reconciled: 2026-10-17 -->
+
+---
+
+## DEC-ALRT-101: External ML Prediction In-App Alert Evaluator, Advisory Locking & Anti-Spam Lifecycle Invariants
+- **Status:** IMPLEMENTED (2026-10-17) — Software implementation and unit tests completed; auto-recovery and independent background polling remain UNAPPROVED / NOT ENABLED; operator verification DEFERRED TO VPS.
+- **Related Task IDs:** `TASK-0413`, `TASK-0701`, `TASK-0704`, `TASK-0705`, `TASK-0708`
+- **Context:**
+  External ML predictions are pulled from an external database via REST API. Abnormal predictions (Warning / Critical) were displayed on dashboard cards but did not surface to operators in `/notifications` or update the sidebar badge.
+- **Decision & Implementation Directives:**
+  1. **Read-Only External DB & Server-Side Evaluation Triggers:**
+     External database remains strictly read-only. Predictions pulled via Gateway MQTT ingestion (`SoilWaterMqttAdapter`) upon telemetry arrival or via Web API `GET /api/v1/devices/[deviceId]/predictions/latest` pass asynchronously through `evaluatePredictionAlerts` in `@kebun-melon/database`. Web API route explicitly enforces `Cache-Control: private, no-cache, no-store, must-revalidate`. Independent background polling remains unapproved/not enabled.
+  2. **PostgreSQL Advisory Transaction Locking:**
+     To prevent race conditions during concurrent evaluations across processes, `evaluatePredictionAlerts` acquires a transaction-level advisory lock: `SELECT pg_advisory_xact_lock(hashtext('prediction_alert_' || device.id || '_' || domain))`.
+  3. **Anti-Spam & Fingerprint Deduplication:**
+     Extracts stable UUID or computes SHA-256 fingerprint from prediction content. Repeated pulls or cache hits of the identical prediction ID are rejected as redundant observations without new alerts.
+  4. **Stable Persisted Episode Identity:**
+     Maintains exactly 1 active open alert episode per `(deviceId, domain, issueCode)` stored directly in the `alertType` column formatted as `REC_${issueCode}` (clamped to 80 chars), with `sourceType = 'ml_prediction'`.
+  5. **Warning/Critical Lifecycle & Escalation:**
+     - Creates new `OPEN` alert on initial Warning/Critical entry.
+     - Subsequent predictions with identical severity update alert evidence context idempotently without emitting duplicate notifications.
+     - Severity escalation (`WARNING` $\to$ `CRITICAL`) updates severity, records escalation metadata, and triggers operator notification. Note: Post-ack Critical escalation visibility is **IMPLEMENTATION UNCONFIRMED / VERIFICATION PENDING** (metadata persistence alone is unconfirmed without concrete API unread-count reset and UI logic consuming escalation metadata).
+  6. **Preserved User-Scoped Acknowledgements:**
+     Acknowledgement is strictly per-user acknowledgement (`alert_acknowledgements`), NOT automatic recovery or global episode resolution. Acknowledgement does NOT close the recommendation episode. Ordinary evidence updates do NOT reset individual operator acknowledgements in `alert_acknowledgements`.
+  7. **Unresolved Policy: Auto-Recovery Pending Approval:**
+     Automatic resolution of alerts upon optimal predictions is NOT enabled. It remains pending explicit user approval to prevent premature alert closure before agronomic verification.
+  8. **Strict Domain Boundary:**
+     Scoped strictly to in-app alerts (`alerts` table, `/notifications`, sidebar badge). Does not trigger transactional emails, publish MQTT commands, or actuate physical valves.
+<!-- DEC-ALRT-101 Reconciled: 2026-10-17 -->
+
+---
+
+## DEC-UIUX-112: Clear Location Row-Editor Alignment, Uniform Button Height & Responsive Whitespace Governance
+- **Status:** IMPLEMENTED (2026-10-17) — Verification DEFERRED TO VPS alongside location chart verification.
+- **Related Task IDs:** `TASK-0504`, `TASK-0504 Follow-up 2`
+- **Context:**
+  In `ReadingHistoryTable.tsx`, the inline location editor action buttons (Save, Clear, Cancel) suffered from inconsistent vertical alignment and awkward line wrapping on mobile and desktop viewports due to unconstrained table cell widths and unstandardized button dimensions.
+- **Decision & Implementation Directives:**
+  1. **Standardized Column Width:**
+     Applied `min-w-[220px] sm:min-w-[240px]` to both table header `<th>` and data cell `<td>` for the location column.
+  2. **Uniform Button Geometry:**
+     Standardized button heights uniformly to `h-7` (28px) with `px-2.5 text-[11px] font-medium`.
+  3. **Flex Wrap & Whitespace Protection:**
+     Action button container uses `flex flex-wrap items-center gap-1.5`. Clear Location button includes `whitespace-nowrap`, guaranteeing clean alignment alongside Save and Cancel without text truncation or awkward layout shifting in both English and Indonesian locales.
+<!-- DEC-UIUX-112 Reconciled: 2026-10-17 -->
+
+---
+
+## DEC-I18N-096: Recommendation Localization Normalization, Parameterized Dynamic Summaries & Non-Intrusive Fallback Disclosure
+- **Status:** APPROVED & OPERATOR-VERIFIED (2026-10-17) — Website testing completed successfully by operator WOOIII. Final CI gates pending.
+- **Related Task IDs:** `TASK-0413`, `TASK-0413 Phase D Follow-up`
+- **Context:**
+  Website testing revealed that external ML prediction strings displayed `[Translation unavailable] Source: ...` throughout the English UI. The external ML service returned Indonesian strings without degree modifiers (`Kelembaban tanah rendah`, `TDS air tinggi`), mixed-language summary strings (`parameter water`), and the previous fallback dumped raw error wrappers directly into primary cards.
+- **Decision & Implementation Directives:**
+  1. **Robust Normalization Pipeline (`normalizeKey`):**
+     Applies Unicode NFKC normalization, whitespace collapsing, outer quote stripping, Indonesian spelling variant normalization (`kelembaban` $\to$ `kelembapan`), and trailing punctuation removal (`[.:;,!?]+$`).
+  2. **100% Screenshot Copy Coverage:**
+     Fully mapped all required screenshot strings for issues, impacts, and actions in `apps/web/lib/recommendation-i18n.ts`, preserving agronomic uncertainty ("may") and action strength without inferring recommendations from raw numbers.
+  3. **Parameterized Dynamic Summaries:**
+     Summary parser dynamically handles counts and parameter lists for water and soil in both locales:
+     - EN: `"{count} water quality {parameter needs / parameters need} attention: {list}."` (with Oxford comma).
+     - ID: `"{count} parameter kualitas air memerlukan perhatian: {list}."`
+     Handles singular and plural grammar seamlessly.
+  4. **Non-Intrusive Fallback Disclosure (`LocalizedTextDisplay`):**
+     Eliminated all `[Translation unavailable] Source: ...` string dumps on primary cards. For genuinely unknown messages, renders a concise localized notice (`Translation unavailable` / `Terjemahan tidak tersedia`) and an optional collapsible disclosure (`<details><summary>View original text / Lihat teks asli</summary>`) displaying the intact original text.
+  5. **Verification Evidence:**
+     Operator WOOIII confirmed website testing passed on `/soil` and `/water`. Comprehensive unit and regression test suite added in `apps/web/test/unit/recommendation-localization-regression.test.tsx`.
+<!-- DEC-I18N-096 Reconciled: 2026-10-17 -->
+
+
 

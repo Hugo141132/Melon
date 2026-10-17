@@ -14,12 +14,13 @@ import {
 } from 'lucide-react';
 import type { LatestPredictionData } from '@/hooks/useLatestPrediction';
 import {
-  translateParameter,
-  translateProblem,
-  translateImpact,
-  translateAction,
-  translateSummary,
+  translateParameterWithMeta,
+  translateProblemWithMeta,
+  translateImpactWithMeta,
+  translateActionWithMeta,
+  translateSummaryWithMeta,
   getParameterUnit,
+  type TranslationResult,
 } from '@/lib/recommendation-i18n';
 
 export interface RecommendationCardProps {
@@ -29,6 +30,43 @@ export interface RecommendationCardProps {
   isStale?: boolean;
   isOffline?: boolean;
   className?: string;
+}
+
+// Renders localized text with clean non-intrusive disclosure for unknown strings
+function LocalizedTextDisplay({
+  result,
+  locale,
+  className = '',
+}: {
+  result: TranslationResult;
+  locale: string;
+  className?: string;
+}) {
+  if (result.isTranslated || !result.originalText) {
+    return <span className={className}>{result.text}</span>;
+  }
+
+  const isEn = locale === 'en';
+  const notice = isEn ? 'Translation unavailable' : 'Terjemahan tidak tersedia';
+  const disclosureLabel = isEn ? 'View original text' : 'Lihat teks asli';
+
+  return (
+    <div className={`space-y-1 ${className}`}>
+      <span className="inline-flex items-center gap-1.5 text-amber-700 dark:text-amber-400 font-medium text-[12px]">
+        <AlertTriangle size={12} className="shrink-0" />
+        <span>{notice}</span>
+      </span>
+      <details className="text-[11px] text-app-on-surface-variant cursor-pointer group">
+        <summary className="hover:text-app-on-surface underline select-none text-[11px] list-none flex items-center gap-1">
+          <span>▸</span>
+          <span>{disclosureLabel}</span>
+        </summary>
+        <div className="mt-1 p-2 rounded-lg bg-app-surface-container text-app-on-surface-variant font-mono text-[11px] break-words border border-app-outline-variant/20">
+          {result.originalText}
+        </div>
+      </details>
+    </div>
+  );
 }
 
 // Format ISO date string into locale-aware formatted time
@@ -172,7 +210,7 @@ export default function RecommendationCard({
 
   const issues = prediction.issues || [];
   const farmerActions = prediction.farmerAction || [];
-  const translatedSummary = translateSummary(prediction.summary, locale);
+  const summaryResult = translateSummaryWithMeta(prediction.summary, locale);
 
   return (
     <section
@@ -249,7 +287,7 @@ export default function RecommendationCard({
       )}
 
       {/* AI Diagnostic Summary Bento Card */}
-      {translatedSummary && (
+      {summaryResult.text && (
         <div
           className={`mb-5 p-4 rounded-xl border border-app-outline-variant/20 border-l-4 ${
             isCritical
@@ -262,12 +300,12 @@ export default function RecommendationCard({
           <div className="flex items-center gap-1.5 mb-1.5 text-[11px] font-bold uppercase tracking-wider text-app-on-surface-variant">
             <span>{t('summaryTitle')}</span>
           </div>
-          <p
+          <div
             data-testid="recommendation-summary"
             className="text-[14px] sm:text-[15px] font-semibold text-app-on-surface leading-relaxed"
           >
-            {translatedSummary}
-          </p>
+            <LocalizedTextDisplay result={summaryResult} locale={locale} />
+          </div>
         </div>
       )}
 
@@ -290,9 +328,9 @@ export default function RecommendationCard({
 
             <div className="space-y-2.5">
               {issues.map((issue, idx) => {
-                const paramName = translateParameter(issue.parameter, locale);
-                const problemText = translateProblem(issue.problem, locale);
-                const impactText = translateImpact(issue.impact, locale);
+                const paramResult = translateParameterWithMeta(issue.parameter, locale);
+                const problemResult = translateProblemWithMeta(issue.problem, locale);
+                const impactResult = translateImpactWithMeta(issue.impact, locale);
                 const unit = getParameterUnit(issue.parameter);
                 const impactPrefix = t('impactPrefix');
 
@@ -304,7 +342,7 @@ export default function RecommendationCard({
                   >
                     {/* Parameter Title & Value Pill */}
                     <div className="flex items-center justify-between gap-2 font-bold text-app-on-surface text-[13px]">
-                      <span>{paramName}</span>
+                      <LocalizedTextDisplay result={paramResult} locale={locale} />
                       {issue.value !== null && issue.value !== undefined && (
                         <span className="font-mono text-[12px] font-bold px-2 py-0.5 rounded-md bg-app-surface-container text-app-on-surface border border-app-outline-variant/15 flex items-center gap-1 shrink-0">
                           <span>{issue.value}</span>
@@ -318,16 +356,17 @@ export default function RecommendationCard({
                     </div>
 
                     {/* Problem Description */}
-                    {problemText && (
-                      <p className="text-rose-700 dark:text-rose-400 text-[12px] font-semibold leading-snug">
-                        {problemText}
-                      </p>
+                    {problemResult.text && (
+                      <div className="text-rose-700 dark:text-rose-400 text-[12px] font-semibold leading-snug">
+                        <LocalizedTextDisplay result={problemResult} locale={locale} />
+                      </div>
                     )}
 
                     {/* Agronomic Impact Explanation */}
-                    {impactText && (
+                    {impactResult.text && (
                       <div className="text-app-on-surface-variant text-[12px] leading-relaxed italic bg-app-surface-container-lowest/80 border border-app-outline-variant/15 rounded-lg px-2.5 py-1.5">
-                        {impactPrefix}: {impactText}
+                        <span className="font-semibold not-italic">{impactPrefix}: </span>
+                        <LocalizedTextDisplay result={impactResult} locale={locale} />
                       </div>
                     )}
                   </div>
@@ -356,7 +395,7 @@ export default function RecommendationCard({
           {farmerActions.length > 0 ? (
             <div className="space-y-2.5">
               {farmerActions.map((action, idx) => {
-                const translatedAction = translateAction(action, locale);
+                const actionResult = translateActionWithMeta(action, locale);
                 return (
                   <div
                     key={idx}
@@ -366,7 +405,11 @@ export default function RecommendationCard({
                     <div className="w-5 h-5 rounded-full bg-app-primary/10 text-app-primary flex items-center justify-center shrink-0 mt-0.5">
                       <CheckCircle2 size={13} className="text-app-primary" />
                     </div>
-                    <span className="font-medium">{translatedAction}</span>
+                    <LocalizedTextDisplay
+                      result={actionResult}
+                      locale={locale}
+                      className="font-medium"
+                    />
                   </div>
                 );
               })}

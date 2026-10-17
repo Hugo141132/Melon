@@ -162,11 +162,19 @@ An Owner must approve the Admin before protected access is allowed.
   - Pre-swap rollback baseline capture: running container ID and image reference are inspected and atomically captured to `/opt/kebun-melon/.prev_web_image` with rollback tag before container recreation.
   - Active Deployed Host: Release `d1c1c13` deployed to VPS operating under `APP_ENV=staging` at `APP_URL=https://monitoring.melonmadura.my.id` (staging environment despite prod compose filename; previous rollback baseline reference `kebun-melon-web:8304c44` preserved in durable state file `/opt/kebun-melon/.prev_web_image` without claiming current availability was independently checked).
   - Alerts 429 Repair Verification: All final verification tests, GitHub Actions CI, and post-deployment manual smoke tests passed (`USER-REPORTED COMPLETE`).
-  - 2026-10-17 Five-Item Repair Batch Deployment & Acceptance Status:
-    - Release Commit: `d1c1c13e93682222d59a81922f47753a85bc6d0b` (`d1c1c13`).
-    - GitHub Actions CI: PASS (Run ID `38998551217` on `d1c1c13`, verified independently via GitHub API).
-    - Website Acceptance & Deployment/Smoke Checks: `USER-REPORTED PASS on 2026-10-17` across `/soil`, `/water`, and `/controls` in English and Indonesian, with public HTTPS health check returning HTTP 200 OK.
-    - Deployment Status: `COMPLETE (USER-CONFIRMED on 2026-10-17)`.
+- **Durable Operational & Workflow Governance (DEC-DEV-041, DEC-MON-095, DEC-ALRT-101, DEC-I18N-096, DEC-UIUX-112):**
+  - **Branch & Git Management:** Development occurs directly on `main`. The human operator exclusively handles git staging (`git add`), commits (`git commit`), and pushes (`git push`). Coding agents must never execute git commit/push commands or alter repository remotes.
+  - **Quality Gates Execution:** The human operator exclusively runs the five final CI quality gates (`npm run check:quality`, `npm run test`, `npm run test:coverage`, `npm run test:integration`, `npm run test:e2e`). Coding agents must never execute these full test gates autonomously.
+  - **Credentials & Deployment Access:** The human operator handles all production/staging credentials and performs VPS deployments directly via IDE Remote SSH.
+  - **Container Packaging & Architecture:** All container images must be built off-VPS for target architecture `linux/amd64` (e.g. via local Docker on workstation) and transferred to the host as plain `.tar` archives without workstation-side gzip dependency. The single-active-gateway rule is strictly preserved (never run multiple instances of `kebun-melon-gateway` against MQTT brokers). Both `kebun-melon-web` and `kebun-melon-gateway` images must be rebuilt and recreated when code changes touch both services.
+  - **Per-Location Chart Semantics & Verification Separation:** Soil and water telemetry charts strictly enforce per-location filtering, keyset pagination traversal ordered deterministically on `[receivedAt, id]`, un-clocked sensor fallback (`recordedAt ?? receivedAt`), and full dataset retrieval without categorical compression. Empirical verification claims must strictly distinguish operator-tested features (`USER-REPORTED PASS`) from features deferred to VPS testing (due to lack of local test fixtures) and unapproved architectural proposals (e.g. background polling or auto-recovery).
+- **2026-10-17 Multi-Domain Follow-up Batch Status:**
+  - Changes: Keyset pagination traversal & un-clocked fallback (`DEC-MON-095`), Clear Location button row alignment (`DEC-UIUX-112`), Recommendation localization & dictionary coverage (`DEC-I18N-096`), External DB prediction alert evaluation & advisory locking (`DEC-ALRT-101`), syntax repair in `prediction-alert-evaluator.ts`.
+  - Operator Localization Website Verification: `USER-REPORTED PASS on 2026-10-17`.
+  - Deferred to VPS Testing: Chart completeness, Clear Location row-editor Save/Clear/Cancel, and recommendation in-app alerts (due to lack of suitable local data fixtures).
+  - CI Gates: PENDING (to be run manually by operator).
+  - Git Commit/Push & Remote CI: PENDING (to be performed manually by operator).
+  - Staging VPS Deployment: PENDING.
 
 ---
 

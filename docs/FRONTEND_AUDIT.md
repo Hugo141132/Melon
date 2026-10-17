@@ -32,6 +32,12 @@
 > - **Browser Tab Title Standardization**: Updated root App Router metadata in `apps/web/app/layout.tsx` (`title.default` and `title.template`) from `"Kebun Melon - Smart Farming"` to `"Melon Governance"`, displaying `"Melon Governance"` on browser tabs for pages defaulting to root metadata.
 > - **Invariants Preserved & Verification**: All authentication logic, route guards, validation schemas, and database operations remain 100% untouched. Verified with 0 TypeScript errors (`npm run typecheck:web`), 100% test pass rate in unit suites, and browser evaluation.
 > - **Staging Impact**: Frontend/documentation only. No Supabase database migration, edge function deployment, or container update required.
+>
+> **Reconciliation Note (2026-10-17 Multi-Domain Follow-up):** Refined inline location annotation editing ergonomics, agronomic recommendation localization, and chart keyset pagination traversal (`Frontend impact: MINOR`). Selected UI direction: `Premium Minimal Ops`. Existing color template: `UNCHANGED`. Selected motion effects: `Button hover`, `Skeleton loading`. 21st.dev MCP: `NOT REQUIRED`.
+> - **Location Row-Editor Alignment (`ReadingHistoryTable.tsx`)**: The location table cell reserves adequate horizontal space (`min-w-[220px] sm:min-w-[240px]`) during active inline editing, rendering action buttons (`Save`, `Clear`, `Cancel` with `h-7 text-xs px-2 sm:px-2.5 whitespace-nowrap`) and input (`h-7 text-xs w-28 sm:w-32`) in a single non-wrapping flex row (`flex items-center gap-1.5 flex-nowrap`), preventing button displacement.
+> - **Agronomic Recommendation Presentation (`RecommendationCard.tsx`, `recommendation-i18n.ts`)**: Normalized source copy by stripping Markdown artifacts before key matching, expanded dictionary parity across `apps/web/messages/en.json` and `apps/web/messages/id.json` to 100% match screenshot copy, introduced dynamic parameter interpolation for live sensor values, and added `LocalizedTextDisplay` providing non-intrusive footnote disclosure (`Source: "..."` tooltip) for unmapped freeform ML model copy without disruptive warning banners.
+> - **Telemetry Chart Sorting (`useHistoricalMonitoring.ts`)**: Retrieves sequential keyset batches ordered by `[receivedAt, id]` from the database and performs deterministic global client sorting by `recordedAt ?? receivedAt` before deduplication and rendering.
+> - **Verification**: Operator localization website testing: `PASS (2026-10-17)`. Row-editor Save/Clear/Cancel, chart completeness, and alert lifecycle: `DEFERRED TO VPS TESTING`.
 
 ---
 

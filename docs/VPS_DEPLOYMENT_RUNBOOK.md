@@ -77,7 +77,21 @@
      - **Staging Runtime Invariant:** Executing under `APP_ENV=staging` at `APP_URL=https://monitoring.melonmadura.my.id` with Compose configuration `docker-compose.prod.yml` pointing to Supabase Staging (`ihgoxqdncepbcrqkchxu`).
      - **Preserved Rollback Baseline:** Baseline rollback image tag `kebun-melon-web:8304c44` is preserved in `/opt/kebun-melon/.prev_web_image` (without claiming its current availability was independently checked).
      - **Deployment & Smoke Test Acceptance:** User-performed deployment and post-deployment manual smoke testing passed (`USER-REPORTED PASS on 2026-10-17`), with public HTTPS probe to `https://monitoring.melonmadura.my.id/health` returning HTTP 200 OK.
-
+7. **2026-10-17 Multi-Domain Follow-up Deployment Requirements (Staging & Production):**
+   - **Container Packaging & Rebuild Requirements:**
+     - **Web Container (`kebun-melon-web`):** **REBUILD & RECREATE REQUIRED**. Code changes touch Next.js web application (`apps/web`), shared library (`packages/database`), translation dictionaries, and frontend components. Image must be built off-VPS for target architecture `linux/amd64`.
+     - **Gateway Container (`kebun-melon-gateway`):** **REBUILD & RECREATE REQUIRED**. Code changes touch `apps/iot-gateway/src/mqtt/soil-water-adapter.ts` to trigger asynchronous prediction alert evaluation via `evaluatePredictionAlerts` upon sensor telemetry arrival. Gateway image must be built off-VPS for `linux/amd64` and transferred to the VPS.
+     - **Strict Single-Active-Gateway Invariant:** When deploying the updated gateway image, ensure only ONE gateway container runs against the EMQX Cloud broker. Stop any staging gateway prior to updating production or vice versa.
+   - **Infrastructure & Configuration Changes:**
+     - **Database Migrations:** **NOT REQUIRED**. The schema changes for location annotations and alert structures were already applied in earlier migrations. All new query filters (`where.AND`, keyset cursor) and alert fields (`sourceType: 'ml_prediction'`, `alertType: 'REC_...'`) operate within the existing Prisma schema and PostgreSQL database structure.
+     - **Environment Variable Changes:** **NOT REQUIRED**. Existing credentials and configuration for database, MQTT TLS, and auth sessions remain 100% sufficient across staging and production.
+     - **Caddy Reverse Proxy (`Caddyfile`):** **NOT REQUIRED**. Caddy proxies port 3000 and handles SSE streaming endpoints (`/api/v1/realtime/stream*`) without configuration adjustments.
+   - **Pre-Swap Rollback Baseline Capture:**
+     - Prior to recreating containers on the VPS, capture running container IDs and image tags atomically to `/opt/kebun-melon/.prev_web_image` and `/opt/kebun-melon/.prev_gateway_image` to ensure clean rollback capability.
+   - **Pending Post-Deployment VPS Acceptance Checklist (Deferred Verification):**
+     - **Chart Completeness Test:** Navigate to `/soil` and `/water`. Verify chart plots complete reading series across 24h, 7d, and 30d without point truncation, tick collision, or scale collapse.
+     - **Row Annotation Save/Clear/Cancel:** In measurement history tables, click location cell on a row. Confirm input and action buttons (`Save`, `Clear`, `Cancel`) render inline on a single line (`min-w-[220px]`) without wrapping. Test Save, Clear, and Cancel without data fabrication.
+     - **Prediction Alert Lifecycle & RBAC:** Confirm external prediction anomalies produce `REC_${issueCode}` alerts visible to Owner and assigned Admin. Test acknowledgement and verify critical escalation visibility behavior if conditions worsen. Physical valve operations must NOT be triggered during verification.
 
 ---
 
