@@ -78,20 +78,20 @@ Kebun Melon is designed to manage agricultural sensor networks and irrigation in
 
 ## 3. Technology Stack
 
-| Layer                        | Technology                                    | Purpose / Configuration                                                    |
-| ---------------------------- | --------------------------------------------- | -------------------------------------------------------------------------- |
-| **Monorepo Management**      | npm Workspaces                                | Multi-package repository (`apps/*`, `packages/*`)                          |
-| **Web Frontend & API**       | Next.js 14.2+ (App Router), React 19, TS 5    | Server Components, Server-side RBAC, SSR AuthContext hydration             |
-| **Styling & UI Components**  | Tailwind CSS, Lucide React, Radix UI          | Clean, accessible dashboard adhering to `Premium Minimal Ops` direction    |
-| **Data Visualization**       | Recharts 2.12                                 | Clean line charts with reading-sequence X-axis, zero markers, no Brush     |
-| **Form & Schema Validation** | React Hook Form, Zod                          | Runtime validation for forms, API endpoints, and MQTT contracts            |
-| **IoT Gateway Service**      | Node.js 20, Fastify 5, TypeScript             | Standalone microservice bridging MQTT broker to PostgreSQL and Web API     |
-| **MQTT Client & Broker**     | MQTT.js 5, EMQX Cloud Serverless (Unified)    | TLS/WSS on port 8084 (`wss://<cluster-host>:8084/mqtt`), ACL isolation     |
-| **Database & ORM**           | PostgreSQL 17 (Supabase Singapore), Prisma    | Relational persistence, Supavisor connection pooling, transaction locks    |
-| **Transactional Email**      | Resend API (`resend`)                         | Verification codes, password resets, approval/rejection notifications      |
-| **Internationalisation**     | `next-intl` (bilingual `id` / `en`)           | Cookie-based routing (`id` default, `en` fallback), zero URL pollution     |
-| **Testing Framework**        | Vitest 4, Playwright 1.41, v8 Coverage        | Unit, integration, route, component, E2E, and quality gate test suites     |
-| **Containerization**         | Docker, Docker Compose, Alpine Linux          | Multi-stage production and staging builds (`apps/web`, `apps/iot-gateway`) |
+| Layer                        | Technology                                 | Purpose / Configuration                                                    |
+| ---------------------------- | ------------------------------------------ | -------------------------------------------------------------------------- |
+| **Monorepo Management**      | npm Workspaces                             | Multi-package repository (`apps/*`, `packages/*`)                          |
+| **Web Frontend & API**       | Next.js 14.2+ (App Router), React 19, TS 5 | Server Components, Server-side RBAC, SSR AuthContext hydration             |
+| **Styling & UI Components**  | Tailwind CSS, Lucide React, Radix UI       | Clean, accessible dashboard adhering to `Premium Minimal Ops` direction    |
+| **Data Visualization**       | Recharts 2.12                              | Clean line charts with reading-sequence X-axis, zero markers, no Brush     |
+| **Form & Schema Validation** | React Hook Form, Zod                       | Runtime validation for forms, API endpoints, and MQTT contracts            |
+| **IoT Gateway Service**      | Node.js 20, Fastify 5, TypeScript          | Standalone microservice bridging MQTT broker to PostgreSQL and Web API     |
+| **MQTT Client & Broker**     | MQTT.js 5, EMQX Cloud Serverless (Unified) | TLS/WSS on port 8084 (`wss://<cluster-host>:8084/mqtt`), ACL isolation     |
+| **Database & ORM**           | PostgreSQL 17 (Supabase Singapore), Prisma | Relational persistence, Supavisor connection pooling, transaction locks    |
+| **Transactional Email**      | Resend API (`resend`)                      | Verification codes, password resets, approval/rejection notifications      |
+| **Internationalisation**     | `next-intl` (bilingual `id` / `en`)        | Cookie-based routing (`id` default, `en` fallback), zero URL pollution     |
+| **Testing Framework**        | Vitest 4, Playwright 1.41, v8 Coverage     | Unit, integration, route, component, E2E, and quality gate test suites     |
+| **Containerization**         | Docker, Docker Compose, Alpine Linux       | Multi-stage production and staging builds (`apps/web`, `apps/iot-gateway`) |
 
 ---
 
@@ -362,6 +362,7 @@ All implementation and contribution must follow the 14-level hierarchy of author
 14. [`AGENTS.md`](AGENTS.md) — Coding agent rules, constraints, and execution policies.
 
 Additional Authoritative Reference Documents:
+
 - [`docs/DECISIONS.md`](docs/DECISIONS.md) — Formal architectural and product decision register.
 - [`docs/VPS_DEPLOYMENT_RUNBOOK.md`](docs/VPS_DEPLOYMENT_RUNBOOK.md) — Production VPS deployment runbook and baseline records.
 - [`docs/SUPABASE_MIGRATION_RUNBOOK.md`](docs/SUPABASE_MIGRATION_RUNBOOK.md) — Database migration, cutover, and rehearsal procedures.
