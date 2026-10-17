@@ -362,8 +362,10 @@ export function NPKChartTooltipContent({
   );
 }
 
+const EMPTY_DATA: BaseSeriesItem[] = [];
+
 export default function NPKChart({
-  data = [],
+  data = EMPTY_DATA,
   selectedMetric = 'npk',
   preset,
   loading = false,
@@ -378,7 +380,12 @@ export default function NPKChart({
   const [brushIndices, setBrushIndices] = useState<{ startIndex?: number; endIndex?: number }>({});
 
   useEffect(() => {
-    setBrushIndices({});
+    setBrushIndices((prev) => {
+      if (prev.startIndex === undefined && prev.endIndex === undefined) {
+        return prev;
+      }
+      return {};
+    });
   }, [data, selectedLocationKey, preset]);
 
   const handleBrushChange = useCallback((range: { startIndex?: number; endIndex?: number }) => {

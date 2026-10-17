@@ -80,8 +80,10 @@ export function WaterChartTooltipContent({
   );
 }
 
+const EMPTY_DATA: BaseSeriesItem[] = [];
+
 export default function WaterNutrientChart({
-  data = [],
+  data = EMPTY_DATA,
   selectedMetric = 'ec',
   preset,
   loading = false,
@@ -97,7 +99,12 @@ export default function WaterNutrientChart({
 
   // Reset zoom whenever data source, location, or preset changes
   useEffect(() => {
-    setBrushIndices({});
+    setBrushIndices((prev) => {
+      if (prev.startIndex === undefined && prev.endIndex === undefined) {
+        return prev;
+      }
+      return {};
+    });
   }, [data, selectedLocationKey, preset]);
 
   const handleBrushChange = useCallback((range: { startIndex?: number; endIndex?: number }) => {
