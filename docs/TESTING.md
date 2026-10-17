@@ -3778,7 +3778,7 @@ The five mandatory CI gates must be executed **exclusively by operator JEMBOT** 
   - Rate limiter prefix isolated to `faucet_history`, preventing quota collision with `/api/v1/alerts`.
   - Added `hasEverOpenedRef` in `FaucetHistoryTable.tsx` to eliminate duplicate fetch amplification on initial SSE mount.
   - Adaptive polling with bounded backoff and `Retry-After` adherence in `FaucetStatusCard.tsx`.
-- **Alerts HTTP 429 Follow-Up Fixes & Invariants (`DEC-ALRT-098`):**
+- **Alerts HTTP 429 Follow-Up Fixes & Invariants:**
   - In `apps/web/hooks/useAlertBadge.ts`, wrapped `refetch` in `useCallback((force = true) => fetchBadgeCount(force), [fetchBadgeCount])`, stabilizing the callback reference across hook re-renders.
   - In `apps/web/components/navigation/Sidebar.tsx`, added `wasOpenRef` edge-detection to trigger badge refetch strictly on the opening transition (`!wasOpenRef.current && isOpen`), and passed `refetchAlertBadge(false)` to reuse cached counts within the 10-second TTL rather than bypassing cache.
   - In `apps/web/app/api/v1/alerts/route.ts`, isolated the rate limiter key prefix to `keyPrefix: 'alerts'`, separating alert count requests from `history` and `faucet_history`.
@@ -3801,19 +3801,64 @@ The five mandatory CI gates must be executed **exclusively by operator JEMBOT** 
 - `apps/web/test/unit/sidebar-navigation.test.tsx`: `Sidebar` edge-detection preventing duplicate alert badge fetches on internal re-renders while open.
 
 ### 3. Website Acceptance & Deployment Status
-- **Release 525caa2 VPS Deployment:** Deployed successfully to VPS (`38.103.171.46`) under `APP_ENV=staging` at `APP_URL=https://monitoring.melonmadura.my.id` with Compose file `docker-compose.prod.yml` and rollback tag `kebun-melon-web:55671ac`.
-- **Alerts-429 Follow-Up Manual Acceptance:** `USER-REPORTED COMPLETE (2026-10-16)`.
-- **Pre-Commit Operator CI Gates Protocol:**
-  - All five mandatory CI gates remain **PENDING USER EXECUTION** prior to commit/push:
-    1. `npm run check:quality` (lint, format, typecheck, env check, traceability)
-    2. `npm run test` (workspace unit tests)
-    3. `npm run test:coverage` (code coverage threshold verification)
-    4. `npm run test:integration` (isolated PostgreSQL database integration tests; prerequisite: running test DB `kebun_melon_test`)
-    5. `npm run test:e2e` (Playwright E2E smoke tests; prerequisite: running web instance / Microsoft Edge)
-- **Batch Release Status:** `PENDING CI GATES` (Not release-ready / not fully DONE until required gates are verified).
-- **Git Commit, Push & Remote CI:** `PENDING`.
-- **Live Database Migrations:** `NOT REQUIRED` (Zero schema changes; existing tables, enums, and indexes preserved).
-- **Staging / VPS Deployment Guidance:** `PENDING`. Build container image off-VPS (`--platform linux/amd64`), push release image, deploy on VPS using actual Compose configuration and `--no-deps web`. Reverse proxy (Caddy), database configuration, and single-active-gateway rule remain untouched.
+- **Release 8304c44 CI & VPS Deployment (COMPLETED):**
+  - **Local Pre-Commit Gates:** All five mandatory CI verification gates (`npm run check:quality`, `npm run test`, `npm run test:coverage`, `npm run test:integration`, `npm run test:e2e`) passed prior to commit.
+  - **Commit & Remote CI:** Pushed commit `8304c44` to `main`; remote GitHub Actions CI workflow passed.
+  - **VPS Deployment Execution:** Built container image `kebun-melon-web:8304c44` off-VPS (`--platform linux/amd64`) and deployed to Nebula VPS (`38.103.171.46`) via in-place web container recreation (`--no-deps web`).
+  - **Runtime Environment:** Operating under `APP_ENV=staging` at `APP_URL=https://monitoring.melonmadura.my.id` with Compose configuration `docker-compose.prod.yml`.
+  - **Rollback Baseline:** Recorded rollback tag `rollback-before-8304c44` as created during deployment (without asserting that its current availability was independently verified).
+  - **Post-Deployment Acceptance:** Post-deployment manual smoke testing passed (`USER-REPORTED COMPLETE`). Deployed verification is complete.
+
+---
+
+## 35.14 Multi-Domain Five-Item Repair Batch Verification Evidence (2026-10-17)
+
+### 1. Implementation Scope & Invariants
+- **Device-Switch Synchronization & Zero Wrong-Device Banner (`TASK-0507`, `TASK-0813`):**
+  - Synchronized domain navigation in `DeviceSelector.tsx` and `DeviceContext.tsx`. Selecting an assigned device outside the active dashboard route triggers client-side router navigation directly to the matching domain dashboard (`SOIL_NODE` -> `/dashboard/soil`, `WATER_QUALITY_NODE` -> `/dashboard/water`, `WATER_TANK_NODE` -> `/dashboard/reservoir`) before telemetry cards evaluate device compatibility.
+  - Eliminates asynchronous race conditions where in-flight telemetry queries evaluate against mismatched device types, permanently preventing transient "Not a Soil/Water Monitoring Device" error banners.
+- **Rejected-Admin Email Notification & Failure Isolation (`TASK-0208`, `DEC-AUTH-113`):**
+  - Owner rejection of pending Admin applicants captures recipient contact details (`email`, `name`, `languagePreference`) in memory prior to deleting the account record from `users`.
+  - Transactional deletion cleans up user rows, credentials, tokens, preferences, and sessions while preserving minimal immutable audit records in `audit_logs` (`ACCOUNT_REJECTED`).
+  - Following transaction commit, the server dispatches a bilingual notification email via Resend (`sendAdminRejectionNotificationEmail`) in a failure-isolated try/catch block. Delivery errors are logged without rolling back the completed deletion. Strictly decoupled from the agronomic alert system (`alerts` table) and `/notifications`.
+- **Shared Compact Numbered Pagination & Localization Parity (`TASK-0504`, `TASK-0814`):**
+  - Shared numbered pagination component (`CompactPagination.tsx`) adapted from 21st.dev and styled with Kebun Melon design tokens (`bg-primary`, `text-primary-foreground`, `rounded-lg`).
+  - Preserves unchanged server-side pagination (5 readings/page for soil/water telemetry; 10 commands/page for faucet history).
+  - Resolved runtime `MISSING_MESSAGE: history.paginationAriaLabel, locale en` defect in `ReadingHistoryTable.tsx`.
+  - Standardized ARIA accessibility labels across `common`, `history`, and `faucet` translation namespaces, enforcing strict `next-intl` call signatures without invalid `{ defaultValue: '...' }` object parameters.
+- **Numeric Chart Coordinates & Elapsed-Time Proportional Spacing (`TASK-0504`, `DEC-MON-093`):**
+  - Telemetry chart X-axis in `NPKChart.tsx` and `WaterNutrientChart.tsx` maps `recordedAt` timestamps to numeric epoch milliseconds (`timestampMs`, `type="number"`, `scale="time"`).
+  - Recharts calculates physical spacing proportionally based on true elapsed time between readings rather than ordinal indices.
+  - Enforces `minTickGap={25}` to prevent tick collision across all responsive viewport widths.
+  - Single-point and zero-spread datasets apply non-degenerate domain padding (±30m for intervals < 2h; ±12h for wider windows), ensuring single readings center cleanly rather than collapse.
+  - Renders time labels using runtime browser display timezone (`getDisplayTimezone()`, reading `Intl.DateTimeFormat().resolvedOptions().timeZone` with fallback `Asia/Jakarta`).
+- **Global Idle/Absolute Session Expiry & Multi-Tab Synchronization (`TASK-0215`):**
+  - Authoritative session deadlines (`idleTimeoutMs = 30m`, `absoluteLifetimeMs = 8h`) derived from server session metadata (`GET /api/v1/auth/session`).
+  - Physical user activity updates local activity timestamp and triggers throttled server touch (`touchLastSeen: true`, max once per 60s).
+  - Passive background requests (SSE streams, health checks, background polling) pass `x-background-check: "1"` header (`touchLastSeen: false`), isolating idle expiration from automated traffic.
+  - Client-side timer automatically revokes local session and redirects to `/login?reason=expired` upon timeout.
+  - Multi-tab synchronization: primary tab broadcasts `session_expired` via `localStorage`; secondary tabs validate payload authenticity (discarding stale events > 60s or mismatching sessions) and immediately redirect to login.
+- **Off-VPS Packaging & Rollback Procedure:**
+  - Off-VPS packaging script generates plain uncompressed `.tar` archives on Windows (`tar -cf`) to prevent gzip corruption.
+  - Pre-swap rollback baseline capture records active container image tag to `.prev_web_image` before deployment.
+
+### 2. Verification & Test Evidence
+- **Regression Test Suites:**
+  - `apps/web/test/unit/chart-xaxis-ticks-labels.test.tsx`: verifies numeric epoch coordinates, proportional elapsed time spacing, collision gap handling, and non-degenerate domains.
+  - `apps/web/test/unit/outage-detection.test.tsx`: validates telemetry outage detection and timing invariants.
+  - `apps/web/test/unit/resend-email.test.ts`: validates bilingual rejection email templates, canonical URL resolution, and HTML/text parity.
+  - `apps/web/test/unit/route.test.ts`: validates session metadata returned by `GET /api/v1/auth/session` and background header handling.
+- **Manual Website Acceptance:**
+  - User-performed interactive browser verification covering all five repaired items was reported PASSED on 2026-10-17 (`USER-REPORTED PASS on 2026-10-17`).
+  - *Factual Note:* Manual testing is recorded as user-reported and was not independently executed or measured by the agent.
+- **Automated Verification Gates (Pending):**
+  - Gate 1: `npm run check:quality` -> `PENDING USER EXECUTION`
+  - Gate 2: `npm run test` -> `PENDING USER EXECUTION`
+  - Gate 3: `npm run test:coverage` -> `PENDING USER EXECUTION`
+  - Gate 4: `npm run test:integration` -> `PENDING USER EXECUTION`
+  - Gate 5: `npm run test:e2e` -> `PENDING USER EXECUTION`
+- **Deployment Status:**
+  - VPS deployment of current repair batch -> `PENDING` (Release `8304c44` remains the currently deployed baseline on VPS staging).
 
 
 

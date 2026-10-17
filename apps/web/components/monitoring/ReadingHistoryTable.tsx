@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useCallback, useMemo, useState } from 'react';
-import { ArrowLeft, ArrowRight, MapPin, Pencil, RefreshCw, X } from 'lucide-react';
+import { MapPin, Pencil, RefreshCw, X } from 'lucide-react';
 import { useTranslations, useLocale } from 'next-intl';
 import { cn } from '@/lib/utils';
+import { CompactPagination } from '@/components/common/CompactPagination';
 
 /**
  * Shared measurement-history table used by both the soil and water-quality
@@ -52,6 +53,7 @@ export interface ReadingHistoryTableProps {
   totalItems: number;
   onNextPage: () => void;
   onPreviousPage: () => void;
+  onGoToPage?: (page: number) => void;
   onRefresh: () => void;
   /** Resolves the promise when the annotation has been persisted. */
   onSaveLocation: (readingId: string, locationName: string | null) => Promise<void>;
@@ -70,6 +72,7 @@ export function ReadingHistoryTable({
   totalItems,
   onNextPage,
   onPreviousPage,
+  onGoToPage,
   onRefresh,
   onSaveLocation,
 }: ReadingHistoryTableProps) {
@@ -334,31 +337,18 @@ export function ReadingHistoryTable({
         </p>
       ) : null}
 
-      <div className="flex flex-col items-center justify-between gap-2 border-t border-outline-variant/40 px-4 py-3 text-xs text-app-on-surface-variant sm:flex-row">
+      <div className="flex flex-col items-center justify-between gap-3 border-t border-outline-variant/40 px-4 py-3 text-xs text-app-on-surface-variant sm:flex-row">
         <span>
           {tHistory('pageOf', { page, total: Math.max(totalPages, 1) })} · {tHistory('rowsPerPage')}{' '}
           · {totalItems}
         </span>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={onPreviousPage}
-            disabled={page <= 1 || loading}
-            aria-label="Previous page"
-            className="inline-flex h-8 items-center gap-1 rounded-full border border-outline-variant px-3 font-medium transition-colors hover:bg-surface-container disabled:opacity-40"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            onClick={onNextPage}
-            disabled={page >= totalPages || loading}
-            aria-label="Next page"
-            className="inline-flex h-8 items-center gap-1 rounded-full border border-outline-variant px-3 font-medium transition-colors hover:bg-surface-container disabled:opacity-40"
-          >
-            <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-          </button>
-        </div>
+        <CompactPagination
+          currentPage={page}
+          totalPages={totalPages}
+          onPageChange={onGoToPage || ((p) => (p > page ? onNextPage() : onPreviousPage()))}
+          disabled={loading}
+          ariaLabel={tHistory('paginationAriaLabel')}
+        />
       </div>
     </div>
   );

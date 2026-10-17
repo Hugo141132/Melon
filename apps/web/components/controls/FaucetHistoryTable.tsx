@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { History, RefreshCw, ArrowLeft, ArrowRight, Droplets, Power, PowerOff } from 'lucide-react';
+import { History, RefreshCw, Droplets, Power, PowerOff } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 import { formatLitersDisplay } from './FaucetPresetSelector';
 import { useRealtimeMonitoring } from '@/hooks/use-realtime-monitoring';
+import { CompactPagination } from '@/components/common/CompactPagination';
 
 export interface FaucetHistoryItem {
   id: string;
@@ -487,97 +488,15 @@ export default function FaucetHistoryTable({
               total: pagination.totalItems,
             })}
           </span>
-          <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap justify-center">
-            <button
-              type="button"
-              disabled={pagination.page <= 1 || loading}
-              onClick={() => fetchHistory(pagination.page - 1)}
-              className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg border border-app-outline-variant/60 bg-app-surface-container-lowest text-app-on-surface hover:bg-app-surface-container/60 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center transition-colors shadow-xs"
-              aria-label="Previous page"
-              data-testid="btn-history-prev-page"
-            >
-              <ArrowLeft size={16} strokeWidth={1.75} />
-            </button>
-
-            {(() => {
-              const current = pagination.page;
-              const total = pagination.totalPages;
-              let items: Array<number | 'dot' | 'ellipsis'> = [];
-              if (total <= 7) {
-                items = Array.from({ length: total }, (_, i) => i + 1);
-              } else if (current <= 4) {
-                items = [1, 2, 3, 4, 'dot', 5, 6, 'ellipsis', total];
-              } else if (current >= total - 3) {
-                items = [
-                  1,
-                  'ellipsis',
-                  total - 5,
-                  total - 4,
-                  'dot',
-                  total - 3,
-                  total - 2,
-                  total - 1,
-                  total,
-                ];
-              } else {
-                items = [1, 'ellipsis', current - 1, current, current + 1, 'ellipsis', total];
-              }
-
-              return items.map((item, idx) => {
-                if (item === 'dot') {
-                  return (
-                    <span
-                      key={`dot-${idx}`}
-                      className="w-2.5 text-center text-app-outline-variant select-none font-bold text-sm"
-                    >
-                      ·
-                    </span>
-                  );
-                }
-                if (item === 'ellipsis') {
-                  return (
-                    <span
-                      key={`ellipsis-${idx}`}
-                      className="px-1 text-center text-app-outline-variant select-none font-bold tracking-widest text-xs"
-                    >
-                      ···
-                    </span>
-                  );
-                }
-
-                const isCurrent = item === current;
-                return (
-                  <button
-                    key={`page-${item}`}
-                    type="button"
-                    disabled={loading}
-                    onClick={() => fetchHistory(item)}
-                    className={cn(
-                      'w-9 h-9 sm:w-10 sm:h-10 rounded-lg text-[13px] flex items-center justify-center transition-colors',
-                      isCurrent
-                        ? 'border border-app-outline-variant/80 bg-app-surface-container-lowest text-app-on-surface font-semibold shadow-xs'
-                        : 'text-app-on-surface-variant hover:text-app-on-surface hover:bg-app-surface-container/60 font-medium'
-                    )}
-                    aria-label={`Page ${item}`}
-                    aria-current={isCurrent ? 'page' : undefined}
-                  >
-                    {item}
-                  </button>
-                );
-              });
-            })()}
-
-            <button
-              type="button"
-              disabled={pagination.page >= pagination.totalPages || loading}
-              onClick={() => fetchHistory(pagination.page + 1)}
-              className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg border border-app-outline-variant/60 bg-app-surface-container-lowest text-app-on-surface hover:bg-app-surface-container/60 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center transition-colors shadow-xs"
-              aria-label="Next page"
-              data-testid="btn-history-next-page"
-            >
-              <ArrowRight size={16} strokeWidth={1.75} />
-            </button>
-          </div>
+          <CompactPagination
+            currentPage={pagination.page}
+            totalPages={pagination.totalPages}
+            onPageChange={(p) => fetchHistory(p)}
+            disabled={loading}
+            ariaLabel={tFaucet('paginationAriaLabel')}
+            prevTestId="btn-history-prev-page"
+            nextTestId="btn-history-next-page"
+          />
         </div>
       )}
     </div>

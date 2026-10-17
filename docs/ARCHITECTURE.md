@@ -2546,6 +2546,33 @@ The root layout metadata (`apps/web/app/layout.tsx`) implements dual media-query
 - Updating upon tab activation is standard Chromium tab behavior. BAMABAA formally accepted tab-activation updates on 2026-10-04, closing background update investigations.
 <!-- Outage Detection & Adaptive Favicon Architecture Reconciled: 2026-10-04 -->
 
+## Session Lifecycle, Cross-Domain Device Routing & Rejection Architecture Note (Reconciled 2026-10-17 / TASK-0215 / TASK-0507 / TASK-0208 / TASK-0504)
+
+### 1. Global Idle and Absolute Session Expiry Architecture (`TASK-0215`)
+- **Authoritative Deadlines**: The client deadline scheduler in `AuthContext` computes timeout deadlines from server-confirmed session timestamps (`expiresAt` and `lastSeenAt`) returned by `GET /api/v1/auth/session`.
+- **Qualifying User Activity**: Physical interactions (`mousedown`, `keydown`, `touchstart`, `scroll`) are throttled to 30s. Qualifying activity updates the local deadline, broadcasts to other tabs via `localStorage` (`melon_session_activity`), and sends an active touch to the server (`touchLastSeen: true`), updating `lastSeenAt` in PostgreSQL with bounded overhead (max 2 GET/min, max 1 async DB write/min).
+- **Passive Traffic Isolation**: Passive requests—including native browser `EventSource` heartbeat checks (`verifyStreamSessionActive`) and background outage probes—pass `touchLastSeen: false`. Automated background polling never falsely extends idle session lifetime.
+- **Multi-Tab Security Invariants**: The `storage` event broadcast contains only non-secret identifiers (`sessionId` and timestamp). Receiving tabs strictly verify the active session ID, check that the timestamp is finite and within reasonable bounds (`mountTimestamp` to `now + 60s`), enforce absolute expiry, update local deadlines, and revalidate with the server (`validateSession(false, true)`).
+- **Automated Client Expiry**: When a deadline expires or SSE receives `session.expired`, `handleSessionExpired` stops rendering protected UI, purges session-scoped storage, broadcasts invalidation, dispatches `melon:unauthenticated`, attempts non-blocking server logout (`POST /api/v1/auth/logout`), and redirects cleanly to `/login?reason=expired`.
+
+### 2. Cross-Domain Device Routing Architecture (`TASK-0507` / `TASK-0813`)
+- **Domain Matching**: Device types map strictly to routes: `SOIL_NODE` (`/soil`), `WATER_QUALITY_NODE` (`/water`), and `WATER_TANK_NODE` (`/controls`).
+- **Delayed In-Memory Mutation**: When switching devices across different monitoring domains in `DeviceSelector.tsx`, synchronous in-memory mutation of `selectedDevice` is bypassed. The route navigation (`router.push`) executes immediately, allowing the outgoing page to finish unmounting with its existing valid device and preventing transient "Not a Soil/Water Monitoring Device" error banners.
+- **Target Route Synchronization**: Upon mounting, the destination route reads `?deviceId=...` and synchronizes `DeviceContext`. If no device is specified in the URL or the current device belongs to another domain, candidate selection priority 4 falls back to the first device matching the active route domain.
+
+### 3. Transactional Account Rejection & Notification Architecture (`TASK-0208`)
+- **Pre-Deletion Recipient Capture**: Applicant contact details (`email`, `fullName`, `preferredLocale`) are safely captured in memory before the account is deleted.
+- **Transactional Purge**: The target user and child records are deleted transactionally in `rejectPendingAdmin` while preserving an immutable `ACCOUNT_REJECTED` audit record.
+- **Post-Commit Failure Isolation**: The bilingual rejection email (`sendAdminRejectionEmail` via Resend) is dispatched post-commit via `notifyFn`. Email delivery failures are safely caught and isolated, ensuring they never roll back committed account deletion.
+- **Decoupled from Alerts**: Admin rejection events are strictly separated from agronomic sensor alerts (`alerts` table) and `/notifications`.
+
+### 4. Shared Compact Numbered Pagination Architecture (`TASK-0504` / `TASK-0814`)
+- **Shared Component**: `CompactPagination.tsx` provides compact `<` `>` chevron controls, numbered buttons, ellipsis `···`, focus rings, and `aria-current="page"`.
+- **Contract Preservation**: Preserves server-side pagination contracts (5 rows/page for soil/water telemetry history, 10 rows/page for valve command history).
+- **Accessibility & Internationalization**: Button aria-labels are fully localized via `next-intl` (`common.pagination`, `common.previousPage`, `common.nextPage`, `common.pageNumber`, `history.paginationAriaLabel`, `faucet.paginationAriaLabel`) without hardcoded English or global fallback suppression.
+<!-- Session, Device Routing & Rejection Architecture Reconciled: 2026-10-17 -->
+
+
 
 
 

@@ -259,7 +259,22 @@ export function DeviceProvider({
       } else if (urlCandidateId) {
         candidateId = urlCandidateId;
       } else if (onDeviceRoute && selectedDeviceRef.current) {
-        candidateId = selectedDeviceRef.current.id;
+        const currentPath =
+          typeof window !== 'undefined' ? window.location.pathname : pathname || '';
+        const isSoilRoute = currentPath === '/soil';
+        const isWaterRoute = currentPath === '/water';
+        const isControlsRoute = currentPath === '/controls';
+
+        // Check if existing in-memory device matches the current route's device domain:
+        const currentDev = selectedDeviceRef.current;
+        const matchesDomain =
+          (isSoilRoute && currentDev.deviceType === 'SOIL_NODE') ||
+          (isWaterRoute && currentDev.deviceType === 'WATER_QUALITY_NODE') ||
+          (isControlsRoute && currentDev.deviceType === 'WATER_TANK_NODE');
+
+        if (matchesDomain) {
+          candidateId = currentDev.id;
+        }
       }
 
       if (candidateId) {

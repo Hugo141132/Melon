@@ -40,7 +40,13 @@ export async function GET(request: Request) {
       );
     }
 
-    const sessionInfo = await validateSession(prisma, token);
+    const isBackgroundCheck =
+      request.headers.get('x-background-check') === '1' ||
+      request.headers.get('x-purpose') === 'preview';
+
+    const sessionInfo = await validateSession(prisma, token, {
+      touchLastSeen: !isBackgroundCheck,
+    });
 
     if (!sessionInfo) {
       const response = NextResponse.json(
@@ -80,6 +86,13 @@ export async function GET(request: Request) {
             role: primaryRole,
             accountStatus: sessionInfo.user.accountStatus,
             preferredLocale: 'id',
+          },
+          session: {
+            id: sessionInfo.session.id,
+            expiresAt: sessionInfo.session.expiresAt.toISOString(),
+            lastSeenAt: sessionInfo.session.lastSeenAt?.toISOString() ?? null,
+            idleTimeoutMs: 30 * 60 * 1000,
+            absoluteLifetimeMs: 8 * 60 * 60 * 1000,
           },
         },
         meta: { requestId },

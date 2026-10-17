@@ -136,6 +136,7 @@ export function MeasurementHistoryPanel({
         totalItems={pagination.meta.totalItems}
         onNextPage={pagination.nextPage}
         onPreviousPage={pagination.previousPage}
+        onGoToPage={pagination.goToPage}
         onRefresh={handleRefresh}
         onSaveLocation={handleSaveLocation}
       />

@@ -233,8 +233,10 @@ The following facts are verified in the traceability matrix regarding `TASK-0705
   - Stabilized `useAlertBadge` `refetch` callback using `useCallback` to prevent unnecessary re-render loops in consuming navigation components.
   - Hardened `Sidebar.tsx` with `wasOpenRef` edge-detection to trigger badge refetch strictly on the drawer opening transition (`!wasOpenRef.current && isOpen`), and passed `refetchAlertBadge(false)` to reuse cached badge counts within the 10-second TTL.
   - Isolated `/api/v1/alerts` rate limiter key prefix to `keyPrefix: 'alerts'`.
-  - Added regression test suites in `apps/web/test/unit/use-alert-badge.test.tsx` and `apps/web/test/unit/sidebar-navigation.test.tsx`. Manual acceptance is `USER-REPORTED COMPLETE (2026-10-16)`; automated pre-commit gates (`check:quality`, `test`, `test:coverage`, `test:integration`, `test:e2e`), new commit/push, CI run, and VPS deployment remain `PENDING USER EXECUTION`.
+  - Added regression test suites in `apps/web/test/unit/use-alert-badge.test.tsx` and `apps/web/test/unit/sidebar-navigation.test.tsx`.
+  - Release `8304c44` Closeout: Local pre-commit verification gates (`check:quality`, `test`, `test:coverage`, `test:integration`, `test:e2e`) and remote GitHub Actions CI passed. Deployed image `kebun-melon-web:8304c44` to Nebula VPS (`38.103.171.46`) operating under `APP_ENV=staging` at `APP_URL=https://monitoring.melonmadura.my.id` with `docker-compose.prod.yml` and rollback tag `rollback-before-8304c44` recorded during deployment (without asserting current availability was independently verified). Post-deployment smoke testing passed (`USER-REPORTED COMPLETE`).
 <!-- TASK-0705 Reconciled: 2026-10-16 -->
+
 
 
 ---
@@ -980,3 +982,37 @@ The following facts are verified in the traceability matrix regarding `TASK-REPA
 - **Deployment Status:**
   - Deployment: **PENDING**. Off-VPS image build for `linux/amd64`, precise image tag and SHA tracking, recreation of web service with `--no-deps web`, preservation of single-active IoT gateway constraint.
 <!-- TASK-REPAIR-20261016 Traceability Reconciled: 2026-10-16 -->
+
+---
+
+## Multi-Domain Five-Item Repair Batch Traceability Note (TASK-0208, TASK-0504, TASK-0507, TASK-0814, TASK-0215 / Reconciled 2026-10-17)
+
+The following facts are verified in the traceability matrix regarding the 2026-10-17 repair batch:
+- **Traceability Baseline:**
+  - Tasks: `TASK-0208`, `TASK-0504`, `TASK-0507`, `TASK-0814`, `TASK-0215` in `TASKS.md`.
+  - Architecture: `docs/ARCHITECTURE.md` §39.
+  - Security: `docs/SECURITY.md` §7.10, §9.2.1.
+  - API & Contracts: `docs/API.md` §10.4, §10.15.
+  - User Flows: `docs/USER_FLOWS.md` (Flows 7, 24, 53).
+  - UI/UX & I18N: `docs/UI_UX.md` §1.14, `docs/I18N.md` §3.9.
+  - Testing & Verification: `docs/TESTING.md` §35.14.
+  - Deployment & Runbooks: `docs/VPS_DEPLOYMENT_RUNBOOK.md` §1.
+  - Durable Governance: `AGENTS.md` §2 (`Multi-Domain Five-Item Repair Batch Invariants`).
+- **Implementation Status Across 5 Domains:**
+  1. *Device-Switch Synchronization* (`TASK-0507`, `TASK-0813`): `DeviceSelector.tsx` and `DeviceContext.tsx` inspect target device type and execute client router navigation to the corresponding dashboard domain (`/dashboard/soil`, `/dashboard/water`, `/dashboard/reservoir`) before telemetry components evaluate compatibility, permanently eliminating transient wrong-device banners.
+  2. *Rejected-Admin Email Notification* (`TASK-0208`, `DEC-AUTH-113`): Captured recipient details (`email`, `name`, `languagePreference`) in memory prior to deleting user row; post-commit bilingual rejection email dispatched via Resend (`sendAdminRejectionNotificationEmail`) with isolated error handling; minimal audit log preserved; decoupled from `/notifications` and `alerts`.
+  3. *Shared Compact Numbered Pagination & Localization* (`TASK-0504`, `TASK-0814`): 21st.dev numbered component (`CompactPagination.tsx`), accessible ARIA controls, unchanged 5/10 server pagination, resolution of `MISSING_MESSAGE: history.paginationAriaLabel` defect, and correct `next-intl` call convention.
+  4. *Numeric Chart Coordinates & Proportional Spacing* (`TASK-0504`, `DEC-MON-093`): Numeric epoch milliseconds (`timestampMs`, `scale="time"`), elapsed-time proportional spacing, `minTickGap={25}` collision avoidance, non-degenerate domain padding for single points, and browser display timezone formatting (`getDisplayTimezone()`).
+  5. *Global Session Expiry & Multi-Tab Synchronization* (`TASK-0215`): Authoritative server deadlines (30m idle, 8h absolute), throttled physical user activity server touch (`touchLastSeen: true`), passive SSE / health check isolation (`touchLastSeen: false`), automated client-side login redirect, and multi-tab broadcast via `localStorage` with replay/stale guards.
+  6. *Off-VPS Packaging & Rollback Procedure*: Plain `.tar` archive creation on Windows (`tar -cf`), `.prev_web_image` baseline tag capture.
+- **Verification Evidence:**
+  - Manual Acceptance Tests: **USER-REPORTED PASS (2026-10-17)** across all 5 areas.
+  - Regression Test Suites: Implemented across `apps/web/test/unit/` (`chart-xaxis-ticks-labels.test.tsx`, `outage-detection.test.tsx`, `resend-email.test.ts`, `route.test.ts`).
+  - Pre-Commit CI Quality Gates: **PENDING USER EXECUTION** (`check:quality`, `test`, `test:coverage`, `test:integration`, `test:e2e`).
+- **Deployment & Infrastructure Assessment:**
+  - Deployment Status: **PENDING**.
+  - Web Container Rollout: **REQUIRED** (Building off-VPS `kebun-melon-web` image and recreating web service with `--no-deps web`).
+  - IoT Gateway: **NOT REQUIRED** (Zero gateway changes, single-active gateway invariant preserved).
+  - Database Migrations: **NOT REQUIRED** (Zero schema migrations needed).
+  - Environment Variables & Reverse Proxy (Caddy): **NOT REQUIRED** (Zero configuration changes).
+<!-- TASK-0208-0504-0507-0814-0215 Traceability Reconciled: 2026-10-17 -->

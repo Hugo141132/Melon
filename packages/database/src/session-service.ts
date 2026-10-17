@@ -279,6 +279,10 @@ export interface ValidatedSession {
   user: PublicSafeUserDto;
 }
 
+export interface ValidateSessionOptions {
+  touchLastSeen?: boolean;
+}
+
 /**
  * Validates a session by its raw token.
  * Checks 30-minute idle timeout, 8-hour absolute lifetime, and revalidates that the user's
@@ -286,7 +290,8 @@ export interface ValidatedSession {
  */
 export async function validateSession(
   prisma: PrismaClient,
-  rawToken: string
+  rawToken: string,
+  options?: ValidateSessionOptions
 ): Promise<ValidatedSession | null> {
   if (!rawToken || typeof rawToken !== 'string') {
     return null;
@@ -348,9 +353,12 @@ export async function validateSession(
   }
 
   // Session is valid: update lastSeenAt only if beyond throttle threshold without blocking the request path
+  // Background health checks / idle watchers pass touchLastSeen: false so idle timeout is preserved
+  const allowTouch = options?.touchLastSeen !== false;
   const shouldUpdateLastSeen =
-    !session.lastSeenAt ||
-    now.getTime() - session.lastSeenAt.getTime() >= SESSION_LAST_SEEN_THROTTLE_MS;
+    allowTouch &&
+    (!session.lastSeenAt ||
+      now.getTime() - session.lastSeenAt.getTime() >= SESSION_LAST_SEEN_THROTTLE_MS);
 
   if (shouldUpdateLastSeen) {
     void prisma.session
@@ -484,7 +492,7 @@ export async function verifyStreamSessionActive(
   prisma: PrismaClient,
   rawToken: string
 ): Promise<boolean> {
-  const validated = await validateSession(prisma, rawToken);
+  const validated = await validateSession(prisma, rawToken, { touchLastSeen: false });
   return validated !== null;
 }
 

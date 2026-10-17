@@ -69,15 +69,28 @@ export function getCustomXTicks(
   locale: string = 'id',
   timeZone?: string
 ): {
-  ticks: string[];
-  formatTick: (value: string) => string;
+  ticks: number[];
+  formatTick: (value: number | string) => string;
 } {
   if (!data || data.length === 0) {
-    return { ticks: [], formatTick: (v: string) => v };
+    return { ticks: [], formatTick: (v: number | string) => String(v) };
   }
 
+  const getMs = (item: BaseSeriesItem): number => {
+    if (typeof item.timestampMs === 'number') return item.timestampMs;
+    const t = new Date(item.timestamp).getTime();
+    return isNaN(t) ? 0 : t;
+  };
+
   if (data.length <= 1) {
-    return { ticks: [data[0].time], formatTick: (v: string) => v };
+    const t0 = getMs(data[0]);
+    return {
+      ticks: [t0],
+      formatTick: (v: number | string) => {
+        const d = new Date(Number(v));
+        return isNaN(d.getTime()) ? String(v) : formatDayMonth(d, locale, timeZone);
+      },
+    };
   }
 
   const tz =
@@ -87,14 +100,14 @@ export function getCustomXTicks(
       : 'Asia/Jakarta') ||
     'Asia/Jakarta';
 
-  const firstTime = new Date(data[0].timestamp).getTime();
-  const lastTime = new Date(data[data.length - 1].timestamp).getTime();
+  const firstTime = getMs(data[0]);
+  const lastTime = getMs(data[data.length - 1]);
   const spanHours = (lastTime - firstTime) / (1000 * 60 * 60);
 
   const is24h = preset === '24h' || (spanHours > 0 && spanHours <= 24);
   const is7d = preset === '7d' || (spanHours > 24 && spanHours <= 8 * 24);
 
-  const tickLabels = new Map<string, string>();
+  const tickLabels = new Map<number, string>();
   const timeFormatter = new Intl.DateTimeFormat('id-ID', {
     hour: '2-digit',
     minute: '2-digit',
@@ -112,17 +125,22 @@ export function getCustomXTicks(
     // 24 Hours: show ~5-8 evenly-spaced readable time labels without displaying every single point
     if (data.length <= 8) {
       for (const d of data) {
-        const itemDate = new Date(d.timestamp);
-        tickLabels.set(d.time, timeFormatter.format(itemDate).replace(/\./g, ':'));
+        const ms = getMs(d);
+        tickLabels.set(ms, timeFormatter.format(new Date(ms)).replace(/\./g, ':'));
       }
       return {
-        ticks: data.map((d) => d.time),
-        formatTick: (v: string) => tickLabels.get(v) || v,
+        ticks: data.map(getMs),
+        formatTick: (v: number | string) => {
+          const num = Number(v);
+          if (tickLabels.has(num)) return tickLabels.get(num)!;
+          const d = new Date(num);
+          return isNaN(d.getTime()) ? String(v) : timeFormatter.format(d).replace(/\./g, ':');
+        },
       };
     }
 
     const targetCount = 6;
-    const selectedTicks: string[] = [];
+    const selectedTicks: number[] = [];
     const chosenIndices = new Set<number>();
 
     for (let k = 0; k < targetCount; k++) {
@@ -132,14 +150,19 @@ export function getCustomXTicks(
 
     for (const idx of Array.from(chosenIndices).sort((a, b) => a - b)) {
       const item = data[idx];
-      selectedTicks.push(item.time);
-      const itemDate = new Date(item.timestamp);
-      tickLabels.set(item.time, timeFormatter.format(itemDate).replace(/\./g, ':'));
+      const ms = getMs(item);
+      selectedTicks.push(ms);
+      tickLabels.set(ms, timeFormatter.format(new Date(ms)).replace(/\./g, ':'));
     }
 
     return {
       ticks: selectedTicks,
-      formatTick: (v: string) => tickLabels.get(v) || v,
+      formatTick: (v: number | string) => {
+        const num = Number(v);
+        if (tickLabels.has(num)) return tickLabels.get(num)!;
+        const d = new Date(num);
+        return isNaN(d.getTime()) ? String(v) : timeFormatter.format(d).replace(/\./g, ':');
+      },
     };
   }
 
@@ -147,7 +170,8 @@ export function getCustomXTicks(
     // 7 Days: group by calendar date, display 4-5 evenly distributed labels preventing overlap
     const dayGroups = new Map<string, BaseSeriesItem>();
     for (const item of data) {
-      const d = new Date(item.timestamp);
+      const ms = getMs(item);
+      const d = new Date(ms);
       const dateKey = dayKeyFormatter.format(d);
       if (!dayGroups.has(dateKey)) {
         dayGroups.set(dateKey, item);
@@ -156,18 +180,24 @@ export function getCustomXTicks(
 
     const distinctDays = Array.from(dayGroups.values());
     if (distinctDays.length <= 4) {
-      const ticks = distinctDays.map((d) => d.time);
+      const ticks = distinctDays.map(getMs);
       for (const d of distinctDays) {
-        tickLabels.set(d.time, formatDayMonth(new Date(d.timestamp), locale, timeZone));
+        const ms = getMs(d);
+        tickLabels.set(ms, formatDayMonth(new Date(ms), locale, tz));
       }
       return {
         ticks,
-        formatTick: (v: string) => tickLabels.get(v) || v,
+        formatTick: (v: number | string) => {
+          const num = Number(v);
+          if (tickLabels.has(num)) return tickLabels.get(num)!;
+          const d = new Date(num);
+          return isNaN(d.getTime()) ? String(v) : formatDayMonth(d, locale, tz);
+        },
       };
     }
 
     const targetCount = Math.min(5, distinctDays.length);
-    const selectedTicks: string[] = [];
+    const selectedTicks: number[] = [];
     const chosenIndices = new Set<number>();
 
     for (let k = 0; k < targetCount; k++) {
@@ -177,16 +207,18 @@ export function getCustomXTicks(
 
     for (const idx of Array.from(chosenIndices).sort((a, b) => a - b)) {
       const item = distinctDays[idx];
-      selectedTicks.push(item.time);
-      tickLabels.set(item.time, formatDayMonth(new Date(item.timestamp), locale, tz));
+      const ms = getMs(item);
+      selectedTicks.push(ms);
+      tickLabels.set(ms, formatDayMonth(new Date(ms), locale, tz));
     }
 
     return {
       ticks: selectedTicks,
-      formatTick: (v: string) => {
-        if (tickLabels.has(v)) return tickLabels.get(v)!;
-        const parts = v.replace(/,/g, '').replace(/\./g, '').split(' ');
-        return parts.length >= 2 ? `${parts[0]} ${parts[1]}` : v;
+      formatTick: (v: number | string) => {
+        const num = Number(v);
+        if (tickLabels.has(num)) return tickLabels.get(num)!;
+        const d = new Date(num);
+        return isNaN(d.getTime()) ? String(v) : formatDayMonth(d, locale, tz);
       },
     };
   }
@@ -194,7 +226,8 @@ export function getCustomXTicks(
   // 30 Days: group by calendar day, display 5-7 evenly distributed date labels
   const dayGroups = new Map<string, BaseSeriesItem>();
   for (const item of data) {
-    const d = new Date(item.timestamp);
+    const ms = getMs(item);
+    const d = new Date(ms);
     const dateKey = dayKeyFormatter.format(d);
     if (!dayGroups.has(dateKey)) {
       dayGroups.set(dateKey, item);
@@ -203,18 +236,24 @@ export function getCustomXTicks(
 
   const distinctDays = Array.from(dayGroups.values());
   if (distinctDays.length <= 6) {
-    const ticks = distinctDays.map((d) => d.time);
+    const ticks = distinctDays.map(getMs);
     for (const d of distinctDays) {
-      tickLabels.set(d.time, formatDayMonth(new Date(d.timestamp), locale, tz));
+      const ms = getMs(d);
+      tickLabels.set(ms, formatDayMonth(new Date(ms), locale, tz));
     }
     return {
       ticks,
-      formatTick: (v: string) => tickLabels.get(v) || v,
+      formatTick: (v: number | string) => {
+        const num = Number(v);
+        if (tickLabels.has(num)) return tickLabels.get(num)!;
+        const d = new Date(num);
+        return isNaN(d.getTime()) ? String(v) : formatDayMonth(d, locale, tz);
+      },
     };
   }
 
   const targetCount = 6;
-  const selectedTicks: string[] = [];
+  const selectedTicks: number[] = [];
   const chosenIndices = new Set<number>();
 
   for (let k = 0; k < targetCount; k++) {
@@ -224,16 +263,18 @@ export function getCustomXTicks(
 
   for (const idx of Array.from(chosenIndices).sort((a, b) => a - b)) {
     const item = distinctDays[idx];
-    selectedTicks.push(item.time);
-    tickLabels.set(item.time, formatDayMonth(new Date(item.timestamp), locale, tz));
+    const ms = getMs(item);
+    selectedTicks.push(ms);
+    tickLabels.set(ms, formatDayMonth(new Date(ms), locale, tz));
   }
 
   return {
     ticks: selectedTicks,
-    formatTick: (v: string) => {
-      if (tickLabels.has(v)) return tickLabels.get(v)!;
-      const parts = v.replace(/,/g, '').replace(/\./g, '').split(' ');
-      return parts.length >= 2 ? `${parts[0]} ${parts[1]}` : v;
+    formatTick: (v: number | string) => {
+      const num = Number(v);
+      if (tickLabels.has(num)) return tickLabels.get(num)!;
+      const d = new Date(num);
+      return isNaN(d.getTime()) ? String(v) : formatDayMonth(d, locale, tz);
     },
   };
 }
@@ -305,9 +346,33 @@ export default function NPKChart({
     return getCustomXTicks(data, preset, locale);
   }, [data, preset, locale]);
 
+  const timeDomain = useMemo<[number, number] | ['dataMin', 'dataMax']>(() => {
+    if (!data || data.length === 0) return ['dataMin', 'dataMax'];
+    const getMs = (item: BaseSeriesItem): number =>
+      typeof item.timestampMs === 'number' ? item.timestampMs : new Date(item.timestamp).getTime();
+    const tFirst = getMs(data[0]);
+    const tLast = getMs(data[data.length - 1]);
+    if (tFirst === tLast && !isNaN(tFirst)) {
+      // Single-point or equal-timestamp dataset: add +/- 1 hour padding so domain is non-degenerate
+      return [tFirst - 3600000, tLast + 3600000];
+    }
+    return ['dataMin', 'dataMax'];
+  }, [data]);
+
   const cleanLabelFormatter = (label: any, payload: any[]) => {
-    if (payload && payload.length > 0 && payload[0]?.payload?.timestamp) {
-      return formatTooltipDateTime(payload[0].payload.timestamp, preset, locale);
+    if (
+      payload &&
+      payload.length > 0 &&
+      (payload[0]?.payload?.timestamp || payload[0]?.payload?.timestampMs)
+    ) {
+      return formatTooltipDateTime(
+        payload[0].payload.timestamp || payload[0].payload.timestampMs,
+        preset,
+        locale
+      );
+    }
+    if (typeof label === 'number') {
+      return formatTooltipDateTime(label, preset, locale);
     }
     return typeof label === 'string' ? label.replace(/,/g, '').replace(/\./g, '').trim() : label;
   };
@@ -372,10 +437,14 @@ export default function NPKChart({
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#eeeeee" vertical={false} />
                 <XAxis
-                  dataKey="time"
+                  dataKey="timestampMs"
+                  type="number"
+                  scale="time"
+                  domain={timeDomain}
                   ticks={ticks.length > 0 ? ticks : undefined}
                   tickFormatter={formatTick}
-                  interval={0}
+                  interval="preserveStartEnd"
+                  minTickGap={25}
                   tick={{ fontSize: 11, fill: '#40493d' }}
                   padding={{ left: 16, right: 16 }}
                   axisLine={false}
@@ -413,10 +482,14 @@ export default function NPKChart({
               <LineChart data={data} margin={{ top: 8, right: 14, left: -14, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#eeeeee" vertical={false} />
                 <XAxis
-                  dataKey="time"
+                  dataKey="timestampMs"
+                  type="number"
+                  scale="time"
+                  domain={timeDomain}
                   ticks={ticks.length > 0 ? ticks : undefined}
                   tickFormatter={formatTick}
-                  interval={0}
+                  interval="preserveStartEnd"
+                  minTickGap={25}
                   tick={{ fontSize: 11, fill: '#40493d' }}
                   padding={{ left: 16, right: 16 }}
                   axisLine={false}

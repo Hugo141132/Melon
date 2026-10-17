@@ -144,7 +144,7 @@ export function parseLocalDateNextDayStart(dateStr: string): Date {
  * Preserves exact timestamps, values, nulls, and zeroes without hourly
  * bucketing or synthetic aggregation.
  */
-function mapReadingsToSeries(data: any[], isMultiDay: boolean): BaseSeriesItem[] {
+export function mapReadingsToSeries(data: any[], isMultiDay: boolean): BaseSeriesItem[] {
   const tz = getDisplayTimezone();
   const timeFormatter = new Intl.DateTimeFormat('id-ID', {
     hour: '2-digit',
@@ -175,6 +175,7 @@ function mapReadingsToSeries(data: any[], isMultiDay: boolean): BaseSeriesItem[]
     return {
       readingId: item.readingId || item.id,
       timestamp: itemDate.toISOString(),
+      timestampMs: itemDate.getTime(),
       time: timeStr,
       nitrogen: n,
       phosphorus: p,

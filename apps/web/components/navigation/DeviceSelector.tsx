@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useTranslations } from 'next-intl';
 import { useDeviceContext, AuthorisedDevice } from '@/context/DeviceContext';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { ChevronDown, Search, Check, AlertTriangle, Cpu, RefreshCw, X } from 'lucide-react';
 import {
   cn,
@@ -19,6 +19,7 @@ export interface DeviceSelectorProps {
 
 export default function DeviceSelector({ className }: DeviceSelectorProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const tDevices = useTranslations('devices');
   const tCommon = useTranslations('common');
   const tAccessibility = useTranslations('accessibility');
@@ -92,15 +93,32 @@ export default function DeviceSelector({ className }: DeviceSelectorProps) {
   // Handle item selection
   const handleSelect = (device: AuthorisedDevice) => {
     const activeId = device.id;
-    selectDevice(activeId);
     setIsOpen(false);
     setSearchQuery('');
+
+    let targetPath = '/soil';
+    let isCurrentDomain = false;
+
     if (device.deviceType === 'SOIL_NODE') {
-      router.push(`/soil?deviceId=${activeId}`);
+      targetPath = '/soil';
+      isCurrentDomain = pathname === '/soil';
     } else if (device.deviceType === 'WATER_QUALITY_NODE') {
-      router.push(`/water?deviceId=${activeId}`);
+      targetPath = '/water';
+      isCurrentDomain = pathname === '/water';
     } else if (device.deviceType === 'WATER_TANK_NODE') {
-      router.push(`/controls?deviceId=${activeId}`);
+      targetPath = '/controls';
+      isCurrentDomain = pathname === '/controls';
+    }
+
+    if (isCurrentDomain) {
+      // Same domain: mutate selection in-place immediately for instant responsiveness
+      selectDevice(activeId);
+      router.push(`${targetPath}?deviceId=${activeId}`);
+    } else {
+      // Cross-domain switch: DO NOT mutate in-memory selectedDevice before route navigation completes
+      // to avoid transient "Not a Soil/Water Monitoring Device" banner flash on outgoing page.
+      // The target route reads ?deviceId=... upon mounting and synchronizes seamlessly.
+      router.push(`${targetPath}?deviceId=${activeId}`);
     }
   };
 

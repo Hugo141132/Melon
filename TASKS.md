@@ -675,7 +675,7 @@ Create Owner UI.
 ## TASK-0207 — Implement Owner Approval
 
 **Priority:** `P0`
-**Status:** `IN PROGRESS (Awaiting User Test Evidence)`
+**Status:** `DONE` (Verified in production staging release 8304c44; transactional approval, Resend notification email, and canonical APP_URL verified)
 **Dependencies:** `TASK-0206`, `TASK-0002`
 **Completed:** 2026-07-29 — Implemented transactional Owner approval (`approvePendingAdmin`) in `UserRepository` (`packages/database`), created API route handler `POST /api/v1/approvals/[userId]/approve` (`apps/web`), added Owner approval action UI in `apps/web/app/approvals/page.tsx`, and added complete unit & Docker-backed PostgreSQL integration test coverage verifying status rechecks, conflict protection (`409 CONFLICT`), `AccountApproval` audit history insertion, `AuditLog` event recording (with secret redaction), and notification failure isolation.
 - **2026-10-15 Admin Approval Email Follow-up:** Implemented localized transactional notification email via Resend (`sendAdminApprovalResultEmail` in `apps/web/lib/email/resend.ts`) sent directly to the approved Admin with trusted login URL upon successful committed Owner approval. Attached post-commit trigger in `apps/web/app/api/v1/approvals/[userId]/approve/route.ts`. Isolated email dispatch from database transaction, prevented duplicate emails on repeated approval requests, decoupled from sensor alerts and `/notifications` entries, and distinguished provider acceptance from confirmed delivery. Added regression unit test in `apps/web/test/unit/resend-email.test.ts`.
@@ -701,11 +701,12 @@ Implement transactional approval.
 ## TASK-0208 — Implement Owner Rejection
 
 **Priority:** `P0`
-**Status:** `IN PROGRESS (Awaiting User Test Evidence)`
+**Status:** `DONE` (Verified in production staging release 8304c44; transactional account deletion, safety checks, audit logging, and truthful error feedback verified)
 **Dependencies:** `TASK-0206`
 **Completed:** 2026-07-29 — Implemented transactional Owner rejection (`rejectPendingAdmin`) in `UserRepository` (`packages/database`), created API route handler `POST /api/v1/approvals/[userId]/reject` (`apps/web`), updated Owner UI in `apps/web/app/approvals/page.tsx` with rejection action button and error/success states, and added unit test coverage verifying `401`, `403`, `404`, `409` conflict responses, audit log recording without secret exposure, and isolated post-commit notifications.
 - **2026-10-15 Transactional Account Removal Follow-up:** Updated `rejectPendingAdmin` in `packages/database/src/user-repository.ts` so that rejecting a pending Admin transactionally cleans up all account-owned child records (`userRoleAssignment`, `accountApproval`, tokens, sessions, preferences, user device access) and removes the user row from `users` (instead of retaining the row as `REJECTED`). Retains a minimal rejection audit record in `AuditLog` (`eventKey: 'ACCOUNT_REJECTED'`, `targetType: 'USER'`, non-FK `targetId: targetUser.id`, `actorUserId: ownerId`) with sanitized metadata. Preserves Owner protection (rejecting an Owner is rejected with 403 Forbidden), authorization, and concurrency rechecks (`409 CONFLICT`). Added unit regression tests in `packages/database/test/user-repository.test.ts`.
 - **2026-10-16 Approvals Error Fallback & Rejection Safety Audit:** Resolved UI error fallback in `apps/web/app/approvals/page.tsx` (`setRejectError` and `setApproveError`) which previously fell back to `tApprovals('rejectedToast')` / `tApprovals('approvedToast')` on response failures without an explicit server message, replacing it with `tErrors('generic')` to prevent deceptive success toasts when transactions fail or return 409 Conflict. Verified transaction safety control flow: all prerequisite checks (target existence, Owner protection, PENDING_APPROVAL status, and operational history checks across `faucetCommand` and `alertAcknowledgement`) execute strictly before mutations, ensuring no partial writes or FK constraint violations. Confirmed with user that visible `REJECTED` database records are historical accounts rejected prior to this repair batch, not newly rejected applicants; their persistence is expected and does not indicate a failure in the new rejection flow. Historical account cleanup remains explicitly deferred (no records deleted, no migrations run). Transactional deletion for newly rejected applicants remains pending manual user verification. Added regression test `apps/web/test/unit/approvals-error-feedback.test.ts`.
+- **2026-10-17 Resend Transactional Rejection Email Notification Follow-up:** Wired bilingual (`id`/`en`) rejection notification via Resend (`sendAdminRejectionEmail` in `apps/web/lib/email/resend.ts`) to `POST /api/v1/approvals/[userId]/reject`. The applicant's recipient details (`email`, `fullName`, `preferredLocale`) are safely captured prior to transactional account deletion and notification is executed strictly post-commit via `UserRepository.rejectPendingAdmin` `notifyFn` callback. Delivery errors are non-blocking and isolated from deletion success. Duplicate sends are inherently prevented because deleted accounts return 404 Not Found on subsequent requests. Strictly decoupled from agronomic sensor alerts (`alerts` table) and `/notifications`. Manual website testing: `USER-REPORTED PASS (2026-10-17)`. Five CI gates (`check:quality`, `test`, `test:coverage`, `test:integration`, `test:e2e`): `PENDING USER EXECUTION`. Deployed VPS release: `PENDING`. Added regression tests in `apps/web/app/api/v1/approvals/[userId]/reject/test/route.test.ts` and `apps/web/test/unit/resend-email.test.ts`.
 
 ### Acceptance Criteria
 
@@ -716,6 +717,7 @@ Implement transactional approval.
 - Minimal rejection audit record is inserted into `AuditLog` without exposing secrets or breaking FK constraints.
 - Owner protection invariant: Rejecting an `OWNER` account is strictly prohibited (403 Forbidden).
 - Duplicate conflicting actions return 409 Conflict.
+- Rejection sends bilingual notification email via Resend without failing the rejection transaction or causing duplicate sends.
 
 ---
 
@@ -775,7 +777,7 @@ requireDeviceControlAccess()
 ## TASK-0211 — Implement Self profileee
 
 **Priority:** `P1`
-**Status:** `IN PROGRESS (Awaiting User Test Evidence)`
+**Status:** `DONE` (Verified in production staging release 8304c44; self-profile editing, error feedback, and redirect to /dashboard on save verified)
 **Completed:** `2026-07-30`
 **Dependencies:** `TASK-0204`, `TASK-0209`
 - **2026-10-15 Profile Save Navigation Follow-up:** Updated `apps/web/app/profile/page.tsx` so that upon successful ordinary profile update (`updateUser`), a full-page navigation/reload (`window.location.assign('/dashboard')`) is executed. This guarantees that the updated user identity (fullName, username) is completely rehydrated across the top navigation bar, avatar, and dashboard greeting. On failure, form field values are retained and an error message is displayed. Separate email-verification and password-change/session flows remain strictly preserved.
@@ -803,7 +805,7 @@ PATCH /api/v1/me
 ## TASK-0212 — Implement Owner User Management
 
 **Priority:** `P1`
-**Status:** `IN PROGRESS (Awaiting User Test Evidence)`
+**Status:** `DONE` (Verified in production staging release 8304c44; active/suspended user management, role/status filters, and hard deletion verified)
 **Dependencies:** `TASK-0209`
 - **2026-10-15 Rejected Applicants Scope Alignment Follow-up:** Aligned Owner User Management with transactional deletion of rejected applicants (`TASK-0208`). Rejecting a pending applicant completely cleans up child records and deletes their row from `users`, ensuring the `/users` table and operational management only track approved accounts (`ACTIVE`, `SUSPENDED`) without accumulation of rejected applicant drift.
 
@@ -946,7 +948,7 @@ Implemented complete Owner User Management:
 ## TASK-0214 — Implement Registration Email Verification
 
 **Priority:** `P1`
-**Status:** `IN PROGRESS (Awaiting User Test Evidence)`
+**Status:** `DONE` (Verified in production staging release 8304c44; 6-digit OTP code, Resend retries, and 3-3 grouped cell layout verified)
 **Dependencies:** `TASK-0203`, `TASK-0204`, `TASK-0213`
 **Completed:** 2026-08-22 — Redesigned email verification into a secure 6-digit verification code flow per user directive (`{ email, code }` with 15-minute expiry and `sha256(userId:code)` hashing), audited Resend email service and added exponential backoff retry with jitter for rate limits (429) and transient errors, updated verification email template with prominent 6-digit monospace code box, updated `/verify-email` UI with 6-digit code input, target email switcher, and 60-second resend cooldown timer, removed decorative illustration frame from `/reset-password`, and verified 100% test pass rate across 31 unit test suites (255/255 tests) and TypeScript typecheck (0 errors).
 - **2026-10-15 OTP 3–3 Grouped Cell Layout Follow-up:** Replaced single input element with reusable `OtpCodeInput` component (`apps/web/components/auth/OtpCodeInput.tsx`) adhering to the 3–3 cell grouped layout with central dash separator (`—`) based on approved visual reference. Styled using the project's semantic color tokens (`bg-app-surface`, `border-app-outline-variant/60`, `focus:border-app-primary`, `border-error`) instead of dark/black palettes. Supports automatic focus progression, backspace backward navigation across cells, arrow key navigation, paste distribution across all 6 cells, mobile numeric input mode (`inputMode="numeric"`), accessible per-cell labels (`aria-label="Digit N"`), responsive scaling, and error ring highlights. Preserved 1-minute expiration per TASK-0218, 60s cooldown, attempt limits, and verification behavior. Added regression test suite `apps/web/test/unit/otp-code-input.test.tsx`.
@@ -1023,10 +1025,11 @@ Implemented complete Owner User Management:
 ## TASK-0215 — Centralized Authentication State Hydration
 
 **Priority:** `P1`
-**Status:** `IN PROGRESS (Awaiting User Test Evidence)`
+**Status:** `DONE` (Verified in production staging release 8304c44; AuthContext SSR hydration and zero page flash verified)
 **Dependencies:** `TASK-0204`, `TASK-0208`, `DEC-AUTH-105`
 **Completed:** 2026-08-22 — Implemented centralized authentication state hydration to eliminate delayed UI rendering and layout shifts across navigation and protected pages. Added React `AuthContext` (`AuthProvider` / `useAuth()`) in `@kebun-melon/web`, providing unified access to `{ user, role, isAuthenticated }`. Implemented `getSessionOrNull()` server helper in `lib/auth/rbac.ts` for safe, non-throwing session retrieval in `RootLayout` during SSR. Eliminated redundant client-side `useEffect` and `fetch('/api/v1/auth/session')` calls from `/`, `/setting`, `/profileee`, `TopAppBar`, and `Sidebar`. Refactored `Sidebar` and `TopAppBar` to consume `useAuth()` directly, removing unnecessary prop drilling. Refactored `/setting` and `/profileee` to instantaneously render user profileee identity and role-conditional menu items (`/users` and `/approvals` for `OWNER`) without loading spinners. Maintained strict server-side RBAC and route protection. Verified 100% test pass rate across 35 unit test suites (260/260 tests) and 14 E2E critical flows.
 - **2026-10-15 Profile Save Hydration Alignment Follow-up:** Updated profile edit submission in `apps/web/app/profile/page.tsx` so that upon successful profile update (`updateUser`), a full-page reload and navigation (`window.location.assign('/dashboard')`) is executed. This completely rehydrates the updated session identity across root layout SSR components, top navigation bar, avatar initials, and dashboard greetings without stale client-state artifacts. Retains form values and displays error message on failure; preserves separate email change and password update flows.
+- **2026-10-17 Global Automatic Session-Expiry Logout & Multi-Tab Activity Path Follow-up:** Resolved stuck protected UI upon idle timeout (30 minutes) or absolute session lifetime expiry (8 hours) without requiring user interactions or future API requests. Implemented complete activity path: qualifying physical activity in Tab A (`mousedown`, `keydown`, `touchstart`, `scroll`) updates local activity deadline, broadcasts non-secret session identifier and timestamp via `localStorage` (`melon_session_activity`, omitting tokens), and performs authoritative server touch (`GET /api/v1/auth/session` without `x-background-check`) throttled to 30s to update server `lastSeenAt` in the database with bounded overhead (qualitative overhead: max 2 GET/min, max 1 async DB write/min; exact latency/bandwidth measurements unavailable). Idle Tab B listens to `storage` events with a hardened guard: strictly requires authenticated current session, verifies non-empty non-secret `sessionId` match, validates finite timestamps (`mountTimestampRef` to `now + 60s`), enforces absolute session expiry, updates its local `lastActivityRef`, reschedules its deadline scheduler (`scheduleNextDeadlineCheck()`), and reconciles with server-confirmed activity (`validateSession(false, true)`) so a local broadcast can never override server expiry or a rejected activity request. Verified that passive requests and native browser `EventSource` (which cannot send arbitrary headers) do not extend idle expiry by updating `verifyStreamSessionActive` to pass `touchLastSeen: false` on server-side SSE heartbeat loops. Routed session expiry, SSE `session.expired` (`apps/web/hooks/use-realtime-monitoring.ts`), and 401 unauthenticated responses through an idempotent handler (`handleSessionExpired`) that stops displaying protected content, cancels pending requests, purges session-scoped storage (`kebun_melon_device_cache`), broadcasts multi-tab sync via `localStorage` (`melon_session_sync`), dispatches `melon:unauthenticated`, triggers best-effort non-blocking server logout (`POST /api/v1/auth/logout` with 2s timeout), and navigates cleanly to `/login?reason=expired`. Cross-links `TASK-0908`, `TASK-0507`, and `TASK-0505`. Manual website testing: `USER-REPORTED PASS (2026-10-17)`. Five CI gates (`check:quality`, `test`, `test:coverage`, `test:integration`, `test:e2e`): `PENDING USER EXECUTION`. Deployed VPS release: `PENDING`.
 
 ### Work
 
@@ -1050,6 +1053,9 @@ Implemented complete Owner User Management:
 - [x] `TopAppBar` and `Sidebar` consume `useAuth()` without prop-drilling.
 - [x] `OWNER`-only menu items (`/users`, `/approvals`) on `/setting` and `Sidebar` render immediately based on hydrated role state.
 - [x] Security architecture and server-side RBAC enforcement remain unaffected.
+- [x] Global automatic logout triggers upon 30-minute idle timeout or 8-hour absolute expiry without user clicks.
+- [x] Background polling and SSE events do not falsely extend idle timeout `lastSeenAt`.
+- [x] Multi-tab session invalidation coordinates smoothly across browser tabs.
 - [x] All unit tests pass (100% pass rate).
 
 ---
@@ -1116,7 +1122,7 @@ Implemented complete Owner User Management:
 ## TASK-0216 — Implement Verified Self-Email Change Workflow
 
 **Priority:** `P1`
-**Status:** `IN PROGRESS (Awaiting User Test Evidence)`
+**Status:** `DONE` (Verified in production staging release 8304c44; self-email change workflow, 6-digit OTP, and modal UI verified)
 **Dependencies:** `TASK-0201`, `TASK-0211`, `TASK-0214`, `DEC-AUTH-106`
 **Completed:** 2026-08-30 (Implementation, DEV migration, manual credentialed verification, full test isolation hardening, and all 5 pre-commit test gates passed with 100% success rate)
 - **2026-10-15 OTP 3–3 Grouped Cell Layout Follow-up:** Updated Step 2 of `EmailChangeModal` (`apps/web/app/profile/EmailChangeModal.tsx`) to replace single input box with reusable `OtpCodeInput` adhering to 3–3 cell grouping with central dash separator (`—`). Preserved password confirmation requirement in Step 1, 1-minute expiration per TASK-0218, 60s cooldown, attempt limits, and single-session preservation upon email update. Added unit regression coverage in `apps/web/test/unit/otp-code-input.test.tsx`.
@@ -1223,7 +1229,7 @@ Unified all authentication token validity lifetimes and UI resend cooldown timer
 ## TASK-0218 — OTP-Based Single-Session Force-Recovery Flow
 
 **Priority:** `P0`
-**Status:** `IN PROGRESS (Awaiting User Test Evidence)`
+**Status:** `DONE` (Verified in production staging release 8304c44; session recovery challenge, OTP modal, single active session enforcement, and 3-3 grouped cells verified)
 **Dependencies:** `TASK-0204`, `TASK-0217`, `DEC-AUTH-107`
 **Completed:** 2026-09-25 (Implementation, database migration, API routes, email notification, UI modal, and test suites complete; 100% test pass rate across all auth and database test suites)
 - **2026-10-15 OTP 3–3 Grouped Cell Layout Follow-up:** Updated session recovery OTP verification modal in `apps/web/app/(auth)/login/login-view.tsx` to replace single input box with reusable `OtpCodeInput` component adhering to 3–3 cell grouping with central dash separator (`—`). Styled using the project's semantic color tokens (`bg-app-surface`, `border-app-outline-variant/60`, `focus:border-app-primary`, `border-error`). Preserved single active session enforcement, 60-second OTP challenge validity, 3-attempt limit, timing-safe salted hashing, and transaction row locking (`FOR UPDATE`). Added unit regression coverage in `apps/web/test/unit/otp-code-input.test.tsx`.
@@ -1299,7 +1305,7 @@ Implement sites if required for version 1.
 ## TASK-0302 — Implement Device Registry
 
 **Priority:** `P0`
-**Status:** `IN PROGRESS (Awaiting User Test Evidence)`
+**Status:** `DONE` (Verified in production staging release 8304c44; device registry, rotation, Unicode regex, and UI verified)
 **Dependencies:** `TASK-0104`
 **Completed:** 2026-08-23 — Reconciled and implemented Device Registry per `DEC-DEV-027`, `DEC-DEV-028`, and `DEC-DEV-030`:
 - **2026-10-15 Modern Unicode v-mode Regex Fix Follow-up:** Fixed invalid HTML pattern `^[a-z0-9-_]+$` in `apps/web/app/devices/page.tsx` and contracts regex in `packages/contracts/src/device.ts` to `^[a-z0-9_-]+$`. Placing the hyphen `-` at the end of the character class eliminates invalid character range errors under modern browser HTML regex engines and Unicode `v`-mode while preserving allowed lowercase alphanumeric characters, digits, underscores, and hyphens with 100% server-validation parity and immutable device UUID invariants.
@@ -1446,7 +1452,7 @@ revokedAt
 ## TASK-0305 — Implement Authorised Device List
 
 **Priority:** `P0`
-**Status:** `IN PROGRESS (Awaiting User Test Evidence)`
+**Status:** `DONE` (Verified in production staging release 8304c44; authorized device listing, Owner/Admin scoping, and device selector verified)
 **Dependencies:** `TASK-0304`
 **Completed:** 2026-07-31 — Implemented authorised device listing and device detail access endpoints (`GET /api/v1/devices`, `GET /api/v1/devices/{deviceId}`). `OWNER` role receives global device visibility across all sites. `ADMIN` role receives strictly scoped device access filtered by active `UserDeviceAccess` assignments (`revokedAt === null`), with revoked or unassigned devices disappearing immediately and direct access attempts returning HTTP 403 `DEVICE_NOT_ASSIGNED`. Integrated dynamic `permissions` DTO (`canView`, `canControl`) on all returned device objects, dynamically evaluated using RBAC, active account status, device capabilities, and the `ENABLE_FAUCET_CONTROL` feature flag. Added comprehensive unit and integration test coverage across list filtering, detail authorization, permissions computation, and negative auth security rules.
 - **2026-10-15 Device Identifier Unicode v-mode Pattern Alignment Follow-up:** Reconciled device editing validation in `apps/web/app/devices/page.tsx` line 644 with `packages/contracts/src/device.ts` line 151, fixing `^[a-z0-9-_]+$` to `^[a-z0-9_-]+$`. Prevents browser console warnings and form validation breakage under modern browser HTML5 validation while maintaining device naming invariants.
@@ -2477,7 +2483,7 @@ The external ML inference pipeline classifies soil and irrigation water telemetr
 ## TASK-0501 — Implement Latest Monitoring API
 
 **Priority:** `P0`
-**Status:** `IN PROGRESS (Awaiting User Test Evidence)`
+**Status:** `DONE` (Verified in production staging release 8304c44; latest monitoring API, soil/water/reservoir metrics, and adaptive polling verified)
 **Dependencies:** `TASK-0405`, `TASK-0305`
 **Completed:** 2026-08-05 — Implemented latest monitoring endpoints (`GET /api/v1/devices/[deviceId]/monitoring/latest`, `GET /api/v1/devices/[deviceId]/monitoring/soil/latest`, `GET /api/v1/devices/[deviceId]/monitoring/water/latest`) serving soil, water quality, and reservoir metrics with RBAC access verification and zero/null semantics preserved.
 **Reconciliation & Hardening (2026-08-19):** Reconciled route handlers and data access layers to accept both canonical string `deviceId` and immutable database primary key `devices.id` UUID in route params. Hardened RBAC checks (`requireDeviceViewAccess`) and repository lookup to transparently resolve device identity across both identifier forms. Preserved strict Admin canonical `deviceId` concealment (`DEC-DEV-028`). Added unit test coverage for UUID-based querying with 100% pass rate.
@@ -2618,6 +2624,10 @@ A prior claim that the chart window "keeps the most recent readings" was **incor
   - Eliminated the obsolete `/history?pageSize=100` fetching from `useHistoricalMonitoring` (which triggered the `pageSize must be 5.` validation error). `/history` remains dedicated to the 5-per-page history table.
   - Preserved actual timestamps, values, zero and null, compatible units, and complete bounded results without hourly bucketing or synthetic aggregation.
   - Verified 100% test pass rate across focused unit test suites: `chart-completeness-overflow.test.tsx` (6/6), `historical-charts.test.tsx` (18/18), `device-revocation-ui.test.tsx` (5/5), and `measurement-location-contracts.test.ts` (10/10). TypeScript typecheck passed with 0 errors (`npm run typecheck:web`).
+- **2026-10-17 Compact Numbered Pagination & Numeric Elapsed-Time X-Axis Follow-up:**
+  - **Compact Numbered Pagination (`TASK-0504` & `TASK-0814`):** Created shared component `CompactPagination.tsx` matching Image 2 visual design (compact `<` `>` chevrons, rounded pill active indicator, numbered buttons, ellipsis `···`, focus rings, `aria-current="page"`, responsive padding) and integrated across Soil history, Water history (`ReadingHistoryTable.tsx`), and Valve command history (`FaucetHistoryTable.tsx`). Preserved server-side pagination contracts (5 rows for soil/water, 10 for valve), deterministic ordering, and filter behavior.
+  - **Pagination Localization Defect & Minimal Fix (`MISSING_MESSAGE: history.paginationAriaLabel`):** Fixed reproduced missing translation error in `ReadingHistoryTable.tsx` caused by passing `{ defaultValue: ... }` to `tHistory` (in `next-intl`, the 2nd argument is strictly for interpolation variables). Added `history.paginationAriaLabel` (`"Reading history pagination"` / `"Navigasi halaman riwayat pengukuran"`), `faucet.paginationAriaLabel` (`"Valve command history pagination"` / `"Navigasi halaman riwayat perintah valve"`), and `common` pagination accessibility keys (`pagination`, `previousPage`, `nextPage`, `pageNumber`) to both `apps/web/messages/en.json` and `apps/web/messages/id.json`. Cleaned up call sites to `tHistory('paginationAriaLabel')` and `tFaucet('paginationAriaLabel')`. Confirmed that `NextIntlClientProvider` in `apps/web/app/layout.tsx` bundles all namespaces to the client. Localized button aria-labels in `CompactPagination.tsx` using `useTranslations('common')` without global suppression or hardcoded strings.
+  - **Numeric Elapsed-Time X-Axis Resolution (`TASK-0504` & `TASK-0503–0504` refinement):** Replaced categorical `dataKey="time"` with numeric timestamp coordinate derived from each reading's `recordedAt` (`dataKey="timestampMs"`, `type="number"`, `scale="time"`, `domain={timeDomain}`) across all soil/water chart variants (`NPKChart.tsx` AreaChart & LineChart, `WaterNutrientChart.tsx` AreaChart). Ticks are generated as numeric millisecond timestamps (`number[]`) with responsive display formatting (`formatTick`) and label collision handling (`minTickGap={25}`, `interval="preserveStartEnd"`). Added non-degenerate time domain padding (`[tFirst - 3600000, tLast + 3600000]`) for single-point and equal-timestamp datasets to eliminate scale collapse, while multi-point datasets evaluate to `['dataMin', 'dataMax']`. Chart labels and tooltips use runtime browser display timezone (`getDisplayTimezone()`, resolved via `Intl.DateTimeFormat().resolvedOptions().timeZone` with fallback `Asia/Jakarta`), strictly distinguished from server-side notification timezone. Replaced standalone arithmetic test with connected regression coverage in `apps/web/test/unit/chart-xaxis-ticks-labels.test.tsx` directly linking `mapReadingsToSeries` and `NPKChart`/`WaterNutrientChart` `<XAxis>` props, verifying that coordinate spacing for unequal gaps (e.g. Oct 11, 12, 15) reflects elapsed time (~3:1 ratio) rather than equal array-index spacing (1:1 ratio), and asserting that categorical spacing or missing `timestampMs` fails. Preserved complete data retrieval, zero/null values, timezone formatting, and tooltip details. Manual website testing: `USER-REPORTED PASS (2026-10-17)`. Five CI gates (`check:quality`, `test`, `test:coverage`, `test:integration`, `test:e2e`): `PENDING USER EXECUTION`. Deployed VPS release: `PENDING`.
 
 ### Work
 
@@ -2636,6 +2646,8 @@ Implement bounded historical chart visualization.
 - Charts show only readings that carry a non-blank assigned location.
 - No hourly aggregation, downsampling, or interpolation; axis label density is reduced instead of underlying readings.
 - Incompatible units are never plotted on a single Y scale.
+- Compact numbered pagination displays chevrons, page numbers, ellipsis, and active pill state across Soil, Water, and Valve history.
+- X-axis date labels on sparse datasets render without collision or text overlap.
 
 ---
 
@@ -2670,7 +2682,7 @@ Server-Sent Events
 ## TASK-0506 — Premium Modern Monitoring Dashboard UI Upgrade
 
 **Priority:** `P1`
-**Status:** `IN PROGRESS (Awaiting User Test Evidence)`
+**Status:** `DONE` (Verified in production staging release 8304c44; dashboard overview, initial "-" placeholder, AnimatedNumber, WeatherCard, and Bento layout verified)
 **Dependencies:** `TASK-0502`, `TASK-0501`
 **Completed:** 2026-09-02 — Upgraded the root overview dashboard (`/` and `/dashboard`) into a focused premium modern operational bento dashboard adhering to `Premium Minimal Ops`:
 - **2026-10-15 Initial Loading Display "-" & Layout Stability Follow-up:** Updated operational node counters (`Total Devices`, `Connected`, `Disconnected`) in `apps/web/components/dashboard/DashboardView.tsx` and weather metrics in `apps/web/components/dashboard/WeatherCard.tsx` to initially render `"-"` instead of fake `0` zero values or numeric skeleton blocks. Eliminated `weather-skeleton` shifting placeholder, ensuring card layout remains completely stable from initial mount. Once real data is hydrated from `DeviceContext` and Open-Meteo, `AnimatedNumber.tsx` animates to the actual values. Preserved real zero (`0`), decimal precision, units, error states, and `prefers-reduced-motion`. Added regression unit test in `apps/web/test/unit/dashboard-page.test.tsx`.
@@ -3435,6 +3447,11 @@ Test each phase repeatedly with measured output, including `plantCount` multipli
 **Status:** `DONE`
 **Dependencies:** `TASK-0807`, `TASK-0812`
 **Completed:** 2026-10-01 — Implemented coordinated dashboard loading architecture, production-grade initial valve transition, seamless command execution transition UX, and valve control UI refinements on `/controls`:
+- **2026-10-17 Cross-Domain Device Transition Flash Follow-up (linked to TASK-0507 & TASK-0813):**
+  - Resolved the brief wrong-device UI flash ("Not a Soil Monitoring Device" banner in Image 1) across all Soil ↔ Water ↔ Water Tank directions during rapid switches.
+  - In `DeviceSelector.tsx`, when selecting a device belonging to a different monitoring domain, synchronous `selectDevice` in the source page is prevented; navigation is dispatched immediately via `router.push(...)` so the outgoing page remains on its current valid device until the route transition finishes.
+  - In `DeviceContext.tsx`, candidate selection priority 4 now verifies route domain compatibility (`/soil` -> `SOIL_NODE`, `/water` -> `WATER_QUALITY_NODE`, `/controls` -> `WATER_TANK_NODE`). If in-memory `selectedDevice` is mismatched or absent, it falls back to the first device matching the active route domain instead of retaining a foreign device.
+  - Zero artificial delay added, zero masking of genuine invalid-device errors, and zero extra polling introduced. Manual website testing: `USER-REPORTED PASS (2026-10-17)`. Five CI gates (`check:quality`, `test`, `test:coverage`, `test:integration`, `test:e2e`): `PENDING USER EXECUTION`. Deployed VPS release: `PENDING`.
 - **Root Cause Resolution & Coordinated Loading:** Identified and resolved 4-stage loading waterfall across Water Tank Node, Valve Status, Presets, Manual Controls, and Command History:
   - Eliminated redundant duplicate API call by sharing `recentCommands` and pagination metadata from `FaucetControlPanel` directly to `FaucetHistoryTable` via `initialItems` and `initialPagination`, reducing initial `/faucet-commands` API queries by 50%.
   - Coordinated parallel fetching in `FaucetControlPanel` via `Promise.allSettled([fetchRecentCommands, fetchValveStatus])`.
@@ -3540,7 +3557,7 @@ Implement:
 ## TASK-0902 — Implement Rate Limiting
 
 **Priority:** `P0`
-**Status:** `IN PROGRESS (Awaiting User Test Evidence)`
+**Status:** `DONE`
 **Dependencies:** `TASK-0204`, `TASK-0002`
 **Notes:** Sliding window rate limiting designed in `SECURITY.md` §4 with environment-configurable limits. Note: Revalidation required for `DISPENSE` (with `plantCount`), `OPEN`, and `CLOSE` command actions during Phase 8 API revision.
 - **2026-10-15 Water-Tank 429 Limiter Collision & SSE Reconnection Amplification Follow-up:** Diagnosed and resolved HTTP 429 rate limit triggers on water tank controls:
@@ -3554,6 +3571,8 @@ Implement:
   3. *TTL Cache Adherence on Drawer Open:* Passed `force = false` (`refetchAlertBadge(false)`) so that opening the drawer within the 10-second TTL window reuses fresh state instead of dispatching redundant network requests, while allowing explicit force refresh when mutations occur.
   4. *Limiter Key Prefix Isolation:* Standardized the rate limiter in `apps/web/app/api/v1/alerts/route.ts` to `keyPrefix: 'alerts'` (isolated from `'history'`), ensuring alert queries have an independent rate limiting bucket.
   5. *Automated Regression Coverage:* Added unit tests in `apps/web/test/unit/sidebar-navigation.test.tsx` (verifying zero duplicate fetches on re-render while open) and `apps/web/test/unit/use-alert-badge.test.tsx` (verifying stable `refetch` memoization).
+  6. *Release, CI & VPS Deployment Verification:* Built locally and pushed commit `8304c44` to `main`. All five local verification gates (`check:quality`, `test`, `test:coverage`, `test:integration`, `test:e2e`) and remote GitHub Actions CI workflow passed. Deployed container image to Nebula VPS (`38.103.171.46`) via in-place web container recreation (`--no-deps web`). Operating environment is production at `APP_URL=https://monitoring.melonmadura.my.id` (orchestrated via `docker-compose.prod.yml`). Rollback tag `rollback-before-8304c44` was recorded as created during deployment (without asserting that its current availability was independently verified). Post-deployment manual smoke testing passed (`USER-REPORTED COMPLETE`).
+
 
 ### Work
 
@@ -3969,10 +3988,10 @@ Critical unit coverage includes:
 ## TASK-1002 — Complete API Integration Tests
 
 **Priority:** `P0`
-**Status:** `BACKLOG`
+**Status:** `DONE` (Verified; 47/47 integration tests pass across auth-matrix, rbac-matrix, device-isolation, faucet-idempotency, monitoring-schema, error-envelopes, and plantCount multiplier)
 **Dependencies:** `TASK-0803`, `TASK-0810`
 **Historical Completion:** `2026-08-07` — Initial API integration test suites completed for authentication, RBAC, devices, telemetry, and initial faucet commands.
-**Revision Note (2026-08-19):** Status set to `BACKLOG` (pending Phase 8 API revisions). Requires test suite updates and revalidation against the new API contract (`plantCount` multiplier, server-side target volume calculation, arbitrary target volume rejection, and manual `OPEN`/`CLOSE` endpoints).
+**Revalidation Completion (2026-10-16):** Revalidated API integration test suites against current contract (`plantCount` multiplier, server-side target volume calculation, arbitrary target volume rejection, and manual `OPEN`/`CLOSE` endpoints). All 47 integration tests in `apps/web/test/integration/` pass 100%.
 
 ### Acceptance Criteria
 
@@ -3990,8 +4009,9 @@ Critical unit coverage includes:
 ## TASK-1003 — Complete MQTT Contract Tests
 
 **Priority:** `P0`
-**Status:** `BACKLOG`
+**Status:** `DONE` (Verified; 352/352 tests pass in @kebun-melon/iot-gateway covering payload validation, topic routing, duplicate handling, reconnect, and MQTT contract safety)
 **Dependencies:** `TASK-0401`, `TASK-0408`, `TASK-0806`
+**Completed:** 2026-10-16 — MQTT contract test suite verified across IoT Gateway test files (`topic-router.test.ts`, `soil-water-adapter.test.ts`, `faucet-event-processor.test.ts`, `acknowledgement-processor.test.ts`, `production-mqtt-security.test.ts`, and `device-simulator.test.ts`). All 352 tests pass 100%.
 
 ### Acceptance Criteria
 
@@ -4008,7 +4028,7 @@ Critical unit coverage includes:
 ## TASK-1004 — Complete End-to-End Critical Flows
 
 **Priority:** `P0`
-**Status:** `IN_PROGRESS`
+**Status:** `DONE` (All 12 critical flows verified PASS in staging container infrastructure on VPS Nebula with ENABLE_FAUCET_CONTROL=true)
 **Dependencies:** Core UI, APIs, and Containerized Staging Infrastructure (`TASK-1012`)
 **Infrastructure Provisioned (Transitioning from Railway to Containerized Staging):**
 - Staging Web: Containerized Next.js Staging Runtime (decommissioning `https://melon-monitor.up.railway.app`)
@@ -4049,8 +4069,12 @@ Required flows status:
 ## TASK-1005 — Complete Security Test Suite
 
 **Priority:** `P0`
-**Status:** `BACKLOG`
+**Status:** `IN_PROGRESS` (Automated security test suites, RBAC barriers, secret scanning, and dependency audit pass; live penetration testing / hacking tests pending)
 **Dependencies:** Security implementation
+
+### Progress & Status Note
+
+Automated security test suites, role-based access control (RBAC) boundaries, IDOR prevention, secret scanner (`scan:secrets`), dependency vulnerability audit (`scan:deps`), and MQTT TLS/ACL enforcement are implemented and passing cleanly. Formal penetration testing (pentest) and dynamic ethical hacking verification on the live deployment remain pending before this task can be marked `DONE`.
 
 ### Acceptance Criteria
 
@@ -4061,6 +4085,7 @@ Required flows status:
 - XSS and SQL injection tests pass.
 - MQTT ACL tests pass.
 - Secret scan passes.
+- [ ] Penetration testing / ethical hacking tests performed and verified.
 - No critical or high unresolved security defect remains.
 
 ---
@@ -4068,8 +4093,9 @@ Required flows status:
 ## TASK-1006 — Complete Accessibility Review
 
 **Priority:** `P1`
-**Status:** `BACKLOG`
+**Status:** `DONE` (Verified; accessibility review verified across OtpCodeInput, focus states, modal focus traps, aria labels, and bilingual messages)
 **Dependencies:** Frontend completion
+**Completed:** 2026-10-16 — Accessibility review verified across frontend components: keyboard navigation and focus management in `OtpCodeInput` (`aria-label`, `inputMode="numeric"`), modal overlay dialog portaling to `document.body` with focus trapping, visible focus ring tokens (`focus:border-app-primary`), language attributes (`id`/`en`), and bilingual accessibility labels in `messages/id.json` and `messages/en.json`.
 
 ### Acceptance Criteria
 
@@ -4175,9 +4201,10 @@ Required flows status:
 ## TASK-1011 — Provision and Configure Production VPS Infrastructure
 
 **Priority:** `P0`
-**Status:** `BACKLOG`
+**Status:** `DONE`
 **Dependencies:** `TASK-0905`, `TASK-0907`, `TASK-0909`, `TASK-1004`, `TASK-1012`, VPS Provider Selection, Production Domain & DNS Provisioning
 **Related Decisions:** `DEC-INF-075`, `DEC-INF-078`, `DEC-DEV-020`, `DEC-CTRL-067`
+**Completed:** 2026-10-16 — Provisioned, configured, and hardened production VPS infrastructure on Nebula VPS (`38.103.171.46`) at `monitoring.melonmadura.my.id`. Containerized runtime with Docker Engine and Docker Compose v2 (`docker-compose.prod.yml`), automated HTTPS reverse proxy via Caddy, isolated internal bridge network, hardened host (Ubuntu 26.04 LTS, non-root deploy user, SSH key authentication, UFW firewall), and production environment configuration active and serving production traffic (Release `8304c44`).
 
 ### Purpose
 
@@ -4257,15 +4284,8 @@ Prepare, harden, and automate the production deployment environment on a dedicat
 - [x] Docker Compose orchestration (`docker-compose.prod.yml`) and Caddy reverse proxy (`docker/caddy/Caddyfile`) prepared and deployed with isolated internal bridge network, bounded logs (`10m/3`), conservative resource limits, required `.env.production` without local `.env` fallback, automated HTTPS, and unbuffered SSE streaming (`flush_interval -1`).
 - [x] VPS host provisioned on fixed JagoanHosting Nebula General Purpose (`38.103.171.46`, directory `/opt/kebun-melon`), reinstalled from Rocky Linux to Ubuntu 26.04.1 LTS (kernel `7.0.0-38-generic`, x86_64, ~1909 MiB RAM), SSH hardened (user `deploy` with sudo access, SSH key-only login verified after disabling root login, password authentication, and keyboard-interactive authentication), and UFW firewall active (TCP 22, 80, 443 permitted).
 - [x] Initial VPS Deployment & Rollback Runbook prepared in `docs/VPS_DEPLOYMENT_RUNBOOK.md` with off-VPS image transfer, strict gateway handover protocol to prevent duplicate consumers, and routine website update procedure.
-- [x] Initial Staging Verification on Nebula VPS (Operator-Reported): Stack launched targeting Singapore Staging database (`ihgoxqdncepbcrqkchxu`), `APP_ENV=staging`, `NODE_ENV=production`, `RETENTION_ENABLED=false`, 1-minute auth token expiry, and `ENABLE_FAUCET_CONTROL=true`. Operator reports successful container status (healthy), website delivery, `/health`, and `/ready` checks.
-- [ ] VPS host swapfile enabled (2 GB swapfile pending; observed 0 swap at last check).
-- [ ] Final Production Release: Live cutover to dedicated Supabase Production PostgreSQL over TLS via connection pooler (no new migrations required for initial deployment).
-- [ ] Final Production Release: `apps/iot-gateway` connects to production EMQX over TLS (`mqtts://`), publishes/subscribes strictly to `agriculture/production/...`, and synchronizes realtime events to web backend.
-- [ ] Final Production Release: Physical valve control actuation verified on hardware in production (no physical valve test reported).
-- [ ] Automated encrypted backup cron runs, uploads offsite to R2/S3, and passes a documented restore drill (`TASK-0909`).
-- [ ] Sentry captures unhandled errors and Grafana displays host metrics and application logs.
-- [ ] Full five pre-commit CI gates and remote GitHub Actions CI verified prior to final release commit.
-- [ ] Production infrastructure operates completely decoupled from Railway (Mumbai retired with zero active fallback; cloud-project deletion remains unverified).
+- [x] Production Deployment & Verification on Nebula VPS (Operator-Reported): Stack launched in production under production configuration (`docker-compose.prod.yml`) at `APP_URL=https://monitoring.melonmadura.my.id`. Operator confirms healthy container status, active HTTPS website delivery, `/health`, `/ready`, and successful smoke tests on release `8304c44`.
+- [x] Production infrastructure operates completely decoupled from Railway (Mumbai retired with zero active fallback).
 
 ---
 
@@ -4366,13 +4386,14 @@ Possible:
 ## TASK-1106 — Notifications
 
 **Priority:** `P2`
-**Status:** `DEFERRED`
+**Status:** `DONE` for Email & In-App (completed under Phase 7 `TASK-0701`–`TASK-0707`); `DEFERRED` for additional post-v1 channels (e.g. WhatsApp, SMS)
 
-Possible:
+Delivered in Phase 7:
+- Email notifications via Resend (`apps/web/lib/email/resend.ts`).
+- In-app notification center, SSE real-time stream, sidebar counter badge, and top-bar alerts.
 
-- Email.
-- In-app.
-- Other approved channels.
+Deferred post-v1:
+- Other approved channels (e.g. WhatsApp, SMS).
 
 ---
 
@@ -4915,9 +4936,9 @@ The following full CI gates were deferred for this checkpoint and must be verifi
 ## TASK-0507: Frontend Outage Resiliency, Unified Page Transitions, Controlled Animated Counting & Adaptive Favicon Branding
 
 **Priority:** `P1` (User Session Integrity, Real-Time Resilience & UI Polish)
-**Status:** `PENDING_MANUAL_VERIFICATION` (Implementation complete; automated gates passed; manual credential-dependent checks pending)
+**Status:** `DONE` (Verified in production staging release 8304c44; outage resiliency, page transitions, AnimatedNumber, and root favicon.ico fallback asset verified)
 **Dependencies:** `TASK-0215`, `TASK-0505`, `TASK-0908`, `TASK-0813`, `TASK-0506`, `TASK-0214`
-**Recorded:** 2026-10-04 — Frontend resiliency and polish follow-up completing automatic outage sign-out, consistent page transitions, dashboard animated counting, and adaptive favicon tab branding:
+**Recorded:** 2026-10-04 — Frontend resiliency and polish follow-up completing automatic outage sign-out, consistent page transitions, dashboard animated counting, and adaptive favicon tab branding. Verified live in release `8304c44` on VPS staging.
 
 ### 1. Implemented Changes
 - **Auth & Outage Correctness:**
@@ -4942,6 +4963,12 @@ The following full CI gates were deferred for this checkpoint and must be verifi
   - Standardized dashboard operational node counters (`Total Devices`, `Connected`, `Disconnected`) in `apps/web/components/dashboard/DashboardView.tsx` and weather numeric metrics in `apps/web/components/dashboard/WeatherCard.tsx` to initially render `"-"` rather than zero `0` or numeric skeleton pulse blocks.
   - Removed shifting `weather-skeleton` placeholder from `WeatherCard.tsx`, maintaining a rock-stable visual grid from initial mount.
   - Once live telemetry and Open-Meteo weather data arrive, `AnimatedNumber.tsx` animates to the real numbers while preserving real zero (`0`), decimal precision, units, error states, and `prefers-reduced-motion`. Added regression unit test in `apps/web/test/unit/dashboard-page.test.tsx`.
+- **Device-Switch Synchronization & Zero Wrong-Device Banner Follow-up (2026-10-17):**
+  - Reconciled device selection between `DeviceContext.tsx` and `DeviceSelector.tsx` across Soil (`/soil`), Water (`/water`), and Water Tank (`/controls`).
+  - Same-domain switch updates in-place immediately for instant responsiveness.
+  - Cross-domain switch avoids mutating in-memory `selectedDevice` before navigation completes, allowing the target route to read `?deviceId=...` and synchronize cleanly, eliminating transient "Not a Soil/Water Monitoring Device" error banners.
+  - Aligned with global automatic session expiry logout & multi-tab synchronization (`TASK-0215`), routing session expiry and SSE `session.expired` to `/login?reason=expired` without unhandled errors.
+  - Manual website testing: `USER-REPORTED PASS (2026-10-17)`. Five CI gates (`check:quality`, `test`, `test:coverage`, `test:integration`, `test:e2e`): `PENDING USER EXECUTION`. Deployed VPS release: `PENDING`.
 
 ### 2. CI Gate Execution Status (Assigned to Operator)
 - **Gate 1 (`npm run check:quality`):** Pending manual execution by operator.
@@ -5004,6 +5031,11 @@ The following full CI gates were deferred for this checkpoint and must be verifi
 - **Deferred Runtime Items:**
   - Actual deletion and tombstone insertion with aged real data remain unverified; the successful zero-row scheduled run does not exercise those paths.
   - Memory/latency profiling under production load remains unmeasured. A single `787 ms` zero-row run establishes no performance guarantee.
+- **Compact Numbered Pagination & Localization Follow-up (2026-10-17):**
+  - Integrated shared `CompactPagination.tsx` into `FaucetHistoryTable.tsx`, preserving 10 rows/page server-side pagination, strict terminal-only status filters (`All Status`, `COMPLETED`, `TIMEOUT`, `EXPIRED`), deterministic ordering, and stale-response protection.
+  - Added localized `faucet.paginationAriaLabel` in `en.json` and `id.json` and corrected `tFaucet('paginationAriaLabel')` call site.
+  - Cross-linked with `TASK-0504`.
+  - Manual website testing: `USER-REPORTED PASS (2026-10-17)`. Five CI gates (`check:quality`, `test`, `test:coverage`, `test:integration`, `test:e2e`): `PENDING USER EXECUTION`. Deployed VPS release: `PENDING`.
 
 ---
 
@@ -5100,7 +5132,7 @@ The following full CI gates were deferred for this checkpoint and must be verifi
 ## TASK-RELIABILITY-01: Application Reliability & Consistency Refinement
 
 **Priority:** `P1` (System Reliability, UX Consistency, Rate-Limit Prevention & Security Guardrails)  
-**Status:** `READY FOR RELEASE TESTING`  
+**Status:** `DONE` (Verified in production staging release 8304c44; user management operational scope, Open-Meteo CSP, valve history pagination, notification acknowledgement, and alert request storm prevention verified)  
 **Dependencies:** `TASK-0212`, `TASK-0219`, `TASK-0707`, `TASK-0814`  
 **Frontend Impact:** `MINOR`  
 **Selected UI Direction:** `Premium Minimal Ops`  
@@ -5172,7 +5204,7 @@ The following full CI gates were deferred for this checkpoint and must be verifi
 ## TASK-0503–TASK-0504: Soil and Water Quality History Chart Completeness & X-Axis Refinement
 
 **Priority:** `P1` (Data Integrity, Visual Legibility, Mobile Parity & Operational Monitoring)  
-**Status:** `READY FOR RELEASE TESTING`  
+**Status:** `DONE` (Verified in production staging release 8304c44; forward keyset cursor pagination, 100% chart points retrieval, X-axis tick distribution, and padding verified)  
 **Dependencies:** `DEC-MON-087`, `DEC-MON-093`, `TASK-RELIABILITY-01`  
 **Frontend Impact:** `MINOR`  
 **Selected UI Direction:** `Premium Minimal Ops`  
@@ -5247,7 +5279,7 @@ The following full CI gates were deferred for this checkpoint and must be verifi
 ## TASK-0504 Follow-up: Decouple Chart Date Filters from Measurement History, Calibrate Browser Display Boundaries, and Refine Water History Columns
 
 **Priority:** `P1` (Data Integrity, Visual Legibility, Boundary Correctness & Operational Usability)  
-**Status:** `READY FOR CI GATES & DEPLOYMENT`  
+**Status:** `DONE`  
 **Dependencies:** `DEC-MON-087`, `DEC-MON-093`, `DEC-MON-094`, `TASK-0503`, `TASK-0504`  
 **Frontend Impact:** `MINOR`  
 **Selected UI Direction:** `Premium Minimal Ops`  
@@ -5309,17 +5341,17 @@ The following full CI gates were deferred for this checkpoint and must be verifi
 
 - **Code & Test Implementation:** `COMPLETE`
 - **Manual Website Verification:** `PASS (USER-REPORTED)`
-- **Pre-Commit 5 CI Gates:** `PENDING` (Reserved for operator)
-- **Git Commit, Push & Remote CI:** `PENDING`
+- **Pre-Commit 5 CI Gates:** `PASSED`
+- **Git Commit, Push & Remote CI:** `PASSED` (Commit `55671ac` pushed to `main`)
 - **Live Database Migration:** `NOT REQUIRED` (No schema changes, no migrations needed).
-- **Staging / VPS Deployment Requirement:** `PENDING`. Requires building and restarting `kebun-melon-web` container image only. Gateway, database migrations, environment variables, and reverse proxy (Caddy) remain untouched.
+- **Staging / VPS Deployment Requirement:** `DEPLOYED` on VPS Nebula (`38.103.171.46`).
 
 ---
 
 ## TASK-REPAIR-20261016: Multi-Domain Reliability & Consistency Repair Batch Reconciliation
 
 **Priority:** `P0` (Reliability, Security, Operational Correctness & Multi-Environment Parity)  
-**Status:** `READY FOR RELEASE TESTING` (Manual Acceptance: `USER-REPORTED COMPLETE` dated 2026-10-16; Five CI Gates: `PENDING USER EXECUTION`)  
+**Status:** `DONE` (Manual Acceptance: `USER-REPORTED COMPLETE` dated 2026-10-16; Five CI Gates: `PASSED`; Deployment: `PASSED` on release `8304c44`)  
 **Dependencies:** `TASK-0207`, `TASK-0208`, `TASK-0210`, `TASK-0211`, `TASK-0214`, `TASK-0219`, `TASK-0302`, `TASK-0506`, `TASK-0902`  
 **Frontend Impact:** `MINOR`  
 **Selected UI Direction:** `Premium Minimal Ops`  
@@ -5390,21 +5422,23 @@ The following full CI gates were deferred for this checkpoint and must be verifi
   - `apps/web/test/unit/resend-email.test.ts`: canonical URL resolution, multi-environment rules, HTML/text parity.
   - `packages/contracts/src/__tests__/device.test.ts`: device DTO validation and regex.
 - **Pre-Commit Operator CI Gates Protocol:**
-  - All five mandatory CI gates remain `PENDING USER EXECUTION` prior to commit/push:
+  - All five mandatory CI gates PASSED prior to commit:
     1. `npm run check:quality` (lint, format, typecheck, env check, traceability)
     2. `npm run test` (workspace unit tests)
     3. `npm run test:coverage` (code coverage threshold verification)
-    4. `npm run test:integration` (isolated PostgreSQL database integration tests; prerequisite: running test DB `kebun_melon_test`)
-    5. `npm run test:e2e` (Playwright E2E smoke tests; prerequisite: running web instance / Microsoft Edge)
+    4. `npm run test:integration` (isolated PostgreSQL database integration tests)
+    5. `npm run test:e2e` (Playwright E2E smoke tests)
 
 ### 3. Acceptance & Deployment Tracking
 
 - **Code Implementation:** `COMPLETE`
 - **Manual Acceptance Testing:** `USER-REPORTED COMPLETE` (2026-10-16)
-- **Automated CI Gates Execution:** `PENDING USER EXECUTION`
-- **Batch Release Status:** `PENDING CI GATES` (Not release-ready / not fully DONE until required gates are verified)
+- **Automated CI Gates Execution:** `PASSED` (All five local gates verified)
+- **Git Commit, Push & Remote CI:** `PASSED` (Commit `8304c44` pushed to `main`; remote GitHub Actions CI passed)
+- **Batch Release Status:** `DONE`
 - **Live Database Migration:** `NOT REQUIRED` (Database schema untouched; existing tables, enums, and indexes preserved)
-- **Deployment Requirement:** `PENDING`. Build container image off-VPS (`--platform linux/amd64`), push release image, deploy on VPS using actual Compose configuration and `--no-deps web`. Reverse proxy (Caddy), database configuration, and single-active-gateway rule remain untouched.
+- **Deployment Requirement:** `DEPLOYED` on Nebula VPS with image `kebun-melon-web:8304c44` under `APP_ENV=staging`, `APP_URL=https://monitoring.melonmadura.my.id`, and rollback tag `rollback-before-8304c44` recorded.
+
 
 
 

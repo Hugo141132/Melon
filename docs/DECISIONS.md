@@ -1906,7 +1906,9 @@ The following facts are supported by the verified decisions governance of `TASK-
      - A minimal audit record (`ACCOUNT_REJECTED`) is recorded in `audit_logs` referencing target user ID and acting Owner before transaction commit, without foreign key integrity violations.
   4. **Historical Cleanup Decoupling:**
      - Historical REJECTED accounts cleanup was an isolated DEV-only operational script reported complete by the user on 2026-10-16 in project `unbyxlkrzqlafolxcypi`. Never claim staging/production cleanup without verified evidence.
-<!-- DEC-AUTH-113 Reconciled: 2026-10-16 -->
+  5. **Post-Commit Transactional Notification Email (Follow-up 2026-10-17 / TASK-0208):**
+     - Recipient contact details (`email`, `name`, `languagePreference`) are captured in memory prior to deleting the user row. Following successful commit, a bilingual rejection notification email is dispatched via Resend (`sendAdminRejectionNotificationEmail`) with isolated error handling (dispatch failure does not roll back the deletion). Strictly decoupled from `/notifications` and the `alerts` table.
+<!-- DEC-AUTH-113 Reconciled: 2026-10-17 -->
 
 ---
 

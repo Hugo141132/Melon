@@ -162,4 +162,40 @@ describe('Automatic Outage Detection & Client State Protection', () => {
 
     window.removeEventListener(AUTH_OUTAGE_EVENT, outageSpy);
   });
+
+  it('triggers immediate session invalidation and navigates to login when session expires or deadline is reached', async () => {
+    const unauthSpy = vi.fn();
+    window.addEventListener(AUTH_UNAUTHORIZED_EVENT, unauthSpy);
+
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        success: true,
+        data: {
+          authenticated: false,
+          user: null,
+        },
+      }),
+    });
+
+    render(
+      <AuthProvider initialSession={mockUserSession}>
+        <ConsumerComponent />
+      </AuthProvider>
+    );
+
+    const btn = screen.getByTestId('btn-revalidate');
+    await act(async () => {
+      btn.click();
+    });
+
+    await waitFor(() => {
+      expect(unauthSpy).toHaveBeenCalled();
+      expect(screen.getByTestId('auth-status')).toHaveTextContent('unauthenticated');
+      expect(sessionStorage.getItem('kebun_melon_device_cache')).toBeNull();
+    });
+
+    window.removeEventListener(AUTH_UNAUTHORIZED_EVENT, unauthSpy);
+  });
 });

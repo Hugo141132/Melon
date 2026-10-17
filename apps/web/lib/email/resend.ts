@@ -2185,3 +2185,182 @@ export async function sendAdminApprovalResultEmail(
     };
   }
 }
+
+export interface SendAdminRejectionEmailInput {
+  toEmail: string;
+  recipientName?: string;
+  decisionNote?: string;
+  locale?: string;
+  requestId?: string;
+}
+
+export interface SendAdminRejectionEmailResult {
+  success: boolean;
+  emailSent: boolean;
+  simulated?: boolean;
+  id?: string;
+  error?: string;
+}
+
+export function getAdminRejectionEmailHtml(
+  input: SendAdminRejectionEmailInput,
+  locale = 'id'
+): { subject: string; html: string; text: string } {
+  const isId = locale === 'id';
+  const subject = isId
+    ? 'Pemberitahuan Pendaftaran Akun Admin - Melon Governance'
+    : 'Admin Account Registration Status - Melon Governance';
+
+  const logoUrl = getEmailLogoUrl();
+
+  const title = isId ? 'Status Pendaftaran Admin' : 'Admin Registration Status';
+  const greeting = isId
+    ? `Halo, ${input.recipientName || 'Admin'}`
+    : `Hello, ${input.recipientName || 'Admin'}`;
+  const message = isId
+    ? 'Terima kasih atas ketertarikan Anda untuk bergabung sebagai Administrator pada sistem pemantauan dan tata kelola Kebun Melon. Setelah ditinjau oleh Pemilik (Owner), kami memberitahukan bahwa permohonan pendaftaran akun Anda saat ini belum dapat disetujui.'
+    : 'Thank you for your interest in joining as an Administrator for the Melon farm monitoring and governance system. After review by the Owner, we regret to inform you that your registration application could not be approved at this time.';
+
+  const noteHeading = isId ? 'Catatan Pemilik' : "Owner's Note";
+  const noteBoxHtml = input.decisionNote
+    ? `
+      <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-left: 3px solid #64748b; padding: 14px 16px; border-radius: 8px; margin: 20px 0; font-size: 13px; color: #334155;">
+        <strong style="color: #0f172a;">${noteHeading}:</strong>
+        <p style="margin: 6px 0 0 0; font-style: italic; color: #475569;">"${input.decisionNote}"</p>
+      </div>
+    `
+    : '';
+
+  const noteBoxText = input.decisionNote ? `\n${noteHeading}: "${input.decisionNote}"\n` : '';
+
+  const securityNotice = isId
+    ? 'Informasi Akun: Sesuai dengan kebijakan tata kelola dan keamanan sistem Melon Governance, data permohonan pendaftaran yang tidak disetujui telah dibersihkan secara aman dari database akun operasional. Riwayat keputusan tetap tercatat dalam log audit yang tidak dapat diubah.'
+    : 'Account Information: In accordance with Melon Governance security and data protection policies, rejected registration data has been securely purged from operational account stores. Decision history remains permanently logged in immutable audit records.';
+
+  const contactNotice = isId
+    ? 'Jika Anda memiliki pertanyaan lebih lanjut mengenai keputusan ini, silakan hubungi Pemilik sistem secara langsung.'
+    : 'If you have further questions regarding this decision, please reach out to the system Owner directly.';
+
+  const html = `
+<!DOCTYPE html>
+<html lang="${locale}">
+<head>
+  <meta charset="utf-8">
+  <title>${subject}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 0; color: #1e293b; }
+    .container { max-width: 600px; margin: 32px auto; background-color: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+    .header { padding: 32px 32px 24px 32px; text-align: center; border-bottom: 1px solid #f1f5f9; }
+    .content { padding: 32px; }
+    .notice { font-size: 13px; color: #64748b; line-height: 1.5; background-color: #f8fafc; padding: 16px; border-radius: 8px; border-left: 3px solid #64748b; margin-top: 24px; }
+    .footer { padding: 24px 32px; text-align: center; font-size: 12px; color: #94a3b8; background-color: #f8fafc; border-top: 1px solid #f1f5f9; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <img src="${logoUrl}" alt="Melon Governance" style="height: 38px; width: auto; max-width: 200px; margin-bottom: 12px;" />
+      <h2 style="margin: 0; color: #0f172a; font-size: 20px;">${title}</h2>
+    </div>
+    <div class="content">
+      <p style="font-size: 16px; font-weight: 600; margin-top: 0;">${greeting},</p>
+      <p style="font-size: 14px; line-height: 1.6; color: #334155;">${message}</p>
+      ${noteBoxHtml}
+      <p style="font-size: 13px; line-height: 1.5; color: #64748b; margin-top: 16px;">${contactNotice}</p>
+      <div class="notice">
+        ${securityNotice}
+      </div>
+    </div>
+    <div class="footer">
+      <p style="margin: 0;">© ${new Date().getFullYear()} Melon Governance Monitoring System. Hak cipta dilindungi.</p>
+    </div>
+  </div>
+</body>
+</html>
+  `.trim();
+
+  const text = `
+${title}
+${greeting},
+
+${message}
+${noteBoxText}
+${contactNotice}
+
+${securityNotice}
+© ${new Date().getFullYear()} Melon Governance Monitoring System.
+  `.trim();
+
+  return { subject, html, text };
+}
+
+export async function sendAdminRejectionEmail(
+  input: SendAdminRejectionEmailInput
+): Promise<SendAdminRejectionEmailResult> {
+  const reqLogger = logger.child({
+    requestId: input.requestId,
+    recipientEmail: input.toEmail,
+  });
+
+  const env = validateServerEnv();
+  const locale = input.locale || env.DEFAULT_LOCALE || 'id';
+
+  const { subject, html, text } = getAdminRejectionEmailHtml(input, locale);
+
+  const apiKey = env.RESEND_API_KEY || process.env.RESEND_API_KEY;
+  const fromEmail =
+    env.RESEND_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || DEFAULT_RESEND_FROM_EMAIL;
+
+  if (!apiKey || env.NODE_ENV === 'test' || process.env.NODE_ENV === 'test') {
+    reqLogger.info('Simulated admin rejection email delivery to ' + input.toEmail);
+    return {
+      success: true,
+      emailSent: false,
+      simulated: true,
+    };
+  }
+
+  try {
+    const resend = new Resend(apiKey);
+    const result = await sendWithRetry(
+      resend,
+      {
+        from: fromEmail,
+        to: [input.toEmail],
+        subject,
+        html,
+        text,
+      },
+      reqLogger
+    );
+
+    if (!result.success) {
+      reqLogger.error(
+        'Resend delivery reported error for admin rejection: ' + (result.error || 'Unknown error')
+      );
+      return {
+        success: false,
+        emailSent: false,
+        error: result.error,
+      };
+    }
+
+    reqLogger.info('Admin rejection email dispatched successfully via Resend');
+    return {
+      success: true,
+      emailSent: true,
+      id: result.id,
+    };
+  } catch (err: any) {
+    reqLogger.error(
+      'Unexpected exception during Resend admin rejection email dispatch: ' +
+        (err?.message || String(err))
+    );
+    return {
+      success: false,
+      emailSent: false,
+      error: err?.message || 'Email delivery failed',
+    };
+  }
+}

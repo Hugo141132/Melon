@@ -126,12 +126,43 @@ An Owner must approve the Admin before protected access is allowed.
   - Successful profile save triggers full navigation to `/dashboard` with refreshed session identity. Failures remain on the form with error feedback.
 - **Device Management Regex & Localized Toast (DEC-DEV-040):**
   - Server and browser regex escaping standardized (`/^[a-zA-Z0-9 _-]{3,50}$/`). Localized success toast interpolates the persisted device name.
+- **Cross-Domain Device-Switch Synchronization (TASK-0507, TASK-0813):**
+  - Same-domain switch updates in-place immediately for instant responsiveness.
+  - Cross-domain switch (`SOIL_NODE` ↔ `WATER_QUALITY_NODE` ↔ `WATER_TANK_NODE`) dispatches route navigation immediately via `router.push(...)` without mutating in-memory `selectedDevice` before navigation completes, allowing target routes (`/soil`, `/water`, `/controls`) to read `?deviceId=...` and synchronize cleanly, completely eliminating transient "Not a Soil/Water Monitoring Device" error banners.
+  - Route candidate fallback in `DeviceContext.tsx` verifies route domain compatibility, falling back to the first device matching the active route domain if in-memory device belongs to another domain.
+- **Rejected-Admin Email Notification & Failure Isolation (TASK-0208):**
+  - Rejection sends bilingual notification email via Resend (`sendAdminRejectionEmail`) to the applicant.
+  - Recipient details (`email`, `fullName`, `preferredLocale`) are safely captured prior to transactional account deletion.
+  - Audit log (`ACCOUNT_REJECTED`) is preserved.
+  - Rejection email dispatch is non-blocking and isolated from committed account deletion.
+  - Decoupled from agronomic alerts (`alerts` table) and `/notifications`.
+- **Shared Compact Numbered Pagination & Localization Governance (TASK-0504, TASK-0814):**
+  - Shared component `CompactPagination.tsx` adheres to project design tokens (`border-app-outline-variant`, focus rings) and accessibility (`aria-current="page"`, localized `aria-label`).
+  - Server-side pagination contracts are strictly preserved: exactly 5 rows for soil/water, 10 rows for valve command history.
+  - `next-intl` translation calls must never pass `{ defaultValue: ... }` as second argument (which is strictly for interpolation variables); all keys must exist in `en.json` and `id.json` (`history.paginationAriaLabel`, `faucet.paginationAriaLabel`, `common.pagination`, `common.previousPage`, `common.nextPage`, `common.pageNumber`).
+- **Numeric Chart Coordinates & Proportional Elapsed-Time Spacing (TASK-0504, DEC-MON-093):**
+  - Chart coordinates use numeric timestamps (`timestampMs`) derived from sensor `recordedAt`, with `type="number"`, `scale="time"`, and `domain={timeDomain}` across all soil/water chart variants.
+  - Point spacing reflects actual elapsed time (e.g. ~3:1 ratio for 3-day gap vs 1-day gap), not equal array-index categorical spacing.
+  - Label collision handling uses `minTickGap={25}` and `interval="preserveStartEnd"`.
+  - Single-point or equal-timestamp datasets apply `[tFirst - 3600000, tLast + 3600000]` padding to prevent scale collapse.
+  - Display timezone uses runtime browser timezone (`getDisplayTimezone()`, fallback `Asia/Jakarta`), strictly distinguished from server-side notification timezone.
+  - Full data retrieval, date filtering, zero/null values, and tooltips are preserved.
+- **Global Idle/Absolute Session Expiry & Multi-Tab Synchronization (TASK-0215):**
+  - Enforces 30-minute idle timeout and 8-hour absolute session lifetime.
+  - Automatically redirects to `/login?reason=expired` without requiring user interaction.
+  - Qualifying physical activity (`mousedown`, `keydown`, `touchstart`, `scroll`) throttled to 30s updates local deadline and touches server `lastSeenAt` (`ValidateSessionOptions.touchLastSeen: true`).
+  - Passive SSE stream validation (`verifyStreamSessionActive`) and background health checks use `touchLastSeen: false` so idle timeout is not falsely extended.
+  - Multi-tab synchronization via `localStorage` `melon_session_activity` and `melon_session_sync`.
+  - Multi-tab storage listener security: requires authenticated session, validates non-secret `sessionId` match, validates finite timestamp bounds, enforces absolute expiry, and re-validates with server (`validateSession(false, true)`).
+  - Idempotent `handleSessionExpired` unmounts protected content, purges session-scoped storage, broadcasts to other tabs, dispatches `melon:unauthenticated`, attempts best-effort server logout, and redirects to login.
 - **Operational Commands, Deployment & Verification Status:**
   - Local development restart: `npm run dev:web`.
-  - Release builds: executed off-VPS (for `linux/amd64`).
+  - Release builds: executed off-VPS (for `linux/amd64`). Plain `.tar` archive supported on Windows workstations without external `gzip` tools.
   - VPS deployment: deploy using actual Compose configuration (`docker-compose.prod.yml`) and release image tag with `--no-deps web`. Single-active-gateway rule is strictly preserved.
-  - Active Deployed Host: Release `525caa2` deployed to VPS operating under `APP_ENV=staging` at `APP_URL=https://monitoring.melonmadura.my.id` (staging environment despite prod compose filename; verified rollback image is `kebun-melon-web:55671ac`).
-  - Follow-up Alerts 429 Repair: Manual acceptance `USER-REPORTED COMPLETE` dated `2026-10-16`. All five CI gates (`check:quality`, `test`, `test:coverage`, `test:integration`, `test:e2e`), new commit/push, new CI run, and follow-up deployment remain `PENDING USER EXECUTION`. Earlier CI success on `525caa2` does not validate this follow-up batch.
+  - Pre-swap rollback baseline capture: running container ID and image reference are inspected and atomically captured to `/opt/kebun-melon/.prev_web_image` with rollback tag before container recreation.
+  - Active Deployed Host: Release `8304c44` deployed to VPS operating under `APP_ENV=staging` at `APP_URL=https://monitoring.melonmadura.my.id` (staging environment despite prod compose filename; rollback tag `rollback-before-8304c44` created during deployment without claiming current availability was independently checked).
+  - Alerts 429 Repair Verification: All final verification tests, GitHub Actions CI, and post-deployment manual smoke tests passed (`USER-REPORTED COMPLETE`).
+  - 2026-10-17 Five-Item Repair Batch Status: Manual website testing across `/soil`, `/water`, and `/controls` in English and Indonesian passed (`USER-REPORTED PASS on 2026-10-17`). Pre-commit CI verification gates (`npm run check:quality`, `npm run test`, `npm run test:coverage`, `npm run test:integration`, `npm run test:e2e`), commit, push, remote GitHub Actions CI, and VPS deployment remain `PENDING USER EXECUTION`.
 
 ---
 

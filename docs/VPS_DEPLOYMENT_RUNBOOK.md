@@ -52,32 +52,25 @@
      - Memory/latency profiling under production load remains unmeasured; a single `787 ms` zero-row run establishes no performance guarantee.
      - Staging application status (`docker-compose.staging.yml`) must be verified independently.
      - GitHub CI for `875f91b` passed per operator confirmation. None of the five reserved CI commands is necessary for this documentation-only closeout; lightweight documentation checks suffice. No staging/VPS, Docker, database, or reverse-proxy update is required.
-5. **2026-10-16 Release 525caa2 Deployment & Post-Deployment Alerts-429 Follow-Up:**
-   - **Release 525caa2 Deployment Status (COMPLETED):**
-     - Release commit `525caa2` passed GitHub CI (`run 38875901401`) and was successfully deployed to the Nebula VPS host (`38.103.171.46`).
-     - **Deployed Environment & Configuration:** The deployed service executes `/opt/kebun-melon` with `WEB_IMAGE=kebun-melon-web:525caa2` using `docker compose --env-file .env.production -f docker-compose.prod.yml up -d --no-deps web`.
+5. **2026-10-16 Release 8304c44 Deployment & Post-Deployment Alerts-429 Closeout:**
+   - **Release 8304c44 Deployment Status (COMPLETED):**
+     - Release commit `8304c44` passed all local test gates (`check:quality`, `test`, `test:coverage`, `test:integration`, `test:e2e`), passed remote GitHub Actions CI, and was successfully deployed to the Nebula VPS host (`38.103.171.46`).
+     - **Deployed Environment & Configuration:** The deployed service executes `/opt/kebun-melon` with `WEB_IMAGE=kebun-melon-web:8304c44` using `docker compose --env-file .env.production -f docker-compose.prod.yml up -d --no-deps web`.
      - **Staging Runtime Invariant:** Even though `docker-compose.prod.yml` is used as the compose file name, the runtime environment explicitly operates with `APP_ENV=staging` and `APP_URL=https://monitoring.melonmadura.my.id` pointing to Supabase Staging (`ihgoxqdncepbcrqkchxu`). Do not classify this host as production solely based on the compose filename.
-     - **Verified Rollback Image:** The previous active web image tag preserved in `/opt/kebun-melon/.prev_web_image` is `kebun-melon-web:55671ac`. Rollback target command:
-       ```bash
-       WEB_IMAGE=kebun-melon-web:55671ac docker compose --env-file .env.production -f docker-compose.prod.yml up -d --no-deps web
-       ```
-   - **Post-Deployment Incident: Alerts HTTP 429:**
-     - Post-deployment testing revealed HTTP 429 `TOO_MANY_REQUESTS` on `GET /api/v1/alerts?status=OPEN&pageSize=100` (`requestId: req-1792143270110`).
+     - **Recorded Rollback Tag:** Rollback tag `rollback-before-8304c44` was recorded as created during deployment (without asserting that its current availability was independently verified).
+   - **Post-Deployment Incident: Alerts HTTP 429 Resolved:**
+     - Post-deployment testing after release `525caa2` had revealed HTTP 429 `TOO_MANY_REQUESTS` on `GET /api/v1/alerts?status=OPEN&pageSize=100` (`requestId: req-1792143270110`).
      - Root cause analysis identified two contributing factors:
        1. **Client Re-render Loop:** In `Sidebar.tsx`, the `useEffect` listening to `[isOpen, refetchAlertBadge]` was re-triggering whenever `refetchAlertBadge` was recreated on every render of `useAlertBadge`. Badge state updates triggered component re-renders, causing a rapid continuous request loop.
        2. **Limiter Prefix Collision:** `/api/v1/alerts` was using shared `keyPrefix: 'history'` on its 30 requests/minute sliding window, causing it to quickly exhaust the history quota during drawer opens.
-   - **Alerts-429 Follow-Up Code Fix (LOCAL IMPLEMENTATION COMPLETE):**
+   - **Alerts-429 Code Fix & Test Invariants:**
      - `apps/web/hooks/useAlertBadge.ts`: Wrapped `refetch` in `useCallback((force = true) => fetchBadgeCount(force), [fetchBadgeCount])` to maintain stable reference identity.
      - `apps/web/components/navigation/Sidebar.tsx`: Added `wasOpenRef` edge-detection to trigger badge refetch strictly on the opening transition (`!wasOpenRef.current && isOpen`), and passed `refetchAlertBadge(false)` to respect the 10-second TTL cache rather than forcing cache bypass.
      - `apps/web/app/api/v1/alerts/route.ts`: Isolated the rate limiter key prefix to `keyPrefix: 'alerts'`.
      - Regression tests added in `apps/web/test/unit/use-alert-badge.test.tsx` and `apps/web/test/unit/sidebar-navigation.test.tsx`.
-   - **Local Development Restart Command:**
-     ```bash
-     npm run dev:web
-     ```
-   - **Verification & Deployment Gates:**
-     - Manual acceptance of the alerts-429 fix is `USER-REPORTED COMPLETE` (dated 2026-10-16).
-     - Automated verification commands (`npm run check:quality`, `npm run test`, `npm run test:coverage`, `npm run test:integration`, `npm run test:e2e`), git commit/push, new GitHub CI run, and VPS container update with the new release image remain **PENDING USER EXECUTION**. Earlier CI pass on `525caa2` does not validate the new follow-up code changes.
+   - **Verification Status:**
+     - Final verification test commands, remote GitHub Actions CI, and post-deployment manual smoke testing passed (`USER-REPORTED COMPLETE`). Deployed verification is complete.
+
 
 ---
 
@@ -483,12 +476,13 @@ Build the new image off-VPS using a **unique identifiable tag** (never rely on `
 # Example: updating web service to release tag v0.1.1-ui
 docker build --platform linux/amd64 -t kebun-melon-web:0.1.1-ui -f apps/web/Dockerfile .
 
-# Export single image directly to tar archive
+# Export single image directly to plain tar archive (do NOT require gzip on Windows)
 docker save -o web-update-0.1.1-ui.tar kebun-melon-web:0.1.1-ui
 
-# Transfer image archive to VPS
+# Transfer plain tar archive to VPS
 scp web-update-0.1.1-ui.tar deploy@38.103.171.46:/opt/kebun-melon/
 ```
+> **WINDOWS PACKAGING NOTE:** Plain `.tar` is directly supported by `docker save -o` and `docker load -i`. Do not require `gzip` compression (`.tar.gz`) on Windows workstations to avoid external toolchain dependencies and pipeline failures. Deployment execution remains deferred until all pre-commit gates and remote CI pass successfully.
 
 ### 8.3 Step 3: Load New Image on VPS Host (Exact Archive Path & Verification)
 Connect to VPS and load the container image:
@@ -550,7 +544,54 @@ To update the image tag used by Compose:
   ```
 
 ### 8.5 Step 5: Web-Only In-Place Recreate (Zero Gateway Interruption)
-For a web-only update, recreate **only the web service** using `--no-deps`. This preserves the running `iot-gateway` container and its active EMQX MQTT connection without interruption:
+For a web-only update, recreate **only the web service** using `--no-deps`. This preserves the running `iot-gateway` container and its active EMQX MQTT connection without interruption.
+
+#### 8.5.1 Capture Verified Rollback Baseline Before In-Place Swap
+Before applying the new image, capture the running container's active image reference to the durable rollback state file:
+```bash
+# 1. Obtain running web container ID (strictly query container, not image)
+RUNNING_WEB_CONTAINER_IDS=$(docker compose -f docker-compose.prod.yml ps -q web)
+CONTAINER_COUNT=$(echo "${RUNNING_WEB_CONTAINER_IDS}" | grep -v '^$' | wc -l)
+
+# 2. Require exactly one expected running web container; ABORT on failure before touching containers
+if [ "${CONTAINER_COUNT}" -ne 1 ]; then
+  echo "ERROR: Expected exactly 1 running web container, but found ${CONTAINER_COUNT}." >&2
+  echo "Aborting in-place recreation before container swap. Preserving existing .prev_web_image." >&2
+  exit 1
+fi
+
+# 3. Inspect .Config.Image from the running CONTAINER ID (do not inspect an image ID for this container field)
+CURRENT_IMAGE=$(docker inspect --format '{{.Config.Image}}' "${RUNNING_WEB_CONTAINER_IDS}" 2>/dev/null)
+
+if [ -z "${CURRENT_IMAGE}" ]; then
+  echo "ERROR: Unable to extract .Config.Image from running web container '${RUNNING_WEB_CONTAINER_IDS}'." >&2
+  echo "Aborting in-place recreation before container swap. Preserving existing .prev_web_image." >&2
+  exit 1
+fi
+
+# 4. Require image exists and inspects cleanly in Docker daemon
+if ! docker image inspect "${CURRENT_IMAGE}" >/dev/null 2>&1; then
+  echo "ERROR: Failed to verify image '${CURRENT_IMAGE}' in Docker daemon." >&2
+  echo "Aborting in-place recreation before container swap. Preserving existing .prev_web_image." >&2
+  exit 1
+fi
+
+# 5. Write to temporary file, restrict permissions, and atomically replace .prev_web_image
+# If writing or atomic replacement fails, clean up temp file, abort immediately, and preserve old rollback file
+if ! (echo "${CURRENT_IMAGE}" > /opt/kebun-melon/.prev_web_image.tmp && \
+      chmod 600 /opt/kebun-melon/.prev_web_image.tmp && \
+      mv -f /opt/kebun-melon/.prev_web_image.tmp /opt/kebun-melon/.prev_web_image); then
+  rm -f /opt/kebun-melon/.prev_web_image.tmp 2>/dev/null
+  echo "ERROR: Failed to write or atomically replace /opt/kebun-melon/.prev_web_image." >&2
+  echo "Aborting in-place recreation before container swap. Preserving existing .prev_web_image." >&2
+  exit 1
+fi
+
+# 6. Report success strictly AFTER atomic replacement succeeds
+echo "Saved verified rollback reference: ${CURRENT_IMAGE}"
+```
+
+#### 8.5.2 Recreate Web Service
 ```bash
 # Recreate only the web container with new tag
 WEB_IMAGE=kebun-melon-web:0.1.1-ui docker compose --env-file .env.production -f docker-compose.prod.yml up -d --no-deps web

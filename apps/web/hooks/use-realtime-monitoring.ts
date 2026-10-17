@@ -68,6 +68,15 @@ export function useRealtimeMonitoring({
         if (name === 'session.expired' || name === 'access.revoked') {
           setStatus('CLOSED');
           es.close();
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(
+              new CustomEvent('melon:unauthenticated', {
+                detail: {
+                  reason: name === 'session.expired' ? 'session_expired' : 'access_revoked',
+                },
+              })
+            );
+          }
         }
       } catch {
         // Ignore JSON parse errors

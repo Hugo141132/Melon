@@ -51,9 +51,33 @@ export default function WaterNutrientChart({
     return getCustomXTicks(data, preset, locale);
   }, [data, preset, locale]);
 
+  const timeDomain = useMemo<[number, number] | ['dataMin', 'dataMax']>(() => {
+    if (!data || data.length === 0) return ['dataMin', 'dataMax'];
+    const getMs = (item: BaseSeriesItem): number =>
+      typeof item.timestampMs === 'number' ? item.timestampMs : new Date(item.timestamp).getTime();
+    const tFirst = getMs(data[0]);
+    const tLast = getMs(data[data.length - 1]);
+    if (tFirst === tLast && !isNaN(tFirst)) {
+      // Single-point or equal-timestamp dataset: add +/- 1 hour padding so domain is non-degenerate
+      return [tFirst - 3600000, tLast + 3600000];
+    }
+    return ['dataMin', 'dataMax'];
+  }, [data]);
+
   const cleanLabelFormatter = (label: any, payload: any[]) => {
-    if (payload && payload.length > 0 && payload[0]?.payload?.timestamp) {
-      return formatTooltipDateTime(payload[0].payload.timestamp, preset, locale);
+    if (
+      payload &&
+      payload.length > 0 &&
+      (payload[0]?.payload?.timestamp || payload[0]?.payload?.timestampMs)
+    ) {
+      return formatTooltipDateTime(
+        payload[0].payload.timestamp || payload[0].payload.timestampMs,
+        preset,
+        locale
+      );
+    }
+    if (typeof label === 'number') {
+      return formatTooltipDateTime(label, preset, locale);
     }
     return typeof label === 'string' ? label.replace(/,/g, '').replace(/\./g, '').trim() : label;
   };
@@ -104,10 +128,14 @@ export default function WaterNutrientChart({
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#eeeeee" vertical={false} />
               <XAxis
-                dataKey="time"
+                dataKey="timestampMs"
+                type="number"
+                scale="time"
+                domain={timeDomain}
                 ticks={ticks.length > 0 ? ticks : undefined}
                 tickFormatter={formatTick}
-                interval={0}
+                interval="preserveStartEnd"
+                minTickGap={25}
                 tick={{ fontSize: 11, fill: '#40493d' }}
                 padding={{ left: 16, right: 16 }}
                 axisLine={false}

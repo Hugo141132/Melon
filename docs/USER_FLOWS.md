@@ -530,8 +530,11 @@ flowchart TD
 3. The server validates Owner permission (`account.reject`).
 4. The server reloads the target account asserting `accountStatus === 'PENDING_APPROVAL'`, role is `ADMIN` (never `OWNER`), and target has NO operational records.
 5. The server records an audit event (`ACCOUNT_REJECTED`) in `audit_logs` capturing acting Owner and target identity before deletion.
-6. The server transactionally deletes the target user row from `users` along with all child records (`user_roles`, `account_approvals`, tokens, sessions, preferences).
-7. The Owner sees confirmation and the table refreshes.
+6. The server captures the target recipient details (`email`, `name`, `languagePreference`) in memory before record deletion.
+7. The server transactionally deletes the target user row from `users` along with all child records (`user_roles`, `account_approvals`, tokens, sessions, preferences).
+8. Following successful transaction commit, the server dispatches a bilingual transactional rejection notification email to the applicant's captured email address via Resend (`sendAdminRejectionNotificationEmail`) in a failure-isolated background handler (email dispatch failure is logged but does not roll back the completed deletion).
+9. The notification is strictly transactional and decoupled from the agronomic alert system (`alerts` table) and `/notifications`.
+10. The Owner sees confirmation and the table refreshes.
 
 **Error flows:**
 
@@ -540,7 +543,7 @@ flowchart TD
 - Target is unverified (`emailVerifiedAt IS NULL`): return HTTP 409 `INVALID_STATUS`.
 - Target already decided: return HTTP 409 `INVALID_STATUS`.
 
-**Postconditions:** Target account is transactionally deleted from `users`; audit record preserved; target cannot log in.
+**Postconditions:** Target account is transactionally deleted from `users`; audit record preserved; recipient receives transactional email notification; target cannot log in.
 **Required permissions:** `account.reject`.
 **Relevant account statuses:** Target `PENDING_APPROVAL` -> Deleted.
 **UI states:** Confirmation, reason field, success, conflict, error.
@@ -1256,7 +1259,10 @@ The application does NOT provide a "Delete Device" flow. Device removal from the
 
 1. The frontend identifies the selected device (displaying device name for all users, with canonical `deviceId` visible only to Owner per `DEC-DEV-028`).
 2. The server verifies the user may access that device (`GET /api/v1/devices/{deviceId}` checking session, active account, and `device.read`).
-3. The system clears or marks previous device data as transitioning.
+3. Domain inspection & synchronized navigation (`TASK-0507`, `TASK-0813`):
+   - The UI evaluates the selected device's `deviceType` against the active dashboard domain (`SOIL_NODE` -> `/dashboard/soil`, `WATER_QUALITY_NODE` -> `/dashboard/water`, `WATER_TANK_NODE` -> `/dashboard/reservoir`).
+   - If the device matches the current domain, the system updates `selectedDeviceId` in `DeviceContext` and refreshes in-domain telemetry.
+   - If the device belongs to a different domain, the frontend updates `selectedDeviceId` and synchronously navigates via client-side router (`router.push`) to the corresponding domain dashboard BEFORE rendering telemetry cards, eliminating race conditions and preventing transient "Not a Soil/Water Monitoring Device" banners.
 4. The system loads the selected device's latest status and data.
 5. All device-specific components update consistently.
 6. The selected device is retained in-memory during active navigation. Persistent restoration of previously/last-accessed device history across logins is removed (`DEC-DEV-029`), while all telemetry/command/assignment/audit history remains 100% intact.
@@ -2105,20 +2111,26 @@ No command is created until explicit modal confirmation.
 
 **Main success flow:**
 
-1. The next protected request fails session validation.
-2. The server returns `401`.
-3. The frontend clears protected local state.
-4. The user is redirected to login.
-5. Unsaved non-sensitive form data may be handled according to policy.
+1. The client-side session manager (`SessionManager.tsx`) computes authoritative idle and absolute deadlines from server session metadata (`expiresAt`, `idleTimeoutMs = 30m`, `absoluteLifetimeMs = 8h`).
+2. Qualifying physical user activity (keystroke, pointer move, click, touch, scroll) updates local activity timestamps and triggers throttled server touches (`GET /api/v1/auth/session` with `touchLastSeen: true`, throttled to at most once per 60 seconds).
+3. Passive SSE events, background polling loops, and liveness health checks include the `x-background-check: "1"` request header (`touchLastSeen: false`), ensuring passive background activity cannot artificially prevent idle session expiration.
+4. When either the idle timeout (30 minutes of physical inactivity) or the absolute session lifetime (8 hours from login) is reached:
+   - The primary tab immediately revokes local session credentials and redirects the user to `/login?reason=expired`.
+   - The primary tab broadcasts an atomic `session_expired` payload via `localStorage` storage events to all open browser tabs.
+   - Secondary tabs receive the `storage` event, validate payload authenticity (discarding stale events older than 60 seconds or mismatching session IDs), clear local state, and immediately redirect to `/login?reason=expired`.
+5. If an unexpired client makes a server request after server-side revocation:
+   - The server rejects the request with HTTP 401 Unauthorized (`SESSION_EXPIRED` or `UNAUTHENTICATED`).
+   - The frontend clears protected local state and redirects to `/login?reason=expired`.
+6. Unsaved non-sensitive form data is cleared; sensitive session tokens are purged from memory.
 
-**Alternative flows:** Silent session renewal if securely implemented.
-**Error flows:** Protected cached data must not remain visible indefinitely.
-**Postconditions:** User must authenticate again.
+**Alternative flows:** Active physical interaction seamlessly extends the idle window up to the absolute 8-hour ceiling without requiring full re-login.
+**Error flows:** Protected cached data must not remain visible indefinitely across any tab. Multi-tab event handlers guard against replay, NaN timestamps, and self-reflection loops.
+**Postconditions:** User is signed out across all tabs; must authenticate again at `/login`.
 **Required permissions:** None after expiry.
 **Relevant account statuses:** Any.
-**UI states:** Session expired, login.
-**Audit events:** Optional session-expiry event.
-**Open decisions:** Session duration and refresh policy.
+**UI states:** Session expired redirect, login with expiration notice toast.
+**Audit events:** Optional session-expiry event (`SESSION_EXPIRED`).
+**Open decisions:** None. Fully resolved per `TASK-0215` (30m idle, 8h absolute, passive request isolation, multi-tab broadcast).
 
 ---
 

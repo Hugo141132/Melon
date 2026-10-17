@@ -330,6 +330,36 @@ The 2026-10-16 repair batch refines the shared OTP code input layout, dashboard 
 3. **Device Management Update Toast Interpolation (`DEC-DEV-040`):**
    - Toast notifications interpolate the persisted device name dynamically (`t('deviceUpdated', { name: device.name })`), preventing raw `{name}` placeholder leakage to the user.
 
+### 1.14 Multi-Domain Repair Batch UI/UX Governance (TASK-0504, TASK-0814, TASK-0507, TASK-0813, TASK-0215 / 2026-10-17)
+The 2026-10-17 repair batch introduces shared compact numbered pagination, numeric elapsed-time monitoring chart coordinates, cross-domain device switching synchronization, and global automatic session expiry UX:
+- **Frontend impact:** `MINOR`
+- **Selected UI direction:** `Premium Minimal Ops`
+- **Existing color template:** `UNCHANGED`
+- **Selected motion effects:** `Button hover`, `Skeleton loading`
+- **21st.dev MCP:** `REQUIRED` (Referenced for compact numbered pagination pattern matching Image 2 visual design)
+
+#### Presentation, Interaction & Visual Governance Rules
+1. **Shared Compact Numbered Pagination (`CompactPagination.tsx` / `TASK-0504`, `TASK-0814`):**
+   - **Visual Layout & Design Tokens**: Compact `<` `>` chevrons with `ChevronLeft` and `ChevronRight` icons, rounded pill active indicator, numbered buttons, ellipsis `···`, focus rings (`focus-visible:ring-2 focus-visible:ring-primary`), and responsive padding. Adheres strictly to Kebun Melon color tokens (`bg-app-surface-container-lowest`, `border-app-outline-variant/60`, `text-app-on-surface`, `bg-primary`, `text-on-primary`).
+   - **Bilingual Accessibility**: Every navigation button and parent container has fully localized aria labels (`common.pagination`, `common.previousPage`, `common.nextPage`, `common.pageNumber`, `history.paginationAriaLabel`, `faucet.paginationAriaLabel`), with active button marked via `aria-current="page"`.
+   - **Contract Preservation**: Integrates across `ReadingHistoryTable.tsx` (Soil & Water) and `FaucetHistoryTable.tsx` (Valve commands), preserving server-side pagination (5 rows/page for monitoring, 10 rows/page for valve commands).
+2. **Numeric Elapsed-Time Monitoring Charts X-Axis (`NPKChart.tsx`, `WaterNutrientChart.tsx` / `TASK-0504`):**
+   - **Coordinates**: Replaced categorical `dataKey="time"` with numeric timestamps (`dataKey="timestampMs"`, `type="number"`, `scale="time"`, `domain={timeDomain}`) across AreaChart and LineChart variants.
+   - **Proportional Elapsed-Time Spacing**: Coordinate spacing reflects real elapsed time between sensor readings (e.g. ~3:1 ratio for a 3-day gap vs a 1-day gap) rather than equal array-index spacing.
+   - **Tick Formatting & Collision Prevention**: Generates numeric millisecond ticks (`number[]`) with responsive display formatting (`formatTick`), preserving label collision handling (`minTickGap={25}`, `interval="preserveStartEnd"`).
+   - **Non-Degenerate Domain Padding**: For single-point or equal-timestamp datasets, `[tFirst - 3600000, tLast + 3600000]` (+/- 1 hour padding) prevents Recharts scale collapse, while multi-point datasets evaluate to `['dataMin', 'dataMax']`.
+   - **Browser Display Timezone**: Formats axis ticks and tooltips strictly using the runtime browser display timezone (`getDisplayTimezone()`, falling back to `Asia/Jakarta`), strictly distinguished from server-side notification timezone.
+   - **Data Preservation**: Complete data retrieval, date filtering, zero/null values, and tooltip details are 100% preserved.
+3. **Seamless Cross-Domain Device Switching (`DeviceSelector.tsx`, `DeviceContext.tsx` / `TASK-0507`, `TASK-0813`):**
+   - **Same-Domain**: Selecting a device within the same domain updates in-place immediately for instant responsiveness.
+   - **Cross-Domain**: Selecting a device belonging to another domain (`SOIL_NODE` ↔ `WATER_QUALITY_NODE` ↔ `WATER_TANK_NODE`) dispatches navigation without mutating in-memory `selectedDevice` before navigation completes, eliminating transient "Not a Soil/Water Monitoring Device" error banners on outgoing pages.
+   - **Destination Route Synchronization**: Upon mounting, the destination route reads `?deviceId=...` and synchronizes `DeviceContext`. If no device is specified in the URL or the current device belongs to another domain, candidate selection priority 4 falls back to the first device matching the active route domain.
+4. **Global Automatic Session Expiry Logout (`AuthContext.tsx` / `TASK-0215`):**
+   - Automatically unmounts protected content and redirects to `/login?reason=expired` upon 30-minute idle timeout or 8-hour absolute expiry without requiring user clicks or subsequent API requests.
+   - Synchronizes multi-tab invalidation smoothly via `localStorage` storage events.
+5. **Verification Status:**
+   - Manual website testing across `/soil`, `/water`, and `/controls` in English and Indonesian: `USER-REPORTED PASS on 2026-10-17`.
+
 ---
 
 ## 2. Source-of-Truth Hierarchy

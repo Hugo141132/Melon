@@ -567,6 +567,9 @@ GET /api/v1/auth/session
 
 **Authentication:** Optional or required depending on framework.
 
+**Headers:**
+- `x-background-check`: Optional (`"1"`). When provided, validates the session passively without updating `lastSeenAt` (`touchLastSeen: false`), ensuring that background health probes and idle watchers do not artificially extend idle session timeout.
+
 Response:
 
 ```json
@@ -576,10 +579,22 @@ Response:
     "authenticated": true,
     "user": {
       "id": "user-001",
+      "fullName": "System Owner",
+      "email": "owner@example.com",
       "role": "OWNER",
       "accountStatus": "ACTIVE",
-      "preferredLocale": "en"
+      "preferredLocale": "id"
+    },
+    "session": {
+      "id": "session-uuid-001",
+      "expiresAt": "2026-10-17T16:00:00.000Z",
+      "lastSeenAt": "2026-10-17T08:30:00.000Z",
+      "idleTimeoutMs": 1800000,
+      "absoluteLifetimeMs": 28800000
     }
+  },
+  "meta": {
+    "requestId": "req-1792170000000"
   }
 }
 ```
@@ -1646,9 +1661,11 @@ Server behaviour (`DEC-AUTH-113`):
 2. Owner protection invariant: verify target user does NOT have the `OWNER` role (returns HTTP 403 `FORBIDDEN_TARGET` if target is an Owner).
 3. Verify target user has verified email ownership (`emailVerifiedAt` is not null). Unverified targets return HTTP 409 `INVALID_STATUS`.
 4. Pre-mutation safety check: verify target user has NO operational records (`faucet_commands`, `alert_acknowledgements`, device access, telemetry, or audit log actor entries). If unexpected operational records exist, rejection is aborted with HTTP 409 `OPERATION_BLOCKED` and a truthful failure message.
-5. Transactional account deletion (`rejectPendingAdmin`): transactionally deletes the target user row from `users` along with all child records (`user_roles`, `account_approvals`, tokens, sessions, preferences).
-6. Insert audit log record (`ACCOUNT_REJECTED`) in `audit_logs` referencing target user ID and acting Owner before transaction commit.
-7. Commit transaction.
+5. Recipient capture: capture applicant recipient details (`email`, `fullName`, `preferredLocale`) safely prior to account deletion.
+6. Transactional account deletion (`rejectPendingAdmin`): transactionally deletes the target user row from `users` along with all child records (`user_roles`, `account_approvals`, tokens, sessions, preferences).
+7. Insert audit log record (`ACCOUNT_REJECTED`) in `audit_logs` referencing target user ID and acting Owner before transaction commit.
+8. Commit transaction.
+9. Post-commit notification: trigger bilingual rejection email (`sendAdminRejectionEmail` via Resend) to the applicant using captured details. Email dispatch failure is non-blocking and isolated from committed account deletion. Decoupled from agronomic sensor alerts (`alerts` table) and `/notifications`.
 
 Response (HTTP 200 OK):
 
@@ -2571,7 +2588,7 @@ Response item (`AlertDto`):
 
 The frontend translates `titleKey` and `messageKey`. Per `DEC-CTRL-098`, user-facing alert templates use friendly parameters (such as `{deviceName}`) without exposing internal `commandId` strings to operators. Raw `commandId` remains in `messageParams` and `sourceId` for diagnostic and audit referencing.
 
-### Rate Limiting & Client Consumption Invariants (DEC-ALRT-098 / Reconciled 2026-10-16)
+### Rate Limiting & Client Consumption Invariants (Reconciled 2026-10-16)
 
 - **Isolated Key Prefix:** `GET /api/v1/alerts` enforces an isolated rate limiter key (`keyPrefix: 'alerts'`) on its 30 requests/minute sliding window (`RATE_LIMIT_HISTORY_MAX = 30`), completely separated from telemetry history (`keyPrefix: 'history'`) and faucet command history (`keyPrefix: 'faucet_history'`).
 - **HTTP 429 Contract:** When the limit is exceeded, the endpoint returns HTTP 429 with `Retry-After` header and body `{ success: false, error: { code: 'TOO_MANY_REQUESTS', message: '...' } }`.

@@ -342,8 +342,19 @@ Registration email ownership verification shall enforce the following security c
 - **Resend Email Delivery Reliability**: Email dispatch via Resend applies `sendWithRetry` with bounded exponential backoff (up to 3 attempts, initial delay 300ms, max 2500ms) and randomized jitter (0–100ms) for transient errors, including HTTP 429 rate limits, HTTP 5xx server errors, and network timeouts (`ECONNRESET`, `ETIMEDOUT`). Structured error logs strictly redact API keys, tokens, and recipient secrets.
 - **Database Concurrency & Conflict Protection**: In `verifyEmailWithToken`, Prisma `P2034` transaction write conflicts are retried with bounded exponential backoff (3 attempts), returning `CONCURRENCY_CONFLICT` (HTTP 409) upon exhaustion and `TOKEN_ALREADY_USED` (HTTP 400) for `P2025` records.
 - **Transactional Email Canonical URL Security (`DEC-AUTH-114`)**: All email links (password reset, admin approval decision, verification codes) resolve base URLs strictly via `getCanonicalAppBaseUrl()`, derived exclusively from the validated server-side `APP_URL` (`validateServerEnv()`). Raw `process.env` bypasses, public client variables, and untrusted request Host headers are strictly forbidden to eliminate Host Header Injection, open-redirect vulnerabilities, and cross-environment account misdirection. Production strictly mandates explicit HTTPS and forbids localhost.
-- **Rate Limiting Key Isolation (`DEC-CTRL-099` / `DEC-ALRT-098`)**: Rate limiter buckets enforce strictly segregated key prefixes (`alerts` for alert listings, `faucet_history` for valve command history, and `history` for device telemetry) to prevent quota exhaustion cross-talk and denial-of-service conditions between monitoring polling, badge synchronization, and physical control tracking.
+- **Rate Limiting Key Isolation (`DEC-CTRL-099`)**: Rate limiter buckets enforce strictly segregated key prefixes (`alerts` for alert listings, `faucet_history` for valve command history, and `history` for device telemetry) to prevent quota exhaustion cross-talk and denial-of-service conditions between monitoring polling, badge synchronization, and physical control tracking.
 - **Delivery & Custom Sending Domain Scope**: Verification has been exercised using Resend test recipients and 6-digit code dispatch. In accordance with `DEC-AUTH-102`, the application configuration and email service have been reconciled to use the verified custom domain `Melon Madura <noreply@melonmadura.my.id>`. Live mailbox delivery to arbitrary external email recipients is subject to DNS verification of DKIM, SPF, and DMARC in the domain registrar's zone editor.
+
+### 7.10 Admin Account Rejection & Notification Security (SEC-AUTH-007 / DEC-AUTH-113 / TASK-0208)
+
+Owner rejection of pending Admin applicants shall enforce the following security controls:
+
+- **Pre-Mutation Safety Verification**: Target user must exist with `accountStatus = PENDING_APPROVAL`, target must have `ADMIN` role only (never `OWNER`), email must be verified (`emailVerifiedAt IS NOT NULL`), and target must have NO operational history (faucet commands, alert acknowledgements, device access, telemetry, or audit log actor records). Rejection is blocked with HTTP 409 `OPERATION_BLOCKED` if operational references exist.
+- **Pre-Deletion Recipient Capture**: Applicant contact details (`email`, `fullName`, `preferredLocale`) are safely extracted and retained in memory before the account row is deleted.
+- **Transactional Account Purging**: The target user row in `users` and all account-owned child records (credentials, tokens, sessions, preferences, role assignments, approvals) are permanently purged in a single interactive PostgreSQL transaction (`rejectPendingAdmin`), preventing orphaned inactive registrations and eliminating credential drift.
+- **Immutable Audit Trail Preservation**: A durable rejection audit record (`ACCOUNT_REJECTED`) is written to `audit_logs` referencing the non-FK target ID, acting Owner ID, and sanitized rejection metadata. Raw credentials and tokens are strictly excluded.
+- **Post-Commit Failure-Isolated Email Dispatch**: Bilingual rejection email notification (`sendAdminRejectionEmail` via Resend) is triggered strictly post-commit. Email transport failures (e.g. Resend rate limits or network issues) are safely logged and isolated, preventing rollback of the committed account deletion.
+- **Domain Decoupling**: Rejection notification is strictly decoupled from agronomic sensor alerts (`alerts` table) and `/notifications`.
 
 ### 7.9 Self-Service Verified Email Change Security (SEC-AUTH-006 / DEC-AUTH-106)
 
@@ -464,6 +475,18 @@ The approved session expiration limits are:
 - **Idle timeout**: 30 minutes of inactivity.
 - **Absolute expiry**: 8 hours maximum session lifetime (`SESSION_ABSOLUTE_LIFETIME_MS = 28800000`).
 - Revocation on logout, password change, suspension, or deactivation.
+
+#### 9.2.1 Client Multi-Tab Activity Path & Automated Expiry Security (SEC-SESS-003 / TASK-0215)
+
+To prevent orphaned UI state, unauthenticated data exposure, and session desynchronization across multiple browser tabs:
+
+- **Authoritative Server Timestamps**: Idle and absolute expiration deadlines are anchored to server-confirmed session timestamps (`expiresAt` and `lastSeenAt`) returned by `GET /api/v1/auth/session`.
+- **Qualifying Activity & Server Touch**: Only physical qualifying user interactions (`mousedown`, `keydown`, `touchstart`, `scroll`) throttled to 30s trigger an authoritative server touch (`touchLastSeen: true`), extending `lastSeenAt` in PostgreSQL.
+- **Passive Traffic Isolation**: Passive requests (SSE stream connection verification via `verifyStreamSessionActive`, background outage health checks) pass `touchLastSeen: false`, preventing automated background traffic from artificially keeping an idle session alive indefinitely.
+- **Multi-Tab Synchronization & Zero Secret Exposure**: Multi-tab synchronization via `localStorage` (`melon_session_activity`) broadcasts ONLY a non-secret session identifier (`sessionId`) and timestamp. Raw session tokens, cookies, or credentials are NEVER stored in web storage (`localStorage` / `sessionStorage`).
+- **Hardened Multi-Tab Event Guarding**: Receiving tabs listening to `storage` events validate that an active authenticated session exists, that `parsed.sessionId` matches the active session ID, that timestamp is finite and bounded (`mountTimestamp` <= ts <= `now + 60s`), and enforce the 8-hour absolute expiry.
+- **Server Authority Over Local Broadcast**: A local broadcast does NOT supersede server authority. Receiving tabs perform server revalidation (`validateSession(false, true)`), ensuring that if the session has been revoked or expired on the server, the tab invalidates immediately.
+- **Automated Client Expiry**: When idle timeout or absolute lifetime expires, `handleSessionExpired` automatically unmounts protected content, purges session-scoped storage (`kebun_melon_device_cache`), broadcasts `melon_session_sync`, dispatches `melon:unauthenticated`, triggers a non-blocking server logout (`POST /api/v1/auth/logout`), and redirects to `/login?reason=expired` without requiring user interaction.
 
 ### 9.3 Session Revocation
 
