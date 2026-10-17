@@ -39,11 +39,9 @@
 > - **Telemetry Chart Sorting (`useHistoricalMonitoring.ts`)**: Retrieves sequential keyset batches ordered by `[receivedAt, id]` from the database and performs deterministic global client sorting by `recordedAt ?? receivedAt` before deduplication and rendering.
 > - **Verification**: Operator localization website testing: `PASS (2026-10-17)`. Row-editor Save/Clear/Cancel, chart completeness, and alert lifecycle: `DEFERRED TO VPS TESTING`.
 >
-> **Reconciliation Note (2026-10-17 Raw Telemetry Discrete Presentation Patch / TASK-0504 Follow-up 3 / DEC-MON-096):** Calibrated soil and water monitoring charts to render discrete raw telemetry points without summarization or visual compression (`Frontend impact: MODERATE`). Selected UI direction: `Premium Minimal Ops`. Existing color template: `UNCHANGED`. Selected motion effects: `None`. 21st.dev MCP: `NOT REQUIRED`.
-> - **Release 08f0d79 Baseline & VPS Defect:** Release `08f0d79` was deployed to VPS (container recreation & health checks confirmed by operator; rollback pair preserved in `/opt/kebun-melon/.rollback-08f0d79.env`). VPS verification for Water Quality $\to$ Testing (90) $\to$ 30 Days $\to$ pH FAILED: readings appeared as a summarized trend line on a smoothed curve without visible individual readings.
-> - **Presentation-Layer Calibration:** Backend and API already delivered 100% of discrete rows. In `WaterNutrientChart.tsx` and `NPKChart.tsx`, replaced cubic curve smoothing (`type="monotone"`) with straight line segments (`type="linear"`), enabled explicit data point markers (`dot` and `activeDot`), added Recharts `<Brush>` zoom controls for dense time windows, and included truncated `readingId` in tooltips for unambiguous identification.
-> - **Sparse Labels Invariant:** Sparse X-axis labels (5–7 ticks) are maintained to prevent label collision; sparse ticks affect only label display, with zero reduction in plotted data points.
-> - **Testing & Verification Status:** Regression test suite `raw-readings-chart-pipeline.test.tsx` added (synthetic 90-reading fixture is regression coverage, not live VPS proof). Operator local website testing, CI gates, and VPS verification are PENDING. Task must not be marked DONE prior to successful operator browser verification on VPS.
+> **Reconciliation Note (2026-10-17 Reading-Sequence X-Axis Follow-up / TASK-0504 Follow-up 4 / DEC-MON-096):** Calibrated soil and water monitoring charts to render equidistant reading-sequence X-axis, straight linear segments, zero markers, no Brush, and overlap-inspecting tooltips (`Frontend impact: MODERATE`). Selected UI direction: `Premium Minimal Ops`. Existing color template: `UNCHANGED`. Selected motion effects: `None`. 21st.dev MCP: `NOT REQUIRED`.
+> - **Release e5e57fe Baseline & Deployment:** Deployed web release `e5e57fe` (full SHA: `e5e57fe1a3b9523e261b50a5a29793a2a8dc5b13`) to Nebula VPS. Web container healthy; gateway (`08f0d79`) and Caddy were not recreated. Rollback web image: `kebun-melon-web:295ee17`, baseline: `/opt/kebun-melon/.rollback-web-e5e57fe.env`.
+> - **Operator Verification Result:** **`OPERATOR-REPORTED PASS on 2026-10-17`**. Operator confirmed all checklist items passed: 1) Reading-sequence charts across Soil and Water Quality, 2) Clean lines without markers or Brush, 3) Original timestamps/values in tooltips, 4) Readable EN/ID axis labels, 5) Water Tank unchanged. Previous failed attempt (`FAILED on 295ee17` due to burst clumping) preserved as historical record. Task `TASK-0504 Follow-up 4` closed as `DONE`. CI quality gates pending operator push.
 
 ---
 
@@ -695,5 +693,9 @@ The following chart components, layout styles, and tooltip mechanisms were audit
   - **Overlap Feedback:** When `matchingItems.length > 1`, renders a multi-reading badge (`N readings`) and lists each individual reading with its distinct truncated `readingId` (`ID: ...`) and exact sensor value + unit.
   - **Unique Reading Display:** For unique points, renders the standard clean header with timestamp, `ID: ...`, and sensor value.
   - **Preserved Raw Values:** Unusual sensor values (such as negative pH present in test/source data) are rendered truthfully without clamping or replacement.
+
+- **Verification & Deployment Record:**
+  - Deployed to Nebula VPS under web release `e5e57fe` (`kebun-melon-web:e5e57fe`, gateway remains `08f0d79`). Web container healthy; gateway and Caddy were not recreated (`USER-CONFIRMED`). Rollback web: `kebun-melon-web:295ee17`, baseline: `/opt/kebun-melon/.rollback-web-e5e57fe.env`.
+  - Operator confirmed all checks passed: **`OPERATOR-REPORTED PASS on 2026-10-17`**. Task `TASK-0504 Follow-up 4` closed as `DONE`. (Previous attempt `FAILED on 295ee17` preserved as history). Unresolved alerts, recovery, and polling remain unchanged.
 
 <!-- Telemetry Chart Reading-Sequence X-Axis Audit Reconciled: 2026-10-17 -->

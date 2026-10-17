@@ -91,25 +91,23 @@
      - Operator verified live API response for location "Testing (90), 30 Days, pH" containing 90 points, 90 unique reading IDs, 90 distinct timestamps, `nextCursor=null`, and `truncated=false`. All 90 points reach the chart component data prop intact.
      - Diagnosis: 65 readings occurred within ~11 minutes, which an elapsed-time proportional scale compressed into $<0.03\%$ of horizontal chart width, causing visual clumping while the rest of the chart was empty.
      - Resolved via reading-sequence categorical X-axis ($x = 0, \dots, n-1$) with explicit label "Urutan pembacaan" / "Reading sequence", straight linear segments (`type="linear"`), clean line presentation (`dot={false}`, `activeDot={false}`, NO `<Brush>`), sparse timestamp ticks, exact tooltips, and combined NPK alignment.
-8. **2026-10-17 Reading-Sequence Presentation Patch Deployment Scope (TASK-0504 Follow-up 4 PENDING):**
-   - **Container Packaging & Rebuild Scope:**
-     - **Web Container (`kebun-melon-web`):** **REBUILD & RECREATE REQUIRED** using the **NEW commit SHA**. Code changes touch chart components (`WaterNutrientChart.tsx`, `NPKChart.tsx`), categorical sequence X-axis, label localization, clean linear styling (`dot={false}`, `activeDot={false}`, NO `<Brush>`), and per-reading tooltips. Must be built off-VPS for `linux/amd64`.
-     - **Gateway Container (`kebun-melon-gateway`):** **UNCHANGED** at `08f0d79`. Zero gateway code changes in this patch.
-     - **Do Not Reuse Image Tag:** Do not reuse image tag `08f0d79` for changed web code.
-   - **Infrastructure & Configuration Changes:**
-     - **Database Migrations:** **NOT REQUIRED** (Zero schema migrations needed).
-     - **Environment Variables:** **NOT REQUIRED** (Preserve existing `.env.production`; update only `WEB_IMAGE`).
-     - **Caddy Reverse Proxy (`Caddyfile`):** **NOT REQUIRED** (Zero Caddy changes).
-   - **Rollback Baseline Invariant:**
-     - Next web deployment must capture and preserve current web `08f0d79` as its rollback baseline without overwriting the historical rollback pair in `/opt/kebun-melon/.rollback-08f0d79.env`.
-   - **Deferred Operator Acceptance Checklist on Nebula VPS:**
-     1. Equidistant Reading-Sequence Positions: All readings receive uniform categorical spacing ($x = 0, \dots, n-1$), resolving visual clumping for burst readings.
-     2. Explicit Axis Label: Bottom X-axis clearly labeled "Urutan pembacaan" (`id`) / "Reading sequence" (`en`).
-     3. Exact Reading Values & Timestamps in Tooltips: Full sensor timestamp, exact metric value with unit, and discrete reading ID.
-     4. Clean Line Presentation: Straight linear connecting segments (`type="linear"`), `dot={false}`, `activeDot={false}`, NO `<Brush>`, clean container height.
-     5. Combined NPK Alignment: In `NPKChart`, all three series (N, P, K) align to identical categorical indices; nulls remain unshifted gaps (`connectNulls={false}`).
-     6. Sparse X-Axis Ticks Without Collisions: 5–7 evenly spaced index ticks formatted from original timestamps without label clipping.
-     7. Scope & Water Tank Exclusion: Applies to Soil and Water Quality historical charts; Water Tank is completely excluded (uses separate `WaterTankMonitoringCard.tsx`).
+8. **2026-10-17 Reading-Sequence Presentation Patch Deployment & Verification Record (TASK-0504 Follow-up 4 DONE — OPERATOR-REPORTED PASS):**
+   - **Deployment Execution:**
+     - **Web Container (`kebun-melon-web`):** Deployed release `e5e57fe` (full SHA: `e5e57fe1a3b9523e261b50a5a29793a2a8dc5b13`, image: `kebun-melon-web:e5e57fe`). Container recreation and health checks succeeded (`USER-CONFIRMED`).
+     - **Gateway Container (`kebun-melon-gateway`):** **UNCHANGED** at `08f0d79`. Was NOT recreated.
+     - **Caddy Reverse Proxy:** **UNCHANGED**. Was NOT recreated.
+     - **Database Migrations:** **NOT REQUIRED** (Zero schema migrations).
+   - **Rollback Baseline:**
+     - Rollback web image: `kebun-melon-web:295ee17`.
+     - Baseline file: `/opt/kebun-melon/.rollback-web-e5e57fe.env` (historical rollback pairs preserved in `/opt/kebun-melon/.rollback-08f0d79.env`).
+   - **Operator Acceptance Checklist Verification on Nebula VPS (OPERATOR-REPORTED PASS on 2026-10-17):**
+     1. **Reading-Sequence Charts Across Soil and Water Quality:** **PASS** — Uniform categorical spacing ($x = 0, \dots, n-1$) resolves visual clumping for burst readings (e.g. 65 readings in 11 minutes).
+     2. **Clean Lines Without Markers or Brush:** **PASS** — Clean straight linear segments (`type="linear"`), `dot={false}`, `activeDot={false}`, NO `<Brush>`, compact container height restored.
+     3. **Original Timestamps/Values in Tooltips:** **PASS** — Full sensor timestamps, exact metric values with units, and discrete reading IDs inspectable for both unique and overlapping timestamps.
+     4. **Readable EN/ID Axis Labels:** **PASS** — Bottom X-axis clearly labeled `"Urutan pembacaan"` (`id`) / `"Reading sequence"` (`en`).
+     5. **Water Tank Unchanged:** **PASS** — Reservoir Water Tank monitoring completely excluded and unchanged (`WaterTankMonitoringCard.tsx`).
+   - **Historical Invariant:** Previous failed attempt (`FAILED on 295ee17` due to burst clumping) preserved as historical record.
+   - **Scope Non-Extension Guard:** Unresolved alert escalation, auto-recovery, and background polling statuses remain unchanged (`PENDING`).
 
 ---
 

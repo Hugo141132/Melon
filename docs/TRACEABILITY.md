@@ -1090,12 +1090,12 @@ The following facts are verified in the traceability matrix regarding the curren
   - *Zero Aggregation & Data Preservation:* 100% of raw readings (all 90 reading IDs), exact original timestamps, unusual/negative values, zero/null values, and independent table pagination (`HISTORY_PAGE_SIZE = 5`) remain intact. Tooltips inspect full timestamps, exact values, and distinct reading IDs.
 - **Verification Evidence & Operational Restrictions:**
   - *Regression Test Suites:* Updated `apps/web/test/unit/chart-xaxis-ticks-labels.test.tsx` and `apps/web/test/unit/raw-readings-chart-pipeline.test.tsx` verifying reading-sequence index spacing, explicit axis labels, burst spacing (65 readings in 11m equally spaced), clean line segments (`type="linear"`, `dot={false}`, `activeDot={false}`, `capturedBrushProps.length === 0`), and combined NPK series alignment.
-  - *Agent Test Execution Prohibition:* Coding agent executed ZERO tests or builds during this turn. All 5 quality gates and website checks are reserved strictly for the operator.
-  - *Status:* `TASK-0504` remains `PENDING` until operator completes manual verification and passes CI gates.
+  - *Verification Status:* **`DONE` (`OPERATOR-REPORTED PASS on 2026-10-17`)**. Operator confirmed all checks in the VPS chart checklist passed on Nebula VPS: 1) Reading-sequence charts across Soil and Water Quality, 2) Clean lines without markers or Brush, 3) Original timestamps/values in tooltips, 4) Readable EN/ID axis labels, 5) Water Tank unchanged. Previous failed attempt (`FAILED on 295ee17`) preserved as historical record.
+  - *Scope Non-Extension Guard:* Does not extend this PASS to unresolved alert escalation, auto-recovery, or background polling (statuses remain `PENDING`).
 - **Deployment & Infrastructure Assessment:**
-  - *Web Container:* Rebuild and redeploy required with **NEW commit SHA**.
-  - *IoT Gateway, Database & Caddy:* **UNCHANGED** (Zero backend/API/database/gateway changes).
-  - *Rollback Baseline:* Next web deployment must capture current web `295ee17` as its rollback baseline without overwriting `/opt/kebun-melon/.rollback-08f0d79.env`.
+  - *Web Container:* Deployed release `e5e57fe` (full SHA: `e5e57fe1a3b9523e261b50a5a29793a2a8dc5b13`, image: `kebun-melon-web:e5e57fe`). Container recreation and health checks succeeded (`USER-CONFIRMED`).
+  - *IoT Gateway, Database & Caddy:* **UNCHANGED** (Gateway remains `08f0d79`; gateway and Caddy were not recreated; zero database schema migrations).
+  - *Rollback Baseline:* Rollback web image: `kebun-melon-web:295ee17`, baseline stored in `/opt/kebun-melon/.rollback-web-e5e57fe.env` (historical rollback pairs preserved in `/opt/kebun-melon/.rollback-08f0d79.env`).
 <!-- TASK-0504-Followup-4 Traceability Reconciled: 2026-10-17 -->
 
 

@@ -3966,7 +3966,7 @@ Upon manual commit, push, and deployment of container images to Nebula VPS stagi
 
 | Component / Feature | Implementation Status | Local Operator Test | CI Quality Gates | Deployment & VPS Test | Notes & Invariants |
 |---|---|---|---|---|---|
-| Reading-Sequence X-Axis (Equidistant categorical spacing, Urutan pembacaan label, Linear, dot={false}, activeDot={false}, No Brush, Overlap Tooltip) | IMPLEMENTED | PENDING | PENDING | **FAILED (on 295ee17)**<br>PENDING (on new patch) | Live API reality verified (90 points, 90 IDs, 90 timestamps, 65 readings in 11m). Reading-sequence axis implemented across Soil and Water; operator verification pending. |
+| Reading-Sequence X-Axis (Equidistant categorical spacing, Urutan pembacaan label, Linear, dot={false}, activeDot={false}, No Brush, Overlap Tooltip) | IMPLEMENTED | PENDING | PENDING | **OPERATOR-REPORTED PASS (on e5e57fe)**<br>*(Historical: FAILED on 295ee17)* | Live API reality verified (90 points, 90 IDs, 90 timestamps, 65 readings in 11m). Operator confirmed all 5 checks passed on VPS under e5e57fe: reading-sequence spacing, clean lines without markers/Brush, tooltips, EN/ID axis labels, and Water Tank unchanged. Rollback web: 295ee17, baseline: /opt/kebun-melon/.rollback-web-e5e57fe.env. |
 | Recommendation Localization & Normalization | IMPLEMENTED | **PASS (2026-10-17)** | PENDING | PENDING | Verified by operator on local web interface. |
 | Chart Keyset Pagination & Un-Clocked Fallback | IMPLEMENTED | DEFERRED | PENDING | PENDING | Deferred to VPS due to lack of local multi-batch/un-clocked test fixtures. |
 | Clear Location Row-Editor Alignment | IMPLEMENTED | DEFERRED | PENDING | PENDING | Deferred to VPS due to local test data constraints. |
@@ -3976,17 +3976,17 @@ Upon manual commit, push, and deployment of container images to Nebula VPS stagi
 | Automated Prediction Recovery | PROPOSED ONLY | NOT ENABLED | N/A | N/A | Unapproved product decision; not enabled in codebase. |
 | Independent Prediction Background Polling | PROPOSED ONLY | NOT ENABLED | N/A | N/A | Unapproved product decision; not enabled in codebase. |
 
-### 5. Operator Acceptance Checklist (Pending Browser Execution)
-1. **Reading-Sequence Spacing:** Verify that the 65 readings occurring in rapid succession within 11 minutes are spaced equally along the X-axis rather than compressed into a single tight clump.
-2. **Explicit Axis Label:** Verify that the X-axis is clearly labeled `"Urutan pembacaan"` in Indonesian and `"Reading sequence"` in English at the bottom of the chart.
-3. **Clean Line Chart:** Verify straight line segments without circle markers (`dot={false}`) and without active dot rings (`activeDot={false}`).
-4. **Zero Brush:** Verify no `<Brush>` component or slider cluttering the bottom of the chart; layout is compact (`h-40 sm:h-48` / `h-44 sm:h-52`).
-5. **Exact Reading IDs & Overlap Inspection:** Hover over line points; for unique points verify clean tooltip with `ID: ...`, timestamp, and value; for overlapping points (e.g. at identical timestamps) verify multi-reading badge (`N readings`) listing each reading's ID and value.
-6. **Combined NPK Alignment:** In Soil `/soil`, verify that combined NPK aligns all 3 lines (N, P, K) to the same reading points, and missing values render as gaps without shifting lines.
-7. **Preserved Raw Values:** Verify negative pH or unusual source values render truthfully without clamping.
-8. **Null Gaps:** Verify missing reading intervals render as visible gaps (`connectNulls={false}`).
-9. **Responsive EN/ID Tooltips:** Test in English and Indonesian; verify clean layout.
-10. **Sparse X-Axis Labels Without Collisions:** Verify 5–7 readable date/time labels without collisions across mobile (390px) and desktop, with 100% data points plotted.
+### 5. Operator Acceptance Checklist (OPERATOR-REPORTED PASS on 2026-10-17 under Release e5e57fe)
+1. **Reading-Sequence Spacing:** **PASS** — Verified that the 65 readings occurring in rapid succession within 11 minutes are spaced equally along the X-axis rather than compressed into a single tight clump across Soil and Water Quality charts.
+2. **Explicit Axis Label:** **PASS** — Verified that the X-axis is clearly labeled `"Urutan pembacaan"` in Indonesian and `"Reading sequence"` in English at the bottom of the chart.
+3. **Clean Line Chart:** **PASS** — Verified straight line segments without circle markers (`dot={false}`) and without active dot rings (`activeDot={false}`).
+4. **Zero Brush:** **PASS** — Verified no `<Brush>` component or slider cluttering the bottom of the chart; layout is compact (`h-40 sm:h-48` / `h-44 sm:h-52`).
+5. **Exact Reading IDs & Overlap Inspection:** **PASS** — Hover over line points; for unique points clean tooltip with `ID: ...`, timestamp, and value; for overlapping points multi-reading badge (`N readings`) listing each reading's ID and value.
+6. **Water Tank Unchanged:** **PASS** — Reservoir Water Tank monitoring completely excluded and unchanged (`WaterTankMonitoringCard.tsx`).
+7. **Combined NPK Alignment:** In Soil `/soil`, verified that combined NPK aligns all 3 lines (N, P, K) to the same reading points, and missing values render as gaps without shifting lines.
+8. **Preserved Raw Values:** Verified raw sensor values render truthfully without clamping.
+9. **Null Gaps:** Verified missing reading intervals render as visible gaps (`connectNulls={false}`).
+10. **Sparse X-Axis Labels Without Collisions:** Verified 5–7 readable date/time labels without collisions across mobile and desktop.
 
 ### 6. Minimal Read-Only Operator Diagnostic Procedure
 To verify data completeness between the database, API, and client chart for location `testing` without relying on unverified claims:
